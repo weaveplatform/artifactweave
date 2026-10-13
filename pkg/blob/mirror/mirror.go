@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sync"
@@ -179,6 +180,22 @@ func (s *Store) settle(ctx context.Context, sha string) error {
 	case <-ctx.Done():
 		return fmt.Errorf("blob/mirror: waiting for commits of %s: %w", sha, ctx.Err())
 	}
+}
+
+// WaitIdle waits until the background commits running when it is called have
+// finished and recorded their outcome, or ctx ends. A server calls it on
+// shutdown so a member finishing after the quorum is recorded rather than
+// left pending for no reason; a test calls it before looking at the members.
+func (s *Store) WaitIdle(ctx context.Context) error {
+	s.mu.Lock()
+	shas := slices.Collect(maps.Keys(s.inflight))
+	s.mu.Unlock()
+	for _, sha := range shas {
+		if err := s.settle(ctx, sha); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 var (
