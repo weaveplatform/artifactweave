@@ -1,6 +1,7 @@
 package acceptance
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -83,7 +84,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
 	sc.Step(`^I PATCH "([^"]*)" as admin with YAML:$`, w.patchYAMLAsAdmin)
 	sc.Step(`^I PATCH "([^"]*)" as admin with JSON:$`, w.patchJSONAsAdmin)
-	sc.Step(`^I (PUT|HEAD) "([^"]*)" as admin$`, w.sendEmptyAsAdmin)
+	sc.Step(`^I (PUT|HEAD|POST) "([^"]*)" as admin$`, w.sendEmptyAsAdmin)
 	sc.Step(`^the next request has header "([^"]*)" "([^"]*)"$`, w.nextHeader)
 	sc.Step(`^a file "([^"]*)" of (\d+) bytes$`, w.writeSizedFile)
 	sc.Step(`^the files "([^"]*)" and "([^"]*)" are identical$`, w.filesIdentical)
@@ -91,6 +92,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the server answered (\d+) to ([A-Z]+) "([^"]*)"$`, w.serverAnswered)
 	sc.Step(`^the server never answered (\d+) to ([A-Z]+) "([^"]*)"$`, w.serverNeverAnswered)
 	sc.Step(`^a file "([^"]*)" with content:$`, w.writeFile)
+	sc.Step(`^a zip file "([^"]*)" holding "([^"]*)" with content "([^"]*)"$`, w.writeZip)
 	sc.Step(`^the response status is (\d+)$`, w.statusIs)
 	sc.Step(`^the response body is "([^"]*)"$`, w.bodyIs)
 	sc.Step(`^the response body contains "([^"]*)"$`, w.bodyContains)
@@ -337,6 +339,24 @@ func (w *world) writeFile(name string, content *godog.DocString) error {
 		w.dir = dir
 	}
 	return os.WriteFile(filepath.Join(w.dir, name), []byte(content.Content), 0o600)
+}
+
+// writeZip writes a zip archive with one entry, for explode and archive
+// entry scenarios (a docstring cannot hold binary content).
+func (w *world) writeZip(name, entry, content string) error {
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	f, err := zw.Create(entry)
+	if err != nil {
+		return err
+	}
+	if _, err := io.WriteString(f, content); err != nil {
+		return err
+	}
+	if err := zw.Close(); err != nil {
+		return err
+	}
+	return w.writeFile(name, &godog.DocString{Content: buf.String()})
 }
 
 func (w *world) request(method, path, body string) error {

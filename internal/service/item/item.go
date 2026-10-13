@@ -173,9 +173,7 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 	return s.storeFile(ctx, d, b.Checksums, b.Size, declared)
 }
 
-// storeFile writes the item for stored content in one transaction: parent
-// folders, the item (replacing a file at the path), the blob reference (and
-// the release of an overwritten file's), the properties and the format hook.
+// storeFile writes the item for stored content in one transaction (putFile).
 func (s *Service) storeFile(
 	ctx context.Context,
 	d Deploy,
@@ -183,50 +181,70 @@ func (s *Service) storeFile(
 	size int64,
 	declared types.Checksums,
 ) (types.Item, error) {
-	now := s.now()
-	full := strings.Trim(d.Path, "/")
 	var stored types.Item
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		if err := s.ensureFolders(ctx, d.Target, path.Dir(full), d.By, now); err != nil {
-			return err
-		}
-		items := s.Store.Items()
-		it := types.Item{
-			RepoKey: d.Repo.Key, Cached: d.Cached, Name: full,
-			Size: size, Actual: actual, Original: declared, MimeType: MimeType(full),
-			Created: now, CreatedBy: d.By, Modified: now, ModifiedBy: d.By, Updated: now,
-		}
-		old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
-		switch {
-		case err == nil && old.Folder:
-			return fmt.Errorf("%w: %s is a folder", ErrConflict, full)
-		case err == nil:
-			it.Created, it.CreatedBy = old.Created, old.CreatedBy
-		case !errors.Is(err, store.ErrNotFound):
-			return fmt.Errorf("item: get %s: %w", full, err)
-		}
-		if stored, err = items.Put(ctx, it); err != nil {
-			return fmt.Errorf("item: put %s: %w", full, err)
-		}
-		if _, err := s.Store.Blobs().Ref(ctx, types.Blob{
-			Checksums: actual, Size: size, Created: now,
-		}, 1); err != nil {
-			return fmt.Errorf("item: reference blob: %w", err)
-		}
-		if old.ID != 0 && old.Actual.SHA256 != "" {
-			if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
-				return fmt.Errorf("item: release overwritten blob: %w", err)
-			}
-		}
-		if len(d.Properties) > 0 {
-			if err := items.PatchProperties(ctx, stored.ID, d.Properties, nil); err != nil {
-				return fmt.Errorf("item: properties of %s: %w", full, err)
-			}
-		}
-		return format.For(d.Repo.PackageType).Deployed(ctx, s.Store, d.Repo, stored)
+		var err error
+		stored, err = s.putFile(ctx, d, actual, size, declared, s.now())
+		return err
 	})
 	if err != nil {
 		return types.Item{}, err //nolint:wrapcheck // the transaction returns ours
+	}
+	return stored, nil
+}
+
+// putFile writes, inside the caller's transaction, the item for stored
+// content: parent folders, the item (replacing a file at the path), the blob
+// reference (and the release of an overwritten file's), the properties and
+// the format hook.
+func (s *Service) putFile(
+	ctx context.Context,
+	d Deploy,
+	actual types.Checksums,
+	size int64,
+	declared types.Checksums,
+	now time.Time,
+) (types.Item, error) {
+	full := strings.Trim(d.Path, "/")
+	if err := s.ensureFolders(ctx, d.Target, path.Dir(full), d.By, now); err != nil {
+		return types.Item{}, err
+	}
+	items := s.Store.Items()
+	it := types.Item{
+		RepoKey: d.Repo.Key, Cached: d.Cached, Name: full,
+		Size: size, Actual: actual, Original: declared, MimeType: MimeType(full),
+		Created: now, CreatedBy: d.By, Modified: now, ModifiedBy: d.By, Updated: now,
+	}
+	old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
+	switch {
+	case err == nil && old.Folder:
+		return types.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
+	case err == nil:
+		it.Created, it.CreatedBy = old.Created, old.CreatedBy
+	case !errors.Is(err, store.ErrNotFound):
+		return types.Item{}, fmt.Errorf("item: get %s: %w", full, err)
+	}
+	stored, err := items.Put(ctx, it)
+	if err != nil {
+		return types.Item{}, fmt.Errorf("item: put %s: %w", full, err)
+	}
+	if _, err := s.Store.Blobs().Ref(ctx, types.Blob{
+		Checksums: actual, Size: size, Created: now,
+	}, 1); err != nil {
+		return types.Item{}, fmt.Errorf("item: reference blob: %w", err)
+	}
+	if old.ID != 0 && old.Actual.SHA256 != "" {
+		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {
+			return types.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
+		}
+	}
+	if len(d.Properties) > 0 {
+		if err := items.PatchProperties(ctx, stored.ID, d.Properties, nil); err != nil {
+			return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
+		}
+	}
+	if err := format.For(d.Repo.PackageType).Deployed(ctx, s.Store, d.Repo, stored); err != nil {
+		return types.Item{}, err //nolint:wrapcheck // the format's own error
 	}
 	return stored, nil
 }
@@ -468,6 +486,12 @@ func (s *Service) Delete(ctx context.Context, t Target, by string) (store.Delete
 		return store.DeleteResult{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return res, nil
+}
+
+// Tree lists the item at t.Path (none for the repository root) and every
+// item below it, parents before their children.
+func (s *Service) Tree(ctx context.Context, t Target) ([]types.Item, error) {
+	return s.affected(ctx, t, strings.Trim(t.Path, "/"))
 }
 
 // affected lists the item at full (none for the root) and every item below.

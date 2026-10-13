@@ -445,7 +445,7 @@ func TestFoldersAndListing(t *testing.T) {
 	wantStatus(
 		t,
 		w.do("PUT", "/artifactory/libs-local/x.zip", "admin", "zip", "X-Explode-Archive", "true"),
-		http.StatusNotImplemented,
+		http.StatusBadRequest,
 	)
 }
 
