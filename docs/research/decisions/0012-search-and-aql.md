@@ -21,9 +21,10 @@ deprecated `archive` domains answer the documented parse error.
 
 Dialect traps are handled explicitly:
 
-- `$match` and `$nmatch` are case-sensitive; SQLite uses `GLOB` (or `LIKE` with
-  `PRAGMA case_sensitive_like`) with `*` and `?` escaped, PostgreSQL uses `LIKE` with an
-  `ESCAPE` clause.
+- `$match` and `$nmatch` are case-sensitive. SQLite uses `GLOB`, whose `*` and `?` are
+  AQL's wildcards, with `[` escaped so it cannot open a character class. PostgreSQL uses
+  `LIKE` with an `ESCAPE` clause: the escape character, `%` and `_` are escaped, then `*`
+  becomes `%` and `?` becomes `_`.
 - Each `@key` criterion compiles to its own `EXISTS` over the property table; `{"@*":v}`
   is an any-key `EXISTS`.
 - `.include("property")` explodes rows, so sort, offset and limit are applied to the

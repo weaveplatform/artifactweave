@@ -1,0 +1,1 @@
+items.find({"type":"any","path":{"$ne":"."},"$or":[{"$and":[{"repo":"libs-local","path":{"$match":"org/*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","type","size")

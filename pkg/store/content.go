@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -107,6 +108,12 @@ type ItemStore interface {
 	// Usage returns content totals per repository and cache, ordered by
 	// (repository, cached).
 	Usage(ctx context.Context) ([]RepoUsage, error)
+	// Search runs an AQL items query: the matching items in the query's
+	// order (then by ID), after its offset and within its limit, or within
+	// o.Limit when it has none. Hits carry their properties only when the
+	// query includes them. Every backend returns the same rows in the same
+	// order as aql.Select.
+	Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error)
 
 	// Properties returns the item's properties (empty when it has none).
 	// This and the other property and statistics methods return ErrNotFound

@@ -94,7 +94,7 @@ operators `$eq`, `$ne`, `$match`, `$nmatch`, `$gt`, `$lt`, property criteria `@k
 `type` in `any | file | folder`, and the `include`, `sort`, `offset`, `transitive`, `limit`
 suffixes. Build searches add the `builds` domain and the `artifact.module.build.*` fields
 after build-info lands. Every query shape the CLI generates is captured as a fixture under
-`pkg/aql/testdata` and executed on both SQL dialects with identical ordered output
+`pkg/aql/aqltest/testdata` and executed on both SQL dialects with identical ordered output
 ([ADR 0012](decisions/0012-search-and-aql.md)).
 
 ## Status-code contract summary
