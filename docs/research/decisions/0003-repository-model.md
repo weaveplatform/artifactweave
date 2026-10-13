@@ -47,6 +47,26 @@ repository is out of scope. `/v2/_catalog` lists across repositories. A reposito
 not collide with the first path segment of another repository's images; the validator
 rejects such keys.
 
+**Repositories API** (research 02). The behaviour where JFrog leaves room:
+- **Keys:** unique without regard to case, as Artifactory enforces them.
+- **Updates:** an update merges into the stored configuration. A field present replaces
+  the stored value, a field left out keeps it, `null` resets it to its default, and `key`,
+  `rclass` and `packageType` cannot change.
+- **Secrets:** reads mask the remote password and sensitive header values for everyone,
+  and an update that leaves the password out or sends a masked header back keeps the
+  stored secret.
+- **Non-admin reads:** callers other than administrators see the repositories a
+  permission lets them read, holding READ on a target that covers the repository, and
+  receive the public subset of its configuration. Path patterns are evaluated in P4.
+- **v2 read:** drops the package-specific field groups that do not apply to the
+  repository's package type.
+- **Deletes:** a delete removes the configuration, the content (for a remote, its cache
+  too), the package index and the repository's place in virtual repositories, in one
+  transaction. Blob references are released for garbage collection. Until the trash can
+  lands (#48) the content does not pass through it.
+- **Protected keys:** the trash can, support bundle and `artifactory-build-info`
+  repositories cannot be deleted.
+
 ## Rationale
 
 A single struct that is byte-compatible with the wire format removes a conversion layer

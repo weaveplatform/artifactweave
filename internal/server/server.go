@@ -66,6 +66,7 @@ func New(cfg Config) http.Handler {
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
 		normalizeContentType,
+		repositoriesSlash,
 	)
 	if cfg.Auth != nil {
 		r.Use(authenticate(cfg.Auth))
@@ -98,7 +99,7 @@ func New(cfg Config) http.Handler {
 	// Generated strict servers, one per spec, each under its service prefix
 	// with the management body limit.
 	r.Group(func(g chi.Router) {
-		g.Use(bodyLimit(managementBodyLimit))
+		g.Use(bodyLimit(managementBodyLimit), requestDetails)
 		strictOpts := artgen.StrictHTTPServerOptions{
 			RequestErrorHandlerFunc:  bindingError(http.StatusBadRequest),
 			ResponseErrorHandlerFunc: bindingError(http.StatusInternalServerError),

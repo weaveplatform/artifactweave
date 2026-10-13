@@ -14,7 +14,7 @@ These gates apply to every pull request and every phase in the
 | Unit tests | `make test` passes with `-race -shuffle=on` on Linux, macOS and Windows; tests never depend on ordering. Suites that need Docker skip cleanly when it is unreachable |
 | Coverage | The merged total stays at or above 95% and no package drops below 90%, enforced by `make cover` with `.testcoverage.yml`. Generated code (`*.gen.go`) and `cmd/` are excluded. New packages aim for 95% |
 | Contracts | Changes to stores, blob backends, format handlers or the remote fetcher run the matching suite: `storetest`, `blobtest`, the format conformance fixtures or the `fakeupstream` fault matrix |
-| Status codes | A handler's response codes come from the status-code column in [research 02](../research/02-artifactory-core-api-inventory.md) and [05](../research/05-platform-identity-and-security-apis.md), and the table-driven status test covers every new route |
+| Status codes | A handler's response codes come from the status-code column in [research 02](../research/02-artifactory-core-api-inventory.md) and [05](../research/05-platform-identity-and-security-apis.md), and the table-driven status test (`internal/server/status_test.go`) covers every new route; `TestStatusTableCoversImplemented` fails while an implemented route has no row |
 | Spec drift | `make generate` produces no diff under `internal/server/gen/` or `pkg/client/` |
 | Acceptance | The Linux `acceptance` job passes within its 15 minute budget. A feature that changes client-visible behaviour adds or updates a `.feature` file |
 | Security | `gosec` (through golangci) and `govulncheck` are clean. Secrets go through `internal/crypt` sealed columns; nothing logs a credential |
