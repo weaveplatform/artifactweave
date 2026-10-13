@@ -415,7 +415,7 @@ func TestRepairLease(t *testing.T) {
 	r.setPending(t, sha, "m2")
 	now := r.clk.now()
 	if ok, err := r.db.Leases().Acquire(ctx, types.Lease{
-		Name: repairLease, Holder: "elsewhere", Acquired: now, Expires: now.Add(time.Hour),
+		Name: defaultRepairLease, Holder: "elsewhere", Acquired: now, Expires: now.Add(time.Hour),
 	}, now); err != nil || !ok {
 		t.Fatal(ok, err)
 	}
@@ -433,7 +433,7 @@ func TestRepairLease(t *testing.T) {
 	if err != nil || !rep.Skipped {
 		t.Fatalf("concurrent pass = %+v, %v", rep, err)
 	}
-	if err := r.db.Leases().Release(ctx, repairLease, "elsewhere"); err != nil {
+	if err := r.db.Leases().Release(ctx, defaultRepairLease, "elsewhere"); err != nil {
 		t.Fatal(err)
 	}
 	if rep := r.repair(t); rep.Copied != 1 {
@@ -442,6 +442,25 @@ func TestRepairLease(t *testing.T) {
 	leases, err := r.db.Leases().List(ctx)
 	if err != nil || len(leases) != 0 {
 		t.Fatalf("the pass did not release its lease: %v %v", leases, err)
+	}
+}
+
+// TestRepairLeaseName checks that a mirror with its own lease name repairs
+// while the default lease is held, as the cold tier must beside the hot one.
+func TestRepairLeaseName(t *testing.T) {
+	ctx := context.Background()
+	r := newRig(t, 3, func(o *Options) { o.RepairLease = "cold-blob-mirror-repair" })
+	sha := putSettled(t, r.s, []byte("own lease")).Digests.SHA256
+	_ = r.f[2].Delete(ctx, sha)
+	r.setPending(t, sha, "m2")
+	now := r.clk.now()
+	if ok, err := r.db.Leases().Acquire(ctx, types.Lease{
+		Name: defaultRepairLease, Holder: "hot tier", Acquired: now, Expires: now.Add(time.Hour),
+	}, now); err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if rep := r.repair(t); rep.Skipped || rep.Copied != 1 {
+		t.Fatalf("repair under its own lease = %+v", rep)
 	}
 }
 

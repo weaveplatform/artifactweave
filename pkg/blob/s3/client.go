@@ -24,11 +24,18 @@ type ClientConfig struct {
 	// AWS default chain (environment, shared config, instance role).
 	AccessKey string
 	SecretKey string
+	// Profile selects a named profile of the shared AWS configuration, so
+	// stores in one process can use different accounts. Empty means the
+	// default profile (or AWS_PROFILE).
+	Profile string
 }
 
 // NewClient builds the S3 client and presigner for cfg.
 func NewClient(ctx context.Context, cfg ClientConfig) (*s3.Client, *s3.PresignClient, error) {
 	opts := []func(*config.LoadOptions) error{config.WithRegion(cfg.Region)}
+	if cfg.Profile != "" {
+		opts = append(opts, config.WithSharedConfigProfile(cfg.Profile))
+	}
 	if cfg.AccessKey != "" || cfg.SecretKey != "" {
 		opts = append(opts, config.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")))

@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	// repairLease names the lease every repair pass holds, so two passes,
+	// defaultRepairLease names the lease every repair pass holds, so two passes,
 	// in this process or another sharing the database, never overlap.
-	repairLease = "blob-mirror-repair"
+	defaultRepairLease = "blob-mirror-repair"
 	// repairLeaseTTL is how far ahead a pass takes the lease; it renews
 	// between steps and pages, so a crashed pass frees the lease this soon.
 	repairLeaseTTL = 5 * time.Minute
@@ -34,6 +34,7 @@ type repairState struct {
 	maxAttempts int
 	backoff     time.Duration
 	onRepair    func(RepairReport, error)
+	lease       string
 	holder      string
 	// running keeps two passes in this process apart; they share a lease
 	// holder, so the lease alone would let both through.
@@ -97,7 +98,7 @@ func (s *Store) Repair(ctx context.Context) (RepairReport, error) {
 		return rep, err
 	}
 	defer func() {
-		_ = s.repair.leases.Release(context.WithoutCancel(ctx), repairLease, s.repair.holder)
+		_ = s.repair.leases.Release(context.WithoutCancel(ctx), s.repair.lease, s.repair.holder)
 	}()
 	for _, step := range []func(context.Context, *RepairReport) error{
 		s.repairPending, s.repairDeletes, s.backfill,
@@ -114,18 +115,18 @@ func (s *Store) Repair(ctx context.Context) (RepairReport, error) {
 
 // lostLease reports a lease taken over mid-pass, which only happens when a
 // step outran repairLeaseTTL.
-func (*Store) lostLease(held bool) error {
+func (s *Store) lostLease(held bool) error {
 	if held {
 		return nil
 	}
-	return fmt.Errorf("blob/mirror: repair lease %s was taken over", repairLease)
+	return fmt.Errorf("blob/mirror: repair lease %s was taken over", s.repair.lease)
 }
 
 // renew takes or extends the repair lease and reports whether it is held.
 func (s *Store) renew(ctx context.Context) (bool, error) {
 	now := s.now()
 	held, err := s.repair.leases.Acquire(ctx, types.Lease{
-		Name: repairLease, Holder: s.repair.holder, Task: "blob mirror repair",
+		Name: s.repair.lease, Holder: s.repair.holder, Task: "blob mirror repair",
 		Acquired: now, Expires: now.Add(repairLeaseTTL),
 	}, now)
 	if err != nil {
