@@ -138,6 +138,10 @@ type Options struct {
 	Blobs store.BlobIndex
 	// Leases holds the lease that keeps two repair passes from overlapping.
 	Leases store.LeaseStore
+	// RepairLease names the lease a pass holds; empty means
+	// "blob-mirror-repair". Two mirrors sharing a lease store (the hot and
+	// cold tiers) need different names, or each pass of one skips the other.
+	RepairLease string
 	// RepairBatch, RepairMaxAttempts and RepairBackoff tune a pass; zero
 	// means the defaults.
 	RepairBatch       int
@@ -262,6 +266,7 @@ func New(o Options) (*Store, error) {
 		now:       o.Now,
 		repair: repairState{
 			blobs: o.Blobs, leases: o.Leases, onRepair: o.OnRepair,
+			lease:       cmp.Or(o.RepairLease, defaultRepairLease),
 			batch:       cmp.Or(o.RepairBatch, DefaultRepairBatch),
 			maxAttempts: cmp.Or(o.RepairMaxAttempts, DefaultRepairMaxAttempts),
 			backoff:     cmp.Or(o.RepairBackoff, DefaultRepairBackoff),

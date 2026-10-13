@@ -20,8 +20,8 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P1 Data model and API schemas | Done (2026-10-13) | Derived from the 637 cached JFrog blocks; full in-scope OpenAPI surface authored with our own field descriptions; parity baseline shrinks accordingly |
 | P1b Enterprise products: specs and model | Done (2026-10-13) | 574 of 635 JFrog operations at parity, 0 divergent; the 61 in the baseline are Mission Control, MyJFrog, bridges and JFConnect only. Seven services; research 16, decisions 0021 to 0026; 27 new tables in research 15 |
 | P2 Stores | Done (2026-10-13) | Store contracts for every entity in research 15 (27 concerns), in-memory reference store, SQLite and PostgreSQL stores over one dialect layer with 71 tables in five migrations, the `storetest` contract suite (62 subtests) passing on all four backends, `migrate up/down/version`, `keys rotate` with versioned master keys, durable S3 upload sessions; merged coverage 97.7%. Stale-upload reaping moves to the P3 GC task; build-info tables to P5 |
-| P2b Cloud blob storage and mirroring | In progress | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22), tracked in GitHub milestone "Cloud blob storage and mirroring"; design in research 18 and decisions 0027 and 0028 |
-| P3 Repositories, generic artifacts, CLI AQL shape | Not started | |
+| P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) moves to P3, after the storage endpoints (#48) |
+| P3 Repositories, generic artifacts, CLI AQL shape | In progress | Epic #52, one GitHub issue per task (#42 to #51) |
 | P4 Identity and authorization | Not started | **M1** |
 | P5 Full AQL, searches, build-info | Not started | |
 | P6 Docker/OCI | Not started | |
@@ -351,6 +351,18 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 5. `pkg/aql` limited to the CLI's query shape (`items.find` with `$or`/`$and`, `$match`, `$ne`, `@prop`, `type`, `include`, `sort`, `offset`, `transitive`, `limit`), with fixtures captured from `jf rt s/dl/del/cp/mv/sp` and run on both dialects.
 6. Minimal admin Basic auth and the seeded `admin`, `anonymous`, `readers`, `Anything`, `Any Remote` principals and targets; `artifactory-build-info` repo.
 7. YAML descriptor PATCH for `localRepositories`, `remoteRepositories`, `virtualRepositories`, `proxies`, `propertySets`, `repoLayouts` with null deletes; `artifactweave config apply`.
+
+**Tracking.** Epic #52 holds one GitHub issue per PR:
+1. Open the metadata store and blob store in `serve` (#42).
+2. Basic auth and the seeded principals (#43).
+3. Repositories API (#44).
+4. Deploy and download generic artifacts (#45).
+5. Storage API: item info, listings and properties (#46).
+6. Copy, move and archives (#47).
+7. Trash can, garbage collection, storage summary and zap (#48), then the mirror's storage administration (#18).
+8. AQL for the JFrog CLI's query shape (#49).
+9. Descriptor PATCH and `artifactweave config apply` (#50).
+10. The exit checks: the JFrog CLI round trip and the Terraform job (#51).
 
 **Exit criteria**
 - `jf rt u/dl/s/cp/mv/del/sp` round-trip a tree, including a checksum-deploy hit for a file over 10 KiB and a split download.
