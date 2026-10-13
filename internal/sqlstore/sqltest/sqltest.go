@@ -1,8 +1,9 @@
 // Package sqltest provides PostgreSQL for the store contract runs. It
 // starts one container per test binary with testcontainers-go and skips the
-// calling test where Docker is unavailable (decision 0015), so the suite
-// runs everywhere and the PostgreSQL half runs in the Linux CI jobs. Set
-// ARTIFACTWEAVE_TEST_POSTGRES_DSN to use an existing server instead.
+// calling test where Docker cannot run Linux containers (decision 0015), so
+// the suite runs everywhere and the PostgreSQL half runs in the Linux CI
+// jobs. Set ARTIFACTWEAVE_TEST_POSTGRES_DSN to use an existing server
+// instead.
 package sqltest
 
 import (
@@ -12,9 +13,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/testcontainers/testcontainers-go"
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
+	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/containertest"
 	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
 )
 
@@ -29,16 +30,14 @@ var (
 )
 
 // PostgresDSN returns a DSN for the PostgreSQL server shared by the test
-// binary, or skips t when there is none and Docker is unavailable.
+// binary, or skips t when there is none and Docker cannot run Linux
+// containers.
 func PostgresDSN(t *testing.T) string {
 	t.Helper()
 	if dsn := os.Getenv("ARTIFACTWEAVE_TEST_POSTGRES_DSN"); dsn != "" {
 		return dsn
 	}
-	if testing.Short() {
-		t.Skip("short mode")
-	}
-	testcontainers.SkipIfProviderIsNotHealthy(t)
+	containertest.RequireLinux(t)
 	pgOnce.Do(func() {
 		ctx := context.Background()
 		c, err := tcpostgres.Run(ctx, postgresImage,

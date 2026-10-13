@@ -11,6 +11,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
 
+	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/containertest"
 	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
 	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob/blobtest"
 )
@@ -27,10 +28,7 @@ const minioImage = "cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15f
 // exercised end to end. It needs Docker and skips without it (decision
 // record 0015); CI runs it on Linux.
 func TestContractOnMinIO(t *testing.T) {
-	if testing.Short() {
-		t.Skip("short mode")
-	}
-	testcontainers.SkipIfProviderIsNotHealthy(t)
+	containertest.RequireLinux(t)
 	ctx := context.Background()
 	ctr, err := tcminio.Run(ctx, minioImage)
 	testcontainers.CleanupContainer(t, ctr)

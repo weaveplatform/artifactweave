@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
@@ -288,6 +289,9 @@ func TestCommitFailures(t *testing.T) {
 func TestSyncDirectory(t *testing.T) {
 	if err := syncDirectory(t.TempDir()); err != nil {
 		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("directories are not synced on Windows, so a missing one is not detected")
 	}
 	if err := syncDirectory(filepath.Join(t.TempDir(), "missing")); err == nil {
 		t.Fatal("syncing a missing directory must fail")

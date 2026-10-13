@@ -22,3 +22,6 @@ exclude:
     # Test harness that starts PostgreSQL for the contract runs; its branches
     # are container start-up failures.
     - ^internal/sqlstore/sqltest/
+    # Skips container tests where Docker cannot run Linux containers; its
+    # branches are the skip paths of other platforms.
+    - ^internal/containertest/
