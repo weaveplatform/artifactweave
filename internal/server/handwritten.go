@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
@@ -22,6 +23,28 @@ import (
 // clients, which is the wrong signal (research 10).
 func registerHandwrittenStubs(r chi.Router, logger *slog.Logger) {
 	existing := registeredRoutes(r)
+	for _, op := range handwrittenOps() {
+		for _, pattern := range chiPatterns(op.path) {
+			key := op.method + " " + pattern
+			if existing[key] {
+				continue
+			}
+			existing[key] = true
+			r.Method(op.method, pattern, handwrittenStub(op.method, op.path))
+			logger.Debug("hand-written operation stubbed", "method", op.method, "path", op.path)
+		}
+	}
+}
+
+// handwrittenOp is a hand-written operation: its method and its full path
+// template, the spec's server prefix included.
+type handwrittenOp struct{ method, path string }
+
+// handwrittenOps lists the routed hand-written operations of every embedded
+// spec. They are parsed and validated once per process: that takes seconds
+// under the race detector, and tests build a router per test.
+var handwrittenOps = sync.OnceValue(func() []handwrittenOp {
+	var ops []handwrittenOp
 	for _, name := range api.SpecFiles {
 		doc, err := loadEmbeddedSpec(name)
 		if err != nil {
@@ -44,25 +67,12 @@ func registerHandwrittenStubs(r chi.Router, logger *slog.Logger) {
 				if v, ok := op.Extensions["x-not-routed"]; ok && v == true {
 					continue
 				}
-				for _, pattern := range chiPatterns(prefix + path) {
-					key := method + " " + pattern
-					if existing[key] {
-						continue
-					}
-					existing[key] = true
-					r.Method(method, pattern, handwrittenStub(method, prefix+path))
-					logger.Debug(
-						"hand-written operation stubbed",
-						"method",
-						method,
-						"path",
-						prefix+path,
-					)
-				}
+				ops = append(ops, handwrittenOp{method: method, path: prefix + path})
 			}
 		}
 	}
-}
+	return ops
+})
 
 // chiPatterns converts an OpenAPI path template to chi patterns. A trailing
 // parameter is registered twice, once as a single segment and once as a

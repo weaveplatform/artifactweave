@@ -36,6 +36,9 @@ type Options struct {
 	Concurrency int
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
+	// Hash is the cost of the dummy hash checked for unknown users; the
+	// zero value means the production parameters. Tests set tiny costs.
+	Hash HashParams
 }
 
 // Authenticator verifies credentials against the user store.
@@ -58,7 +61,7 @@ func NewAuthenticator(
 ) (*Authenticator, error) {
 	var pw [16]byte
 	_, _ = rand.Read(pw[:])
-	dummy, err := HashPassword(string(pw[:]))
+	dummy, err := HashPasswordWith(o.Hash, string(pw[:]))
 	if err != nil {
 		return nil, err
 	}

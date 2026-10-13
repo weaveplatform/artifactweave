@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -22,10 +21,8 @@ import (
 func seededHandler(t *testing.T) (http.Handler, *inmem.Store) {
 	t.Helper()
 	db := inmem.New()
-	if _, err := auth.Seed(context.Background(), db, "pw", time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
+	cheapSeed(t, db)
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,10 +126,8 @@ func TestAuthentication(t *testing.T) {
 func TestAuthenticatePrincipal(t *testing.T) {
 	db := inmem.New()
 	ctx := context.Background()
-	if _, err := auth.Seed(ctx, db, "pw", time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
+	cheapSeed(t, db)
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +173,7 @@ func TestAuthenticateStoreFailures(t *testing.T) {
 	a, err := auth.NewAuthenticator(
 		brokenUsers{db.Users()},
 		brokenSettings{db.Settings()},
-		auth.Options{},
+		auth.Options{Hash: testHash},
 	)
 	if err != nil {
 		t.Fatal(err)

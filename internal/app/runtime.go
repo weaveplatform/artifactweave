@@ -54,7 +54,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err := applyBootstrap(ctx, cfg, st, log); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{})
+	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{Hash: authHash})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}

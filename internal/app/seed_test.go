@@ -111,7 +111,11 @@ func (s hiddenSettings) Get(ctx context.Context, key string, into any) error {
 func TestSeedLostRaceRemovesPasswordFile(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	if _, err := auth.Seed(ctx, db, "winner", time.Now()); err != nil {
+	hash, err := auth.HashPasswordWith(authHash, "winner")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := auth.SeedHashed(ctx, db, hash, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	h := &hidden{Store: db}

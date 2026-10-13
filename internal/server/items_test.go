@@ -4,17 +4,13 @@ import (
 	"context"
 	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum here
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/argon2"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -40,35 +36,6 @@ type signingBlobs struct{ blob.Store }
 
 func (signingBlobs) PresignGet(_ context.Context, sha string, _ time.Duration) (string, error) {
 	return "https://signed.example/" + sha, nil
-}
-
-// cheapHash is an Argon2id hash of "pw" with minimal cost. Verification
-// reads the cost from the stored hash, so it checks like a real one while
-// sparing these tests the 64 MiB production hash per login, which is what
-// made them slow under the race detector.
-var cheapHash = func() []byte {
-	salt := []byte("0123456789abcdef")
-	key := argon2.IDKey([]byte("pw"), salt, 1, 64, 1, 32)
-	b64 := base64.RawStdEncoding
-	return fmt.Appendf(nil, "$argon2id$v=%d$m=64,t=1,p=1$%s$%s",
-		argon2.Version, b64.EncodeToString(salt), b64.EncodeToString(key))
-}()
-
-// cheapSeed seeds db and gives the admin cheapHash.
-func cheapSeed(t *testing.T, db *inmem.Store) {
-	t.Helper()
-	ctx := context.Background()
-	if _, err := auth.Seed(ctx, db, "pw", time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	admin, err := db.Users().Get(ctx, auth.AdminUser)
-	if err != nil {
-		t.Fatal(err)
-	}
-	admin.PasswordHash = cheapHash
-	if err := db.Users().Update(ctx, admin); err != nil {
-		t.Fatal(err)
-	}
 }
 
 func newItemWorld(t *testing.T, anonymous bool) *itemWorld {
@@ -123,7 +90,7 @@ func newItemWorld(t *testing.T, anonymous bool) *itemWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

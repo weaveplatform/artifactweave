@@ -15,6 +15,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
+// authHash is the password hashing cost: the zero value, the production
+// parameters, everywhere but this package's tests, which lower it in an init
+// (hash_test.go). No configuration reaches it.
+var authHash auth.HashParams
+
 // InitialPasswordFile is where the first start writes a generated admin
 // password, under the data directory. A file with mode 0600 rather than a
 // log line, because logs are shipped and kept where the password must not be.
@@ -51,7 +56,11 @@ func seedPrincipals(
 			return fmt.Errorf("seed: %w", err)
 		}
 	}
-	seededNow, err := auth.Seed(ctx, st, password, time.Now())
+	hash, err := auth.HashPasswordWith(authHash, password)
+	if err != nil {
+		return fmt.Errorf("seed: %w", err)
+	}
+	seededNow, err := auth.SeedHashed(ctx, st, hash, time.Now())
 	if err != nil {
 		return err //nolint:wrapcheck // auth wraps its own errors
 	}

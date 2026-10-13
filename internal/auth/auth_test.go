@@ -19,7 +19,7 @@ import (
 // tens of milliseconds per hash, which the suite would pay hundreds of
 // times. Parsing the parameters from each hash is tested separately.
 func TestMain(m *testing.M) {
-	defaultParams = hashParams{memory: 64, time: 1, threads: 1}
+	defaultParams = HashParams{MemoryKiB: 64, Time: 1, Threads: 1}
 	os.Exit(m.Run())
 }
 
@@ -36,7 +36,7 @@ func TestHashAndCheck(t *testing.T) {
 	}
 	// A hash made with other parameters still verifies: they are read
 	// from the hash, not assumed.
-	other, err := hashWith(hashParams{memory: 128, time: 2, threads: 2}, "s3cret")
+	other, err := HashPasswordWith(HashParams{MemoryKiB: 128, Time: 2, Threads: 2}, "s3cret")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,6 +46,38 @@ func TestHashAndCheck(t *testing.T) {
 	h2, _ := HashPassword("s3cret")
 	if string(h) == string(h2) {
 		t.Fatal("two hashes of one password share a salt")
+	}
+}
+
+// TestProductionHashParams pins the production cost (RFC 9106's second
+// recommended option). TestMain lowers defaultParams for speed, so the pin
+// reads productionParams, which nothing can change.
+func TestProductionHashParams(t *testing.T) {
+	if got := productionParams(); got != (HashParams{MemoryKiB: 64 << 10, Time: 3, Threads: 4}) {
+		t.Fatalf("production hash parameters changed: %+v", got)
+	}
+}
+
+func TestHashParamsReachTheHashAndTheDummy(t *testing.T) {
+	cheap := HashParams{MemoryKiB: 32, Time: 1, Threads: 1}
+	h, err := HashPasswordWith(cheap, "pw")
+	if err != nil || !strings.HasPrefix(string(h), "$argon2id$v=19$m=32,t=1,p=1$") {
+		t.Fatalf("hash %q, %v", h, err)
+	}
+	db := inmem.New()
+	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Hash: cheap})
+	if err != nil || !strings.HasPrefix(string(a.dummy), "$argon2id$v=19$m=32,t=1,p=1$") {
+		t.Fatalf("dummy %q, %v", a.dummy, err)
+	}
+	if _, err := SeedHashed(context.Background(), db, h, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	admin, err := db.Users().Get(context.Background(), AdminUser)
+	if err != nil || string(admin.PasswordHash) != string(h) {
+		t.Fatalf("admin hash %q, %v", admin.PasswordHash, err)
+	}
+	if now, err := SeedHashed(context.Background(), db, h, time.Now()); now || err != nil {
+		t.Fatalf("second seed: %v %v", now, err)
 	}
 }
 
