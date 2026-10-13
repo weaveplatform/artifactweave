@@ -215,3 +215,76 @@ func TestCheckKeypairs(t *testing.T) {
 		t.Fatalf("store failure: %v", err)
 	}
 }
+
+type failingProjects struct {
+	store.ProjectStore
+	scope string
+}
+
+func (f failingProjects) Environments(
+	ctx context.Context,
+	key string,
+) ([]types.Environment, error) {
+	if key == f.scope {
+		return nil, errors.New("boom")
+	}
+	return f.ProjectStore.Environments(ctx, key) //nolint:wrapcheck // test double
+}
+
+func TestCheckEnvironments(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	if err := db.Projects().Create(ctx, types.Project{Key: "proj"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range []types.Environment{{Name: "QA"}, {ProjectKey: "proj", Name: "proj-stage"}} {
+		if err := db.Projects().CreateEnvironment(ctx, e); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c := repo.Config{Key: "r", Environments: []string{"dev", "qa", "DEV"}}
+	if err := CheckEnvironments(ctx, db.Projects(), &c); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(c.Environments, ","); got != "DEV,QA" {
+		t.Fatalf("environments %s: rewritten to the stored spelling, once each", got)
+	}
+	if err := CheckEnvironments(ctx, db.Projects(), &repo.Config{Key: "r"}); err != nil {
+		t.Fatalf("no environments: %v", err)
+	}
+	scoped := repo.Config{
+		Key:          "r",
+		ProjectKey:   "proj",
+		Environments: []string{"PROJ-STAGE", "prod"},
+	}
+	if err := CheckEnvironments(ctx, db.Projects(), &scoped); err != nil ||
+		strings.Join(scoped.Environments, ",") != "proj-stage,PROD" {
+		t.Fatalf("project environment: %v %v", scoped.Environments, err)
+	}
+	// Another project's environment is not this repository's.
+	err := CheckEnvironments(
+		ctx,
+		db.Projects(),
+		&repo.Config{Key: "r", Environments: []string{"proj-stage"}},
+	)
+	if err == nil || !strings.Contains(err.Error(), "Environment 'proj-stage' does not exist") {
+		t.Fatalf("outside its project: %v", err)
+	}
+	err = CheckEnvironments(
+		ctx,
+		db.Projects(),
+		&repo.Config{Key: "r", ProjectKey: "ghost", Environments: []string{"DEV"}},
+	)
+	if err != nil {
+		t.Fatalf("a project without environments: %v", err)
+	}
+	for scope, c := range map[string]repo.Config{
+		"":     {Key: "r", Environments: []string{"DEV"}},
+		"proj": {Key: "r", ProjectKey: "proj", Environments: []string{"DEV"}},
+	} {
+		if err := CheckEnvironments(ctx, failingProjects{db.Projects(), scope}, &c); err == nil ||
+			!strings.Contains(err.Error(), "boom") {
+			t.Fatalf("store failure for %q: %v", scope, err)
+		}
+	}
+}

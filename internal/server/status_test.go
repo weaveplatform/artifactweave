@@ -318,10 +318,13 @@ func repositoryStatusRows() []statusCase {
 		{create, r + "/LIBS-LOCAL", "admin", `{"rclass":"local"}`, 400},
 		{create, r + "/no-url", "admin", `{"rclass":"remote"}`, 400},
 		{create, r + "/new-virt", "admin", `{"rclass":"virtual","repositories":["ghost"]}`, 400},
+		{create, r + "/env-local", "admin", `{"rclass":"local","environments":["dev"]}`, 200},
+		{create, r + "/bad-env", "admin", `{"rclass":"local","environments":["nope"]}`, 400},
 		{create, r + "/user-local", "user", `{"rclass":"local"}`, 403},
 		{create, r + "/anon-local", "", `{"rclass":"local"}`, 401},
 
 		{update, r + "/libs-local", "admin", `{"description":"updated"}`, 200},
+		{update, r + "/libs-local", "admin", `{"environments":["nope"]}`, 400},
 		{update, r + "/libs-local", "admin", `{"rclass":"remote"}`, 400},
 		{update, r + "/missing", "admin", `{"description":"x"}`, 404},
 		{update, r + "/libs-local", "user", `{"description":"x"}`, 403},
@@ -428,6 +431,13 @@ func descriptorStatusRows() []statusCase {
 	return []statusCase{
 		{patch, path, "admin", "localRepositories:\n  patch-local:\n    type: generic\n", 200},
 		{patch, path, "admin", "localRepositories:\n  patch-bad:\n    nonsense: 1\n", 400},
+		{
+			patch,
+			path,
+			"admin",
+			"localRepositories:\n  patch-env:\n    type: generic\n    environments: [nope]\n",
+			400,
+		},
 		{patch, path, "", "localRepositories: {}", 401},
 		{patch, path, "anonymous", "localRepositories: {}", 401},
 		{patch, path, "user", "localRepositories: {}", 403},

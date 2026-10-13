@@ -91,6 +91,44 @@ func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) erro
 	return nil
 }
 
+// CheckEnvironments rejects an environment c names that does not exist:
+// DEV, PROD or a stored global environment, or one of the repository's
+// project's environments (decision 0013). Names compare without regard to
+// case, and each is rewritten to the environment's stored spelling, because
+// renaming or deleting an environment finds its repositories by that
+// spelling: a repository keeping "dev" would be missed when DEV is renamed.
+func CheckEnvironments(ctx context.Context, projects store.ProjectStore, c *repo.Config) error {
+	if len(c.Environments) == 0 {
+		return nil
+	}
+	known := slices.Clone(types.BuiltinEnvironments)
+	scopes := []string{""}
+	if c.ProjectKey != "" {
+		scopes = append(scopes, c.ProjectKey)
+	}
+	for _, scope := range scopes {
+		envs, err := projects.Environments(ctx, scope)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			return fmt.Errorf("repos: environments %q: %w", scope, err)
+		}
+		for _, e := range envs {
+			known = append(known, e.Name)
+		}
+	}
+	out := make([]string, 0, len(c.Environments))
+	for _, name := range c.Environments {
+		i := slices.IndexFunc(known, func(k string) bool { return strings.EqualFold(k, name) })
+		if i < 0 {
+			return badRequest("Environment '%s' does not exist", name)
+		}
+		if !slices.Contains(out, known[i]) {
+			out = append(out, known[i])
+		}
+	}
+	c.Environments = out
+	return nil
+}
+
 // Merge merges an update body into the stored configuration with
 // Artifactory's rules: a field present replaces the stored value, a field
 // left out keeps it, and null resets it to its default. The key, class and

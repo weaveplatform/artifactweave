@@ -306,3 +306,44 @@ func TestStoredDocumentThatIsNotJSON(t *testing.T) {
 		t.Fatal("an unreadable stored document compared equal")
 	}
 }
+
+// TestApplyEnvironments checks that the descriptor refuses an environment
+// that does not exist, and that a name spelled in another case is stored in
+// the environment's own spelling and unchanged on the next apply.
+func TestApplyEnvironments(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	const doc = `
+localRepositories:
+  env-local:
+    type: generic
+    environments: [dev]
+`
+	if res := mustApply(t, db, doc); len(res.Created) != 1 {
+		t.Fatalf("first apply %+v", res)
+	}
+	c, err := db.Repos().Get(ctx, "env-local")
+	if err != nil || strings.Join(c.Environments, ",") != "DEV" {
+		t.Fatalf("stored %+v %v", c.Environments, err)
+	}
+	if res := mustApply(t, db, doc); len(res.Unchanged) != 1 || len(res.Updated) != 0 {
+		t.Fatalf("second apply %+v: the stored spelling must compare equal", res)
+	}
+	_, err = apply(t, db, `
+localRepositories:
+  other-local:
+    type: generic
+  env-local:
+    environments: [DEV, nope]
+`)
+	if !errors.Is(err, ErrInvalid) ||
+		!strings.Contains(err.Error(), "Environment 'nope' does not exist") {
+		t.Fatalf("unknown environment: %v", err)
+	}
+	if _, err := db.Repos().Get(ctx, "other-local"); err == nil {
+		t.Fatal("a refused descriptor created a repository")
+	}
+	if c, _ := db.Repos().Get(ctx, "env-local"); strings.Join(c.Environments, ",") != "DEV" {
+		t.Fatalf("a refused descriptor changed a repository: %v", c.Environments)
+	}
+}
