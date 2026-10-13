@@ -37,6 +37,12 @@ var (
 	ErrNoBlob = errors.New("item: no stored content has the checksum")
 	// ErrConflict is a file where a folder must go, or the reverse (409).
 	ErrConflict = errors.New("item: path conflict")
+	// ErrCollected is content garbage collection removed while it was being
+	// deployed: nothing was stored, and the deploy must be repeated (503,
+	// which the JFrog CLI retries).
+	ErrCollected = errors.New(
+		"item: the content was removed by garbage collection while it was deployed; deploy it again",
+	)
 	// ErrNotFound is a missing item.
 	ErrNotFound = store.ErrNotFound
 )
@@ -134,7 +140,24 @@ func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
 	actual := types.Checksums{
 		SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
 	}
-	return s.storeFile(ctx, d, actual, info.Size, declared)
+	stored, err := s.storeFile(ctx, d, actual, info.Size, declared)
+	if errors.Is(err, store.ErrDeleting) {
+		s.finishCollection(ctx, actual.SHA256)
+	}
+	return stored, err
+}
+
+// finishCollection completes a garbage collection that is removing sha's
+// content, as the collector would. A deleting row has no references and can
+// gain none, so whoever finishes the removal is safe; doing it here means a
+// collector that crashed halfway refuses deploys of this content once rather
+// than until its next pass. Best effort: the collector finishes what fails.
+func (s *Service) finishCollection(ctx context.Context, sha string) {
+	ctx = context.WithoutCancel(ctx)
+	if err := s.Blobs.Delete(ctx, sha); err != nil && !errors.Is(err, blob.ErrNotFound) {
+		return
+	}
+	_ = s.Store.Blobs().FinishDelete(ctx, sha, s.now())
 }
 
 // DeployByChecksum stores the item from content the server already holds,
@@ -170,7 +193,12 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 	} else if !ok {
 		return types.Item{}, ErrNoBlob
 	}
-	return s.storeFile(ctx, d, b.Checksums, b.Size, declared)
+	stored, err := s.storeFile(ctx, d, b.Checksums, b.Size, declared)
+	if errors.Is(err, ErrCollected) {
+		// Collected since it was found: a miss, so the client uploads it.
+		return types.Item{}, ErrNoBlob
+	}
+	return stored, err
 }
 
 // storeFile writes the item for stored content in one transaction (putFile).
@@ -228,10 +256,27 @@ func (s *Service) putFile(
 	if err != nil {
 		return types.Item{}, fmt.Errorf("item: put %s: %w", full, err)
 	}
-	if _, err := s.Store.Blobs().Ref(ctx, types.Blob{
+	ref, err := s.Store.Blobs().Ref(ctx, types.Blob{
 		Checksums: actual, Size: size, Created: now,
-	}, 1); err != nil {
+	}, 1)
+	if errors.Is(err, store.ErrDeleting) {
+		return types.Item{}, fmt.Errorf("%w: %w", ErrCollected, err)
+	}
+	if err != nil {
 		return types.Item{}, fmt.Errorf("item: reference blob: %w", err)
+	}
+	// Content garbage collection removed recently may have gone after this
+	// deploy wrote it: the row only says when it went. Checked inside the
+	// transaction, so a miss rolls the whole deploy back; content never
+	// collected costs nothing here.
+	if !ref.Deleted.IsZero() {
+		ok, err := s.Blobs.Exists(ctx, actual.SHA256)
+		if err != nil {
+			return types.Item{}, fmt.Errorf("item: blob exists: %w", err)
+		}
+		if !ok {
+			return types.Item{}, ErrCollected
+		}
 	}
 	if old.ID != 0 && old.Actual.SHA256 != "" {
 		if _, err := s.Store.Blobs().Unref(ctx, old.Actual.SHA256, 1); err != nil {

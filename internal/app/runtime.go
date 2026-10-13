@@ -69,7 +69,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	// The cold tier is not collected: nothing writes it until archiving (P16),
 	// which brings the references its collection would have to trust.
-	collector, err := gc.New(st, hot.store, gc.Options{Grace: cfg.GC.GracePeriod, Log: log})
+	collector, err := gc.New(st, hot.store, gc.Options{Grace: cfg.GC.GracePeriod})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}

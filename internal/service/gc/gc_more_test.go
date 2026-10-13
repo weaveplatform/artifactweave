@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,13 +45,62 @@ func (u uploadsFailing) Uploads() store.UploadStore {
 	return failDeleteUploads{u.Store.Uploads()}
 }
 
-type conflictBlobs struct{ store.BlobIndex }
+// faultBlobs fails chosen blob index calls.
+type faultBlobs struct {
+	store.BlobIndex
+	mark, finish, deleting, get, prune error
+}
 
-func (conflictBlobs) Delete(context.Context, string) error { return store.ErrConflict }
+func (f faultBlobs) MarkDeleting(
+	ctx context.Context,
+	b types.Blob,
+	at time.Time,
+) (types.Blob, error) {
+	if f.mark != nil {
+		return types.Blob{}, f.mark
+	}
+	return f.BlobIndex.MarkDeleting(ctx, b, at) //nolint:wrapcheck // test double
+}
 
-type conflicting struct{ failing }
+func (f faultBlobs) FinishDelete(ctx context.Context, sha string, at time.Time) error {
+	if f.finish != nil {
+		return f.finish
+	}
+	return f.BlobIndex.FinishDelete(ctx, sha, at) //nolint:wrapcheck // test double
+}
 
-func (c conflicting) Blobs() store.BlobIndex { return conflictBlobs{c.Store.Blobs()} }
+func (f faultBlobs) Deleting(ctx context.Context, p store.Page) ([]types.Blob, string, error) {
+	if f.deleting != nil {
+		return nil, "", f.deleting
+	}
+	return f.BlobIndex.Deleting(ctx, p) //nolint:wrapcheck // test double
+}
+
+func (f faultBlobs) Get(ctx context.Context, sha string) (types.Blob, error) {
+	if f.get != nil {
+		return types.Blob{}, f.get
+	}
+	return f.BlobIndex.Get(ctx, sha) //nolint:wrapcheck // test double
+}
+
+func (f faultBlobs) Prune(ctx context.Context, before time.Time) (int64, error) {
+	if f.prune != nil {
+		return 0, f.prune
+	}
+	return f.BlobIndex.Prune(ctx, before) //nolint:wrapcheck // test double
+}
+
+// faulty is a store whose blob index fails as faults says.
+type faulty struct {
+	failing
+	faults faultBlobs
+}
+
+func (f faulty) Blobs() store.BlobIndex {
+	b := f.faults
+	b.BlobIndex = f.Store.Blobs()
+	return b
+}
 
 func TestDefaults(t *testing.T) {
 	w := newWorld(t)
@@ -88,49 +136,65 @@ func TestManyUnreferenced(t *testing.T) {
 
 func TestDeleteFailures(t *testing.T) {
 	ctx := context.Background()
-	collect := func(t *testing.T, st store.Store, blobs blob.Store) (gc.Report, error) {
+	// prepare leaves one unreferenced blob past the grace period.
+	prepare := func(t *testing.T) (*world, string) {
 		t.Helper()
 		w := newWorld(t)
 		w.trashOff(t)
-		w.deploy(t, "f.txt", "content")
+		sha := w.deploy(t, "f.txt", "content").Actual.SHA256
 		w.remove(t, "f.txt")
 		w.advance(2 * gc.DefaultGrace)
-		if st == nil {
-			st = w.db
-		}
-		if r, ok := st.(racing); ok {
-			r.Store = w.db
-			st = r
-		}
-		if c, ok := st.(conflicting); ok {
-			c.Store = w.db
-			st = c
-		}
-		c, err := gc.New(
-			st,
-			failBlobStore{Store: w.blobs, del: delErr(blobs)},
-			gc.Options{Now: w.now},
-		)
+		return w, sha
+	}
+	collect := func(t *testing.T, w *world, faults faultBlobs, blobs blob.Store) (gc.Report, error) {
+		t.Helper()
+		c, err := gc.New(faulty{failing{Store: w.db}, faults}, blobs, gc.Options{Now: w.now})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return c.Run(ctx)
 	}
-	if _, err := collect(t, racing{get: func(n int) (types.Blob, error, bool) {
-		return types.Blob{}, errBoom, n == 1
-	}, n: &atomic.Int64{}}, nil); !errors.Is(err, errBoom) {
-		t.Fatalf("index read failure: %v", err)
+	w, sha := prepare(t)
+	if rep, err := collect(t, w, faultBlobs{mark: store.ErrConflict}, w.blobs); err != nil ||
+		rep.Kept != 1 || !w.stored(t, sha) {
+		t.Fatalf("a blob referenced again is kept: %+v, %v", rep, err)
 	}
-	if rep, err := collect(t, racing{get: func(n int) (types.Blob, error, bool) {
-		return types.Blob{}, store.ErrNotFound, n == 1
-	}, n: &atomic.Int64{}}, nil); err != nil || rep.BlobsDeleted != 0 {
-		t.Fatalf("a row deleted concurrently is skipped: %+v, %v", rep, err)
+	if _, err := collect(t, w, faultBlobs{mark: errBoom}, w.blobs); !errors.Is(err, errBoom) {
+		t.Fatalf("mark failure: %v", err)
 	}
-	if rep, err := collect(t, conflicting{}, nil); err != nil || rep.Kept != 1 {
-		t.Fatalf("a delete refused while referenced keeps the blob: %+v, %v", rep, err)
+	if _, err := collect(t, w, faultBlobs{finish: errBoom}, w.blobs); !errors.Is(err, errBoom) {
+		t.Fatalf("finish failure: %v", err)
 	}
-	if _, err := collect(t, nil, failBlobStore{del: errBoom}); !errors.Is(err, errBoom) {
+
+	// A content delete that fails leaves the row deleting: deploys of the
+	// content are refused until the next pass finishes the removal.
+	w, sha = prepare(t)
+	if _, err := collect(
+		t,
+		w,
+		faultBlobs{},
+		failBlobStore{Store: w.blobs, del: errBoom},
+	); !errors.Is(
+		err,
+		errBoom,
+	) {
 		t.Fatalf("content delete failure: %v", err)
+	}
+	if b, err := w.db.Blobs().Get(ctx, sha); err != nil || b.State != types.BlobDeleting {
+		t.Fatalf("row after a failed content delete: %+v, %v", b, err)
+	}
+	if _, err := collect(t, w, faultBlobs{deleting: errBoom}, w.blobs); !errors.Is(err, errBoom) {
+		t.Fatalf("listing deleting rows: %v", err)
+	}
+	rep, err := collect(t, w, faultBlobs{}, w.blobs)
+	if b, gerr := w.db.Blobs().
+		Get(ctx, sha); err != nil || rep.BlobsDeleted != 1 || w.stored(t, sha) ||
+		gerr != nil ||
+		b.State != types.BlobDeleted {
+		t.Fatalf("the next pass finishes the removal: %+v, %v; row %+v, %v", rep, err, b, gerr)
+	}
+	if _, err := collect(t, w, faultBlobs{prune: errBoom}, w.blobs); !errors.Is(err, errBoom) {
+		t.Fatalf("prune failure: %v", err)
 	}
 }
 
@@ -157,9 +221,18 @@ func TestOrphanFailures(t *testing.T) {
 	if _, err := walkFails.Run(ctx); !errors.Is(err, errBoom) {
 		t.Fatalf("walk failure: %v", err)
 	}
+	// An index that cannot be read must not make content look orphaned.
+	readFails, err := gc.New(faulty{failing{Store: w.db}, faultBlobs{get: errBoom}}, w.blobs,
+		gc.Options{Now: w.now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readFails.Run(ctx); !errors.Is(err, errBoom) {
+		t.Fatalf("index read failure in the walk: %v", err)
+	}
 	deleteFails, err := gc.New(
 		w.db,
-		failBlobStore{Store: w.blobs, del: errBoom},
+		failBlobStore{Store: w.blobs, del: delErr(failBlobStore{del: errBoom})},
 		gc.Options{Now: w.now},
 	)
 	if err != nil {
@@ -169,15 +242,6 @@ func TestOrphanFailures(t *testing.T) {
 	w.advance(2 * gc.DefaultGrace)
 	if _, err := deleteFails.Run(ctx); !errors.Is(err, errBoom) {
 		t.Fatalf("orphan delete failure: %v", err)
-	}
-	// Indexed between the walk and the delete: kept.
-	c := w.collector(t, racing{Store: w.db, get: func(n int) (types.Blob, error, bool) {
-		return types.Blob{}, nil, n == 3
-	}, n: &atomic.Int64{}})
-	run(t, c)
-	w.advance(2 * gc.DefaultGrace)
-	if rep := run(t, c); rep.OrphansDeleted != 0 {
-		t.Fatalf("an orphan indexed after the walk is kept: %+v", rep)
 	}
 }
 

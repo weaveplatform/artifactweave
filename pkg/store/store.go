@@ -54,6 +54,9 @@ var (
 	// ErrConflict reports a create that collides with an existing key, or a
 	// change that would break a uniqueness rule.
 	ErrConflict = errors.New("store: conflict")
+	// ErrDeleting reports a blob whose content garbage collection is
+	// removing: it cannot be referenced until the removal has finished.
+	ErrDeleting = errors.New("store: blob is being deleted")
 	// ErrInvalidCursor reports a malformed pagination cursor.
 	ErrInvalidCursor = errors.New("store: invalid cursor")
 	// ErrInvalid reports a record the store cannot hold as given, for
