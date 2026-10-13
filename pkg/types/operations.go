@@ -192,6 +192,9 @@ const (
 	SettingAnonymousAccess          = "security.anonymous_access"
 	SettingTrashcan                 = "trashcan"
 	SettingBundleRetention          = "distribution.bundle_retention"
+	// SettingSeeded marks that the built-in principals were created, so a
+	// later start never recreates one an administrator removed.
+	SettingSeeded = "bootstrap.seeded"
 )
 
 // UserLockPolicy locks an account after repeated failed logins.

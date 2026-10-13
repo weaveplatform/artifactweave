@@ -48,12 +48,12 @@ Feature: System endpoints
     Then the response status is 200
 
   Scenario: Xray is stubbed in its own envelope
-    When I GET "/xray/api/v1/system/version"
+    When I GET "/xray/api/v1/system/version" as admin
     Then the response status is 501
     And the JSON field "error" is not empty
 
   Scenario: A missing repository uses the Artifactory error envelope
-    When I GET "/artifactory/api/nonexistent/missing"
+    When I GET "/artifactory/api/nonexistent/missing" as admin
     Then the response status is 404
     And the JSON field "errors.0.status" equals "404"
     And the JSON field "errors.0.message" is not empty

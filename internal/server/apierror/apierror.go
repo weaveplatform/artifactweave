@@ -81,12 +81,20 @@ func NotSupported(product string) *Error {
 	}
 }
 
+// BasicChallenge is the WWW-Authenticate value of a 401: Artifactory's realm.
+const BasicChallenge = `Basic realm="Artifactory Realm"`
+
 // Write renders err on the given surface. Errors that are not *Error become a
 // 500 with a generic message so internal details never reach a client.
 func Write(w http.ResponseWriter, s Surface, err error) {
 	var e *Error
 	if !errors.As(err, &e) {
 		e = New(http.StatusInternalServerError, "internal error")
+	}
+	// Clients send credentials only after a challenge. A handler that needs
+	// another scheme (the Docker token flow's Bearer) sets its own first.
+	if e.Status == http.StatusUnauthorized && w.Header().Get("WWW-Authenticate") == "" {
+		w.Header().Set("WWW-Authenticate", BasicChallenge)
 	}
 	if s == Text {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
