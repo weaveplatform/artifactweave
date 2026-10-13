@@ -43,6 +43,7 @@ func (s artifactoryService) registerItemRoutes(r chi.Router) {
 		r.Delete(p, s.deleteItem)
 	}
 	r.Post("/artifactory/api/search/aql", s.searchAQL)
+	s.registerTransferRoutes(r)
 }
 
 // itemRequest is a parsed item URL.
@@ -198,6 +199,10 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 			"Checksum deploy failed: no stored content matches the checksum")
 	case errors.Is(err, item.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
+	case errors.Is(err, item.ErrBadArchive):
+		return apierror.New(http.StatusBadRequest, err.Error())
+	case errors.Is(err, item.ErrOverwriteDenied):
+		return auth.ErrForbidden
 	case errors.Is(err, types.ErrInvalidItemPath):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, store.ErrNotFound):
@@ -281,9 +286,11 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 	}
 	svc := s.items(st)
 	t := item.Target{Repo: c, Path: req.path}
+	explode := strings.EqualFold(r.Header.Get("X-Explode-Archive"), "true") ||
+		strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true")
 	existing, err := st.Items().Get(ctx, c.Key, false, req.path)
 	switch {
-	case err == nil && !existing.Folder && !req.folder && !can(c, types.ActionDelete):
+	case err == nil && !existing.Folder && !req.folder && !explode && !can(c, types.ActionDelete):
 		// Overwriting replaces content, which needs the right to delete it.
 		writeErr(w, r, denied(p))
 		return
@@ -295,8 +302,13 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case req.folder:
 		it, err = svc.MakeFolder(ctx, t, req.props, p.Name)
-	case strings.EqualFold(r.Header.Get("X-Explode-Archive"), "true"):
-		err = apierror.New(http.StatusNotImplemented, "exploding archives is not implemented yet")
+	case explode:
+		it, err = svc.Explode(ctx, item.Explode{
+			Deploy: s.deployRequest(r, t, req, p),
+			Atomic: strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true"),
+			// Replacing files needs the right to delete them, as a deploy does.
+			CanOverwrite: can(c, types.ActionDelete),
+		})
 	case strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true"):
 		it, err = svc.DeployByChecksum(ctx, s.deployRequest(r, t, req, p))
 	default:
@@ -516,6 +528,17 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	f, err := lookup(ctx, st, c, cached, req.path, can, map[string]bool{})
 	if errors.Is(err, store.ErrNotFound) {
+		// "<archive>!/<entry>" names an entry inside an archive file; a path
+		// that exists as an item is served as one first.
+		if archive, entry, ok := strings.Cut(req.path, "!/"); ok {
+			a, err := lookup(ctx, st, c, cached, archive, can, map[string]bool{})
+			if err != nil {
+				writeErr(w, r, itemNotFound())
+				return
+			}
+			s.getArchiveEntry(w, r, st, a, entry)
+			return
+		}
 		s.getSidecar(w, r, st, c, cached, req.path, can)
 		return
 	}

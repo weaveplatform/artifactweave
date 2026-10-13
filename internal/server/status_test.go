@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"maps"
 	"net/http"
@@ -45,6 +46,7 @@ func statusTable() []statusCase {
 		descriptorStatusRows(),
 		itemStatusRows(),
 		storageStatusRows(),
+		transferStatusRows(),
 	)
 }
 
@@ -118,12 +120,22 @@ func statusFixture(t *testing.T, anonymous bool) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{"fixture/get.txt", "fixture/del.txt"} {
+	for _, p := range []string{"fixture/get.txt", "fixture/del.txt", "fixture/move.txt"} {
 		if _, err := items.Deploy(ctx, item.Deploy{
 			Target: item.Target{Repo: libs, Path: p}, Body: strings.NewReader("fixture"),
 		}); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if _, err := items.Deploy(ctx, item.Deploy{
+		Target: item.Target{Repo: libs, Path: "fixture/archive.zip"},
+		Body:   bytes.NewReader(zipBytes(t, map[string]string{"inner.txt": "inner"})),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Settings().Put(ctx, types.SettingFolderDownload,
+		types.FolderDownloadSettings{Enabled: true}); err != nil {
+		t.Fatal(err)
 	}
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
 	if err != nil {
@@ -315,16 +327,20 @@ func TestStatusTable(t *testing.T) {
 // implementedHandwritten lists the hand-written routes with real handlers;
 // the guard below holds them to the same rule as the generated ones.
 var implementedHandwritten = map[string]bool{
-	"PATCH /artifactory/api/system/configuration":          true,
-	"PUT /artifactory/{repoKey}/{filePath}":                true,
-	"GET /artifactory/{repoKey}/{filePath}":                true,
-	"HEAD /artifactory/{repoKey}/{filePath}":               true,
-	"DELETE /artifactory/{repoKey}/{filePath}":             true,
-	"POST /artifactory/api/search/aql":                     true,
-	"GET /artifactory/api/storage/{repoKey}/{itemPath}":    true,
-	"PUT /artifactory/api/storage/{repoKey}/{itemPath}":    true,
-	"DELETE /artifactory/api/storage/{repoKey}/{itemPath}": true,
-	"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}": true,
+	"PATCH /artifactory/api/system/configuration":            true,
+	"PUT /artifactory/{repoKey}/{filePath}":                  true,
+	"GET /artifactory/{repoKey}/{filePath}":                  true,
+	"HEAD /artifactory/{repoKey}/{filePath}":                 true,
+	"DELETE /artifactory/{repoKey}/{filePath}":               true,
+	"POST /artifactory/api/search/aql":                       true,
+	"GET /artifactory/api/storage/{repoKey}/{itemPath}":      true,
+	"PUT /artifactory/api/storage/{repoKey}/{itemPath}":      true,
+	"DELETE /artifactory/api/storage/{repoKey}/{itemPath}":   true,
+	"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}":   true,
+	"POST /artifactory/api/copy/{srcRepoKey}/{srcFilePath}":  true,
+	"POST /artifactory/api/move/{srcRepoKey}/{srcFilePath}":  true,
+	"GET /artifactory/api/archive/download/{repoKey}/{path}": true,
+	"GET /artifactory/{repoKey}/{archivePath}!/{entryPath}":  true,
 }
 
 func descriptorStatusRows() []statusCase {
@@ -407,5 +423,44 @@ func storageStatusRows() []statusCase {
 		{patch, meta, "user", `{"props":{"k":"v"}}`, 403},
 		{patch, meta, "anonymous", `{"props":{"k":"v"}}`, 401},
 		{patch, meta, "", `{"props":{"k":"v"}}`, 401},
+	}
+}
+
+func transferStatusRows() []statusCase {
+	const (
+		cp  = "POST /artifactory/api/copy/{srcRepoKey}/{srcFilePath}"
+		mv  = "POST /artifactory/api/move/{srcRepoKey}/{srcFilePath}"
+		ar  = "GET /artifactory/api/archive/download/{repoKey}/{path}"
+		en  = "GET /artifactory/{repoKey}/{archivePath}!/{entryPath}"
+		c   = "/artifactory/api/copy/libs-local/fixture/"
+		m   = "/artifactory/api/move/libs-local/fixture/"
+		dl  = "/artifactory/api/archive/download/libs-local/"
+		lib = "/artifactory/libs-local/fixture/"
+	)
+	return []statusCase{
+		{cp, c + "get.txt?to=/libs-local/copied/get.txt", "admin", "", 200},
+		{cp, c + "get.txt", "admin", "", 400},
+		{cp, c + "get.txt?to=/virt/x", "admin", "", 400},
+		{cp, c + "absent?to=/libs-local/x", "admin", "", 404},
+		{cp, c + "get.txt?to=/libs-local/x", "user", "", 403},
+		{cp, c + "get.txt?to=/libs-local/x", "anonymous", "", 401},
+		{cp, c + "get.txt?to=/libs-local/x", "", "", 401},
+
+		{mv, m + "move.txt?to=/libs-local/moved/move.txt", "admin", "", 200},
+		{mv, m + "get.txt?to=/virt/x", "admin", "", 400},
+		{mv, m + "absent?to=/libs-local/x", "admin", "", 404},
+		{mv, m + "get.txt?to=/libs-local/x", "user", "", 403},
+		{mv, m + "get.txt?to=/libs-local/x", "", "", 401},
+
+		{ar, dl + "fixture?archiveType=zip", "admin", "", 200},
+		{ar, dl + "fixture?archiveType=rar", "admin", "", 400},
+		{ar, dl + "absent?archiveType=zip", "admin", "", 404},
+		{ar, dl + "fixture?archiveType=zip", "user", "", 403},
+		{ar, dl + "fixture?archiveType=zip", "", "", 401},
+
+		{en, lib + "archive.zip!/inner.txt", "admin", "", 200},
+		{en, lib + "archive.zip!/absent", "admin", "", 404},
+		{en, lib + "archive.zip!/inner.txt", "user", "", 403},
+		{en, lib + "archive.zip!/inner.txt", "", "", 401},
 	}
 }

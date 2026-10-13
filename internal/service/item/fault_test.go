@@ -44,7 +44,7 @@ func (f faultyItems) Get(ctx context.Context, k string, c bool, p string) (types
 }
 
 func (f faultyItems) Put(ctx context.Context, it types.Item) (types.Item, error) {
-	if f.fail == "put" || (f.fail == "putFolder" && it.Folder) {
+	if f.fail == "put" || (f.fail == "putFolder" && it.Folder) || f.fail == "put:"+it.Name {
 		return it, errBoom
 	}
 	return f.ItemStore.Put(ctx, it)
@@ -88,6 +88,33 @@ func (f faultyItems) Delete(
 		return store.DeleteResult{}, errBoom
 	}
 	return f.ItemStore.Delete(ctx, k, c, p)
+}
+
+func (f faultyItems) Stats(ctx context.Context, id int64) (types.ItemStats, error) {
+	if f.fail == "stats" {
+		return types.ItemStats{}, errBoom
+	}
+	return f.ItemStore.Stats(ctx, id)
+}
+
+func (f faultyItems) PutStats(ctx context.Context, id int64, st types.ItemStats) error {
+	if f.fail == "putStats" {
+		return errBoom
+	}
+	return f.ItemStore.PutStats(ctx, id, st)
+}
+
+func (f faultyItems) Children(
+	ctx context.Context,
+	k string,
+	c bool,
+	folder string,
+	p store.Page,
+) ([]types.Item, string, error) {
+	if f.fail == "children" {
+		return nil, "", errBoom
+	}
+	return f.ItemStore.Children(ctx, k, c, folder, p)
 }
 
 type faultyBlobs struct {
