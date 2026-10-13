@@ -97,6 +97,10 @@ docker:
 gcp-%:
 	$(MAKE) -C deploy/terraform/acceptance $*
 
+## azure-<target>: run a target of deploy/terraform/acceptance-azure (the Azure acceptance environment), e.g. make azure-up
+azure-%:
+	$(MAKE) -C deploy/terraform/acceptance-azure $*
+
 ## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
 # Authors edit fragments (one per API family) so families can be written in
 # parallel; the bundled file is what codegen and the parity test read.

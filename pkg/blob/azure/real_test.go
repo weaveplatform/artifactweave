@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -18,7 +19,6 @@ import (
 	azblobpkg "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/sas"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
@@ -33,11 +33,17 @@ const (
 	envRealAccount   = "ARTIFACTWEAVE_TEST_AZURE_ACCOUNT"
 	envRealContainer = "ARTIFACTWEAVE_TEST_AZURE_CONTAINER"
 	envRealKey       = "ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY"
+	// envRealLargeRanges turns on the Put Block From URL probes beyond
+	// 101 MiB. Off by default: they stage about 4 GiB in the account.
+	envRealLargeRanges = "ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES"
 )
 
 type realAccount struct {
 	account, key, container, prefix string
 	cc                              *container.Client
+	// cred is the Entra ID credential when no account key is set; the
+	// probes sign copy sources with a user delegation SAS from it.
+	cred azcore.TokenCredential
 }
 
 // realContainer returns the configured account and a prefix unique to this
@@ -73,6 +79,7 @@ func realContainer(t *testing.T) realAccount {
 		if cerr != nil {
 			t.Fatal(cerr)
 		}
+		ra.cred = cred
 		ra.cc, err = container.NewClient(containerURL, cred, nil)
 	}
 	if err != nil {
@@ -126,32 +133,15 @@ func TestContractOnRealAzure(t *testing.T) {
 }
 
 // TestRealAzureProbes answers research 18's open Azure questions and logs
-// each answer as a PROBE line for the workflow summary. They need the
-// account key, because a copy source must carry a SAS.
+// each answer as a PROBE line for the workflow summary. A copy source must
+// carry a SAS: signed with the account key when one is set, otherwise with
+// a user delegation key from the Entra ID credential, so the probes also run
+// against accounts that allow no Shared Key.
 func TestRealAzureProbes(t *testing.T) {
 	ra := realContainer(t)
-	if ra.key == "" {
-		t.Skipf("%s is not set; the probes sign copy sources with the account key", envRealKey)
-	}
 	ctx := context.Background()
-	cred, err := container.NewSharedKeyCredential(ra.account, ra.key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	signed := func(name string) string {
-		qp, err := sas.BlobSignatureValues{
-			Protocol:      sas.ProtocolHTTPS,
-			StartTime:     time.Now().Add(-15 * time.Minute),
-			ExpiryTime:    time.Now().Add(time.Hour),
-			Permissions:   (&sas.BlobPermissions{Read: true}).String(),
-			ContainerName: ra.container,
-			BlobName:      name,
-		}.SignWithSharedKey(cred)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return ra.cc.NewBlobClient(name).URL() + "?" + qp.Encode()
-	}
+	signed := realSigner(ctx, t, ra)
+	var err error
 	upload := func(name string, data []byte) {
 		t.Helper()
 		if _, err := ra.cc.NewBlockBlobClient(name).Upload(ctx, body(data), nil); err != nil {
@@ -164,6 +154,18 @@ func TestRealAzureProbes(t *testing.T) {
 	// 100 MiB and 4,000 MiB. Copy a 101 MiB range.
 	big := ra.prefix + "big"
 	upload(big, bytes.Repeat([]byte("a"), 101<<20))
+	// A 100 MiB range from the same source and SAS first, as a control: it
+	// tells a size limit apart from a source the service cannot verify.
+	_, err = ra.cc.NewBlockBlobClient(ra.prefix+"range").
+		StageBlockFromURL(ctx, id("r-000000"), signed(big),
+			&blockblob.StageBlockFromURLOptions{
+				Range: azblobpkg.HTTPRange{Offset: 0, Count: 100 << 20},
+			})
+	t.Logf(
+		"PROBE azure.put_block_from_url.100MiB_range accepted=%v error=%v",
+		err == nil,
+		short(err),
+	)
 	_, err = ra.cc.NewBlockBlobClient(ra.prefix+"range").
 		StageBlockFromURL(ctx, id("r-000001"), signed(big),
 			&blockblob.StageBlockFromURLOptions{
@@ -174,18 +176,25 @@ func TestRealAzureProbes(t *testing.T) {
 		err == nil,
 		short(err),
 	)
+	largeRangeProbes(ctx, t, ra, signed, big)
 
 	// Research 18: does Copy Blob From URL accept Shared Key authorisation of
-	// a same-account source, with no SAS on the source?
-	small := ra.prefix + "small"
-	upload(small, []byte("copy me"))
-	_, err = ra.cc.NewBlobClient(ra.prefix+"copied").
-		CopyFromURL(ctx, ra.cc.NewBlobClient(small).URL(), nil)
-	t.Logf(
-		"PROBE azure.copy_from_url.shared_key_source_without_sas accepted=%v error=%v",
-		err == nil,
-		short(err),
-	)
+	// a same-account source, with no SAS on the source? Only an account that
+	// allows Shared Key can answer.
+	if ra.key == "" {
+		t.Logf("PROBE azure.copy_from_url.shared_key_source_without_sas skipped=true " +
+			"error=the account allows no Shared Key")
+	} else {
+		small := ra.prefix + "small"
+		upload(small, []byte("copy me"))
+		_, err = ra.cc.NewBlobClient(ra.prefix+"copied").
+			CopyFromURL(ctx, ra.cc.NewBlobClient(small).URL(), nil)
+		t.Logf(
+			"PROBE azure.copy_from_url.shared_key_source_without_sas accepted=%v error=%v",
+			err == nil,
+			short(err),
+		)
+	}
 
 	// Research 18: does Put Blob with If-None-Match: * succeed on a name that
 	// holds only uncommitted blocks? Azurite answers 409.
@@ -207,6 +216,81 @@ func TestRealAzureProbes(t *testing.T) {
 		err == nil,
 		short(err),
 	)
+}
+
+// largeRangeProbes copies ever larger single ranges with Put Block From URL,
+// up to the documented 4,000 MiB and one MiB past it as a control. The
+// source is assembled server-side from 100 MiB ranges of big, so the client
+// uploads nothing more.
+func largeRangeProbes(
+	ctx context.Context,
+	t *testing.T,
+	ra realAccount,
+	signed func(string) string,
+	big string,
+) {
+	t.Helper()
+	if os.Getenv(envRealLargeRanges) == "" {
+		t.Logf("PROBE azure.put_block_from_url.large_ranges skipped=true error=%s is not set",
+			envRealLargeRanges)
+		return
+	}
+	huge := ra.prefix + "huge"
+	const parts, part = 41, 100 << 20 // 4,100 MiB
+	ids := make([]string, parts)
+	sem := make(chan struct{}, 8)
+	errs := make(chan error, parts)
+	for i := range parts {
+		ids[i] = base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("h-%06d", i)))
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem }()
+			_, err := ra.cc.NewBlockBlobClient(huge).StageBlockFromURL(ctx, ids[i], signed(big),
+				&blockblob.StageBlockFromURLOptions{
+					Range: azblobpkg.HTTPRange{Offset: 0, Count: part},
+				})
+			errs <- err
+		}()
+	}
+	for range parts {
+		if err := <-errs; err != nil {
+			t.Fatalf("assemble the large source: %v", err)
+		}
+	}
+	if _, err := ra.cc.NewBlockBlobClient(huge).CommitBlockList(ctx, ids, nil); err != nil {
+		t.Fatalf("commit the large source: %v", err)
+	}
+	for _, mib := range []int64{256, 1024, 4000, 4001} {
+		start := time.Now()
+		_, err := ra.cc.NewBlockBlobClient(ra.prefix+"range-large").StageBlockFromURL(ctx,
+			base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("l-%06d", mib))), signed(huge),
+			&blockblob.StageBlockFromURLOptions{
+				Range: azblobpkg.HTTPRange{Offset: 0, Count: mib << 20},
+			})
+		t.Logf("PROBE azure.put_block_from_url.%dMiB_range accepted=%v error=%v seconds=%.1f",
+			mib, err == nil, short(err), time.Since(start).Seconds())
+	}
+}
+
+// realSigner returns a function that adds a one-hour read SAS to a blob's
+// URL, signed the way the backend presigns: a service SAS from the account
+// key, or a user delegation SAS from the Entra ID credential (Storage Blob
+// Data Contributor includes the generateUserDelegationKey action).
+func realSigner(ctx context.Context, t *testing.T, ra realAccount) func(string) string {
+	t.Helper()
+	api, err := NewAPI(ClientConfig{
+		Account: ra.account, AccountKey: ra.key, Container: ra.container, Credential: ra.cred,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return func(name string) string {
+		u, err := api.SignRead(ctx, name, time.Hour)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
 }
 
 // short keeps a probe line readable: the service error code, not the whole

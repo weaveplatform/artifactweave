@@ -152,7 +152,10 @@ func TestSourceAuthorisation(t *testing.T) {
 		"tmp",
 		opts,
 	); err != nil ||
-		!strings.HasSuffix(u, "?sv=x&sig=y") { //nolint:forcetypeassert,lll // adapter under test
+		u != "https://acct.blob.core.windows.net/c/tmp?sv=x&sig=y" { //nolint:forcetypeassert,lll // adapter under test
+		// The SAS appears once: the container client's URL already carries
+		// it, and a second copy fails the copy source's signature check
+		// (CannotVerifyCopySource on real Azure).
 		t.Fatalf("sas source = %q, %v", u, err)
 	}
 	if _, err := sasd.SignRead(ctx, "x", time.Minute); !errors.Is(err, ErrConfig) {
