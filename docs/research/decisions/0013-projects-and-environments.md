@@ -25,6 +25,33 @@ quota warns and blocks at the documented thresholds.
 Global and project environments live in the Access API with the documented endpoints;
 a repository's `environments` field is validated against them.
 
+**Global roles and environments** (`/access/api/v1/roles`, `/access/api/v1/environments`,
+issue #77, `internal/service/roles`):
+- **Built-ins:** they're defined in code (`types.BuiltinGlobalRoles`,
+  `types.BuiltinEnvironments`), never stored, and can't be changed: PUT or DELETE of one
+  answers 400.
+  - The roles are "Project Admin" (`ADMIN`, the whole global vocabulary on DEV and PROD)
+    and Developer, Contributor, Viewer, Release Manager and Security Manager
+    (`PREDEFINED`). Application Admin and the ML roles belong to products artifactweave
+    does not serve.
+  - JFrog names the predefined roles but documents their default actions only in its
+    UI, so the action sets in `pkg/types/roles.go` are chosen to match each role's
+    documented purpose.
+- **Names:** environment names are compared without regard to case, across global and
+  project environments.
+- **Rename** updates roles, project assignments and repository configurations in one
+  transaction.
+- **Delete** refuses an environment a repository belongs to, and removes it from the
+  custom roles that name it.
+- **Custom global roles:**
+  - At most 30, as JFrog allows.
+  - Actions are checked against the 25-value global vocabulary, and environments must
+    exist.
+  - Deleting a role removes it from every project membership; a membership left with no
+    role is removed.
+- **Reading a role for the permission evaluator:** `roles.Service.Role`, then
+  `types.RoleActions`.
+
 ## Rationale
 
 Projects are how multi-team Artifactory instances are organised and what the Terraform
