@@ -37,6 +37,49 @@ unreachable, so the macOS and Windows matrix legs stay green and cover the same 
 through fakes. See decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 
+## Real-cloud conformance (manual)
+
+`cloud-conformance.yml` runs the blob contract (`blobtest.Run`) and the research 18
+probes against a real Google Cloud Storage bucket and a real Azure Blob Storage
+container. fake-gcs-server and Azurite do not enforce compose preconditions,
+copy-source authorisation, signed URLs or service limits, so this is the only check of
+them. The workflow is not part of the gate: it needs cloud credentials and is started
+from the Actions tab (**Run workflow**, target `both`, `gcs` or `azure`). Each run
+writes under `conformance/<random>/` and deletes that prefix when it ends. The step
+summary lists the `PROBE` lines that answer the open questions in
+[research 18 §4](../research/18-cloud-blob-storage.md#4-open-questions-for-a-real-cloud-check).
+A run whose variables or secrets are missing fails rather than skipping.
+
+| Name | Kind | Value |
+|---|---|---|
+| `CONFORMANCE_GCS_BUCKET` | variable | An existing bucket |
+| `GCP_SERVICE_ACCOUNT_KEY` | secret | JSON key of a service account with `roles/storage.objectAdmin` on the bucket. The key also signs URLs locally, so no `signBlob` permission is needed |
+| `CONFORMANCE_AZURE_ACCOUNT` | variable | Storage account name, with Shared Key access enabled |
+| `CONFORMANCE_AZURE_CONTAINER` | variable | An existing container in that account |
+| `AZURE_STORAGE_ACCOUNT_KEY` | secret | An account key; the probes sign copy sources with it |
+
+Give both stores a lifecycle rule that deletes `conformance/` objects after a day, in
+case a cancelled run skips its cleanup. On GCS, a bucket with soft delete enabled bills
+the deleted temporary parts for the retention period.
+
+The same tests run from a workstation. They skip unless their variables are set:
+
+```bash
+ARTIFACTWEAVE_TEST_GCS_BUCKET=my-bucket \
+GOOGLE_APPLICATION_CREDENTIALS=key.json \
+  go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
+
+ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=myaccount \
+ARTIFACTWEAVE_TEST_AZURE_CONTAINER=conformance \
+ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY=... \
+  go test -count=1 -v -run 'TestContractOnRealAzure|TestRealAzureProbes' ./pkg/blob/azure/
+```
+
+Without `GOOGLE_APPLICATION_CREDENTIALS`, GCS uses Application Default Credentials
+(`gcloud auth application-default login`). Without the Azure account key, the contract
+authenticates with `DefaultAzureCredential` (`az login`, with Storage Blob Data
+Contributor on the container), and the probes skip.
+
 ## Local equivalents
 
 | Command | What |

@@ -1,0 +1,140 @@
+name: go | Real-cloud conformance
+
+# Runs the blob contract and the research 18 probes against real Google Cloud
+# Storage and Azure Blob Storage (issue #12). Emulators miss behaviour the
+# backends rely on (compose preconditions, copy-source authorisation, signed
+# URLs, service limits), so this run is the only check of it. It is opt-in and
+# manual because it needs cloud credentials and costs a few cents a run; it is
+# not part of the quality gate. docs/testing/ci.md lists the secrets and
+# variables it reads.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which clouds to test'
+        type: choice
+        options: [both, gcs, azure]
+        default: both
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+
+jobs:
+  gcs:
+    name: 'Google Cloud Storage'
+    if: inputs.target == 'both' || inputs.target == 'gcs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARTIFACTWEAVE_TEST_GCS_BUCKET: ${{ vars.CONFORMANCE_GCS_BUCKET }}
+      GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      # The tests skip without configuration; a dispatched run that skipped
+      # would look like a pass, so missing configuration fails here instead.
+      - name: Write credentials
+        shell: bash
+        run: |
+          if [ -z "$ARTIFACTWEAVE_TEST_GCS_BUCKET" ] || [ -z "$GCP_SERVICE_ACCOUNT_KEY" ]; then
+            echo "::error::Set the CONFORMANCE_GCS_BUCKET variable and the GCP_SERVICE_ACCOUNT_KEY secret"
+            exit 1
+          fi
+          key="$RUNNER_TEMP/gcp-key.json"
+          umask 077
+          printf '%s' "$GCP_SERVICE_ACCOUNT_KEY" > "$key"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$key" >> "$GITHUB_ENV"
+
+      - name: Contract and probes
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout 25m -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/ \
+            | tee "$RUNNER_TEMP/gcs.log"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Google Cloud Storage probes'
+            echo '```'
+            grep -o 'PROBE .*' "$RUNNER_TEMP/gcs.log" || echo 'no probe output'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove credentials
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/gcp-key.json"
+
+  azure:
+    name: 'Azure Blob Storage'
+    if: inputs.target == 'both' || inputs.target == 'azure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARTIFACTWEAVE_TEST_AZURE_ACCOUNT: ${{ vars.CONFORMANCE_AZURE_ACCOUNT }}
+      ARTIFACTWEAVE_TEST_AZURE_CONTAINER: ${{ vars.CONFORMANCE_AZURE_CONTAINER }}
+      ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY: ${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      # The probes sign copy sources with the account key, so the key is
+      # required here even though the contract alone could use Entra ID.
+      - name: Check configuration
+        shell: bash
+        run: |
+          if [ -z "$ARTIFACTWEAVE_TEST_AZURE_ACCOUNT" ] || [ -z "$ARTIFACTWEAVE_TEST_AZURE_CONTAINER" ] \
+            || [ -z "$ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY" ]; then
+            echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT and CONFORMANCE_AZURE_CONTAINER variables and the AZURE_STORAGE_ACCOUNT_KEY secret"
+            exit 1
+          fi
+
+      - name: Contract and probes
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout 25m -v -run 'TestContractOnRealAzure|TestRealAzureProbes' ./pkg/blob/azure/ \
+            | tee "$RUNNER_TEMP/azure.log"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Azure Blob Storage probes'
+            echo '```'
+            grep -o 'PROBE .*' "$RUNNER_TEMP/azure.log" || echo 'no probe output'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
