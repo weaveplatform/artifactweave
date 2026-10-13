@@ -43,9 +43,21 @@ item or trash entry and refreshes the storage summary.
 - **Garbage collection** runs every `gc.interval` (4 hours) and on `POST /api/system/storage/gc`, under the `storage-gc` lease. A pass:
   - purges expired trash entries;
   - reaps upload sessions untouched for 24 hours;
+  - finishes removals a crashed pass left deleting;
   - deletes blobs unreferenced for `gc.grace_period` (an hour);
-  - deletes content the index has no row for, once the walk has seen it unindexed for the grace period across passes. Blob stores keep no times.
-- **Deleting a blob** removes its index row before its content. A checksum deploy finds content only through the index, so once the row is gone the same content has to be uploaded again. The one case that can lose data is a full upload of identical content landing between the row delete and the content delete. The pass checks the index on both sides of the content delete, and reports and logs that case.
+  - deletes content the index has no live row for, once the walk has seen it unindexed for the grace period across passes. Blob stores keep no times;
+  - prunes tombstones older than a day.
+- **Deleting a blob** takes three steps, for an indexed blob and an orphan alike (#64):
+  1. Its index row is marked `deleting`, in a transaction that refuses while the blob is referenced. Content the index never recorded gets a `deleting` row.
+  2. Its content is deleted.
+  3. The row becomes a `deleted` tombstone, recording when the content went.
+- **A deploy racing a removal of the same bytes** is refused rather than left referencing missing content:
+  - A deploy writes its content before referencing it, and a content-addressed store skips content that is already there. So the content the deploy relies on can be the copy the collector is removing.
+  - The reference fails while the row is `deleting`. The deploy then finishes the removal itself, which is safe because a deleting row has no references and can gain none, and answers 503, which the JFrog CLI retries.
+  - Reviving a tombstone keeps its deletion time. A deploy whose reference lands on such a row checks, inside its transaction, that the content exists; a miss rolls the whole deploy back and answers 503.
+  - Rows never collected cost the common path nothing.
+  - A checksum deploy treats either case as a miss, so the client uploads the content.
+  - Tombstones are kept a day, far longer than the milliseconds between a deploy writing content and referencing it.
 - **The cold tier** is not collected until archiving (P16) writes the references its collection would depend on.
 - **The storage summary** is computed on every request. `calculate` acknowledges and does nothing else.
 

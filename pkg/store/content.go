@@ -138,24 +138,45 @@ type ItemStore interface {
 // cold_blobs table for the archive tier). Rows are keyed by sha256 and
 // reference-counted; garbage collection deletes blobs whose count reached
 // zero.
+//
+// Garbage collection removes a blob in three steps (decision 0010):
+// MarkDeleting, then the content delete, then FinishDelete. A deleting row
+// refuses references, and the tombstone FinishDelete leaves records when the
+// content went, so a deploy that wrote the same content just before it was
+// removed finds out and never references missing content.
 type BlobIndex interface {
-	// Ref adds n references to b, creating its row when absent. ErrConflict
-	// when the stored size or checksums differ from b's, which means two
-	// different contents claim one sha256.
+	// Ref adds n references to b and returns the row as updated. An absent
+	// row is created live; a tombstone is revived, keeping Deleted.
+	// ErrDeleting while the row is deleting; ErrConflict when the stored size
+	// or checksums differ from b's, which means two different contents claim
+	// one sha256.
 	Ref(ctx context.Context, b types.Blob, n int64) (types.Blob, error)
 	// Unref removes n references, never going below zero, and returns the
 	// row as updated.
 	Unref(ctx context.Context, sha256 string, n int64) (types.Blob, error)
-	// Get returns the row for sha256.
+	// Get returns the row for sha256, in whatever state.
 	Get(ctx context.Context, sha256 string) (types.Blob, error)
-	// Find returns the blob matching the strongest digest set in c (sha256,
-	// then sha1, then md5).
+	// Find returns the live blob matching the strongest digest set in c
+	// (sha256, then sha1, then md5).
 	Find(ctx context.Context, c types.Checksums) (types.Blob, error)
-	// Unreferenced lists blobs with no references, ordered by sha256.
+	// Unreferenced lists live blobs with no references, ordered by sha256.
 	Unreferenced(ctx context.Context, p Page) ([]types.Blob, string, error)
-	// Delete removes an unreferenced row; ErrConflict while referenced.
-	Delete(ctx context.Context, sha256 string) error
-	// Totals returns the number of blobs and their combined size.
+	// MarkDeleting starts removing b's content: an unreferenced live row or a
+	// tombstone becomes deleting at at, and content the index has no row for
+	// gets a deleting row from b. A row already deleting is returned as it
+	// is. ErrConflict while the row is referenced.
+	MarkDeleting(ctx context.Context, b types.Blob, at time.Time) (types.Blob, error)
+	// FinishDelete turns a deleting row into a tombstone deleted at at, once
+	// its content is gone. A tombstone is left as it is; ErrConflict for a
+	// live row, ErrNotFound when there is no row.
+	FinishDelete(ctx context.Context, sha256 string, at time.Time) error
+	// Deleting lists the rows being deleted, ordered by sha256, so a pass
+	// can finish what a crashed one started.
+	Deleting(ctx context.Context, p Page) ([]types.Blob, string, error)
+	// Prune drops tombstones deleted before before and clears Deleted on
+	// live rows deleted before then, returning how many rows changed.
+	Prune(ctx context.Context, before time.Time) (int64, error)
+	// Totals returns the number of live blobs and their combined size.
 	Totals(ctx context.Context) (count, bytes int64, err error)
 }
 

@@ -199,6 +199,8 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 			"Checksum deploy failed: no stored content matches the checksum")
 	case errors.Is(err, item.ErrConflict):
 		return apierror.New(http.StatusConflict, err.Error())
+	case errors.Is(err, item.ErrCollected):
+		return apierror.New(http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, item.ErrBadArchive):
 		return apierror.New(http.StatusBadRequest, err.Error())
 	case errors.Is(err, item.ErrOverwriteDenied):

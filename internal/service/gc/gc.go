@@ -5,6 +5,12 @@
 // content was written). Passes run on a schedule and on
 // POST /api/system/storage/gc, under a lease so two instances sharing a
 // database never collect at once.
+//
+// Every blob is removed in three steps: its index row is marked deleting,
+// its content is deleted, and the row becomes a tombstone. A deleting row
+// refuses references, and a deploy that revives a tombstone checks the
+// content is still there, so a deploy of the same content racing the removal
+// is refused and repeated rather than left referencing missing content.
 package gc
 
 import (
@@ -12,7 +18,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -39,6 +44,12 @@ const (
 	leaseName = "storage-gc"
 	leaseTTL  = 30 * time.Minute
 	batch     = 500
+	// tombstoneRetention is how long the index remembers that a blob's
+	// content was removed. A deploy reviving the row in that time checks the
+	// content is there, so it must outlast the moment between a deploy
+	// writing content and referencing it, which is milliseconds; a day is
+	// generous and keeps the rows few.
+	tombstoneRetention = 24 * time.Hour
 )
 
 // Report is what one pass did.
@@ -53,10 +64,9 @@ type Report struct {
 	// Kept counts blobs that were referenced again while being collected,
 	// and so were left alone.
 	Kept int
-	// Lost lists blobs whose content was deleted while the same content was
-	// uploaded again. Their items need the content deployed again; the pass
-	// also logs each one.
-	Lost []string
+	// Pruned counts tombstones dropped and revived rows forgotten after
+	// tombstoneRetention.
+	Pruned int64
 }
 
 // Options configures New. Zero values mean the defaults.
@@ -65,7 +75,6 @@ type Options struct {
 	UploadExpiry time.Duration
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
-	Log *slog.Logger
 }
 
 // Collector runs garbage collection passes over one store and its blob
@@ -77,7 +86,6 @@ type Collector struct {
 	grace        time.Duration
 	uploadExpiry time.Duration
 	now          func() time.Time
-	log          *slog.Logger
 	holder       string
 
 	mu sync.Mutex
@@ -97,14 +105,11 @@ func New(st store.Store, blobs blob.Store, o Options) (*Collector, error) {
 	if o.Now == nil {
 		o.Now = time.Now
 	}
-	if o.Log == nil {
-		o.Log = slog.Default()
-	}
 	return &Collector{
 		store: st, blobs: blobs, trash: &trash.Service{Store: st, Now: o.Now},
 		grace:        cmp.Or(o.Grace, DefaultGrace),
 		uploadExpiry: cmp.Or(o.UploadExpiry, DefaultUploadExpiry),
-		now:          o.Now, log: o.Log, holder: "storage-gc-" + id,
+		now:          o.Now, holder: "storage-gc-" + id,
 		orphans: map[string]time.Time{},
 	}, nil
 }
@@ -125,7 +130,7 @@ func (c *Collector) Run(ctx context.Context) (Report, error) {
 	}()
 	var errs []error
 	for _, step := range []func(context.Context, *Report) error{
-		c.purgeTrash, c.reapUploads, c.collectIndexed, c.collectOrphans,
+		c.purgeTrash, c.reapUploads, c.finishDeleting, c.collectIndexed, c.collectOrphans, c.prune,
 	} {
 		errs = append(errs, step(ctx, &rep))
 		if held, err := c.renew(ctx); err != nil || !held {
@@ -184,6 +189,29 @@ func (c *Collector) reapUploads(ctx context.Context, rep *Report) error {
 	}
 }
 
+// finishDeleting removes the blobs a crashed pass marked deleting and never
+// finished. Until then a deploy of the same content is refused.
+func (c *Collector) finishDeleting(ctx context.Context, rep *Report) error {
+	page := store.Page{Limit: batch}
+	for {
+		rows, next, err := c.store.Blobs().Deleting(ctx, page)
+		if err != nil {
+			return fmt.Errorf("gc: deleting blobs: %w", err)
+		}
+		for _, b := range rows {
+			if err := c.remove(ctx, b); err != nil {
+				return err
+			}
+			rep.BlobsDeleted++
+			rep.BytesFreed += b.Size
+		}
+		if next == "" {
+			return nil
+		}
+		page.After = next
+	}
+}
+
 // collectIndexed deletes blobs whose index row has had no references for the
 // grace period.
 func (c *Collector) collectIndexed(ctx context.Context, rep *Report) error {
@@ -198,8 +226,13 @@ func (c *Collector) collectIndexed(ctx context.Context, rep *Report) error {
 			if b.Created.After(cutoff) {
 				continue
 			}
-			if err := c.deleteBlob(ctx, b, rep); err != nil {
+			removed, err := c.destroy(ctx, b, rep)
+			if err != nil {
 				return err
+			}
+			if removed {
+				rep.BlobsDeleted++
+				rep.BytesFreed += b.Size
 			}
 		}
 		if next == "" {
@@ -209,78 +242,58 @@ func (c *Collector) collectIndexed(ctx context.Context, rep *Report) error {
 	}
 }
 
-var (
-	// errReferenced aborts a row delete for a blob referenced again.
-	errReferenced = errors.New("gc: blob is referenced")
-	// errLeaseLost ends a pass whose lease another instance took over, which
-	// only happens when a step outran the lease TTL.
-	errLeaseLost = errors.New("gc: lease was taken over")
-)
+// errLeaseLost ends a pass whose lease another instance took over, which only
+// happens when a step outran the lease TTL.
+var errLeaseLost = errors.New("gc: lease was taken over")
 
-// deleteBlob removes an unreferenced blob: its index row first, then its
-// content. The row goes first because a checksum deploy finds content
-// through the index. Once the row is gone, a deploy of the same content must
-// upload it again, so the content cannot be deleted under a reference taken
-// through the index. Content uploaded again in the moment between the row
-// delete and the content delete is the one case that loses data; it is
-// checked for on both sides of the content delete and reported.
-func (c *Collector) deleteBlob(ctx context.Context, b types.Blob, rep *Report) error {
-	sha := b.Checksums.SHA256
-	err := c.store.Tx(ctx, func(ctx context.Context) error {
-		row, err := c.store.Blobs().Get(ctx, sha)
-		if err != nil {
-			return fmt.Errorf("gc: blob %s: %w", sha, err)
-		}
-		if row.Refs > 0 {
-			return errReferenced
-		}
-		err = c.store.Blobs().Delete(ctx, sha)
-		if errors.Is(err, store.ErrConflict) {
-			return errReferenced
-		}
-		return err //nolint:wrapcheck // wrapped below with the blob
-	})
+// destroy removes a blob: its row is marked deleting, which a blob
+// referenced again since it was listed refuses (it is kept), then remove
+// deletes the content and leaves the tombstone. It reports whether it
+// removed the blob.
+func (c *Collector) destroy(ctx context.Context, b types.Blob, rep *Report) (bool, error) {
+	_, err := c.store.Blobs().MarkDeleting(ctx, b, c.now())
 	switch {
-	case errors.Is(err, errReferenced):
+	case errors.Is(err, store.ErrConflict):
 		rep.Kept++
-		return nil
-	case errors.Is(err, store.ErrNotFound):
-		return nil
+		return false, nil
 	case err != nil:
-		return fmt.Errorf("gc: delete blob %s: %w", sha, err)
+		return false, fmt.Errorf("gc: mark blob %s: %w", b.Checksums.SHA256, err)
 	}
-	if c.reindexed(ctx, sha) {
-		// Uploaded and referenced again since the row was deleted: the
-		// content is in use.
-		rep.Kept++
-		return nil
-	}
+	return true, c.remove(ctx, b)
+}
+
+// remove deletes a deleting blob's content and turns its row into a
+// tombstone. The row is unreferenced and refuses new references, so nothing
+// can come to need the content while it goes.
+func (c *Collector) remove(ctx context.Context, b types.Blob) error {
+	sha := b.Checksums.SHA256
 	if err := c.blobs.Delete(ctx, sha); err != nil && !errors.Is(err, blob.ErrNotFound) {
 		return fmt.Errorf("gc: delete content %s: %w", sha, err)
 	}
-	if c.reindexed(ctx, sha) {
-		if ok, err := c.blobs.Exists(ctx, sha); err == nil && !ok {
-			rep.Lost = append(rep.Lost, sha)
-			c.log.ErrorContext(
-				ctx,
-				"garbage collection deleted content uploaded again at the same moment; deploy it again",
-				"sha256",
-				sha,
-			)
-		}
+	err := c.store.Blobs().FinishDelete(ctx, sha, c.now())
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("gc: finish deleting %s: %w", sha, err)
 	}
-	rep.BlobsDeleted++
-	rep.BytesFreed += b.Size
 	return nil
 }
 
-func (c *Collector) reindexed(ctx context.Context, sha string) bool {
-	_, err := c.store.Blobs().Get(ctx, sha)
-	return err == nil
+// indexed reports whether the index serves sha: a live row, or a deleting
+// one that finishDeleting owns. A tombstone or no row at all leaves content
+// unindexed. A failed read is an error, never "unindexed": content must not
+// be taken for an orphan because the index could not be asked.
+func (c *Collector) indexed(ctx context.Context, sha string) (bool, error) {
+	b, err := c.store.Blobs().Get(ctx, sha)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("gc: blob %s: %w", sha, err)
+	}
+	return b.State != types.BlobDeleted, nil
 }
 
-// collectOrphans deletes content the index has no row for once it has stayed
-// unindexed for the grace period. The walk only collects candidates; content
+// collectOrphans deletes content the index does not serve once it has stayed
+// that way for the grace period. The walk only collects candidates; content
 // is deleted after it, so no store is changed under its own iterator.
 func (c *Collector) collectOrphans(ctx context.Context, rep *Report) error {
 	now := c.now()
@@ -289,7 +302,11 @@ func (c *Collector) collectOrphans(ctx context.Context, rep *Report) error {
 	err := c.blobs.Walk(ctx, func(info blob.Info) error {
 		sha := info.Digests.SHA256
 		seen[sha] = true
-		if c.reindexed(ctx, sha) {
+		indexed, err := c.indexed(ctx, sha)
+		if err != nil {
+			return err
+		}
+		if indexed {
 			delete(c.orphans, sha)
 			return nil
 		}
@@ -313,16 +330,34 @@ func (c *Collector) collectOrphans(ctx context.Context, rep *Report) error {
 	}
 	for _, info := range due {
 		sha := info.Digests.SHA256
-		if c.reindexed(ctx, sha) {
-			delete(c.orphans, sha)
+		delete(c.orphans, sha)
+		indexed, err := c.indexed(ctx, sha)
+		if err != nil {
+			return err
+		}
+		if indexed {
 			continue
 		}
-		if err := c.blobs.Delete(ctx, sha); err != nil && !errors.Is(err, blob.ErrNotFound) {
-			return fmt.Errorf("gc: delete orphan %s: %w", sha, err)
+		removed, err := c.destroy(ctx, types.Blob{
+			Checksums: types.Checksums{SHA256: sha}, Size: info.Size, Created: now,
+		}, rep)
+		if err != nil {
+			return err
 		}
-		delete(c.orphans, sha)
-		rep.OrphansDeleted++
-		rep.BytesFreed += info.Size
+		if removed {
+			rep.OrphansDeleted++
+			rep.BytesFreed += info.Size
+		}
+	}
+	return nil
+}
+
+// prune forgets removals older than tombstoneRetention.
+func (c *Collector) prune(ctx context.Context, rep *Report) error {
+	n, err := c.store.Blobs().Prune(ctx, c.now().Add(-tombstoneRetention))
+	rep.Pruned += n
+	if err != nil {
+		return fmt.Errorf("gc: prune tombstones: %w", err)
 	}
 	return nil
 }

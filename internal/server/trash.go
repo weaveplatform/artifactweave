@@ -327,7 +327,7 @@ func (s artifactoryService) collector() (*gc.Collector, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := gc.New(st, s.cfg.Blobs, gc.Options{Log: s.cfg.Logger})
+	c, err := gc.New(st, s.cfg.Blobs, gc.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("garbage collector: %w", err)
 	}

@@ -1,11 +1,8 @@
 package gc_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
-	"io"
-	"log/slog"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -54,9 +51,7 @@ func (w *world) advance(d time.Duration) { w.set(w.now().Add(d)) }
 
 func (w *world) collector(t *testing.T, st store.Store) *gc.Collector {
 	t.Helper()
-	c, err := gc.New(st, w.blobs, gc.Options{
-		Now: w.now, Log: slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
+	c, err := gc.New(st, w.blobs, gc.Options{Now: w.now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,8 +120,19 @@ func TestUnreferencedAfterGrace(t *testing.T) {
 	if rep.BlobsDeleted != 1 || rep.BytesFreed != int64(len("content")) || w.stored(t, sha) {
 		t.Fatalf("after the grace period: %+v", rep)
 	}
+	// The row stays a day as a tombstone, so a deploy of the same content
+	// racing the removal finds out; then it is pruned.
+	if b, err := w.db.Blobs().
+		Get(context.Background(), sha); err != nil ||
+		b.State != types.BlobDeleted {
+		t.Fatalf("tombstone: %+v, %v", b, err)
+	}
+	w.advance(25 * time.Hour)
+	if rep := run(t, c); rep.Pruned != 1 {
+		t.Fatalf("prune: %+v", rep)
+	}
 	if _, err := w.db.Blobs().Get(context.Background(), sha); !errors.Is(err, store.ErrNotFound) {
-		t.Fatalf("index row left: %v", err)
+		t.Fatalf("tombstone left after a day: %v", err)
 	}
 }
 
@@ -218,75 +224,6 @@ func TestLeaseHeldElsewhere(t *testing.T) {
 	}
 }
 
-// racing wraps the blob index so a test can answer Get differently on each
-// call, as a deploy referencing the blob mid-collection would.
-type racing struct {
-	*inmem.Store
-	get func(n int) (types.Blob, error, bool)
-	n   *atomic.Int64
-}
-
-func (r racing) Blobs() store.BlobIndex { return racingBlobs{r.Store.Blobs(), r} }
-func (r racing) Tx(ctx context.Context, fn func(context.Context) error) error {
-	return r.Store.Tx(ctx, fn) //nolint:wrapcheck // test double
-}
-
-type racingBlobs struct {
-	store.BlobIndex
-	r racing
-}
-
-func (b racingBlobs) Get(ctx context.Context, sha string) (types.Blob, error) {
-	if got, err, ok := b.r.get(int(b.r.n.Add(1))); ok {
-		return got, err
-	}
-	return b.BlobIndex.Get(ctx, sha) //nolint:wrapcheck // test double
-}
-
-func TestRaces(t *testing.T) {
-	ctx := context.Background()
-	for name, tc := range map[string]struct {
-		// get answers the Nth Get: 1 is inside the delete transaction, 2
-		// before the content delete, 3 after it (the orphan walk follows).
-		get                 func(n int) (types.Blob, error, bool)
-		kept, deleted, lost int
-		stored              bool
-	}{
-		"referenced before the row delete": {
-			get: func(n int) (types.Blob, error, bool) {
-				return types.Blob{Refs: 1}, nil, n == 1
-			},
-			kept: 1, stored: true,
-		},
-		"referenced after the row delete": {
-			get: func(n int) (types.Blob, error, bool) {
-				return types.Blob{}, nil, n == 2
-			},
-			kept: 1, stored: true,
-		},
-		"uploaded again during the content delete": {
-			get: func(n int) (types.Blob, error, bool) {
-				return types.Blob{}, nil, n == 3
-			},
-			deleted: 1, lost: 1,
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			w := newWorld(t)
-			w.trashOff(t)
-			sha := w.deploy(t, "f.txt", "content").Actual.SHA256
-			w.remove(t, "f.txt")
-			w.advance(2 * gc.DefaultGrace)
-			st := racing{w.db, tc.get, &atomic.Int64{}}
-			rep, err := w.collector(t, st).Run(ctx)
-			if err != nil || rep.Kept != tc.kept || rep.BlobsDeleted != tc.deleted ||
-				len(rep.Lost) != tc.lost || w.stored(t, sha) != tc.stored {
-				t.Fatalf("%+v, %v", rep, err)
-			}
-		})
-	}
-}
-
 // failing makes chosen store calls fail.
 type failing struct {
 	*inmem.Store
@@ -371,8 +308,7 @@ func TestStepFailures(t *testing.T) {
 
 func TestLoop(t *testing.T) {
 	w := newWorld(t)
-	var buf bytes.Buffer
-	c, err := gc.New(w.db, w.blobs, gc.Options{Log: slog.New(slog.NewTextHandler(&buf, nil))})
+	c, err := gc.New(w.db, w.blobs, gc.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
