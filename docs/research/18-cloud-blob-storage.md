@@ -1,0 +1,324 @@
+# Cloud blob storage: Google Cloud Storage and Azure Blob Storage
+
+Research baseline: **2026-10-13**.
+
+Artifactory stores binaries on Google Cloud Storage and Azure Blob Storage as well as S3
+(the `google-storage-v2` and `azure-blob-storage-v2` binary providers). This report records
+what the two services and their official Go SDKs offer for the blob contract in
+`pkg/blob`, where it matters:
+
+- Uploads are sessions resumed across HTTP requests and processes from persisted state.
+- Chunks arrive in arbitrary sizes (Docker PATCH, JFrog CLI multipart).
+- Blobs reach many GiB.
+- The content-addressed name is known only at commit.
+
+Decision [0027](decisions/0027-cloud-blob-backends.md) records the design that follows.
+
+Source abbreviations:
+
+| Short form | Means |
+|---|---|
+| **GCS-SDK** | `cloud.google.com/go/storage@v1.69.0` (module source in the Go module cache) |
+| **API** | `google.golang.org/api@v0.288.0` |
+| **FGS** | `github.com/fsouza/fake-gcs-server@v1.56.1` |
+| **AZB** | `github.com/Azure/azure-sdk-for-go/sdk/storage/azblob@v1.8.2` |
+| **AZC** | `.../sdk/azcore@v1.23.3` |
+| **AZI** | `.../sdk/azidentity@v1.14.1` |
+| **AZT** | Azurite v3.37.0 |
+| **GCS docs** | https://docs.cloud.google.com/storage/docs/ |
+| **MS:x** | https://learn.microsoft.com/en-us/rest/api/storageservices/x |
+
+**[probe]** marks a behaviour observed by running the SDK against the emulator on
+2026-10-13.
+
+## 1. Google Cloud Storage
+
+### 1.1 SDK
+
+- **Release:** v1.69.0, 2026-10-01. Releases come roughly every two weeks (GCS-SDK/CHANGES.md:4-140).
+- **Go:** minimum 1.26.0 (GCS-SDK/go.mod:3).
+- **Dependencies:** `cloud.google.com/go/auth`, `google.golang.org/api`, gRPC, OpenTelemetry and the GCP metric exporter (GCS-SDK/go.mod:7-31).
+- **Binary size:** a trivial client links 463 packages into a 47 MB binary. With the `disable_grpc_modules` build tag, which drops the rls, xds and directpath imports, it links 325 packages into 29 MB (GCS-SDK/grpc_dp.go:1,20-21; doc.go:398-401).
+- **Which client:** use the HTTP client, `storage.NewClient` with `storage.WithJSONReads()`. Reads default to the XML API (GCS-SDK/reader.go:93-97; option.go:128-142). The gRPC client's Direct Connectivity only helps inside GCP with a co-located bucket (doc.go:362-396).
+
+### 1.2 Multi-request uploads with persisted state
+
+| Mechanism | Service limits | Go SDK support |
+|---|---|---|
+| JSON resumable upload | session lives up to a week; the session URI is a bearer credential; chunks must be multiples of 256 KiB except the last ([resumable-uploads], [performing-resumable-uploads]) | **cannot resume a session from persisted state**: `storage.Writer` exposes no session URI (GCS-SDK/writer.go:45-252); the generated client consumes `Location` internally (API/storage/v1/storage-gen.go:11196) and the resumable code is in an internal package (API/internal/gensupport/resumable.go:30-33) |
+| Appendable objects (`NewWriterFromAppendableObject`) | gRPC only, zonal Rapid buckets only, which allow no JSON API writes, no resumable uploads, no soft delete ([rapid-bucket]) | takeover by generation (GCS-SDK/storage.go:1293-1317), not usable on general buckets |
+| XML API multipart upload | parts ≥ 5 MiB except the last, ≤ 5 GiB, ≤ 10,000 parts, objects ≤ 5 TiB; no preconditions; no MD5 on the result; unfinished uploads persist until a lifecycle rule aborts them ([quotas], [multipart-uploads], [request-preconditions]) | **none**: the only reference is the lifecycle constant `AbortIncompleteMPUAction` (GCS-SDK/bucket.go:664) |
+| Compose | 1 to 32 sources per request; **no limit on total components** (the old 1,024 cap is gone: "`componentCount` saturates at 2,147,483,647", [quotas]); same bucket and storage class; any destination name; destination `ifGenerationMatch` (0 = must not exist) and per-source generation preconditions; `deleteSourceObjects` hard-deletes the sources ([compose reference], [composite-objects]) | full: `dst.ComposerFrom(srcs...)` and `Composer.Run` (GCS-SDK/copy.go:155,184), `DeleteSourceObjects` (copy.go:162-182), retried only with a destination precondition (copy.go:233) |
+
+The SDK's own experimental parallel upload uses the compose pattern. It writes parts with
+`ChunkSize=0` and composes them in a 32-way tree with `DeleteSourceObjects` under a
+temporary prefix (GCS-SDK/pcu.go:271-290,509-575,36-37).
+
+Composite objects carry a CRC32C but **no MD5**, and their ETag is not an MD5
+([composite-objects]). The docs say compose "ignores any CRC32C value you provide". The
+SDK says the compose is "rejected" on a mismatch (GCS-SDK/copy.go:168-173). Compare the
+CRC32C client-side, as the SDK's parallel upload does (pcu.go:579-582). Nothing in the SDK's
+read path relies on MD5; the HTTP reader validates CRC32C on full reads only
+(GCS-SDK/http_client.go:1484-1515,1675-1688).
+
+**Cost.** One Class A operation per part and per compose; deletes are free ([pricing]). A
+10 GiB blob in 16 MiB parts costs about 640 part writes, 21 folds and one final compose,
+about $0.003 at $0.005 per 1,000.
+
+### 1.3 Reads, writes and retries
+
+- **Ranged reads:** `NewRangeReader(ctx, offset, length)`. A negative length reads to the end (GCS-SDK/reader.go:102-130).
+- **Transcoding:** an object stored with `Content-Encoding: gzip` is served whole whatever range is requested. `ReadCompressed(true)` prevents decompression (reader.go:108-112; storage.go:1172-1177). Blobs must never carry a content encoding.
+- **Reopening:** the reader pins the first response's generation as a precondition when it reopens (http_client.go:1618-1628).
+- **Sentinel errors:** `ErrObjectNotExist` and `ErrBucketNotExist` (storage.go:67-73). Other errors are `*googleapi.Error` (doc.go:275-312).
+- **Small uploads:** `Writer.ChunkSize` defaults to 16 MiB. Content smaller than `ChunkSize` goes as one buffered, retryable request. Content of exactly `ChunkSize` or more becomes a resumable upload, because end of input is only seen on the next read (API/internal/gensupport/media.go:121-133,194-199; buffer.go:53-68). So a part is written with `ChunkSize` rounded up to a multiple of 256 KiB above its length. `ChunkSize = 0` streams with no retry (writer.go:106-111).
+- **Preconditions:** `If(storage.Conditions{DoesNotExist: true})` sends `ifGenerationMatch=0`, which makes the write idempotent and so retried (storage.go:2189-2285; writer.go:477). A conflict is 412. A retried write whose first attempt succeeded also returns 412, so compare `Attrs` (size, CRC32C) before treating 412 as a different object.
+- **Retry policy:**
+  - The default retries idempotent operations on 408, 429, 5xx and connection resets until the context ends (invoke.go:192-248; storage.go:2570-2587).
+  - `Delete` is retried only with a generation precondition (storage.go:1166-1169).
+  - Compose and copy are retried only with a destination precondition (copy.go:123,233).
+- **Listing and deleting:**
+  - `Objects` with `Query{Prefix}` and `SetAttrSelection([]string{"Name","Size"})` (bucket.go:2436; storage.go:1930-2087).
+  - Listing is strongly consistent ([consistency]).
+  - Deleting a missing object returns a wrapped `ErrObjectNotExist` (http_client.go:512-523).
+
+### 1.4 Signed URLs and authentication
+
+- **`BucketHandle.SignedURL`** signs locally with `GoogleAccessID` plus `PrivateKey` or `SignBytes`. Otherwise it finds the service account from the client credentials or the metadata server and signs through IAM Credentials `signBlob`, which needs `iam.serviceAccounts.signBlob` (bucket.go:187-360; doc.go:252-273). That IAM call uses `context.Background()` (bucket.go:331).
+- **Signing scheme:** the default is V2; set `Scheme: storage.SigningSchemeV4`. V4 expiry is at most 7 days (storage.go:556-558,756-760).
+- **Testing:** pass a test key through `GoogleAccessID` and `PrivateKey` to sign with no network.
+- **Credentials:** Application Default Credentials covers Workload Identity through the metadata server.
+  - `option.WithCredentialsFile` and `WithCredentialsJSON` are deprecated. Use `option.WithAuthCredentialsFile(option.ServiceAccount, path)` (API/option/option.go:83-120).
+  - `option.WithEndpoint` needs the `/storage/v1/` suffix with the trailing slash.
+  - `STORAGE_EMULATOR_HOST` forces unauthenticated HTTP (storage.go:179-205).
+
+### 1.5 Emulators
+
+- **There is no official emulator** (GCS-SDK/doc.go:70).
+- **fake-gcs-server v1.56.1:**
+  - Runs in process or as a container: image `fsouza/fake-gcs-server:1.56.1@sha256:797ce226d62f947c009dc40246b30cfb456b8473d8241407f9d6f2c04e4d69ef` through testcontainers `modules/fakegcsserver` v0.44.0 (no default image; `StorageURL()` lacks the trailing slash).
+  - Supports media, multipart and resumable inserts with `ifGenerationMatch`, compose with the 32-source limit, range reads, listing and rewrite.
+- **What fake-gcs-server gets wrong:**
+  - Compose **ignores destination and source preconditions and `deleteSourceObjects`**.
+  - A missing compose source returns 500.
+  - Composite objects get an MD5.
+  - Resumable status queries finalise the object.
+  - Signed URLs are not validated.
+  - (FGS/fakestorage/object.go:1442-1507; FGS/fakestorage/upload.go:770-796)
+- **Consequence:** the backend's semantics need a fake that models real GCS. The container then checks the wiring.
+
+### 1.6 JFrog's GCS provider
+
+`google-storage-v2` ([google-storage-v2]) takes these parameters:
+
+| Parameter | Default |
+|---|---|
+| `bucketName` | |
+| `path` | `filestore` |
+| `rootFoldersNameLength` | 2 |
+| `endpoint` | |
+| `bucketExists` | false |
+| `testConnection` | true |
+| `useInstanceCredentials` | false; true means ADC or GKE, otherwise `gcp.credentials.json` |
+| `enableSignedUrlRedirect` | false |
+| `signedUrlExpirySeconds` | 30 |
+| `maxConnections` | 100 |
+| `maxRetries` | 1 |
+| proxy settings | |
+
+No multipart or part-size settings are documented. The layout is keyed by SHA-1.
+
+### 1.7 Traps
+
+- **Name limits:**
+  - Writing the same object name more than once per second can return 429 ([quotas]), so part and fold names are never reused.
+  - Object names are 1 to 1,024 bytes, with no CR or LF.
+- **Soft delete:** on by default, with 7-day retention, and soft-deleted objects are billed ([soft-delete]). Parts removed by `DeleteSourceObjects` are hard-deleted; parts removed by an abort are soft-deleted.
+- **Storage class:** parts take the bucket's default class. A Nearline or Coldline default bills early deletion on temporary parts ([pricing]).
+- **Cleanup:** crashed uploads leave parts behind. A lifecycle `Delete` rule on the `_uploads/` prefix is the backstop ([lifecycle]).
+
+## 2. Azure Blob Storage
+
+### 2.1 SDK
+
+- **Releases:**
+  - azblob v1.8.2, 2026-10-01.
+  - azcore v1.23.3, 2026-10-06.
+  - azidentity v1.14.1, 2026-08-27.
+  - All require Go 1.25 (AZB/go.mod:3; AZC/go.mod:3; AZI/go.mod:3).
+- **Service API version:** the SDK sends `2026-12-06`, hard-coded per request (AZB/internal/generated/zz_constants.go:8).
+- **No override:** setting `ClientOptions.APIVersion` makes every request fail (AZC/runtime/policy_api_version.go:62-64).
+- **Weight:** the `container` package imports `apache/arrow-go/v18` for Arrow-format listings (AZB/container/client.go:256-300). azidentity brings MSAL.
+
+### 2.2 Block staging
+
+- **API:** `blockblob.Client` `StageBlock`, `StageBlockFromURL`, `CommitBlockList` and `GetBlockList` (AZB/blockblob/client.go:212-267). `StageBlock` needs a seekable body so retries can rewind.
+- **Block IDs:**
+  - Base64 strings of at most 64 bytes before encoding, and all the same length within a blob ([MS:put-block]).
+  - **[probe]** Azurite rejects a different length with `400 InvalidBlobOrBlock`, URL-safe or unpadded base64 with `400 InvalidQueryParameterValue`, and a 65-byte ID with `400 OutOfRangeInput`.
+  - Use standard, padded base64.
+- **Limits** for API 2019-12-12 and later ([MS:put-block]):
+  - Blocks up to 4,000 MiB each.
+  - 50,000 committed blocks per blob, about 190.7 TiB.
+  - 100,000 uncommitted blocks.
+  - No minimum block size.
+- **Persistence:**
+  - Staged blocks are server-side state keyed by blob name and block ID, so another process can commit them.
+  - They are garbage-collected after a week without a Put Block or Put Block List ([MS:put-block]).
+  - **[probe]** `GetBlockList` lists them; `GetProperties` on a blob with only uncommitted blocks returns `404 BlobNotFound`.
+- **Interference:**
+  - A Put Block List discards uncommitted blocks it does not name, and a Put Blob discards all of them ([MS:put-block]).
+  - Re-staging an ID replaces the earlier block, so retries are idempotent.
+  - A missing block fails the commit with `400 InvalidBlockList` (**[probe]**).
+
+### 2.3 Finalising at a content address known only at commit
+
+Block IDs are scoped to one blob name and the flat namespace has no rename, so bytes
+staged under a temporary name must be copied server-side.
+
+| Option | Behaviour | Verdict |
+|---|---|---|
+| Copy Blob (`StartCopyFromURL`) | asynchronous and best-effort; for block blobs it "creates a committed blob of zero length before returning", visible while pending; a failed copy leaves an empty blob; a second copy to the destination gets 409 ([MS:copy-blob]); **[probe]** Azurite always completes it synchronously, so tests never see the pending state | rejected: a zero-length placeholder breaks content-addressed `Exists` |
+| Copy Blob From URL (`CopyFromURL`) | synchronous, source ≤ 256 MiB ([MS:copy-blob-from-url]); the page contradicts itself on whether Shared Key authorises a same-account source | usable below 256 MiB once verified on real Azure |
+| Put Block From URL (`StageBlockFromURL`) ranges into the final name, then one commit | synchronous per range; the final blob stays invisible until the atomic commit; the source must be public, carry a SAS, or be authorised with `x-ms-copy-source-authorization: Bearer` (version 2020-10-02 and later); Shared Key on the destination does not authorise the source ([MS:put-block-from-url]); maximum range per call is stated as both 100 MiB and 4,000 MiB on the same page; **[probe]** Azurite 3.37.0 returns `403 CannotVerifyCopySource` without a source SAS and succeeds with one | **chosen**: 100 MiB ranges in parallel with `SourceIfMatch` on the temporary blob's ETag |
+| Pointer blob or metadata | no copy, but doubles round trips on every read and needs its own garbage collection | rejected |
+| Hierarchical-namespace rename (`x-ms-rename-source`) | atomic, but needs the azdatalake SDK and a DFS endpoint ([path-create]) | possible later fast path |
+
+A declared digest avoids the copy entirely: stage on the final name and commit with
+`If-None-Match: *`.
+
+### 2.4 Writes, reads and errors
+
+- **Small blobs:**
+  - `blockblob.Client.Upload` is one Put Blob, up to 5,000 MiB (AZB/blockblob/client.go:177; [MS:put-blob]).
+  - The `UploadBuffer` and `UploadStream` helpers use random block IDs and cannot resume (AZB/blockblob/client.go:478-482).
+  - Put Blob stores a service-computed Content-MD5. A Put Block List stores the `x-ms-blob-content-md5` it is given without checking it.
+- **Create if absent:**
+  - Use `IfNoneMatch: azcore.ETagAny`.
+  - **[probe]** Azurite answers an existing name with `409 BlobAlreadyExists`; the generic documentation says 412 ([conditional headers]). Treat both as "exists".
+  - **[probe]** Azurite also answers 409 for a name holding only uncommitted blocks.
+- **Ranged reads:**
+  - `DownloadStream` with `HTTPRange{Offset, Count}`, where Count 0 means "to the end" (AZB/blob/client.go:514; models.go:78-81).
+  - `NewRetryReader` re-reads with `If-Match` on the first ETag (blob/retry_reader.go:30-55).
+  - **[probe]** An offset at or past the end returns `416 InvalidRange`.
+- **Error codes:**
+  - `bloberror.HasCode` unwraps `*azcore.ResponseError` and reads `x-ms-error-code` first, so bodiless HEAD responses carry a code (AZB/bloberror/error_codes.go:15-28; AZC/internal/exported/response_error.go:20-24).
+  - The codes that matter ([blob-service-error-codes]): `BlobNotFound` and `ContainerNotFound` (404); `BlobAlreadyExists`, `BlockCountExceedsLimit` and `PendingCopyOperation` (409); `InvalidBlockList` and `InvalidBlockId` (400); `CannotVerifyCopySource`.
+  - **[probe]** A missing container returns `404 ContainerNotFound`. It is a configuration error, not a missing blob.
+- **Listing:**
+  - `NewListBlobsFlatPager` with Prefix and MaxResults (up to 5,000); pages may be short and still continue (AZB/container/client.go:256-300; [MS:list-blobs]).
+  - Uncommitted-only blobs appear only with `Include.UncommittedBlobs`.
+- **Deleting:**
+  - `BlobNotFound` on delete counts as success.
+  - A blob with snapshots needs `DeleteSnapshots: include`.
+  - With soft delete or versioning on, data is retained and billed ([MS:delete-blob]).
+- **Consistency:** Azure is strongly consistent ([concurrency-manage]).
+
+### 2.5 SAS, authentication and transport
+
+- **Service SAS:**
+  - `sas.BlobSignatureValues{...}.SignWithSharedKey(cred)` (AZB/sas/service.go:104-200).
+  - `blob.Client.GetSASURL` re-parses the URL and treats a non-IP host such as `localhost` as path-style, signing the wrong blob name. **[probe]** That gives 403 against `localhost` and 200 against `127.0.0.1`.
+  - Sign with explicit container and blob names instead (AZB/internal/shared/shared.go:232-246).
+- **User delegation SAS:**
+  - `service.Client.GetUserDelegationCredential` with an Entra ID token; keys last at most 7 days ([create-user-delegation-sas]).
+  - It derives the account name from the first DNS label of the host (AZB/service/client.go:128).
+- **SAS start time:** JFrog backdates it by 900 s (`sasStartTimeOffsetSeconds`).
+- **Constructors:**
+  - `NewClientWithSharedKeyCredential`, `NewClient` (token credential), `NewClientWithNoCredential` (SAS or anonymous) and `NewClientFromConnectionString` (no `UseDevelopmentStorage=true` shortcut) (AZB/client.go:30-74; internal/shared/shared.go:68-133).
+  - Bearer tokens over plain HTTP need `InsecureAllowCredentialWithHTTP` (AZC/policy/policy.go:39-42).
+- **Entra ID:**
+  - `azidentity.NewDefaultAzureCredential` tries environment, workload identity, managed identity and the developer tools (AZI/default_azure_credential.go:62-90).
+  - Managed identity (managed_identity_credential.go:86-113) and workload identity (workload_identity.go:74-93) can also be selected directly.
+  - The token scope is `https://storage.azure.com/.default` (AZB/internal/shared/shared.go:22).
+- **Retries:** `policy.RetryOptions` defaults to 3 retries, retrying 408, 429 and 5xx. `MaxRetries < 0` disables retries (AZC/policy/policy.go:89-131).
+- **Transport:** `ClientOptions.Transport` takes any HTTP doer, which allows fault injection.
+
+### 2.6 Emulator
+
+- **Image:** Azurite v3.37.0, `mcr.microsoft.com/azure-storage/azurite@sha256:830430c1da1a2d537e08f3e6764dd1f5ae00cf0346bcaf625b968ec3f0971fd5` (amd64 and arm64).
+- **API version check:** its baseline API version is 2026-06-06, older than the SDK's.
+  - **[probe]** Every request is refused with `400 InvalidHeaderValue` unless Azurite runs with `--skipApiVersionCheck` (AZT/src/blob/utils/constants.ts:5).
+- **testcontainers module:** `modules/azure/azurite` v0.44.0. It has no default image, `WithEnabledServices(BlobService)`, and `BlobServiceURL` without the account name; it has no connection-string helper.
+- **Where Azurite differs from Azure** (AZT/src/blob/persistence/LokiBlobMetadataStore.ts:1047-1075,1998; handlers/BlobHandler.ts:877-879):
+  - It never checks the source authorisation of a same-account Copy Blob From URL.
+  - It completes Copy Blob synchronously.
+  - It enforces neither the block limits nor the 7-day garbage collection.
+  - Put Blob does not discard uncommitted blocks.
+- **Consequence:** a fake must model real Azure, and Azurite checks the wiring.
+
+### 2.7 JFrog's Azure provider
+
+`azure-blob-storage-v2` ([azure-blob-storage-v2]) takes these parameters:
+
+| Parameter | Default |
+|---|---|
+| `accountName` | |
+| `accountKey` or `sasToken` | |
+| `endpoint` | |
+| `container` | |
+| `path` | `data` |
+| `httpsOnly` | true |
+| `testConnection` | |
+| `enableSignedUrlRedirect` | |
+| `signedUrlExpirySeconds` | 30 |
+| `multiPartLimit` | 256 MiB |
+| `multipartElementSize` | 100 MiB |
+| `maxConnections` | 5 |
+| `sasStartTimeOffsetSeconds` | 900 |
+
+Managed identity is supported through `useInstanceCredentials` for AKS Workload Identity
+from 7.125.4 ([azure-workload-identity]).
+
+### 2.8 Traps
+
+- **Block ID length:** IDs keep one length for every session that ever stages on a name.
+- **Commit conflicts:** a concurrent writer to the same final name discards our uncommitted blocks. On `InvalidBlockList`, `BlobAlreadyExists` or `ConditionNotMet` at commit, check whether the final blob exists with the expected size.
+- **No overwrites:** never overwrite a committed content blob. An overwrite changes its ETag and breaks in-flight readers pinned with `If-Match`.
+- **Accounts without Shared Key:** where Shared Key is disallowed, service and account SAS are rejected. Copy-source authorisation and presigning then need a bearer token or a user delegation SAS.
+- **Hierarchical-namespace accounts:** the block APIs work, but listing returns directory entries, and empty directories remain after deletes ([data-lake-storage-known-issues]).
+
+## 3. Open questions for a real-cloud check
+
+1. **Azure:** the Put Block From URL maximum range, 100 MiB or 4,000 MiB.
+2. **Azure:** whether Copy Blob From URL accepts Shared Key authorisation of a same-account source.
+3. **Azure:** whether Put Blob with `If-None-Match: *` succeeds on a name that holds only uncommitted blocks. Azurite returns 409.
+4. **GCS:** compose behaviour with a mismatched CRC32C, and with source generation preconditions.
+5. **GCS:** whether federated Workload Identity principals without a service account can sign URLs.
+
+The opt-in conformance workflow (issue #12) runs the blob contract against real accounts
+to settle these.
+
+## Sources
+
+**Google Cloud Storage**
+- [resumable-uploads]: https://docs.cloud.google.com/storage/docs/resumable-uploads
+- [performing-resumable-uploads]: https://docs.cloud.google.com/storage/docs/performing-resumable-uploads
+- [rapid-bucket]: https://docs.cloud.google.com/storage/docs/rapid/rapid-bucket
+- [multipart-uploads]: https://docs.cloud.google.com/storage/docs/multipart-uploads
+- [request-preconditions]: https://docs.cloud.google.com/storage/docs/request-preconditions
+- [quotas]: https://docs.cloud.google.com/storage/quotas
+- [compose reference]: https://docs.cloud.google.com/storage/docs/json_api/v1/objects/compose
+- [composite-objects]: https://docs.cloud.google.com/storage/docs/composite-objects
+- [consistency]: https://docs.cloud.google.com/storage/docs/consistency
+- [soft-delete]: https://docs.cloud.google.com/storage/docs/soft-delete
+- [lifecycle]: https://docs.cloud.google.com/storage/docs/lifecycle
+- [pricing]: https://cloud.google.com/storage/pricing
+- [google-storage-v2]: https://docs.jfrog.com/installation/docs/google-storage-binary-provider-native-client-template
+
+**Azure Blob Storage**
+- [MS:put-block]: https://learn.microsoft.com/en-us/rest/api/storageservices/put-block
+- [MS:put-blob]: https://learn.microsoft.com/en-us/rest/api/storageservices/put-blob
+- [MS:put-block-from-url]: https://learn.microsoft.com/en-us/rest/api/storageservices/put-block-from-url
+- [MS:copy-blob]: https://learn.microsoft.com/en-us/rest/api/storageservices/copy-blob
+- [MS:copy-blob-from-url]: https://learn.microsoft.com/en-us/rest/api/storageservices/copy-blob-from-url
+- [MS:list-blobs]: https://learn.microsoft.com/en-us/rest/api/storageservices/list-blobs
+- [MS:delete-blob]: https://learn.microsoft.com/en-us/rest/api/storageservices/delete-blob
+- [conditional headers]: https://learn.microsoft.com/en-us/rest/api/storageservices/specifying-conditional-headers-for-blob-service-operations
+- [blob-service-error-codes]: https://learn.microsoft.com/en-us/rest/api/storageservices/blob-service-error-codes
+- [create-user-delegation-sas]: https://learn.microsoft.com/en-us/rest/api/storageservices/create-user-delegation-sas
+- [path-create]: https://learn.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/create
+- [concurrency-manage]: https://learn.microsoft.com/en-us/azure/storage/blobs/concurrency-manage
+- [data-lake-storage-known-issues]: https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-known-issues
+- [azure-blob-storage-v2]: https://docs.jfrog.com/installation/docs/azure-blob-storage-v2-binary-provider
+- [azure-workload-identity]: https://docs.jfrog.com/installation/docs/azure-workload-identity

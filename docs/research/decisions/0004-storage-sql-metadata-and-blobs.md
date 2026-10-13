@@ -33,8 +33,10 @@ columns as they are. Properties are an entity-attribute-value table keyed by ite
 
 **Blobs.** `pkg/blob` is a content-addressed store keyed by sha256 with sha1 and md5
 recorded in the item index so checksum deploy and checksum search work from the database.
-Backends: `fs` (temp-then-rename into a two-level hex tree) and `s3` (aws-sdk-go-v2,
-multipart upload for large objects, no rename). The contract:
+Backends: `fs` (temp-then-rename into a two-level hex tree), `s3` (aws-sdk-go-v2,
+multipart upload for large objects, no rename), and `gcs` and `azure` as decided in
+[0027](0027-cloud-blob-backends.md) (compose of temporary parts; staged blocks). The
+contract:
 
 - `BeginUpload(ctx) → UploadID`, `Append(ctx, id, chunk)`, `Commit(ctx, id, digest)`,
   `Abort(ctx, id)`; the fs backend keeps a temp directory per upload id, the s3 backend
