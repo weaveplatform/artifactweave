@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated event Go client (make generate).
+package: event
+output: pkg/client/event/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

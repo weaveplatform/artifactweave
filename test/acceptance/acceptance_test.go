@@ -1,0 +1,94 @@
+// Package acceptance runs the Gherkin features in features/ against the real
+// artifactweave binary (decision record 0015). The binary is built once with
+// -cover; when ARTIFACTWEAVE_GOCOVERDIR is set (make accept) every process
+// writes coverage there so acceptance runs count toward the merged gate.
+//
+// The suite runs on Linux in CI. Windows runners cannot run the container
+// backed scenarios and macOS runners have no Docker, so both skip unless a
+// developer opts in locally.
+package acceptance
+
+import (
+	"flag"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"github.com/cucumber/godog"
+)
+
+const module = "github.com/weaveplatform/weaveplatform-artifact-registry"
+
+// binary is the built artifactweave path.
+var binary string
+
+// coverDir receives coverage from the binary when set.
+var coverDir = os.Getenv("ARTIFACTWEAVE_GOCOVERDIR")
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	if skip, why := skipReason(); skip {
+		fmt.Fprintln(os.Stderr, "skipping acceptance: "+why)
+		os.Exit(0)
+	}
+	dir, err := os.MkdirTemp("", "artifactweave-accept-")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	code := func() int {
+		defer func() { _ = os.RemoveAll(dir) }()
+		out := filepath.Join(dir, "artifactweave")
+		args := []string{"build", "-o", out}
+		if coverDir != "" {
+			args = append(args, "-cover", "-covermode=atomic", "-coverpkg="+module+"/...")
+		}
+		cmd := exec.Command("go", append(args, "../../cmd/artifactweave")...)
+		cmd.Env = append(os.Environ(), "GOWORK=off")
+		if b, err := cmd.CombinedOutput(); err != nil {
+			fmt.Fprintf(
+				os.Stderr,
+				"cannot build cmd/artifactweave for acceptance (does it exist yet?): %v\n%s",
+				err,
+				b,
+			)
+			return 1
+		}
+		binary = out
+		return m.Run()
+	}()
+	os.Exit(code)
+}
+
+// skipReason decides whether this OS runs the suite. The CI matrix runs unit
+// tests on every OS, so the skip must be a clean exit rather than a failure.
+func skipReason() (bool, string) {
+	switch runtime.GOOS {
+	case "windows":
+		return true, "acceptance runs on Linux only (decision 0015)"
+	case "darwin":
+		if os.Getenv("ARTIFACTWEAVE_ACCEPT_LOCAL") == "" {
+			return true, "set ARTIFACTWEAVE_ACCEPT_LOCAL=1 to run on macOS"
+		}
+	}
+	return false, ""
+}
+
+func TestFeatures(t *testing.T) {
+	suite := godog.TestSuite{
+		ScenarioInitializer: func(sc *godog.ScenarioContext) { newWorld(t).register(sc) },
+		Options: &godog.Options{
+			Format:   "pretty",
+			Paths:    []string{"features"},
+			TestingT: t,
+			Strict:   true,
+			Tags:     os.Getenv("ARTIFACTWEAVE_ACCEPT_TAGS"),
+		},
+	}
+	if suite.Run() != 0 {
+		t.Fatal("acceptance features failed")
+	}
+}

@@ -1,0 +1,21 @@
+# Shared schemas: the error envelope and the system documents.
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      description: The error envelope used by every /event response.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          description: Required within this object. One entry per error; clients read the first.
+          items:
+            type: object
+            required: [code, message]
+            properties:
+              code:
+                type: string
+                description: Required within this object. A symbolic code such as NOT_FOUND.
+              message:
+                type: string
+                description: Required within this object. Human readable explanation.

@@ -1,0 +1,939 @@
+# Webhook subscriptions served under /event: create, read, replace, delete and test
+# subscriptions, and read the delivery troubleshooting log. Facts come from the oracle
+# (integrations-jfrog-platform-webhooks-api family); the prose is ours
+# (docs/research/07-webhooks-retention-projects.md, decision 0011). Status codes are the
+# ones the jfrog/artifactory Terraform provider's 24 webhook resources hard-check.
+components:
+  schemas:
+    CustomWebhookHandlerCreate:
+      description: 'A custom-webhook handler: the request is built from templates.'
+      properties:
+        handler_type:
+          description: Required within this object. Must be custom-webhook.
+          enum:
+          - custom-webhook
+          type: string
+        http_headers:
+          description: Optional within this object. HTTP headers sent with every delivery. Values may reference
+            secrets as {{.secrets.<name>}}.
+          items:
+            $ref: '#/components/schemas/HttpHeader'
+          type: array
+        method:
+          default: POST
+          description: Optional within this object. HTTP method used for the delivery. Defaults to POST.
+          enum:
+          - POST
+          - PUT
+          - GET
+          - PATCH
+          - DELETE
+          type: string
+        payload:
+          description: Optional within this object. Go text/template rendered into the request body. The template
+            sees the event as {{.data}} (for example {{.data.repo_key}}; {{json .data}} renders it as JSON), the
+            subscription's secrets as {{.secrets.<name>}} and the acting user as {{.userContext.id}}. Omitted means
+            the event's default JSON payload. A template that fails to parse is rejected with 400.
+          type: string
+        proxy:
+          description: Optional within this object. Key of a configured outbound proxy to use for deliveries. Omitted
+            means a direct connection, or the platform default proxy when one is set.
+          type: string
+        secrets:
+          description: Optional within this object. Named secrets the templates can reference.
+          items:
+            $ref: '#/components/schemas/NamedSecretCreate'
+          type: array
+        url:
+          description: Required within this object. Absolute http or https URL the event is delivered to. Failed
+            deliveries are retried with backoff (decision 0011). The URL may reference secrets as {{.secrets.<name>}}.
+          format: uri
+          type: string
+      required:
+      - handler_type
+      - url
+      type: object
+    CustomWebhookHandlerRead:
+      description: A custom-webhook handler as the server returns it.
+      properties:
+        handler_type:
+          description: Required within this object. Always custom-webhook.
+          enum:
+          - custom-webhook
+          type: string
+        http_headers:
+          description: Optional within this object. The header templates.
+          items:
+            $ref: '#/components/schemas/HttpHeader'
+          type: array
+        method:
+          description: Optional within this object. The delivery method.
+          enum:
+          - POST
+          - PUT
+          - GET
+          - PATCH
+          - DELETE
+          type: string
+        payload:
+          description: Optional within this object. The payload template.
+          type: string
+        proxy:
+          description: Optional within this object. The proxy key, when one is set.
+          type: string
+        secrets:
+          description: Optional within this object. The secret names; values are never returned.
+          items:
+            $ref: '#/components/schemas/NamedSecretRead'
+          type: array
+        url:
+          description: Required within this object. The delivery URL template.
+          format: uri
+          type: string
+      required:
+      - handler_type
+      - url
+      type: object
+    CustomWebhookHandlerUpdate:
+      description: A custom-webhook handler in a replace body.
+      properties:
+        handler_type:
+          description: Required within this object. Must be custom-webhook.
+          enum:
+          - custom-webhook
+          type: string
+        http_headers:
+          description: Optional within this object. HTTP headers sent with every delivery. Values may reference
+            secrets as {{.secrets.<name>}}.
+          items:
+            $ref: '#/components/schemas/HttpHeader'
+          type: array
+        method:
+          description: Optional within this object. HTTP method used for the delivery. Defaults to POST.
+          enum:
+          - POST
+          - PUT
+          - GET
+          - PATCH
+          - DELETE
+          type: string
+        payload:
+          description: Optional within this object. Go text/template rendered into the request body. The template
+            sees the event as {{.data}} (for example {{.data.repo_key}}; {{json .data}} renders it as JSON), the
+            subscription's secrets as {{.secrets.<name>}} and the acting user as {{.userContext.id}}. Omitted means
+            the event's default JSON payload. A template that fails to parse is rejected with 400.
+          type: string
+        proxy:
+          description: Optional within this object. Key of a configured outbound proxy to use for deliveries. Omitted
+            means a direct connection, or the platform default proxy when one is set.
+          type: string
+        secrets:
+          description: Optional within this object. Named secrets the payload and header templates can reference.
+            On replace, a listed name without a value keeps that secret, a value rotates it, an empty string wipes
+            it, and a secret whose name is not listed is removed.
+          items:
+            $ref: '#/components/schemas/NamedSecretUpdate'
+          type: array
+        url:
+          description: Required within this object. Absolute http or https URL the event is delivered to. Failed
+            deliveries are retried with backoff (decision 0011).
+          format: uri
+          type: string
+      required:
+      - handler_type
+      - url
+      type: object
+    EventFilter:
+      description: Selects the domain, the event types and the resources whose events are delivered.
+      properties:
+        criteria:
+          allOf:
+          - $ref: '#/components/schemas/EventFilterCriteria'
+          description: Optional within this object. Resource conditions for the domain. Required for every domain
+            except user and curation.
+        domain:
+          description: Required within this object. One of artifact, artifact_property, docker, build, user, release_bundle,
+            distribution, artifactory_release_bundle, destination, release_bundle_v2, release_bundle_v2_promotion,
+            artifact_lifecycle, xray_scan_status, app_trust or curation. Subscriptions are accepted for every domain
+            so Terraform plans stay clean, but artifactweave only emits events for artifact, artifact_property,
+            docker, build and user. Project admins may only use artifact, artifact_property, docker and build.
+          type: string
+        event_types:
+          description: 'Required within this object. Events of the domain that trigger the subscription, at least
+            one, spelled exactly as listed here because clients compare them verbatim. artifact: deployed, deleted,
+            moved, copied, cached. artifact_property: added, deleted. docker: pushed, deleted, promoted. build:
+            uploaded, deleted, promoted. user: locked. release_bundle: created, signed, deleted. distribution: distribute_started,
+            distribute_completed, distribute_aborted, distribute_failed, delete_started, delete_completed, delete_failed.
+            artifactory_release_bundle and destination: received, delete_started, delete_completed, delete_failed.
+            release_bundle_v2: release_bundle_v2_started, release_bundle_v2_failed, release_bundle_v2_completed.
+            release_bundle_v2_promotion: release_bundle_v2_promotion_started, release_bundle_v2_promotion_failed,
+            release_bundle_v2_promotion_completed. artifact_lifecycle: archive, restore. An event type that does
+            not belong to the domain is rejected with 400.'
+          items:
+            type: string
+          minItems: 1
+          type: array
+      required:
+      - domain
+      - event_types
+      type: object
+    EventFilterCriteria:
+      additionalProperties: true
+      description: 'Resource conditions for the domain. Which fields apply depends on the domain: artifact, artifact_property,
+        docker and artifact_lifecycle use anyLocal, anyRemote, anyFederated, repoKeys and the patterns; build uses
+        anyBuild, selectedBuilds and the patterns; release_bundle, distribution, artifactory_release_bundle and
+        destination use anyReleaseBundle and registeredReleaseBundlesNames; release_bundle_v2 uses anyReleaseBundle
+        and selectedReleaseBundles; release_bundle_v2_promotion uses selectedEnvironments; app_trust uses applicationKeys
+        and stages; user and curation take no criteria. Fields that do not apply to the domain are stored and echoed
+        but have no effect. Unknown fields are kept as given.'
+      properties:
+        anyBuild:
+          description: 'Optional within this object. Build domain: match every build.'
+          type: boolean
+        anyFederated:
+          description: 'Optional within this object. Repository domains: match events in every federated repository.'
+          type: boolean
+        anyLocal:
+          description: 'Optional within this object. Repository domains: match events in every local repository.'
+          type: boolean
+        anyReleaseBundle:
+          description: 'Optional within this object. Release bundle domains: match every release bundle.'
+          type: boolean
+        anyRemote:
+          description: 'Optional within this object. Repository domains: match events in every remote repository
+            cache.'
+          type: boolean
+        applicationKeys:
+          description: 'Optional within this object. app_trust: application keys whose events match.'
+          items:
+            type: string
+          type: array
+        excludePatterns:
+          description: 'Optional within this object. Repository and build domains: Ant patterns that exclude an
+            otherwise matching path or build name.'
+          items:
+            type: string
+          type: array
+        includePatterns:
+          description: 'Optional within this object. Repository and build domains: Ant patterns an artifact path
+            (or build name) must match. Empty means everything.'
+          items:
+            type: string
+          type: array
+        registeredReleaseBundlesNames:
+          description: 'Optional within this object. release_bundle, distribution, artifactory_release_bundle and
+            destination: release bundle names that match.'
+          items:
+            type: string
+          type: array
+        repoKeys:
+          description: 'Optional within this object. Repository domains: repositories whose events match, in addition
+            to the any* flags. A repository that does not exist is rejected with 400.'
+          items:
+            type: string
+          type: array
+        selectedBuilds:
+          description: 'Optional within this object. Build domain: build names that match, in addition to anyBuild.'
+          items:
+            type: string
+          type: array
+        selectedEnvironments:
+          description: 'Optional within this object. release_bundle_v2_promotion: target environments whose promotions
+            match.'
+          items:
+            type: string
+          type: array
+        selectedReleaseBundles:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          description: 'Optional within this object. release_bundle_v2: map from release bundle name to the versions
+            that match; an empty list matches every version of that bundle.'
+          type: object
+        stages:
+          description: 'Optional within this object. app_trust: lifecycle stages whose events match.'
+          items:
+            type: string
+          type: array
+      type: object
+    HttpHeader:
+      description: One HTTP header added to deliveries.
+      properties:
+        name:
+          description: Required within this object. Header name.
+          type: string
+        value:
+          description: Required within this object. Header value; custom-webhook values may reference {{.secrets.<name>}}.
+          type: string
+      required:
+      - name
+      - value
+      type: object
+    NamedSecretCreate:
+      description: A named secret for templates.
+      properties:
+        name:
+          description: Required within this object. Secret name, a letter or underscore followed by letters, digits
+            or underscores.
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          type: string
+        value:
+          description: 'Required within this object. Secret value. Write-only: responses return the name only.'
+          format: password
+          type: string
+          writeOnly: true
+      required:
+      - name
+      - value
+      type: object
+    NamedSecretRead:
+      description: 'A named secret as the server returns it: the name only.'
+      properties:
+        name:
+          description: Required within this object. Secret name.
+          type: string
+      required:
+      - name
+      type: object
+    NamedSecretUpdate:
+      description: A named secret in a replace body.
+      properties:
+        name:
+          description: Required within this object. Name of the secret to keep, rotate or wipe.
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          type: string
+        value:
+          description: Optional within this object. Write-only. Omitted keeps the stored value, a non-empty value
+            rotates it, and an empty string wipes it.
+          format: password
+          type: string
+          writeOnly: true
+      required:
+      - name
+      type: object
+    WebhookHandler:
+      description: 'A webhook handler: the event is posted as JSON to url.'
+      properties:
+        custom_http_headers:
+          description: Optional within this object. Extra HTTP headers sent with every delivery. Header names must
+            be unique.
+          items:
+            $ref: '#/components/schemas/HttpHeader'
+          type: array
+        handler_type:
+          description: Required within this object. Must be webhook.
+          enum:
+          - webhook
+          type: string
+        proxy:
+          description: Optional within this object. Key of a configured outbound proxy to use for deliveries. Omitted
+            means a direct connection, or the platform default proxy when one is set.
+          type: string
+        secret:
+          description: 'Optional within this object. Shared secret for the X-JFrog-Event-Auth delivery header. Write-only:
+            responses never echo it. On replace, omitting it keeps the stored secret, a new value rotates it, and
+            an empty string removes it.'
+          format: password
+          type: string
+          writeOnly: true
+        url:
+          description: Required within this object. Absolute http or https URL the event is delivered to. Failed
+            deliveries are retried with backoff (decision 0011).
+          format: uri
+          type: string
+        use_secret_for_signing:
+          default: false
+          description: 'Optional within this object. Selects what X-JFrog-Event-Auth carries: false (the default)
+            sends the secret itself, true sends the lower-case hex HMAC-SHA256 of the request body keyed with the
+            secret, so the receiver can verify the payload. Ignored when no secret is set.'
+          type: boolean
+      required:
+      - handler_type
+      - url
+      type: object
+    WebhookHandlerInputCreate:
+      description: A handler in a create body, discriminated by handler_type.
+      discriminator:
+        mapping:
+          custom-webhook: '#/components/schemas/CustomWebhookHandlerCreate'
+          webhook: '#/components/schemas/WebhookHandler'
+        propertyName: handler_type
+      oneOf:
+      - $ref: '#/components/schemas/WebhookHandler'
+      - $ref: '#/components/schemas/CustomWebhookHandlerCreate'
+    WebhookHandlerInputUpdate:
+      description: A handler in a replace body, discriminated by handler_type.
+      discriminator:
+        mapping:
+          custom-webhook: '#/components/schemas/CustomWebhookHandlerUpdate'
+          webhook: '#/components/schemas/WebhookHandler'
+        propertyName: handler_type
+      oneOf:
+      - $ref: '#/components/schemas/WebhookHandler'
+      - $ref: '#/components/schemas/CustomWebhookHandlerUpdate'
+    WebhookHandlerRead:
+      description: A webhook handler as the server returns it.
+      properties:
+        custom_http_headers:
+          description: Optional within this object. The extra headers.
+          items:
+            $ref: '#/components/schemas/HttpHeader'
+          type: array
+        handler_type:
+          description: Required within this object. Always webhook.
+          enum:
+          - webhook
+          type: string
+        proxy:
+          description: Optional within this object. The proxy key, when one is set.
+          type: string
+        secret:
+          description: 'Optional within this object. Never the stored secret: absent when no secret is set, otherwise
+            a fixed mask, so a client can tell that one exists.'
+          readOnly: true
+          type: string
+        url:
+          description: Required within this object. The delivery URL.
+          format: uri
+          type: string
+        use_secret_for_signing:
+          description: Optional within this object. Whether deliveries carry an HMAC signature rather than the raw
+            secret.
+          type: boolean
+      required:
+      - handler_type
+      - url
+      type: object
+    WebhookHandlerResponse:
+      description: A handler as the server returns it, discriminated by handler_type.
+      discriminator:
+        mapping:
+          custom-webhook: '#/components/schemas/CustomWebhookHandlerRead'
+          webhook: '#/components/schemas/WebhookHandlerRead'
+        propertyName: handler_type
+      oneOf:
+      - $ref: '#/components/schemas/WebhookHandlerRead'
+      - $ref: '#/components/schemas/CustomWebhookHandlerRead'
+    WebhookSubscription:
+      description: A stored webhook subscription as the server returns it, with secrets redacted.
+      properties:
+        debug:
+          description: Optional within this object. Whether successful deliveries are logged too.
+          type: boolean
+        description:
+          description: Optional within this object. The stored description.
+          type: string
+        enabled:
+          description: Optional within this object. Whether events are delivered.
+          type: boolean
+        event_filter:
+          allOf:
+          - $ref: '#/components/schemas/EventFilter'
+          description: Optional within this object. The stored filter.
+        handlers:
+          description: Optional within this object. The single handler, with secrets redacted.
+          items:
+            $ref: '#/components/schemas/WebhookHandlerResponse'
+          maxItems: 1
+          minItems: 1
+          type: array
+        key:
+          description: Optional within this object. The subscription key.
+          type: string
+        project_key:
+          description: Optional within this object. The owning project; absent for a global subscription.
+          type: string
+      type: object
+    WebhookSubscriptionCreate:
+      description: Body for creating (or test-delivering) a webhook subscription.
+      properties:
+        debug:
+          default: false
+          description: Optional within this object. When true every delivery attempt, successful or not, is kept
+            in the troubleshooting log; when false (the default) only failed attempts are kept.
+          type: boolean
+        description:
+          description: Optional within this object. Free text describing the subscription.
+          type: string
+        enabled:
+          default: false
+          description: Required within this object. Whether events are delivered. A disabled subscription is stored
+            but never fires.
+          type: boolean
+        event_filter:
+          allOf:
+          - $ref: '#/components/schemas/EventFilter'
+          description: Required within this object. Which events trigger the subscription. See EventFilter.
+        handlers:
+          description: 'Required within this object. Exactly one delivery handler: a webhook (fixed JSON payload)
+            or a custom-webhook (templated request).'
+          items:
+            $ref: '#/components/schemas/WebhookHandlerInputCreate'
+          maxItems: 1
+          minItems: 1
+          type: array
+        key:
+          description: 'Required within this object. Subscription key, unique on the server: a letter followed by
+            letters, digits, underscore or hyphen, at most 500 characters. Immutable once created; it is the {key}
+            path parameter of the other operations.'
+          maxLength: 500
+          pattern: ^[A-Za-z][A-Za-z0-9_\-]+$
+          type: string
+        project_key:
+          description: 'Optional within this object. Project the subscription belongs to. Omitted means a global
+            subscription. Project admins must set it to their own project. Immutable: a replace that changes it
+            is rejected with 400.'
+          type: string
+      required:
+      - key
+      - enabled
+      - event_filter
+      - handlers
+      type: object
+    WebhookSubscriptionUpdate:
+      description: Body for replacing a webhook subscription. Every field is replaced except the key, which comes
+        from the path, and secrets, which follow the keep, rotate and wipe rules on their fields.
+      properties:
+        debug:
+          default: false
+          description: Optional within this object. When true every delivery attempt, successful or not, is kept
+            in the troubleshooting log; when false (the default) only failed attempts are kept.
+          type: boolean
+        description:
+          description: Optional within this object. Free text describing the subscription.
+          type: string
+        enabled:
+          description: Required within this object. Whether events are delivered.
+          type: boolean
+        event_filter:
+          allOf:
+          - $ref: '#/components/schemas/EventFilter'
+          description: Required within this object. Which events trigger the subscription. See EventFilter.
+        handlers:
+          description: 'Required within this object. Exactly one delivery handler: a webhook (fixed JSON payload)
+            or a custom-webhook (templated request).'
+          items:
+            $ref: '#/components/schemas/WebhookHandlerInputUpdate'
+          maxItems: 1
+          minItems: 1
+          type: array
+        project_key:
+          description: Optional within this object. Must equal the stored project key or be omitted; the project
+            of a subscription cannot change.
+          type: string
+      required:
+      - enabled
+      - event_filter
+      - handlers
+      type: object
+paths:
+  /api/v1/subscriptions:
+    get:
+      description: Returns every subscription the caller may manage, global and project ones, with secrets redacted.
+        Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
+        and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
+        r.
+      operationId: getWebhookSubscriptions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/WebhookSubscription'
+                type: array
+          description: The subscriptions; an empty array when there are none.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+      summary: List webhook subscriptions
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscriptions.md
+    post:
+      description: Stores a new subscription and starts delivering matching events if it is enabled. Answers 201,
+        which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400.
+        Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
+        and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
+        w.
+      operationId: createWebhookSubscription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSubscriptionCreate'
+        description: The subscription to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscription'
+          description: The subscription was created; the body echoes it with secrets redacted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+      summary: Create a webhook subscription
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/createwebhooksubscription.md
+  /api/v1/subscriptions/test:
+    post:
+      description: Builds a sample event for the body's domain and first event type and delivers it once through
+        the body's handler, without storing anything. Useful to check a URL, secret or template before creating
+        the subscription. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property,
+        docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url>
+        with x.
+      operationId: testWebhookSubscription
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSubscriptionCreate'
+        description: A subscription as it would be created; its key need not be unique.
+        required: true
+      responses:
+        '200':
+          description: The test delivery was attempted. The status reflects only that the request was valid; the
+            receiver's answer appears in the troubleshooting log.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+      summary: Send a test delivery
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/testwebhooksubscription.md
+  /api/v1/subscriptions/{key}:
+    delete:
+      description: Deletes the subscription. Deliveries already in flight finish; no new ones start. Requires a
+        platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build
+        domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with d.
+      operationId: deleteWebhookSubscription
+      parameters:
+      - description: Required path parameter. Key of the webhook subscription.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: The subscription was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No subscription exists with this key.
+      summary: Delete a webhook subscription
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/deletewebhooksubscription.md
+    get:
+      description: Returns one subscription with secrets redacted. Requires a platform admin, a project admin (project
+        subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role,
+        or a token scoped system:webhooks@<project>/<url> with r.
+      operationId: getWebhookSubscription
+      parameters:
+      - description: Required path parameter. Key of the webhook subscription.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscription'
+          description: The subscription.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No subscription exists with this key.
+      summary: Get a webhook subscription
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscription.md
+    put:
+      description: Replaces the subscription with the body. The key and project cannot change. Secrets follow the
+        keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted)
+        can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires.
+        Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
+        and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
+        w.
+      operationId: updateWebhookSubscription
+      parameters:
+      - description: Required path parameter. Key of the webhook subscription.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSubscriptionUpdate'
+        description: The complete new subscription.
+        required: true
+      responses:
+        '204':
+          description: The subscription was replaced.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No subscription exists with this key.
+      summary: Replace a webhook subscription
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/updatewebhooksubscription.md
+  /api/v1/troubleshooting:
+    get:
+      description: 'Returns delivery attempt records from a store that keeps the most recent 10,000; older ones
+        are discarded. Three modes, chosen by the parameters: without start the connection stays open and streams
+        each new record as it happens until the client disconnects; with start alone the stored records from that
+        time are sent first and the stream then stays live; with start plus end or count the call returns the matching
+        stored records and ends. start=0 begins at the oldest record held. subscription and target filter every
+        mode. A record is kept for every failed attempt, and for every attempt of a subscription with debug set.
+        Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
+        and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
+        r.'
+      operationId: streamWebhookTroubleshooting
+      parameters:
+      - description: Optional query parameter. Only records of this subscription key.
+        in: query
+        name: subscription
+        schema:
+          type: string
+      - description: Optional query parameter. Only records whose target URL equals this value.
+        in: query
+        name: target
+        schema:
+          type: string
+      - description: Optional query parameter. Earliest record to include, as Unix time in milliseconds, the unit
+          of each record's timestamp; 0 means the oldest record held. Alone it keeps the stream live after the stored
+          records; with end or count the call ends after them.
+        in: query
+        name: start
+        schema:
+          format: int64
+          type: integer
+        x-unverified: true
+      - description: Optional query parameter. Exclude records at or after this time, as Unix time in milliseconds.
+          Only valid with start (400 otherwise); makes the call a bounded fetch.
+        in: query
+        name: end
+        schema:
+          format: int64
+          type: integer
+        x-unverified: true
+      - description: Optional query parameter. Maximum number of records returned. Only valid with start (400 otherwise);
+          makes the call a bounded fetch.
+        in: query
+        name: count
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  elapsed_millis:
+                    description: Optional within this object. How long the attempt took, in milliseconds.
+                    type: integer
+                  errors:
+                    description: Optional within this object. Errors met during the attempt (connection, timeout
+                      or template errors); empty on success.
+                    items:
+                      type: string
+                    type: array
+                  event:
+                    description: Optional within this object. The event that was delivered.
+                    properties:
+                      data:
+                        description: Optional within this object. The event payload, serialised as a JSON string.
+                        type: string
+                      domain:
+                        description: Optional within this object. Event domain.
+                        type: string
+                      event_type:
+                        description: Optional within this object. Event type.
+                        type: string
+                      id:
+                        description: Optional within this object. Unique event identifier; retries of one event
+                          share it.
+                        type: string
+                      source:
+                        description: Optional within this object. Service that raised the event, for example jfrt@<service
+                          id>.
+                        type: string
+                      subscription_key:
+                        description: Optional within this object. Subscription that delivered it.
+                        type: string
+                    type: object
+                  request:
+                    description: Optional within this object. The outgoing request, with secrets masked.
+                    properties:
+                      headers:
+                        additionalProperties:
+                          type: string
+                        description: Optional within this object. Request headers; the auth header and secret-bearing
+                          values are masked.
+                        type: object
+                      method:
+                        description: Optional within this object. HTTP method.
+                        type: string
+                      payload:
+                        description: Optional within this object. Rendered request body.
+                        type: string
+                      retries_attempted:
+                        description: Optional within this object. Number of retries before this attempt.
+                        type: integer
+                      url:
+                        description: Optional within this object. Target URL.
+                        type: string
+                    type: object
+                  response:
+                    description: Optional within this object. The receiver's answer; absent when no response arrived.
+                    properties:
+                      body:
+                        description: Optional within this object. Body the receiver returned, as text. JFrog documents
+                          no size limit; artifactweave keeps at most the first 4 KiB.
+                        type: string
+                        x-unverified: true
+                      headers:
+                        additionalProperties:
+                          type: string
+                        description: Optional within this object. Response headers.
+                        type: object
+                      status:
+                        description: Optional within this object. HTTP status code returned by the receiver.
+                        type: integer
+                    type: object
+                  timestamp:
+                    description: Optional within this object. When the delivery attempt was made, as Unix time in
+                      milliseconds.
+                    format: int64
+                    type: integer
+                type: object
+          description: One delivery record per JSON value.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, a project admin for the subscription's project and domain,
+            a holder of the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with the needed
+            action.
+      summary: Read the webhook delivery log
+      tags:
+      - webhooks
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/streamwebhooktroubleshooting.md

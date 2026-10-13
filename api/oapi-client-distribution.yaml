@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated distribution Go client (make generate).
+package: distribution
+output: pkg/client/distribution/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

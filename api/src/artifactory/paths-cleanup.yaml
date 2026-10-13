@@ -1,0 +1,2639 @@
+# Cleanup policies: package, build and release bundle retention rules, their runs and
+# reports. Only the /api/cleanup operations of the storage-and-archive family are in
+# scope here; cold-storage archive and smart archiving live in paths-archive.yaml. Facts come
+# from the oracle; the prose is ours (docs/research/07-webhooks-retention-projects.md,
+# decisions 0010 and 0018). Package policies are implemented; build and release bundle
+# policies are specified so their shapes are fixed but answer 501 in v1 (x-tier: stub).
+components:
+  schemas:
+    BuildCleanupPolicyRequest:
+      description: Body for creating or replacing a build cleanup policy, which deletes build-info records (and
+        optionally their artifacts) by build name and age.
+      properties:
+        cronExp:
+          description: 'Optional within this object. Quartz cron expression (six or seven fields with seconds, ?,
+            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone (decision 0010).
+            Omitted or empty means the policy only runs when triggered through the run operation.'
+          type: string
+        deleteArtifacts:
+          description: Optional within this object. When true the artifacts recorded in each deleted build are deleted
+            as well. Defaults to false, which deletes only the build-info record.
+          type: boolean
+        description:
+          description: Optional within this object. Free text shown with the policy, at most 256 characters.
+          maxLength: 256
+          type: string
+        durationInMinutes:
+          description: Optional within this object. Maximum run time in minutes. A run that reaches it stops where
+            it is, reports COMPLETED_WITH_ERRORS or STOPPED, and does not resume. Omitted means no limit.
+          type: integer
+        enabled:
+          description: 'Optional within this object. Whether scheduled and manual runs may execute. Must be false
+            or omitted on create: the server rejects a create with true (400). Turn a policy on afterwards with
+            the enablement operation; on replace the value is ignored and enablement keeps its current state.'
+          type: boolean
+        itemType:
+          description: Required within this object. Must be build.
+          enum:
+          - build
+          type: string
+        key:
+          description: Required within this object. The policy key, unique per item type, at least three characters
+            of letters, digits, underscore and hyphen. Must equal the policyKey path parameter.
+          type: string
+        projectKey:
+          description: Optional within this object. Project key for a project-level policy. Omitted for a global
+            policy. Project admins may only manage policies of their own projects; the key cannot change after creation.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/BuildCleanupSearchCriteria'
+          description: Required within this object. The selection rules. See BuildCleanupSearchCriteria.
+        skipTrashcan:
+          description: Optional within this object. When true, deleted items bypass the trash can and are removed
+            permanently. Defaults to false, which moves them to the trash can where its retention period applies.
+          type: boolean
+      required:
+      - key
+      - itemType
+      - searchCriteria
+      type: object
+    BuildCleanupPolicyResponse:
+      description: A stored build cleanup policy as the server returns it.
+      properties:
+        cronExp:
+          description: Optional within this object. The stored Quartz schedule; empty when the policy only runs
+            on demand.
+          type: string
+        deleteArtifacts:
+          description: Optional within this object. Whether each deleted build's artifacts are deleted too.
+          type: boolean
+        description:
+          description: Optional within this object. The free text stored with the policy.
+          type: string
+        durationInMinutes:
+          description: Optional within this object. The stored maximum run time in minutes.
+          type: integer
+        enabled:
+          description: Optional within this object. Whether scheduled and manual runs may execute.
+          type: boolean
+        itemType:
+          description: Optional within this object. Always build.
+          enum:
+          - build
+          type: string
+        key:
+          description: Optional within this object. The policy key.
+          type: string
+        projectKey:
+          description: Optional within this object. The owning project's key; absent for a global policy.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/BuildCleanupSearchCriteria'
+          description: Optional within this object. The stored selection rules.
+        skipTrashcan:
+          description: Optional within this object. Whether deletions bypass the trash can.
+          type: boolean
+      type: object
+    BuildCleanupSearchCriteria:
+      description: Which builds a build cleanup policy deletes.
+      properties:
+        createdBeforeInDays:
+          description: Optional within this object. Only items created at least this many 24-hour days before the
+            run are selected. Omitted or 0 means creation age is not a condition.
+          minimum: 0
+          type: integer
+        createdBeforeInMonths:
+          description: Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for
+            configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays
+            is set.
+          minimum: 0
+          type: integer
+        excludeBuildsWithReleaseBundles:
+          description: Optional within this object. When true, builds referenced by a release bundle are never deleted.
+          type: boolean
+        includeAllProjects:
+          description: Required within this object. When true the policy covers every project, and includedProjects
+            is ignored. Only meaningful on global policies created by a platform admin. Defaults to false.
+          type: boolean
+        includedBuilds:
+          description: Required within this object. Build name patterns to clean up, at least one.
+          items:
+            $ref: '#/components/schemas/CleanupBuildTarget'
+          type: array
+        includedProjects:
+          description: Required within this object. Project keys the policy covers. The key default stands for repositories
+            (or builds) not assigned to any project. Ignored when includeAllProjects is true.
+          items:
+            type: string
+          type: array
+      required:
+      - includeAllProjects
+      - includedProjects
+      - includedBuilds
+      type: object
+    CleanupBuildTarget:
+      description: One build name pattern, scoped to a project or to the global level.
+      properties:
+        name:
+          description: Required within this object. Build name; a trailing * matches any suffix.
+          type: string
+        projectKey:
+          description: Required within this object. Project the build belongs to; empty string for global builds.
+          type: string
+      required:
+      - name
+      - projectKey
+      type: object
+    CleanupExecutionSummary:
+      description: When the run started and finished.
+      properties:
+        durationMillis:
+          description: Optional within this object. Elapsed time in milliseconds.
+          format: int64
+          type: integer
+        finishedAt:
+          description: Optional within this object. Finish time, RFC 3339 UTC; absent while running.
+          format: date-time
+          type: string
+        startedAt:
+          description: Optional within this object. Start time, RFC 3339 UTC.
+          format: date-time
+          type: string
+      type: object
+    CleanupPagination:
+      description: Paging information for a run listing. Pages are numbered from 1.
+      properties:
+        currentPage:
+          description: Optional within this object. This page's number, starting at 1.
+          format: int64
+          type: integer
+        lastPage:
+          description: Optional within this object. Number of the last page.
+          format: int64
+          type: integer
+        pageSize:
+          description: Optional within this object. Runs per page.
+          format: int64
+          type: integer
+        total:
+          description: Optional within this object. Number of runs matching the filters.
+          format: int64
+          type: integer
+      type: object
+    CleanupPolicyEnablement:
+      description: Turns a policy's schedule and manual runs on or off.
+      properties:
+        enabled:
+          description: Required within this object. true lets scheduled and manual runs execute; false blocks them
+            and leaves a running run alone.
+          type: boolean
+      required:
+      - enabled
+      type: object
+    CleanupPolicyEntry:
+      description: One policy in the overview, with its schedule and the outcome of its last run.
+      properties:
+        displayProject:
+          description: Optional within this object. Display name of the owning project; absent for a global policy.
+          type: string
+        enabled:
+          description: Optional within this object. Whether the policy may run.
+          type: boolean
+        includedProjects:
+          description: Optional within this object. Project keys the policy covers.
+          items:
+            type: string
+          type: array
+        itemType:
+          description: Optional within this object. package, build or releaseBundle.
+          type: string
+        lastRunData:
+          allOf:
+          - $ref: '#/components/schemas/CleanupPolicyLastRun'
+          description: Optional within this object. Outcome of the most recent run; absent when the policy never
+            ran.
+        nextRunTime:
+          description: Optional within this object. Next scheduled run as epoch milliseconds; absent when the policy
+            has no schedule or is disabled.
+          format: int64
+          type: integer
+        policyKey:
+          description: Optional within this object. The policy key.
+          type: string
+      type: object
+    CleanupPolicyLastRun:
+      description: The outcome of a policy's most recent run.
+      properties:
+        dryRun:
+          description: Optional within this object. Whether that run only reported what it would delete.
+          type: boolean
+        lastRunTime:
+          description: Optional within this object. When that run started, as epoch milliseconds.
+          format: int64
+          type: integer
+        reportDownloaded:
+          description: Optional within this object. Whether anyone has downloaded that run's report.
+          type: boolean
+        runId:
+          description: Optional within this object. Identifier of that run.
+          type: integer
+        status:
+          description: Optional within this object. Status of that run, from the run status values (for example
+            COMPLETED).
+          type: string
+        totalItems:
+          description: Optional within this object. Number of items that run selected.
+          format: int64
+          type: integer
+      type: object
+    CleanupPolicyRunView:
+      description: One page of cleanup policy runs.
+      properties:
+        pagination:
+          allOf:
+          - $ref: '#/components/schemas/CleanupPagination'
+          description: Optional within this object. Where this page sits in the full result.
+        runViews:
+          description: Optional within this object. The runs on this page, ordered by sortBy and sortOrder.
+          items:
+            $ref: '#/components/schemas/CleanupPolicyRunViewEntry'
+          type: array
+      type: object
+    CleanupPolicyRunViewEntry:
+      description: One cleanup policy run, scheduled or manual, real or dry.
+      properties:
+        cleanedItems:
+          description: Optional within this object. Number of items deleted (0 for a dry run).
+          format: int64
+          type: integer
+        cleanedSize:
+          description: Optional within this object. Bytes freed by the deletions, counting each blob once.
+          format: int64
+          type: integer
+        displayProject:
+          description: Optional within this object. Display name of the owning project; absent for a global policy.
+          type: string
+        dryRun:
+          description: Optional within this object. Whether the run only reported what it would delete.
+          type: boolean
+        endTime:
+          description: Optional within this object. End as epoch milliseconds; absent while running.
+          format: int64
+          type: integer
+        includedProjects:
+          description: Optional within this object. Project keys the policy covered.
+          items:
+            type: string
+          type: array
+        itemType:
+          description: Optional within this object. Item type of the policy.
+          enum:
+          - package
+          - build
+          - releaseBundle
+          type: string
+        manual:
+          description: Optional within this object. true for a run started through the run operation, false for
+            a scheduled run.
+          type: boolean
+        policyKey:
+          description: Optional within this object. Key of the policy that ran.
+          type: string
+        policyTaskId:
+          description: Optional within this object. Internal task number of the run; informational.
+          type: integer
+        runId:
+          description: Optional within this object. Identifier of the run; the same value as the triggerId returned
+            when it was queued.
+          type: integer
+        startTime:
+          description: Optional within this object. Start as epoch milliseconds.
+          format: int64
+          type: integer
+        status:
+          description: Optional within this object. Run status. IN_PROGRESS and IN_PROGRESS_WITH_ERRORS are running;
+            COMPLETED, COMPLETED_WITH_ERRORS, STOPPED and FAILED are final; STOPPING is a stop in progress. PENDING_WARM,
+            PARTIAL_WARMED and WARMED describe Artifactory's index warm-up before a run and are never reported by
+            artifactweave, whose package index is always current.
+          enum:
+          - IN_PROGRESS
+          - IN_PROGRESS_WITH_ERRORS
+          - COMPLETED
+          - COMPLETED_WITH_ERRORS
+          - STOPPED
+          - STOPPING
+          - FAILED
+          - PENDING_WARM
+          - PARTIAL_WARMED
+          - WARMED
+          type: string
+        totalItems:
+          description: Optional within this object. Number of items selected.
+          format: int64
+          type: integer
+        triggeredBy:
+          description: Optional within this object. User who started a manual run, or system for a scheduled one.
+          type: string
+      type: object
+    CleanupPolicySummary:
+      description: Identity and outcome of the run the summary describes.
+      properties:
+        dryRun:
+          description: Optional within this object. Whether the run only reported what it would delete.
+          type: boolean
+        policyName:
+          description: Optional within this object. Key of the policy that ran.
+          type: string
+        runId:
+          description: Optional within this object. Identifier of the run.
+          type: integer
+        status:
+          description: Optional within this object. Final or current run status.
+          type: string
+        triggeredBy:
+          description: Optional within this object. User who started a manual run, or system for a scheduled one.
+          type: string
+      type: object
+    CleanupPolicyView:
+      description: Policies of every requested item type, summarised for an overview screen.
+      properties:
+        policies:
+          description: Optional within this object. One entry per policy, across the requested item types.
+          items:
+            $ref: '#/components/schemas/CleanupPolicyEntry'
+          type: array
+      type: object
+    CleanupProcessedItemsSummary:
+      description: Counts and sizes of the items the run selected and deleted.
+      properties:
+        failedItems:
+          description: Optional within this object. Items whose deletion failed; the report lists them.
+          format: int64
+          type: integer
+        itemType:
+          description: Optional within this object. Item type of the policy.
+          type: string
+        processedItems:
+          description: Optional within this object. Items deleted (or that would be deleted, for a dry run).
+          format: int64
+          type: integer
+        processedPhysicalSizeBytes:
+          description: Optional within this object. Bytes actually released from the blob store, counting shared
+            content once.
+          format: int64
+          type: integer
+        processedVirtualSizeBytes:
+          description: Optional within this object. Sum of the deleted items' sizes, counting shared content once
+            per item.
+          format: int64
+          type: integer
+        totalItems:
+          description: Optional within this object. Items the selection matched.
+          format: int64
+          type: integer
+      type: object
+    CleanupReleaseBundleTarget:
+      description: One release bundle name pattern, scoped to a project or to the global level.
+      properties:
+        name:
+          description: Required within this object. Release bundle name; ** matches every bundle.
+          type: string
+        projectKey:
+          description: Required within this object. Project the bundle belongs to; empty string for global bundles.
+          type: string
+      required:
+      - name
+      - projectKey
+      type: object
+    CleanupRunAction:
+      description: An action on a running policy. Stop is the only action.
+      properties:
+        action:
+          description: Required within this object. Must be stop. A stopped run cannot be resumed; start a new run
+            instead.
+          enum:
+          - stop
+          type: string
+      required:
+      - action
+      type: object
+    CleanupRunConfiguration:
+      description: A snapshot of the policy configuration taken when the run started.
+      properties:
+        cleanupCriteria:
+          allOf:
+          - $ref: '#/components/schemas/CleanupRunCriteria'
+          description: Optional within this object. The age and version-count conditions at run time.
+        createdAt:
+          description: Optional within this object. When the policy was created, RFC 3339 UTC.
+          format: date-time
+          type: string
+        createdBy:
+          description: Optional within this object. User who created the policy.
+          type: string
+        description:
+          description: Optional within this object. The policy's description at run time.
+          type: string
+        modifiedAt:
+          description: Optional within this object. When the policy was last changed before the run, RFC 3339 UTC.
+          format: date-time
+          type: string
+        modifiedBy:
+          description: Optional within this object. User who last changed the policy.
+          type: string
+        schedule:
+          allOf:
+          - $ref: '#/components/schemas/CleanupSchedule'
+          description: Optional within this object. The schedule at run time.
+        skipTrashCan:
+          description: Optional within this object. Whether the run bypassed the trash can.
+          type: boolean
+        target:
+          allOf:
+          - $ref: '#/components/schemas/CleanupTarget'
+          description: Optional within this object. The selection at run time.
+      type: object
+    CleanupRunCriteria:
+      description: The age and version-count conditions of the snapshot, in readable form.
+      properties:
+        createdBefore:
+          description: Optional within this object. Creation-age condition in words (for example 30 days); absent
+            when not used.
+          type: string
+        keepLastNVersions:
+          description: Optional within this object. Versions kept per package.
+          format: int64
+          type: integer
+        lastDownloadedBeforeInDays:
+          description: Optional within this object. Download-age condition in days; absent when not used.
+          format: int64
+          type: integer
+      type: object
+    CleanupRunSummary:
+      description: 'The summary report of one run: what the policy looked like when it ran, how long it took and
+        what it processed.'
+      properties:
+        executionSummary:
+          allOf:
+          - $ref: '#/components/schemas/CleanupExecutionSummary'
+          description: Optional within this object. Start, finish and duration.
+        policySummary:
+          allOf:
+          - $ref: '#/components/schemas/CleanupPolicySummary'
+          description: Optional within this object. Which run this is and how it ended.
+        processedItemsSummary:
+          allOf:
+          - $ref: '#/components/schemas/CleanupProcessedItemsSummary'
+          description: Optional within this object. What the run selected and deleted.
+        runConfiguration:
+          allOf:
+          - $ref: '#/components/schemas/CleanupRunConfiguration'
+          description: Optional within this object. The policy as it was when the run started; later edits do not
+            change it.
+      type: object
+    CleanupRunTrigger:
+      description: The identifier of a run the server has just queued.
+      properties:
+        triggerId:
+          description: Optional within this object. Identifier of the queued run. Pass it as triggerId to the run,
+            summary and report operations and as runId to stop the run.
+          type: integer
+      type: object
+    CleanupSchedule:
+      description: The schedule part of the snapshot.
+      properties:
+        cronExpression:
+          description: Optional within this object. The Quartz schedule; empty for an on-demand policy.
+          type: string
+        maxRunDurationMillis:
+          description: Optional within this object. Maximum run time in milliseconds; absent when unlimited.
+          format: int64
+          type: integer
+      type: object
+    CleanupTarget:
+      description: 'The selection part of the snapshot: which repositories, packages and projects it covered.'
+      properties:
+        includeAllProjects:
+          description: Optional within this object. Whether every project was covered.
+          type: boolean
+        packageTypes:
+          description: Optional within this object. Package types covered.
+          items:
+            type: string
+          type: array
+        packagesExcluded:
+          description: Optional within this object. Exact package names excluded.
+          items:
+            type: string
+          type: array
+        packagesIncluded:
+          description: Optional within this object. Package names or patterns covered.
+          items:
+            type: string
+          type: array
+        projectsIncluded:
+          description: Optional within this object. Project keys covered.
+          items:
+            type: string
+          type: array
+        reposExcluded:
+          description: Optional within this object. Repository keys or patterns excluded.
+          items:
+            type: string
+          type: array
+        reposIncluded:
+          description: Optional within this object. Repository keys or patterns covered.
+          items:
+            type: string
+          type: array
+      type: object
+    PackageCleanupPolicyRequest:
+      description: Body for creating or replacing a package cleanup policy. A policy selects package versions by
+        package type, repository, package name, age, download age, version count and properties, and deletes them
+        on a schedule or on demand.
+      properties:
+        cronExp:
+          description: 'Optional within this object. Quartz cron expression (six or seven fields with seconds, ?,
+            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone (decision 0010).
+            Omitted or empty means the policy only runs when triggered through the run operation.'
+          type: string
+        description:
+          description: Optional within this object. Free text shown with the policy, at most 256 characters.
+          maxLength: 256
+          type: string
+        durationInMinutes:
+          description: Optional within this object. Maximum run time in minutes. A run that reaches it stops where
+            it is, reports COMPLETED_WITH_ERRORS or STOPPED, and does not resume. Omitted means no limit.
+          type: integer
+        enabled:
+          description: 'Optional within this object. Whether scheduled and manual runs may execute. Must be false
+            or omitted on create: the server rejects a create with true (400). Turn a policy on afterwards with
+            the enablement operation; on replace the value is ignored and enablement keeps its current state.'
+          type: boolean
+        itemType:
+          description: Optional within this object. Always package for this policy kind. Defaults to package when
+            omitted.
+          type: string
+        key:
+          description: Required within this object. The policy key, unique per item type, at least three characters
+            of letters, digits, underscore and hyphen. Must equal the policyKey path parameter.
+          type: string
+        projectKey:
+          description: Optional within this object. Project key for a project-level policy. Omitted for a global
+            policy. Project admins may only manage policies of their own projects; the key cannot change after creation.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/PackageCleanupSearchCriteria'
+          description: Required within this object. The selection rules. See PackageCleanupSearchCriteria.
+        skipTrashcan:
+          description: Optional within this object. When true, deleted items bypass the trash can and are removed
+            permanently. Defaults to false, which moves them to the trash can where its retention period applies.
+          type: boolean
+      required:
+      - key
+      - searchCriteria
+      type: object
+    PackageCleanupPolicyResponse:
+      description: A stored package cleanup policy as the server returns it, including its enablement state.
+      properties:
+        cronExp:
+          description: Optional within this object. The stored Quartz schedule; empty when the policy only runs
+            on demand.
+          type: string
+        description:
+          description: Optional within this object. The free text stored with the policy.
+          type: string
+        durationInMinutes:
+          description: Optional within this object. The stored maximum run time in minutes; absent when unlimited.
+          type: integer
+        enabled:
+          description: Optional within this object. Whether scheduled and manual runs may execute.
+          type: boolean
+        itemType:
+          description: Optional within this object. Always package.
+          type: string
+        key:
+          description: Optional within this object. The policy key.
+          type: string
+        projectKey:
+          description: Optional within this object. The owning project's key; absent for a global policy.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/PackageCleanupSearchCriteria'
+          description: Optional within this object. The stored selection rules.
+        skipTrashcan:
+          description: Optional within this object. Whether deletions bypass the trash can.
+          type: boolean
+      type: object
+    PackageCleanupSearchCriteria:
+      description: Which package versions a package cleanup policy deletes. Every condition must hold for a version
+        to be selected; the version-count and exclusion rules then protect versions from deletion.
+      properties:
+        createdBeforeInDays:
+          description: Optional within this object. Only items created at least this many 24-hour days before the
+            run are selected. Omitted or 0 means creation age is not a condition.
+          minimum: 0
+          type: integer
+        createdBeforeInMonths:
+          description: Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for
+            configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays
+            is set.
+          minimum: 0
+          type: integer
+        excludedPackageVersions:
+          description: Optional within this object. Version strings or wildcard patterns (for example *.0) that
+            are never deleted.
+          items:
+            type: string
+          type: array
+        excludedPackages:
+          description: Optional within this object. Exact package names that are never deleted. Patterns are not
+            accepted here; an entry containing a wildcard is rejected with 400.
+          items:
+            type: string
+          type: array
+        excludedProperties:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          description: 'Optional within this object. Property conditions on the package''s lead artifact that protect
+            a version: if any key carries one of the listed values the version is never deleted.'
+          type: object
+        excludedRepos:
+          description: Optional within this object. Repository keys or wildcard patterns removed from the repos
+            selection.
+          items:
+            type: string
+          type: array
+        includeAllProjects:
+          description: Optional within this object. When true the policy covers every project, and includedProjects
+            is ignored. Only meaningful on global policies created by a platform admin. Defaults to false.
+          type: boolean
+        includeAllStages:
+          description: Optional within this object. When true the policy covers repositories in every environment
+            and includedStages must be empty. Defaults to true in artifactweave, which has no lifecycle stages beyond
+            environments.
+          type: boolean
+        includedPackageVersions:
+          description: Optional within this object. Version strings or wildcard patterns (for example 1.*) to clean
+            up. Omitted means every version that meets the other conditions.
+          items:
+            type: string
+          type: array
+        includedPackages:
+          description: Required within this object. Package names or wildcard patterns to clean up, at least one;
+            ** selects every package. Patterns match the package name as the ecosystem spells it (for example @scope/name
+            for npm), not a storage path.
+          items:
+            type: string
+          type: array
+        includedProjects:
+          description: Optional within this object. Project keys the policy covers. The key default stands for repositories
+            (or builds) not assigned to any project. Ignored when includeAllProjects is true.
+          items:
+            type: string
+          type: array
+        includedProperties:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          description: 'Optional within this object. Property conditions on the package''s lead artifact: a version
+            is selected only when, for every key, the artifact carries that property with one of the listed values.'
+          type: object
+        includedStages:
+          description: Optional within this object. Environment names the policy covers when includeAllStages is
+            false; at least one is then required.
+          items:
+            type: string
+          type: array
+        keepLastNVersions:
+          description: Optional within this object. Number of newest versions of each package that are never deleted,
+            ordered by the package type's version comparator. The newest version is always kept even when this is
+            omitted or 0.
+          minimum: 0
+          type: integer
+        lastDownloadedBeforeInDays:
+          description: Optional within this object. Only versions whose most recent download is at least this many
+            days before the run are selected; a version never downloaded counts from its creation time. Omitted
+            or 0 means download age is not a condition.
+          minimum: 0
+          type: integer
+        lastDownloadedBeforeInMonths:
+          description: Optional within this object. Legacy month-based form of lastDownloadedBeforeInDays (30-day
+            months). Ignored when the day form is set.
+          minimum: 0
+          type: integer
+        packageTypes:
+          description: Required within this object. Package types the policy applies to, at least one, using the
+            repository packageType names (for example npm, docker, maven). Versions are identified and ordered with
+            each type's own rules through the package index (decision 0018).
+          items:
+            type: string
+          type: array
+        repos:
+          description: Required within this object. Repository keys or wildcard patterns the policy runs on, at
+            least one. ** selects every repository of the listed types. Only local repositories and remote caches
+            hold packages that can be deleted; virtual repositories are skipped.
+          items:
+            type: string
+          type: array
+      required:
+      - packageTypes
+      - repos
+      - includedPackages
+      type: object
+    ReleaseBundleCleanupPolicyRequest:
+      description: Body for creating or replacing a release bundle cleanup policy, which deletes release bundle
+        (v2) versions by name and age, optionally sparing promoted ones.
+      properties:
+        cronExp:
+          description: 'Optional within this object. Quartz cron expression (six or seven fields with seconds, ?,
+            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone (decision 0010).
+            Omitted or empty means the policy only runs when triggered through the run operation.'
+          type: string
+        description:
+          description: Optional within this object. Free text shown with the policy, at most 256 characters.
+          maxLength: 256
+          type: string
+        durationInMinutes:
+          description: Optional within this object. Maximum run time in minutes. A run that reaches it stops where
+            it is, reports COMPLETED_WITH_ERRORS or STOPPED, and does not resume. Omitted means no limit.
+          type: integer
+        itemType:
+          description: Required within this object. Must be releaseBundle.
+          enum:
+          - releaseBundle
+          type: string
+        key:
+          description: Required within this object. The policy key, unique per item type, at least three characters
+            of letters, digits, underscore and hyphen. Must equal the policyKey path parameter.
+          type: string
+        projectKey:
+          description: Optional within this object. Project key for a project-level policy. Omitted for a global
+            policy. Project admins may only manage policies of their own projects; the key cannot change after creation.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/ReleaseBundleCleanupSearchCriteria'
+          description: Required within this object. The selection rules. See ReleaseBundleCleanupSearchCriteria.
+      required:
+      - key
+      - itemType
+      - searchCriteria
+      type: object
+    ReleaseBundleCleanupPolicyResponse:
+      description: A stored release bundle cleanup policy as the server returns it.
+      properties:
+        cronExp:
+          description: Optional within this object. The stored Quartz schedule; empty when the policy only runs
+            on demand.
+          type: string
+        description:
+          description: Optional within this object. The free text stored with the policy.
+          type: string
+        durationInMinutes:
+          description: Optional within this object. The stored maximum run time in minutes.
+          type: integer
+        enabled:
+          description: Optional within this object. Whether scheduled and manual runs may execute.
+          type: boolean
+        itemType:
+          description: Optional within this object. Always releaseBundle.
+          enum:
+          - releaseBundle
+          type: string
+        key:
+          description: Optional within this object. The policy key.
+          type: string
+        projectKey:
+          description: Optional within this object. The owning project's key; absent for a global policy.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/ReleaseBundleCleanupSearchCriteria'
+          description: Optional within this object. The stored selection rules.
+      type: object
+    ReleaseBundleCleanupSearchCriteria:
+      description: Which release bundle versions a release bundle cleanup policy deletes.
+      properties:
+        createdBeforeInDays:
+          description: Optional within this object. Only items created at least this many 24-hour days before the
+            run are selected. Omitted or 0 means creation age is not a condition.
+          minimum: 0
+          type: integer
+        createdBeforeInMonths:
+          description: Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for
+            configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays
+            is set.
+          minimum: 0
+          type: integer
+        excludeAllPromotedEnvironments:
+          description: Optional within this object. When true, a bundle version promoted to any environment is never
+            deleted.
+          type: boolean
+        excludePromotedEnvironments:
+          description: 'Required within this object. Environment names: a bundle version promoted to any of them
+            is never deleted. ** spares every promoted version.'
+          items:
+            type: string
+          type: array
+        includeAllProjects:
+          description: Required within this object. When true the policy covers every project, and includedProjects
+            is ignored. Only meaningful on global policies created by a platform admin. Defaults to false.
+          type: boolean
+        includedProjects:
+          description: Required within this object. Project keys the policy covers. The key default stands for repositories
+            (or builds) not assigned to any project. Ignored when includeAllProjects is true.
+          items:
+            type: string
+          type: array
+        releaseBundles:
+          description: Required within this object. Release bundle name patterns to clean up, at least one.
+          items:
+            $ref: '#/components/schemas/CleanupReleaseBundleTarget'
+          type: array
+      required:
+      - includeAllProjects
+      - includedProjects
+      - releaseBundles
+      - excludePromotedEnvironments
+      type: object
+paths:
+  /api/cleanup/builds/policies:
+    get:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Returns every build cleanup policy
+        the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin,
+        or a project admin when the policy belongs to their project.'
+      operationId: getAllBuildCleanupPolicies
+      parameters:
+      - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
+          policies for a platform admin; a project admin must always pass their project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  policies:
+                    description: Optional within this object. The build cleanup policies visible to the caller.
+                    items:
+                      $ref: '#/components/schemas/CleanupPolicyEntry'
+                    type: array
+                type: object
+          description: The build cleanup policies.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: List build cleanup policies
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallbuildcleanuppolicies.md
+      x-tier: stub
+  /api/cleanup/builds/policies/{policyKey}:
+    delete:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule.
+        A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation;
+        the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when
+        the policy belongs to their project.'
+      operationId: deleteBuildCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: The policy was deleted; the body is a confirmation string.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Delete a build cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletebuildcleanuppolicy.md
+      x-tier: stub
+    get:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Returns one build cleanup policy.
+        Requires a platform admin, or a project admin when the policy belongs to their project.'
+      operationId: getBuildCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildCleanupPolicyResponse'
+          description: The policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Get a build cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getbuildcleanuppolicy.md
+      x-tier: stub
+    post:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy
+        under policyKey, disabled. The body''s key must match the path, and enabled must be false or omitted: a
+        policy is always created inactive and switched on with the enablement operation, which is the sequence the
+        jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy
+        belongs to their project.'
+      operationId: createBuildCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildCleanupPolicyRequest'
+        description: The build cleanup policy.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildCleanupPolicyResponse'
+          description: The policy was created disabled; the body is the stored policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A policy with this key already exists for this item type.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Create a build cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createbuildcleanuppolicy.md
+      x-tier: stub
+    put:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Replaces the policy''s configuration
+        with the body. The key, item type and project cannot change. The enablement state is kept; change it with
+        the enablement operation. A run already in progress continues with the configuration it started with. Requires
+        a platform admin, or a project admin when the policy belongs to their project.'
+      operationId: updateBuildCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildCleanupPolicyRequest'
+        description: The complete new configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildCleanupPolicyResponse'
+          description: The policy was replaced; the body is the stored policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Replace a build cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatebuildcleanuppolicy.md
+      x-tier: stub
+  /api/cleanup/builds/policies/{policyKey}/enablement:
+    post:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Sets whether the policy''s schedule
+        fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform
+        admin, or a project admin when the policy belongs to their project.'
+      operationId: enableDisableBuildCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupPolicyEnablement'
+        description: The new enablement state.
+        required: true
+      responses:
+        '200':
+          description: The enablement state was stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Enable or disable a build cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablebuildcleanuppolicy.md
+      x-tier: stub
+  /api/cleanup/builds/policies/{policyKey}/run:
+    put:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside
+        its schedule and returns at once with the run''s identifier. The policy must be enabled. Only one run per
+        policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run
+        selects builds and writes its report without deleting anything. Requires a platform admin, or a project
+        admin when the policy belongs to their project.'
+      operationId: runBuildCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. When true the run selects items and writes its report but deletes
+          nothing. Defaults to false.
+        in: query
+        name: dryRun
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupRunTrigger'
+          description: The run was queued; the body carries its triggerId.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Run a build cleanup policy now
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/runbuildcleanuppolicy.md
+      x-tier: stub
+  /api/cleanup/bundles/policies:
+    get:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Returns every release bundle cleanup
+        policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform
+        admin, or a project admin when the policy belongs to their project.'
+      operationId: getAllReleaseBundleCleanupPolicies
+      parameters:
+      - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
+          policies for a platform admin; a project admin must always pass their project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ReleaseBundleCleanupPolicyResponse'
+                type: array
+          description: The release bundle cleanup policies.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: List release bundle cleanup policies
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallreleasebundlecleanuppolicies.md
+      x-tier: stub
+  /api/cleanup/bundles/policies/{policyKey}:
+    delete:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule.
+        A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation;
+        the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when
+        the policy belongs to their project.'
+      operationId: deleteReleaseBundleCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: The policy was deleted; the body is a confirmation string.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Delete a release bundle cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletereleasebundlecleanuppolicy.md
+      x-tier: stub
+    get:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Returns one release bundle cleanup
+        policy. Requires a platform admin, or a project admin when the policy belongs to their project.'
+      operationId: getReleaseBundleCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleCleanupPolicyResponse'
+          description: The policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Get a release bundle cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getreleasebundlecleanuppolicy.md
+      x-tier: stub
+    post:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup
+        policy under policyKey, disabled. The body''s key must match the path, and enabled must be false or omitted:
+        a policy is always created inactive and switched on with the enablement operation, which is the sequence
+        the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the
+        policy belongs to their project.'
+      operationId: createReleaseBundleCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseBundleCleanupPolicyRequest'
+        description: The release bundle cleanup policy.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleCleanupPolicyResponse'
+          description: The policy was created disabled; the body is the stored policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A policy with this key already exists for this item type.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Create a release bundle cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createreleasebundlecleanuppolicy.md
+      x-tier: stub
+    put:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Replaces the policy''s configuration
+        with the body. The key, item type and project cannot change. The enablement state is kept; change it with
+        the enablement operation. A run already in progress continues with the configuration it started with. Requires
+        a platform admin, or a project admin when the policy belongs to their project.'
+      operationId: updateReleaseBundleCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseBundleCleanupPolicyRequest'
+        description: The complete new configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleCleanupPolicyResponse'
+          description: The policy was replaced; the body is the stored policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Replace a release bundle cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatereleasebundlecleanuppolicy.md
+      x-tier: stub
+  /api/cleanup/bundles/policies/{policyKey}/enablement:
+    post:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Sets whether the policy''s schedule
+        fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform
+        admin, or a project admin when the policy belongs to their project.'
+      operationId: enableDisableReleaseBundleCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupPolicyEnablement'
+        description: The new enablement state.
+        required: true
+      responses:
+        '200':
+          description: The enablement state was stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Enable or disable a release bundle cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablereleasebundlecleanuppolicy.md
+      x-tier: stub
+  /api/cleanup/bundles/policies/{policyKey}/run:
+    put:
+      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
+        The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside
+        its schedule and returns at once with the run''s identifier. The policy must be enabled. Only one run per
+        policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run
+        selects release bundle versions and writes its report without deleting anything. Requires a platform admin,
+        or a project admin when the policy belongs to their project.'
+      operationId: runReleaseBundleCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. When true the run selects items and writes its report but deletes
+          nothing. Defaults to false.
+        in: query
+        name: dryRun
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupRunTrigger'
+          description: The run was queued; the body carries its triggerId.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Run a release bundle cleanup policy now
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/runreleasebundlecleanuppolicy.md
+      x-tier: stub
+  /api/cleanup/packages/policies:
+    get:
+      description: Returns every package cleanup policy the caller may manage, global ones for a platform admin
+        or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+        Package policies are evaluated by artifactweave's in-process scheduler over the package index (decisions
+        0010 and 0018).
+      operationId: getAllPackageCleanupPolicies
+      parameters:
+      - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
+          policies for a platform admin; a project admin must always pass their project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PackageCleanupPolicyResponse'
+                type: array
+          description: The package cleanup policies.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: List package cleanup policies
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallpackagecleanuppolicies.md
+  /api/cleanup/packages/policies/{policyKey}:
+    delete:
+      description: Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports
+        are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code.
+        Requires a platform admin, or a project admin when the policy belongs to their project.
+      operationId: deletePackageCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: The policy was deleted; the body is a confirmation string.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Delete a package cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletepackagecleanuppolicy.md
+    get:
+      description: Returns one package cleanup policy. Requires a platform admin, or a project admin when the policy
+        belongs to their project.
+      operationId: getPackageCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. When true the server also resolves the repository keys named explicitly
+          in searchCriteria.repos and excludedRepos against the repositories that exist now. JFrog documents only
+          the name and the default, and its response has no field for the result, so artifactweave leaves keys that
+          no longer resolve out of the returned searchCriteria (patterns are returned as stored) and never changes
+          the stored policy. Defaults to false, which returns the policy exactly as stored.
+        in: query
+        name: checkRepoAvailability
+        required: false
+        schema:
+          default: false
+          type: boolean
+        x-unverified: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageCleanupPolicyResponse'
+          description: The policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Get a package cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpackagecleanuppolicy.md
+    post:
+      description: 'Stores a new package cleanup policy under policyKey, disabled. The body''s key must match the
+        path, and enabled must be false or omitted: a policy is always created inactive and switched on with the
+        enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a
+        platform admin, or a project admin when the policy belongs to their project.'
+      operationId: createPackageCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageCleanupPolicyRequest'
+        description: The package cleanup policy.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageCleanupPolicyResponse'
+          description: The policy was created disabled; the body is the stored policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A policy with this key already exists for this item type.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Create a package cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createpackagecleanuppolicy.md
+    put:
+      description: Replaces the policy's configuration with the body. The key, item type and project cannot change.
+        The enablement state is kept; change it with the enablement operation. A run already in progress continues
+        with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs
+        to their project.
+      operationId: updatePackageCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageCleanupPolicyRequest'
+        description: The complete new configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageCleanupPolicyResponse'
+          description: The policy was replaced; the body is the stored policy.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Replace a package cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatepackagecleanuppolicy.md
+  /api/cleanup/packages/policies/{policyKey}/enablement:
+    post:
+      description: Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does
+        not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their
+        project.
+      operationId: enableDisablePackageCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupPolicyEnablement'
+        description: The new enablement state.
+        required: true
+      responses:
+        '200':
+          description: The enablement state was stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Enable or disable a package cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablepackagecleanuppolicy.md
+  /api/cleanup/packages/policies/{policyKey}/run:
+    put:
+      description: Queues a run of the policy outside its schedule and returns at once with the run's identifier.
+        The policy must be enabled. Only one run per policy executes at a time; a second request while one is running
+        is rejected with 400. With dryRun the run selects package versions and writes its report without deleting
+        anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+      operationId: runPackageCleanupPolicy
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. When true the run selects items and writes its report but deletes
+          nothing. Defaults to false.
+        in: query
+        name: dryRun
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupRunTrigger'
+          description: The run was queued; the body carries its triggerId.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Run a package cleanup policy now
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/runpackagecleanuppolicy.md
+  /api/cleanup/policies/forceDisableAll:
+    put:
+      description: 'Emergency switch: disables every cleanup policy of every item type at the global level, or only
+        those of projectKey. Runs already in progress continue; stop them with the stop-all operation. Requires
+        a platform admin, or a project admin for their own project.'
+      operationId: disableAllCleanupPolicies
+      parameters:
+      - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
+          policies for a platform admin; a project admin must always pass their project.
+        in: query
+        name: projectKey
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Every matching policy is now disabled.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Disable every cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/disableallcleanuppolicies.md
+  /api/cleanup/policies/runs/downloadReport:
+    get:
+      description: Streams the run's per-item report as CSV, one row per selected item with its repository, path,
+        size and outcome. Downloading sets reportDownloaded on the policy's last-run data. Answers 404 while the
+        run has produced no report yet. Requires a platform admin, or a project admin when the policy belongs to
+        their project.
+      operationId: downloadCleanupPolicyRunReport
+      parameters:
+      - description: Required query parameter. Key of the cleanup policy.
+        in: query
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      - description: Required query parameter. Identifier of the run, as returned in triggerId when it was queued.
+        in: query
+        name: runId
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: The CSV report, served as application/octet-stream.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Download a cleanup run's item report
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/downloadcleanuppolicyrunreport.md
+  /api/cleanup/policies/runs/forceStopAll:
+    put:
+      description: Asks every running cleanup run of every item type to stop. Each run finishes the item it is working
+        on, reports STOPPED and cannot be resumed. Returns before the runs have stopped. Requires a platform admin.
+      operationId: stopAllRunningCleanupPolicies
+      responses:
+        '202':
+          description: Stop was requested for every running run.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Stop every running cleanup policy
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/stopallrunningcleanuppolicies.md
+  /api/cleanup/policies/runs/summaryReports:
+    get:
+      description: 'Returns the summary of one run: the policy snapshot it ran with, its timing and its counts.
+        Available once the run has started; counters grow while it runs. Requires a platform admin, or a project
+        admin when the policy belongs to their project.'
+      operationId: viewCleanupPolicyRunSummaryReport
+      parameters:
+      - description: Required query parameter. Identifier of the run, as returned in triggerId when it was queued.
+        in: query
+        name: triggerId
+        required: true
+        schema:
+          type: integer
+      - description: Required query parameter. Key of the cleanup policy.
+        in: query
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupRunSummary'
+          description: The summary report.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Get a cleanup run's summary report
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/viewcleanuppolicyrunsummaryreport.md
+  /api/cleanup/policies/runs/view:
+    get:
+      description: Returns one page of cleanup runs across policies, filtered and sorted by the query parameters.
+        Omitting every filter lists all runs the caller may see, newest first. Requires a platform admin, or a project
+        admin when the policy belongs to their project.
+      operationId: getCleanupPolicyRunsView
+      parameters:
+      - description: 'Optional query parameter. Item types to include: any of package, build and releaseBundle,
+          comma-separated or repeated.'
+        in: query
+        name: itemTypes
+        schema:
+          items:
+            type: string
+          type: array
+      - description: Optional query parameter. Only runs that started at or after this time, as epoch milliseconds.
+        in: query
+        name: from
+        schema:
+          format: int64
+          type: integer
+      - description: Optional query parameter. Only runs that started before this time, as epoch milliseconds.
+        in: query
+        name: to
+        schema:
+          format: int64
+          type: integer
+      - description: Optional query parameter. Key of the cleanup policy.
+        in: query
+        name: policyKey
+        schema:
+          type: string
+      - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
+          policies for a platform admin; a project admin must always pass their project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      - description: Optional query parameter. Page to return, counting from 1. Defaults to 1. The response's pagination
+          object reports currentPage, lastPage, pageSize and total, so a client can walk the pages.
+        in: query
+        name: page
+        schema:
+          default: 1
+          minimum: 1
+          type: integer
+        x-unverified: true
+      - description: Optional query parameter. Runs per page. JFrog documents no default or maximum; artifactweave
+          defaults to 25, caps the value at 500 and reports the size it applied in pagination.pageSize.
+        in: query
+        name: pageSize
+        schema:
+          minimum: 1
+          type: integer
+        x-unverified: true
+      - description: Optional query parameter. Run field to order by. Defaults to startTime which, with the default
+          sortOrder desc, puts the newest run first as JFrog's Runs tab does. Any other field name is rejected with
+          400.
+        in: query
+        name: sortBy
+        schema:
+          default: startTime
+          enum:
+          - runId
+          - itemType
+          - policyKey
+          - displayProject
+          - startTime
+          - endTime
+          - totalItems
+          - cleanedSize
+          - cleanedItems
+          - status
+          - triggeredBy
+          - manual
+          - dryRun
+          type: string
+        x-unverified: true
+      - description: Optional query parameter. asc or desc. Defaults to desc, newest first.
+        in: query
+        name: sortOrder
+        schema:
+          enum:
+          - asc
+          - desc
+          type: string
+      - description: Optional query parameter. When the string true, runs that selected no items are left out.
+        in: query
+        name: excludeBlankExecutions
+        schema:
+          type: string
+      - description: Optional query parameter. Only runs in these statuses (repeat or comma-separate the values).
+        in: query
+        name: status
+        schema:
+          items:
+            type: string
+          type: array
+      - description: Optional query parameter. Only runs of policies in these projects.
+        in: query
+        name: projectKeyList
+        schema:
+          items:
+            type: string
+          type: array
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupPolicyRunView'
+          description: One page of runs.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: List cleanup runs
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getcleanuppolicyrunsview.md
+  /api/cleanup/policies/runs/{policyKey}/{triggerId}:
+    get:
+      description: Returns the status and counters of one run of a policy, running or finished. Requires a platform
+        admin, or a project admin when the policy belongs to their project.
+      operationId: getRunByTriggerId
+      parameters:
+      - description: Required path parameter. Key of the cleanup policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      - description: Required path parameter. Identifier of the run, as returned in triggerId when it was queued.
+        in: path
+        name: triggerId
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupPolicyRunViewEntry'
+          description: The run.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Get one cleanup run
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getrunbytriggerid.md
+  /api/cleanup/policies/runs/{runId}:
+    put:
+      description: Asks one running run to stop. The run reports STOPPING and then STOPPED; it cannot be resumed,
+        and a new run starts from the beginning. Stopping a run that already ended is rejected with 400. Requires
+        a platform admin, or a project admin when the policy belongs to their project.
+      operationId: stopRunningCleanupPolicy
+      parameters:
+      - description: Required path parameter. Identifier of the run, as returned in triggerId when it was queued.
+        in: path
+        name: runId
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupRunAction'
+        description: The action to apply; only stop exists.
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Stop was requested; the body is a confirmation string.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No policy (or run) exists with the given key or identifier.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Stop one cleanup run
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/stoprunningcleanuppolicy.md
+  /api/cleanup/policies/view:
+    get:
+      description: Returns every policy of the requested item types with its schedule and last-run outcome, optionally
+        filtered by policyKey and projectKey. Used for an overview screen. Requires a platform admin, or a project
+        admin when the policy belongs to their project.
+      operationId: getCleanupPoliciesView
+      parameters:
+      - description: 'Required query parameter. Item types to include: any of package, build and releaseBundle,
+          each at most once.'
+        in: query
+        name: itemTypes
+        required: true
+        schema:
+          items:
+            enum:
+            - package
+            - build
+            - releaseBundle
+            type: string
+          type: array
+          uniqueItems: true
+      - description: Optional query parameter. Key of the cleanup policy.
+        in: query
+        name: policyKey
+        schema:
+          type: string
+      - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
+          policies for a platform admin; a project admin must always pass their project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupPolicyView'
+          description: The matching policies.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither a platform admin nor an admin of the policy's project.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed to complete the operation; nothing was changed.
+      summary: Overview of cleanup policies
+      tags:
+      - cleanup
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getcleanuppoliciesview.md

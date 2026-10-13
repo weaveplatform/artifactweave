@@ -1,0 +1,106 @@
+# 0004: Storage: SQL metadata, item model and content-addressed blobs
+
+Status: Proposed
+
+## Context
+
+The server must run as one static binary with no external dependencies and must also run
+against shared services (PostgreSQL, S3-compatible object storage) when operators want
+durability beyond one disk. hostweave's decision 0006 established `database/sql` behind a
+dialect layer with one contract suite on every backend.
+
+Artifactory's storage API exposes items with a `path` that has a leading slash, AQL
+exposes the same items with a parent `path` of `.` for the root and a separate `name`,
+checksum deploy looks up existing binaries by sha1 or sha256, Maven clients PUT `.sha1`
+and `.md5` files beside artifacts, the JFrog CLI downloads with `Range` requests, and
+`downloadRedirect` means a 302 to a signed object-store URL. Large uploads arrive as Docker
+chunks and as the CLI's multipart protocol.
+
+## Decision
+
+**Metadata.** Store contracts in `pkg/store` with narrow interfaces per concern (repos,
+items, properties, stats, package index, users, groups, permissions, tokens, policies,
+webhooks, projects, builds) composed into `Store` with `Tx`. `internal/sqlstore` follows
+hostweave's `sqlcommon` pattern with two dialects: SQLite (`modernc.org/sqlite`, CGO-free,
+WAL, one writer connection; the default) and PostgreSQL (`pgx/v5/stdlib`). Embedded
+migrations per dialect. An in-memory store exists for unit tests.
+
+**Item canonical form.** The items table stores `repo_key`, `path` (the parent directory,
+`.` for the root), `name`, `depth`, `type`, `cached`, `size`, `mime_type`, timestamps and
+actors, `actual_md5`, `actual_sha1`, `actual_sha256`, `original_md5`, `original_sha1`.
+The storage API layer prefixes `/` on `path` and joins `path` and `name`; AQL reads the
+columns as they are. Properties are an entity-attribute-value table keyed by item.
+
+**Blobs.** `pkg/blob` is a content-addressed store keyed by sha256 with sha1 and md5
+recorded in the item index so checksum deploy and checksum search work from the database.
+Backends: `fs` (temp-then-rename into a two-level hex tree) and `s3` (aws-sdk-go-v2,
+multipart upload for large objects, no rename). The contract:
+
+- `BeginUpload(ctx) → UploadID`, `Append(ctx, id, chunk)`, `Commit(ctx, id, digest)`,
+  `Abort(ctx, id)`; the fs backend keeps a temp directory per upload id, the s3 backend
+  persists the multipart upload id in the store so a Docker chunked upload or a CLI
+  multipart upload can resume across requests.
+- `Open(ctx, digest) → io.ReadSeekCloser` so handlers serve `206` with
+  `http.ServeContent`; the s3 backend passes `Range` through.
+- `PresignGet(ctx, digest, ttl)` for `downloadRedirect` on object stores.
+- `Delete`, `Exists`, `Stat`.
+
+**Checksum sidecars.** `.sha1`, `.md5`, `.sha256` and `.sha512` files are never stored.
+GET and HEAD serve them from item metadata. PUT validates the client value against the
+artifact per the repository's `checksumPolicyType`: `client-checksums` rejects a mismatch
+and records the client value as `original_*`; `server-generated-checksums` records and
+ignores. Mismatches feed the bad-checksum search.
+
+**Garbage collection.** Items reference blobs; deleting an item moves it to the trash can
+and the blob stays referenced until the trash entry is purged. GC runs as a task behind
+`POST /api/system/storage/gc` and removes unreferenced blobs, feeding the `storageinfo`
+numbers.
+
+**Single process.** SQLite means one server process. PostgreSQL is supported as a
+database but artifactweave v1 is still one process: singleflight, upload sessions and the
+scheduler are in-process. High availability (leader leases, shared blob stores only,
+store-backed upload sessions) is a later decision.
+
+## Rationale
+
+Matching hostweave keeps the pattern, the contract suite habits and the reviewers shared.
+sha256 content addressing with sha1 and md5 indexed gives every client what it asks for:
+the JFrog CLI sends all three on upload, Maven wants sha1 and md5, Docker wants sha256.
+An explicit upload-session contract is the only way Docker chunked uploads, S3 multipart
+and the CLI's multipart protocol can share one implementation.
+
+**Alternatives considered:**
+- *sha1-keyed filestore like Artifactory*: sha1 is deprecated for integrity and sha256 is
+  what Docker and the CLI check; indexing all three costs one table.
+- *Storing sidecar files as items*: simpler, but then a sidecar can disagree with its
+  artifact and `badChecksum` has nothing to compare.
+- *MySQL as a third dialect*: deferred; nothing in scope needs it.
+- *bun, ent, gorm*: heavier abstractions and harder to test to 95%.
+
+## Constraints
+
+- Every query is written for two dialects; the contract suite is the guard.
+- SQLite supports one server process. Two processes against one SQLite file is a
+  configuration error the binary refuses.
+- S3 multipart requires parts of at least 5 MiB; the s3 backend buffers to that size.
+- The items table is the hot path; indexes on `(repo_key, path, name)`, `actual_sha1`,
+  `actual_sha256` and the EAV property table are part of the migrations.
+
+## Verification
+
+- `pkg/store/storetest` and `pkg/blob/blobtest` contract suites run against the in-memory
+  store, SQLite, PostgreSQL (testcontainers) and MinIO (testcontainers) on Linux CI and
+  skip cleanly where Docker is absent.
+- Upload-session tests resume across simulated process boundaries on both blob backends.
+- Ranged download and checksum-sidecar tests in the item handler package.
+- Migration up, down, up tests per dialect.
+
+## References
+
+- [02-artifactory-core-api-inventory](../02-artifactory-core-api-inventory.md), Artifacts
+  and Storage section
+- [09-jfrog-cli-compatibility](../09-jfrog-cli-compatibility.md), upload and download rows
+- `weaveplatform/hostweave@main`, `docs/research/decisions/0006-sql-storage-backends.md`
+- <https://pkg.go.dev/modernc.org/sqlite>
+- <https://pkg.go.dev/github.com/jackc/pgx/v5/stdlib>
+- <https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/s3>

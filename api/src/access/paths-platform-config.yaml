@@ -1,0 +1,3965 @@
+# Access platform configuration: CA and root certificates, the basic-auth switch,
+# password policy and default token lifetime, OIDC providers, identity mappings and
+# the token exchange, LDAP connections and group settings (implemented with the
+# descriptor and LDAP phase), and HashiCorp Vault connections. SAML, SCIM, Crowd,
+# HTTP SSO, cloud log shipping, AWS IAM roles and Access backup files are kept for
+# parity and answer 501 (decision 0019, research 10). Facts come from the oracle
+# (administration-jfrog-platform-rest-apis and administration-jfrog-platform-aws-iam-api
+# families); the prose is ours.
+components:
+  schemas:
+    AwsIamRoleAssignment:
+      description: Maps one user to the AWS IAM role their AWS credentials must assume. Not supported by artifactweave.
+      properties:
+        iam_role:
+          description: Required within this object. ARN of the AWS IAM role the user's AWS credentials must assume.
+          type: string
+        username:
+          description: Required within this object. User the role is mapped to.
+          type: string
+      required:
+      - username
+      - iam_role
+      type: object
+    CrowdConfiguration:
+      description: Atlassian Crowd integration settings. Not supported by artifactweave (decision 0019).
+      properties:
+        allow_user_to_access_profile:
+          description: Optional within this object. Whether users created through Crowd may open their own profile.
+          type: boolean
+        application_name:
+          description: Optional within this object. Application name registered in Crowd.
+          type: string
+        auto_user_creation:
+          description: Optional within this object. Whether a first login creates a local user.
+          type: boolean
+        custom_cookie_token_key:
+          description: Optional within this object. Name of the single sign-on cookie when it differs from Crowd's
+            default.
+          type: string
+        direct_authentication:
+          description: Optional within this object. Whether passwords are checked against Crowd directly rather
+            than through single sign-on.
+          type: boolean
+        enable_integration:
+          description: Optional within this object. Whether users are authenticated against Crowd.
+          type: boolean
+        override_all_groups_upon_login:
+          description: Optional within this object. Whether each login replaces the user's group memberships with
+            those in Crowd.
+          type: boolean
+        password:
+          description: Optional within this object. Application password registered in Crowd. Never returned.
+          type: string
+          writeOnly: true
+        server_url:
+          description: Optional within this object. Base URL of the Crowd server.
+          type: string
+        session_validation_interval:
+          description: Optional within this object. Minutes between re-validations of a Crowd session.
+          format: int64
+          type: integer
+        use_default_proxy:
+          description: Optional within this object. Whether calls to Crowd go through the default proxy.
+          type: boolean
+      type: object
+    GroupMappingStrategy:
+      description: Default attribute names and filter for one LDAP group mapping strategy, a starting point for
+        a group setting.
+      properties:
+        description:
+          description: Optional within this object. Default attribute copied into a group's description.
+          type: string
+        filter:
+          description: Optional within this object. Default filter that selects group entries.
+          type: string
+        groupKeyMember:
+          description: Optional within this object. Default attribute that links groups and members for the strategy.
+          type: string
+        groupNameAttribute:
+          description: Optional within this object. Default attribute that holds a group's name.
+          type: string
+      type: object
+    HashicorpVaultAgentAuth:
+      description: Vault authentication delegated to a Vault agent that runs beside the server.
+      properties:
+        type:
+          description: Required within this object. Always Agent.
+          enum:
+          - Agent
+          type: string
+      required:
+      - type
+      type: object
+    HashicorpVaultAppRoleAuth:
+      description: Vault AppRole authentication.
+      properties:
+        roleId:
+          description: Optional within this object. AppRole role ID.
+          type: string
+        secretId:
+          description: Optional within this object. AppRole secret ID. Never returned.
+          type: string
+          writeOnly: true
+        type:
+          description: Required within this object. Always AppRole.
+          enum:
+          - AppRole
+          type: string
+      required:
+      - type
+      type: object
+    HashicorpVaultCertificateAuth:
+      description: Vault TLS certificate authentication.
+      properties:
+        clientCertificate:
+          description: Optional within this object. PEM client certificate presented to Vault.
+          type: string
+        clientPrivateKey:
+          description: Optional within this object. PEM private key of clientCertificate. Never returned.
+          type: string
+          writeOnly: true
+        type:
+          description: Required within this object. Always Certificate.
+          enum:
+          - Certificate
+          type: string
+      required:
+      - type
+      type: object
+    HashicorpVaultConfig:
+      description: How the server reaches HashiCorp Vault and which secret engines it reads.
+      properties:
+        auth:
+          description: 'Optional within this object. How the server authenticates to Vault, selected by type: AppRole,
+            Certificate or Agent.'
+          discriminator:
+            mapping:
+              Agent: '#/components/schemas/HashicorpVaultAgentAuth'
+              AppRole: '#/components/schemas/HashicorpVaultAppRoleAuth'
+              Certificate: '#/components/schemas/HashicorpVaultCertificateAuth'
+            propertyName: type
+          oneOf:
+          - $ref: '#/components/schemas/HashicorpVaultAppRoleAuth'
+          - $ref: '#/components/schemas/HashicorpVaultCertificateAuth'
+          - $ref: '#/components/schemas/HashicorpVaultAgentAuth'
+        mounts:
+          description: Optional within this object. Secret engine mounts that keys are read from.
+          items:
+            $ref: '#/components/schemas/HashicorpVaultMount'
+          type: array
+        url:
+          description: Optional within this object. Vault server URL. Vault must be served over TLS, so the scheme
+            is https.
+          format: uri
+          type: string
+      type: object
+    HashicorpVaultMount:
+      description: One Vault secret engine mount.
+      properties:
+        path:
+          description: Optional within this object. Mount path in Vault.
+          type: string
+        type:
+          description: 'Optional within this object. Secret engine version: KV1 or KV2.'
+          enum:
+          - KV1
+          - KV2
+          type: string
+      type: object
+    HttpSsoConfiguration:
+      description: HTTP single sign-on through an authenticating reverse proxy. Not supported by artifactweave (decision
+        0019).
+      properties:
+        allow_user_to_access_profile:
+          description: Optional within this object. Whether proxied users may open their own profile.
+          type: boolean
+        auto_create_user:
+          description: Optional within this object. Whether a first request from an unknown proxied user creates
+            a local user.
+          type: boolean
+        http_sso_proxied:
+          description: Optional within this object. Whether an authenticating reverse proxy passes the username
+            in a request variable.
+          type: boolean
+        remote_user_request_variable:
+          description: Optional within this object. Header or request variable that carries the authenticated username.
+          type: string
+        sync_ldap_groups:
+          description: Optional within this object. Whether group memberships are read from LDAP for proxied users.
+          type: boolean
+      type: object
+    LdapGroup:
+      description: One group found by an LDAP group search.
+      properties:
+        description:
+          description: Optional within this object. Description read through the setting's description_attribute.
+          type: string
+        group_dn:
+          description: Optional within this object. Distinguished name of the group entry.
+          type: string
+        group_name:
+          description: Optional within this object. Name of the group in LDAP, used as the local group name.
+          type: string
+        required_update:
+          description: 'Optional within this object. Sync state of the LDAP group against the groups this instance
+            already holds. DOES_NOT_EXIST: no group of this name exists yet, so import creates it; this is the value
+            an import request normally carries. REQUIRES_UPDATE: a group of this name exists but its DN in LDAP
+            has changed, so import refreshes it. IN_ARTIFACTORY: the group exists and matches LDAP, so import leaves
+            it alone. Search fills it in; import reads it to choose between creating and updating.'
+          enum:
+          - DOES_NOT_EXIST
+          - REQUIRES_UPDATE
+          - IN_ARTIFACTORY
+          type: string
+      type: object
+    LdapGroupSettings:
+      description: How groups are read from an LDAP connection and mapped to local groups.
+      properties:
+        description_attribute:
+          description: Optional within this object. Attribute copied into the local group's description.
+          type: string
+        enabled_ldap:
+          description: Optional within this object. Key of the LDAP connection the groups are read from.
+          type: string
+        filter:
+          description: Optional within this object. LDAP filter that selects group entries, for example (objectClass=groupOfNames).
+          type: string
+        force_attribute_search:
+          description: Optional within this object. Whether memberships are read from user attributes even when
+            the strategy would not do so.
+          type: boolean
+        group_base_dn:
+          description: Optional within this object. DN under which groups are searched, relative to the connection's
+            base DN.
+          type: string
+        group_member_attribute:
+          description: Optional within this object. Attribute that lists a group's members, for example uniqueMember.
+          type: string
+        group_name_attribute:
+          description: Optional within this object. Attribute that holds a group's name, for example cn.
+          type: string
+        name:
+          description: Optional within this object. Unique name of the group setting.
+          type: string
+        strategy:
+          description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members),
+            DYNAMIC (users list their groups) or HIERARCHY (the user''s DN encodes the groups).'
+          type: string
+        sub_tree:
+          description: Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
+          type: boolean
+      type: object
+    LdapGroupSettingsCreate:
+      description: A new LDAP group setting. Same fields as LdapGroupSettings; name and enabled_ldap are required.
+      properties:
+        description_attribute:
+          description: Optional within this object. Attribute copied into the local group's description.
+          type: string
+        enabled_ldap:
+          description: Required within this object. Key of the LDAP connection the groups are read from.
+          type: string
+        filter:
+          description: Optional within this object. LDAP filter that selects group entries, for example (objectClass=groupOfNames).
+          type: string
+        force_attribute_search:
+          description: Optional within this object. Whether memberships are read from user attributes even when
+            the strategy would not do so.
+          type: boolean
+        group_base_dn:
+          description: Optional within this object. DN under which groups are searched, relative to the connection's
+            base DN.
+          type: string
+        group_member_attribute:
+          description: Optional within this object. Attribute that lists a group's members, for example uniqueMember.
+          type: string
+        group_name_attribute:
+          description: Optional within this object. Attribute that holds a group's name, for example cn.
+          type: string
+        name:
+          description: Required within this object. Unique name of the group setting.
+          type: string
+        strategy:
+          description: 'Optional within this object. How memberships are resolved: STATIC (groups list their members),
+            DYNAMIC (users list their groups) or HIERARCHY (the user''s DN encodes the groups).'
+          type: string
+        sub_tree:
+          description: Optional within this object. Whether the group search descends into sub-trees of group_base_dn.
+          type: boolean
+      required:
+      - name
+      - enabled_ldap
+      type: object
+    LdapImport:
+      description: Which LDAP groups to import and through which group setting.
+      properties:
+        import_groups:
+          description: Optional within this object. Groups to create or update, as returned by the search operation.
+          items:
+            $ref: '#/components/schemas/LdapGroup'
+          type: array
+        ldap_group_settings:
+          allOf:
+          - $ref: '#/components/schemas/LdapGroupSettings'
+          description: Optional within this object. Group setting the groups are read through.
+      type: object
+    LdapSearchPattern:
+      description: How a user's LDAP entry is searched for when user_dn_pattern is not enough.
+      properties:
+        manager_dn:
+          description: Optional within this object. DN of the account the server binds as to run searches.
+          type: string
+        manager_password:
+          description: Optional within this object. Password of manager_dn. Stored sealed (decision 0017) and never
+            returned.
+          type: string
+          writeOnly: true
+        search_base:
+          description: Optional within this object. DN under which the search starts, relative to the connection's
+            base DN. Empty searches from the base DN.
+          type: string
+        search_filter:
+          description: Optional within this object. LDAP filter that selects the user's entry, with {0} standing
+            for the username, for example (uid={0}).
+          type: string
+        search_sub_tree:
+          description: Optional within this object. Whether the search descends into sub-trees of search_base.
+          type: boolean
+      type: object
+    LdapSettings:
+      description: One LDAP server connection used to authenticate users. manager_password is never returned.
+      properties:
+        allow_user_to_access_profile:
+          description: Optional within this object. Whether users created through this connection may open their
+            own profile.
+          type: boolean
+        auto_create_user:
+          description: Optional within this object. Whether a first successful login creates a local user.
+          type: boolean
+        email_attribute:
+          description: Optional within this object. Attribute that holds the user's email address, for example mail.
+          type: string
+        enabled:
+          description: Optional within this object. Whether logins are checked against this server.
+          type: boolean
+        key:
+          description: Optional within this object. Unique name of the connection.
+          type: string
+        ldap_poisoning_protection:
+          description: Optional within this object. Whether attributes returned by the server are checked to defend
+            against LDAP response poisoning.
+          type: boolean
+        ldap_url:
+          description: Optional within this object. Server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com.
+          type: string
+        paging_support_enabled:
+          description: Optional within this object. Whether searches request paged results, for servers that cap
+            result size.
+          type: boolean
+        search:
+          allOf:
+          - $ref: '#/components/schemas/LdapSearchPattern'
+          description: Optional within this object. How to find a user's entry when user_dn_pattern is not set or
+            does not match.
+        user_dn_pattern:
+          description: Optional within this object. Pattern that builds a user's DN from the username, with {0}
+            standing for the username, for example uid={0},ou=people.
+          type: string
+      type: object
+    LdapSettingsCreate:
+      description: A new LDAP connection. Same fields as LdapSettings; key and ldap_url are required.
+      properties:
+        allow_user_to_access_profile:
+          description: Optional within this object. Whether users created through this connection may open their
+            own profile.
+          type: boolean
+        auto_create_user:
+          description: Optional within this object. Whether a first successful login creates a local user.
+          type: boolean
+        email_attribute:
+          description: Optional within this object. Attribute that holds the user's email address, for example mail.
+          type: string
+        enabled:
+          default: true
+          description: Optional within this object. Whether logins are checked against this server. Defaults to
+            true.
+          type: boolean
+        key:
+          description: Required within this object. Unique name of the connection.
+          type: string
+        ldap_poisoning_protection:
+          description: Optional within this object. Whether attributes returned by the server are checked to defend
+            against LDAP response poisoning.
+          type: boolean
+        ldap_url:
+          description: Required within this object. Server URL including the base DN, for example ldap://ldap.example.com:389/dc=example,dc=com.
+          type: string
+        paging_support_enabled:
+          description: Optional within this object. Whether searches request paged results, for servers that cap
+            result size.
+          type: boolean
+        search:
+          allOf:
+          - $ref: '#/components/schemas/LdapSearchPattern'
+          description: Optional within this object. How to find a user's entry when user_dn_pattern is not set or
+            does not match.
+        user_dn_pattern:
+          description: Optional within this object. Pattern that builds a user's DN from the username, with {0}
+            standing for the username, for example uid={0},ou=people.
+          type: string
+      required:
+      - key
+      - ldap_url
+      type: object
+    OidcConfiguration:
+      description: An external OpenID Connect identity provider whose ID tokens may be exchanged for access tokens.
+      properties:
+        audience:
+          description: Optional within this object. When set, ID tokens must carry this value in aud.
+          type: string
+        azure_app_id:
+          description: Optional within this object. For Azure providers, the application ID the tokens are issued
+            for.
+          type: string
+        description:
+          description: Optional within this object. Free text for administrators.
+          type: string
+        enable_permissive_configuration:
+          default: false
+          description: Optional within this object. Applies to the GitHub provider type only. When false, organization
+            is mandatory and only tokens issued for that GitHub organization are accepted; when true, the organization
+            restriction is lifted and any repository on the issuer can obtain a token that a mapping's claims allow.
+            For the other provider types the flag is stored and returned but has no effect. Defaults to false; enabling
+            it widens who can authenticate.
+          type: boolean
+        issuer_url:
+          description: Optional within this object. Issuer that ID tokens must carry in iss. The provider's signing
+            keys are discovered from this URL.
+          type: string
+        name:
+          description: Optional within this object. Unique provider name; token exchanges refer to it as provider_name.
+          type: string
+        organization:
+          description: Optional within this object. GitHub organization the tokens must come from, compared case-sensitively.
+            Mandatory for the GitHub provider type unless enable_permissive_configuration is true. For GitHub Enterprise
+            it is accepted and kept as the token issuer. Rejected for the generic and Azure types.
+          type: string
+        project_key:
+          description: Optional within this object. Project the provider belongs to. Omitted or empty means a global
+            provider.
+          type: string
+        provider_type:
+          description: 'Optional within this object. Kind of identity provider, in the Access vocabulary: `Generic
+            OpenID Connect`, `GitHub`, `GitHub Enterprise` or `Azure`. Generic covers any other OpenID Connect issuer,
+            such as GitLab, Jenkins or Okta. The jfrog/platform Terraform provider sends exactly these values, mapping
+            its own `generic` and `GitHubEnterprise` onto them. artifactweave also accepts the lower-case short
+            names older JFrog examples use (`generic`, `github`, `github enterprise`, `azure`, any case) and stores
+            and returns the canonical form.'
+          type: string
+        token_issuer:
+          description: Optional within this object. For GitHub providers, the organisation or enterprise that issues
+            the tokens.
+          type: string
+        use_default_proxy:
+          description: Optional within this object. Whether fetching the issuer's signing keys goes through the
+            default proxy.
+          type: boolean
+      type: object
+    OidcIdentityMapping:
+      description: A rule that turns a matching ID token into an access token of a given shape.
+      properties:
+        claims:
+          additionalProperties: true
+          description: Optional within this object. Claims an ID token must carry, as an object of claim name to
+            expected value. Every listed claim must match.
+          type: object
+        description:
+          description: Optional within this object. Free text for administrators.
+          type: string
+        name:
+          description: Optional within this object. Unique name of the mapping within its provider.
+          type: string
+        priority:
+          description: 'Optional within this object. Evaluation order among a provider''s mappings: lower numbers
+            are tried first, starting at 1, and a mapping without a priority is tried last. When the token exchange
+            names a project_key, mappings scoped to that project are tried before global ones whatever their numbers;
+            within each group, equal priorities go to the mapping created first. The first mapping whose claims
+            match the presented token produces the access token, so the most restrictive mapping should carry priority
+            1.'
+          minimum: 1
+          type: integer
+        token_spec:
+          allOf:
+          - $ref: '#/components/schemas/TokenSpec'
+          description: Optional within this object. Shape of the access token issued when this mapping matches.
+      type: object
+    OidcIdentityMappingResponse:
+      allOf:
+      - $ref: '#/components/schemas/OidcIdentityMapping'
+      - properties:
+          project_key:
+            description: Optional within this object. Project the mapping belongs to, derived from a project role
+              in token_spec.scope. Set by the server.
+            type: string
+        type: object
+      description: A stored identity mapping, with the project it belongs to.
+      type: object
+    OidcTokenExchangeRequest:
+      description: An RFC 8693 token exchange request carrying a provider's ID token.
+      properties:
+        application_key:
+          description: Optional within this object. AppTrust application key. Accepted and ignored, because AppTrust
+            is out of scope.
+          type: string
+        branch:
+          description: Optional within this object. Source branch of the CI run, recorded with the issued token
+            for auditing.
+          type: string
+        grant_type:
+          description: Optional within this object. Must be urn:ietf:params:oauth:grant-type:token-exchange.
+          type: string
+        identity_mapping_name:
+          description: Optional within this object. Restricts matching to the named mapping instead of trying every
+            mapping of the provider.
+          type: string
+        include_reference_token:
+          description: Optional within this object. Whether the response also carries a reference token for the
+            issued token.
+          type: boolean
+        job_id:
+          description: Optional within this object. Identifier of the CI job, recorded with the issued token for
+            auditing.
+          type: string
+        project_key:
+          description: Optional within this object. Project the issued token is scoped to when the matching mapping
+            is project-scoped.
+          type: string
+        provider_name:
+          description: Optional within this object. Registered provider that issued subject_token.
+          type: string
+        provider_type:
+          description: Optional within this object. Kind of provider, as in its configuration. The stored configuration
+            takes precedence.
+          type: string
+        repo:
+          description: Optional within this object. Source repository of the CI run, recorded with the issued token
+            for auditing.
+          type: string
+        revision:
+          description: Optional within this object. Source revision of the CI run, recorded with the issued token
+            for auditing.
+          type: string
+        run_id:
+          description: Optional within this object. Identifier of the CI run, recorded with the issued token for
+            auditing.
+          type: string
+        subject_token:
+          description: Optional within this object. The ID token issued by the provider. It is this request's credential
+            and is never stored.
+          type: string
+          writeOnly: true
+        subject_token_type:
+          description: Optional within this object. Must be urn:ietf:params:oauth:token-type:id_token.
+          type: string
+      type: object
+    OidcTokenExchangeResult:
+      description: The access token issued by a successful exchange.
+      properties:
+        access_token:
+          description: Optional within this object. The issued access token.
+          type: string
+        expires_in:
+          description: Optional within this object. Lifetime of the issued token in seconds.
+          type: integer
+        issued_token_type:
+          description: Optional within this object. RFC 8693 type of the issued token, the access token URN.
+          type: string
+        reference_token:
+          description: Optional within this object. Reference token for the issued token. Present only when include_reference_token
+            was true.
+          type: string
+        token_type:
+          description: Optional within this object. Always Bearer.
+          type: string
+        username:
+          description: Optional within this object. Username the mapping produced for the token's subject.
+          type: string
+      type: object
+    PasswordPolicy:
+      description: Complexity rules for internal users' passwords. On PATCH an omitted field keeps its current value;
+        on PUT it returns to its default.
+      properties:
+        digit:
+          description: Optional within this object. Minimum number of digits. 0 means no requirement.
+          type: integer
+        length:
+          description: Optional within this object. Minimum password length in characters.
+          type: integer
+        lowercase:
+          description: Optional within this object. Minimum number of lower-case letters. 0 means no requirement.
+          type: integer
+        not_match_old:
+          description: Optional within this object. Whether a new password must differ from the user's current one.
+          type: boolean
+        special_char:
+          description: Optional within this object. Minimum number of characters that are neither letters nor digits.
+            0 means no requirement.
+          type: integer
+        uppercase:
+          description: Optional within this object. Minimum number of upper-case letters. 0 means no requirement.
+          type: integer
+      type: object
+    SamlGeneralSettings:
+      description: The instance-wide SAML switch. Not supported by artifactweave (decision 0019).
+      properties:
+        certificateIsPresent:
+          description: Optional within this object. Whether a service provider certificate is installed. Set by
+            the server.
+          readOnly: true
+          type: boolean
+        enable:
+          description: Optional within this object. Whether SAML login is enabled at all.
+          type: boolean
+      type: object
+    SamlSetting:
+      description: One SAML identity provider. Not supported by artifactweave (decision 0019).
+      properties:
+        allow_user_to_access_profile:
+          description: Optional within this object. Whether users created through SAML may open their own profile.
+          type: boolean
+        auto_redirect:
+          description: Optional within this object. Whether the login page sends users straight to the identity
+            provider.
+          type: boolean
+        auto_user_creation:
+          description: Optional within this object. Whether a first login creates a local user.
+          type: boolean
+        certificate:
+          description: Optional within this object. PEM certificate of the identity provider, used to verify assertion
+            signatures.
+          type: string
+        email_attribute:
+          description: Optional within this object. Assertion attribute that holds the user's email address.
+          type: string
+        enable_integration:
+          description: Optional within this object. Whether login through this identity provider is enabled.
+          type: boolean
+        group_attribute:
+          description: Optional within this object. Assertion attribute that lists the user's groups.
+          type: string
+        ldap_group_settings:
+          description: Optional within this object. Names of LDAP group settings whose groups are resolved for users
+            who log in through SAML.
+          items:
+            type: string
+          type: array
+        login_url:
+          description: Optional within this object. Identity provider URL that login redirects to.
+          type: string
+        logout_url:
+          description: Optional within this object. Identity provider URL that logout redirects to.
+          type: string
+        name:
+          description: Optional within this object. Unique name of the setting.
+          type: string
+        name_id_attribute:
+          description: Optional within this object. Assertion attribute used as the username instead of the NameID.
+          type: string
+        service_provider_name:
+          description: Optional within this object. Entity ID this server presents to the identity provider.
+          type: string
+        sync_groups:
+          description: Optional within this object. Whether group memberships are taken from the assertion on each
+            login.
+          type: boolean
+        use_encrypted_assertion:
+          description: Optional within this object. Whether assertions must be encrypted.
+          type: boolean
+        verify_audience_restriction:
+          description: Optional within this object. Whether an assertion's audience must name this service provider.
+          type: boolean
+      type: object
+    SamlSettingCreate:
+      description: A new SAML identity provider. Not supported by artifactweave (decision 0019).
+      properties:
+        allow_user_to_access_profile:
+          description: Optional within this object. Whether users created through SAML may open their own profile.
+          type: boolean
+        auto_redirect:
+          description: Optional within this object. Whether the login page sends users straight to the identity
+            provider.
+          type: boolean
+        auto_user_creation:
+          description: Optional within this object. Whether a first login creates a local user.
+          type: boolean
+        certificate:
+          description: Required within this object. PEM certificate of the identity provider, used to verify assertion
+            signatures.
+          type: string
+        email_attribute:
+          description: Optional within this object. Assertion attribute that holds the user's email address.
+          type: string
+        enable_integration:
+          description: Optional within this object. Whether login through this identity provider is enabled.
+          type: boolean
+        group_attribute:
+          description: Optional within this object. Assertion attribute that lists the user's groups.
+          type: string
+        ldap_group_settings:
+          description: Optional within this object. Names of LDAP group settings whose groups are resolved for users
+            who log in through SAML.
+          items:
+            type: string
+          type: array
+        login_url:
+          description: Required within this object. Identity provider URL that login redirects to.
+          type: string
+        logout_url:
+          description: Required within this object. Identity provider URL that logout redirects to.
+          type: string
+        name:
+          description: Required within this object. Unique name of the setting.
+          type: string
+        name_id_attribute:
+          description: Optional within this object. Assertion attribute used as the username instead of the NameID.
+          type: string
+        service_provider_name:
+          description: Required within this object. Entity ID this server presents to the identity provider.
+          type: string
+        sync_groups:
+          description: Optional within this object. Whether group memberships are taken from the assertion on each
+            login.
+          type: boolean
+        use_encrypted_assertion:
+          description: Optional within this object. Whether assertions must be encrypted.
+          type: boolean
+        verify_audience_restriction:
+          description: Optional within this object. Whether an assertion's audience must name this service provider.
+          type: boolean
+      required:
+      - name
+      - login_url
+      - logout_url
+      - certificate
+      - service_provider_name
+      type: object
+    ScimGroupListResponse:
+      description: A SCIM 2.0 list response of groups (RFC 7644). Not supported by artifactweave.
+      properties:
+        Resources:
+          description: Optional within this object. Groups on this page.
+          items:
+            properties:
+              description:
+                description: Optional within this object. Description of the group.
+                type: string
+              displayName:
+                description: Optional within this object. Name of the group.
+                type: string
+              id:
+                description: Optional within this object. SCIM identifier of the group, equal to its name.
+                type: string
+              members:
+                description: Optional within this object. Members of the group as SCIM member references.
+                items:
+                  type: object
+                type: array
+              meta:
+                description: Optional within this object. SCIM resource metadata.
+                nullable: true
+                properties:
+                  resourceType:
+                    description: Optional within this object. SCIM resource type name.
+                    type: string
+                type: object
+              schemas:
+                description: Optional within this object. SCIM schema URNs of the resource.
+                items:
+                  type: string
+                type: array
+            type: object
+          type: array
+        itemsPerPage:
+          description: Optional within this object. Number of groups on this page.
+          type: integer
+        schemas:
+          description: Optional within this object. SCIM schema URNs of the list response.
+          items:
+            type: string
+          type: array
+        startIndex:
+          description: Optional within this object. One-based index of the first group on this page.
+          type: integer
+        totalResults:
+          description: Optional within this object. Number of groups that match the filter.
+          type: integer
+      type: object
+    ScimResource:
+      additionalProperties: true
+      description: A SCIM 2.0 resource or patch document (RFC 7643, RFC 7644), free-form. Not supported by artifactweave.
+      type: object
+    ScimResourceTypeListResponse:
+      description: A SCIM 2.0 list response of resource types. Not supported by artifactweave.
+      properties:
+        Resources:
+          description: Optional within this object. The resource types the endpoint supports, User and Group.
+          items:
+            type: object
+          type: array
+        itemsPerPage:
+          description: Optional within this object. Number of resource types on this page.
+          type: integer
+        schemas:
+          description: Optional within this object. SCIM schema URNs of the list response.
+          items:
+            type: string
+          type: array
+        startIndex:
+          description: Optional within this object. One-based index of the first resource type on this page.
+          type: integer
+        totalResults:
+          description: Optional within this object. Number of resource types.
+          type: integer
+      type: object
+    ScimUserListResponse:
+      description: A SCIM 2.0 list response of users. Not supported by artifactweave.
+      properties:
+        Resources:
+          description: Optional within this object. Users on this page.
+          items:
+            properties:
+              active:
+                description: Optional within this object. Whether the user is enabled.
+                type: boolean
+              emails:
+                description: Optional within this object. Email addresses of the user.
+                items:
+                  properties:
+                    primary:
+                      description: Optional within this object. Whether this is the primary address.
+                      type: boolean
+                    value:
+                      description: Optional within this object. The email address.
+                      type: string
+                  type: object
+                type: array
+              groups:
+                description: Optional within this object. Groups the user belongs to.
+                items:
+                  properties:
+                    value:
+                      description: Optional within this object. Name of the group.
+                      type: string
+                  type: object
+                type: array
+              id:
+                description: Optional within this object. SCIM identifier of the user, equal to the username.
+                type: string
+              meta:
+                description: Optional within this object. SCIM resource metadata.
+                properties:
+                  resourceType:
+                    description: Optional within this object. SCIM resource type name.
+                    type: string
+                type: object
+              schemas:
+                description: Optional within this object. SCIM schema URNs of the resource.
+                items:
+                  type: string
+                type: array
+              userName:
+                description: Optional within this object. Username.
+                type: string
+            type: object
+          type: array
+        itemsPerPage:
+          description: Optional within this object. Number of users on this page.
+          type: integer
+        schemas:
+          description: Optional within this object. SCIM schema URNs of the list response.
+          items:
+            type: string
+          type: array
+        startIndex:
+          description: Optional within this object. One-based index of the first user on this page.
+          type: integer
+        totalResults:
+          description: Optional within this object. Number of users that match the filter.
+          type: integer
+      type: object
+    TokenSpec:
+      description: The shape of the access token an identity mapping issues.
+      properties:
+        audience:
+          description: Optional within this object. Audience of the issued token. Omitted means every service.
+          type: string
+        expires_in:
+          description: Optional within this object. Lifetime of the issued token in seconds.
+          format: int64
+          type: integer
+        groups_pattern:
+          description: Optional within this object. Template that builds group names from the ID token's claims.
+            The issued token carries those groups.
+          type: string
+        scope:
+          description: Optional within this object. Scope of the issued token, in the access token scope grammar
+            of POST /api/v1/tokens.
+          type: string
+        self_revocable:
+          description: Optional within this object. Whether the issued token may revoke itself.
+          type: boolean
+        username:
+          description: Optional within this object. Username of the issued token's subject. Use username_pattern
+            instead to derive it from claims.
+          type: string
+        username_pattern:
+          description: Optional within this object. Template that builds the subject's username from the ID token's
+            claims.
+          type: string
+      type: object
+    VaultConfig:
+      description: A stored HashiCorp Vault connection. Secrets are never returned.
+      properties:
+        config:
+          allOf:
+          - $ref: '#/components/schemas/HashicorpVaultConfig'
+          description: Required within this object. Connection settings. Secrets inside are never returned.
+        key:
+          description: Required within this object. Unique key of the connection, as used in the path and in a keypair's
+            vaultKey.
+          type: string
+        type:
+          description: Required within this object. Secret manager kind. Only HashicorpVault exists.
+          enum:
+          - HashicorpVault
+          type: string
+      required:
+      - key
+      - type
+      - config
+      type: object
+    VaultConfigRequest:
+      description: A Vault connection to store or test.
+      properties:
+        config:
+          allOf:
+          - $ref: '#/components/schemas/HashicorpVaultConfig'
+          description: Required within this object. Connection settings.
+        key:
+          description: Optional within this object. Key of the connection. When present it must equal the vault_key
+            path parameter.
+          type: string
+        type:
+          description: Required within this object. Secret manager kind. Only HashicorpVault exists.
+          enum:
+          - HashicorpVault
+          type: string
+      required:
+      - type
+      - config
+      type: object
+paths:
+  /api/v1/aws/iam_role:
+    put:
+      description: AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation
+        is kept for parity and always answers 501 in the Access error envelope.
+      operationId: putAwsIamRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AwsIamRoleAssignment'
+        description: The role mapping.
+        required: true
+      responses:
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A resource with that name already exists.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: AWS IAM role mapping is not implemented.'
+      summary: Assign an AWS IAM role (not supported)
+      tags:
+      - aws
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/putawsiamrole.md
+      x-tier: stub
+  /api/v1/aws/iam_role/{username}:
+    delete:
+      description: AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation
+        is kept for parity and always answers 501 in the Access error envelope.
+      operationId: deleteAwsIamRole
+      parameters:
+      - description: Required path parameter. Username the operation applies to.
+        in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: AWS IAM role mapping is not implemented.'
+      summary: Remove a user's AWS IAM role (not supported)
+      tags:
+      - aws
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteawsiamrole.md
+      x-tier: stub
+    get:
+      description: AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation
+        is kept for parity and always answers 501 in the Access error envelope.
+      operationId: getAwsIamRole
+      parameters:
+      - description: Required path parameter. Username the operation applies to.
+        in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AwsIamRoleAssignment'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: AWS IAM role mapping is not implemented.'
+      summary: Get a user's AWS IAM role (not supported)
+      tags:
+      - aws
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getawsiamrole.md
+      x-tier: stub
+  /api/v1/cert/ca:
+    get:
+      description: Returns, as PEM text, the public certificate of the authority that signs the instance's internal
+        service certificates. The server generates the authority on first start and keeps its key sealed (decision
+        0017). Requires a platform admin.
+      operationId: getCaCertificate
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: The CA certificate in PEM form.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+      summary: Get the CA certificate
+      tags:
+      - certificates
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getcacertificate.md
+  /api/v1/cert/root:
+    get:
+      description: Returns the certificate whose key signs the instance's access tokens, so that other services
+        can verify them. By default the body is the base64 certificate on one line; with formatted=true it is a
+        PEM block with header, footer and line breaks. Any authenticated caller may read it.
+      operationId: getRootCertificate
+      parameters:
+      - description: Optional query parameter. When true the certificate is returned as a PEM block with header,
+          footer and line breaks. Omitted or false returns the base64 body on one line.
+        in: query
+        name: formatted
+        required: false
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: The root certificate as text.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+      summary: Get the root certificate
+      tags:
+      - certificates
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getrootcertificate.md
+  /api/v1/config/security/authentication/basic_authentication_enabled:
+    get:
+      description: Returns whether usernames and passwords are accepted over HTTP Basic. When the switch is off,
+        only access tokens and reference tokens authenticate (decision 0005). Requires a platform admin.
+      operationId: getBasicAuthenticationStatus
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  enabled:
+                    description: Optional within this object. Whether usernames and passwords over HTTP Basic are
+                      accepted.
+                    type: boolean
+                type: object
+          description: The current switch value.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Get the basic authentication switch
+      tags:
+      - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getbasicauthenticationstatus.md
+    put:
+      description: Turns acceptance of usernames and passwords over HTTP Basic on or off for the whole instance,
+        from the next request on. Returns 200 with no body. Requires a platform admin.
+      operationId: setBasicAuthenticationStatus
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                enabled:
+                  description: Required within this object. true accepts usernames and passwords over HTTP Basic;
+                    false refuses them while tokens keep working.
+                  type: boolean
+              required:
+              - enabled
+              type: object
+        description: The new switch value.
+        required: true
+      responses:
+        '200':
+          description: The switch was changed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Set the basic authentication switch
+      tags:
+      - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setbasicauthenticationstatus.md
+  /api/v1/config/security/password_policy:
+    patch:
+      description: Merges the supplied fields into the password policy; omitted fields keep their current values.
+        The policy applies when a password is set or changed, not to existing passwords. Returns 204 with no body.
+        Requires a platform admin.
+      operationId: updatePasswordPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordPolicy'
+        description: The fields to change.
+        required: true
+      responses:
+        '204':
+          description: The policy was updated.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Update the password policy
+      tags:
+      - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatepasswordpolicy.md
+    put:
+      description: Replaces the whole password policy that internal users' passwords must satisfy. Every field not
+        supplied returns to its default, so an empty object resets the policy. The policy applies when a password
+        is set or changed, not to existing passwords. Returns 204 with no body. Requires a platform admin.
+      operationId: createPasswordPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordPolicy'
+        description: The complete new policy.
+        required: true
+      responses:
+        '204':
+          description: The policy was replaced.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Replace the password policy
+      tags:
+      - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createpasswordpolicy.md
+  /api/v1/config/token/default_expiry:
+    get:
+      description: Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in.
+        Requires a platform admin.
+      operationId: getTokenDefaultExpiry
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  default_token_expiration:
+                    description: Optional within this object. Lifetime in seconds given to access tokens created
+                      without expires_in. 3600 unless an admin changed it.
+                    type: integer
+                type: object
+          description: The current default lifetime.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Get the default token lifetime
+      tags:
+      - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/gettokendefaultexpiry.md
+    put:
+      description: Changes the lifetime given to access tokens created without expires_in. Tokens already issued
+        keep their expiry. Returns 200 with no body. Requires a platform admin.
+      operationId: setTokenDefaultExpiry
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                default_token_expiration:
+                  description: Required within this object. New default lifetime in seconds. Applies only to tokens
+                    created after the change.
+                  type: integer
+              required:
+              - default_token_expiration
+              type: object
+        description: The new default lifetime.
+        required: true
+      responses:
+        '200':
+          description: The default was changed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Set the default token lifetime
+      tags:
+      - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/settokendefaultexpiry.md
+  /api/v1/crowd:
+    get:
+      description: Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation
+        is kept for parity and always answers 501 in the Access error envelope.
+      operationId: getCrowdConfiguration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrowdConfiguration'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: Atlassian Crowd integration is not implemented.'
+      summary: Get the Crowd configuration (not supported)
+      tags:
+      - crowd
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getcrowdconfiguration.md
+      x-tier: stub
+    put:
+      description: Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation
+        is kept for parity and always answers 501 in the Access error envelope.
+      operationId: upsertCrowdConfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrowdConfiguration'
+        description: The Crowd configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CrowdConfiguration'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: Atlassian Crowd integration is not implemented.'
+      summary: Set the Crowd configuration (not supported)
+      tags:
+      - crowd
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/upsertcrowdconfiguration.md
+      x-tier: stub
+  /api/v1/httpsso:
+    get:
+      description: HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getHttpSsoConfiguration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSsoConfiguration'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: HTTP single sign-on is not implemented.'
+      summary: Get the HTTP single sign-on configuration (not supported)
+      tags:
+      - httpsso
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/gethttpssoconfiguration.md
+      x-tier: stub
+    put:
+      description: HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: upsertHttpSsoConfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HttpSsoConfiguration'
+        description: The HTTP single sign-on configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HttpSsoConfiguration'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: HTTP single sign-on is not implemented.'
+      summary: Set the HTTP single sign-on configuration (not supported)
+      tags:
+      - httpsso
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/upserthttpssoconfiguration.md
+      x-tier: stub
+  /api/v1/ldap/groups:
+    get:
+      description: Returns every LDAP group synchronisation setting. Requires a platform admin.
+      operationId: getAllLdapGroupSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/LdapGroupSettings'
+                type: array
+          description: Every group setting.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: List LDAP group settings
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallldapgroupsettings.md
+    post:
+      description: Defines how groups are read from the LDAP connection named in enabled_ldap and mapped to local
+        groups. Answers 201 with the stored setting. Requires a platform admin.
+      operationId: createLdapGroupSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapGroupSettingsCreate'
+        description: The group setting to add.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LdapGroupSettings'
+          description: The setting was added; the body is the stored setting.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Create an LDAP group setting
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createldapgroupsettings.md
+    put:
+      description: Replaces the group setting whose name matches the body's name. Requires a platform admin.
+      operationId: updateLdapGroupSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapGroupSettings'
+        description: The complete new group setting.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LdapGroupSettings'
+          description: The setting was replaced; the body is the stored setting.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Replace an LDAP group setting
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updateldapgroupsettings.md
+  /api/v1/ldap/groups/import:
+    post:
+      description: Creates local groups, or updates existing ones, for the listed LDAP groups through the given
+        group setting, so that permissions can be granted to them. Returns 204. Requires a platform admin.
+      operationId: importLdapGroups
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapImport'
+        description: The groups to import and the setting to read them through.
+        required: true
+      responses:
+        '204':
+          description: The groups were imported.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Import LDAP groups
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/importldapgroups.md
+  /api/v1/ldap/groups/search:
+    post:
+      description: Runs the group search described by the body against its LDAP connection and returns the groups
+        found, each with its distinguished name and local status. With username, returns only that user's groups.
+        Nothing is stored. Requires a platform admin.
+      operationId: searchLdapGroups
+      parameters:
+      - description: Optional query parameter. Returns only the groups this user belongs to. Omitted returns every
+          group the search finds.
+        in: query
+        name: username
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapGroupSettings'
+        description: The group setting that describes the search.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/LdapGroup'
+                type: array
+          description: The groups found.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Search LDAP groups
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/searchldapgroups.md
+  /api/v1/ldap/groups/strategy:
+    get:
+      description: Returns the default filter and attribute names of one group mapping strategy, as a starting point
+        for a new group setting. Requires a platform admin.
+      operationId: getLdapGroupMappingStrategy
+      parameters:
+      - description: 'Optional query parameter. Strategy to describe: STATIC, DYNAMIC or HIERARCHY.'
+        in: query
+        name: strategy
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMappingStrategy'
+          description: The strategy's defaults.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Get a group mapping strategy
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getldapgroupmappingstrategy.md
+  /api/v1/ldap/groups/{name}:
+    delete:
+      description: Removes the group setting. Groups already imported through it remain as local groups. Returns
+        204. Requires a platform admin.
+      operationId: deleteLdapGroupSettings
+      parameters:
+      - description: Required path parameter. Name of the group setting to remove.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: The setting was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group setting has that name.
+      summary: Delete an LDAP group setting
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteldapgroupsettings.md
+    get:
+      description: Returns one LDAP group setting. Requires a platform admin.
+      operationId: getLdapGroupSettingsByName
+      parameters:
+      - description: Required path parameter. Name of the group setting.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LdapGroupSettings'
+          description: The group setting.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group setting has that name.
+      summary: Get an LDAP group setting
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getldapgroupsettingsbyname.md
+  /api/v1/ldap/groups/{name}/refresh:
+    post:
+      description: Re-reads the LDAP groups of the named setting. operation chooses whether to update the memberships
+        of groups already imported, import the groups not yet present, or both. With username, only that user's
+        memberships are refreshed. Returns a plain-text summary that includes the number of groups imported. Requires
+        a platform admin.
+      operationId: refreshLdapGroupSettings
+      parameters:
+      - description: Required path parameter. Name of the group setting whose groups are refreshed.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. UPDATE refreshes the memberships of groups already imported, IMPORT
+          imports the groups not yet present, UPDATE_AND_IMPORT does both. Defaults to UPDATE_AND_IMPORT.
+        in: query
+        name: operation
+        required: false
+        schema:
+          default: UPDATE_AND_IMPORT
+          enum:
+          - UPDATE
+          - IMPORT
+          - UPDATE_AND_IMPORT
+          type: string
+      - description: Optional query parameter. Limits the refresh to this user's memberships. Omitted refreshes
+          every user.
+        in: query
+        name: username
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: A plain-text summary of the refresh.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group setting has that name.
+      summary: Refresh LDAP groups
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/refreshldapgroupsettings.md
+  /api/v1/ldap/settings:
+    get:
+      description: Returns every LDAP server connection that logins are checked against. Manager passwords are never
+        returned. Requires a platform admin.
+      operationId: getAllLdapSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/LdapSettings'
+                type: array
+          description: Every LDAP connection.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: List LDAP connections
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallldapsettings.md
+    post:
+      description: Adds an LDAP server that login attempts are checked against, in addition to internal users. Answers
+        201 with the stored connection. Requires a platform admin.
+      operationId: createLdapSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapSettingsCreate'
+        description: The connection to add.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LdapSettings'
+          description: The connection was added; the body is the stored connection without its manager password.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Create an LDAP connection
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createldapsettings.md
+    put:
+      description: Replaces the connection whose key matches the body's key. Requires a platform admin.
+      operationId: updateLdapSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapSettings'
+        description: The complete new connection.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LdapSettings'
+          description: The connection was replaced; the body is the stored connection without its manager password.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Replace an LDAP connection
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updateldapsettings.md
+  /api/v1/ldap/settings/test:
+    post:
+      description: Binds to the server described by the body, without storing anything, and answers 204 when the
+        bind and any configured search succeed. A failing test answers 400 with the server's error. Requires a platform
+        admin.
+      operationId: testLdapConnection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LdapSettings'
+        description: The connection to test.
+        required: true
+      responses:
+        '204':
+          description: The bind succeeded.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The bind or search failed; the error explains why.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Test an LDAP connection
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/testldapconnection.md
+  /api/v1/ldap/settings/{key}:
+    delete:
+      description: Removes the connection. Users created through it keep their local accounts but can no longer
+        log in through it, and group settings that name it in enabled_ldap stop synchronising. Returns 204. Requires
+        a platform admin.
+      operationId: deleteLdapSettings
+      parameters:
+      - description: Required path parameter. Key of the LDAP connection to remove.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: The connection was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No connection has that key.
+      summary: Delete an LDAP connection
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteldapsettings.md
+    get:
+      description: Returns one LDAP connection without its manager password. Requires a platform admin.
+      operationId: getLdapSettingsByKey
+      parameters:
+      - description: Required path parameter. Key of the LDAP connection.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LdapSettings'
+          description: The connection.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No connection has that key.
+      summary: Get an LDAP connection
+      tags:
+      - ldap
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getldapsettingsbykey.md
+  /api/v1/logshipping/config:
+    post:
+      description: Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10).
+        The operation is kept for parity and always answers 501 in the Access error envelope.
+      operationId: enableCloudLogCollection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                enabled:
+                  description: Required within this object. Whether log collection is switched on.
+                  type: boolean
+              required:
+              - enabled
+              type: object
+        description: The new switch value.
+        required: true
+      responses:
+        '200':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: Cloud log collection is not implemented.'
+      summary: Switch cloud log collection (not supported)
+      tags:
+      - logshipping
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/enablecloudlogcollection.md
+      x-tier: stub
+  /api/v1/oidc:
+    get:
+      description: Returns every OpenID Connect provider whose ID tokens the token exchange (POST /api/v1/oidc/token)
+        trusts. Requires a platform admin.
+      operationId: getAllOidcConfigurations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OidcConfiguration'
+                type: array
+          description: Every provider configuration.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: List OIDC providers
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getalloidcconfigurations.md
+    post:
+      description: Registers an external identity provider, typically a CI system, whose signed ID tokens may be
+        exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider
+        expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400.
+        Requires a platform admin.
+      operationId: createOidcConfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcConfiguration'
+        description: The provider to register. name and issuer_url must be set.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcConfiguration'
+          description: The provider was registered; the body is the stored configuration.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Create an OIDC provider
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createoidcconfiguration.md
+  /api/v1/oidc/token:
+    post:
+      description: 'Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents
+        an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries
+        the provider''s identity mappings in priority order, and issues an access token shaped by the token_spec
+        of the first mapping whose claims all match. Needs no authentication: the subject token is the credential.
+        Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not
+        verify. The jfrog/artifactory provider''s oidc_provider_name setting and the JFrog CLI use this operation.'
+      operationId: oidcTokenExchange
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcTokenExchangeRequest'
+        description: The exchange request.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcTokenExchangeResult'
+          description: The token was issued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or no identity mapping matches.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The subject token does not verify against the provider.
+      summary: Exchange an ID token for an access token
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/oidctokenexchange.md
+  /api/v1/oidc/{name}:
+    delete:
+      description: Removes the provider and its identity mappings, so token exchanges that name it fail from then
+        on. Tokens already issued through it stay valid until they expire or are revoked. Returns 204. Requires
+        a platform admin.
+      operationId: deleteOidcConfiguration
+      parameters:
+      - description: Required path parameter. Name of the provider to remove.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: The provider was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No provider has that name.
+      summary: Delete an OIDC provider
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteoidcconfiguration.md
+    get:
+      description: Returns one provider configuration. Requires a platform admin.
+      operationId: getOidcConfiguration
+      parameters:
+      - description: Required path parameter. Name of the provider.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcConfiguration'
+          description: The provider configuration.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No provider has that name.
+      summary: Get an OIDC provider
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcconfiguration.md
+    put:
+      description: Replaces the named provider's configuration with the body. The path names the provider; a name
+        in the body must match it. Requires a platform admin.
+      operationId: updateOidcConfiguration
+      parameters:
+      - description: Required path parameter. Name of the provider to replace.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcConfiguration'
+        description: The complete new configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcConfiguration'
+          description: The provider was replaced; the body is the stored configuration.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Replace an OIDC provider
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcconfiguration.md
+  /api/v1/oidc/{provider_name}/identity_mappings:
+    get:
+      description: Returns the identity mappings of one provider, optionally only those of one project. Requires
+        a platform admin.
+      operationId: getOidcIdentityMappings
+      parameters:
+      - description: Required path parameter. Name of the OIDC provider the mappings belong to.
+        in: path
+        name: provider_name
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. Returns only the mappings that belong to this project. Omitted returns
+          every mapping of the provider.
+        in: query
+        name: project_key
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/OidcIdentityMappingResponse'
+                type: array
+          description: The provider's mappings.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No provider has that name.
+      summary: List identity mappings
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappings.md
+    post:
+      description: 'Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange
+        issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key
+        derived from its scope. Requires a platform admin.'
+      operationId: createOidcIdentityMapping
+      parameters:
+      - description: Required path parameter. Name of the OIDC provider the mappings belong to.
+        in: path
+        name: provider_name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcIdentityMapping'
+        description: The mapping to add.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcIdentityMappingResponse'
+          description: The mapping was added; the body is the stored mapping.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Create an identity mapping
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createoidcidentitymapping.md
+  /api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}:
+    delete:
+      description: Removes one identity mapping. Tokens already issued through it stay valid. Returns 204. Requires
+        a platform admin.
+      operationId: deleteOidcIdentityMapping
+      parameters:
+      - description: Required path parameter. Name of the OIDC provider the mappings belong to.
+        in: path
+        name: provider_name
+        required: true
+        schema:
+          type: string
+      - description: Required path parameter. Name of the identity mapping.
+        in: path
+        name: mapping_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: The mapping was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The provider or the mapping does not exist.
+      summary: Delete an identity mapping
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteoidcidentitymapping.md
+    get:
+      description: Returns one identity mapping of a provider. Requires a platform admin.
+      operationId: getOidcIdentityMappingByName
+      parameters:
+      - description: Required path parameter. Name of the OIDC provider the mappings belong to.
+        in: path
+        name: provider_name
+        required: true
+        schema:
+          type: string
+      - description: Required path parameter. Name of the identity mapping.
+        in: path
+        name: mapping_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcIdentityMappingResponse'
+          description: The mapping.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The provider or the mapping does not exist.
+      summary: Get an identity mapping
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappingbyname.md
+    put:
+      description: Replaces the named mapping with the body. Requires a platform admin.
+      operationId: updateOidcIdentityMapping
+      parameters:
+      - description: Required path parameter. Name of the OIDC provider the mappings belong to.
+        in: path
+        name: provider_name
+        required: true
+        schema:
+          type: string
+      - description: Required path parameter. Name of the identity mapping.
+        in: path
+        name: mapping_name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OidcIdentityMapping'
+        description: The complete new mapping.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OidcIdentityMappingResponse'
+          description: The mapping was replaced; the body is the stored mapping.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The provider or the mapping does not exist.
+      summary: Replace an identity mapping
+      tags:
+      - oidc
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcidentitymapping.md
+  /api/v1/saml:
+    get:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getAllSamlSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SamlSetting'
+                type: array
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: List SAML settings (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallsamlsettings.md
+      x-tier: stub
+    post:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: createSamlSetting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SamlSettingCreate'
+        description: The SAML setting.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SamlSetting'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: Create a SAML setting (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createsamlsetting.md
+      x-tier: stub
+  /api/v1/saml/general_settings:
+    get:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getSamlGeneralSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SamlGeneralSettings'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: Get the SAML switch (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlgeneralsettings.md
+      x-tier: stub
+    put:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: updateSamlGeneralSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                enable:
+                  description: Required within this object. Whether SAML login is enabled at all.
+                  type: boolean
+              required:
+              - enable
+              type: object
+        description: The new switch value.
+        required: true
+      responses:
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: Set the SAML switch (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatesamlgeneralsettings.md
+      x-tier: stub
+  /api/v1/saml/{name}:
+    delete:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: deleteSamlSetting
+      parameters:
+      - description: Required path parameter. Name of the SAML setting.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: Delete a SAML setting (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletesamlsetting.md
+      x-tier: stub
+    get:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getSamlSettingByName
+      parameters:
+      - description: Required path parameter. Name of the SAML setting.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SamlSetting'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: Get a SAML setting (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlsettingbyname.md
+      x-tier: stub
+    put:
+      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: updateSamlSetting
+      parameters:
+      - description: Required path parameter. Name of the SAML setting.
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SamlSetting'
+        description: The SAML setting.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SamlSetting'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SAML single sign-on is not implemented.'
+      summary: Replace a SAML setting (not supported)
+      tags:
+      - saml
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatesamlsetting.md
+      x-tier: stub
+  /api/v1/scim/v2/Groups:
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimGroups
+      parameters:
+      - description: Optional query parameter. SCIM filter expression that selects resources.
+        in: query
+        name: filter
+        schema:
+          type: string
+      - description: Optional query parameter. One-based index of the first result.
+        in: query
+        name: startIndex
+        schema:
+          type: integer
+      - description: Optional query parameter. Maximum number of results.
+        in: query
+        name: count
+        schema:
+          type: integer
+      - description: Optional query parameter. Comma-separated attributes to leave out of each resource.
+        in: query
+        name: excludedAttributes
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimGroupListResponse'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: List SCIM groups (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroups.md
+      x-tier: stub
+    post:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: createScimGroup
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              $ref: '#/components/schemas/ScimResource'
+        description: The SCIM group resource.
+        required: true
+      responses:
+        '201':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A resource with that name already exists.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Create a SCIM group (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createscimgroup.md
+      x-tier: stub
+  /api/v1/scim/v2/Groups/{groupName}:
+    delete:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: deleteScimGroup
+      parameters:
+      - description: Required path parameter. Name of the SCIM group.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Delete a SCIM group (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimgroup.md
+      x-tier: stub
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimGroupByName
+      parameters:
+      - description: Required path parameter. Name of the SCIM group.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. Comma-separated attributes to leave out of each resource.
+        in: query
+        name: excludedAttributes
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Get a SCIM group (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroupbyname.md
+      x-tier: stub
+    patch:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: patchScimGroup
+      parameters:
+      - description: Required path parameter. Name of the SCIM group.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              $ref: '#/components/schemas/ScimResource'
+        description: The SCIM patch document.
+        required: true
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Patch a SCIM group (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimgroup.md
+      x-tier: stub
+    put:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: updateScimGroup
+      parameters:
+      - description: Required path parameter. Name of the SCIM group.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              $ref: '#/components/schemas/ScimResource'
+        description: The SCIM group resource.
+        required: true
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Replace a SCIM group (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatescimgroup.md
+      x-tier: stub
+  /api/v1/scim/v2/ResourceTypes:
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimResourceTypes
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResourceTypeListResponse'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: List SCIM resource types (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimresourcetypes.md
+      x-tier: stub
+  /api/v1/scim/v2/Schemas:
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimSchemas
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: List SCIM schemas (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimschemas.md
+      x-tier: stub
+  /api/v1/scim/v2/Schemas/{schemaId}:
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimSchemaById
+      parameters:
+      - description: Required path parameter. URN of the SCIM schema.
+        in: path
+        name: schemaId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Get a SCIM schema (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimschemabyid.md
+      x-tier: stub
+  /api/v1/scim/v2/ServiceProviderConfig:
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimServiceProviderConfig
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Get the SCIM service provider configuration (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimserviceproviderconfig.md
+      x-tier: stub
+  /api/v1/scim/v2/Users:
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimUsers
+      parameters:
+      - description: Optional query parameter. SCIM filter expression that selects resources.
+        in: query
+        name: filter
+        schema:
+          type: string
+      - description: Optional query parameter. One-based index of the first result.
+        in: query
+        name: startIndex
+        schema:
+          type: integer
+      - description: Optional query parameter. Maximum number of results.
+        in: query
+        name: count
+        schema:
+          type: integer
+      - description: Optional query parameter. Comma-separated attributes to leave out of each resource.
+        in: query
+        name: excludedAttributes
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimUserListResponse'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: List SCIM users (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimusers.md
+      x-tier: stub
+    post:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: createScimUser
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              $ref: '#/components/schemas/ScimResource'
+        description: The SCIM user resource.
+        required: true
+      responses:
+        '201':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A resource with that name already exists.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Create a SCIM user (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createscimuser.md
+      x-tier: stub
+  /api/v1/scim/v2/Users/{username}:
+    delete:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: deleteScimUser
+      parameters:
+      - description: Required path parameter. Username the operation applies to.
+        in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Delete a SCIM user (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimuser.md
+      x-tier: stub
+    get:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: getScimUserByUsername
+      parameters:
+      - description: Required path parameter. Username the operation applies to.
+        in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. Comma-separated attributes to leave out of each resource.
+        in: query
+        name: excludedAttributes
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Get a SCIM user (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getscimuserbyusername.md
+      x-tier: stub
+    patch:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: patchScimUser
+      parameters:
+      - description: Required path parameter. Username the operation applies to.
+        in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              $ref: '#/components/schemas/ScimResource'
+        description: The SCIM patch document.
+        required: true
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Patch a SCIM user (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimuser.md
+      x-tier: stub
+    put:
+      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
+        for parity and always answers 501 in the Access error envelope.
+      operationId: updateScimUser
+      parameters:
+      - description: Required path parameter. Username the operation applies to.
+        in: path
+        name: username
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/scim+json:
+            schema:
+              $ref: '#/components/schemas/ScimResource'
+        description: The SCIM user resource.
+        required: true
+      responses:
+        '200':
+          content:
+            application/scim+json:
+              schema:
+                $ref: '#/components/schemas/ScimResource'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: SCIM provisioning is not implemented.'
+      summary: Replace a SCIM user (not supported)
+      tags:
+      - scim
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatescimuser.md
+      x-tier: stub
+  /api/v1/system/backup/export:
+    post:
+      description: Access backup export and import is not implemented in artifactweave (configuration as code replaces
+        it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+      operationId: exportAccessConfiguration
+      responses:
+        '202':
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: Access backup export and import is not implemented.'
+      summary: Export the Access configuration (not supported)
+      tags:
+      - backup
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/exportaccessconfiguration.md
+      x-tier: stub
+  /api/v1/system/backup/import:
+    post:
+      description: Access backup export and import is not implemented in artifactweave (configuration as code replaces
+        it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+      operationId: importAccessConfiguration
+      responses:
+        '200':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Always returned: Access backup export and import is not implemented.'
+      summary: Import the Access configuration (not supported)
+      tags:
+      - backup
+      - stub
+      x-oracle-source: https://docs.jfrog.com/administration/reference/importaccessconfiguration.md
+      x-tier: stub
+  /api/v1/vault/configs:
+    get:
+      description: Returns every HashiCorp Vault connection. Keypairs whose vaultKey names a connection read their
+        private key from Vault instead of the database. Secrets are never returned. Requires a platform admin.
+      operationId: getVaultConfigurations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/VaultConfig'
+                type: array
+          description: Every Vault connection.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: List Vault connections
+      tags:
+      - vault
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getvaultconfigurations.md
+  /api/v1/vault/configs/test:
+    post:
+      description: Authenticates to the Vault server described by the body, without storing anything, and answers
+        204 on success. Requires a platform admin.
+      operationId: testVaultConfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VaultConfigRequest'
+        description: The connection to test.
+        required: true
+      responses:
+        '204':
+          description: Authentication succeeded.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is not application/json.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The test could not be completed.
+      summary: Test a Vault connection
+      tags:
+      - vault
+      x-oracle-source: https://docs.jfrog.com/administration/reference/testvaultconfiguration.md
+  /api/v1/vault/configs/{vault_key}:
+    delete:
+      description: Removes the connection. Keypairs that name it can no longer sign until a connection with the
+        same key is stored again. Returns 204. Requires a platform admin.
+      operationId: deleteVaultConfiguration
+      parameters:
+      - description: Required path parameter. Key of the Vault connection to remove.
+        in: path
+        name: vault_key
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: The connection was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No connection has that key.
+      summary: Delete a Vault connection
+      tags:
+      - vault
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletevaultconfiguration.md
+    put:
+      description: Stores the connection under vault_key, replacing any connection with that key, and returns it
+        without secrets. Vault must be reached over TLS. A body that is not application/json answers 415. Requires
+        a platform admin.
+      operationId: setVaultConfiguration
+      parameters:
+      - description: Required path parameter. Key under which the connection is stored; keypairs refer to it in
+          vaultKey.
+        in: path
+        name: vault_key
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VaultConfigRequest'
+        description: The connection to store.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaultConfig'
+          description: The connection was stored; the body omits secrets.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body or a parameter is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is not application/json.
+      summary: Create or replace a Vault connection
+      tags:
+      - vault
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setvaultconfiguration.md

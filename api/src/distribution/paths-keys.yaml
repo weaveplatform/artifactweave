@@ -1,0 +1,298 @@
+paths:
+  /api/v1/keys/pgp:
+    get:
+      description: Returns the alias and ASCII-armoured public part of the default GPG key, the key that signs release
+        bundles. The private part is never returned.
+      operationId: getGpgSigningKey
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GpgKey'
+          description: The default key.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Get the default GPG signing key
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgsigningkey.md
+    post:
+      description: Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in
+        the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages,
+        so a key added here is visible there and the reverse.
+      operationId: setGpgSigningKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GpgKeyUpload'
+        description: The key pair.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropagationReport'
+          description: The key was stored; the report covers propagation, or says it was not requested.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The keys are not ASCII-armoured PGP keys, do not form a pair, or the alias is taken.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Add a GPG signing key
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setgpgsigningkey.md
+  /api/v1/keys/pgp/aliases:
+    get:
+      description: Lists the aliases of the configured GPG keys.
+      operationId: getAllGpgKeyAliases
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/GpgKeyAlias'
+                type: array
+          description: One entry per key.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List GPG key aliases
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallgpgkeyaliases.md
+  /api/v1/keys/pgp/propagate:
+    post:
+      description: Sends one key (`alias`) or every key (`all=true`) to every edge peer, which adds it to the keys
+        it trusts for verifying signatures. Only public parts leave this instance.
+      operationId: uploadAndPropagateGpgSigningKeysForDistribution
+      parameters:
+      - description: Optional query parameter. Alias of the one key to propagate. Ignored when all is true.
+        in: query
+        name: alias
+        schema:
+          type: string
+      - description: Optional query parameter. When true every configured key is propagated. Defaults to false.
+        in: query
+        name: all
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropagationReport'
+          description: Per-edge outcome.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Propagate GPG keys to edges
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/uploadandpropagategpgsigningkeysfordistribution.md
+  /api/v1/keys/pgp/{alias}:
+    delete:
+      description: Deletes the key pair. Versions already signed with it stay valid on edges that hold its public
+        part; new versions cannot be signed with it.
+      operationId: deleteGpgKeyByAlias
+      parameters:
+      - description: Required path parameter. Alias of the key.
+        in: path
+        name: alias
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+      summary: Delete a GPG key
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletegpgkeybyalias.md
+    get:
+      description: Returns the alias and public part of one key.
+      operationId: getGpgPublicKeyByAlias
+      parameters:
+      - description: Required path parameter. Alias of the key.
+        in: path
+        name: alias
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GpgKey'
+          description: The key.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+      summary: Get a GPG key by alias
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgpublickeybyalias.md
+    put:
+      description: Changes the alias of a key; the key material is unchanged.
+      operationId: updateGpgKeyAlias
+      parameters:
+      - description: Required path parameter. Current alias of the key.
+        in: path
+        name: alias
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The new alias. JFrog's current OpenAPI definition names the field alias and its 2.8.1
+                reference new_alias; either is accepted, and one must be present.
+              properties:
+                alias:
+                  description: Optional within this object. The new alias; must not be taken.
+                  type: string
+                new_alias:
+                  description: Optional within this object. The new alias, older field name; used when alias is
+                    absent.
+                  type: string
+              type: object
+        description: The new alias.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GpgKey'
+          description: The key under its new alias.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+      summary: Rename a GPG key
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updategpgkeyalias.md
+  /api/v2/distribution/key/propagate/{key_name}:
+    post:
+      description: Sends the named key's public part to every edge peer, which adds it to the keys it trusts for
+        verifying release bundle signatures. Run it after adding or rotating the signing key and before distributing.
+      operationId: propagatePublicSigningKey
+      parameters:
+      - description: Required path parameter. Name of the signing key in the keypair store.
+        in: path
+        name: key_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PropagationReport'
+          description: Per-edge outcome.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Propagating keys needs an administrator.
+      summary: Propagate a signing key to edges
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatepublicsigningkey.md
+  /api/v2/distribution/key/{key_name}:
+    get:
+      description: Returns the ASCII-armoured public part of the named key from the keypair store, as plain text.
+      operationId: getPublicSigningKeyForDistribution
+      parameters:
+      - description: Required path parameter. Name of the signing key in the keypair store.
+        in: path
+        name: key_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: The public key.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Reading signing keys needs an administrator.
+      summary: Get a signing key's public part
+      tags:
+      - signing-keys
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpublicsigningkeyfordistribution.md

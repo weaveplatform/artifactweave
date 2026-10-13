@@ -1,0 +1,2741 @@
+components:
+  schemas:
+    ArchiveMapping:
+      description: One input-to-output path rewrite applied while building a build artifacts archive.
+      properties:
+        input:
+          description: Optional within this object. Regular expression matched against each artifact's repository
+            path. Artifacts that do not match any mapping keep their path.
+          type: string
+        output:
+          description: Optional within this object. Replacement path inside the archive; capture groups from `input`
+            are referenced as `$1`, `$2` and so on. Omitted means the matched artifacts keep their original path.
+          type: string
+      type: object
+    ArtifactoryArtifactsStorageApiBuildArtifactsRequest:
+      description: Selects the artifacts of one build run and the archive format to pack them in. artifactweave
+        serves this once build-info lands (P5); until then it answers 501.
+      properties:
+        archiveType:
+          description: 'Required within this object. Archive container to produce: `zip`, `tar`, `tar.gz` or `tgz`
+            (`tgz` is `tar.gz` with a different extension).'
+          enum:
+          - tar
+          - zip
+          - tar.gz
+          - tgz
+          type: string
+        buildName:
+          description: Required within this object. Name of the published build whose artifacts are archived.
+          minLength: 1
+          type: string
+        buildNumber:
+          description: Required within this object. Build number within that build name. Must be a published run,
+            not `LATEST`.
+          minLength: 1
+          type: string
+        buildStatus:
+          description: Optional within this object. Restricts the lookup to the latest run whose promotion status
+            equals this value. Omitted means the exact `buildNumber` is used.
+          type: string
+        mappings:
+          description: Optional within this object. Path rewrites applied in order; the first matching mapping wins.
+            Omitted means artifacts keep their repository paths inside the archive.
+          items:
+            $ref: '#/components/schemas/ArchiveMapping'
+          type: array
+        repos:
+          description: Optional within this object. Repository keys to search for the build's artifacts. Omitted
+            means every repository the caller can read.
+          items:
+            description: One repository key.
+            type: string
+          type: array
+      required:
+      - buildName
+      - buildNumber
+      - archiveType
+      type: object
+    BackgroundTask:
+      description: One scheduled or running server task such as garbage collection, a cleanup policy run or a replication.
+      properties:
+        description:
+          description: Optional within this object. Human readable summary of what the task does, for operators.
+          type: string
+        id:
+          description: Optional within this object. Server-assigned task identifier, unique for the lifetime of
+            the process.
+          type: string
+        nodeId:
+          description: Optional within this object. Identifier of the node executing the task. artifactweave runs
+            a single process in v1 and reports its configured node id.
+          type: string
+        started:
+          description: Optional within this object. RFC 3339 time the current execution started. Absent while the
+            task is only scheduled.
+          format: date-time
+          type: string
+        state:
+          description: 'Optional within this object. Lifecycle state: `scheduled` (waiting for its trigger), `running`,
+            `stopped` (completed or stopped by an operator) or `cancelled`.'
+          enum:
+          - scheduled
+          - running
+          - stopped
+          - cancelled
+          type: string
+        type:
+          description: Optional within this object. Fully qualified task type name. artifactweave uses its own task
+            names and clients should treat the value as opaque.
+          type: string
+      type: object
+    BackgroundTasks:
+      description: Response envelope of the background tasks listing.
+      properties:
+        tasks:
+          description: Optional within this object. Every task known to the scheduler, scheduled or running. Empty
+            when nothing is registered.
+          items:
+            $ref: '#/components/schemas/BackgroundTask'
+          type: array
+      type: object
+    BinariesSummary:
+      description: Totals over the content-addressed blob store and the items that reference it. Every value is
+        a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory emits and what the JFrog
+        CLI prints verbatim.
+      properties:
+        artifactsCount:
+          description: Optional within this object. Number of file items, formatted with thousands separators.
+          type: string
+        artifactsSize:
+          description: Optional within this object. Total size of all items as if nothing were deduplicated, formatted
+            with a unit.
+          type: string
+        binariesCount:
+          description: Optional within this object. Number of distinct stored blobs, formatted with thousands separators.
+          type: string
+        binariesSize:
+          description: Optional within this object. Total size of distinct blobs, formatted with a unit.
+          type: string
+        itemsCount:
+          description: Optional within this object. Number of items, files and folders together, formatted with
+            thousands separators.
+          type: string
+        optimization:
+          description: Optional within this object. Percentage saved by deduplication (`binariesSize` relative to
+            `artifactsSize`), formatted as `nn.nn%`.
+          type: string
+      type: object
+    Checksums:
+      description: Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums`
+        holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum
+        search.
+      properties:
+        md5:
+          description: Optional within this object. Lowercase hex MD5 digest, 32 characters.
+          type: string
+        sha1:
+          description: Optional within this object. Lowercase hex SHA-1 digest, 40 characters.
+          type: string
+        sha256:
+          description: Optional within this object. Lowercase hex SHA-256 digest, 64 characters. This is the blob
+            store key in artifactweave.
+          type: string
+      type: object
+    CopyOrMoveMessage:
+      description: One diagnostic line produced while copying or moving a tree.
+      properties:
+        level:
+          description: 'Optional within this object. Severity of the message: `INFO` for progress, `WARNING` for
+            items skipped, `ERROR` for items that failed.'
+          enum:
+          - INFO
+          - WARNING
+          - ERROR
+          type: string
+        message:
+          description: Optional within this object. Human readable text naming the item concerned.
+          type: string
+      type: object
+    CopyOrMoveResult:
+      description: Outcome of a copy or move. The HTTP status is 200 even when individual items failed; callers
+        must inspect the message levels.
+      properties:
+        messages:
+          description: Optional within this object. Diagnostics in processing order. A dry run reports what would
+            happen with the same levels.
+          items:
+            $ref: '#/components/schemas/CopyOrMoveMessage'
+          type: array
+      type: object
+    CreateSignedUrlRequest:
+      description: Request for a time-limited download URL for one artifact. Not supported by artifactweave v1 (Enterprise
+        feature in Artifactory); declared for parity.
+      properties:
+        expiry:
+          description: Optional within this object. Absolute expiry as Unix epoch seconds. Mutually exclusive with
+            `valid_for_secs`.
+          format: int64
+          type: integer
+        repo_path:
+          description: Required within this object. `<repoKey>/<path>` of the artifact to sign.
+          minLength: 1
+          type: string
+        valid_for_secs:
+          description: Optional within this object. Lifetime of the URL in seconds from now. Mutually exclusive
+            with `expiry`; omitted means the server default.
+          format: int32
+          type: integer
+      required:
+      - repo_path
+      type: object
+    DistributeArtifactRequest:
+      description: Legacy Bintray distribution request. Bintray was retired in 2021; artifactweave answers 501.
+      properties:
+        async:
+          default: false
+          description: Optional within this object. Whether to return before distribution completes. Default false.
+          type: boolean
+        dryRun:
+          default: false
+          description: Optional within this object. Whether to validate without distributing. Default false.
+          type: boolean
+        gpgPassphrase:
+          description: Optional within this object. Passphrase for signing on the target.
+          type: string
+        overrideExistingFiles:
+          default: false
+          description: Optional within this object. Whether existing files on the target may be replaced. Default
+            false.
+          type: boolean
+        packagesRepoPaths:
+          description: Required within this object. `<repoKey>/<path>` entries to distribute.
+          items:
+            description: One `<repoKey>/<path>` entry.
+            type: string
+          type: array
+        publish:
+          default: true
+          description: Optional within this object. Whether to publish after upload. Default true.
+          type: boolean
+        targetRepo:
+          description: Required within this object. Distribution repository key.
+          type: string
+      required:
+      - targetRepo
+      - packagesRepoPaths
+      type: object
+    FileInfo:
+      description: Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps
+        are RFC 3339 with millisecond precision and a zone offset.
+      properties:
+        checksums:
+          allOf:
+          - $ref: '#/components/schemas/Checksums'
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
+            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
+            the two is visible to the bad-checksum search.
+        created:
+          description: Optional within this object. RFC 3339 time the item was first stored. For large uploads this
+            can be later than `lastModified`.
+          format: date-time
+          type: string
+        createdBy:
+          description: Optional within this object. Username that created the item, or `anonymous`.
+          type: string
+        downloadUri:
+          description: Optional within this object. Absolute URL that downloads the content, `<base>/artifactory/<repo>/<path>`.
+          type: string
+        lastModified:
+          description: Optional within this object. RFC 3339 time the content was last replaced.
+          format: date-time
+          type: string
+        lastUpdated:
+          description: Optional within this object. RFC 3339 time the item record, including properties, last changed.
+          format: date-time
+          type: string
+        mimeType:
+          description: Optional within this object. Media type detected from the file name at deploy time.
+          type: string
+        modifiedBy:
+          description: Optional within this object. Username that last replaced the content.
+          type: string
+        originalChecksums:
+          allOf:
+          - $ref: '#/components/schemas/Checksums'
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
+            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
+            the two is visible to the bad-checksum search.
+        path:
+          description: Optional within this object. Item path relative to the repository root, always with a leading
+            `/`. AQL reports the same item without the slash and with `.` for the root.
+          type: string
+        remoteUrl:
+          description: Optional within this object. Upstream URL the content was fetched from. Present only for
+            items cached from a remote repository.
+          type: string
+        repo:
+          description: Optional within this object. Repository key the item lives in. Cached remote content reports
+            the `<key>-cache` alias.
+          type: string
+        size:
+          description: Optional within this object. Content length in bytes rendered as a decimal string, not a
+            number, because clients parse it as a string.
+          type: string
+        uri:
+          description: Optional within this object. Absolute URL of this storage API resource, built from the resolved
+            base URL (decision 0002).
+          type: string
+      type: object
+    FileList:
+      description: Recursive or shallow listing of a folder produced by the `list` mode of the storage API.
+      properties:
+        created:
+          description: Optional within this object. RFC 3339 time the listing was generated, not the folder's creation
+            time.
+          format: date-time
+          type: string
+        files:
+          description: Optional within this object. Entries in depth-first path order. Folders appear only when
+            `listFolders=1`.
+          items:
+            $ref: '#/components/schemas/FileListItem'
+          type: array
+        uri:
+          description: Optional within this object. Absolute storage API URL of the listed folder.
+          type: string
+      type: object
+    FileListItem:
+      description: One entry of a file listing.
+      properties:
+        folder:
+          description: Optional within this object. True for a folder entry, false for a file.
+          type: boolean
+        lastModified:
+          description: Optional within this object. RFC 3339 time the content was last replaced.
+          format: date-time
+          type: string
+        mdTimestamps:
+          additionalProperties:
+            description: RFC 3339 time the named metadata was last written.
+            format: date-time
+            type: string
+          description: Optional within this object. Map from metadata name to the RFC 3339 time that metadata was
+            last written. Present only when `mdTimestamps=1`.
+          type: object
+        sha1:
+          description: Optional within this object. Lowercase hex SHA-1 of a file; absent for folders.
+          type: string
+        size:
+          description: Optional within this object. Content length in bytes as a decimal string; folders report
+            `-1`.
+          type: string
+        uri:
+          description: Optional within this object. Path relative to the listed folder with a leading `/`, or the
+            item's own path when `includeRootPath=1`.
+          type: string
+      type: object
+    FileStatistics:
+      description: Download statistics of one file, returned by the `stats` mode.
+      properties:
+        downloadCount:
+          description: Optional within this object. Number of completed downloads since the item was created. Downloads
+            with `skipUpdateStats=true` are not counted.
+          format: int64
+          type: integer
+        lastDownloaded:
+          description: Optional within this object. Time of the last download as Unix epoch milliseconds. This is
+            the only place the storage API uses an epoch number rather than RFC 3339; it is 0 when never downloaded.
+          format: int64
+          type: integer
+        lastDownloadedBy:
+          description: Optional within this object. Username of the last download, or `anonymous`.
+          type: string
+        uri:
+          description: Optional within this object. Absolute storage API URL of the file.
+          type: string
+      type: object
+    FileStoreSummary:
+      description: Capacity figures of the blob store. Space values are human-formatted strings with a unit, as
+        Artifactory emits them.
+      properties:
+        freeSpace:
+          description: Optional within this object. Free space on the volume, with the percentage in parentheses.
+          type: string
+        storageDirectory:
+          description: Optional within this object. Root directory for the local disk store, or the bucket and prefix
+            for object storage.
+          type: string
+        storageType:
+          description: 'Optional within this object. Backend kind: `file-system` for the local disk store or `s3`
+            for object storage.'
+          type: string
+        totalSpace:
+          description: Optional within this object. Total capacity of the volume. Reported as `unknown` for object
+            storage.
+          type: string
+        usedSpace:
+          description: Optional within this object. Space used on the volume, with the percentage in parentheses.
+          type: string
+      type: object
+    FolderChild:
+      description: One direct child of a folder.
+      properties:
+        folder:
+          description: Optional within this object. True when the child is itself a folder.
+          type: boolean
+        uri:
+          description: Optional within this object. Child name with a leading `/`, relative to the folder.
+          type: string
+      type: object
+    FolderInfo:
+      description: Metadata of one folder item, returned instead of `FileInfo` when the path names a folder.
+      properties:
+        children:
+          description: Optional within this object. Direct children only, sorted by name. Empty for an empty folder.
+          items:
+            $ref: '#/components/schemas/FolderChild'
+          type: array
+        created:
+          description: Optional within this object. RFC 3339 time the folder was created.
+          format: date-time
+          type: string
+        createdBy:
+          description: Optional within this object. Username that created the folder, or `anonymous`.
+          type: string
+        lastModified:
+          description: Optional within this object. RFC 3339 time the folder's own record last changed; children
+            do not bubble up.
+          format: date-time
+          type: string
+        lastUpdated:
+          description: Optional within this object. RFC 3339 time the folder record, including properties, last
+            changed.
+          format: date-time
+          type: string
+        modifiedBy:
+          description: Optional within this object. Username of that change.
+          type: string
+        path:
+          description: Optional within this object. Folder path relative to the repository root with a leading `/`;
+            the root itself is `/`.
+          type: string
+        repo:
+          description: Optional within this object. Repository key the folder lives in.
+          type: string
+        uri:
+          description: Optional within this object. Absolute storage API URL of the folder.
+          type: string
+      type: object
+    ItemCreated:
+      description: Body returned with 201 after a deploy. It is `FileInfo` without the modification fields because
+        the item was just created.
+      properties:
+        checksums:
+          allOf:
+          - $ref: '#/components/schemas/Checksums'
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
+            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
+            the two is visible to the bad-checksum search.
+        created:
+          description: Optional within this object. RFC 3339 creation time.
+          format: date-time
+          type: string
+        createdBy:
+          description: Optional within this object. Username that deployed the item.
+          type: string
+        downloadUri:
+          description: Optional within this object. Absolute download URL of the new item.
+          type: string
+        mimeType:
+          description: Optional within this object. Media type detected from the file name.
+          type: string
+        originalChecksums:
+          allOf:
+          - $ref: '#/components/schemas/Checksums'
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
+            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
+            the two is visible to the bad-checksum search.
+        path:
+          description: Optional within this object. Item path relative to the repository root with a leading `/`.
+          type: string
+        repo:
+          description: Optional within this object. Repository key the item was stored in. A deploy to a virtual
+            repository reports its default deployment repository.
+          type: string
+        size:
+          description: Optional within this object. Content length in bytes as a decimal string.
+          type: string
+        uri:
+          description: Optional within this object. Absolute storage API URL of the new item.
+          type: string
+      type: object
+    ItemLastModified:
+      description: 'Result of the `lastModified` mode: the newest modification time under a path.'
+      properties:
+        lastModified:
+          description: Optional within this object. RFC 3339 modification time of that item.
+          format: date-time
+          type: string
+        uri:
+          description: Optional within this object. Absolute storage API URL of the newest item found, which for
+            a folder is the descendant that was modified last.
+          type: string
+      type: object
+    ItemPermissions:
+      description: Effective permissions on an item, returned by the `permissions` mode. Only an admin can request
+        it.
+      properties:
+        principals:
+          description: Optional within this object. Users and groups that hold any permission on the item, with
+            the legacy permission codes they hold.
+          properties:
+            groups:
+              additionalProperties:
+                description: Permission codes held by one group.
+                items:
+                  description: One permission code.
+                  type: string
+                type: array
+              description: Optional within this object. Map from group name to the permission codes the group holds,
+                using the same codes as `users`.
+              type: object
+            users:
+              additionalProperties:
+                description: Permission codes held by one user.
+                items:
+                  description: One permission code.
+                  type: string
+                type: array
+              description: 'Optional within this object. Map from username to the legacy permission codes that user
+                holds on the item: `r` read, `n` annotate, `w` deploy, `d` delete, `m` manage.'
+              type: object
+          type: object
+        uri:
+          description: Optional within this object. Absolute storage API URL of the item.
+          type: string
+      type: object
+    ItemProperties:
+      description: Properties attached to an item, returned by the `properties` mode. The response is 404 when the
+        item has no properties at all.
+      properties:
+        properties:
+          additionalProperties:
+            description: Values of one property key, in insertion order.
+            items:
+              description: One value.
+              type: string
+            type: array
+          description: Optional within this object. Map from property key to its values. A value is always an array,
+            even for single-valued properties.
+          type: object
+        uri:
+          description: Optional within this object. Absolute storage API URL of the item.
+          type: string
+      type: object
+    PudDirectoryInfo:
+      description: Progress of the prune process within one blob store directory.
+      properties:
+        binariesCleaned:
+          description: Optional within this object. Unreferenced blobs deleted from this directory. In a dry run,
+            the number that would be deleted.
+          format: int64
+          type: integer
+        binariesProcessed:
+          description: Optional within this object. Blobs examined in this directory so far.
+          format: int64
+          type: integer
+        bytesCleaned:
+          description: Optional within this object. Bytes freed, or that would be freed in a dry run.
+          format: int64
+          type: integer
+        name:
+          description: Optional within this object. Directory name being handled, which for the content-addressed
+            store is the two-character digest prefix.
+          type: string
+        status:
+          description: 'Optional within this object. State of this directory: `running`, `stopped`, `finished` or
+            `error`.'
+          enum:
+          - running
+          - stopped
+          - finished
+          - error
+          type: string
+        timing:
+          allOf:
+          - $ref: '#/components/schemas/PudTiming'
+          description: 'Optional within this object. Timing of a prune run or of one of its directories. Each time
+            is given twice: formatted for people and as Unix epoch milliseconds for programs.'
+      type: object
+    PudProcessResponse:
+      description: Acknowledgement of a prune start or stop, or the reason a request was refused with 412.
+      properties:
+        info:
+          description: Optional within this object. Human readable status line.
+          type: string
+      type: object
+    PudProcessStatus:
+      description: Current state of the prune unreferenced data process. artifactweave runs blob garbage collection
+        as this process, so the figures are the GC run's figures.
+      properties:
+        dryRun:
+          description: Optional within this object. True when the run only reports what it would delete.
+          type: boolean
+        error:
+          description: Optional within this object. Message of the failure that moved the run to `error`. Absent
+            otherwise.
+          type: string
+        lastHandledDirectory:
+          allOf:
+          - $ref: '#/components/schemas/PudDirectoryInfo'
+          description: Optional within this object. Progress of the prune process within one blob store directory.
+        progress:
+          description: Optional within this object. Percentage of directories handled, formatted as `nn%`.
+          type: string
+        report:
+          allOf:
+          - $ref: '#/components/schemas/PudReport'
+          description: Optional within this object. Totals of a prune run.
+        status:
+          description: 'Optional within this object. Overall state: `running`, `stopped` (by an operator), `finished`
+            or `error`.'
+          enum:
+          - running
+          - stopped
+          - finished
+          - error
+          type: string
+        timing:
+          allOf:
+          - $ref: '#/components/schemas/PudTiming'
+          description: 'Optional within this object. Timing of a prune run or of one of its directories. Each time
+            is given twice: formatted for people and as Unix epoch milliseconds for programs.'
+      type: object
+    PudReport:
+      description: Totals of a prune run.
+      properties:
+        totalBinariesCleaned:
+          description: Optional within this object. Blobs deleted, or that would be deleted in a dry run.
+          format: int64
+          type: integer
+        totalBinariesProcessed:
+          description: Optional within this object. Blobs examined.
+          format: int64
+          type: integer
+        totalBytesCleaned:
+          description: Optional within this object. Bytes freed, or that would be freed in a dry run.
+          format: int64
+          type: integer
+      type: object
+    PudTiming:
+      description: 'Timing of a prune run or of one of its directories. Each time is given twice: formatted for
+        people and as Unix epoch milliseconds for programs.'
+      properties:
+        duration:
+          description: Optional within this object. Human readable elapsed time.
+          type: string
+        durationMillis:
+          description: Optional within this object. Elapsed time in milliseconds.
+          format: int64
+          type: integer
+        lastUpdated:
+          description: Optional within this object. Human readable time of the last progress update.
+          type: string
+        lastUpdatedMillis:
+          description: Optional within this object. Last progress update as Unix epoch milliseconds.
+          format: int64
+          type: integer
+        startedAt:
+          description: Optional within this object. Human readable start time.
+          type: string
+        startedAtMillis:
+          description: Optional within this object. Start time as Unix epoch milliseconds.
+          format: int64
+          type: integer
+      type: object
+    RepositorySummary:
+      description: Per-repository row of the storage summary. The list ends with a synthetic row whose `repoKey`
+        is `TOTAL`.
+      properties:
+        filesCount:
+          description: Optional within this object. Number of file items.
+          type: integer
+        foldersCount:
+          description: Optional within this object. Number of folder items.
+          type: integer
+        itemsCount:
+          description: Optional within this object. Files plus folders.
+          type: integer
+        packageType:
+          description: Optional within this object. Package type of the repository, or `NA` on the total row.
+          type: string
+        percentage:
+          description: Optional within this object. Share of `usedSpace` over all repositories, formatted as `nn.nn%`.
+          type: string
+        repoKey:
+          description: Optional within this object. Repository key, or `TOTAL` for the summary row. Caches of remote
+            repositories appear under their `<key>-cache` alias.
+          type: string
+        repoType:
+          description: Optional within this object. `LOCAL`, `REMOTE`, `CACHE`, `VIRTUAL`, `FEDERATED`, or `NA`
+            on the total row.
+          type: string
+        usedSpace:
+          description: Optional within this object. Sum of file sizes, human-formatted with a unit, before deduplication.
+          type: string
+      type: object
+    RubyGemVersion:
+      description: One version of a RubyGem as the rubygems.org versions API describes it. Gems are outside the
+        artifactweave v1 ecosystem scope (research 10); the operation answers 501.
+      properties:
+        authors:
+          description: Optional within this object. Comma-separated author names from the gemspec.
+          type: string
+        built_at:
+          description: Optional within this object. RFC 3339 time the gem was built.
+          format: date-time
+          type: string
+        created_at:
+          description: Optional within this object. RFC 3339 time the version was pushed.
+          format: date-time
+          type: string
+        description:
+          description: Optional within this object. Longer description from the gemspec.
+          type: string
+        downloads_count:
+          description: Optional within this object. Downloads of this version as counted by the serving registry.
+          type: integer
+        licenses:
+          description: Optional within this object. License identifiers from the gemspec.
+          items:
+            description: One license identifier.
+            type: string
+          type: array
+        metadata:
+          additionalProperties: true
+          description: Optional within this object. Free-form gemspec metadata map.
+          type: object
+        number:
+          description: Optional within this object. Gem version string.
+          type: string
+        platform:
+          description: Optional within this object. Target platform, `ruby` for pure Ruby gems.
+          type: string
+        prerelease:
+          description: Optional within this object. True for a pre-release version.
+          type: boolean
+        requirements:
+          description: Optional within this object. External requirements declared by the gemspec.
+          items:
+            description: One requirement line.
+            type: string
+          type: array
+        ruby_version:
+          description: Optional within this object. Required Ruby version constraint.
+          type: string
+        sha:
+          description: Optional within this object. Hex SHA-256 of the gem file.
+          type: string
+        summary:
+          description: Optional within this object. One-line gem summary from the gemspec.
+          type: string
+      type: object
+    Sha256ChecksumRequest:
+      description: Names the item whose `sha256` property should be computed. Kept for compatibility with clients
+        written before SHA-256 was native; artifactweave always records SHA-256, so the call only re-attaches the
+        property.
+      properties:
+        path:
+          description: Required within this object. Item path without a leading `/`. A folder path applies the operation
+            to every file below it.
+          minLength: 1
+          type: string
+        repoKey:
+          description: Required within this object. Repository key of the item.
+          minLength: 1
+          type: string
+      required:
+      - repoKey
+      - path
+      type: object
+    StartPudProcessRequest:
+      description: Tuning for a prune run. Every field is optional; an empty body starts a full, non-dry run.
+      properties:
+        binaryOlderThanDays:
+          default: 1
+          description: Optional within this object. Only blobs written at least this many days ago are candidates.
+            Default 1, which protects uploads that are still being referenced.
+          format: int32
+          type: integer
+        dryRun:
+          default: false
+          description: Optional within this object. Report instead of delete. Default false.
+          type: boolean
+        startFromBinary:
+          default: 0
+          description: Optional within this object. Zero-based offset within the first directory, to resume an interrupted
+            run. Default 0.
+          format: int32
+          type: integer
+        startFromDirectory:
+          description: Optional within this object. Directory name to resume from. Omitted means the first directory.
+          type: string
+      type: object
+    StorageSummaryInfo:
+      description: Snapshot of storage usage. The figures are computed by the last `calculate` run, not on every
+        request, so they can lag writes.
+      properties:
+        binariesSummary:
+          allOf:
+          - $ref: '#/components/schemas/BinariesSummary'
+          description: Optional within this object. Totals over the content-addressed blob store and the items that
+            reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory
+            emits and what the JFrog CLI prints verbatim.
+        fileStoreSummary:
+          allOf:
+          - $ref: '#/components/schemas/FileStoreSummary'
+          description: Optional within this object. Capacity figures of the blob store. Space values are human-formatted
+            strings with a unit, as Artifactory emits them.
+        repositoriesSummaryList:
+          description: Optional within this object. One row per repository plus the `TOTAL` row, sorted by key.
+          items:
+            $ref: '#/components/schemas/RepositorySummary'
+          type: array
+      type: object
+    UpdatePropertiesRequest:
+      description: Partial update of an item's properties. Keys not mentioned are left as they are.
+      properties:
+        props:
+          additionalProperties:
+            description: A single string sets one value, an array of strings sets several, and null removes the
+              key.
+            nullable: true
+            oneOf:
+            - description: A single value.
+              type: string
+            - description: Several values.
+              items:
+                description: One value.
+                type: string
+              type: array
+          description: Optional within this object. Map from property key to the new value. A string sets a single
+            value, an array sets multiple values, and `null` removes the key. An empty map is rejected with 400.
+          type: object
+      type: object
+paths:
+  /api/archive/buildArtifacts:
+    post:
+      description: Packs the artifacts of one build run into a single archive. Served once build-info lands in P5;
+        until then artifactweave answers 501 in the Artifactory envelope.
+      operationId: retrieveBuildArtifactsArchive
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtifactoryArtifactsStorageApiBuildArtifactsRequest'
+          application/vnd.org.jfrog.artifactory.build.BuildArtifactsRequest+json:
+            schema:
+              $ref: '#/components/schemas/ArtifactoryArtifactsStorageApiBuildArtifactsRequest'
+        description: Which build and which archive format.
+        required: true
+      responses:
+        '200':
+          content:
+            application/x-gzip:
+              schema:
+                description: Gzip-compressed tar archive bytes.
+                format: binary
+                type: string
+            application/x-tar:
+              schema:
+                description: Tar archive bytes.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: Zip archive bytes.
+                format: binary
+                type: string
+          description: The archive in the requested format.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Build artifacts archive
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrievebuildartifactsarchive.md
+  /api/archive/download/{repoKey}/{path}:
+    get:
+      description: Streams a folder, or a whole repository when `path` is empty, as one archive. Only local repositories
+        and remote caches can be archived, and the folder download setting must be enabled in the system configuration
+        or the request is refused with 403.
+      operationId: retrieveFolderOrRepositoryArchive
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Folder path relative to the repository root, or empty to archive the
+          whole repository.
+        in: path
+        name: path
+        required: true
+        schema:
+          description: Folder path relative to the repository root, or empty to archive the whole repository.
+          minLength: 1
+          type: string
+      - description: 'Required query parameter. Archive container to produce: `zip`, `tar`, `tar.gz` or `tgz`.'
+        in: query
+        name: archiveType
+        required: true
+        schema:
+          description: 'Archive container to produce: `zip`, `tar`, `tar.gz` or `tgz`.'
+          enum:
+          - zip
+          - tar
+          - tar.gz
+          - tgz
+          type: string
+      - description: Optional query parameter. When true, the `.md5`, `.sha1` and `.sha256` sidecar files are added
+          next to each artifact in the archive. Default false.
+        in: query
+        name: includeChecksumFiles
+        required: false
+        schema:
+          description: When true, the `.md5`, `.sha1` and `.sha256` sidecar files are added next to each artifact
+            in the archive. Default false.
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/x-gzip:
+              schema:
+                description: Gzip-compressed tar archive bytes.
+                format: binary
+                type: string
+            application/x-tar:
+              schema:
+                description: Tar archive bytes.
+                format: binary
+                type: string
+            application/zip:
+              schema:
+                description: Zip archive bytes.
+                format: binary
+                type: string
+          description: The archive in the requested format.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks read permission, or folder download is disabled.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Download a folder as an archive
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrievefolderorrepositoryarchive.md
+  /api/checksum/sha256:
+    post:
+      description: Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder.
+        Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory
+        5.5.
+      operationId: setItemSha256Checksum
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Sha256ChecksumRequest'
+        description: The item or folder to process.
+        required: true
+      responses:
+        '200':
+          description: The property was attached.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Attach the sha256 property
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemsha256checksum.md
+  /api/copy/{srcRepoKey}/{srcFilePath}:
+    post:
+      description: Copies a file or a folder subtree to another path, in the same or another repository. Works on
+        local repositories, federated repositories and remote caches as the source; the target must be local. Properties
+        are copied with the items. Returns 200 with per-item messages even when some items failed; `failFast=1`
+        stops at the first failure.
+      operationId: copyItem
+      parameters:
+      - description: Required path parameter. Key of the repository holding the source item.
+        in: path
+        name: srcRepoKey
+        required: true
+        schema:
+          description: Key of the repository holding the source item.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the source file or folder relative to the repository root.
+          A folder copies or moves its whole subtree.
+        in: path
+        name: srcFilePath
+        required: true
+        schema:
+          description: Path of the source file or folder relative to the repository root. A folder copies or moves
+            its whole subtree.
+          minLength: 1
+          type: string
+      - description: Required query parameter. Target as `/<repoKey>/<path>` with the leading `/`. A folder target
+          receives the source under its own name.
+        in: query
+        name: to
+        required: true
+        schema:
+          description: Target as `/<repoKey>/<path>` with the leading `/`. A folder target receives the source under
+            its own name.
+          type: string
+      - description: Optional query parameter. `1` reports what would happen without changing anything. Default
+          0.
+        in: query
+        name: dry
+        required: false
+        schema:
+          default: 0
+          description: '`1` reports what would happen without changing anything. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` copies the path verbatim; `0` translates it between the source
+          and target repository layouts when they differ. Default 1.
+        in: query
+        name: suppressLayouts
+        required: false
+        schema:
+          default: 1
+          description: '`1` copies the path verbatim; `0` translates it between the source and target repository
+            layouts when they differ. Default 1.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` stops at the first item that fails; `0` continues and reports
+          every failure in the messages. Default 0.
+        in: query
+        name: failFast
+        required: false
+        schema:
+          description: '`1` stops at the first item that fails; `0` continues and reports every failure in the messages.
+            Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json:
+              schema:
+                $ref: '#/components/schemas/CopyOrMoveResult'
+          description: The copy finished; inspect the message levels for per-item failures.
+        '400':
+          content:
+            application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json:
+              schema:
+                $ref: '#/components/schemas/CopyOrMoveResult'
+          description: The source or target path is invalid; the messages explain which.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Copy an item
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/copyitem.md
+  /api/distribute:
+    post:
+      deprecated: true
+      description: Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier
+        stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+      operationId: distributeArtifact
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DistributeArtifactRequest'
+        description: The Bintray distribution request.
+        required: true
+      responses:
+        '200':
+          description: The distribution was accepted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Distribute to Bintray (retired)
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributeartifact.md
+  /api/download/{repoKey}/{filePath}:
+    get:
+      description: Downloads a file while emitting progress marks so clients with short timeouts stay connected
+        during a slow remote fetch. With `content=none` only the marks are sent; with `content=progress` the marks
+        precede the content. Resolution and statistics behave as for the plain download.
+      operationId: artifactSyncDownload
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file relative to the repository root, without a leading
+          `/`. May contain `/`. Matrix parameters `;key=value` appended to the last segment carry properties.
+        in: path
+        name: filePath
+        required: true
+        schema:
+          description: Path of the file relative to the repository root, without a leading `/`. May contain `/`.
+            Matrix parameters `;key=value` appended to the last segment carry properties.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. `none` streams progress marks instead of the content; `progress`
+          streams marks followed by the content. Omitted streams the content only.
+        in: query
+        name: content
+        required: false
+        schema:
+          description: '`none` streams progress marks instead of the content; `progress` streams marks followed
+            by the content. Omitted streams the content only.'
+          enum:
+          - none
+          - progress
+          type: string
+      - description: Optional query parameter. Number of kilobytes between progress marks. Default 1024.
+        in: query
+        name: mark
+        required: false
+        schema:
+          default: 1024
+          description: Number of kilobytes between progress marks. Default 1024.
+          type: integer
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Raw file bytes.
+                format: binary
+                type: string
+            text/plain:
+              schema:
+                description: Progress marks, one character per `mark` kilobytes, when `content=none`.
+                type: string
+          description: The content, the progress marks, or both, as selected by `content`.
+        '400':
+          content:
+            text/html:
+              schema:
+                description: An HTML error page.
+                type: string
+          description: The parameters are invalid; the body is an HTML error page as in Artifactory.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Download with progress marks
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
+  /api/gems/{repoName}/api/v1/versions/{gemName}:
+    get:
+      description: Returns the versions of one gem in the rubygems.org versions format. Gems are outside the v1
+        ecosystem scope (research 10). artifactweave does not implement this operation (research 10, tier stub);
+        it is declared for wire parity and answers 501 in the Artifactory error envelope.
+      operationId: getRubyGemVersionList
+      parameters:
+      - description: Required path parameter. Key of the gems repository.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: Key of the gems repository.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Name of the gem.
+        in: path
+        name: gemName
+        required: true
+        schema:
+          description: Name of the gem.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The version list.
+                items:
+                  $ref: '#/components/schemas/RubyGemVersion'
+                type: array
+            application/yaml:
+              schema:
+                description: The same list rendered as YAML.
+                type: string
+          description: The version list as JSON or YAML according to `Accept`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: List gem versions
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrubygemversionlist.md
+  /api/metadata/{repoKey}/{itemPath}:
+    patch:
+      description: 'Applies a partial update to an item''s properties from a JSON body: keys set to a string or
+        array are replaced, keys set to `null` are removed, other keys are untouched. Needs annotate permission
+        on the path. Works on local repositories and remote caches. Responds 204 on success and 400 when `props`
+        is missing or empty.'
+      operationId: updateItemProperties
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file or folder relative to the repository root, without
+          a leading `/`. May contain `/`; the root folder is addressed with an empty path on the storage API.
+        in: path
+        name: itemPath
+        required: true
+        schema:
+          description: Path of the file or folder relative to the repository root, without a leading `/`. May contain
+            `/`; the root folder is addressed with an empty path on the storage API.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. `1` applies the update to every item below a folder; `0` touches
+          only the folder itself. Default 1.
+        in: query
+        name: recursiveProperties
+        required: false
+        schema:
+          description: '`1` applies the update to every item below a folder; `0` touches only the folder itself.
+            Default 1.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` applies all keys in one transaction so a failure leaves nothing
+          changed; `0` applies them one by one. Default 0.
+        in: query
+        name: atomicProperties
+        required: false
+        schema:
+          description: '`1` applies all keys in one transaction so a failure leaves nothing changed; `0` applies
+            them one by one. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePropertiesRequest'
+        description: The keys to set or remove.
+        required: true
+      responses:
+        '204':
+          description: The properties were updated.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: '`props` is missing or empty, or a value is not a string, array of strings or null.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Update item properties
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updateitemproperties.md
+  /api/move/{srcRepoKey}/{srcFilePath}:
+    post:
+      description: Moves a file or a folder subtree to another path in the same or another local repository; remote
+        caches and virtual repositories cannot be the source. Properties move with the items. Returns 200 with per-item
+        messages even when some items failed; `failFast=1` stops at the first failure.
+      operationId: moveItem
+      parameters:
+      - description: Required path parameter. Key of the repository holding the source item.
+        in: path
+        name: srcRepoKey
+        required: true
+        schema:
+          description: Key of the repository holding the source item.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the source file or folder relative to the repository root.
+          A folder copies or moves its whole subtree.
+        in: path
+        name: srcFilePath
+        required: true
+        schema:
+          description: Path of the source file or folder relative to the repository root. A folder copies or moves
+            its whole subtree.
+          minLength: 1
+          type: string
+      - description: Required query parameter. Target as `/<repoKey>/<path>` with the leading `/`. A folder target
+          receives the source under its own name.
+        in: query
+        name: to
+        required: true
+        schema:
+          description: Target as `/<repoKey>/<path>` with the leading `/`. A folder target receives the source under
+            its own name.
+          type: string
+      - description: Optional query parameter. `1` reports what would happen without changing anything. Default
+          0.
+        in: query
+        name: dry
+        required: false
+        schema:
+          default: 0
+          description: '`1` reports what would happen without changing anything. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` moves the path verbatim; `0` translates it between the source
+          and target repository layouts when they differ. Default 1.
+        in: query
+        name: suppressLayouts
+        required: false
+        schema:
+          default: 1
+          description: '`1` moves the path verbatim; `0` translates it between the source and target repository
+            layouts when they differ. Default 1.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` stops at the first item that fails; `0` continues and reports
+          every failure in the messages. Default 0.
+        in: query
+        name: failFast
+        required: false
+        schema:
+          description: '`1` stops at the first item that fails; `0` continues and reports every failure in the messages.
+            Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json:
+              schema:
+                $ref: '#/components/schemas/CopyOrMoveResult'
+          description: The move finished; inspect the message levels for per-item failures.
+        '400':
+          content:
+            application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json:
+              schema:
+                $ref: '#/components/schemas/CopyOrMoveResult'
+          description: The source or target path is invalid, or the source is not a local repository; the messages
+            explain which.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Move an item
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/moveitem.md
+  /api/signed/url:
+    post:
+      description: Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature
+        in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared
+        for wire parity and answers 501 in the Artifactory error envelope.
+      operationId: createSignedUrl
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSignedUrlRequest'
+        description: The artifact and the lifetime of the URL.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The signed URL as a JSON string.
+                type: string
+          description: The signed URL as a JSON string.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Create a signed download URL
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createsignedurl.md
+  /api/signed/url/key:
+    post:
+      description: Invalidates every signed URL by replacing the signing key. artifactweave does not implement this
+        operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error
+        envelope.
+      operationId: replaceSignedUrlKey
+      responses:
+        '201':
+          description: A new key is in place.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Rotate the signed URL key
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/replacesignedurlkey.md
+  /api/storage/{repoKey}/{itemPath}:
+    delete:
+      description: Removes the named property keys from an item and, by default, from everything below a folder.
+        Needs annotate permission. Works on local repositories and remote caches. Responds 204; asking to remove
+        a key the item does not have is not an error.
+      operationId: deleteItemProperties
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file or folder relative to the repository root, without
+          a leading `/`. May contain `/`; the root folder is addressed with an empty path on the storage API.
+        in: path
+        name: itemPath
+        required: true
+        schema:
+          description: Path of the file or folder relative to the repository root, without a leading `/`. May contain
+            `/`; the root folder is addressed with an empty path on the storage API.
+          minLength: 1
+          type: string
+      - description: Required query parameter. Comma-separated property keys to remove.
+        in: query
+        name: properties
+        required: true
+        schema:
+          description: Comma-separated property keys to remove.
+          type: string
+      - description: Optional query parameter. `1` also removes the keys from every item below a folder; `0` touches
+          only the folder. Default 1.
+        in: query
+        name: recursive
+        required: false
+        schema:
+          default: 1
+          description: '`1` also removes the keys from every item below a folder; `0` touches only the folder. Default
+            1.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '204':
+          description: The properties were removed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Delete item properties
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemproperties.md
+    get:
+      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for
+        a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions`
+        or `list` selects another view and changes the response shape and media type accordingly. Needs read permission;
+        `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions`
+        needs admin. Works on local repositories, remote caches and virtual repositories.
+      operationId: getStorageItem
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file or folder relative to the repository root, without
+          a leading `/`. May contain `/`; the root folder is addressed with an empty path on the storage API.
+        in: path
+        name: itemPath
+        required: true
+        schema:
+          description: Path of the file or folder relative to the repository root, without a leading `/`. May contain
+            `/`; the root folder is addressed with an empty path on the storage API.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. Selects the properties view. Empty returns every property; a comma-separated
+          list of keys returns only those. Cannot be combined with another mode.
+        in: query
+        name: properties
+        required: false
+        schema:
+          description: Selects the properties view. Empty returns every property; a comma-separated list of keys
+            returns only those. Cannot be combined with another mode.
+          type: string
+      - description: Optional query parameter. Selects the last-modified view, which needs deploy permission on
+          the path and for a folder reports the newest descendant. Cannot be combined with another mode.
+        in: query
+        name: lastModified
+        required: false
+        schema:
+          description: Selects the last-modified view, which needs deploy permission on the path and for a folder
+            reports the newest descendant. Cannot be combined with another mode.
+          type: boolean
+      - description: Optional query parameter. Selects the download statistics view for a file. Cannot be combined
+          with another mode.
+        in: query
+        name: stats
+        required: false
+        schema:
+          description: Selects the download statistics view for a file. Cannot be combined with another mode.
+          type: boolean
+      - description: Optional query parameter. Selects the permissions view, admin only. Cannot be combined with
+          another mode.
+        in: query
+        name: permissions
+        required: false
+        schema:
+          description: Selects the permissions view, admin only. Cannot be combined with another mode.
+          type: boolean
+      - description: Optional query parameter. Selects the file listing view for a folder; anonymous callers are
+          refused. The remaining listing parameters apply only with it.
+        in: query
+        name: list
+        required: false
+        schema:
+          description: Selects the file listing view for a folder; anonymous callers are refused. The remaining
+            listing parameters apply only with it.
+          type: boolean
+      - description: Optional query parameter. `1` lists the whole subtree; `0` lists direct children only. Default
+          0.
+        in: query
+        name: deep
+        required: false
+        schema:
+          description: '`1` lists the whole subtree; `0` lists direct children only. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. Maximum number of levels below the folder when `deep=1`. Omitted
+          means unlimited.
+        in: query
+        name: depth
+        required: false
+        schema:
+          description: Maximum number of levels below the folder when `deep=1`. Omitted means unlimited.
+          type: integer
+      - description: Optional query parameter. `1` includes folder entries; `0` lists files only. Default 0.
+        in: query
+        name: listFolders
+        required: false
+        schema:
+          description: '`1` includes folder entries; `0` lists files only. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` adds the `mdTimestamps` map to each entry. Default 0.
+        in: query
+        name: mdTimestamps
+        required: false
+        schema:
+          description: '`1` adds the `mdTimestamps` map to each entry. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. `1` reports each entry's full path in `uri` instead of the path relative
+          to the listed folder. Default 0.
+        in: query
+        name: includeRootPath
+        required: false
+        schema:
+          description: '`1` reports each entry''s full path in `uri` instead of the path relative to the listed
+            folder. Default 0.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/FileList'
+                - $ref: '#/components/schemas/FileStatistics'
+                - $ref: '#/components/schemas/ItemLastModified'
+                - $ref: '#/components/schemas/ItemProperties'
+                - $ref: '#/components/schemas/ItemPermissions'
+                - $ref: '#/components/schemas/FolderInfo'
+                - $ref: '#/components/schemas/FileInfo'
+            application/vnd.org.jfrog.artifactory.storage.FileInfo+json:
+              schema:
+                $ref: '#/components/schemas/FileInfo'
+            application/vnd.org.jfrog.artifactory.storage.FileList+json:
+              schema:
+                $ref: '#/components/schemas/FileList'
+            application/vnd.org.jfrog.artifactory.storage.FolderInfo+json:
+              schema:
+                $ref: '#/components/schemas/FolderInfo'
+            application/vnd.org.jfrog.artifactory.storage.ItemLastModified+json:
+              schema:
+                $ref: '#/components/schemas/ItemLastModified'
+            application/vnd.org.jfrog.artifactory.storage.ItemProperties+json:
+              schema:
+                $ref: '#/components/schemas/ItemProperties'
+            application/vnd.org.jfrog.storage.StatsInfo+json:
+              schema:
+                $ref: '#/components/schemas/FileStatistics'
+          description: The view selected by the mode parameter. Without a mode, `FileInfo` or `FolderInfo`; the
+            vendor media types name the shape explicitly.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: More than one mode parameter was given, or a listing parameter was used without `list`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The item does not exist, or the `properties` view was requested for an item that has no properties.
+      summary: Item information
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstorageitem.md
+    put:
+      description: Sets properties on an item and, by default, on everything below a folder, replacing existing
+        values of the same keys. Needs annotate permission. Works on local repositories and remote caches only;
+        a virtual or remote repository key is refused with 400. Responds 204.
+      operationId: setItemProperties
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file or folder relative to the repository root, without
+          a leading `/`. May contain `/`; the root folder is addressed with an empty path on the storage API.
+        in: path
+        name: itemPath
+        required: true
+        schema:
+          description: Path of the file or folder relative to the repository root, without a leading `/`. May contain
+            `/`; the root folder is addressed with an empty path on the storage API.
+          minLength: 1
+          type: string
+      - description: Required query parameter. Properties to set as `key=value` pairs separated by `;` or `|`; multiple
+          values of one key are separated by `,`. Characters `,`, `\`, `|` and `=` inside a value are escaped with
+          `%5C`. An existing key is replaced.
+        in: query
+        name: properties
+        required: true
+        schema:
+          description: Properties to set as `key=value` pairs separated by `;` or `|`; multiple values of one key
+            are separated by `,`. Characters `,`, `\`, `|` and `=` inside a value are escaped with `%5C`. An existing
+            key is replaced.
+          type: string
+      - description: Optional query parameter. `1` also sets the properties on every item below a folder; `0` touches
+          only the folder. Default 1.
+        in: query
+        name: recursive
+        required: false
+        schema:
+          default: 1
+          description: '`1` also sets the properties on every item below a folder; `0` touches only the folder.
+            Default 1.'
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '204':
+          description: The properties were set.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The `properties` value could not be parsed, or the repository is not local or a cache.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Set item properties
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemproperties.md
+  /api/storageinfo:
+    get:
+      description: Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r`
+        token scope.
+      operationId: getStorageSummaryInfo
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageSummaryInfo'
+          description: The current snapshot.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Storage summary
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md
+  /api/storageinfo/calculate:
+    post:
+      description: Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+      operationId: refreshStorageSummaryInfo
+      responses:
+        '202':
+          content:
+            text/plain:
+              schema:
+                description: Acknowledgement text.
+                type: string
+          description: The recalculation started.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Recalculate the storage summary
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/refreshstoragesummaryinfo.md
+  /api/system/storage/optimize:
+    post:
+      description: Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin
+        only. Returns a plain-text acknowledgement.
+      operationId: optimizeSystemStorage
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Acknowledgement text.
+                type: string
+          description: Housekeeping started; the body is a plain-text acknowledgement.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Optimise storage
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/optimizesystemstorage.md
+  /api/system/storage/prune/start:
+    post:
+      description: Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave
+        runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is
+        already in progress.
+      operationId: startPudProcess
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartPudProcessRequest'
+        description: Optional tuning; an empty or absent body starts a full run.
+        required: false
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PudProcessResponse'
+          description: The prune run started.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '412':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PudProcessResponse'
+          description: A prune run is already in progress.
+      summary: Start pruning unreferenced blobs
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/startpudprocess.md
+  /api/system/storage/prune/status:
+    get:
+      description: Reports the state and totals of the current or last prune run. Admin only. Responds 412 when
+        no run has ever been started.
+      operationId: getPudProcessStatus
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PudProcessStatus'
+          description: Success.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '412':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PudProcessResponse'
+          description: No prune run has been started yet.
+      summary: Prune status
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpudprocessstatus.md
+  /api/system/storage/prune/stop:
+    post:
+      description: Asks the running prune process to stop after the current directory. Admin only. Returns 202 when
+        a stop was requested and 412 when nothing is running.
+      operationId: stopPudProcess
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PudProcessResponse'
+          description: The stop was requested.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '412':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PudProcessResponse'
+          description: No prune run is in progress.
+      summary: Stop pruning
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/stoppudprocess.md
+  /api/tasks:
+    get:
+      description: Lists the scheduled and running server tasks. Admin only.
+      operationId: getBackgroundTasks
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackgroundTasks'
+          description: The task list.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Background tasks
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getbackgroundtasks.md
+  /api/v1/metrics:
+    get:
+      description: Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r`
+        token scope. artifactweave serves this regardless of licence tier.
+      operationId: getOpenMetricsForArtifactory
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: OpenMetrics exposition.
+                type: string
+          description: Metrics in OpenMetrics text format.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Prometheus metrics
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsforartifactory.md
+  /api/v1/metrics/application:
+    get:
+      description: Artifactory Cloud exposes application-level metrics here. artifactweave serves the same metrics
+        as `/api/v1/metrics` so dashboards written for either path work.
+      operationId: getArtifactoryApplicationMetrics
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: OpenMetrics exposition.
+                type: string
+          description: Metrics in OpenMetrics text format.
+        '401':
+          description: No credentials or invalid credentials.
+        '403':
+          description: The caller lacks the permission the operation needs.
+      summary: Application metrics (cloud)
+      tags:
+      - storage
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getartifactoryapplicationmetrics.md
+  /api/zap/{repoPath}:
+    post:
+      description: Marks the cached metadata under a path of a remote repository's cache as expired, so the next
+        request fetches it from the upstream again. Cached binaries are not deleted. Needs manage or delete permission
+        on the cache.
+      operationId: zapCache
+      parameters:
+      - description: Required path parameter. `<repoKey>-cache/<path>` of the cached folder or file whose metadata
+          expiry should be reset. The cache alias is required because zap only applies to cached content.
+        in: path
+        name: repoPath
+        required: true
+        schema:
+          description: '`<repoKey>-cache/<path>` of the cached folder or file whose metadata expiry should be reset.
+            The cache alias is required because zap only applies to cached content.'
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Confirmation of the zapped path.
+                properties:
+                  Message:
+                    description: Optional within this object. Confirmation naming the zapped path.
+                    type: string
+                type: object
+          description: The cached metadata was marked expired.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+      summary: Expire cached metadata
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/zapcache.md
+  /{repoKey}/{archivePath}!/{entryPath}:
+    get:
+      description: Streams one entry from inside a stored zip, jar, tar or similar archive without the client downloading
+        the whole file. The `!/` after the archive path is literal. Needs read permission on the archive.
+      operationId: archiveEntryDownload
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the archive file relative to the repository root.
+        in: path
+        name: archivePath
+        required: true
+        schema:
+          description: Path of the archive file relative to the repository root.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the entry inside the archive, relative to the archive root.
+          The `!/` separator before it is literal.
+        in: path
+        name: entryPath
+        required: true
+        schema:
+          description: Path of the entry inside the archive, relative to the archive root. The `!/` separator before
+            it is literal.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Raw file bytes.
+                format: binary
+                type: string
+            text/plain:
+              schema:
+                description: The entry when it is a text file.
+                type: string
+          description: The entry's bytes.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The archive or the entry does not exist.
+      summary: Download an archive entry
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/archiveentrydownload.md
+  /{repoKey}/{filePath}:
+    delete:
+      description: Deletes a file or a folder subtree from a local repository or a remote cache and moves it to
+        the trash can when the trash can is enabled. Needs delete permission. Responds 204; a virtual repository
+        key is refused with 405.
+      operationId: deleteItem
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file relative to the repository root, without a leading
+          `/`. May contain `/`. Matrix parameters `;key=value` appended to the last segment carry properties.
+        in: path
+        name: filePath
+        required: true
+        schema:
+          description: Path of the file relative to the repository root, without a leading `/`. May contain `/`.
+            Matrix parameters `;key=value` appended to the last segment carry properties.
+          minLength: 1
+          type: string
+      responses:
+        '204':
+          description: The item was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is virtual.
+      summary: Delete an item
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitem.md
+    get:
+      description: 'Streams the content of a file. Resolution follows the repository class: local serves stored
+        content, remote serves the cache or fetches from upstream, virtual walks its members in order. Matrix parameters
+        `;key=value` on the path restrict resolution to items carrying those properties. The version tokens `[RELEASE]`,
+        `[INTEGRATION]` and `SNAPSHOT` in layout-aware repositories resolve to the latest matching version. Supports
+        `Range` requests with 206 and exposes `X-Checksum-Md5`, `X-Checksum-Sha1` and `X-Checksum-Sha256` headers.
+        Each completed download updates the statistics unless `skipUpdateStats=true`.'
+      operationId: retrieveArtifact
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file relative to the repository root, without a leading
+          `/`. May contain `/`. Matrix parameters `;key=value` appended to the last segment carry properties.
+        in: path
+        name: filePath
+        required: true
+        schema:
+          description: Path of the file relative to the repository root, without a leading `/`. May contain `/`.
+            Matrix parameters `;key=value` appended to the last segment carry properties.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. `true` serves the content without counting the download or updating
+          `lastDownloaded`. Default false.
+        in: query
+        name: skipUpdateStats
+        required: false
+        schema:
+          default: false
+          description: '`true` serves the content without counting the download or updating `lastDownloaded`. Default
+            false.'
+          type: boolean
+      - description: Optional query parameter. When present, returns a plain-text explanation of how the request
+          was resolved (repository, virtual member, cache hit, permission checks) instead of the content.
+        in: query
+        name: trace
+        required: false
+        schema:
+          description: When present, returns a plain-text explanation of how the request was resolved (repository,
+            virtual member, cache hit, permission checks) instead of the content.
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Raw file bytes.
+                format: binary
+                type: string
+            text/plain:
+              schema:
+                description: The resolution trace returned when `trace` is given.
+                type: string
+          description: The content, or the resolution trace when `trace` was given.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or item does not exist, or the caller may not know that it does.
+      summary: Download an artifact
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrieveartifact.md
+    put:
+      description: 'Stores the request body at the path. Needs deploy permission; the target must be a local repository
+        or a virtual repository with a default deployment repository, otherwise 405. A path ending in `/` with an
+        empty body creates a folder. Matrix parameters `;key=value` on the last path segment become properties.
+        Checksums declared in `X-Checksum-*` headers are recorded as original checksums and verified against the
+        stored bytes; a mismatch is rejected with 409. Responds 201 with the created item. Deploying over an existing
+        path replaces the content unless the repository forbids overwrites. The same route carries two variants
+        selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose
+        entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true`
+        makes the extraction all-or-nothing). With `X-Checksum-Deploy: true` and a checksum header the server deploys
+        an existing binary with that checksum without a body, answering 201, or 404 when no readable binary matches
+        so the client uploads normally.'
+      operationId: deployArtifact
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file relative to the repository root, without a leading
+          `/`. May contain `/`. Matrix parameters `;key=value` appended to the last segment carry properties.
+        in: path
+        name: filePath
+        required: true
+        schema:
+          description: Path of the file relative to the repository root, without a leading `/`. May contain `/`.
+            Matrix parameters `;key=value` appended to the last segment carry properties.
+          minLength: 1
+          type: string
+      - description: Optional header parameter. Lowercase hex SHA-1 the client computed. Recorded as the original
+          checksum and compared with the stored bytes; a mismatch is rejected with 409.
+        in: header
+        name: X-Checksum-Sha1
+        required: false
+        schema:
+          description: Lowercase hex SHA-1 the client computed. Recorded as the original checksum and compared with
+            the stored bytes; a mismatch is rejected with 409.
+          type: string
+      - description: Optional header parameter. Lowercase hex SHA-256 the client computed. Recorded and verified
+          like `X-Checksum-Sha1`.
+        in: header
+        name: X-Checksum-Sha256
+        required: false
+        schema:
+          description: Lowercase hex SHA-256 the client computed. Recorded and verified like `X-Checksum-Sha1`.
+          type: string
+      - description: Optional header parameter. Must be `true`. Marks the upload as an archive to be extracted into
+          the folder named by the path; only the extracted entries are stored.
+        in: header
+        name: X-Explode-Archive
+        required: false
+        schema:
+          description: Must be `true`. Marks the upload as an archive to be extracted into the folder named by the
+            path; only the extracted entries are stored.
+          enum:
+          - true
+          type: boolean
+      - description: Optional header parameter. `true` extracts into a staging area and publishes every entry in
+          one step, so a failed extraction leaves nothing behind. Default false.
+        in: header
+        name: X-Explode-Archive-Atomic
+        required: false
+        schema:
+          description: '`true` extracts into a staging area and publishes every entry in one step, so a failed extraction
+            leaves nothing behind. Default false.'
+          type: boolean
+      - description: Optional header parameter. Must be `true`. Asks the server to create the item from a blob it
+          already holds instead of reading the request body.
+        in: header
+        name: X-Checksum-Deploy
+        required: false
+        schema:
+          description: Must be `true`. Asks the server to create the item from a blob it already holds instead of
+            reading the request body.
+          enum:
+          - true
+          type: boolean
+      - description: 'Optional header parameter. Checksum whose algorithm is inferred from its length: 32 hex characters
+          MD5, 40 SHA-1, 64 SHA-256. The JFrog CLI sends SHA-256 here.'
+        in: header
+        name: X-Checksum
+        required: false
+        schema:
+          description: 'Checksum whose algorithm is inferred from its length: 32 hex characters MD5, 40 SHA-1, 64
+            SHA-256. The JFrog CLI sends SHA-256 here.'
+          type: string
+      requestBody:
+        content:
+          application/gzip:
+            schema:
+              description: Gzip-compressed tar archive bytes.
+              format: binary
+              type: string
+          application/octet-stream:
+            schema:
+              description: Raw file bytes.
+              format: binary
+              type: string
+          application/x-tar:
+            schema:
+              description: Tar archive bytes.
+              format: binary
+              type: string
+          application/zip:
+            schema:
+              description: Zip archive bytes.
+              format: binary
+              type: string
+        description: The artifact bytes. May be empty when creating a folder.
+        required: false
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemCreated'
+            application/vnd.org.jfrog.artifactory.storage.ItemCreated+json:
+              schema:
+                $ref: '#/components/schemas/ItemCreated'
+          description: The item was stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is remote, or virtual without a default deployment repository.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A declared checksum does not match the uploaded bytes.
+      summary: Deploy an artifact
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deployartifact.md
+      x-oracle-source-also:
+      - https://docs.jfrog.com/artifactory/reference/deployartifactsfromarchive.md
+      - https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md
+  /{repoKey}/{filePath}/checksum:
+    put:
+      description: 'Documentation alias of the checksum-deploy variant of deployArtifact. JFrog''s reference lists
+        it under a `/checksum` suffix, but clients send the ordinary deploy URL with `X-Checksum-Deploy: true`;
+        artifactweave serves it there and never routes this path, so a file named `checksum` can still be deployed.'
+      operationId: deployArtifactByChecksum
+      parameters:
+      - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
+          `<key>-cache` and a virtual repository resolves through its members.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual
+            repository resolves through its members.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Path of the file relative to the repository root, without a leading
+          `/`. May contain `/`. Matrix parameters `;key=value` appended to the last segment carry properties.
+        in: path
+        name: filePath
+        required: true
+        schema:
+          description: Path of the file relative to the repository root, without a leading `/`. May contain `/`.
+            Matrix parameters `;key=value` appended to the last segment carry properties.
+          minLength: 1
+          type: string
+      - description: Required header parameter. Must be `true`. Asks the server to create the item from a blob it
+          already holds instead of reading the request body.
+        in: header
+        name: X-Checksum-Deploy
+        required: true
+        schema:
+          description: Must be `true`. Asks the server to create the item from a blob it already holds instead of
+            reading the request body.
+          enum:
+          - true
+          type: boolean
+      - description: Optional header parameter. Lowercase hex SHA-1 of the blob to link. At least one checksum header
+          must be present.
+        in: header
+        name: X-Checksum-Sha1
+        required: false
+        schema:
+          description: Lowercase hex SHA-1 of the blob to link. At least one checksum header must be present.
+          type: string
+      - description: Optional header parameter. Lowercase hex SHA-256 of the blob to link.
+        in: header
+        name: X-Checksum-Sha256
+        required: false
+        schema:
+          description: Lowercase hex SHA-256 of the blob to link.
+          type: string
+      - description: 'Optional header parameter. Checksum whose algorithm is inferred from its length: 32 hex characters
+          MD5, 40 SHA-1, 64 SHA-256. The JFrog CLI sends SHA-256 here.'
+        in: header
+        name: X-Checksum
+        required: false
+        schema:
+          description: 'Checksum whose algorithm is inferred from its length: 32 hex characters MD5, 40 SHA-1, 64
+            SHA-256. The JFrog CLI sends SHA-256 here.'
+          type: string
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              description: Raw file bytes.
+              format: binary
+              type: string
+        description: Ignored; the content is taken from the existing blob.
+        required: false
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemCreated'
+            application/vnd.org.jfrog.artifactory.storage.ItemCreated+json:
+              schema:
+                $ref: '#/components/schemas/ItemCreated'
+          description: The item was created from the existing blob.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No checksum header was sent, or its value is not a hex digest of a known length.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission the operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No readable blob with the declared checksum exists; upload the content normally.
+      summary: Deploy by checksum
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+      x-not-routed: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md

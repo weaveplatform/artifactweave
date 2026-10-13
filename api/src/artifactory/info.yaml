@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info:
+  title: artifactweave Artifactory-compatible REST API
+  version: 0.1.0
+  description: >-
+    The management surface served under /artifactory. Paths, field names and status
+    codes mirror the documented Artifactory wire behaviour (docs/research/02) so the
+    JFrog CLI and the jfrog Terraform providers work unchanged. This document is
+    authored by the artifactweave project; it cites JFrog's documentation and copies
+    nothing from it. Operations marked x-handwritten are served by hand-written
+    handlers and are excluded from code generation (decision 0002).
+servers:
+  - url: /artifactory
+    description: The Artifactory service prefix on the single artifactweave listener.
+tags:
+  - name: system
+    description: Health, version and telemetry endpoints that need no authentication.
+  - name: handwritten
+    description: Marker tag. Operations with this tag are implemented by hand and excluded from generation.

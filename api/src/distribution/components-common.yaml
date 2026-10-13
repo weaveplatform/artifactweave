@@ -1,0 +1,30 @@
+# Shared schemas for this service: the error envelope.
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      description: The Distribution error envelope. status_code and message repeat the first entry of errors so clients reading either form agree.
+      required: [status_code, message, errors]
+      properties:
+        status_code:
+          type: integer
+          description: Required within this object. The HTTP status of the response.
+        message:
+          type: string
+          description: Required within this object. Human readable explanation of the first error.
+        detail:
+          type: string
+          description: Optional within this object. Extra context such as the bundle or target the error concerns.
+        errors:
+          type: array
+          description: Required within this object. One entry per error; clients read the first.
+          items:
+            type: object
+            required: [status, message]
+            properties:
+              status:
+                type: integer
+                description: Required within this object. The HTTP status this error maps to.
+              message:
+                type: string
+                description: Required within this object. Human readable explanation.

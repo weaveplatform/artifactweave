@@ -1,0 +1,85 @@
+package types
+
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+	"time"
+)
+
+// ErrInvalidSubject reports a token subject that is not an Access subject.
+var ErrInvalidSubject = errors.New("invalid token subject")
+
+// Token defaults from the Access configuration (research 05).
+const (
+	DefaultTokenExpiry        = time.Hour
+	DefaultRevocableThreshold = 6 * time.Hour
+	DefaultRefreshGrace       = 24 * time.Hour
+)
+
+// Token is the stored record of an access token. The JWT itself is never
+// stored: AccessDigest, RefreshDigest and ReferenceDigest are hashes used to
+// revoke by value and to resolve refresh and reference tokens. A zero
+// ExpiresAt means the token never expires.
+type Token struct {
+	ID              string
+	Subject         string
+	Scope           Scope
+	Audience        string
+	Description     string
+	ProjectKey      string
+	IssuedAt        time.Time
+	ExpiresAt       time.Time
+	Refreshable     bool
+	Revocable       bool
+	LastUsed        time.Time
+	AccessDigest    []byte `json:"-"`
+	RefreshDigest   []byte `json:"-"`
+	ReferenceDigest []byte `json:"-"`
+}
+
+// Expired reports whether the token has expired at now.
+func (t Token) Expired(now time.Time) bool {
+	return !t.ExpiresAt.IsZero() && !now.Before(t.ExpiresAt)
+}
+
+// Revocable applies Access's rule: a token is revocable when it never
+// expires, lives at least the revocable threshold, or the caller forced it.
+// Short-lived tokens are not tracked for revocation because they expire
+// before a revocation list would matter.
+func Revocable(expiresIn, threshold time.Duration, force bool) bool {
+	return force || expiresIn == 0 || expiresIn >= threshold
+}
+
+// Subject is a parsed Access token subject, jfac@<service id>/users/<name>.
+type Subject struct {
+	ServiceID string
+	Kind      string // "users" for user tokens
+	Name      string
+}
+
+// String renders the subject.
+func (s Subject) String() string { return s.ServiceID + "/" + s.Kind + "/" + s.Name }
+
+// ParseSubject reads a token subject. The JFrog CLI extracts the user name
+// from the "/users/" segment, so that form is the one artifactweave issues.
+func ParseSubject(s string) (Subject, error) {
+	service, rest, ok := strings.Cut(s, "/")
+	if !ok || !strings.Contains(service, "@") {
+		return Subject{}, fmt.Errorf("%w: %q", ErrInvalidSubject, s)
+	}
+	kind, name, ok := strings.Cut(rest, "/")
+	if !ok || kind == "" || name == "" {
+		return Subject{}, fmt.Errorf("%w: %q", ErrInvalidSubject, s)
+	}
+	return Subject{ServiceID: service, Kind: kind, Name: name}, nil
+}
+
+// referenceTokenPattern is the documented reference-token form: base64 of
+// "reftkn:01..." ("cmVmd" plus 59 alphanumerics, 64 characters in all).
+var referenceTokenPattern = regexp.MustCompile(`^cmVmd[A-Za-z0-9]{59}$`)
+
+// IsReferenceToken reports whether s has the reference-token form, which is
+// how the authenticator tells a reference token from a JWT or an API key.
+func IsReferenceToken(s string) bool { return referenceTokenPattern.MatchString(s) }

@@ -1,0 +1,75 @@
+# Shared schemas: the error envelope and the system documents.
+components:
+  schemas:
+    SystemVersion:
+      type: object
+      additionalProperties: false
+      required: [version, revision, addons]
+      properties:
+        version:
+          type: string
+          description: >-
+            Required within this object. The Artifactory version artifactweave is
+            compatible with, in major.minor.patch form. Configured by
+            compat.artifactory_version; defaults to 7.155.0.
+        revision:
+          type: string
+          description: >-
+            Required within this object. The artifactweave build identifier (git
+            describe output), so operators can tell the real version apart from the
+            compatibility version.
+        addons:
+          type: array
+          description: >-
+            Required within this object. Always empty; Artifactory lists licensed
+            add-ons here and no client depends on the contents.
+          items:
+            type: string
+            description: Optional within this object. An add-on name.
+        license:
+          type: string
+          description: >-
+            Optional within this object. Always the literal artifactweave. Real
+            Artifactory servers emit a licence type here; no client parses it.
+    License:
+      type: object
+      additionalProperties: false
+      required: [type, validThrough, licensedTo]
+      properties:
+        type:
+          type: string
+          description: >-
+            Required within this object. Always artifactweave. Artifactory reports its
+            licence tier here; artifactweave has none.
+        validThrough:
+          type: string
+          description: Required within this object. Always the literal never.
+        licensedTo:
+          type: string
+          description: Required within this object. Always artifactweave.
+    Probe:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          description: Required within this object. OK when the probe passes.
+    ErrorResponse:
+      type: object
+      description: The Artifactory error envelope used by every /artifactory response.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          description: Required within this object. One entry per error; clients read the first.
+          items:
+            type: object
+            required: [status, message]
+            properties:
+              status:
+                type: integer
+                description: Required within this object. The HTTP status code repeated in the body.
+              message:
+                type: string
+                description: Required within this object. Human readable explanation.

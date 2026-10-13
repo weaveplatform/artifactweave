@@ -1,0 +1,2968 @@
+components:
+  parameters:
+    environmentName:
+      description: Required path parameter. The environment name, matched case-insensitively.
+      in: path
+      name: environmentName
+      required: true
+      schema:
+        type: string
+    groupName:
+      description: Required path parameter. The group name.
+      in: path
+      name: name
+      required: true
+      schema:
+        type: string
+    permissionName:
+      description: Required path parameter. The permission name, at most 64 characters.
+      in: path
+      name: permissionName
+      required: true
+      schema:
+        type: string
+    projectKey:
+      description: Required path parameter. The project key, 2 to 32 lower-case characters starting with a letter.
+      in: path
+      name: projectKey
+      required: true
+      schema:
+        type: string
+    resourceType:
+      description: 'Required path parameter. Which section of the permission to address: artifact for repositories,
+        build for build-info, release_bundle for release bundles. release_bundle sections are stored but have no
+        effect in artifactweave.'
+      in: path
+      name: resourceType
+      required: true
+      schema:
+        enum:
+        - artifact
+        - build
+        - release_bundle
+        type: string
+    roleName:
+      description: Required path parameter. The role name.
+      in: path
+      name: role
+      required: true
+      schema:
+        type: string
+    tokenId:
+      description: Required path parameter. The token id from the create response, or me for the caller's own token.
+      in: path
+      name: tokenId
+      required: true
+      schema:
+        type: string
+    username:
+      description: Required path parameter. The user's login name, case-insensitive.
+      in: path
+      name: username
+      required: true
+      schema:
+        type: string
+  schemas:
+    Actions:
+      description: 'Actions granted per principal. Values are upper-case action names: READ, ANNOTATE, WRITE, DELETE,
+        MANAGE, SCAN and, for release bundles, EXECUTE. These map one to one onto the legacy codes r, n, w, d, m,
+        mxm and x. DELETE implies the ability to overwrite.'
+      properties:
+        groups:
+          additionalProperties:
+            description: Actions for one group.
+            items:
+              description: An action name.
+              type: string
+            type: array
+          description: Optional within this object. Map from group name to its action list.
+          type: object
+        users:
+          additionalProperties:
+            description: Actions for one user.
+            items:
+              description: An action name.
+              type: string
+            type: array
+          description: Optional within this object. Map from username to its action list.
+          type: object
+      type: object
+    Environment:
+      description: A global or project environment.
+      properties:
+        name:
+          description: Required within this object. The environment name as stored.
+          type: string
+      required:
+      - name
+      type: object
+    EnvironmentCreate:
+      description: A new environment.
+      properties:
+        name:
+          description: Required within this object. At most 32 characters of letters, digits, hyphen and underscore;
+            compared case-insensitively.
+          maxLength: 32
+          type: string
+      required:
+      - name
+      type: object
+    EnvironmentRename:
+      description: A rename request.
+      properties:
+        new_name:
+          description: Required within this object. The new name, with the same rules as on creation.
+          maxLength: 32
+          type: string
+      required:
+      - new_name
+      type: object
+    ExpandedPermissionsResponse:
+      description: One page of the permission listing with expand=true.
+      properties:
+        cursor:
+          description: Optional within this object. Present only when more permissions remain.
+          type: string
+        permissions:
+          description: Required within this object. Full permission documents.
+          items:
+            $ref: '#/components/schemas/PermissionDetails'
+          type: array
+      required:
+      - permissions
+      type: object
+    GlobalRole:
+      description: A global role as returned by reads.
+      properties:
+        actions:
+          description: 'Required within this object. Actions from the global vocabulary: READ_REPOSITORY, ANNOTATE_REPOSITORY,
+            DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE,
+            ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE,
+            READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE,
+            TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY,
+            POLICIES_SECURITY, RULES_SECURITY, READ_POLICIES_SECURITY. Only the repository and build actions have
+            an effect in artifactweave; the rest are stored and echoed.'
+          items:
+            description: An action name.
+            type: string
+          type: array
+        description:
+          description: Optional within this object. Free text.
+          type: string
+        environments:
+          description: Required within this object. Environment names the role applies to; empty means every environment.
+          items:
+            description: An environment name.
+            type: string
+          type: array
+        name:
+          description: Required within this object. The role name.
+          type: string
+        type:
+          allOf:
+          - $ref: '#/components/schemas/GlobalRoleType'
+          description: Optional within this object. The kind of a global role. ADMIN and PREDEFINED are built in
+            and immutable; CUSTOM_GLOBAL roles are created through this API.
+      required:
+      - actions
+      - environments
+      - name
+      type: object
+    GlobalRoleCreate:
+      description: A new custom global role.
+      properties:
+        actions:
+          description: Optional within this object. Actions from the global vocabulary listed on GlobalRole. Omitted
+            grants nothing.
+          items:
+            description: An action name.
+            type: string
+          type: array
+        description:
+          description: Optional within this object. Free text.
+          type: string
+        environments:
+          description: Optional within this object. Environments the role applies to; each must exist. Omitted means
+            every environment.
+          items:
+            description: An environment name.
+            type: string
+          type: array
+        name:
+          description: Required within this object. Unique role name.
+          type: string
+        type:
+          description: Required within this object. Must be CUSTOM_GLOBAL; built-in types cannot be created.
+          enum:
+          - CUSTOM_GLOBAL
+          type: string
+      required:
+      - name
+      - type
+      type: object
+    GlobalRoleType:
+      description: The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles
+        are created through this API.
+      enum:
+      - ADMIN
+      - PREDEFINED
+      - CUSTOM_GLOBAL
+      type: string
+    GlobalRoleUpdate:
+      description: The replacement content of a custom global role.
+      properties:
+        actions:
+          description: Optional within this object. The complete action list; omitted grants nothing.
+          items:
+            description: An action name.
+            type: string
+          type: array
+        description:
+          description: Optional within this object. Free text; omitted clears it.
+          type: string
+        environments:
+          description: Optional within this object. The complete environment list; omitted means every environment.
+          items:
+            description: An environment name.
+            type: string
+          type: array
+        name:
+          description: Required within this object. Must equal the role name in the path.
+          type: string
+        type:
+          allOf:
+          - $ref: '#/components/schemas/GlobalRoleType'
+          description: Required within this object. The kind of a global role. ADMIN and PREDEFINED are built in
+            and immutable; CUSTOM_GLOBAL roles are created through this API.
+      required:
+      - name
+      - type
+      type: object
+    GroupCreateRequest:
+      description: A new group.
+      properties:
+        admin_privileges:
+          default: false
+          description: Optional within this object. Members become effective admins. Defaults to false.
+          type: boolean
+        auto_join:
+          default: false
+          description: Optional within this object. When true every newly created user joins this group. Defaults
+            to false.
+          type: boolean
+        description:
+          description: Optional within this object. Free text shown to administrators.
+          type: string
+        external_id:
+          description: Optional within this object. Identifier of the group in an external identity provider; stored
+            and echoed.
+          type: string
+        import_from_ldap_group_setting:
+          description: Optional within this object. Name of an LDAP group setting to take members from. Mutually
+            exclusive with members. Not available in artifactweave v1; a value answers 400.
+          type: string
+        manage_resources:
+          default: false
+          description: Optional within this object. Members may manage repositories without being full admins. Defaults
+            to false.
+          type: boolean
+        manage_webhook:
+          default: false
+          description: Optional within this object. Members may manage webhook subscriptions. Defaults to false.
+          type: boolean
+        members:
+          description: Optional within this object. Initial member usernames; each must exist. Mutually exclusive
+            with import_from_ldap_group_setting.
+          items:
+            description: A username.
+            type: string
+          type: array
+        name:
+          description: Required within this object. The group name; unique, case-insensitive.
+          type: string
+        policy_manager:
+          default: false
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        policy_viewer:
+          default: false
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        reports_manager:
+          default: false
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        watch_manager:
+          default: false
+          description: Optional within this object. Stored and echoed; no effect in artifactweave.
+          type: boolean
+      required:
+      - name
+      type: object
+    GroupDetails:
+      description: A stored group as returned by every read.
+      properties:
+        admin_privileges:
+          description: Required within this object. Whether members are effective admins.
+          type: boolean
+        auto_join:
+          description: Required within this object. Whether new users join automatically.
+          type: boolean
+        description:
+          description: Optional within this object. The description.
+          type: string
+        external_id:
+          description: Optional within this object. The external identifier.
+          type: string
+        manage_resources:
+          description: Optional within this object. Repository management right.
+          type: boolean
+        manage_webhook:
+          description: Optional within this object. Webhook management right.
+          type: boolean
+        members:
+          description: Required within this object. Member usernames, possibly empty.
+          items:
+            description: A username.
+            type: string
+          type: array
+        name:
+          description: Required within this object. The group name.
+          type: string
+        policy_manager:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+        policy_viewer:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+        realm:
+          description: Required within this object. Server-owned. internal for groups stored by artifactweave.
+          type: string
+        realm_attributes:
+          description: Optional within this object. Server-owned. Realm-specific metadata; empty for internal groups.
+          type: string
+        reports_manager:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+        watch_manager:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+      required:
+      - admin_privileges
+      - auto_join
+      - members
+      - name
+      - realm
+      type: object
+    GroupListResponse:
+      description: One page of the group listing.
+      properties:
+        cursor:
+          description: Optional within this object. Present only when more groups remain.
+          type: string
+        groups:
+          description: Required within this object. The groups in this page, possibly empty.
+          items:
+            $ref: '#/components/schemas/GroupRecordResponse'
+          type: array
+      required:
+      - groups
+      type: object
+    GroupRecordResponse:
+      description: A group summary in a listing.
+      properties:
+        group_name:
+          description: Required within this object. The group name.
+          type: string
+        uri:
+          description: Required within this object. Absolute URL of the group's details resource.
+          type: string
+      required:
+      - group_name
+      - uri
+      type: object
+    GroupUpdateRequest:
+      description: Group attributes that may change. Every field is optional; omitted fields keep their value. Name,
+        realm and members are not updatable here.
+      properties:
+        admin_privileges:
+          description: Optional within this object. Admin grant flag.
+          type: boolean
+        auto_join:
+          description: Optional within this object. Auto-join flag.
+          type: boolean
+        description:
+          description: Optional within this object. New description.
+          type: string
+        external_id:
+          description: Optional within this object. External identifier.
+          type: string
+        manage_resources:
+          description: Optional within this object. Repository management right.
+          type: boolean
+        manage_webhook:
+          description: Optional within this object. Webhook management right.
+          type: boolean
+        policy_manager:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        policy_viewer:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        reports_manager:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        watch_manager:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+      type: object
+    Patterns:
+      description: Ant-style path patterns that scope a target. Paths matching any include pattern and no exclude
+        pattern are covered.
+      properties:
+        exclude_patterns:
+          description: Optional within this object. Patterns to exclude after inclusion.
+          items:
+            description: An Ant-style pattern.
+            type: string
+          type: array
+        include_patterns:
+          description: Optional within this object. Patterns to include; omitted or empty means all paths. Each
+            at most 1024 characters.
+          items:
+            description: An Ant-style pattern such as org/acme/**.
+            type: string
+          type: array
+      type: object
+    PermissionCreateRequest:
+      description: A new permission in the Access v2 model.
+      properties:
+        description:
+          description: Optional within this object. Free text for administrators.
+          type: string
+        name:
+          description: Required within this object. Unique name, at most 64 characters.
+          type: string
+        resources:
+          description: Optional within this object. One section per resource type. A permission with no sections
+            grants nothing. The jfrog/platform provider also sends destination and pipeline_source sections, which
+            artifactweave stores and echoes without effect.
+          properties:
+            artifact:
+              allOf:
+              - $ref: '#/components/schemas/PermissionResource'
+              description: 'Optional within this object. The grants for one resource type: which principals get
+                which actions on which targets. Targets are repository keys (artifact), the build-info repository
+                (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL,
+                ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories'' caches.'
+            build:
+              allOf:
+              - $ref: '#/components/schemas/PermissionResource'
+              description: 'Optional within this object. The grants for one resource type: which principals get
+                which actions on which targets. Targets are repository keys (artifact), the build-info repository
+                (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL,
+                ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories'' caches.'
+            release_bundle:
+              allOf:
+              - $ref: '#/components/schemas/PermissionResource'
+              description: 'Optional within this object. The grants for one resource type: which principals get
+                which actions on which targets. Targets are repository keys (artifact), the build-info repository
+                (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL,
+                ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories'' caches.'
+          type: object
+      required:
+      - name
+      type: object
+    PermissionDetails:
+      description: A stored permission.
+      properties:
+        name:
+          description: Required within this object. The permission name.
+          type: string
+        resources:
+          description: Required within this object. The sections that exist on this permission.
+          properties:
+            artifact:
+              allOf:
+              - $ref: '#/components/schemas/PermissionResource'
+              description: 'Optional within this object. The grants for one resource type: which principals get
+                which actions on which targets. Targets are repository keys (artifact), the build-info repository
+                (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL,
+                ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories'' caches.'
+            build:
+              allOf:
+              - $ref: '#/components/schemas/PermissionResource'
+              description: 'Optional within this object. The grants for one resource type: which principals get
+                which actions on which targets. Targets are repository keys (artifact), the build-info repository
+                (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL,
+                ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories'' caches.'
+            release_bundle:
+              allOf:
+              - $ref: '#/components/schemas/PermissionResource'
+              description: 'Optional within this object. The grants for one resource type: which principals get
+                which actions on which targets. Targets are repository keys (artifact), the build-info repository
+                (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL,
+                ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories'' caches.'
+          type: object
+      required:
+      - name
+      - resources
+      type: object
+    PermissionListResponse:
+      description: One page of the permission listing without expand.
+      properties:
+        cursor:
+          description: Optional within this object. Present only when more permissions remain.
+          type: string
+        permissions:
+          description: Required within this object. Name and uri per permission, possibly empty.
+          items:
+            description: A permission summary.
+            properties:
+              name:
+                description: Required within this object. The permission name.
+                type: string
+              uri:
+                description: Required within this object. Absolute URL of the permission resource.
+                type: string
+            required:
+            - name
+            - uri
+            type: object
+          type: array
+      required:
+      - permissions
+      type: object
+    PermissionResource:
+      description: 'The grants for one resource type: which principals get which actions on which targets. Targets
+        are repository keys (artifact), the build-info repository (build, exactly one target) or release bundle
+        repositories, plus the special keys ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE
+        also covers the remote repositories'' caches.'
+      properties:
+        actions:
+          allOf:
+          - $ref: '#/components/schemas/Actions'
+          description: 'Optional within this object. Actions granted per principal. Values are upper-case action
+            names: READ, ANNOTATE, WRITE, DELETE, MANAGE, SCAN and, for release bundles, EXECUTE. These map one
+            to one onto the legacy codes r, n, w, d, m, mxm and x. DELETE implies the ability to overwrite.'
+        targets:
+          additionalProperties:
+            $ref: '#/components/schemas/Patterns'
+          description: Optional within this object. Map from target key to its include and exclude patterns. A target
+            without patterns means include everything.
+          type: object
+      type: object
+    PermissionResourceUpdate:
+      description: Entries to merge into a resource section; shape as PermissionResource, every part optional.
+      properties:
+        actions:
+          allOf:
+          - $ref: '#/components/schemas/Actions'
+          description: 'Optional within this object. Actions granted per principal. Values are upper-case action
+            names: READ, ANNOTATE, WRITE, DELETE, MANAGE, SCAN and, for release bundles, EXECUTE. These map one
+            to one onto the legacy codes r, n, w, d, m, mxm and x. DELETE implies the ability to overwrite.'
+        targets:
+          additionalProperties:
+            $ref: '#/components/schemas/Patterns'
+          description: Optional within this object. Targets to add or replace by key.
+          type: object
+      type: object
+    TokenCreateRequest:
+      description: An access token request. Accepted as JSON or form-encoded. Every field is optional; the defaults
+        mint an identity token for the caller that expires after the configured default expiry (3600 seconds).
+      properties:
+        audience:
+          default: '*@*'
+          description: Optional within this object. Which services accept the token, as <service type>@<service
+            id> patterns. Defaults to *@*, every service.
+          maxLength: 255
+          type: string
+        description:
+          description: Optional within this object. Free text stored with the token metadata.
+          maxLength: 1024
+          type: string
+        expires_in:
+          description: Optional within this object. Lifetime in seconds. Defaults to the default expiry setting
+            (3600). 0 means the token never expires and is allowed for admins only. Tokens shorter than 21600 seconds
+            are not revocable unless force_revocable is set.
+          minimum: 0
+          type: integer
+        force_revocable:
+          default: false
+          description: Optional within this object. Makes a short-lived token revocable at the cost of a server-side
+            record. Defaults to false.
+          type: boolean
+        grant_type:
+          default: client_credentials
+          description: Optional within this object. client_credentials mints a new token; refresh_token exchanges
+            refresh_token for a new one. Defaults to client_credentials.
+          enum:
+          - client_credentials
+          - refresh_token
+          type: string
+        include_reference_token:
+          default: false
+          description: Optional within this object. When true the response also carries a 64-character reference
+            token that stands in for the JWT. Defaults to false.
+          type: boolean
+        project_key:
+          description: Optional within this object. Scopes a token minted by a project admin to that project. The
+            Terraform provider sends it as an empty string when unset, which is treated as absent.
+          type: string
+        refresh_token:
+          description: Optional within this object. Required when grant_type is refresh_token; the refresh token
+            from the original response.
+          type: string
+          writeOnly: true
+        refreshable:
+          default: false
+          description: Optional within this object. When true a refresh_token is issued alongside. Defaults to false.
+          type: boolean
+        scope:
+          default: applied-permissions/user
+          description: 'Optional within this object. Space-separated scope terms. Forms: applied-permissions/user
+            (the subject''s own permissions, the default), applied-permissions/admin, applied-permissions/groups:"g1","g2",
+            applied-permissions/roles:<project>:<role>, artifact:<repo or *>[/<ant path>]:<actions> with actions
+            from r,w,d,a,x,s,m or *, repo:<key>:r, project:<key>/members/users:r, project:<key>/members/groups:r,
+            project:<key>/roles:r, and system:* scopes such as system:identities:r. A scope never grants more than
+            the subject already holds.'
+          maxLength: 500
+          type: string
+        username:
+          description: Optional within this object. The subject of the new token. Defaults to the caller. Only admins
+            may name another user; the name need not exist, which is how service tokens are minted.
+          maxLength: 255
+          type: string
+      type: object
+    TokenDetails:
+      description: Metadata of one token. Never includes the token value.
+      properties:
+        description:
+          description: Optional within this object. The description given at creation.
+          type: string
+        expiry:
+          description: Optional within this object. Expiry as Unix seconds; absent when the token never expires.
+          type: integer
+        issued_at:
+          description: Required within this object. Issue time as Unix seconds.
+          type: integer
+        issuer:
+          description: Required within this object. Server-owned. The issuing service id, jfac@<service id>.
+          type: string
+        last_used:
+          description: Optional within this object. Unix seconds of the last authenticated request with this token;
+            absent when never used or when usage tracking is off.
+          type: integer
+        refreshable:
+          description: Required within this object. Whether a refresh token was issued.
+          type: boolean
+        scope:
+          description: Required within this object. The stored scope string.
+          type: string
+        subject:
+          description: Required within this object. Server-owned. The subject in the form jfac@<service id>/users/<username>.
+          type: string
+        token_id:
+          description: Required within this object. The token id.
+          type: string
+      required:
+      - issued_at
+      - issuer
+      - refreshable
+      - scope
+      - subject
+      - token_id
+      type: object
+    TokenListResponse:
+      description: Token metadata visible to the caller.
+      properties:
+        tokens:
+          description: Required within this object. One entry per token, possibly empty.
+          items:
+            $ref: '#/components/schemas/TokenDetails'
+          type: array
+      required:
+      - tokens
+      type: object
+    TokenResponse:
+      description: A freshly minted token. The documented schema omits token_id, but Artifactory returns it and
+        the artifactory_scoped_token resource depends on it, so it is always present.
+      properties:
+        access_token:
+          description: Required within this object. The JWT; shown only in this response.
+          type: string
+        expires_in:
+          description: Required within this object. Lifetime in seconds; 0 when the token never expires.
+          type: integer
+        reference_token:
+          description: Optional within this object. Present only when include_reference_token was true; 64 characters
+            starting with cmVmd.
+          type: string
+        refresh_token:
+          description: Optional within this object. Present only when refreshable was true.
+          type: string
+        scope:
+          description: Required within this object. The effective scope as stored.
+          type: string
+        token_id:
+          description: Required within this object. Server-owned. The id used to read or revoke the token.
+          type: string
+        token_type:
+          description: Required within this object. Always Bearer.
+          type: string
+      required:
+      - access_token
+      - expires_in
+      - scope
+      - token_id
+      - token_type
+      type: object
+    UserCreateRequest:
+      description: A new internal user.
+      properties:
+        admin:
+          default: false
+          description: Optional within this object. Grants platform admin rights. Defaults to false.
+          type: boolean
+        disable_ui_access:
+          default: false
+          description: Optional within this object. Blocks interactive UI login; API access is unaffected. Defaults
+            to false.
+          type: boolean
+        email:
+          description: Required within this object. The user's email address.
+          format: email
+          type: string
+        groups:
+          description: Optional within this object. Groups to join on creation; each must exist.
+          items:
+            description: A group name.
+            type: string
+          type: array
+        internal_password_disabled:
+          default: false
+          description: Optional within this object. When true the user cannot log in with a password and must use
+            tokens or an external identity. Defaults to false.
+          type: boolean
+        manage_webhook:
+          default: false
+          description: Optional within this object. Allows managing webhook subscriptions. Defaults to false.
+          type: boolean
+        password:
+          description: Optional within this object. The clear-text password; required unless internal_password_disabled
+            is true. Checked against the password policy and stored as a hash.
+          format: password
+          type: string
+          writeOnly: true
+        platform_auditor:
+          default: false
+          description: Optional within this object. Read-only access to audit information. Defaults to false.
+          type: boolean
+        policy_manager:
+          description: Optional within this object. Xray policy management right. Stored and echoed; no effect in
+            artifactweave.
+          type: boolean
+        policy_viewer:
+          description: Optional within this object. Xray policy view right. Stored and echoed; no effect in artifactweave.
+          type: boolean
+        profile_updatable:
+          default: true
+          description: Optional within this object. Whether the user may change their own email and password. Defaults
+            to true.
+          type: boolean
+        reports_manager:
+          description: Optional within this object. Xray reports right. Stored and echoed; no effect in artifactweave.
+          type: boolean
+        resources_manager:
+          description: Optional within this object. Allows managing repositories without being a full admin.
+          type: boolean
+        username:
+          description: Required within this object. The login name. Stored lower-case; at most 255 characters; must
+            not be admin or anonymous.
+          type: string
+        watch_manager:
+          description: Optional within this object. Xray watch management right. Stored and echoed; has no effect
+            in artifactweave.
+          type: boolean
+      required:
+      - email
+      - username
+      type: object
+    UserDetails:
+      description: A stored user as returned by every read. Secrets are never included.
+      properties:
+        admin:
+          description: Required within this object. Whether the admin flag is set directly on the user.
+          type: boolean
+        disable_ui_access:
+          description: Required within this object. Whether UI login is blocked.
+          type: boolean
+        effective_admin:
+          description: Required within this object. Server-owned. True when the user is an admin directly or through
+            a group with admin_privileges.
+          type: boolean
+        email:
+          description: Required within this object. The email address.
+          type: string
+        groups:
+          description: Required within this object. Names of the groups the user belongs to, possibly empty.
+          items:
+            description: A group name.
+            type: string
+          type: array
+        internal_password_disabled:
+          description: Required within this object. Whether password login is disabled.
+          type: boolean
+        last_logged_in:
+          description: Optional within this object. Server-owned. RFC 3339 time of the last successful authentication;
+            absent when the user has never logged in.
+          format: date-time
+          type: string
+        manage_webhook:
+          description: Optional within this object. Webhook management right.
+          type: boolean
+        platform_auditor:
+          description: Optional within this object. Audit read right.
+          type: boolean
+        policy_manager:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+        policy_viewer:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+        profile_updatable:
+          description: Required within this object. Whether the user may edit their own profile.
+          type: boolean
+        realm:
+          description: Required within this object. Server-owned. internal for artifactweave-stored users.
+          type: string
+        reports_manager:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+        resources_manager:
+          description: Optional within this object. Repository management right.
+          type: boolean
+        status:
+          description: Required within this object. Server-owned lifecycle state. locked is set by the user lock
+            policy after repeated failed logins.
+          enum:
+          - invited
+          - enabled
+          - disabled
+          - locked
+          type: string
+        username:
+          description: Required within this object. The login name.
+          type: string
+        watch_manager:
+          description: Optional within this object. Echo of the stored flag.
+          type: boolean
+      required:
+      - admin
+      - disable_ui_access
+      - effective_admin
+      - email
+      - groups
+      - internal_password_disabled
+      - profile_updatable
+      - realm
+      - status
+      - username
+      type: object
+    UserListResponse:
+      description: One page of the user listing.
+      properties:
+        cursor:
+          description: Optional within this object. Present only when more users remain; pass it back as the cursor
+            query parameter.
+          type: string
+        users:
+          description: Required within this object. The users in this page, possibly empty.
+          items:
+            description: A user summary.
+            properties:
+              realm:
+                description: 'Required within this object. Where the user is authenticated: internal for users stored
+                  by artifactweave, ldap once LDAP is supported.'
+                type: string
+              status:
+                description: Required within this object. The lifecycle state, one of invited, enabled, disabled,
+                  locked.
+                type: string
+              uri:
+                description: Required within this object. Absolute URL of the user's details resource.
+                type: string
+              username:
+                description: Required within this object. The login name.
+                type: string
+            required:
+            - realm
+            - status
+            - uri
+            - username
+            type: object
+          type: array
+      required:
+      - users
+      type: object
+    UserUpdateRequest:
+      description: Fields of a user that may change. Every field is optional; omitted fields keep their value.
+      properties:
+        admin:
+          description: Optional within this object. Platform admin flag.
+          type: boolean
+        disable_ui_access:
+          description: Optional within this object. Blocks or allows UI login.
+          type: boolean
+        email:
+          description: Optional within this object. The new email address.
+          format: email
+          type: string
+        internal_password_disabled:
+          description: Optional within this object. Disables or re-enables password login.
+          type: boolean
+        manage_webhook:
+          description: Optional within this object. Webhook management right.
+          type: boolean
+        password:
+          description: Optional within this object. A new clear-text password; required when internal_password_disabled
+            changes to false for a user without one.
+          format: password
+          type: string
+          writeOnly: true
+        platform_auditor:
+          description: Optional within this object. Audit read right.
+          type: boolean
+        policy_manager:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        policy_viewer:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        profile_updatable:
+          description: Optional within this object. Whether the user may edit their own profile.
+          type: boolean
+        reports_manager:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+        resources_manager:
+          description: Optional within this object. Repository management right.
+          type: boolean
+        watch_manager:
+          description: Optional within this object. Stored and echoed; no effect.
+          type: boolean
+      type: object
+paths:
+  /api/v1/environments:
+    get:
+      description: Returns every global environment, including the built-in DEV and PROD. Every repository belongs
+        to exactly one environment (DEV by default). Admin only.
+      operationId: getGlobalEnvironments
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The environments.
+                items:
+                  $ref: '#/components/schemas/Environment'
+                type: array
+          description: The environments.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: List global environments
+      tags:
+      - environments
+    post:
+      description: Creates an environment and returns it with status 201, which the artifactory_global_environment
+        resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing
+        one only by case answers 409. Admin only.
+      operationId: createGlobalEnvironment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnvironmentCreate'
+        description: The environment to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+          description: The environment was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name is empty, too long, or contains characters other than letters, digits, hyphen and
+            underscore.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An environment with this name already exists.
+      summary: Create a global environment
+      tags:
+      - environments
+  /api/v1/environments/{environmentName}:
+    delete:
+      description: Removes an environment. DEV and PROD cannot be deleted, nor can an environment that still has
+        repositories assigned; both answer 400. Admin only. Answers 204 with no body.
+      operationId: deleteGlobalEnvironment
+      parameters:
+      - $ref: '#/components/parameters/environmentName'
+      responses:
+        '204':
+          description: The environment was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No environment with this name.
+      summary: Delete a global environment
+      tags:
+      - environments
+  /api/v1/environments/{environmentName}/rename:
+    post:
+      description: Renames the environment and updates every repository and role that references it. The built-in
+        DEV and PROD cannot be renamed. Admin only. Answers 200 with the environment under its new name.
+      operationId: renameGlobalEnvironment
+      parameters:
+      - $ref: '#/components/parameters/environmentName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnvironmentRename'
+        description: The new name.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+          description: The renamed environment.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The new name is invalid, already taken, or the environment is built in.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No environment with this name.
+      summary: Rename a global environment
+      tags:
+      - environments
+  /api/v1/projects/{projectKey}/environments:
+    get:
+      description: Returns the environments defined inside one project, which project roles and project repositories
+        may reference in addition to the global ones. Requires a platform admin or an admin of the project.
+      operationId: getProjectEnvironments
+      parameters:
+      - $ref: '#/components/parameters/projectKey'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The environments.
+                items:
+                  $ref: '#/components/schemas/Environment'
+                type: array
+          description: The project environments.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller administers neither the platform nor this project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No project with this key.
+      summary: List a project's environments
+      tags:
+      - environments
+    post:
+      description: Creates an environment scoped to the project and returns it with status 201. A project may hold
+        at most ten environments by default. The name must not collide with a global environment. Requires a platform
+        admin or an admin of the project.
+      operationId: createProjectEnvironment
+      parameters:
+      - $ref: '#/components/parameters/projectKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnvironmentCreate'
+        description: The environment to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+          description: The environment was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name is invalid or the project's environment limit is reached.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller administers neither the platform nor this project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No project with this key.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An environment with this name already exists in the project or globally.
+      summary: Create a project environment
+      tags:
+      - environments
+  /api/v1/projects/{projectKey}/environments/{environmentName}:
+    delete:
+      description: Removes a project environment that no repository in the project still uses. Requires a platform
+        admin or an admin of the project. Answers 204 with no body.
+      operationId: deleteProjectEnvironment
+      parameters:
+      - $ref: '#/components/parameters/projectKey'
+      - $ref: '#/components/parameters/environmentName'
+      responses:
+        '204':
+          description: The environment was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller administers neither the platform nor this project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such project or environment.
+      summary: Delete a project environment
+      tags:
+      - environments
+  /api/v1/projects/{projectKey}/environments/{environmentName}/rename:
+    post:
+      description: Renames a project environment and updates the project's repositories and roles that reference
+        it. Requires a platform admin or an admin of the project.
+      operationId: renameProjectEnvironment
+      parameters:
+      - $ref: '#/components/parameters/projectKey'
+      - $ref: '#/components/parameters/environmentName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnvironmentRename'
+        description: The new name.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Environment'
+          description: The renamed environment.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The new name is invalid or already taken.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller administers neither the platform nor this project.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such project or environment.
+      summary: Rename a project environment
+      tags:
+      - environments
+  /api/v1/roles:
+    get:
+      description: 'Returns every global role: the built-in ADMIN and PREDEFINED roles and the CUSTOM_GLOBAL roles
+        created through this API. Admin only.'
+      operationId: getAllGlobalRoles
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The roles.
+                items:
+                  $ref: '#/components/schemas/GlobalRole'
+                type: array
+          description: All global roles.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: List global roles
+      tags:
+      - roles
+    post:
+      description: Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201
+        with no body (the platform_global_role resource relies on the status alone and then reads the role back).
+        Admin only. An existing name answers 409.
+      operationId: createGlobalRole
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalRoleCreate'
+        description: The role to create.
+        required: true
+      responses:
+        '201':
+          description: The role was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed, for example an action outside the global vocabulary or an unknown environment.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A role with this name already exists.
+      summary: Create a global role
+      tags:
+      - roles
+  /api/v1/roles/{role}:
+    delete:
+      description: Removes a CUSTOM_GLOBAL role and every assignment of it. Built-in roles answer 400. Admin only.
+        Answers 204 with no body.
+      operationId: deleteGlobalRole
+      parameters:
+      - $ref: '#/components/parameters/roleName'
+      responses:
+        '204':
+          description: The role was deleted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The role is built in.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No role with this name.
+      summary: Delete a global role
+      tags:
+      - roles
+    get:
+      description: Returns one global role by name. Admin only.
+      operationId: getGlobalRole
+      parameters:
+      - $ref: '#/components/parameters/roleName'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalRole'
+          description: The role.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No role with this name.
+      summary: Get a global role
+      tags:
+      - roles
+    put:
+      description: Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body
+        must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers
+        200 with no body.
+      operationId: updateGlobalRole
+      parameters:
+      - $ref: '#/components/parameters/roleName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GlobalRoleUpdate'
+        description: The complete role.
+        required: true
+      responses:
+        '200':
+          description: The role was updated.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The role is built in, the names differ, or an action or environment is unknown.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No role with this name.
+      summary: Replace a global role
+      tags:
+      - roles
+  /api/v1/service_trust/pairing/{useCase}:
+    post:
+      description: 'Issues a single-use pairing token on this instance so that another artifactweave instance can
+        establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to
+        be trusted, hand the token to the administrator of the other instance, who redeems it there, for example
+        when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation
+        target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never
+        stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (the JFrog pairing-token default; configurable).
+        Only the platform-federation use case is supported: Mission Control and Bridge are not part of artifactweave,
+        so mission-control and bridge answer 501. Pairing with JFrog Platform Deployments is not supported. Administrators
+        only.'
+      operationId: createPairingToken
+      parameters:
+      - description: Required path parameter. What the trust is for. platform-federation pairs two artifactweave
+          instances for platform federation, Access federation and topology membership. mission-control and bridge
+          are accepted for compatibility and answer 501.
+        in: path
+        name: useCase
+        required: true
+        schema:
+          enum:
+          - mission-control
+          - bridge
+          - platform-federation
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The pairing token document.
+                properties:
+                  pairing_token:
+                    description: Required within this object. The opaque, single-use token to give to the other
+                      instance's administrator. Treat it as a secret until it is redeemed.
+                    type: string
+                required:
+                - pairing_token
+                type: object
+          description: Pairing token issued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unknown use case.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The use case is mission-control or bridge, which artifactweave does not implement.
+      summary: Create a pairing token
+      tags:
+      - tokens
+  /api/v1/tokens:
+    get:
+      description: A platform admin sees every token; any other caller sees only tokens whose subject is their own
+        user. Expired tokens are omitted. The token values themselves are never returned, only their metadata.
+      operationId: getTokens
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenListResponse'
+          description: The visible tokens.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller's token does not permit listing.
+      summary: List access tokens
+      tags:
+      - tokens
+    post:
+      description: 'With grant_type client_credentials (the default) mints a new access token for username, or for
+        the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access
+        token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form,
+        the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user).
+        Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not
+        201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.'
+      operationId: createToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenCreateRequest'
+        description: The token request.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+          description: The new token. The access_token value is shown once.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Validation failed: unknown grant_type, a scope that does not parse, expires_in of 0 from
+            a non-admin, or a refresh_token that is unknown or not refreshable.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not mint a token with this username or scope.
+      summary: Create or refresh an access token
+      tags:
+      - tokens
+  /api/v1/tokens/revoke:
+    delete:
+      description: Revokes the token whose JWT or reference token is given in the body and returns its id. A token
+        is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created
+        with force_revocable; other tokens answer 400. Admin only.
+      operationId: revokeTokenByValue
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Revocation request.
+              properties:
+                token:
+                  description: Required within this object. The access token (JWT) or the 64-character reference
+                    token.
+                  type: string
+                  writeOnly: true
+              required:
+              - token
+              type: object
+        description: The token to revoke.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Revocation result.
+                properties:
+                  revoked_token_id:
+                    description: Required within this object. The id of the token that was revoked.
+                    type: string
+                required:
+                - revoked_token_id
+                type: object
+          description: The token was revoked.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The value does not correspond to a known, unexpired token.
+      summary: Revoke a token by its value
+      tags:
+      - tokens
+  /api/v1/tokens/{tokenId}:
+    delete:
+      description: Revokes the token with this id; me revokes the caller's own token. Subject to the same revocable
+        threshold as revocation by value. A non-admin may only revoke their own tokens. Answers 200 with no body.
+      operationId: revokeTokenById
+      parameters:
+      - $ref: '#/components/parameters/tokenId'
+      responses:
+        '200':
+          description: The token was revoked.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The token belongs to another user and the caller is not an admin, or the token is not revocable.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such token.
+      summary: Revoke a token by id
+      tags:
+      - tokens
+    get:
+      description: Returns the metadata of one token. The id me stands for the token used to authenticate the call.
+        A non-admin may only read their own tokens. The jfrog/artifactory provider removes the artifactory_scoped_token
+        resource from state when this answers 404.
+      operationId: getTokenById
+      parameters:
+      - $ref: '#/components/parameters/tokenId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenDetails'
+          description: The token metadata.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The token belongs to another user and the caller is not an admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such token, or it has expired or been revoked.
+      summary: Get a token's metadata
+      tags:
+      - tokens
+  /api/v2/groups:
+    get:
+      description: Returns one record per group as a cursor-paginated page. Requires a platform admin or the system:identities:r
+        scope. Filters combine with AND.
+      operationId: getGroupList
+      parameters:
+      - description: Optional query parameter. Maximum number of groups in the page. Defaults to 1000; cursor is
+          set when more remain.
+        in: query
+        name: limit
+        schema:
+          default: 1000
+          minimum: 1
+          type: integer
+      - description: Optional query parameter. Sort direction by group name. Defaults to false, ascending.
+        in: query
+        name: descendingOrder
+        schema:
+          default: false
+          type: boolean
+      - description: Optional query parameter. Case-insensitive substring the group name must contain.
+        in: query
+        name: groupName
+        schema:
+          type: string
+      - description: Optional query parameter. The cursor from the previous page; omitted starts at the first page.
+        in: query
+        name: cursor
+        schema:
+          type: string
+      - description: Optional query parameter. Keeps only groups holding this role, globally or within projectKey.
+        in: query
+        name: role
+        schema:
+          type: string
+      - description: Optional query parameter. With resourceName, keeps only groups that have a permission on that
+          resource.
+        in: query
+        name: resourceType
+        schema:
+          type: string
+      - description: Optional query parameter. The resource key paired with resourceType. Ignored without resourceType.
+        in: query
+        name: resourceName
+        schema:
+          type: string
+      - description: Optional query parameter. Scopes the role filter to one project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupListResponse'
+          description: One page of groups.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A filter value is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither an admin nor holds system:identities:r.
+      summary: List groups
+      tags:
+      - groups
+    post:
+      description: 'Creates a group and returns its details with status 201, which the jfrog/platform provider requires.
+        members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes
+        them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin
+        only. An existing name answers 409.'
+      operationId: createGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupCreateRequest'
+        description: The group to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+          description: The group was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Validation failed: missing name, both members and import_from_ldap_group_setting given,
+            or a member that does not exist.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A referenced user or LDAP setting does not exist.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A group with this name already exists.
+      summary: Create a group
+      tags:
+      - groups
+  /api/v2/groups/{name}:
+    delete:
+      description: Removes the group, its memberships and its entries in permission targets. The built-in readers
+        group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers
+        204 with no body, which the jfrog/platform provider requires.
+      operationId: deleteGroup
+      parameters:
+      - $ref: '#/components/parameters/groupName'
+      responses:
+        '204':
+          description: The group was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group with this name.
+      summary: Delete a group
+      tags:
+      - groups
+    get:
+      description: Returns the group including its member usernames. Requires a platform admin or the system:identities:r
+        scope.
+      operationId: getGroupDetails
+      parameters:
+      - $ref: '#/components/parameters/groupName'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+          description: The group.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name is syntactically invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read groups.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group with this name.
+      summary: Get a group
+      tags:
+      - groups
+    patch:
+      description: Partial update of the group's attributes. Omitted fields keep their values. The name, realm,
+        realm_attributes and members cannot be changed here; members go through the members sub-resource. The body
+        may be empty, which changes nothing and returns the current group. Admin only.
+      operationId: updateGroup
+      parameters:
+      - $ref: '#/components/parameters/groupName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupUpdateRequest'
+        description: The attributes to change.
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupDetails'
+          description: The updated group.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body contains a field that cannot be updated here.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group with this name.
+      summary: Update a group
+      tags:
+      - groups
+  /api/v2/groups/{name}/members:
+    patch:
+      description: Applies the add list then the remove list to the group's members and returns the resulting full
+        member list. Unknown usernames in add answer 404; names already present or already absent are ignored. Admin
+        only.
+      operationId: updateGroupMembers
+      parameters:
+      - $ref: '#/components/parameters/groupName'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Membership changes.
+              properties:
+                add:
+                  description: Optional within this object. Usernames to add; each must exist.
+                  items:
+                    description: A username.
+                    type: string
+                  type: array
+                remove:
+                  description: Optional within this object. Usernames to remove.
+                  items:
+                    description: A username.
+                    type: string
+                  type: array
+              type: object
+        description: Usernames to add and remove.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The resulting membership.
+                properties:
+                  members:
+                    description: Required within this object. Every member username.
+                    items:
+                      description: A username.
+                      type: string
+                    type: array
+                required:
+                - members
+                type: object
+          description: The group's complete member list after the change.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No group with this name, or a username in add does not exist.
+      summary: Add or remove members
+      tags:
+      - groups
+  /api/v2/permissions:
+    get:
+      description: Returns permissions as a cursor-paginated page. Without filters the page holds name and uri per
+        permission. With user or group filters it holds only permissions that grant something to those principals,
+        and expand=true then returns the full PermissionDetails instead of the name and uri pair. Requires a platform
+        admin or the system:permissions:r scope.
+      operationId: getPermissions
+      parameters:
+      - description: Optional query parameter. The cursor from the previous page; omitted starts at the first page.
+        in: query
+        name: cursor
+        schema:
+          type: string
+      - description: Optional query parameter. Maximum number of permissions in the page, between 1 and 99999. Omitted
+          uses the server default page size.
+        in: query
+        name: limit
+        schema:
+          maximum: 99999
+          minimum: 1
+          type: integer
+      - description: Optional query parameter. Comma-separated usernames; keeps permissions that grant any action
+          to at least one of them, directly or through their groups when include_inherited_groups is true.
+        explode: false
+        in: query
+        name: user
+        schema:
+          description: Usernames.
+          items:
+            description: A username.
+            type: string
+          type: array
+        style: form
+      - description: Optional query parameter. Comma-separated group names; keeps permissions that grant any action
+          to at least one of them.
+        explode: false
+        in: query
+        name: group
+        schema:
+          description: Group names.
+          items:
+            description: A group name.
+            type: string
+          type: array
+        style: form
+      - description: Optional query parameter. When filtering by user, also match permissions granted to the user's
+          groups. Defaults to true.
+        in: query
+        name: include_inherited_groups
+        schema:
+          default: true
+          type: boolean
+      - description: Optional query parameter. When true, and only together with user or group, each entry is the
+          full permission document. Defaults to false. Without a principal filter it answers 400.
+        in: query
+        name: expand
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/PermissionListResponse'
+                - $ref: '#/components/schemas/ExpandedPermissionsResponse'
+          description: 'One page of permissions. The entry shape depends on expand: name and uri pairs, or full
+            documents.'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: expand was requested without user or group, or limit is out of range.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither an admin nor holds system:permissions:r.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A filtered user or group does not exist.
+      summary: List permissions
+      tags:
+      - permissions
+    post:
+      description: Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform
+        provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions
+        and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository
+        and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and
+        ANY DISTRIBUTION. Admin only. An existing name answers 409.
+      operationId: createPermission
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionCreateRequest'
+        description: The permission to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionDetails'
+          description: The permission was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Validation failed: missing name, an unknown action, a build resource with more than one
+            target, or a pattern longer than 1024 characters.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A permission with this name already exists.
+      summary: Create a permission
+      tags:
+      - permissions
+  /api/v2/permissions/{permissionName}:
+    delete:
+      description: Removes the permission and every grant it carried. Admin only. Answers 204 with no body.
+      operationId: deletePermission
+      parameters:
+      - $ref: '#/components/parameters/permissionName'
+      responses:
+        '204':
+          description: The permission was deleted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name is syntactically invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No permission with this name.
+      summary: Delete a permission
+      tags:
+      - permissions
+    get:
+      description: Returns the full permission document. Requires a platform admin, the system:permissions:r scope,
+        or MANAGE on every resource of the permission.
+      operationId: getPermissionDetails
+      parameters:
+      - $ref: '#/components/parameters/permissionName'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionDetails'
+          description: The permission.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name is syntactically invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read this permission.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No permission with this name.
+      summary: Get a permission
+      tags:
+      - permissions
+  /api/v2/permissions/{permissionName}/{resourceType}:
+    delete:
+      description: Removes the section for the resource type; the permission itself stays, even when it ends up
+        with no sections. Admin only. Answers 204 with no body.
+      operationId: deletePermissionResource
+      parameters:
+      - $ref: '#/components/parameters/permissionName'
+      - $ref: '#/components/parameters/resourceType'
+      responses:
+        '204':
+          description: The section was removed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name or resource type is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such permission, or it has no section for this resource type.
+      summary: Delete one resource section
+      tags:
+      - permissions
+    get:
+      description: Returns the actions and targets of a single resource type within the permission. A permission
+        that has no section for the type answers 404. Requires a platform admin or the system:permissions:r scope.
+      operationId: getPermissionResource
+      parameters:
+      - $ref: '#/components/parameters/permissionName'
+      - $ref: '#/components/parameters/resourceType'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResource'
+          description: The resource section.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The name or resource type is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read this permission.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such permission, or it has no section for this resource type.
+      summary: Get one resource section of a permission
+      tags:
+      - permissions
+    patch:
+      description: 'Merges the body into the existing section: principals and targets present in the body replace
+        their stored counterparts, others stay. To remove a principal or target use PUT with the full section. Admin
+        only.'
+      operationId: updatePermissionResource
+      parameters:
+      - $ref: '#/components/parameters/permissionName'
+      - $ref: '#/components/parameters/resourceType'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionResourceUpdate'
+        description: The entries to merge.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResource'
+          description: The section after the merge.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An unknown action or a non-existent target.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such permission, or it has no section for this resource type.
+      summary: Merge into one resource section
+      tags:
+      - permissions
+    put:
+      description: Replaces the whole actions and targets section for the resource type, creating the section when
+        the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider
+        uses this to update a single resource. Admin only.
+      operationId: replacePermissionResource
+      parameters:
+      - $ref: '#/components/parameters/permissionName'
+      - $ref: '#/components/parameters/resourceType'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionResource'
+        description: The complete section.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionResource'
+          description: The section as stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An unknown action, a non-existent target, or a build section with more than one target.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No permission with this name.
+      summary: Replace one resource section
+      tags:
+      - permissions
+  /api/v2/users:
+    get:
+      description: Returns one record per user, newest first unless descendingOrder is false, as a cursor-paginated
+        page. Requires a platform admin or a token carrying the system:identities:r scope. Every query parameter
+        is a filter; filters combine with AND.
+      operationId: getUserList
+      parameters:
+      - description: Optional query parameter. Keeps only users in the given lifecycle state. Omitted means every
+          state.
+        in: query
+        name: status
+        schema:
+          enum:
+          - invited
+          - enabled
+          - disabled
+          - locked
+          type: string
+      - description: Optional query parameter. Maximum number of users in the page. Defaults to 1000; the server
+          never returns more than the limit and sets cursor when more remain.
+        in: query
+        name: limit
+        schema:
+          default: 1000
+          minimum: 1
+          type: integer
+      - description: Optional query parameter. Case-insensitive substring that the username must contain.
+        in: query
+        name: username
+        schema:
+          type: string
+      - description: Optional query parameter. When true only users with the admin flag or an admin-granting group
+          are returned. Omitted or false returns everyone.
+        in: query
+        name: onlyAdmins
+        schema:
+          type: boolean
+      - description: Optional query parameter. The cursor value from the previous page. Omitted starts from the
+          first page. Cursors are opaque and only valid with the same filters.
+        in: query
+        name: cursor
+        schema:
+          type: string
+      - description: Optional query parameter. Keeps only users holding this role name, globally or within projectKey
+          when that is also given.
+        in: query
+        name: role
+        schema:
+          type: string
+      - description: Optional query parameter. Together with resourceName, keeps only users that have any permission
+          on that resource. Values follow the permission resource types, for example artifact or build.
+        in: query
+        name: resourceType
+        schema:
+          type: string
+      - description: Optional query parameter. The resource key paired with resourceType, for example a repository
+          key. Ignored without resourceType.
+        in: query
+        name: resourceName
+        schema:
+          type: string
+      - description: Optional query parameter. Scopes role and membership filters to one project. A project admin
+          may only use their own project keys.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      - description: Optional query parameter. Sort direction by username. Omitted sorts ascending.
+        in: query
+        name: descendingOrder
+        schema:
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+          description: One page of users.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A filter value is malformed, for example an unknown status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither an admin nor holds system:identities:r.
+      summary: List users
+      tags:
+      - users
+    post:
+      description: Creates an internal user and returns its details with status 201. The jfrog/artifactory provider
+        calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint,
+        so the same internal user record backs both. Admin only. A username that already exists answers 409.
+      operationId: createUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreateRequest'
+        description: The user to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetails'
+          description: The user was created. The body is the stored user without secrets.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: 'Validation failed: missing username or email, password absent while internal_password_disabled
+            is false, a group that does not exist, or a password rejected by the password policy.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A user with this username already exists.
+      summary: Create a user
+      tags:
+      - users
+  /api/v2/users/expire_password_for_all_users:
+    post:
+      description: Marks every internal user's password as expired so each user must set a new one at next login.
+        Users with internal_password_disabled are unaffected. Admin only. Responds with a plain text confirmation.
+      operationId: expirePasswordForAllUsers
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A short confirmation message.
+                type: string
+          description: All passwords were expired.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Expire every internal password
+      tags:
+      - users
+  /api/v2/users/unexpire_password_for_all_users:
+    post:
+      description: 'Reverses expire_password_for_all_users: every internal password becomes valid again without
+        the user changing it. Admin only. Responds with a plain text confirmation.'
+      operationId: unexpirePasswordForAllUsers
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A short confirmation message.
+                type: string
+          description: All passwords were un-expired.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Clear the expired flag on every password
+      tags:
+      - users
+  /api/v2/users/{username}:
+    delete:
+      description: Removes the user, its group memberships, its tokens and its entries in permission targets. The
+        built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body; the jfrog/artifactory
+        provider accepts any 2xx here.
+      operationId: deleteUser
+      parameters:
+      - $ref: '#/components/parameters/username'
+      responses:
+        '204':
+          description: The user was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin, or the user is built in.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Delete a user
+      tags:
+      - users
+    get:
+      description: Returns the stored user record. Requires a platform admin or the system:identities:r scope; a
+        user may always read their own record.
+      operationId: getUserDetails
+      parameters:
+      - $ref: '#/components/parameters/username'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetails'
+          description: The user.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The username is syntactically invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read other users.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Get a user
+      tags:
+      - users
+    patch:
+      description: 'Partial update: only the fields present in the body change, omitted fields keep their stored
+        values, and the username cannot be changed. Group membership is not updated here; use the groups sub-resource.
+        Setting internal_password_disabled to false on a user that has no password requires a password in the same
+        request. Admin only.'
+      operationId: updateUser
+      parameters:
+      - $ref: '#/components/parameters/username'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+        description: The fields to change.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetails'
+          description: The updated user.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Validation failed, for example a password that violates the policy or a request that re-enables
+            internal passwords without supplying one.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Update a user
+      tags:
+      - users
+  /api/v2/users/{username}/groups:
+    patch:
+      description: Applies the add list then the remove list to the user's memberships and returns the resulting
+        full membership. Names that are already present (add) or already absent (remove) are ignored; a name in
+        both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and
+        later. Admin only.
+      operationId: updateUserGroups
+      parameters:
+      - $ref: '#/components/parameters/username'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Membership changes.
+              properties:
+                add:
+                  description: Optional within this object. Group names to join. Every name must exist.
+                  items:
+                    description: A group name.
+                    type: string
+                  type: array
+                remove:
+                  description: Optional within this object. Group names to leave.
+                  items:
+                    description: A group name.
+                    type: string
+                  type: array
+              type: object
+        description: Group names to add and remove.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The resulting membership.
+                properties:
+                  groups:
+                    description: Required within this object. Every group the user now belongs to.
+                    items:
+                      description: A group name.
+                      type: string
+                    type: array
+                required:
+                - groups
+                type: object
+          description: The user's complete membership after the change.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A group in the add list does not exist.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Add or remove group memberships
+      tags:
+      - users
+  /api/v2/users/{username}/password:
+    put:
+      description: Replaces the user's internal password. A platform admin may set any user's password; any user
+        may set their own. The new value must satisfy the password policy and, when the policy forbids reuse, differ
+        from the current one. Answers 204 with no body.
+      operationId: changeUserPassword
+      parameters:
+      - $ref: '#/components/parameters/username'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Password change.
+              properties:
+                password:
+                  description: Required within this object. The new clear-text password. Stored as an Argon2id hash
+                    and never returned.
+                  format: password
+                  type: string
+                  writeOnly: true
+              required:
+              - password
+              type: object
+        description: The new password.
+        required: true
+      responses:
+        '204':
+          description: The password was changed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The password violates the policy.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is neither an admin nor the user.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Set a user's password
+      tags:
+      - users
+  /api/v2/users/{username}/password/expire:
+    post:
+      description: Marks the user's password as expired so they must change it at next login. Admin only. Answers
+        204 with no body.
+      operationId: expireUserPassword
+      parameters:
+      - $ref: '#/components/parameters/username'
+      responses:
+        '204':
+          description: The password was expired.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Expire a user's password
+      tags:
+      - users
+  /api/v2/users/{username}/unlock:
+    post:
+      description: Clears the lock that the user lock policy applied after too many failed logins and resets the
+        failure counter. Unlocking an unlocked user succeeds. Admin only. Answers 204 with no body.
+      operationId: unlockUser
+      parameters:
+      - $ref: '#/components/parameters/username'
+      responses:
+        '204':
+          description: The user is unlocked.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No user with this username.
+      summary: Unlock a user
+      tags:
+      - users

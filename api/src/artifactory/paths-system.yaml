@@ -1,0 +1,1051 @@
+components:
+  parameters:
+    BundleId:
+      description: Required path parameter. The identifier returned when the bundle was created.
+      in: path
+      name: bundleId
+      required: true
+      schema:
+        minLength: 1
+        type: string
+  schemas:
+    LicenseBatchResult:
+      description: The per-key or per-hash outcome of a licence batch operation.
+      properties:
+        messages:
+          additionalProperties:
+            description: The outcome for one key or hash.
+            type: string
+          description: Optional within this object. One entry per licence key or hash, mapping it to its outcome
+            message.
+          type: object
+        status:
+          description: Optional within this object. The overall HTTP-style status, 200 when every entry succeeded.
+          type: integer
+      type: object
+    NodeLicense:
+      description: The licence of one cluster node. artifactweave reports a single node.
+      properties:
+        expired:
+          description: Optional within this object. Whether the licence has expired; always false here.
+          type: boolean
+        licenseHash:
+          description: Optional within this object. The hash that identifies the licence in delete requests.
+          type: string
+        licensedTo:
+          description: Optional within this object. The licensee name.
+          type: string
+        nodeId:
+          description: Optional within this object. The node identifier; the configured service id here.
+          type: string
+        nodeUrl:
+          description: Optional within this object. The node's base URL as resolved by the base URL resolver.
+          type: string
+        type:
+          description: Optional within this object. The licence type; always artifactweave here.
+          type: string
+        validThrough:
+          description: Optional within this object. Expiry as a display string; never for artifactweave.
+          type: string
+      type: object
+    ReverseProxyConfig:
+      description: Reverse proxy settings, stored as the reverseProxies section of the descriptor. Field names follow
+        Artifactory; both sslPort and httpsPort are accepted and returned.
+      properties:
+        artifactoryAppContext:
+          description: Optional within this object. The context path under which the proxy reaches the registry.
+            Fixed to artifactory in artifactweave; stored as sent.
+          type: string
+        artifactoryPort:
+          description: Optional within this object. The listener port the proxy forwards to. The Terraform resource
+            never sends it; artifactweave fills it from its own listen address.
+          type: integer
+        artifactoryServerName:
+          description: Optional within this object. The host the proxy forwards to, usually localhost.
+          type: string
+        dockerReverseProxyMethod:
+          description: Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the
+            native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is sent
+            by the Terraform resource and treated like REPOPATHPREFIX.
+          enum:
+          - SUBDOMAIN
+          - REPOPATHPREFIX
+          - PORTPERREPO
+          - DIRECT
+          type: string
+        httpPort:
+          description: Optional within this object. The plain HTTP listener port.
+          type: integer
+        httpsPort:
+          description: Optional within this object. The TLS listener port as the Terraform resource names it. Alias
+            of sslPort.
+          type: integer
+        key:
+          description: Optional within this object. The configuration name. Artifactory keeps exactly one; artifactweave
+            stores whatever is sent and defaults to nginx.
+          type: string
+        publicAppContext:
+          description: Optional within this object. The context path clients use. Must match artifactoryAppContext
+            unless the proxy rewrites paths.
+          type: string
+        serverName:
+          description: Optional within this object. The public host name the proxy answers for.
+          type: string
+        serverNameExpression:
+          description: Optional within this object. A wildcard host expression for the Docker subdomain method,
+            for example *.example.com. The Terraform resource never sends it.
+          type: string
+        sslCertificate:
+          description: Optional within this object. Path to the TLS certificate on the proxy host.
+          type: string
+        sslKey:
+          description: Optional within this object. Path to the TLS private key on the proxy host.
+          type: string
+        sslPort:
+          description: Optional within this object. The TLS listener port. Alias of httpsPort; the response carries
+            both.
+          type: integer
+        useHttp:
+          description: Optional within this object. Whether the proxy listens on plain HTTP.
+          type: boolean
+        useHttps:
+          description: Optional within this object. Whether the proxy listens on TLS.
+          type: boolean
+        webServerType:
+          description: Optional within this object. The proxy software. Only NGINX renders a snippet in v1.
+          enum:
+          - NGINX
+          - APACHE
+          type: string
+      type: object
+    StatusMessage:
+      description: A status code with one message, used by the licence operations.
+      properties:
+        message:
+          description: Optional within this object. A human readable outcome.
+          type: string
+        status:
+          description: Optional within this object. The HTTP-style status of the operation, 200 on success.
+          type: integer
+      type: object
+    SupportBundleConfig:
+      description: What a support bundle should contain. Accepted for parity; not implemented.
+      properties:
+        description:
+          description: Optional within this object. Free text about why the bundle was made.
+          type: string
+        name:
+          description: Optional within this object. A display name for the bundle.
+          type: string
+        parameters:
+          allOf:
+          - $ref: '#/components/schemas/SupportBundleParameters'
+          description: Optional within this object. Which collectors a support bundle runs. Accepted for parity;
+            not implemented.
+      type: object
+    SupportBundleCreated:
+      description: The identifier of a created bundle. Never produced by artifactweave.
+      properties:
+        artifactory:
+          description: Optional within this object. Where the bundle was written.
+          properties:
+            bundle_url:
+              description: Optional within this object. Download URL of the bundle.
+              type: string
+            service_id:
+              description: Optional within this object. The service that produced it.
+              type: string
+          type: object
+        id:
+          description: Optional within this object. The bundle identifier.
+          type: string
+      type: object
+    SupportBundleList:
+      description: A page of bundles. Never produced by artifactweave.
+      properties:
+        bundles:
+          description: Optional within this object. The bundles.
+          items:
+            description: One bundle summary.
+            properties:
+              created:
+                description: Optional within this object. Creation time.
+                format: date-time
+                type: string
+              description:
+                description: Optional within this object. Free text, null when none was given.
+                nullable: true
+                type: string
+              id:
+                description: Optional within this object. The bundle identifier.
+                type: string
+              name:
+                description: Optional within this object. The display name.
+                type: string
+              status:
+                description: Optional within this object. Collection state.
+                type: string
+            type: object
+          type: array
+        count:
+          description: Optional within this object. Number of bundles listed.
+          type: integer
+      type: object
+    SupportBundleMetadata:
+      description: Metadata of one bundle. Never produced by artifactweave.
+      properties:
+        artifactory:
+          description: Optional within this object. Where the bundle was written.
+          properties:
+            bundle_url:
+              description: Optional within this object. Download URL of the bundle.
+              type: string
+            service_id:
+              description: Optional within this object. The service that produced it.
+              type: string
+          type: object
+        created:
+          description: Optional within this object. Creation time.
+          format: date-time
+          type: string
+        description:
+          description: Optional within this object. Free text.
+          type: string
+        id:
+          description: Optional within this object. The bundle identifier.
+          type: string
+        name:
+          description: Optional within this object. The display name.
+          type: string
+        parameters:
+          allOf:
+          - $ref: '#/components/schemas/SupportBundleParameters'
+          description: Optional within this object. Which collectors a support bundle runs. Accepted for parity;
+            not implemented.
+        status:
+          description: Optional within this object. Collection state, for example success.
+          type: string
+      type: object
+    SupportBundleParameters:
+      description: Which collectors a support bundle runs. Accepted for parity; not implemented.
+      properties:
+        collectSlowQueriesFromDatabase:
+          default: false
+          description: Optional within this object. Include slow database queries.
+          type: boolean
+        configuration:
+          default: true
+          description: Optional within this object. Include configuration files.
+          type: boolean
+        logs:
+          description: Optional within this object. Which logs to include.
+          properties:
+            end_date:
+              description: Optional within this object. Latest log date, ISO 8601 date.
+              type: string
+            include:
+              default: true
+              description: Optional within this object. Include log files at all.
+              type: boolean
+            start_date:
+              description: Optional within this object. Earliest log date, ISO 8601 date.
+              type: string
+          type: object
+        system:
+          default: true
+          description: Optional within this object. Include system information.
+          type: boolean
+        thread_dump:
+          description: Optional within this object. Thread dump collection.
+          properties:
+            count:
+              default: 1
+              description: Optional within this object. Number of dumps to take.
+              type: integer
+            interval:
+              default: 0
+              description: Optional within this object. Seconds between dumps.
+              type: integer
+          type: object
+      type: object
+paths:
+  /api/metadata_server/reindex:
+    post:
+      description: Artifactory's package metadata runs in a separate service that can be reindexed from these paths.
+        artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem
+        reindex operations, so this operation answers 501.
+      operationId: reindexMetadataServer
+      parameters:
+      - description: Optional query parameter. Run in the background. Ignored.
+        in: query
+        name: async
+        required: false
+        schema:
+          default: true
+          type: boolean
+      - description: Optional query parameter. Drop the index before rebuilding. Ignored.
+        in: query
+        name: delete_first
+        required: false
+        schema:
+          default: false
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The paths to reindex.
+              properties:
+                paths:
+                  description: Required within this object. Repository paths of the form repo/path.
+                  items:
+                    description: One repository path.
+                    type: string
+                  type: array
+              required:
+              - paths
+              type: object
+        description: The repository paths to reindex.
+        required: true
+      responses:
+        '200':
+          description: Documented by Artifactory; artifactweave never returns it.
+        '202':
+          description: Documented by Artifactory; artifactweave never returns it.
+        '400':
+          description: The paths array is missing.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Reindex the metadata service
+      tags:
+      - system
+      x-tier: stub
+  /api/system:
+    get:
+      description: 'A plain text dump of runtime facts: build version and revision, Go runtime, operating system,
+        uptime, configured database driver and blob backend, and the compatibility version. Artifactory prints JVM
+        and host details here; the format is free text and no client parses it. Admin only.'
+      operationId: getSystemInfo
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Free-text key and value lines.
+                type: string
+          description: The report.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: System information
+      tags:
+      - system
+  /api/system/configuration:
+    get:
+      description: Returns the global configuration descriptor as XML, generated from current state in the element
+        order of Artifactory's XSD (research 06). The artifactory_* configuration Terraform resources read their
+        sections back from this document, so the sections artifactweave manages (repositories, proxies, property
+        sets, layouts, backups, mail, GC, trash can, quota, security) are always present; sections that are stored
+        but have no effect are echoed as received. Secrets are masked. Admin only.
+      operationId: getSystemConfiguration
+      responses:
+        '200':
+          content:
+            application/xml:
+              schema:
+                description: The XML descriptor document.
+                type: string
+          description: The descriptor.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Read the configuration descriptor
+      tags:
+      - system
+      - handwritten
+      x-handwritten: true
+    patch:
+      description: 'The configuration-as-code entry point (decision 0009). The body is a YAML document in Artifactory''s
+        descriptor format: top-level sections such as localRepositories, remoteRepositories, virtualRepositories,
+        proxies, propertySets, repoLayouts, backups, mailServer, gcConfig, trashcanConfig, quotaConfig, urlBase
+        and security, each a map keyed by entity name. Named entities that do not exist are created, existing ones
+        are updated field by field, omitted keys are untouched, and a key whose value is null is deleted. Repository
+        entries use the YAML spellings (type, repoLayout, xray.enabled) and are validated with the same rules as
+        the JSON repositories API. Unknown sections are stored and echoed without effect and named in the response.
+        Values of the form ${ENV_VAR} are resolved from the server environment and never written back. Unlike Artifactory,
+        an empty document is rejected with 400 instead of deleting every repository. The whole patch is applied
+        in one transaction. Admin only.'
+      operationId: patchSystemConfiguration
+      requestBody:
+        content:
+          application/yaml:
+            schema:
+              description: A YAML document in the descriptor format.
+              type: string
+        description: The YAML patch.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A summary naming the entities created, updated and deleted and any sections that were
+                  stored without effect.
+                type: string
+          description: The patch was applied.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The document is empty, is not valid YAML, contains an unknown repository field, or fails
+            repository validation; the body names the first error.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Apply a YAML configuration patch
+      tags:
+      - system
+      - handwritten
+      x-handwritten: true
+    post:
+      description: Artifactory replaces the whole descriptor with the posted XML. artifactweave does not implement
+        full XML replacement in v1 (research 10) and answers 501; use the YAML PATCH form, which covers every managed
+        section.
+      operationId: saveSystemConfiguration
+      requestBody:
+        content:
+          application/xml:
+            schema:
+              description: The XML descriptor document.
+              type: string
+        description: The complete XML descriptor.
+        required: true
+      responses:
+        '200':
+          description: Documented by Artifactory; artifactweave never returns it in v1.
+        '400':
+          description: The document is not well-formed XML.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Replace the configuration descriptor
+      tags:
+      - system
+      - handwritten
+      x-handwritten: true
+      x-tier: stub
+  /api/system/configuration/baseUrl:
+    put:
+      description: 'Sets the urlBase section of the descriptor: the scheme, host and optional path prefix that embedded
+        links use when no X-JFrog-Override-Base-Url or X-Forwarded-* header is present (decision 0002). Sending
+        an empty body clears it, after which links derive from the request. Admin only.'
+      operationId: updateCustomUrlBase
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: An absolute http or https URL without a trailing slash.
+              type: string
+        description: The URL as plain text, for example https://artifacts.example.com.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A confirmation line echoing the stored value.
+                type: string
+          description: The base URL was stored.
+        '400':
+          description: The body is not an absolute http or https URL.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Set the public base URL
+      tags:
+      - system
+      - handwritten
+      x-handwritten: true
+  /api/system/configuration/reverseProxy/nginx:
+    get:
+      description: 'Renders an nginx server block from the stored reverse proxy configuration: the server name,
+        the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service
+        prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered
+        in v1; APACHE answers 400. Admin only.'
+      operationId: getReverseProxySnippet
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: An nginx configuration fragment.
+                type: string
+          description: The snippet.
+        '400':
+          description: No reverse proxy configuration is stored or its type is not NGINX.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Generate an nginx snippet
+      tags:
+      - system
+  /api/system/configuration/webServer:
+    get:
+      description: Returns the stored reverse proxy settings. Both sslPort and httpsPort are emitted with the same
+        value because the documentation names the former and the platform_reverse_proxy Terraform resource reads
+        the latter. Admin only.
+      operationId: getReverseProxyConfiguration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReverseProxyConfig'
+          description: The configuration.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+        '404':
+          description: No reverse proxy configuration has been stored yet.
+      summary: Read the reverse proxy configuration
+      tags:
+      - system
+    post:
+      description: Creates or replaces the single reverse proxy configuration. The document is stored as the reverseProxies
+        section of the descriptor and drives the nginx snippet and the Docker access method. Either sslPort or httpsPort
+        may be sent; when both are present they must agree. Admin only.
+      operationId: updateReverseProxyConfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReverseProxyConfig'
+        description: The configuration to store.
+        required: true
+      responses:
+        '200':
+          description: Stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A required field is missing, an enum value is unknown, or sslPort and httpsPort disagree.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Store the reverse proxy configuration
+      tags:
+      - system
+  /api/system/license:
+    get:
+      description: Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly;
+        no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads
+        it back.
+      operationId: getSystemLicense
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/License'
+          description: Licence details.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Artifactory returns this on SaaS instances; artifactweave never does.
+        '401':
+          description: Rejected credentials (documented by Artifactory; not produced here).
+        '403':
+          description: Non-admin caller (documented by Artifactory; not produced here).
+      summary: Licence information
+      tags:
+      - system
+    post:
+      description: Artifactory installs a licence from the posted key. artifactweave has no licences; it validates
+        that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete
+        without error. Admin only.
+      operationId: installLicense
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: A single licence key.
+              properties:
+                licenseKey:
+                  description: Optional within this object. The licence key text. Ignored by artifactweave; an empty
+                    or missing key is still accepted.
+                  type: string
+              type: object
+        description: The licence key to install.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMessage'
+          description: The key was accepted.
+        '400':
+          description: The body is not a JSON object.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Install a licence key
+      tags:
+      - system
+  /api/system/licenses:
+    delete:
+      description: Artifactory removes the licences whose hashes are listed. artifactweave has none to remove and
+        answers with a per-hash message saying so, with status 200, so removal scripts do not fail. Admin only.
+      operationId: deleteHALicense
+      parameters:
+      - description: Required query parameter. Comma-separated licence hashes as returned in the list. Unknown hashes
+          are reported in messages rather than rejected.
+        in: query
+        name: licenseHash
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseBatchResult'
+          description: Per-hash outcome.
+        '400':
+          description: The licenseHash parameter is missing or empty.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Remove node licences
+      tags:
+      - system
+    get:
+      description: Artifactory lists one licence per cluster node. artifactweave is a single process and returns
+        a one-element list describing itself, so tooling that iterates the list keeps working. Admin or a token
+        scoped system:info/licenses:r.
+      operationId: getHALicenseInfo
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The licences of every node in the cluster.
+                items:
+                  $ref: '#/components/schemas/NodeLicense'
+                type: array
+          description: One entry per node.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Documented by Artifactory for SaaS instances; not produced here.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller lacks the admin role or the licences scope.
+      summary: List node licences
+      tags:
+      - system
+    post:
+      description: Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts
+        the array, stores nothing and reports every key as installed. Admin only.
+      operationId: installHALicenses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: One entry per licence key.
+              items:
+                description: A single licence key.
+                properties:
+                  licenseKey:
+                    description: Optional within this object. The licence key text; ignored.
+                    type: string
+                type: object
+              type: array
+        description: The keys to install, one object per key.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseBatchResult'
+          description: Per-key outcome.
+        '400':
+          description: The body is not a JSON array of objects.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Install node licences
+      tags:
+      - system
+  /api/system/migration/sha2/start:
+    post:
+      description: Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records
+        SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501
+        (research 10).
+      operationId: startSha256Migration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Migration tuning parameters, all optional.
+              properties:
+                batchThreshold:
+                  default: 10
+                  description: Optional within this object. Rows per batch. Ignored.
+                  type: integer
+                forceRunOnNodeId:
+                  description: Optional within this object. Cluster node to run on. Ignored.
+                  type: string
+                queryLimit:
+                  default: 100
+                  description: Optional within this object. Rows per query. Ignored.
+                  type: integer
+                sleepIntervalMillis:
+                  default: 5000
+                  description: Optional within this object. Pause between batches in milliseconds. Ignored.
+                  type: integer
+                waitForClusterSleepIntervalMillis:
+                  default: 5000
+                  description: Optional within this object. Cluster wait interval in milliseconds. Ignored.
+                  type: integer
+              type: object
+        description: Tuning parameters for the migration job.
+        required: false
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A confirmation line.
+                type: string
+          description: Documented by Artifactory; artifactweave never returns it.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Documented by Artifactory; not produced here.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Start the SHA-256 migration
+      tags:
+      - system
+      x-tier: stub
+  /api/system/migration/sha2/stop:
+    post:
+      description: Pair of the start operation; there is no migration to stop and the operation answers 501.
+      operationId: stopSha256Migration
+      parameters:
+      - description: Optional query parameter. Pause before stopping, in milliseconds. Ignored.
+        in: query
+        name: sleepIntervalMillis
+        required: false
+        schema:
+          default: 5000
+          type: integer
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A confirmation line.
+                type: string
+          description: Documented by Artifactory; artifactweave never returns it.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Stop the SHA-256 migration
+      tags:
+      - system
+      x-tier: stub
+  /api/system/ping:
+    get:
+      description: Returns the plain text OK that jf rt ping expects.
+      operationId: systemPing
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                example: OK
+                type: string
+          description: The service is up.
+        '500':
+          description: The service is up but cannot serve requests.
+      summary: Liveness ping
+      tags:
+      - system
+      - handwritten
+      x-handwritten: true
+  /api/system/support/bundle:
+    post:
+      description: Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has
+        no support organisation to send bundles to and answers 501; operators collect logs from the process directly
+        (docs/operations).
+      operationId: createSupportBundle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportBundleConfig'
+        description: What the bundle should include.
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleCreated'
+          description: Documented by Artifactory; artifactweave never returns it.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Documented by Artifactory; not produced here.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Create a support bundle
+      tags:
+      - system
+      x-tier: stub
+  /api/system/support/bundle/{bundleId}:
+    delete:
+      description: Support bundles are not implemented; the operation answers 501.
+      operationId: deleteSupportBundle
+      parameters:
+      - $ref: '#/components/parameters/BundleId'
+      responses:
+        '204':
+          description: Documented by Artifactory; artifactweave never returns it.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+        '404':
+          description: No bundle has that id.
+      summary: Delete a support bundle
+      tags:
+      - system
+      x-tier: stub
+    get:
+      description: Support bundles are not implemented; the operation answers 501.
+      operationId: getSupportBundleMetadata
+      parameters:
+      - $ref: '#/components/parameters/BundleId'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleMetadata'
+          description: Documented by Artifactory; artifactweave never returns it.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+        '404':
+          description: No bundle has that id.
+      summary: Read support bundle metadata
+      tags:
+      - system
+      x-tier: stub
+  /api/system/support/bundle/{bundleId}/archive:
+    get:
+      description: Support bundles are not implemented; the operation answers 501.
+      operationId: getSupportBundle
+      parameters:
+      - $ref: '#/components/parameters/BundleId'
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: The bundle archive.
+                format: binary
+                type: string
+          description: Documented by Artifactory; artifactweave never returns it.
+        '400':
+          description: The bundle is not ready for download.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+        '404':
+          description: No bundle has that id.
+      summary: Download a support bundle
+      tags:
+      - system
+      x-tier: stub
+  /api/system/support/bundles:
+    get:
+      description: Support bundles are not implemented; the operation answers 501.
+      operationId: listSupportBundles
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleList'
+          description: Documented by Artifactory; artifactweave never returns it.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: List support bundles
+      tags:
+      - system
+      x-tier: stub
+  /api/system/usage:
+    post:
+      description: The JFrog CLI and Terraform providers post usage reports here. artifactweave accepts any body
+        and discards it so those clients never log a failure.
+      operationId: postSystemUsage
+      responses:
+        '200':
+          description: Accepted and discarded.
+      summary: Usage telemetry sink
+      tags:
+      - system
+      - handwritten
+      x-handwritten: true
+  /api/system/verifyconnection:
+    post:
+      description: Performs a GET against the given endpoint from the server, using the global proxy settings and
+        the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories.
+        Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported
+        as 400 with the reason. Admin only.
+      operationId: verifyConnection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Connection details to test.
+              properties:
+                endpoint:
+                  description: Required within this object. The absolute http or https URL to probe.
+                  type: string
+                password:
+                  description: Optional within this object. Basic authentication password or token; required when
+                    username is set. Never stored or logged.
+                  type: string
+                username:
+                  description: Optional within this object. Basic authentication user name sent to the endpoint.
+                    Ignored when empty.
+                  type: string
+              required:
+              - endpoint
+              type: object
+        description: The endpoint and optional credentials.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A confirmation line including the HTTP status received.
+                type: string
+          description: The endpoint answered successfully.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The endpoint could not be reached or rejected the request.
+        '401':
+          description: Rejected credentials.
+        '403':
+          description: Caller is not an administrator.
+      summary: Verify an outbound connection
+      tags:
+      - system
+  /api/system/version:
+    get:
+      description: Reports the Artifactory version artifactweave is compatible with. The JFrog Terraform providers
+        parse only the version field and gate features on it; the JFrog CLI reads it before uploads to decide on
+        multipart. The real artifactweave build is in revision.
+      operationId: getSystemVersion
+      parameters:
+      - description: Optional header parameter. Clients that send the vendor media type application/vnd.org.jfrog.artifactory.system.Version+json
+          receive it back as the response content type; any other value yields application/json.
+        in: header
+        name: Accept
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemVersion'
+            application/vnd.org.jfrog.artifactory.system.Version+json:
+              schema:
+                $ref: '#/components/schemas/SystemVersion'
+          description: The compatibility version.
+        '401':
+          description: Artifactory documents this for rejected credentials. artifactweave serves the endpoint anonymously
+            and never returns it, but keeps it for parity.
+      summary: Artifactory-compatible version
+      tags:
+      - system
+  /api/v1/system/liveness:
+    get:
+      description: Returns OK while the process is alive.
+      operationId: getSystemLiveness
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Probe'
+          description: Alive.
+        '500':
+          description: The process is alive but unhealthy.
+      summary: Liveness probe
+      tags:
+      - system
+  /api/v1/system/readiness:
+    get:
+      description: Returns OK once the server can serve requests.
+      operationId: getSystemReadiness
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Probe'
+          description: Ready.
+        '500':
+          description: Not ready.
+      summary: Readiness probe
+      tags:
+      - system

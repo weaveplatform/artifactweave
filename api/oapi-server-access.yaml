@@ -1,0 +1,15 @@
+# oapi-codegen configuration for the access strict chi server (make generate).
+# Operations tagged "handwritten" (x-handwritten: true in the spec) are excluded
+# here so the generated mux never claims a path a hand-written handler serves
+# (decision 0002).
+package: access
+output: internal/server/gen/access/server.gen.go
+generate:
+  models: true
+  chi-server: true
+  strict-server: true
+  embedded-spec: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

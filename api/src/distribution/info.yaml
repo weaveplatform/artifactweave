@@ -1,0 +1,14 @@
+openapi: 3.0.3
+info:
+  title: artifactweave Distribution-compatible REST API
+  version: 0.1.0
+  description: >-
+    The release bundle distribution surface: bundles v1, distribution rules and jobs, signing keys, edge targets (decision 0023), served under /distribution. Paths and shapes mirror JFrog's documented API
+    (docs/research/16). Authored by the artifactweave project; cites JFrog's
+    documentation and copies nothing from it.
+servers:
+  - url: /distribution
+    description: The distribution service prefix on the single artifactweave listener.
+tags:
+  - name: handwritten
+    description: Marker tag. Operations with this tag are implemented by hand and excluded from generation.

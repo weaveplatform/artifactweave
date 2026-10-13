@@ -1,0 +1,469 @@
+components:
+  schemas:
+    FederationTarget:
+      description: 'A federation target as stored on this instance: a peer artifactweave instance that receives
+        this instance''s identity changes over the peer protocol (decision 0021). Returned by every read; secrets
+        of the trust relationship are never included.'
+      properties:
+        active:
+          description: Optional within this object. When false the target stays registered but receives no changes
+            until reactivated; queued changes are kept and sent on reactivation.
+          type: boolean
+        entities:
+          description: 'Optional within this object. The identity entity types replicated to the target: any of
+            users, groups, permissions and tokens.'
+          items:
+            description: One identity entity type.
+            enum:
+            - users
+            - groups
+            - permissions
+            - tokens
+            type: string
+          type: array
+        group_filters:
+          allOf:
+          - $ref: '#/components/schemas/PatternFilter'
+          description: Optional within this object. Limits which groups, by name, are replicated. Users are replicated
+            with only the memberships of groups that pass this filter.
+        name:
+          description: Optional within this object. Server-owned on update. The unique name of the target, fixed
+            at registration and used as {serverName} in the item paths.
+          type: string
+        permission_filters:
+          allOf:
+          - $ref: '#/components/schemas/PatternFilter'
+          description: Optional within this object. Limits which permissions, by name, are replicated.
+        url:
+          description: Optional within this object. Server-owned on update. Base URL of the peer instance, fixed
+            at registration.
+          type: string
+      type: object
+    FederationTargetCreate:
+      description: 'Registration of a new federation target. The peer must already trust this instance: pair the
+        two instances first with a platform-federation pairing token (POST /access/api/v1/service_trust/pairing/platform-federation
+        on the peer), otherwise registration is rejected with 400.'
+      properties:
+        active:
+          default: true
+          description: Optional within this object. Whether replication starts immediately. Defaults to true.
+          type: boolean
+        entities:
+          default:
+          - users
+          - groups
+          - permissions
+          - tokens
+          description: 'Optional within this object. Identity entity types to replicate. Defaults to all four: users,
+            groups, permissions and tokens.'
+          items:
+            description: One identity entity type.
+            enum:
+            - users
+            - groups
+            - permissions
+            - tokens
+            type: string
+          type: array
+        force_override:
+          default: false
+          description: Optional within this object. When true, a target with the same name is replaced instead of
+            answering 409. Defaults to false. The replaced target's queued changes are discarded and a full broadcast
+            is scheduled.
+          type: boolean
+        group_filters:
+          allOf:
+          - $ref: '#/components/schemas/PatternFilter'
+          description: Optional within this object. Limits which groups, by name, are replicated. Omitted means
+            all.
+        name:
+          description: Required within this object. Unique name for the target on this instance. Cannot be changed
+            later.
+          type: string
+        permission_filters:
+          allOf:
+          - $ref: '#/components/schemas/PatternFilter'
+          description: Optional within this object. Limits which permissions, by name, are replicated. Omitted means
+            all.
+        url:
+          description: Required within this object. Base URL of the peer artifactweave instance, for example https://peer.example.com.
+            Cannot be changed later; register a new target instead.
+          type: string
+      required:
+      - name
+      - url
+      type: object
+    FederationTargetList:
+      description: Every federation target registered on this instance.
+      properties:
+        targets:
+          description: Optional within this object. The targets, ordered by name. Empty when none is registered.
+          items:
+            $ref: '#/components/schemas/FederationTarget'
+          type: array
+      type: object
+    FederationTargetUpdate:
+      description: Partial update of a federation target. Omitted fields keep their values. name and url cannot
+        be changed; sending either answers 400.
+      properties:
+        active:
+          description: Optional within this object. Pauses (false) or resumes (true) replication to the target.
+          type: boolean
+        entities:
+          description: Optional within this object. Replaces the list of replicated entity types. Removing a type
+            stops future changes of that type; entities already on the peer are not deleted.
+          items:
+            description: One identity entity type.
+            enum:
+            - users
+            - groups
+            - permissions
+            - tokens
+            type: string
+          type: array
+        group_filters:
+          allOf:
+          - $ref: '#/components/schemas/PatternFilter'
+          description: Optional within this object. Replaces the group filter.
+        permission_filters:
+          allOf:
+          - $ref: '#/components/schemas/PatternFilter'
+          description: Optional within this object. Replaces the permission filter.
+      type: object
+    FederationValidateRequest:
+      description: The peer to probe before registering it as a target.
+      properties:
+        url:
+          description: Required within this object. Base URL of the candidate peer instance.
+          type: string
+      required:
+      - url
+      type: object
+    PatternFilter:
+      description: Ant-style include and exclude patterns that narrow which named entities a federation target receives.
+        An entity is sent when it matches at least one include pattern (all entities when include_patterns is empty)
+        and no exclude pattern.
+      properties:
+        exclude_patterns:
+          description: Optional within this object. Patterns that remove matching names after the include patterns
+            are applied. Exclusion wins over inclusion.
+          items:
+            description: One pattern; * matches any run of characters.
+            type: string
+          type: array
+        include_patterns:
+          description: Optional within this object. Patterns an entity name must match to be federated. Empty or
+            omitted means every name.
+          items:
+            description: One pattern; * matches any run of characters.
+            type: string
+          type: array
+      type: object
+paths:
+  /api/v1/system/federation:
+    get:
+      description: Returns every Access federation target registered on this instance, active or paused. Administrators
+        only. In artifactweave a target is always a peer artifactweave instance; federation with JFrog Access or
+        Mission Control is not supported (decision 0025).
+      operationId: getAllAccessFederations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationTargetList'
+          description: The registered targets.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      summary: List federation targets
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallaccessfederations.md
+    post:
+      description: Registers a peer instance as a target of Access federation. From then on every create, update
+        and delete of the selected identity entities on this instance is queued in the peer outbox and delivered
+        to the target in order, with retries, over the peer protocol (decision 0021); changes made on the target
+        are not sent back unless the target also registers this instance. Registration requires an existing pairing
+        with the peer. A full broadcast runs once after registration so the target starts from this instance's current
+        state. Administrators only.
+      operationId: registerAccessFederation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederationTargetCreate'
+        description: The target to register.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationTarget'
+          description: Target registered; the body is the stored target.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Invalid body (for example a missing name or url, an unknown entity type) or the peer is not
+            paired with this instance.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A target with this name already exists and force_override was not set.
+      summary: Register a federation target
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/registeraccessfederation.md
+  /api/v1/system/federation/validate_server:
+    post:
+      description: Checks, without registering anything, that the peer at url is reachable, is an artifactweave
+        instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing.
+        Use it before registration to get a precise error. Administrators only.
+      operationId: validateFederationTarget
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederationValidateRequest'
+        description: The candidate peer.
+        required: true
+      responses:
+        '204':
+          description: The peer is reachable, compatible and trusts this instance.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Empty or invalid body, or the peer failed a check; the message names the failed check.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      summary: Validate a candidate federation target
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/validatefederationtarget.md
+  /api/v1/system/federation/{serverName}:
+    delete:
+      description: Removes a federation target and discards changes still queued for it. Entities already replicated
+        to the peer stay there; the peer's pairing with this instance is not revoked. Administrators only.
+      operationId: deleteAccessFederation
+      parameters:
+      - description: Required path parameter. Name of the federation target, as given at registration.
+        in: path
+        name: serverName
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Target removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No target has this name.
+      summary: Unregister a federation target
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteaccessfederation.md
+    get:
+      description: Returns one federation target by name. Administrators only.
+      operationId: getAccessFederation
+      parameters:
+      - description: Required path parameter. Name of the federation target, as given at registration.
+        in: path
+        name: serverName
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationTarget'
+          description: The target.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server name is blank.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No target has this name.
+      summary: Get a federation target
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getaccessfederation.md
+    patch:
+      description: Changes the replicated entity types, the filters or the active flag of a target. Fields that
+        are omitted keep their values; name and url are immutable. Narrowing the entities or filters affects future
+        changes only; nothing already replicated is removed from the peer. Accepts plain JSON or a JSON merge patch
+        with the same fields. Administrators only.
+      operationId: updateAccessFederation
+      parameters:
+      - description: Required path parameter. Name of the federation target, as given at registration.
+        in: path
+        name: serverName
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FederationTargetUpdate'
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/FederationTargetUpdate'
+        description: The fields to change.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationTarget'
+          description: Target updated; the body is the stored target.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Invalid body, including any attempt to change name or url.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No target has this name.
+      summary: Update a federation target
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updateaccessfederation.md
+  /api/v1/system/federation/{serverName}/full_broadcast:
+    put:
+      description: Sends the complete current set of selected identity entities to the target, after which the target
+        matches this instance for those entities (the full-sync fallback of decision 0021). Use it after a long
+        outage or when the incremental outbox was discarded. The broadcast runs in the background; at most one runs
+        per target. Administrators only.
+      operationId: fullBroadcastAccessFederation
+      parameters:
+      - description: Required path parameter. Name of the federation target, as given at registration.
+        in: path
+        name: serverName
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: A full broadcast for this target is already running; nothing new was started.
+        '204':
+          description: Full broadcast started.
+        '304':
+          description: 'The target is not eligible: it is paused (active is false) or replicates no entity types.'
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server name is blank.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No target has this name.
+      summary: Run a full broadcast to a target
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/administration/reference/fullbroadcastaccessfederation.md

@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated artifactory Go client (make generate).
+package: artifactory
+output: pkg/client/artifactory/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

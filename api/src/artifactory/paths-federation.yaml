@@ -1,0 +1,1627 @@
+paths:
+  /api/federation/binaries/failures/delete:
+    delete:
+      description: 'Deletes binary transfer tasks of a federated repository that exhausted their retries: all of
+        them, or only the task for one SHA-1. Use it once the missing content has been dealt with another way, for
+        example re-deployed.'
+      operationId: deleteFailedBinaryTasks
+      parameters:
+      - description: Required query parameter. Key of the federated repository.
+        in: query
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Optional query parameter. Delete only the task for this SHA-1. Omitted deletes every failed
+          task of the repository.
+        in: query
+        name: sha1
+        schema:
+          description: SHA-1 hex digest.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Deletion count.
+                properties:
+                  deletedTasks:
+                    description: Optional within this object. Number of tasks deleted.
+                    type: integer
+                type: object
+          description: The tasks were deleted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Delete failed binary transfer tasks
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletefailedbinarytasks.md
+  /api/federation/binaries/failures/list:
+    get:
+      description: Lists binary transfer tasks of a federated repository that failed because the content could not
+        be fetched from the originating member within the attempt limit (10 by default). Metadata for these items
+        arrived; their content did not.
+      operationId: getListOfFailedBinaryTasks
+      parameters:
+      - description: Required query parameter. Key of the federated repository.
+        in: query
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Optional query parameter. Page size. Defaults to 1000.
+        in: query
+        name: limit
+        schema:
+          default: 1000
+          description: Page size.
+          type: integer
+      - description: Optional query parameter. Page number, starting at 1.
+        in: query
+        name: page
+        schema:
+          description: Page number.
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Failed tasks.
+                items:
+                  description: One failed task.
+                  properties:
+                    creationTime:
+                      description: Optional within this object. Time the task was created, in epoch milliseconds.
+                      format: int64
+                      type: integer
+                    failuresCount:
+                      description: Optional within this object. Attempts made so far.
+                      type: integer
+                    repoKey:
+                      description: Optional within this object. Federated repository the task belongs to.
+                      type: string
+                    sha1:
+                      description: Optional within this object. SHA-1 of the content that could not be fetched.
+                      type: string
+                  type: object
+                type: array
+          description: The failed tasks on this page.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List failed binary transfer tasks
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlistoffailedbinarytasks.md
+  /api/federation/binaries/failures/replay:
+    put:
+      description: Queues failed binary transfer tasks again, all of a repository's or only the one for a SHA-1,
+        with their attempt count reset.
+      operationId: replayFailedBinaryTasks
+      parameters:
+      - description: Required query parameter. Key of the federated repository.
+        in: query
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Optional query parameter. Replay only the task for this SHA-1. Omitted replays every failed
+          task of the repository.
+        in: query
+        name: sha1
+        schema:
+          description: SHA-1 hex digest.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Replay count.
+                properties:
+                  replayTasks:
+                    description: Optional within this object. Number of tasks queued again.
+                    type: integer
+                type: object
+          description: The tasks were queued again.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Replay failed binary transfer tasks
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/replayfailedbinarytasks.md
+  /api/federation/configSync/{repoKey}:
+    post:
+      description: Sends this member's shared configuration of a federated repository to every other member, repairing
+        drift left by a network failure. Only shared settings travel; each member keeps its own repository key and
+        local-only settings (decision 0022).
+      operationId: synchronizeFederatedMemberConfiguration
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Result; its fields are not specified.
+                type: object
+          description: The configuration was sent to every reachable member.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Push federated repository configuration to members
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/synchronizefederatedmemberconfiguration.md
+  /api/federation/convertToLocal:
+    post:
+      description: Converts federated repositories back to local repositories, keeping their content and metadata.
+        Allowed only for a repository whose federation has no other active members; remove the other members first.
+      operationId: convertFederatedRepositoryToLocal
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Keys of the federated repositories to convert.
+              items:
+                description: One repository key.
+                type: string
+              type: array
+        description: Keys of the federated repositories to convert.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A confirmation message, or a map of repositories that could not be converted when some
+                  of the list failed.
+                oneOf:
+                - description: Confirmation message when every repository was converted.
+                  type: string
+                - description: Per-repository failures when only part of the list was converted.
+                  properties:
+                    failedConversionRepositories:
+                      additionalProperties:
+                        description: Why one repository could not be converted.
+                        type: string
+                      description: Optional within this object. Map from repository key to the reason it could not
+                        be converted.
+                      type: object
+                  type: object
+          description: Every listed repository was converted.
+        '400':
+          content:
+            application/json:
+              schema:
+                description: At least one repository could not be converted; the body names each and the reason.
+                properties:
+                  failedConversionRepositories:
+                    additionalProperties:
+                      description: Why one repository could not be converted.
+                      type: string
+                    description: Optional within this object. Map from repository key to the reason it could not
+                      be converted.
+                    type: object
+                type: object
+          description: At least one repository could not be converted; the body names each and the reason.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A listed repository does not exist.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Convert federated repositories to local
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/convertfederatedrepositorytolocal.md
+  /api/federation/forceFullSync/{repoKey}:
+    post:
+      description: Starts a full synchronization of a federated repository, interrupting one already in progress.
+        Use it when a full sync appears stuck.
+      operationId: federatedRepositoryForceFullSync
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Optional query parameter. Base URL of one member to synchronize with. Omitted means every other
+          member.
+        in: query
+        name: mirror
+        schema:
+          description: Member base URL.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: What was started.
+                properties:
+                  message:
+                    description: Optional within this object. Summary of what was started.
+                    type: string
+                  resultPaths:
+                    description: Optional within this object. Paths of report files the run writes, when any.
+                    items:
+                      description: One report path.
+                      type: string
+                    type: array
+                type: object
+          description: The full sync was started.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Force a full sync of a federated repository
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/federatedrepositoryforcefullsync.md
+  /api/federation/fullSync/{repoKey}:
+    post:
+      description: 'Runs a full synchronization: members compare their item sets by path and checksum and each side
+        sends what the other lacks. Where both sides changed an item, the change with the later event time wins
+        and the originating instance id breaks ties (decision 0022). With `isDry=true` nothing is transferred and
+        the comparison writes a report of the differences.'
+      operationId: federatedRepositoryFullSync
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Optional query parameter. Base URL of one member to synchronize with. Omitted means every other
+          member.
+        in: query
+        name: mirror
+        schema:
+          description: Member base URL.
+          type: string
+      - description: Optional query parameter. When true, compare only and write a report. Defaults to false.
+        in: query
+        name: isDry
+        schema:
+          default: false
+          description: Compare only.
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: What was started.
+                properties:
+                  message:
+                    description: Optional within this object. Summary of what was started.
+                    type: string
+                  resultPaths:
+                    description: Optional within this object. Paths of report files the run writes, when any.
+                    items:
+                      description: One report path.
+                      type: string
+                    type: array
+                type: object
+          description: The full sync, or the comparison, was started.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Run a full sync of a federated repository
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/federatedrepositoryfullsync.md
+  /api/federation/inconsistentRepos:
+    get:
+      description: Lists federated repositories whose shared configuration differs from at least one member's. Repair
+        them with the configuration sync operation.
+      operationId: getListOfInconsistentFederatedRepositories
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Repositories whose configuration differs from a member's.
+                items:
+                  description: One repository.
+                  type: string
+                type: array
+          description: The repositories with drift.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List federated repositories with configuration drift
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlistofinconsistentfederatedrepositories.md
+  /api/federation/migrate/{repoKey}:
+    post:
+      description: Converts a local repository into a federated repository with this instance as its only member,
+        keeping content and metadata. Add members afterwards by updating the repository's `members`. Inside a project,
+        every member of a federation must carry the same project key.
+      operationId: convertLocalRepositoryToFederated
+      parameters:
+      - description: Required path parameter. Key of the local repository to convert.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: The repository was converted; the body is a short confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Convert a local repository to federated
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/convertlocalrepositorytofederated.md
+  /api/federation/prioritization/{repoKey}:
+    put:
+      description: Gives a federated repository's outgoing event queue priority over standard queues when the outbox
+        is busy. At most 10 repositories can be high priority at once.
+      operationId: prioritizeFederatedRepository
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      - description: Required query parameter. `high` or `standard`.
+        in: query
+        name: priorityLevel
+        required: true
+        schema:
+          description: Priority level.
+          enum:
+          - high
+          - standard
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: The priority was set; the body is a short confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The value is unknown or 10 repositories are already high priority.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Set federated repository sync priority
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/prioritizefederatedrepository.md
+  /api/federation/propagateCreatedTime:
+    put:
+      description: 'Instance-wide switch: when enabled, full sync gives each received item its original creation
+        time instead of the time of transfer.'
+      operationId: propagateCreationTimeMetadataDuringFullSync
+      parameters:
+      - description: Required query parameter. True to keep original creation times.
+        in: query
+        name: enabled
+        required: true
+        schema:
+          description: Keep creation times.
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Result; its fields are not specified.
+                type: object
+          description: The setting was changed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Set whether full sync keeps creation times
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatecreationtimemetadataduringfullsync.md
+  /api/federation/reconnect:
+    post:
+      description: 'Re-establishes the link between the repository service and the federation sync worker. In Artifactory
+        the worker is the separate Artifactory Federation Service (RTFS), reached over gRPC; a health-check job
+        reconnects it automatically (every 80 seconds by default) and this call does it on demand, for example when
+        the service was unavailable at startup. artifactweave runs the sync worker inside the server process, so
+        the call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once
+        the worker is running. Administrators only.'
+      operationId: reconnectToFederationClient
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: The sync worker is running again; the body is a short plain-text confirmation.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '424':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The sync worker could not be started. In Artifactory this means the Federation Service could
+            not be reached; in artifactweave it means the worker failed to start, for example because the peer keys
+            could not be unsealed. The body names the cause.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Reconnect the federation sync worker
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/reconnecttofederationclient.md
+  /api/federation/recovery:
+    post:
+      description: Clears the error state of outgoing event queues that exhausted their retries (six attempts by
+        default in Artifactory), so delivery to members resumes without waiting for the auto-healing job (every
+        20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted.
+        A member whose missing events were already purged stays out of sync and needs a full sync.
+      operationId: federationRecovery
+      parameters:
+      - description: Optional query parameter. Key of the federated repository to recover. Omitted means every federated
+          repository.
+        in: query
+        name: repoKey
+        schema:
+          description: Repository key.
+          type: string
+      - description: 'Optional query parameter. When true, recovery runs even for queues that are not exhausted:
+          every outgoing queue in scope has its error counters cleared and is retried at once. Artifactory documents
+          only that the flag forces the operation; this behaviour is artifactweave''s reading of it. Defaults to
+          false.'
+        in: query
+        name: force
+        schema:
+          default: false
+          description: Reset all queues.
+          type: boolean
+        x-unverified: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: Recovery was performed; the body is a short confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Recover exhausted federation queues
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/federationrecovery.md
+  /api/federation/removeMember:
+    post:
+      description: Removes a member, identified by its base URL, from every federation on this instance. The removed
+        instance keeps its copies; it stops receiving events.
+      operationId: removeFederationMember
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: Base URL of the member to remove.
+              type: string
+        description: Base URL of the member to remove.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: The member was removed; the body is a short confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Remove a member from every federation
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/removefederationmember.md
+  /api/federation/state:
+    get:
+      deprecated: true
+      description: Lists every federated repository on this instance with its members and sync state.
+      operationId: getFederationSyncState
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Sync state per federated repository.
+                items:
+                  description: One federated repository.
+                  properties:
+                    key:
+                      description: Optional within this object. Repository key on this instance.
+                      type: string
+                    members:
+                      description: Optional within this object. The other members.
+                      items:
+                        description: One member.
+                        properties:
+                          remoteKey:
+                            description: Optional within this object. Repository key on the member.
+                            type: string
+                          remoteUrl:
+                            description: Optional within this object. Base URL of the member instance.
+                            type: string
+                        type: object
+                      type: array
+                    status:
+                      description: Optional within this object. `SYNCING` in normal operation, `FULL_SYNC_RUNNING`
+                        during a full sync, `OUT_OF_SYNC` when events are failing, `DISABLED` when federation is
+                        turned off for the repository.
+                      enum:
+                      - SYNCING
+                      - FULL_SYNC_RUNNING
+                      - DISABLED
+                      - OUT_OF_SYNC
+                      type: string
+                  type: object
+                type: array
+          description: The repositories and their state.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List federated repository sync state
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationsyncstate.md
+  /api/federation/status/connectionStates/{repoKey}:
+    get:
+      description: Shows, for each member of one federated repository, whether events are flowing and how far behind
+        delivery is. The cheapest status operation, suited to routine monitoring. Artifactory serves this operation
+        only when its standalone Federation Service (RTFS) is enabled and answers 405 otherwise; artifactweave always
+        serves it.
+      operationId: getFederationConnectionDetails
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Connection state of each member.
+                properties:
+                  memberConnections:
+                    description: Optional within this object. One entry per member.
+                    items:
+                      description: One member connection.
+                      properties:
+                        disabled:
+                          description: Optional within this object. True when sync to this member is turned off.
+                          type: boolean
+                        lagInMs:
+                          description: Optional within this object. Age of the oldest undelivered event, in milliseconds.
+                          format: int64
+                          type: integer
+                        localPlatformUrl:
+                          description: Optional within this object. Base URL of this instance.
+                          type: string
+                        localRepoKey:
+                          description: Optional within this object. Repository key on this instance.
+                          type: string
+                        queuedEvents:
+                          description: Optional within this object. Events waiting for delivery.
+                          format: int64
+                          type: integer
+                        remotePlatformUrl:
+                          description: Optional within this object. Base URL of the member instance.
+                          type: string
+                        remoteRepoKey:
+                          description: Optional within this object. Repository key on the member.
+                          type: string
+                        status:
+                          description: 'Optional within this object. Dashboard state of the connection from the
+                            local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with
+                            lag above the threshold. ERROR: any underlying error state (generic, inactive target,
+                            out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is
+                            preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member
+                            cannot report status. READONLY: the member is receiving-only. N/A: the state cannot
+                            be determined because a side is unreachable.'
+                          enum:
+                          - HEALTHY
+                          - DELAYED
+                          - ERROR
+                          - PENDING_FS
+                          - FULL_SYNC_RUNNING
+                          - DISABLED
+                          - UNSUPPORTED
+                          - READONLY
+                          - N/A
+                          type: string
+                        supported:
+                          description: Optional within this object. False when the remote member cannot report federation
+                            status; the connection then shows N/A or UNSUPPORTED. In artifactweave this is false
+                            when the peer speaks a protocol major version this instance does not (decision 0021).
+                          type: boolean
+                      type: object
+                    type: array
+                type: object
+          description: Connection state per member.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get federated repository connection state
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationconnectiondetails.md
+  /api/federation/status/mirrorsLag:
+    get:
+      deprecated: true
+      description: Lists, per federated repository and member, how long the oldest undelivered event has waited.
+      operationId: getFederationMirrorLagTime
+      parameters:
+      - description: Optional query parameter. Only return entries whose lag exceeds this many milliseconds.
+        in: query
+        name: thresholdTimeInMs
+        schema:
+          description: Lag threshold in milliseconds.
+          format: int64
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Lag per repository and member.
+                items:
+                  description: One repository and member pair.
+                  properties:
+                    eventRegistrationTimeStamp:
+                      description: Optional within this object. Time the oldest undelivered event was recorded,
+                        in epoch milliseconds.
+                      format: int64
+                      type: integer
+                    lagInMS:
+                      description: Optional within this object. Age of that event, in milliseconds.
+                      format: int64
+                      type: integer
+                    localRepoKey:
+                      description: Optional within this object. Repository key on this instance.
+                      type: string
+                    remoteRepoKey:
+                      description: Optional within this object. Repository key on the member.
+                      type: string
+                    remoteUrl:
+                      description: Optional within this object. Base URL of the member instance.
+                      type: string
+                  type: object
+                type: array
+          description: Lag per repository and member.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List federation member lag
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationmirrorlagtime.md
+  /api/federation/status/repo/{repoKey}:
+    get:
+      deprecated: true
+      description: 'Detailed sync status of one federated repository: binary transfer tasks, event delivery per
+        member and artifact counts. Expensive on large repositories; use the connection state operation for routine
+        monitoring. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering
+        405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the
+        member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked
+        unverified until captured.'
+      operationId: getFederatedRepositoryStatus
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Sync status of one federated repository.
+                properties:
+                  binariesTasksInfo:
+                    description: Optional within this object. Binary transfer tasks for the repository.
+                    properties:
+                      failingTasks:
+                        description: Optional within this object. Tasks that exhausted their retries (ten by default).
+                        type: integer
+                      inProgressTasks:
+                        description: Optional within this object. Tasks in flight or waiting to be retried.
+                        type: integer
+                    type: object
+                  federatedArtifactStatus:
+                    description: 'Optional within this object. Artifact replication counts on this instance, as
+                      the legacy repository status window shows them: artifacts replicated with metadata and binary,
+                      and artifacts whose metadata arrived but whose binary has not.'
+                    properties:
+                      fullyReplicatedArtifacts:
+                        description: Optional within this object. Artifacts with both metadata and binary present.
+                        format: int64
+                        type: integer
+                        x-unverified: true
+                      metadataOnlyArtifacts:
+                        description: Optional within this object. Artifacts whose binary is still being fetched.
+                        format: int64
+                        type: integer
+                        x-unverified: true
+                    type: object
+                  localKey:
+                    description: Optional within this object. Repository key on this instance.
+                    type: string
+                  mirrorEventsStatusInfo:
+                    description: Optional within this object. Event delivery state per target mirror.
+                    items:
+                      description: Event delivery state of one target mirror, as the legacy repository status window
+                        shows it.
+                      properties:
+                        createEvents:
+                          description: Optional within this object. Create events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        deleteEvents:
+                          description: Optional within this object. Delete events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        errorEvents:
+                          description: Optional within this object. Events that failed during sync.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        eventRegistrationTimeStamp:
+                          description: Optional within this object. When the mirror next registers with its target,
+                            in epoch milliseconds. Same name as the mirror lag operation.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        lagInMS:
+                          description: 'Optional within this object. Mirror latency: now minus the time of the oldest
+                            event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.'
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        propertiesEvents:
+                          description: Optional within this object. Property change events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        remoteRepoKey:
+                          description: Optional within this object. Repository key on the target mirror.
+                          type: string
+                        remoteUrl:
+                          description: Optional within this object. Base URL of the target mirror's instance.
+                          type: string
+                        status:
+                          description: Optional within this object. Whether the mirror is in sync. Version 1 reports
+                            a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY,
+                            PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
+                            IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED
+                            or OUT_OF_SYNC there.
+                          type: string
+                          x-unverified: true
+                        updateEvents:
+                          description: Optional within this object. Update events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                      type: object
+                    type: array
+                type: object
+          description: The sync status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get federated repository sync status
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatus.md
+      x-unverified: true
+  /api/federation/status/stateList:
+    get:
+      description: Lists each federation on this instance with the aggregated state of its members, optionally filtered
+        by state.
+      operationId: getFederationStateDetails
+      parameters:
+      - description: Optional query parameter. Comma-separated states to include, for example `HEALTHY,ERROR`. Omitted
+          means every state.
+        in: query
+        name: status
+        schema:
+          description: State filter.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Federations and member states.
+                properties:
+                  federations:
+                    description: Optional within this object. One entry per federated repository.
+                    items:
+                      description: One federation.
+                      properties:
+                        localRepoKey:
+                          description: Optional within this object. Repository key on this instance.
+                          type: string
+                        memberInfoList:
+                          description: Optional within this object. The members and their state.
+                          items:
+                            description: One member.
+                            properties:
+                              aggregatedStatus:
+                                description: Optional within this object. The member's state, one of those counted
+                                  by the state summary operation.
+                                type: string
+                              isDisabled:
+                                description: Optional within this object. True when sync to this member is turned
+                                  off.
+                                type: boolean
+                              isInLag:
+                                description: Optional within this object. True when the member's oldest undelivered
+                                  event is older than the lag threshold.
+                                type: boolean
+                              isSupported:
+                                description: Optional within this object. False when the member's sync protocol
+                                  version is incompatible.
+                                type: boolean
+                              repoKey:
+                                description: Optional within this object. Repository key on the member.
+                                type: string
+                              url:
+                                description: Optional within this object. Base URL of the member instance.
+                                type: string
+                            type: object
+                          type: array
+                        priority:
+                          description: Optional within this object. Queue priority of the repository, `HIGH` or
+                            `STANDARD`.
+                          enum:
+                          - HIGH
+                          - STANDARD
+                          type: string
+                      type: object
+                    type: array
+                type: object
+          description: The federations and their members.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List federations and member states
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationstatedetails.md
+  /api/federation/status/stateSummary:
+    get:
+      description: Counts federation members by state across every federated repository on this instance.
+      operationId: getFederationStateSummaries
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Member counts per state.
+                properties:
+                  federationStates:
+                    description: Optional within this object. Number of members in each state.
+                    properties:
+                      DELAYED:
+                        description: Optional within this object. Members whose events wait longer than the lag
+                          threshold.
+                        format: int64
+                        type: integer
+                      DISABLED:
+                        description: Optional within this object. Members with sync turned off.
+                        format: int64
+                        type: integer
+                      ERROR:
+                        description: Optional within this object. Members whose events fail after every retry.
+                        format: int64
+                        type: integer
+                      FULL_SYNC_RUNNING:
+                        description: Optional within this object. Members in a full sync.
+                        format: int64
+                        type: integer
+                      HEALTHY:
+                        description: Optional within this object. Members receiving events promptly.
+                        format: int64
+                        type: integer
+                      NOT_AVAILABLE:
+                        description: Optional within this object. Members that cannot be reached.
+                        format: int64
+                        type: integer
+                      PENDING_FS:
+                        description: Optional within this object. Members waiting for a full sync, for example right
+                          after joining.
+                        format: int64
+                        type: integer
+                    type: object
+                type: object
+          description: Member counts per state.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Count federation members by state
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederationstatesummaries.md
+  /api/federation/status/unavailableMirrors:
+    get:
+      deprecated: true
+      description: 'Lists members that are not synchronizing: newly added members waiting for their first full sync,
+        members of repositories being converted from local, and members past the error threshold.'
+      operationId: getUnavailableMirrors
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Members that are not synchronizing.
+                items:
+                  description: One member.
+                  properties:
+                    localRepoKey:
+                      description: Optional within this object. Repository key on this instance.
+                      type: string
+                    remoteRepoKey:
+                      description: Optional within this object. Repository key on the member.
+                      type: string
+                    remoteUrl:
+                      description: Optional within this object. Base URL of the member instance.
+                      type: string
+                    status:
+                      description: Optional within this object. Why the member is not synchronizing.
+                      type: string
+                  type: object
+                type: array
+          description: The members that are not synchronizing.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List members that are not synchronizing
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getunavailablemirrors.md
+  /api/v2/federation/status/repo/{repoKey}:
+    get:
+      deprecated: true
+      description: 'Version 2 of the repository sync status, which reports a wider set of member states. The fields
+        are those of version 1. Artifactory serves this operation only without its standalone Federation Service
+        (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes
+        no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation,
+        and stay marked unverified until captured.'
+      operationId: getFederatedRepositoryStatusV2
+      parameters:
+      - description: Required path parameter. Key of the federated repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Sync status of one federated repository.
+                properties:
+                  binariesTasksInfo:
+                    description: Optional within this object. Binary transfer tasks for the repository.
+                    properties:
+                      failingTasks:
+                        description: Optional within this object. Tasks that exhausted their retries (ten by default).
+                        type: integer
+                      inProgressTasks:
+                        description: Optional within this object. Tasks in flight or waiting to be retried.
+                        type: integer
+                    type: object
+                  federatedArtifactStatus:
+                    description: 'Optional within this object. Artifact replication counts on this instance, as
+                      the legacy repository status window shows them: artifacts replicated with metadata and binary,
+                      and artifacts whose metadata arrived but whose binary has not.'
+                    properties:
+                      fullyReplicatedArtifacts:
+                        description: Optional within this object. Artifacts with both metadata and binary present.
+                        format: int64
+                        type: integer
+                        x-unverified: true
+                      metadataOnlyArtifacts:
+                        description: Optional within this object. Artifacts whose binary is still being fetched.
+                        format: int64
+                        type: integer
+                        x-unverified: true
+                    type: object
+                  localKey:
+                    description: Optional within this object. Repository key on this instance.
+                    type: string
+                  mirrorEventsStatusInfo:
+                    description: Optional within this object. Event delivery state per target mirror.
+                    items:
+                      description: Event delivery state of one target mirror, as the legacy repository status window
+                        shows it.
+                      properties:
+                        createEvents:
+                          description: Optional within this object. Create events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        deleteEvents:
+                          description: Optional within this object. Delete events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        errorEvents:
+                          description: Optional within this object. Events that failed during sync.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        eventRegistrationTimeStamp:
+                          description: Optional within this object. When the mirror next registers with its target,
+                            in epoch milliseconds. Same name as the mirror lag operation.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        lagInMS:
+                          description: 'Optional within this object. Mirror latency: now minus the time of the oldest
+                            event not yet handled, in milliseconds. Same name and meaning as the mirror lag operation.'
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        propertiesEvents:
+                          description: Optional within this object. Property change events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                        remoteRepoKey:
+                          description: Optional within this object. Repository key on the target mirror.
+                          type: string
+                        remoteUrl:
+                          description: Optional within this object. Base URL of the target mirror's instance.
+                          type: string
+                        status:
+                          description: Optional within this object. Whether the mirror is in sync. Version 1 reports
+                            a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY,
+                            PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
+                            IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED
+                            or OUT_OF_SYNC there.
+                          type: string
+                          x-unverified: true
+                        updateEvents:
+                          description: Optional within this object. Update events waiting to be sent.
+                          format: int64
+                          type: integer
+                          x-unverified: true
+                      type: object
+                    type: array
+                type: object
+          description: The sync status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get federated repository sync status (version 2)
+      tags:
+      - federation
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getfederatedrepositorystatusv2.md
+      x-unverified: true

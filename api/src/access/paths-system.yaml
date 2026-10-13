@@ -1,0 +1,33 @@
+# System operations (P0). One fragment per family; see docs/research/01 for the oracle.
+paths:
+  /api/v1/system/ping:
+    get:
+      operationId: accessPing
+      tags: [system, handwritten]
+      x-handwritten: true
+      summary: Access liveness ping
+      description: Returns the plain text OK.
+      responses:
+        "200":
+          description: The service is up.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+  /api/v1/system/version:
+    get:
+      operationId: getAccessVersion
+      tags: [system]
+      summary: Access-compatible version
+      description: >-
+        The jfrog/platform Terraform provider parses the name field as the Access
+        version and gates lifecycle and OIDC features on it. artifactweave reports the
+        same compatibility version as /artifactory/api/system/version.
+      responses:
+        "200":
+          description: The compatibility version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessVersion"

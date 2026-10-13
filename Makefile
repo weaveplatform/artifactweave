@@ -23,7 +23,7 @@ help:
 ## init: rename the module after creating a repository from the template (make init NAME=<repo>)
 init:
 	@test -n "$(NAME)" || { echo "usage: make init NAME=<repository name>"; exit 1; }
-	@grep -rl --exclude-dir=.git weaveplatform-template . | xargs sed -i.bak 's/weaveplatform-template/$(NAME)/g'
+	@grep -rl --exclude-dir=.git weaveplatform-artifact-registry . | xargs sed -i.bak 's/weaveplatform-artifact-registry/$(NAME)/g'
 	@find . -name '*.bak' -not -path './.git/*' -delete
 	$(GO) mod tidy
 	@echo "renamed to github.com/weaveplatform/$(NAME); review README.md and CODEOWNERS"
@@ -44,6 +44,11 @@ vet:
 test:
 	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit
 	$(GO) test -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit
+
+## accept: godog acceptance features against the coverage-instrumented binary (Linux; needs Docker for @storage)
+accept:
+	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
+	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -count=1 ./test/acceptance/...
 
 ## cover: merge every cover/* directory and enforce .testcoverage.yml (>=95% total, >=90% per package)
 cover:
@@ -72,7 +77,53 @@ build:
 		done; \
 	done
 
+## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
+# Authors edit fragments (one per API family) so families can be written in
+# parallel; the bundled file is what codegen and the parity test read.
+bundle:
+	$(GO) run ./tools/openapi-bundle -src api/src -out api
+
+## generate: bundle the specs, regenerate the strict chi servers, Go clients and 501 stubs
+# Pinned by version so every developer and CI produce byte-identical output; the
+# drift check in verify-generate depends on that.
+OAPI_CODEGEN := github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.8.0
+# One service per api/src/<service>/info.yaml; adding a service is a new directory.
+SPECS := $(patsubst api/src/%/info.yaml,%,$(wildcard api/src/*/info.yaml))
+generate: bundle
+	@for s in $(SPECS); do \
+		echo "generate $$s"; \
+		$(GO) run $(OAPI_CODEGEN) -config api/oapi-server-$$s.yaml api/$$s.openapi.yaml || exit 1; \
+		$(GO) run $(OAPI_CODEGEN) -config api/oapi-client-$$s.yaml api/$$s.openapi.yaml || exit 1; \
+		$(GO) run ./tools/stubgen internal/server/gen/$$s/server.gen.go || exit 1; \
+	done
+
+## verify-generate: fail if make generate would change the committed generated code
+verify-generate: generate
+	git diff --exit-code -- api/*.openapi.yaml internal/server/gen pkg/client
+
+## oracle-fetch: cache JFrog's published OpenAPI blocks under .specoracle (gitignored; test oracle only)
+oracle-fetch:
+	$(GO) run ./tools/specoracle fetch -cache .specoracle
+
+## oracle-inventory: write api/oracle-inventory.json and docs/research/14-data-model-inventory.md from the cache
+oracle-inventory:
+	$(GO) run ./tools/specoracle inventory -cache .specoracle -api api
+
+## scaffold: draft a spec fragment from one cached family (make scaffold FAMILY=<slug> SERVICE=<a directory under api/src>)
+scaffold:
+	@test -n "$(FAMILY)" -a -n "$(SERVICE)" || { echo "usage: make scaffold FAMILY=<cache family> SERVICE=<a directory under api/src>"; exit 1; }
+	$(GO) run ./tools/specoracle scaffold -cache .specoracle -family $(FAMILY) -service $(SERVICE) \
+		-out api/src/$(SERVICE)/paths-$$(echo $(FAMILY) | sed -E 's/^(artifactory|administration|projects|integrations)-//; s/-api$$//').yaml
+
+## parity: compare api/*.openapi.yaml with the cached JFrog definitions and print the report
+parity:
+	$(GO) run ./tools/specoracle report -cache .specoracle -api api
+
+## parity-baseline: rewrite api/parity-baseline.json from the current report (review the diff)
+parity-baseline:
+	$(GO) run ./tools/specoracle baseline -cache .specoracle -api api -update
+
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: help init fmt lint vet test cover vuln build gate
+.PHONY: bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate

@@ -1,0 +1,950 @@
+components:
+  schemas:
+    ChecksumReplicationConfig:
+      description: 'Settings for checksum-only replication, where artifact content moves through storage-level replication
+        and artifactweave only replicates metadata. Not supported in v1: the operation that takes this body answers
+        501.'
+      properties:
+        checkBinaryExistenceAllowed:
+          description: Required within this object. Permits replications on this instance to set checkBinaryExistenceInFilestore
+            and skip transferring content that already exists in the target filestore.
+          type: boolean
+        daysToTrust:
+          default: 0
+          description: Optional within this object. Number of days, 0 to 30, for which a checksum from the source
+            is trusted without the content. Defaults to 0.
+          format: int32
+          maximum: 30
+          minimum: 0
+          type: integer
+      required:
+      - checkBinaryExistenceAllowed
+      type: object
+    ChecksumReplicationStatus:
+      description: Current checksum replication settings on the target instance.
+      properties:
+        checkBinaryExistenceAllowed:
+          description: Optional within this object. Whether checkBinaryExistenceInFilestore may be used against
+            this instance.
+          type: boolean
+        trustUntil:
+          description: Optional within this object. Instant after which trusted checksums are no longer accepted
+            without content. The format is not fixed by the upstream documentation.
+          type: string
+      type: object
+    GlobalSystemReplicationConfig:
+      description: Instance-wide switches that pause every push or pull replication without touching the per-repository
+        configurations.
+      properties:
+        blockPullReplications:
+          description: Optional within this object. True while pull replications are globally blocked.
+          type: boolean
+        blockPushReplications:
+          description: Optional within this object. True while push replications are globally blocked.
+          type: boolean
+      type: object
+    MultipleReplicationConfigRequest:
+      description: 'Multi-push replication configuration: one schedule fanning out to several targets. Not supported
+        in v1; the operations that take this body answer 501. Use one single-target configuration per repository
+        instead.'
+      properties:
+        cronExp:
+          description: Required within this object. Schedule in Quartz cron syntax shared by every target.
+          type: string
+        enableEventReplication:
+          description: Required within this object. Whether writes trigger replication immediately in addition to
+            the schedule.
+          type: boolean
+        replications:
+          description: Required within this object. One target configuration per destination.
+          items:
+            $ref: '#/components/schemas/ReplicationConfigRequest'
+          type: array
+      required:
+      - cronExp
+      - enableEventReplication
+      - replications
+      type: object
+    ReplicationConfigRequest:
+      description: Configuration of one replication for a repository. On a local repository it is a push to another
+        instance's local repository; on a remote repository it is a pull from the upstream into the cache. The same
+        shape is returned by the read operation, where replicationKey and repoKey are filled in by the server.
+      properties:
+        checkBinaryExistenceInFilestore:
+          description: Optional within this object. Skip transferring content the target already holds, as allowed
+            by the target's checksum replication settings. Accepted and ignored in v1.
+          type: boolean
+        cronExp:
+          description: Optional within this object. Schedule in Quartz cron syntax, for example 0 0 2 * * ?. Omitted
+            on create leaves the replication unscheduled and only runnable on demand. When an array of configurations
+            is set, the first element's value applies to all.
+          type: string
+        disableProxy:
+          description: Optional within this object. True ignores the instance-wide default proxy for this replication.
+            Defaults to false.
+          type: boolean
+        enableEventReplication:
+          description: Optional within this object. True replicates each write as it happens in addition to the
+            schedule. Defaults to false. Event-based replication is accepted and stored but not acted on in v1.
+          type: boolean
+        enabled:
+          description: Optional within this object. False keeps the configuration but stops the schedule. Defaults
+            to true.
+          type: boolean
+        excludePathPrefixPattern:
+          description: Optional within this object. Ant pattern of paths to leave out even when they match the include
+            pattern.
+          type: string
+        includePathPrefixPattern:
+          description: Optional within this object. Ant pattern of paths to replicate. Omitted replicates the whole
+            repository.
+          type: string
+        password:
+          description: 'Optional within this object. Password or access token for url. Write-only: stored sealed
+            and returned masked.'
+          type: string
+        proxy:
+          description: Optional within this object. Key of a configured proxy to route the replication through.
+          type: string
+        replicationKey:
+          description: Optional within this object. Server-owned identifier of this configuration; ignored on input.
+            Whether Artifactory keeps it stable across updates is not documented, so clients should not depend on
+            it.
+          readOnly: true
+          type: string
+        repoKey:
+          description: Optional within this object. Server-owned; the repository the configuration belongs to, taken
+            from the path. Ignored on input.
+          readOnly: true
+          type: string
+        socketTimeoutMillis:
+          description: Optional within this object. Network timeout per request in milliseconds. Defaults to 15000.
+          format: int32
+          type: integer
+        syncDeletes:
+          description: Optional within this object. True also deletes items at the target that no longer exist at
+            the source. Defaults to false.
+          type: boolean
+        syncProperties:
+          description: Optional within this object. True replicates item properties along with content. Defaults
+            to true.
+          type: boolean
+        syncStatistics:
+          description: Optional within this object. True also replicates download statistics. Defaults to false.
+          type: boolean
+        url:
+          description: 'Optional within this object. For push: URL of the target repository on the other instance,
+            ending in the repository key. For pull: omitted, because the source is the remote repository''s own
+            upstream URL. Required for push on create.'
+          type: string
+        username:
+          description: Optional within this object. User name for url.
+          type: string
+      type: object
+    ReplicationEnableDisableRequest:
+      description: Selects replications by target URL pattern for bulk enable or disable.
+      properties:
+        exclude:
+          description: Optional within this object. Wildcard patterns over target URLs to leave untouched even when
+            they match include.
+          items:
+            description: A target URL pattern with * wildcards.
+            type: string
+          type: array
+        include:
+          description: Optional within this object. Wildcard patterns over target URLs of the replications to change.
+            Omitted matches all.
+          items:
+            description: A target URL pattern with * wildcards.
+            type: string
+          type: array
+      type: object
+    ReplicationRepositoryStatus:
+      description: Status of replication for one repository, as seen from a path that belongs to it.
+      properties:
+        lastCompleted:
+          description: Optional within this object. When the last run finished; absent when it never ran.
+          format: date-time
+          type: string
+        status:
+          description: 'Optional within this object. Outcome of the last run: never_run, ok, warn, error, incomplete,
+            inconsistent, partial_failure, or unknown when the state cannot be read.'
+          enum:
+          - unknown
+          - never_run
+          - incomplete
+          - error
+          - warn
+          - ok
+          - inconsistent
+          - partial_failure
+          type: string
+      type: object
+    ReplicationRequest:
+      description: Per-target options for a replication started on demand. For a pull the array holds at most one
+        element and url may be omitted; for a push each element names a target.
+      properties:
+        checkBinaryExistenceInFilestore:
+          description: Optional within this object. Skip transferring content the target already holds. Accepted
+            and ignored in v1.
+          type: boolean
+        delete:
+          default: false
+          description: Optional within this object. True also deletes items at the destination that are absent at
+            the source. Defaults to false.
+          type: boolean
+        disableProxy:
+          description: Optional within this object. True ignores the instance-wide default proxy for this run.
+          type: boolean
+        excludePathPrefixPattern:
+          description: Optional within this object. Ant pattern of paths to leave out.
+          type: string
+        includePathPrefixPattern:
+          description: Optional within this object. Ant pattern of paths to replicate. Omitted replicates everything
+            under the requested path.
+          type: string
+        password:
+          description: Optional within this object. Password or access token for url. Never echoed.
+          type: string
+        properties:
+          default: true
+          description: Optional within this object. True replicates item properties with the content. Defaults to
+            true.
+          type: boolean
+        proxy:
+          description: Optional within this object. Key of a configured proxy to route this run through.
+          type: string
+        url:
+          description: Optional within this object. Target repository URL for a push. Omitted for a pull, and omitted
+            for a push when the stored configuration should be used.
+          type: string
+        username:
+          description: Optional within this object. User name for url.
+          type: string
+      type: object
+    ReplicationStatus:
+      description: 'Replication status read from the replication properties the last run annotated on the items
+        under a path. The shape differs by repository class: a local repository with several push targets lists
+        them in targets; a remote repository reports the single pull in status and lastCompleted.'
+      properties:
+        lastCompleted:
+          description: Optional within this object. When the last run under this path finished.
+          format: date-time
+          type: string
+        repositories:
+          additionalProperties:
+            $ref: '#/components/schemas/ReplicationRepositoryStatus'
+          description: Optional within this object. Per-repository status keyed by repository key, present when
+            the path spans several repositories.
+          type: object
+        status:
+          description: Optional within this object. Overall outcome of the last run; see ReplicationRepositoryStatus
+            for the values.
+          enum:
+          - unknown
+          - never_run
+          - incomplete
+          - error
+          - warn
+          - ok
+          - inconsistent
+          - partial_failure
+          type: string
+        targets:
+          description: Optional within this object. One entry per push target of a local repository.
+          items:
+            $ref: '#/components/schemas/ReplicationTarget'
+          type: array
+      type: object
+    ReplicationTarget:
+      description: Status of one push target.
+      properties:
+        lastCompleted:
+          description: Optional within this object. When the last run to this target finished.
+          format: date-time
+          type: string
+        repoKey:
+          description: Optional within this object. Key of the target repository on the other instance.
+          type: string
+        status:
+          description: Optional within this object. Outcome of the last run to this target; see ReplicationRepositoryStatus
+            for the values.
+          enum:
+          - unknown
+          - never_run
+          - incomplete
+          - error
+          - warn
+          - ok
+          - inconsistent
+          - partial_failure
+          type: string
+        url:
+          description: Optional within this object. URL of the target repository.
+          type: string
+      type: object
+paths:
+  /api/config/storage/checksumReplication:
+    get:
+      description: 'Reads the checksum replication settings of this instance. Not supported in v1: artifactweave
+        has no storage-level replication, so the operation answers 501.'
+      operationId: getChecksumReplication
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecksumReplicationStatus'
+          description: The current settings.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getchecksumreplication.md
+      x-tier: stub
+    put:
+      description: Configures checksum replication on this instance. Not supported in v1; answers 501.
+      operationId: configureChecksumReplication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChecksumReplicationConfig'
+        description: The settings to store.
+        required: true
+      responses:
+        '200':
+          description: Settings stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was malformed or daysToTrust was outside 0 to 30.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/configurechecksumreplication.md
+      x-tier: stub
+  /api/replication/execute/{repoPath}:
+    post:
+      description: 'Starts a replication now, independently of any schedule. The direction follows the repository
+        class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored
+        configuration; a remote repository pulls from its upstream into the cache, and its body may name at most
+        one target. The path may name a folder below the repository to limit the run. The run is scheduled and the
+        call answers 200 with an empty body as soon as it is accepted, as Artifactory does; progress and per-file
+        messages go to the server log, and the status operation reports the outcome. Multi-target pushes to several
+        instances in one call are not supported in v1 and a body with more than one target is rejected with 400.
+        Callers other than administrators are limited to the user query result limit when choosing files. The caller
+        needs manage permission on the repository.'
+      operationId: executePullPushReplication
+      parameters:
+      - description: Required path parameter. Repository key, optionally followed by a folder path, for example
+          libs-release-local or libs-release-local/org/acme. May span several segments.
+        in: path
+        name: repoPath
+        required: true
+        schema:
+          description: Repository key with an optional folder path.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. Named replication strategy. Artifactory declares the parameter without
+          publishing its accepted values; artifactweave accepts any value and ignores it.
+        in: query
+        name: strategy
+        required: false
+        schema:
+          description: Strategy name.
+          type: string
+        x-unverified: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: One options object per target; at most one in v1.
+              items:
+                $ref: '#/components/schemas/ReplicationRequest'
+              type: array
+        description: Optional per-target options. Omitted uses the stored configuration.
+        required: false
+      responses:
+        '200':
+          description: The replication was accepted and scheduled; there is no body.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was malformed, named several targets, or the repository class has no replication
+            direction (virtual).
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks manage permission on the repository, or replication is globally blocked.
+      tags:
+      - handwritten
+      - replication
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/executepullpushreplication.md
+  /api/replication/{repoPath}:
+    get:
+      description: Reports the outcome of the last replication that touched a repository or a folder in it, read
+        from the replication properties the run annotated on the items. The caller needs read permission on the
+        repository.
+      operationId: getReplicationStatus
+      parameters:
+      - description: Required path parameter. Repository key, optionally followed by a folder path. May span several
+          segments.
+        in: path
+        name: repoPath
+        required: true
+        schema:
+          description: Repository key with an optional folder path.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplicationStatus'
+          description: The status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository or path does not exist.
+      tags:
+      - handwritten
+      - replication
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
+  /api/replications/channels/release:
+    post:
+      description: Closes every event-based pull replication channel other instances hold open against this one,
+        forcing them to reconnect. Event-based replication is not supported in v1; the operation answers 501.
+      operationId: closeEventBasedPullReplicationChannels
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Empty object.
+                type: object
+          description: Channels closed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/closeeventbasedpullreplicationchannels.md
+      x-tier: stub
+  /api/replications/channels/{repoKey}:
+    get:
+      description: Lists the remote instances subscribed to a local repository for event-based pull replication.
+        Event-based replication is not supported in v1; the operation answers 501.
+      operationId: getRemoteRepositoriesRegisteredForReplication
+      parameters:
+      - description: Required path parameter. Key of the local repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Subscriber identifiers.
+                items:
+                  description: An instance identifier.
+                  type: string
+                type: array
+          description: The subscribed instances.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getremoterepositoriesregisteredforreplication.md
+      x-tier: stub
+  /api/replications/multiple/{repoKey}:
+    post:
+      description: Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one
+        single-target replication per repository instead.
+      operationId: updateMultiPushReplication
+      parameters:
+      - description: Required path parameter. Key of the local repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultipleReplicationConfigRequest'
+        description: The configuration to apply.
+        required: true
+      responses:
+        '200':
+          description: Configuration updated.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatemultipushreplication.md
+      x-tier: stub
+    put:
+      description: Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+      operationId: createOrReplaceMultiPushReplication
+      parameters:
+      - description: Required path parameter. Key of the local repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultipleReplicationConfigRequest'
+        description: The configuration to store.
+        required: true
+      responses:
+        '200':
+          description: Configuration stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createorreplacemultipushreplication.md
+      x-tier: stub
+  /api/replications/{repoKey}:
+    delete:
+      description: Removes the replication configuration of a repository. With url only the push target with that
+        URL is removed; without it every configuration of the repository is removed. Administrators only.
+      operationId: deleteRepositoryReplicationConfiguration
+      parameters:
+      - description: Required path parameter. Key of the local or remote repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. Target URL of the single push configuration to remove.
+        in: query
+        name: url
+        required: false
+        schema:
+          description: Target repository URL.
+          type: string
+      responses:
+        '200':
+          description: Configuration removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository has no replication configuration, or no target with that URL.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepositoryreplicationconfiguration.md
+    get:
+      description: Returns the replication configuration of a local or remote repository. A local repository with
+        several push targets returns an array; otherwise a single object. password is returned masked. The caller
+        needs manage permission on the repository.
+      operationId: getRepositoryReplicationConfiguration
+      parameters:
+      - description: Required path parameter. Key of the local or remote repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/ReplicationConfigRequest'
+                - description: Array form, returned when a local repository has several push targets.
+                  items:
+                    $ref: '#/components/schemas/ReplicationConfigRequest'
+                  type: array
+          description: The configuration, as one object or an array of them.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is virtual and cannot replicate.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks manage permission on the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository has no replication configuration.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryreplicationconfiguration.md
+    post:
+      description: 'Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory
+        routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable
+        request and the call switches many replications on or off at once, selected by wildcard patterns over their
+        target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through
+        this path. Administrators only.'
+      operationId: updateRepositoryReplicationConfiguration
+      parameters:
+      - description: Required path parameter. Key of the local or remote repository, or the reserved value `enable`
+          or `disable` for the bulk operation.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: A replication configuration update, or an enable/disable request when repoKey is `enable`
+                or `disable`.
+              oneOf:
+              - $ref: '#/components/schemas/ReplicationConfigRequest'
+              - $ref: '#/components/schemas/ReplicationEnableDisableRequest'
+        description: The fields to change, or for the reserved keys the target URL patterns to include and exclude.
+        required: true
+      responses:
+        '200':
+          description: Configuration updated, or the matching replications were switched.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was malformed, or the repository is virtual.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository has no replication configuration to update.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updaterepositoryreplicationconfiguration.md
+      x-oracle-source-also: https://docs.jfrog.com/artifactory/reference/enableordisablemultiplereplications.md
+    put:
+      description: Creates or replaces the replication configuration of a local or remote repository. The body is
+        one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from
+        the first element for all. Several targets in the array amount to multi-push, which is not supported in
+        v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider
+        accepts any 2xx.
+      operationId: setRepositoryReplicationConfiguration
+      parameters:
+      - description: Required path parameter. Key of the local or remote repository.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/ReplicationConfigRequest'
+              - description: Array form; only a single element is accepted in v1.
+                items:
+                  $ref: '#/components/schemas/ReplicationConfigRequest'
+                type: array
+        description: The configuration to store.
+        required: true
+      responses:
+        '200':
+          description: Configuration stored. artifactweave returns 201 as Artifactory does; this entry is kept for
+            parity with the documented response set.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was malformed, named several targets, or the repository is virtual.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setrepositoryreplicationconfiguration.md
+  /api/system/replications:
+    get:
+      description: Reports whether push and pull replication are blocked for the whole instance. Administrators
+        only.
+      operationId: getGlobalSystemReplicationConfiguration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalSystemReplicationConfig'
+          description: The global switches.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getglobalsystemreplicationconfiguration.md
+  /api/system/replications/block:
+    post:
+      description: Pauses replication for the whole instance. push and pull default to true; passing false for one
+        leaves that direction running. Scheduled and on-demand runs are refused while blocked. Administrators only.
+      operationId: blockSystemReplication
+      parameters:
+      - description: Optional query parameter. true (default) blocks push replications; false leaves them running.
+        in: query
+        name: push
+        required: false
+        schema:
+          default: 'true'
+          description: true or false as a string.
+          type: string
+      - description: Optional query parameter. true (default) blocks pull replications; false leaves them running.
+        in: query
+        name: pull
+        required: false
+        schema:
+          default: 'true'
+          description: true or false as a string.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: A plain text confirmation of what was blocked.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/blocksystemreplication.md
+  /api/system/replications/unblock:
+    post:
+      description: Resumes replication for the whole instance. push and pull default to true; passing false for
+        one leaves that direction blocked. Administrators only.
+      operationId: unblockSystemReplication
+      parameters:
+      - description: Optional query parameter. true (default) unblocks push replications; false leaves them blocked.
+        in: query
+        name: push
+        required: false
+        schema:
+          default: 'true'
+          description: true or false as a string.
+          type: string
+      - description: Optional query parameter. true (default) unblocks pull replications; false leaves them blocked.
+        in: query
+        name: pull
+        required: false
+        schema:
+          default: 'true'
+          description: true or false as a string.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: A plain text confirmation of what was unblocked.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+      tags:
+      - replication
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/unblocksystemreplication.md

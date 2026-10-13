@@ -1,0 +1,1471 @@
+components:
+  parameters:
+    distributionTrackerPath:
+      description: Required path parameter. Numeric id of a distribution tracker, as returned in `id` by a distribute
+        or delete call.
+      in: path
+      name: distribution_tracker
+      required: true
+      schema:
+        format: int64
+        type: integer
+    projectQuery:
+      description: Optional query parameter. Key of the project the bundle belongs to. Omitted means the default
+        project.
+      in: query
+      name: project
+      schema:
+        type: string
+    releaseBundleNamePath:
+      description: Required path parameter. Name of the release bundle.
+      in: path
+      name: release_bundle_name
+      required: true
+      schema:
+        type: string
+    releaseBundleVersionPath:
+      description: Required path parameter. Version of the release bundle within its name.
+      in: path
+      name: release_bundle_version
+      required: true
+      schema:
+        type: string
+    repositoryKeyQuery:
+      description: Optional query parameter. For Release Bundles v2, the repository that stores the bundle. Omitted
+        means the project's default release bundle repository.
+      in: query
+      name: repository_key
+      schema:
+        type: string
+  schemas:
+    DeleteReleaseBundleRequest:
+      description: Which edges should remove a distributed version.
+      properties:
+        distribution_rules:
+          description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
+            Only artifactweave peers paired as edges can match.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          type: array
+        dry_run:
+          default: false
+          description: Optional within this object. When true the response lists the edges that would be affected
+            and nothing changes. Defaults to false.
+          type: boolean
+        on_success:
+          description: Optional within this object. `delete` also deletes the version here once every selected edge
+            confirmed; `keep`, the default, leaves it.
+          enum:
+          - keep
+          - delete
+          type: string
+      type: object
+    DestinationPermission:
+      description: Who may distribute release bundles to, or delete them from, a set of edges.
+      properties:
+        distribution_destinations:
+          description: Optional within this object. The edges this permission covers; an edge is covered when it
+            matches any entry.
+          items:
+            description: One destination filter. Its fields combine with AND, and `*` matches any value.
+            properties:
+              cityName:
+                description: Optional within this object. City the edge declared when it was paired, or `*`.
+                type: string
+              countryCodes:
+                description: Optional within this object. ISO 3166 country codes the edge declared, or `*`.
+                items:
+                  type: string
+                type: array
+              siteName:
+                description: Optional within this object. Name of the edge peer, or `*` for every edge.
+                type: string
+            type: object
+          type: array
+        id:
+          description: Optional within this object. Server-owned identifier of the permission; ignored on input.
+          readOnly: true
+          type: string
+        name:
+          description: Optional within this object. Name of the permission; must match the path when sent.
+          readOnly: true
+          type: string
+        principals:
+          description: Optional within this object. The users and groups granted actions on the destinations.
+          properties:
+            groups:
+              additionalProperties:
+                items:
+                  enum:
+                  - distribute
+                  - delete
+                  type: string
+                type: array
+              description: 'Optional within this object. Map from group name to the actions its members may take:
+                `distribute`, `delete` or both.'
+              type: object
+            users:
+              additionalProperties:
+                items:
+                  enum:
+                  - distribute
+                  - delete
+                  type: string
+                type: array
+              description: 'Optional within this object. Map from username to the actions that user may take: `distribute`,
+                `delete` or both.'
+              type: object
+          type: object
+        resourceType:
+          description: Optional within this object. Always DESTINATION.
+          enum:
+          - DESTINATION
+          readOnly: true
+          type: string
+      type: object
+    DistributeByLastDaysRequest:
+      description: A window of days and the edge to redistribute it to.
+      properties:
+        autoCreateMissingRepositories:
+          default: false
+          description: Optional within this object. When true the edge creates any target repository it lacks. Defaults
+            to false.
+          type: boolean
+        date:
+          description: Required within this object. Last day of the window, as YYYY-MM-DD.
+          type: string
+        edgeName:
+          description: Required within this object. Name of the edge peer to redistribute to.
+          type: string
+        lastNumberOfDays:
+          description: Required within this object. Window length in days, counting back from date; from 1 to the
+            configured maximum, 7 by default.
+          minimum: 1
+          type: integer
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Priority of the distributions started. Defaults to medium.
+      required:
+      - date
+      - lastNumberOfDays
+      - edgeName
+      type: object
+    DistributeByLastDaysResult:
+      description: The redistributions started.
+      properties:
+        totalTriggered:
+          description: Optional within this object. Number of distributions started.
+          type: integer
+        triggered:
+          description: Optional within this object. The versions redistributed, one entry each.
+          items:
+            type: string
+          type: array
+          uniqueItems: true
+      type: object
+    DistributionPriorityLevel:
+      default: medium
+      description: 'Scheduling priority of a distribution: high work is sent before medium and medium before low.
+        Defaults to medium.'
+      enum:
+      - low
+      - medium
+      - high
+      type: string
+    DistributionPriorityUpdateRequest:
+      description: New priorities for an in-flight Release Bundle v2 distribution.
+      properties:
+        distribution_rules:
+          description: Optional within this object. Rules whose matching edges take the rule's own priority; other
+            edges keep the base priority.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          type: array
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. New base priority. Omitted leaves it unchanged.
+      type: object
+    DistributionPriorityUpdateResponse:
+      description: The outcome of a priority change.
+      properties:
+        distribution_tracker_friendly_id:
+          description: Optional within this object. Short sequential id of the tracker, for people.
+          format: int64
+          type: integer
+        distribution_tracker_id:
+          description: Optional within this object. Id of the tracker changed.
+          format: int64
+          type: integer
+        edges:
+          description: Optional within this object. Per-edge outcome.
+          items:
+            $ref: '#/components/schemas/EdgePriorityUpdate'
+          type: array
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Base priority after the change.
+        release_bundle_name:
+          description: Optional within this object. Name of the release bundle.
+          type: string
+        release_bundle_version:
+          description: Optional within this object. Version of the release bundle.
+          type: string
+      type: object
+    DistributionPriorityUpdateResult:
+      description: 'Per-edge outcome of a priority change: applied took effect at once, recorded applies to work
+        not yet sent, skipped means the edge had finished, unchanged means the priority already matched.'
+      enum:
+      - applied
+      - recorded
+      - skipped
+      - unchanged
+      type: string
+    DistributionProgress:
+      description: One distribution tracker with the progress of each edge.
+      properties:
+        distributed_by:
+          description: Optional within this object. User who started the distribution.
+          type: string
+        distribution_id:
+          description: Optional within this object. Id of the tracker.
+          format: int64
+          type: integer
+        edge_nodes:
+          description: Optional within this object. One entry per target edge.
+          items:
+            description: Progress toward one edge.
+            properties:
+              name:
+                description: Optional within this object. Name of the edge peer.
+                type: string
+              priority:
+                allOf:
+                - $ref: '#/components/schemas/DistributionPriorityLevel'
+                description: Optional within this object. Priority in force for this edge.
+              service_id:
+                description: Optional within this object. Service id of the edge peer.
+                type: string
+              status:
+                description: Optional within this object. Status of the transfer to this edge, for example In progress,
+                  Completed or Failed.
+                type: string
+            type: object
+          type: array
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Base priority of the distribution.
+        started:
+          description: Optional within this object. When the distribution started, RFC 3339.
+          type: string
+        status:
+          description: 'Optional within this object. Overall status: In progress until every edge finished, then
+            Completed, or Failed when any edge failed.'
+          type: string
+        type:
+          description: Optional within this object. distribute or delete.
+          type: string
+      type: object
+    DistributionRequest:
+      description: Which edges should receive a signed version.
+      properties:
+        auto_create_missing_repositories:
+          description: Optional within this object. When true each edge creates target repositories it lacks; otherwise
+            a missing repository fails that edge. Defaults to false.
+          type: boolean
+        distribution_rules:
+          description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
+            Only artifactweave peers paired as edges can match.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          type: array
+        dry_run:
+          default: false
+          description: Optional within this object. When true the response lists the selected edges and nothing
+            is sent. Defaults to false.
+          type: boolean
+      type: object
+    DistributionResponse:
+      description: The tracker created for a distribute or delete request.
+      properties:
+        id:
+          description: Optional within this object. Id of the distribution tracker; use it with the tracker status
+            operations.
+          format: int64
+          type: integer
+        sites:
+          description: Optional within this object. The edges selected.
+          items:
+            $ref: '#/components/schemas/PlatformServiceInstance'
+          type: array
+      type: object
+    DistributionRule:
+      description: Selects edges by what each edge peer declared when it was paired. Fields combine with AND; an
+        omitted field or `*` matches any value.
+      properties:
+        city_name:
+          description: Optional within this object. City the edge declared, or `*`.
+          type: string
+        country_codes:
+          description: Optional within this object. ISO 3166 country codes the edge declared, or `*`.
+          items:
+            type: string
+          type: array
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Priority for the edges this rule selects; overrides the base
+            priority.
+        site_name:
+          description: Optional within this object. Name of the edge peer, or `*`.
+          type: string
+      type: object
+    DistributionStatus:
+      description: One distribution (or remote delete) of a version and its per-target progress. Confirmed by jfrog-client-go
+        (DistributionStatusResponse, DistributionSiteStatus) and JFrog's Distribution REST reference.
+      properties:
+        created_by:
+          description: Optional within this object. User who created the version.
+          type: string
+        distributed_by:
+          description: Optional within this object. User who started the distribution.
+          type: string
+        distribution_friendly_id:
+          description: Optional within this object. Short sequential number of the tracker.
+          format: int64
+          type: integer
+        distribution_id:
+          description: Required within this object. Id of the tracker; the id a distribute or delete call returned.
+          format: int64
+          type: integer
+        distribution_rules:
+          description: Optional within this object. The rules the targets were selected by.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          type: array
+        duration:
+          description: Optional within this object. Running time in milliseconds.
+          format: int64
+          type: integer
+        finish_time:
+          description: Optional within this object. When it finished, RFC 3339; absent while running.
+          format: date-time
+          type: string
+        release_bundle_name:
+          description: Optional within this object. Name of the bundle.
+          type: string
+        release_bundle_version:
+          description: Optional within this object. Version of the bundle.
+          type: string
+        sites:
+          description: Optional within this object. Progress per target instance.
+          items:
+            description: Progress on one target instance.
+            properties:
+              distributed_bytes:
+                description: Optional within this object. Bytes transferred so far.
+                format: int64
+                type: integer
+              distributed_files:
+                description: Optional within this object. Files transferred so far.
+                format: int64
+                type: integer
+              file_errors:
+                description: Optional within this object. Per-file errors, one string each.
+                items:
+                  description: One error.
+                  type: string
+                type: array
+              files_in_progress:
+                description: Optional within this object. Paths still being transferred.
+                items:
+                  description: One path.
+                  type: string
+                type: array
+              general_error:
+                description: Optional within this object. Why the target failed, when it did; empty otherwise.
+                type: string
+              status:
+                description: Optional within this object. Status on this target.
+                enum:
+                - Not distributed
+                - In progress
+                - In queue
+                - Completed
+                - Failed
+                type: string
+              target_artifactory:
+                description: Optional within this object. The target instance.
+                properties:
+                  name:
+                    description: Optional within this object. Name of the target as configured.
+                    type: string
+                  service_id:
+                    description: Optional within this object. Service id of the target, jfrt@<id>; for artifactweave
+                      the peer's instance id.
+                    type: string
+                  type:
+                    description: Optional within this object. Role of the target; edge for every artifactweave target.
+                    type: string
+                type: object
+              total_bytes:
+                description: Optional within this object. Bytes to transfer.
+                format: int64
+                type: integer
+              total_files:
+                description: Optional within this object. Files to transfer.
+                format: int64
+                type: integer
+            type: object
+          type: array
+        start_time:
+          description: Optional within this object. When the distribution started, RFC 3339.
+          format: date-time
+          type: string
+        status:
+          description: Optional within this object. Overall status, the worst of the targets' statuses.
+          enum:
+          - Not distributed
+          - In progress
+          - In queue
+          - Completed
+          - Failed
+          type: string
+        type:
+          description: Optional within this object. distribute, or delete_release_bundle_version for a remote delete.
+          enum:
+          - distribute
+          - delete_release_bundle_version
+          type: string
+      required:
+      - distribution_id
+      type: object
+    DistributionTokenResponse:
+      description: A token issued by the Distribution token operation.
+      properties:
+        access_token:
+          description: Optional within this object. The access token, a JWT.
+          type: string
+        expires_in:
+          description: Optional within this object. Seconds until the access token expires.
+          format: int64
+          type: integer
+        refresh_token:
+          description: Optional within this object. Refresh token, present when a refreshable token was requested.
+          type: string
+        scope:
+          description: Optional within this object. The scope granted.
+          type: string
+        token_type:
+          description: Optional within this object. Always Bearer.
+          type: string
+      type: object
+    DistributionTrackerSimple:
+      description: Summary of one distribution tracker.
+      properties:
+        distributed_by:
+          description: Optional within this object. User who started the distribution.
+          type: string
+        distribution_id:
+          description: Optional within this object. Id of the tracker.
+          format: int64
+          type: integer
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Base priority of the distribution.
+        started:
+          description: Optional within this object. When the distribution started, RFC 3339.
+          type: string
+        status:
+          description: Optional within this object. Overall status of the distribution.
+          type: string
+        type:
+          description: Optional within this object. distribute or delete.
+          type: string
+      type: object
+    DynamicDistributionRequest:
+      description: The content of a generated bundle and where to send it.
+      properties:
+        distribution_rules:
+          description: Required within this object. Rules selecting the edges; an edge matching any rule is selected.
+            Only artifactweave peers paired as edges can match.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          minItems: 1
+          type: array
+        spec:
+          description: Optional within this object. What the generated bundle contains.
+          properties:
+            project_key:
+              description: Optional within this object. Project the generated bundle belongs to. Omitted means the
+                default project.
+              type: string
+            queries:
+              description: Optional within this object. AQL queries whose results become the bundle's artifacts,
+                each in the query shape of ReleaseBundleCreation.
+              items: {}
+              type: array
+          type: object
+      required:
+      - distribution_rules
+      type: object
+    DynamicDistributionResponse:
+      allOf:
+      - $ref: '#/components/schemas/DistributionResponse'
+      - description: The tracker plus the generated bundle name and version.
+        properties:
+          name:
+            description: Required within this object. Generated name of the bundle.
+            type: string
+          version:
+            description: Required within this object. Generated version of the bundle.
+            type: string
+        required:
+        - name
+        - version
+        type: object
+      description: The tracker plus the generated bundle name and version.
+      type: object
+    EdgeNodesInfo:
+      description: The edge peers.
+      properties:
+        edge_nodes:
+          description: Optional within this object. One entry per edge.
+          items:
+            $ref: '#/components/schemas/PlatformServiceInstance'
+          type: array
+      type: object
+    EdgePriorityUpdate:
+      description: The outcome of a priority change for one edge.
+      properties:
+        edge_node_name:
+          description: Optional within this object. Name of the edge peer.
+          type: string
+        effective_priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Priority now in force for this edge.
+        previous_priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Priority before the change.
+        result:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityUpdateResult'
+          description: Optional within this object. What happened for this edge.
+        status:
+          description: Optional within this object. Transfer status of this edge when the change was made.
+          type: string
+      type: object
+    ForceStopAllReport:
+      description: What STOP_ALL affected, or would affect in a dry run.
+      properties:
+        tasksQueueFlushed:
+          description: Optional within this object. True when the pending work queue was emptied; false in a dry
+            run.
+          type: boolean
+        trackersDbInfo:
+          description: Optional within this object. How many records were, or would be, stopped.
+          properties:
+            affectedEdgeTrackerArtifacts:
+              description: Optional within this object. Per-artifact transfer records stopped.
+              type: integer
+            affectedEdgeTrackers:
+              description: Optional within this object. Per-edge transfer records stopped.
+              type: integer
+            affectedTrackers:
+              description: Optional within this object. Distribution trackers stopped.
+              type: integer
+          type: object
+      type: object
+    GpgKey:
+      description: A GPG key's alias and public part.
+      properties:
+        alias:
+          description: Required within this object. Alias of the key.
+          type: string
+        default:
+          description: Optional within this object. True for the key that signs when no alias is chosen.
+          type: boolean
+        public_key:
+          description: Required within this object. ASCII-armoured public key.
+          type: string
+      required:
+      - alias
+      - public_key
+      type: object
+    GpgKeyAlias:
+      description: One configured GPG signing key, as listed by the aliases operation (Distribution 2.8.1 and later).
+      properties:
+        alias:
+          description: Required within this object. Alias of the key.
+          type: string
+        default:
+          description: Optional within this object. True for the key that signs when no alias is chosen.
+          type: boolean
+        passphrase:
+          description: Optional within this object. True when the private key is protected by a passphrase, which
+            callers then send in X-GPG-PASSPHRASE when signing.
+          type: boolean
+      required:
+      - alias
+      type: object
+    GpgKeyUpload:
+      description: 'Body of a GPG key upload. Two forms are accepted because JFrog documents both: the flat form
+        of its current OpenAPI definition (alias, public_key, private_key at the top level) and the wrapped form
+        of its 2.4 and later reference (key plus the propagation flags). A body must carry a key in one form.'
+      properties:
+        alias:
+          description: 'Optional within this object. Flat form: name for the key pair; must be unique.'
+          type: string
+        fail_on_propagation_failure:
+          default: false
+          description: Optional within this object. When true a propagation failure fails the upload. Defaults to
+            false.
+          type: boolean
+        key:
+          description: 'Optional within this object. Wrapped form: The key pair, given either as armoured text or
+            as a vault reference.'
+          properties:
+            alias:
+              description: Optional within this object. Name for the key pair; must be unique. Required when more
+                than one key is configured.
+              type: string
+            private_key:
+              description: Optional within this object. ASCII-armoured private key, stored sealed and never returned.
+                Not combined with vault_data.
+              type: string
+              writeOnly: true
+            public_key:
+              description: Optional within this object. ASCII-armoured public key. Not combined with vault_data.
+              type: string
+            vault_data:
+              description: Optional within this object. Where to read the pair from a vault instead. Vault integration
+                is not supported in v1 and is rejected with 400.
+              properties:
+                private_key:
+                  description: Optional within this object. Path and key of the private part.
+                  properties:
+                    key:
+                      description: Optional within this object. Key within the secret.
+                      type: string
+                    path:
+                      description: Optional within this object. Secret path.
+                      type: string
+                  type: object
+                public_key:
+                  description: Optional within this object. Path and key of the public part.
+                  properties:
+                    key:
+                      description: Optional within this object. Key within the secret.
+                      type: string
+                    path:
+                      description: Optional within this object. Secret path.
+                      type: string
+                  type: object
+                vault_id:
+                  description: Optional within this object. Vault name; hashicorp in JFrog.
+                  type: string
+              type: object
+          type: object
+        private_key:
+          description: 'Optional within this object. Flat form: ASCII-armoured private key, stored sealed and never
+            returned.'
+          type: string
+          writeOnly: true
+        propagate_to_edge_nodes:
+          default: false
+          description: Optional within this object. When true the key is pushed to every receiving instance. Defaults
+            to false.
+          type: boolean
+        public_key:
+          description: 'Optional within this object. Flat form: ASCII-armoured public key.'
+          type: string
+        set_as_default:
+          default: false
+          description: Optional within this object. When true the key becomes the default signing key; the first
+            key uploaded always does.
+          type: boolean
+      type: object
+    MessageStatusResponse:
+      description: A status message.
+      properties:
+        detail:
+          description: Optional within this object. Extra context, when there is any.
+          type: string
+        message:
+          description: Optional within this object. The message, OK when healthy.
+          type: string
+        status_code:
+          description: Optional within this object. HTTP status of the response.
+          type: integer
+      type: object
+    PlatformServiceInstance:
+      description: One instance in the distribution topology.
+      properties:
+        name:
+          description: Optional within this object. Name of the instance; for an edge, the peer name.
+          type: string
+        service_id:
+          description: Optional within this object. Service id of the instance.
+          type: string
+        type:
+          description: Optional within this object. edge for an edge peer, artifactory for this source instance.
+          type: string
+      type: object
+    PropagationReport:
+      description: Outcome of pushing signing keys to the receiving instances.
+      properties:
+        report:
+          description: Required within this object. The report.
+          properties:
+            details:
+              description: Optional within this object. One entry per target instance and key.
+              items:
+                description: The outcome for one target and key.
+                properties:
+                  jpd_id:
+                    description: Optional within this object. Id of the target instance; for artifactweave the peer's
+                      instance id.
+                    type: string
+                  key_alias:
+                    description: Optional within this object. Alias of the key pushed.
+                    type: string
+                  name:
+                    description: Optional within this object. Name of the target instance.
+                    type: string
+                  status:
+                    description: Optional within this object. SUCCESS or FAILURE for this target.
+                    enum:
+                    - SUCCESS
+                    - FAILURE
+                    type: string
+                type: object
+              type: array
+            message:
+              description: Optional within this object. Error detail when the status is not SUCCESS.
+              type: string
+            status:
+              description: Required within this object. Overall result. PROPAGATION_NOT_REQUESTED when the call
+                asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched, PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL
+                is JFrog-specific and never returned by artifactweave.
+              enum:
+              - SUCCESS
+              - PARTIAL_SUCCESS
+              - FAILURE
+              - PROPAGATION_NOT_REQUESTED
+              - PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL
+              - NO_GPG_KEY_TO_PROPAGATE
+              type: string
+          required:
+          - status
+          type: object
+      required:
+      - report
+      type: object
+    RBv2DistributionRequest:
+      description: Which edges should receive a Release Bundle v2 version.
+      properties:
+        auto_create_missing_repositories:
+          description: Optional within this object. When true each edge creates target repositories it lacks. Defaults
+            to false.
+          type: boolean
+        distribution_rules:
+          description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
+            Only artifactweave peers paired as edges can match.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          type: array
+        dry_run:
+          default: false
+          description: Optional within this object. When true nothing is sent. Defaults to false.
+          type: boolean
+        include_evidence:
+          default: false
+          description: Optional within this object. When true evidence attached to the bundle is sent too.
+          type: boolean
+        insecure_tls:
+          description: Optional within this object. Skips TLS verification toward the edges. artifactweave always
+            verifies peers (decision 0021) and ignores it.
+          type: boolean
+        modifications:
+          description: Optional within this object. Path mappings the edges apply when storing the artifacts.
+          type: object
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Base priority. Defaults to medium.
+      type: object
+    RBv2RemoteDeleteRequest:
+      description: Which edges should remove a Release Bundle v2 version.
+      properties:
+        auto_create_missing_repositories:
+          description: Optional within this object. Accepted for symmetry with distribution; has no effect on deletion.
+          type: boolean
+        distribution_rules:
+          description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
+            Only artifactweave peers paired as edges can match.
+          items:
+            $ref: '#/components/schemas/DistributionRule'
+          type: array
+        dry_run:
+          default: false
+          description: Optional within this object. When true nothing changes. Defaults to false.
+          type: boolean
+        priority:
+          allOf:
+          - $ref: '#/components/schemas/DistributionPriorityLevel'
+          description: Optional within this object. Base priority. Defaults to medium.
+      type: object
+    ReleaseBundleCreation:
+      description: Body of a release bundle v1 create. The same body without name and version updates an unsigned
+        version (ReleaseBundleUpdate). Shape confirmed by jfrog-client-go (createReleaseBundleBody, ReleaseBundleBody)
+        and JFrog's Distribution REST reference.
+      properties:
+        description:
+          description: Optional within this object. Free text describing the version.
+          type: string
+        dry_run:
+          default: false
+          description: Optional within this object. When true the queries are evaluated and the result returned;
+            nothing is stored. Defaults to false.
+          type: boolean
+        name:
+          description: Required within this object. Name of the bundle; several versions share it.
+          minLength: 1
+          type: string
+        release_notes:
+          description: Optional within this object. Release notes kept with the version.
+          properties:
+            content:
+              description: Required within this object. The notes themselves.
+              type: string
+            syntax:
+              default: plain_text
+              description: Optional within this object. Markup of content. Defaults to plain_text.
+              enum:
+              - markdown
+              - asciidoc
+              - plain_text
+              type: string
+          required:
+          - content
+          type: object
+        sign_immediately:
+          default: false
+          description: Optional within this object. When true the version is signed as soon as it is stored, with
+            the default key or the one whose passphrase is sent in X-GPG-PASSPHRASE. Defaults to false.
+          type: boolean
+        spec:
+          description: Required within this object. How the artifacts are selected.
+          properties:
+            exclude_props_patterns:
+              description: Optional within this object. Patterns of property keys not copied to the receiving instance
+                for any artifact. They do not affect added_props.
+              items:
+                description: One key pattern; * matches any run.
+                type: string
+              type: array
+            queries:
+              description: Required within this object. The queries whose results become the artifacts; at least
+                one.
+              items:
+                description: One query whose results become artifacts of the version.
+                properties:
+                  added_props:
+                    description: Optional within this object. Properties set on the artifacts once they are stored
+                      on the receiving instance.
+                    items:
+                      description: One property.
+                      properties:
+                        key:
+                          description: Required within this object. Property key to create or replace.
+                          type: string
+                        values:
+                          description: Optional within this object. Values for the key. Defaults to an empty list.
+                          items:
+                            description: One value.
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      type: object
+                    type: array
+                  aql:
+                    description: Required within this object. An AQL items query, for example items.find({"repo":"libs-release-local"}),
+                      run against this instance. Every item it returns is pinned by path and SHA-256.
+                    type: string
+                  exclude_props_patterns:
+                    description: Optional within this object. Patterns of property keys not copied with this query's
+                      artifacts. JFrog's field table places this list on spec rather than on a query, while its
+                      example places it here; both positions are accepted and combined.
+                    items:
+                      description: One key pattern; * matches any run.
+                      type: string
+                    type: array
+                  mappings:
+                    description: Optional within this object. Path rewrites applied when the artifacts are stored
+                      on the receiving instance. Each input is a regular expression matched against <repo>/<path>;
+                      output may use $1, $2 for its groups.
+                    items:
+                      description: One rewrite.
+                      properties:
+                        input:
+                          description: Required within this object. Regular expression matched against the source
+                            <repo>/<path>.
+                          type: string
+                        output:
+                          description: Required within this object. Replacement <repo>/<path>; $1 and so on refer
+                            to groups in input.
+                          type: string
+                      required:
+                      - input
+                      - output
+                      type: object
+                    type: array
+                  query_name:
+                    description: Optional within this object. Label for the query in the version details. 2 to 32
+                      characters, starting with a letter followed by letters, digits or any of _-.:. Defaults to
+                      query-<index>.
+                    pattern: ^[A-Za-z][A-Za-z0-9_.:-]{1,31}$
+                    type: string
+                required:
+                - aql
+                type: object
+              minItems: 1
+              type: array
+            source_artifactory_id:
+              deprecated: true
+              description: 'Optional within this object. Service id of the instance the queries run against. Deprecated
+                by JFrog and ignored: queries always run against this instance.'
+              type: string
+          required:
+          - queries
+          type: object
+        storing_repository:
+          description: Optional within this object. Release bundles repository that records the signed manifest.
+            Null or omitted means the instance default.
+          nullable: true
+          type: string
+        version:
+          description: Required within this object. Version within the name; unique per name.
+          minLength: 1
+          type: string
+      required:
+      - name
+      - version
+      - spec
+      type: object
+    ReleaseBundleUpdate:
+      description: 'Body of a release bundle v1 update: the creation body without name and version, which come from
+        the path. Only an OPEN (unsigned) version can be updated; the queries are run again and replace the artifact
+        list.'
+      properties:
+        description:
+          description: Optional within this object. Free text describing the version.
+          type: string
+        dry_run:
+          default: false
+          description: Optional within this object. When true the queries are evaluated and the result returned;
+            nothing is stored. Defaults to false.
+          type: boolean
+        release_notes:
+          description: Optional within this object. Release notes kept with the version.
+          properties:
+            content:
+              description: Required within this object. The notes themselves.
+              type: string
+            syntax:
+              default: plain_text
+              description: Optional within this object. Markup of content. Defaults to plain_text.
+              enum:
+              - markdown
+              - asciidoc
+              - plain_text
+              type: string
+          required:
+          - content
+          type: object
+        sign_immediately:
+          default: false
+          description: Optional within this object. When true the version is signed as soon as it is stored, with
+            the default key or the one whose passphrase is sent in X-GPG-PASSPHRASE. Defaults to false.
+          type: boolean
+        spec:
+          description: Required within this object. How the artifacts are selected.
+          properties:
+            exclude_props_patterns:
+              description: Optional within this object. Patterns of property keys not copied to the receiving instance
+                for any artifact. They do not affect added_props.
+              items:
+                description: One key pattern; * matches any run.
+                type: string
+              type: array
+            queries:
+              description: Required within this object. The queries whose results become the artifacts; at least
+                one.
+              items:
+                description: One query whose results become artifacts of the version.
+                properties:
+                  added_props:
+                    description: Optional within this object. Properties set on the artifacts once they are stored
+                      on the receiving instance.
+                    items:
+                      description: One property.
+                      properties:
+                        key:
+                          description: Required within this object. Property key to create or replace.
+                          type: string
+                        values:
+                          description: Optional within this object. Values for the key. Defaults to an empty list.
+                          items:
+                            description: One value.
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      type: object
+                    type: array
+                  aql:
+                    description: Required within this object. An AQL items query, for example items.find({"repo":"libs-release-local"}),
+                      run against this instance. Every item it returns is pinned by path and SHA-256.
+                    type: string
+                  exclude_props_patterns:
+                    description: Optional within this object. Patterns of property keys not copied with this query's
+                      artifacts. JFrog's field table places this list on spec rather than on a query, while its
+                      example places it here; both positions are accepted and combined.
+                    items:
+                      description: One key pattern; * matches any run.
+                      type: string
+                    type: array
+                  mappings:
+                    description: Optional within this object. Path rewrites applied when the artifacts are stored
+                      on the receiving instance. Each input is a regular expression matched against <repo>/<path>;
+                      output may use $1, $2 for its groups.
+                    items:
+                      description: One rewrite.
+                      properties:
+                        input:
+                          description: Required within this object. Regular expression matched against the source
+                            <repo>/<path>.
+                          type: string
+                        output:
+                          description: Required within this object. Replacement <repo>/<path>; $1 and so on refer
+                            to groups in input.
+                          type: string
+                      required:
+                      - input
+                      - output
+                      type: object
+                    type: array
+                  query_name:
+                    description: Optional within this object. Label for the query in the version details. 2 to 32
+                      characters, starting with a letter followed by letters, digits or any of _-.:. Defaults to
+                      query-<index>.
+                    pattern: ^[A-Za-z][A-Za-z0-9_.:-]{1,31}$
+                    type: string
+                required:
+                - aql
+                type: object
+              minItems: 1
+              type: array
+            source_artifactory_id:
+              deprecated: true
+              description: 'Optional within this object. Service id of the instance the queries run against. Deprecated
+                by JFrog and ignored: queries always run against this instance.'
+              type: string
+          required:
+          - queries
+          type: object
+        storing_repository:
+          description: Optional within this object. Release bundles repository that records the signed manifest.
+            Null or omitted means the instance default.
+          nullable: true
+          type: string
+      required:
+      - spec
+      type: object
+    ReleaseBundleV1Version:
+      description: A release bundle v1 version as Distribution reports it. Field names follow the documented examples
+        for create, sign, list and get. state and status both carry the version state; see status.
+      properties:
+        archived:
+          description: Optional within this object. Whether the version is archived. Always false in artifactweave.
+          type: boolean
+        artifacts:
+          description: Optional within this object. The artifacts the version pins.
+          items:
+            description: One artifact pinned by the version.
+            properties:
+              checksum:
+                description: Optional within this object. SHA-256 of the artifact. A receiving instance rejects
+                  content whose digest differs.
+                type: string
+              props:
+                description: Optional within this object. Properties recorded with the artifact, including those
+                  added by the query.
+                items:
+                  description: One property.
+                  properties:
+                    key:
+                      description: Optional within this object. Property key.
+                      type: string
+                    values:
+                      description: Optional within this object. Property values.
+                      items:
+                        description: One value.
+                        type: string
+                      type: array
+                  type: object
+                type: array
+              repo_path:
+                description: Optional within this object. <repo>/<path> of the artifact on this instance; the same
+                  value as source_repo_path. JFrog's current OpenAPI definition uses this name, its documented examples
+                  the source and target pair, so both are sent.
+                type: string
+              source_repo_path:
+                description: Optional within this object. <repo>/<path> of the artifact on this instance.
+                type: string
+              target_repo_path:
+                description: Optional within this object. <repo>/<path> the artifact is stored under on a receiving
+                  instance, after the query's mappings.
+                type: string
+              xray_scan_info:
+                description: Optional within this object. Xray block state in JFrog. artifactweave has no Xray,
+                  so blocked is always false.
+                properties:
+                  blocked:
+                    description: Optional within this object. Whether a scan policy blocks the artifact.
+                    type: boolean
+                  blocked_reason:
+                    description: Optional within this object. Why it is blocked; null when it is not.
+                    nullable: true
+                    type: string
+                type: object
+            type: object
+          type: array
+        created:
+          description: Optional within this object. When the version was created, RFC 3339.
+          format: date-time
+          type: string
+        created_by:
+          description: Optional within this object. User who created the version.
+          type: string
+        description:
+          description: Optional within this object. Free text describing the version.
+          type: string
+        distributed_by:
+          description: Optional within this object. User who last distributed the version, when it has been distributed.
+          type: string
+        name:
+          description: Required within this object. Name of the bundle.
+          type: string
+        release_notes:
+          description: Optional within this object. Release notes kept with the version.
+          properties:
+            content:
+              description: Required within this object. The notes themselves.
+              type: string
+            syntax:
+              default: plain_text
+              description: Optional within this object. Markup of content. Defaults to plain_text.
+              enum:
+              - markdown
+              - asciidoc
+              - plain_text
+              type: string
+          required:
+          - content
+          type: object
+        state:
+          description: Required within this object. OPEN until the version is signed, then SIGNED; a SIGNED version
+            is immutable and can be distributed or exported. These are the two states JFrog documents and the only
+            ones artifactweave reports.
+          enum:
+          - OPEN
+          - SIGNED
+          type: string
+        status:
+          description: Optional within this object. JFrog's current OpenAPI definition names this field while its
+            documented examples use state; artifactweave sends both, with the same value, so clients reading either
+            work.
+          type: string
+          x-unverified: true
+        version:
+          description: Required within this object. Version within the name.
+          type: string
+      required:
+      - name
+      - version
+      - state
+      type: object
+    StuckDistribution:
+      description: A distribution stuck in a non-final state.
+      properties:
+        bundleName:
+          description: Optional within this object. Name of the release bundle.
+          type: string
+        bundleVersion:
+          description: Optional within this object. Version of the release bundle.
+          type: string
+        distributionFriendlyId:
+          description: Optional within this object. Short sequential id of the tracker.
+          format: int64
+          type: integer
+        distributionTrackerId:
+          description: Optional within this object. Id of the tracker.
+          format: int64
+          type: integer
+        releaseBundlesSchema:
+          description: 'Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1 on artifactweave.'
+          enum:
+          - RBV1
+          - RBV2
+          - RBV2_ATW
+          type: string
+        status:
+          description: Optional within this object. The non-final state it is stuck in.
+          enum:
+          - STORING_IN_PROGRESS
+          - XRAY_SCAN_IN_PROGRESS
+          - QUEUED
+          - IN_PROGRESS
+          - VALIDATE
+          - CLOSE_IN_PROGRESS
+          - ABORT_IN_PROGRESS
+          type: string
+      type: object
+    SupportBundleCreateRequest:
+      description: What a support bundle collects.
+      properties:
+        description:
+          description: Optional within this object. Free text describing why the bundle was made.
+          type: string
+        name:
+          description: Optional within this object. Name of the bundle.
+          type: string
+        parameters:
+          description: Optional within this object. Which kinds of information to collect.
+          properties:
+            configuration:
+              default: true
+              description: Optional within this object. Include the configuration with every secret masked. Defaults
+                to true.
+              type: boolean
+            logs:
+              description: Optional within this object. Log collection.
+              properties:
+                end_date:
+                  description: Optional within this object. Last day of logs to include, YYYY-MM-DD.
+                  format: date
+                  type: string
+                include:
+                  default: true
+                  description: Optional within this object. Include logs. Defaults to true.
+                  type: boolean
+                start_date:
+                  description: Optional within this object. First day of logs to include, YYYY-MM-DD.
+                  format: date
+                  type: string
+              type: object
+            system:
+              default: true
+              description: 'Optional within this object. Include system information: versions, operating system
+                and storage. Defaults to true.'
+              type: boolean
+            thread_dump:
+              description: Optional within this object. Goroutine dumps to capture.
+              properties:
+                count:
+                  default: 1
+                  description: Optional within this object. How many dumps to take. Defaults to 1.
+                  type: integer
+                interval:
+                  default: 0
+                  description: Optional within this object. Milliseconds between dumps. Defaults to 0.
+                  type: integer
+              type: object
+          type: object
+      type: object
+    SupportBundleCreateResponse:
+      description: Where a new support bundle can be fetched.
+      properties:
+        artifactory:
+          description: Optional within this object. The instance holding the bundle.
+          properties:
+            bundle_url:
+              description: Optional within this object. URL that downloads the bundle.
+              type: string
+            service_id:
+              description: Optional within this object. Service id of the instance.
+              type: string
+          type: object
+        id:
+          description: Optional within this object. Id of the bundle.
+          type: string
+      type: object
+    SupportBundleInfo:
+      description: Metadata of one support bundle.
+      properties:
+        artifactory:
+          description: Optional within this object. The instance holding the bundle.
+          properties:
+            bundle_url:
+              description: Optional within this object. URL that downloads the bundle.
+              type: string
+            service_id:
+              description: Optional within this object. Service id of the instance.
+              type: string
+          type: object
+        created:
+          description: Optional within this object. Date the bundle was created.
+          format: date
+          type: string
+        description:
+          description: Optional within this object. Free text describing why the bundle was made.
+          type: string
+        name:
+          description: Optional within this object. Name of the bundle.
+          type: string
+        parameters:
+          description: Optional within this object. What the bundle collected.
+          properties:
+            configuration:
+              description: Optional within this object. Whether the masked configuration was included.
+              type: boolean
+            logs:
+              description: Optional within this object. Log collection.
+              properties:
+                end_date:
+                  description: Optional within this object. Last day of logs included.
+                  format: date
+                  type: string
+                include:
+                  description: Optional within this object. Whether logs were included.
+                  type: boolean
+                start_date:
+                  description: Optional within this object. First day of logs included.
+                  format: date
+                  type: string
+              type: object
+            system:
+              description: Optional within this object. Whether system information was included.
+              type: boolean
+            thread_dump:
+              description: Optional within this object. Goroutine dumps captured.
+              properties:
+                count:
+                  description: Optional within this object. How many dumps were taken.
+                  type: integer
+                interval:
+                  description: Optional within this object. Milliseconds between dumps.
+                  type: integer
+              type: object
+          type: object
+        status:
+          description: 'Optional within this object. Collection status: in_progress, success or failure.'
+          type: string
+      type: object
+    SupportBundleList:
+      description: Support bundles on the instance.
+      properties:
+        bundles:
+          description: Optional within this object. One entry per bundle.
+          items:
+            description: One bundle.
+            properties:
+              created:
+                description: Optional within this object. Date the bundle was created.
+                format: date
+                type: string
+              description:
+                description: Optional within this object. Free text describing the bundle.
+                type: string
+              id:
+                description: Optional within this object. Id of the bundle.
+                type: string
+              name:
+                description: Optional within this object. Name of the bundle.
+                type: string
+            type: object
+          type: array
+        count:
+          description: Optional within this object. Number of bundles.
+          type: integer
+      type: object
+    SystemInfo:
+      description: Version and health of the distribution service.
+      properties:
+        message:
+          description: Optional within this object. Which dependency is failing, when status is UNSTABLE.
+          type: string
+        serviceId:
+          description: Optional within this object. Service id of the instance.
+          type: string
+        status:
+          description: Optional within this object. STABLE when every dependency is reachable, otherwise UNSTABLE.
+          enum:
+          - STABLE
+          - UNSTABLE
+          type: string
+        version:
+          description: Optional within this object. The compatibility version reported to clients.
+          type: string
+      type: object
+    SystemSettings:
+      description: Distribution settings.
+      properties:
+        call_home_enabled:
+          description: Optional within this object. Accepted and stored for compatibility. artifactweave never sends
+            usage data, so it has no effect.
+          type: boolean
+      type: object
+    TokenInfo:
+      description: One issued token.
+      properties:
+        expiry:
+          description: Optional within this object. Expiry as epoch seconds; 0 for a token that never expires.
+          format: int64
+          type: integer
+        issued_at:
+          description: Optional within this object. Issue time as epoch seconds.
+          format: int64
+          type: integer
+        issuer:
+          description: Optional within this object. Service id of the issuer.
+          type: string
+        refreshable:
+          description: Optional within this object. Whether a refresh token was issued with it.
+          type: boolean
+        subject:
+          description: Optional within this object. Subject the token was issued for.
+          type: string
+        token_id:
+          description: Optional within this object. Id of the token, for revocation.
+          type: string
+      type: object
+    TokensResponse:
+      description: Issued tokens.
+      properties:
+        tokens:
+          description: Optional within this object. One entry per token.
+          items:
+            $ref: '#/components/schemas/TokenInfo'
+          type: array
+      type: object
+    UnlockStuckReport:
+      description: What UNLOCK_STUCK affected, or would affect in a dry run.
+      properties:
+        stuckDistributions:
+          description: Optional within this object. The distributions unlocked, or that would be.
+          items:
+            $ref: '#/components/schemas/StuckDistribution'
+          type: array
+        unlocked:
+          description: Optional within this object. True when they were unlocked; false in a dry run.
+          type: boolean
+      type: object

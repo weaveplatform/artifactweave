@@ -14,7 +14,7 @@ jobs:
     # The template does not release itself: repositories created from it copy
     # CHANGELOG.md and .release-please-manifest.json, and must start clean at
     # 0.0.0 so their first release is initial-version (0.1.0).
-    if: ${{ github.repository != 'weaveplatform/weaveplatform-template' }}
+    if: ${{ github.repository != 'weaveplatform/weaveplatform-artifact-registry' }}
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner

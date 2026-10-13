@@ -1,0 +1,3173 @@
+# Package-type specific operations (P1). In-scope ecosystems (Docker, npm, Maven, PyPI,
+# NuGet, Helm, Terraform, Go) are described in full; the others carry x-tier: stub and
+# answer 501. Facts come from the oracle (docs/research/01), prose is ours.
+paths:
+  /api/alpine/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Alpine ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateAlpineRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatealpinerepositorymetadata.md
+      x-tier: stub
+  /api/bower/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateBowerIndex
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatebowerindex.md
+      x-tier: stub
+  /api/cargo/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateCargoRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecargorepositorymetadata.md
+      x-tier: stub
+  /api/cocoapods/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the CocoaPods ecosystem. The operation
+        is kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateCocoaPodsIndex
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecocoapodsindex.md
+      x-tier: stub
+  /api/conan/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Conan ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateConanRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateconanrepositorymetadata.md
+      x-tier: stub
+  /api/conda/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Conda ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateCondaRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecondarepositorymetadata.md
+      x-tier: stub
+  /api/cran/reindex/{repoKey}:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateCranRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecranrepositorymetadata.md
+      x-tier: stub
+  /api/cran/{repoKey}/move-archives:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: moveCranArchives
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Free-form JSON document Artifactory returns; never produced here.
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/movecranarchives.md
+      x-tier: stub
+  /api/deb/indexCached/{repoKey}:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateCachedRemoteDebianRepositoryCoordinates
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatecachedremotedebianrepositorycoordinates.md
+      x-tier: stub
+  /api/deb/reindex/{repoKey}:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateDebianRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      - description: Optional query parameter. 1 writes package coordinates as item properties during
+          the rebuild, 0 skips them. Ignored by artifactweave, which answers 501 for this ecosystem.
+        in: query
+        name: writeProps
+        schema:
+          description: 1 writes package coordinates as item properties during the rebuild, 0 skips them.
+            Ignored by artifactweave, which answers 501 for this ecosystem.
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatedebianrepositorymetadata.md
+      x-tier: stub
+  /api/deb/{repoKey}/snapshot:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: createDebianSnapshot
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits
+          for it to finish. Ignored by artifactweave, which answers 501 for this ecosystem.
+        in: query
+        name: async
+        schema:
+          description: 1 queues the work, 0 waits for it.
+          enum:
+          - 0
+          - 1
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Debian snapshot request body.
+              properties:
+                distribution:
+                  description: Required within this object. Debian distribution the snapshot is taken
+                    for.
+                  type: string
+                tag:
+                  description: Required within this object. Name given to the snapshot.
+                  type: string
+                targetRepo:
+                  description: Required within this object. Repository that receives the snapshot.
+                  type: string
+              required:
+              - tag
+              - targetRepo
+              - distribution
+              type: object
+        description: Snapshot request. Ignored by artifactweave, which answers 501 for the Debian ecosystem.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request is malformed or names something the server cannot act on; the body
+            carries the Artifactory error envelope.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createdebiansnapshot.md
+      x-tier: stub
+  /api/gems/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the RubyGems ecosystem. The operation
+        is kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateRubyGemsIndex
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculaterubygemsindex.md
+      x-tier: stub
+  /api/helm/{repoKey}/reindex:
+    post:
+      description: Regenerates index.yaml for a local or federated Helm repository from every chart archive
+        and provenance file it holds. Use it after bulk uploads that bypassed the normal deploy path or
+        after a restore. The calculation is queued and the response returns at once; clients see the previous
+        index until it completes. Repositories of the helmoci type have no index and reject the call.
+      operationId: calculateHelmChartIndex
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement that the Helm index recalculation was scheduled.
+                type: string
+          description: The recalculation was queued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatehelmchartindex.md
+  /api/helm/{repoKey}/{pathForPartialReindex}/reindex:
+    post:
+      description: Regenerates the Helm index entries for the charts stored under one folder of a local
+        or federated Helm repository, leaving the rest of index.yaml untouched. The folder is a path segment
+        inside the URL, so this operation is routed by a hand-written handler rather than the generated
+        server. Supported for Artifactory parity from 7.105.2.
+      operationId: helmChartsPartialReIndexing
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Folder inside the repository, relative to its root and possibly
+          spanning several segments, whose charts are reindexed.
+        in: path
+        name: pathForPartialReindex
+        required: true
+        schema:
+          description: Folder inside the repository, relative to its root and possibly spanning several
+            segments, whose charts are reindexed.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement that the partial Helm reindex was scheduled.
+                type: string
+          description: The partial recalculation was queued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      - handwritten
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/helmchartspartialreindexing.md
+      x-handwritten: true
+  /api/maven:
+    post:
+      description: Builds or refreshes the Maven indexer archive (the nexus-maven-repository-index that
+        IDEs download) for the listed repositories. This is distinct from maven-metadata.xml generation,
+        which happens on every deploy and through calculateMavenMetadata. Local, remote-cache and virtual
+        repositories are accepted; a virtual repository indexes the union of its members. The calculation
+        runs in the background.
+      operationId: calculateMavenIndex
+      parameters:
+      - description: Optional query parameter. Comma-separated repository keys to index. When omitted
+          every Maven, Gradle, Ivy and SBT repository is indexed.
+        in: query
+        name: repos
+        schema:
+          description: Comma-separated repository keys to index. When omitted every Maven, Gradle, Ivy
+            and SBT repository is indexed.
+          type: string
+      - description: Optional query parameter. 1 rebuilds the index even if nothing changed since the
+          last run; 0 or omitted lets the server skip repositories whose index is current.
+        in: query
+        name: force
+        schema:
+          description: 1 rebuilds the index even if nothing changed since the last run; 0 or omitted lets
+            the server skip repositories whose index is current.
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement listing the repositories whose index was scheduled.
+                type: string
+          description: The index calculation was queued for the requested repositories.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatemavenindex.md
+  /api/maven/calculateMetadata/{repoKey}/{folderPath}:
+    post:
+      description: 'Regenerates maven-metadata.xml for a folder of a local Maven, Gradle, Ivy or SBT repository:
+        artifact-level metadata (versions, latest, release) and snapshot-level metadata (timestamped builds).
+        Recurses into subfolders unless noneRecursive is true. Artifactweave rewrites metadata automatically
+        on deploy and delete, so this is a repair operation for content that arrived another way. The
+        folder is a path segment inside the URL, so the operation is served by a hand-written handler.'
+      operationId: calculateMavenMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Folder inside the repository, relative to its root and possibly
+          spanning several segments, whose maven-metadata.xml files are regenerated.
+        in: path
+        name: folderPath
+        required: true
+        schema:
+          description: Folder inside the repository, relative to its root and possibly spanning several
+            segments, whose maven-metadata.xml files are regenerated.
+          type: string
+      - description: Optional query parameter. When true only the named folder is processed; when false
+          or omitted every subfolder is processed too.
+        in: query
+        name: noneRecursive
+        schema:
+          description: When true only the named folder is processed; when false or omitted every subfolder
+            is processed too.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement naming the folder whose metadata was recalculated.
+                type: string
+          description: Metadata was regenerated for the folder.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      - handwritten
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md
+      x-handwritten: true
+  /api/maven/generatePom/{repoKey}/{jarFilePath}:
+    post:
+      description: Writes a minimal POM next to a JAR that was deployed without one, deriving the coordinates
+        from the repository layout, so Maven clients can resolve the artifact. Local repositories only;
+        an existing POM is left untouched. The JAR path is a path segment inside the URL, so the operation
+        is served by a hand-written handler.
+      operationId: generateMavenPomFile
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Path of the JAR inside the repository, relative to its root
+          and possibly spanning several segments, for which the POM is generated.
+        in: path
+        name: jarFilePath
+        required: true
+        schema:
+          description: Path of the JAR inside the repository, relative to its root and possibly spanning
+            several segments, for which the POM is generated.
+          type: string
+      responses:
+        '200':
+          description: A POM was generated for the JAR, or one already existed. No body is returned.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      - handwritten
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md
+      x-handwritten: true
+  /api/npm/{repoKey}/reindex:
+    post:
+      description: Rebuilds the packuments and dist-tags of a local npm repository from the tarballs it
+        holds, including the .npm metadata cache that install clients read. Local repositories only; remote
+        and virtual repositories derive their metadata on demand. The rebuild runs in the background.
+      operationId: calculateNpmRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement that the npm metadata rebuild was scheduled.
+                type: string
+          description: The npm metadata rebuild was queued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenpmrepositorymetadata.md
+  /api/nuget/{repoKey}/reindex:
+    post:
+      description: Rebuilds the NuGet metadata index (the nuspec-derived data behind the v2 feed, the
+        v3 registration pages and search) for a repository. Accepted for local, remote-cache, remote and
+        virtual NuGet repositories; a virtual repository reindexes its members. Runs in the background.
+      operationId: calculateNuGetRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement that the NuGet metadata rebuild was scheduled.
+                type: string
+          description: The NuGet metadata rebuild was queued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md
+  /api/opkg/reindex/{repoKey}:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Opkg ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateOpkgRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      - description: Optional query parameter. 1 writes package coordinates as item properties during
+          the rebuild, 0 skips them. Ignored by artifactweave, which answers 501 for this ecosystem.
+        in: query
+        name: writeProps
+        schema:
+          description: 1 writes package coordinates as item properties during the rebuild, 0 skips them.
+            Ignored by artifactweave, which answers 501 for this ecosystem.
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateopkgrepositorymetadata.md
+      x-tier: stub
+  /api/pub/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Pub ecosystem. The operation is kept
+        in the specification so the API surface matches Artifactory and clients get the Artifactory error
+        envelope rather than a 404.'
+      operationId: calculatePubRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepubrepositorymetadata.md
+      x-tier: stub
+  /api/puppet/{repoKey}/v3/modules:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: getPuppetModules
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Puppet Forge style paginated listing; never produced here.
+                properties:
+                  current:
+                    description: Optional within this object. URL of the current page of results.
+                    type: string
+                  limit:
+                    description: Optional within this object. Page size the upstream Forge API applied.
+                    type: integer
+                  next:
+                    description: Optional within this object. URL of the next page, or null on the last
+                      page.
+                    type: string
+                  offset:
+                    description: Optional within this object. Index of the first result on this page.
+                    type: integer
+                  previous:
+                    description: Optional within this object. URL of the previous page, or null on the
+                      first page.
+                    type: string
+                  results:
+                    description: Optional within this object. Forge module or release records for this
+                      page.
+                    items:
+                      description: One element of the list.
+                      type: object
+                    type: array
+                  total:
+                    description: Optional within this object. Total number of records across all pages.
+                    type: integer
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetmodules.md
+      x-tier: stub
+  /api/puppet/{repoKey}/v3/modules/{userModule}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: getPuppetModuleInfo
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Puppet module coordinates in user-module form.
+        in: path
+        name: userModule
+        required: true
+        schema:
+          description: Puppet module coordinates in user-module form.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Free-form JSON document Artifactory returns; never produced here.
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetmoduleinfo.md
+      x-tier: stub
+  /api/puppet/{repoKey}/v3/releases:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: getPuppetReleases
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Puppet Forge style paginated listing; never produced here.
+                properties:
+                  current:
+                    description: Optional within this object. URL of the current page of results.
+                    type: string
+                  limit:
+                    description: Optional within this object. Page size the upstream Forge API applied.
+                    type: integer
+                  next:
+                    description: Optional within this object. URL of the next page, or null on the last
+                      page.
+                    type: string
+                  offset:
+                    description: Optional within this object. Index of the first result on this page.
+                    type: integer
+                  previous:
+                    description: Optional within this object. URL of the previous page, or null on the
+                      first page.
+                    type: string
+                  results:
+                    description: Optional within this object. Forge module or release records for this
+                      page.
+                    items:
+                      description: One element of the list.
+                      type: object
+                    type: array
+                  total:
+                    description: Optional within this object. Total number of records across all pages.
+                    type: integer
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetreleases.md
+      x-tier: stub
+  /api/puppet/{repoKey}/v3/releases/{userModuleVersion}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: getPuppetReleaseInfo
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Puppet release coordinates in user-module-version form.
+        in: path
+        name: userModuleVersion
+        required: true
+        schema:
+          description: Puppet release coordinates in user-module-version form.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Free-form JSON document Artifactory returns; never produced here.
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpuppetreleaseinfo.md
+      x-tier: stub
+  /api/pypi/{repoKey}/reindex:
+    post:
+      description: Rebuilds the simple index pages and the per-project JSON of a local PyPI repository
+        from the distribution files it holds, normalising project names as PEP 503 requires. Local repositories
+        only. With async=true the server queues the rebuild and returns immediately; otherwise the response
+        waits for it to finish.
+      operationId: calculatePypiRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement of the PyPI reindex.
+                type: string
+          description: The PyPI metadata was rebuilt, or the rebuild was queued when async was requested.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md
+  /api/pypi/{repository}/pypi/{package}/json:
+    get:
+      description: 'Returns the PyPI JSON API document for the latest version of a project in a PyPI repository,
+        in the shape pypi.org serves at /pypi/<project>/json: an info object with the core metadata, a
+        releases map keyed by version, and the urls list of the latest release''s files. Served for local
+        repositories and for remote and virtual repositories whose upstream exposes the JSON API. The
+        project name is normalised before lookup.'
+      operationId: getPypiLatestPackageVersionMetadataInJson
+      parameters:
+      - description: Required path parameter. Key of the PyPI repository (local, remote or virtual) to
+          read from.
+        in: path
+        name: repository
+        required: true
+        schema:
+          description: Key of the PyPI repository (local, remote or virtual) to read from.
+          type: string
+      - description: Required path parameter. PyPI project name. Normalised per PEP 503 (case-insensitive,
+          runs of '-', '_' and '.' collapse to '-') before lookup.
+        in: path
+        name: package
+        required: true
+        schema:
+          description: PyPI project name. Normalised per PEP 503 (case-insensitive, runs of '-', '_' and
+            '.' collapse to '-') before lookup.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A PyPI JSON API document (info, releases, urls, last_serial). The shape follows
+                  pypi.org and is not constrained further here.
+                type: object
+          description: The JSON document for the latest version.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypilatestpackageversionmetadatainjson.md
+  /api/pypi/{repository}/pypi/{package}/{version}/json:
+    get:
+      description: 'Returns the PyPI JSON API document for one version of a project, in the shape pypi.org
+        serves at /pypi/<project>/<version>/json: the info object for that version and the urls list of
+        its files. Served for local repositories and for remote and virtual repositories whose upstream
+        exposes the JSON API. The project name is normalised before lookup.'
+      operationId: getPypiPackageVersionMetadataInJson
+      parameters:
+      - description: Required path parameter. Key of the PyPI repository (local, remote or virtual) to
+          read from.
+        in: path
+        name: repository
+        required: true
+        schema:
+          description: Key of the PyPI repository (local, remote or virtual) to read from.
+          type: string
+      - description: Required path parameter. PyPI project name. Normalised per PEP 503 (case-insensitive,
+          runs of '-', '_' and '.' collapse to '-') before lookup.
+        in: path
+        name: package
+        required: true
+        schema:
+          description: PyPI project name. Normalised per PEP 503 (case-insensitive, runs of '-', '_' and
+            '.' collapse to '-') before lookup.
+          type: string
+      - description: Required path parameter. Exact release version string of the project as it appears
+          in the index.
+        in: path
+        name: version
+        required: true
+        schema:
+          description: Exact release version string of the project as it appears in the index.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A PyPI JSON API document (info, urls, last_serial) for one release. The shape
+                  follows pypi.org and is not constrained further here.
+                type: object
+          description: The JSON document for the requested version.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getpypipackageversionmetadatainjson.md
+  /api/swift/{repoKey}/reindex:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the Swift ecosystem. The operation is
+        kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateSwiftIndex
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateswiftindex.md
+      x-tier: stub
+  /api/terraform/{repoKey}/reindex:
+    post:
+      description: Rebuilds the module and provider registry indexes of a local Terraform repository from
+        the uploaded archives, SHA256SUMS and signature files, so the versions and download endpoints
+        reflect everything on disk. Local repositories only; the repository's terraformType decides which
+        index is built. Runs in the background.
+      operationId: calculateTerraformIndex
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text acknowledgement that the Terraform index rebuild was scheduled.
+                type: string
+          description: The Terraform index rebuild was queued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateterraformindex.md
+  /api/vcs/branches/{repoKey}/{userOrg}/{repo}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: getVcsBranches
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: List of Git references; never produced here.
+                items:
+                  description: One element of the list.
+                  properties:
+                    commitId:
+                      description: Optional within this object. Commit the reference points at.
+                      type: string
+                    isBranch:
+                      description: Optional within this object. True for a branch, false for a tag.
+                      type: boolean
+                    name:
+                      description: Optional within this object. Reference name as reported by the upstream
+                        provider.
+                      type: string
+                  type: object
+                type: array
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcsbranches.md
+      x-tier: stub
+  /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsBranchAlternative
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the branch to download.
+        in: path
+        name: branchName
+        required: true
+        schema:
+          description: Name of the branch to download.
+          type: string
+      - description: Optional query parameter. Archive format to produce. Ignored by artifactweave, which
+          answers 501 for the VCS ecosystem.
+        in: query
+        name: ext
+        schema:
+          default: tar.gz
+          description: Archive format to produce. Ignored by artifactweave, which answers 501 for the
+            VCS ecosystem.
+          enum:
+          - tar.gz
+          - zip
+          type: string
+      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
+          form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+        in: query
+        name: properties
+        schema:
+          description: Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave,
+            which answers 501 for the VCS ecosystem.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranchalternative.md
+      x-tier: stub
+  /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsBranchFromSubgroupRepository
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the branch to download.
+        in: path
+        name: branchName
+        required: true
+        schema:
+          description: Name of the branch to download.
+          type: string
+      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
+          form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+        in: query
+        name: properties
+        schema:
+          description: Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave,
+            which answers 501 for the VCS ecosystem.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranchfromsubgrouprepository.md
+      x-tier: stub
+  /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsBranch
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the branch to download.
+        in: path
+        name: branchName
+        required: true
+        schema:
+          description: Name of the branch to download.
+          type: string
+      - description: Optional query parameter. Archive format to produce. Ignored by artifactweave, which
+          answers 501 for the VCS ecosystem.
+        in: query
+        name: ext
+        schema:
+          default: tar.gz
+          description: Archive format to produce. Ignored by artifactweave, which answers 501 for the
+            VCS ecosystem.
+          enum:
+          - tar.gz
+          - zip
+          type: string
+      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
+          form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+        in: query
+        name: properties
+        schema:
+          description: Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave,
+            which answers 501 for the VCS ecosystem.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsbranch.md
+      x-tier: stub
+  /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadFileWithinVcsBranchAlternative
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the branch to download.
+        in: path
+        name: branchName
+        required: true
+        schema:
+          description: Name of the branch to download.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcsbranchalternative.md
+      x-tier: stub
+  /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadFileInVcsBranchInSubgroupRepository
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the branch to download.
+        in: path
+        name: branchName
+        required: true
+        schema:
+          description: Name of the branch to download.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfileinvcsbranchinsubgrouprepository.md
+      x-tier: stub
+  /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadFileWithinVcsBranch
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the branch to download.
+        in: path
+        name: branchName
+        required: true
+        schema:
+          description: Name of the branch to download.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcsbranch.md
+      x-tier: stub
+  /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsCommit
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Commit identifier to download.
+        in: path
+        name: commitId
+        required: true
+        schema:
+          description: Commit identifier to download.
+          type: string
+      - description: Optional query parameter. Archive format to produce. Ignored by artifactweave, which
+          answers 501 for the VCS ecosystem.
+        in: query
+        name: ext
+        schema:
+          default: tar.gz
+          description: Archive format to produce. Ignored by artifactweave, which answers 501 for the
+            VCS ecosystem.
+          enum:
+          - tar.gz
+          - zip
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcscommit.md
+      x-tier: stub
+  /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsRelease
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the release whose assets are downloaded.
+        in: path
+        name: releaseName
+        required: true
+        schema:
+          description: Name of the release whose assets are downloaded.
+          type: string
+      - description: Optional query parameter. Archive format to produce. Ignored by artifactweave, which
+          answers 501 for the VCS ecosystem.
+        in: query
+        name: ext
+        schema:
+          default: tar.gz
+          description: Archive format to produce. Ignored by artifactweave, which answers 501 for the
+            VCS ecosystem.
+          enum:
+          - tar.gz
+          - zip
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcsrelease.md
+      x-tier: stub
+  /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsTagFromSubgroupRepository
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the tag to download.
+        in: path
+        name: tagName
+        required: true
+        schema:
+          description: Name of the tag to download.
+          type: string
+      - description: Optional query parameter. Properties to attach to the downloaded archive in key=value
+          form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+        in: query
+        name: properties
+        schema:
+          description: Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave,
+            which answers 501 for the VCS ecosystem.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstagfromsubgrouprepository.md
+      x-tier: stub
+  /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsTag
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the tag to download.
+        in: path
+        name: tagName
+        required: true
+        schema:
+          description: Name of the tag to download.
+          type: string
+      - description: Optional query parameter. Archive format to produce. Ignored by artifactweave, which
+          answers 501 for the VCS ecosystem.
+        in: query
+        name: ext
+        schema:
+          default: tar.gz
+          description: Archive format to produce. Ignored by artifactweave, which answers 501 for the
+            VCS ecosystem.
+          enum:
+          - tar.gz
+          - zip
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstag.md
+      x-tier: stub
+  /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadVcsTagAlternative
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the tag to download.
+        in: path
+        name: tagName
+        required: true
+        schema:
+          description: Name of the tag to download.
+          type: string
+      - description: Optional query parameter. Archive format to produce. Ignored by artifactweave, which
+          answers 501 for the VCS ecosystem.
+        in: query
+        name: ext
+        schema:
+          default: tar.gz
+          description: Archive format to produce. Ignored by artifactweave, which answers 501 for the
+            VCS ecosystem.
+          enum:
+          - tar.gz
+          - zip
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadvcstagalternative.md
+      x-tier: stub
+  /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadFileInVcsTagInSubgroupRepository
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the tag to download.
+        in: path
+        name: tagName
+        required: true
+        schema:
+          description: Name of the tag to download.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfileinvcstaginsubgrouprepository.md
+      x-tier: stub
+  /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadFileWithinVcsTag
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the tag to download.
+        in: path
+        name: tagName
+        required: true
+        schema:
+          description: Name of the tag to download.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcstag.md
+      x-tier: stub
+  /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: downloadFileWithinVcsTagAlternative
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the tag to download.
+        in: path
+        name: tagName
+        required: true
+        schema:
+          description: Name of the tag to download.
+          type: string
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                description: Archive bytes Artifactory would stream; never produced here.
+                format: binary
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository, package or path named in the request does not exist; the body carries
+            the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/downloadfilewithinvcstagalternative.md
+      x-tier: stub
+  /api/vcs/refs/{repoKey}/{userOrg}/{repo}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: getVcsRefs
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: List of Git references; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcsrefs.md
+      x-tier: stub
+  /api/vcs/tags/{repoKey}/{userOrg}/{repo}:
+    get:
+      description: 'Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem.
+        The operation is kept in the specification so the API surface matches Artifactory and clients
+        get the Artifactory error envelope rather than a 404.'
+      operationId: getVcsTags
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Required path parameter. Owner or organisation segment of the upstream Git repository.
+        in: path
+        name: userOrg
+        required: true
+        schema:
+          description: Owner or organisation segment of the upstream Git repository.
+          type: string
+      - description: Required path parameter. Name of the upstream Git repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Name of the upstream Git repository.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: List of Git references; never produced here.
+                items:
+                  description: One element of the list.
+                  properties:
+                    commitId:
+                      description: Optional within this object. Commit the reference points at.
+                      type: string
+                    isBranch:
+                      description: Optional within this object. True for a branch, false for a tag.
+                      type: boolean
+                    name:
+                      description: Optional within this object. Reference name as reported by the upstream
+                        provider.
+                      type: string
+                  type: object
+                type: array
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getvcstags.md
+      x-tier: stub
+  /api/yum/{repoKey}:
+    post:
+      description: 'Not supported: artifactweave answers 501 for the RPM/YUM ecosystem. The operation
+        is kept in the specification so the API surface matches Artifactory and clients get the Artifactory
+        error envelope rather than a 404.'
+      operationId: calculateYumRepositoryMetadata
+      parameters:
+      - description: Required path parameter. Key of the repository to act on. The repository's package
+          type must match this operation's ecosystem; a mismatch is rejected with 400.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: Key of the repository to act on. The repository's package type must match this
+            operation's ecosystem; a mismatch is rejected with 400.
+          type: string
+      - description: Optional query parameter. Sub-path to limit the calculation to. Ignored by artifactweave,
+          which answers 501 for this ecosystem.
+        in: query
+        name: path
+        schema:
+          description: Sub-path to limit the calculation to. Ignored by artifactweave, which answers 501
+            for this ecosystem.
+          type: string
+      - description: Optional query parameter. When true the server queues the work and returns at once;
+          when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+        in: query
+        name: async
+        schema:
+          description: When true the server queues the work and returns at once; when false or omitted
+            the response waits for the work to finish. Artifactory defaults to synchronous.
+          type: boolean
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text body Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory
+            error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory
+            error envelope.
+      tags:
+      - specific
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculateyumrepositorymetadata.md
+      x-tier: stub

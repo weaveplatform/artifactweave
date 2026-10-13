@@ -1,0 +1,34 @@
+# Shared schemas: the error envelope and the system documents.
+components:
+  schemas:
+    AccessVersion:
+      type: object
+      additionalProperties: false
+      required: [name, version]
+      properties:
+        name:
+          type: string
+          description: >-
+            Required within this object. The compatibility version; the platform
+            provider reads this field, not version.
+        version:
+          type: string
+          description: Required within this object. The same value as name.
+    ErrorResponse:
+      type: object
+      description: The Access error envelope used by every /access response.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          description: Required within this object. One entry per error; clients read the first.
+          items:
+            type: object
+            required: [code, message]
+            properties:
+              code:
+                type: string
+                description: Required within this object. A symbolic code such as NOT_FOUND.
+              message:
+                type: string
+                description: Required within this object. Human readable explanation.

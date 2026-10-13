@@ -1,0 +1,1428 @@
+components:
+  parameters:
+    DockerImageName:
+      description: Required path parameter. The image name inside the Docker repository, including any namespace
+        segments.
+      in: path
+      name: imageName
+      required: true
+      schema:
+        description: Image name as the Docker client sends it, for example library/nginx.
+        minLength: 1
+        type: string
+    DockerRepoKey:
+      description: Required path parameter. Key of the Docker or OCI repository to list.
+      in: path
+      name: repo-key
+      required: true
+      schema:
+        description: Repository key.
+        minLength: 1
+        type: string
+    Repos:
+      description: 'Optional query parameter. Comma-separated repository keys that limit the search. Omitted means
+        every repository the caller may read. Which classes are searched depends on the operation: most searches
+        cover local repositories and remote caches, and only those that say so include virtual repositories.'
+      in: query
+      name: repos
+      schema:
+        description: Comma-separated repository keys.
+        type: string
+    XResultDetail:
+      description: Optional header parameter. Widens each result from a bare uri to the file info document (info),
+        the item properties (properties), or both (info, properties). Omitted returns only uri.
+      in: header
+      name: X-Result-Detail
+      required: false
+      schema:
+        description: One of info, properties, or info, properties.
+        enum:
+        - info
+        - properties
+        - info, properties
+        type: string
+  responses:
+    ArtifactorySearchesApiBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The query was malformed, for example a missing required parameter, an AQL body over the size
+        limit, or a pattern containing **.
+    ArtifactorySearchesApiForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The caller is authenticated but lacks read permission on the repositories searched, or is anonymous
+        on a search that requires a named user.
+    ArtifactorySearchesApiInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The search failed inside the server. The envelope carries the reason.
+    ArtifactorySearchesApiNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The repository, image or path named in the request does not exist or is not visible to the caller.
+    ArtifactorySearchesApiUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: Credentials were missing or rejected on a search that does not allow anonymous access.
+  schemas:
+    AqlRange:
+      description: Describes which slice of the full result set the results array holds. Positions are zero-based
+        and end_pos is exclusive.
+      properties:
+        end_pos:
+          description: Optional within this object. Index one past the last returned result.
+          type: integer
+        limit:
+          description: Optional within this object. The limit the query asked for, present only when .limit() was
+            used.
+          type: integer
+        notification:
+          description: Optional within this object. Present only when the server trimmed the result set at its hard
+            limit; the text says so.
+          type: string
+        start_pos:
+          description: Optional within this object. Index of the first returned result; equals the offset the query
+            asked for.
+          type: integer
+        total:
+          description: Optional within this object. Number of results in this response, not the number of matches
+            overall.
+          type: integer
+      type: object
+    ArchiveSearchResult:
+      description: Result of the deprecated archive entry search. Kept for parity; artifactweave answers it only
+        until AQL covers the use case and may remove it when Artifactory does.
+      properties:
+        results:
+          description: Optional within this object. One entry per archive member name that matched.
+          items:
+            description: A matching archive member and the archives that contain it.
+            properties:
+              archiveUris:
+                description: Optional within this object. File info URIs of the archives that contain the entry.
+                items:
+                  description: A file info URI under /api/storage.
+                  format: uri
+                  type: string
+                type: array
+              entry:
+                description: Optional within this object. Path of the member inside the archive.
+                type: string
+            type: object
+          type: array
+      type: object
+    ArtifactorySearchesApiBuildArtifactsRequest:
+      description: Selects a build whose artifacts should be listed. Served once build-info lands; until then the
+        operation answers 501.
+      properties:
+        buildName:
+          description: Required within this object. Name of the build as published with jf rt build-publish.
+          minLength: 1
+          type: string
+        buildNumber:
+          description: Required within this object. Build number, or LATEST for the most recent run.
+          minLength: 1
+          type: string
+        buildStatus:
+          description: Optional within this object. Restricts the match to builds whose latest promotion status
+            equals this value.
+          type: string
+        mappings:
+          description: Optional within this object. Regular expressions that an artifact path must match to be returned.
+            Omitted returns every artifact of the build.
+          items:
+            description: One pattern to filter by.
+            properties:
+              input:
+                description: Optional within this object. Regular expression applied to the artifact path.
+                type: string
+            type: object
+          type: array
+        repos:
+          description: Optional within this object. Repository keys to look in. Omitted searches every readable
+            repository.
+          items:
+            description: A repository key.
+            type: string
+          type: array
+      required:
+      - buildName
+      - buildNumber
+      type: object
+    BadChecksumSearchResult:
+      description: Items whose checksum declared by the uploading client differs from, or is missing against, the
+        checksum the server computed from the content.
+      properties:
+        results:
+          description: Optional within this object. At most 10,000 entries; the server stops counting at that cap.
+          items:
+            description: One item with a disputed checksum.
+            properties:
+              clientMd5:
+                description: Optional within this object. The checksum the client declared on upload, or an empty
+                  string when none was sent. Despite the name the field carries the checksum of the type requested.
+                type: string
+              serverMd5:
+                description: Optional within this object. The checksum the server computed from the stored content.
+                type: string
+              uri:
+                description: Optional within this object. File info URI of the item under /api/storage.
+                type: string
+            type: object
+          type: array
+      type: object
+    BuildArtifactsSearchResult:
+      description: Download URIs of the artifacts a build produced.
+      properties:
+        results:
+          description: Optional within this object. One entry per artifact.
+          items:
+            description: One build artifact.
+            properties:
+              downloadUri:
+                description: Optional within this object. Absolute URL from which the artifact can be downloaded,
+                  rendered through the base URL resolver.
+                format: uri
+                type: string
+            type: object
+          type: array
+      type: object
+    BuildDependencySearchResult:
+      description: Builds that list the given artifact among their dependencies.
+      properties:
+        results:
+          description: Optional within this object. One entry per build run.
+          items:
+            description: One build run.
+            properties:
+              uri:
+                description: Optional within this object. URI of the build run under /api/build.
+                type: string
+            type: object
+          type: array
+      type: object
+    CreationSearchResult:
+      description: Items created inside the requested time window.
+      properties:
+        results:
+          description: Optional within this object. One entry per item.
+          items:
+            description: One created item.
+            properties:
+              created:
+                description: Optional within this object. Creation time in ISO 8601 with milliseconds and offset.
+                format: date-time
+                type: string
+              uri:
+                description: Optional within this object. File info URI of the item under /api/storage.
+                type: string
+            type: object
+          type: array
+      type: object
+    DatesSearchResult:
+      description: Items with at least one of the requested date fields inside the window. Only the fields named
+        in dateFields are present on each entry.
+      properties:
+        results:
+          description: Optional within this object. One entry per item.
+          items:
+            description: One item and the date fields that were requested.
+            properties:
+              created:
+                description: Optional within this object. Creation time, present when dateFields includes created.
+                format: date-time
+                type: string
+              lastDownloaded:
+                description: Optional within this object. Last download time, present when dateFields includes lastDownloaded.
+                  Note the storage API's stats view returns the same instant as epoch milliseconds.
+                format: date-time
+                type: string
+              lastModified:
+                description: Optional within this object. Last modification time, present when dateFields includes
+                  lastModified.
+                format: date-time
+                type: string
+              uri:
+                description: Optional within this object. File info URI of the item under /api/storage.
+                type: string
+            type: object
+          type: array
+      type: object
+    ErrorDetail:
+      description: One entry of the Artifactory error envelope.
+      properties:
+        message:
+          description: Required within this object. Human-readable reason.
+          minLength: 1
+          type: string
+        status:
+          description: Optional within this object. The HTTP status repeated inside the body.
+          type: integer
+      required:
+      - message
+      type: object
+    GavcSearchResult:
+      description: Items matching the Maven coordinates. With specific=false each entry carries uri; with specific=true
+        the entry carries downloadUri, ext, version and classifier instead.
+      properties:
+        results:
+          description: Optional within this object. One entry per matching item.
+          items:
+            description: One matching item in either the default or the specific shape.
+            properties:
+              classifier:
+                description: Optional within this object. Maven classifier taken from the layout, present only with
+                  specific=true.
+                type: string
+              downloadUri:
+                description: Optional within this object. Absolute download URL, present only with specific=true.
+                format: uri
+                type: string
+              ext:
+                description: Optional within this object. File extension taken from the layout, present only with
+                  specific=true.
+                type: string
+              uri:
+                description: Optional within this object. File info URI under /api/storage, present only with specific=false.
+                type: string
+              version:
+                description: Optional within this object. Version taken from the layout, present only with specific=true.
+                type: string
+            type: object
+          type: array
+      type: object
+    LatestVersionByPropertiesResult:
+      description: The highest version found among items carrying a lowercase version property, and the items that
+        carry it.
+      properties:
+        artifacts:
+          description: Optional within this object. Items at the winning version. Contains the folder URI by default
+            and the file URIs when listFiles=1.
+          items:
+            description: One item at the latest version.
+            properties:
+              uri:
+                description: Optional within this object. Absolute storage URI of the item.
+                format: uri
+                type: string
+            type: object
+          type: array
+        version:
+          description: Optional within this object. The winning version string, compared with Maven version ordering.
+          type: string
+      type: object
+    LicenseSearchResult:
+      description: Items tagged with licence information. artifactweave stores licence tags as ordinary properties
+        and this search reads them; automatic discovery is not supported.
+      properties:
+        results:
+          description: Optional within this object. One entry per item and licence.
+          items:
+            description: One item with its licence status.
+            properties:
+              found:
+                description: Optional within this object. Licence name discovered by automatic detection. Always
+                  empty in artifactweave because autofind is not implemented.
+                type: string
+              license:
+                description: Optional within this object. Licence name stored on the item.
+                type: string
+              status:
+                description: 'Optional within this object. Approval status of the licence: approved, unapproved,
+                  neutral or unknown.'
+                enum:
+                - approved
+                - unapproved
+                - neutral
+                - unknown
+                type: string
+              uri:
+                description: Optional within this object. File info URI of the item under /api/storage.
+                type: string
+            type: object
+          type: array
+      type: object
+    PatternSearchResult:
+      description: Files matching an Ant path pattern inside one repository.
+      properties:
+        files:
+          description: Optional within this object. Paths relative to the repository root, in the order found.
+          items:
+            description: A repository-relative file path.
+            type: string
+          type: array
+        repositoryUri:
+          description: Optional within this object. Absolute storage URI of the repository that was searched.
+          format: uri
+          type: string
+        sourcePattern:
+          description: Optional within this object. The pattern as received, including the repository key prefix.
+          type: string
+      type: object
+    UriSearchResult:
+      description: 'The common search result: a list of file info URIs. With X-Result-Detail each entry also carries
+        the file info fields and, when requested, a properties map.'
+      properties:
+        results:
+          description: Optional within this object. One entry per matching item; empty when nothing matched.
+          items:
+            description: One matching item.
+            properties:
+              uri:
+                description: Optional within this object. File info URI of the item under /api/storage, rendered
+                  through the base URL resolver.
+                type: string
+            type: object
+          type: array
+      type: object
+    UsageSearchResult:
+      description: Items that have not been downloaded since the given instant.
+      properties:
+        results:
+          description: Optional within this object. One entry per item.
+          items:
+            description: One unused item.
+            properties:
+              lastDownloaded:
+                description: Optional within this object. Last download time in ISO 8601, or absent when the item
+                  was never downloaded.
+                format: date-time
+                type: string
+              uri:
+                description: Optional within this object. File info URI of the item under /api/storage.
+                type: string
+            type: object
+          type: array
+      type: object
+    VersionSearchResult:
+      description: Versions found for the given Maven group and artifact, ordered newest first.
+      properties:
+        results:
+          description: Optional within this object. One entry per distinct version.
+          items:
+            description: One version.
+            properties:
+              integration:
+                description: Optional within this object. True for integration (snapshot) versions, false for releases.
+                type: boolean
+              version:
+                description: Optional within this object. The version string as the layout extracted it.
+                type: string
+            type: object
+          type: array
+      type: object
+paths:
+  /api/docker/{repo-key}/v2/_catalog:
+    get:
+      description: Lists the image names held in one Docker or OCI repository, in the shape of the Docker registry
+        _catalog extension. The caller needs read permission on the repository. For remote repositories artifactweave
+        lists the cache. Results are sorted and paginated with n and last exactly as the registry API does, so clients
+        can reuse their registry pagination code.
+      operationId: listDockerRepositories
+      parameters:
+      - $ref: '#/components/parameters/DockerRepoKey'
+      - description: Optional query parameter. Maximum number of names to return. Omitted returns every name.
+        in: query
+        name: n
+        schema:
+          description: Page size, a positive integer.
+          type: integer
+      - description: Optional query parameter. The last image name of the previous page; the response starts after
+          it.
+        in: query
+        name: last
+        schema:
+          description: An image name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The registry catalogue document.
+                properties:
+                  repositories:
+                    description: Optional within this object. Image names in the repository, sorted.
+                    items:
+                      description: An image name, for example library/nginx.
+                      type: string
+                    type: array
+                type: object
+          description: The image names, possibly a page of them.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockerrepositories.md
+  /api/docker/{repo-key}/v2/parentManifests:
+    post:
+      description: Finds the multi-platform manifest lists that reference a given image manifest, so a caller can
+        learn which fat tags would change if the platform image were deleted. The caller needs read permission on
+        the repository.
+      operationId: findParentManifestLists
+      parameters:
+      - $ref: '#/components/parameters/DockerRepoKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Identifies one image manifest by name and tag.
+              properties:
+                dockerRepository:
+                  description: Required within this object. Image name inside the repository.
+                  type: string
+                tag:
+                  description: Required within this object. Tag of the platform-specific manifest.
+                  type: string
+              required:
+              - dockerRepository
+              - tag
+              type: object
+        description: The platform-specific image to look up.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Parent manifest lists of the queried image.
+                properties:
+                  parentManifestLists:
+                    description: Optional within this object. One entry per manifest list that references the image.
+                    items:
+                      description: One referencing manifest list.
+                      properties:
+                        digest:
+                          description: Optional within this object. Digest of the manifest list, as sha256:hex.
+                          type: string
+                        dockerRepository:
+                          description: Optional within this object. Image name the manifest list belongs to.
+                          type: string
+                        tags:
+                          description: Optional within this object. Tags that currently point at the manifest list.
+                          items:
+                            description: A tag name.
+                            type: string
+                          type: array
+                      type: object
+                    type: array
+                type: object
+          description: The manifest lists that include the manifest; empty when none does.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/findparentmanifestlists.md
+  /api/docker/{repo-key}/v2/{imageName}/tags/list:
+    get:
+      description: Lists the tags of one image in the shape of the registry tags endpoint. Tags that are not valid
+        under the OCI and Docker naming rules are omitted. The caller needs read permission on the repository. Pagination
+        with n and last behaves as in the registry API; the response omits the Link header the registry would add.
+      operationId: listDockerTags
+      parameters:
+      - $ref: '#/components/parameters/DockerRepoKey'
+      - $ref: '#/components/parameters/DockerImageName'
+      - description: Optional query parameter. Maximum number of tags to return. Omitted returns every tag.
+        in: query
+        name: n
+        schema:
+          description: Page size, a positive integer.
+          type: integer
+      - description: Optional query parameter. The last tag of the previous page; the response starts after it.
+        in: query
+        name: last
+        schema:
+          description: A tag name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The registry tags document.
+                properties:
+                  name:
+                    description: Optional within this object. The image name that was queried.
+                    type: string
+                  tags:
+                    description: Optional within this object. Tag names, sorted.
+                    items:
+                      description: A tag name.
+                      type: string
+                    type: array
+                type: object
+          description: The tags, possibly a page of them.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockertags.md
+  /api/search/aql:
+    post:
+      description: 'Runs an Artifactory Query Language query. The body is the query text, not JSON, and is limited
+        to 6,000 characters; longer bodies are rejected with 400. A query has the form domain.find(criteria).include(fields).sort({"$asc"|"$desc":[fields]}).offset(n).limit(n),
+        and may add .transitive() (accepted and ignored) and .distinct(bool) (default true). The JFrog CLI emits
+        the suffixes in the order include, sort, offset, transitive, limit. Domains are items, properties, builds,
+        build.promotions and the dotted secondary domains reachable from them; the archive.entries domain is not
+        supported. Criteria are JSON objects: {"field":value} means $eq; {"field":{"$op":value}} with $eq, $ne,
+        $gt, $gte, $lt, $lte, $match, $nmatch, $before and $last; $and and $or combine them and siblings are an
+        implicit $and; {"@key":value} and {"@*":value} address properties; {"$msp":[...]} matches on a single property.
+        Wildcards * and ? apply only with $match and $nmatch and are matched case-sensitively. sort, offset and
+        limit apply only when include names fields of the primary domain. An authenticated user is required; a user
+        without admin rights may query only the items domain and must constrain repo, path and name. The optional
+        scan-factor header is accepted and ignored.'
+      operationId: searchAql
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: Query text, at most 6,000 characters.
+              type: string
+        description: The AQL query as plain text.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: AQL result document.
+                properties:
+                  range:
+                    allOf:
+                    - $ref: '#/components/schemas/AqlRange'
+                    description: Optional within this object. Describes which slice of the full result set the results
+                      array holds. Positions are zero-based and end_pos is exclusive.
+                  results:
+                    description: Optional within this object. One object per matching record. Items carry repo,
+                      path (. for the root, no leading slash), name, type, size, created, created_by, modified,
+                      modified_by and updated by default; include widens or narrows the fields and may add a properties
+                      array or a stats object.
+                    items:
+                      description: One record of the queried domain with the included fields.
+                      type: object
+                    type: array
+                type: object
+          description: The matching records and the range they cover.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - handwritten
+      - searches
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchaql.md
+  /api/search/archive:
+    get:
+      description: Deprecated search for entries inside archives by member name. Artifactory has scheduled it for
+        removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the
+        next major release; prefer AQL.
+      operationId: searchArchive
+      parameters:
+      - description: Optional query parameter. Member name or fragment to look for inside archives; * and ? wildcards
+          are allowed.
+        in: query
+        name: name
+        schema:
+          description: Archive member name pattern.
+          type: string
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ArchiveEntrySearchResult+json:
+              schema:
+                $ref: '#/components/schemas/ArchiveSearchResult'
+          description: Archive members that matched and the archives holding them.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searcharchive.md
+      x-tier: deprecated
+  /api/search/artifact:
+    get:
+      description: Finds files whose name contains the given text. Only local repositories and remote caches are
+        searched; a virtual repository key in repos is ignored. Anonymous callers may search when anonymous access
+        is enabled. Each result is a file info URI unless X-Result-Detail asks for more.
+      operationId: searchArtifact
+      parameters:
+      - description: Required query parameter. Substring of the file name; * and ? wildcards are allowed.
+        in: query
+        name: name
+        required: true
+        schema:
+          description: File name fragment.
+          minLength: 1
+          type: string
+      - $ref: '#/components/parameters/Repos'
+      - $ref: '#/components/parameters/XResultDetail'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UriSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ArtifactSearchResult+json:
+              schema:
+                $ref: '#/components/schemas/UriSearchResult'
+          description: Matching files, possibly none.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchartifact.md
+  /api/search/badChecksum:
+    get:
+      description: Finds items whose checksum declared by the uploading client differs from the computed one, or
+        was never declared. The search covers local repositories, remote caches and virtual repositories and returns
+        at most 10,000 results. Anonymous callers may search when anonymous access is enabled.
+      operationId: searchBadChecksum
+      parameters:
+      - description: 'Required query parameter. Which checksum to compare: md5 or sha1.'
+        in: query
+        name: type
+        required: true
+        schema:
+          description: md5 or sha1.
+          enum:
+          - md5
+          - sha1
+          type: string
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BadChecksumSearchResult'
+            application/vnd.org.jfrog.artifactory.search.BadChecksumSearchResult+json:
+              schema:
+                $ref: '#/components/schemas/BadChecksumSearchResult'
+          description: Items with a disputed checksum of the requested type.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchbadchecksum.md
+  /api/search/buildArtifacts:
+    post:
+      description: Lists the artifacts a build produced, optionally filtered by repository, promotion status and
+        path patterns. Depends on build-info and answers 501 until that lands.
+      operationId: searchBuildArtifacts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArtifactorySearchesApiBuildArtifactsRequest'
+          application/vnd.org.jfrog.artifactory.search.BuildArtifactsRequest+json:
+            schema:
+              $ref: '#/components/schemas/ArtifactorySearchesApiBuildArtifactsRequest'
+        description: Which build, and optional filters.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildArtifactsSearchResult'
+            application/vnd.org.jfrog.artifactory.search.BuildArtifactsSearchResult+json:
+              schema:
+                $ref: '#/components/schemas/BuildArtifactsSearchResult'
+          description: Download URIs of the build's artifacts.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchbuildartifacts.md
+      x-tier: stub
+  /api/search/checksum:
+    get:
+      description: Finds items whose content has the given checksum. Exactly one of md5, sha1 or sha256 should be
+        given; when several are given all must match. The search covers local repositories, remote caches and virtual
+        repositories. Anonymous callers may search when anonymous access is enabled.
+      operationId: searchChecksum
+      parameters:
+      - description: Optional query parameter. Hex MD5 of the content, 32 characters.
+        in: query
+        name: md5
+        schema:
+          description: Hex MD5.
+          type: string
+      - description: Optional query parameter. Hex SHA-1 of the content, 40 characters.
+        in: query
+        name: sha1
+        schema:
+          description: Hex SHA-1.
+          type: string
+      - description: Optional query parameter. Hex SHA-256 of the content, 64 characters.
+        in: query
+        name: sha256
+        schema:
+          description: Hex SHA-256.
+          type: string
+      - $ref: '#/components/parameters/Repos'
+      - $ref: '#/components/parameters/XResultDetail'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UriSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ChecksumSearchResult+json:
+              schema:
+                $ref: '#/components/schemas/UriSearchResult'
+          description: Items with the given checksum, possibly none.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchchecksum.md
+  /api/search/creation:
+    get:
+      description: Finds items created between two instants. Only local repositories and remote caches are searched.
+        A named user is required; anonymous callers receive 401.
+      operationId: searchCreation
+      parameters:
+      - description: Required query parameter. Start of the window as epoch milliseconds.
+        in: query
+        name: from
+        required: true
+        schema:
+          description: Epoch milliseconds.
+          format: int64
+          type: integer
+      - description: Optional query parameter. End of the window as epoch milliseconds. Omitted means now.
+        in: query
+        name: to
+        schema:
+          description: Epoch milliseconds.
+          format: int64
+          type: integer
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreationSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ArtifactCreationResult+json:
+              schema:
+                $ref: '#/components/schemas/CreationSearchResult'
+          description: Items created inside the window.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchcreation.md
+  /api/search/dates:
+    get:
+      description: Finds items for which at least one of the requested date fields falls inside the window. Only
+        local repositories and remote caches are searched. A named user is required. The fields named in dateFields
+        are the ones returned on each result.
+      operationId: searchDates
+      parameters:
+      - description: Required query parameter. Start of the window, as epoch milliseconds or an ISO 8601 timestamp.
+        in: query
+        name: from
+        required: true
+        schema:
+          description: 'Parsed by the handler: Epoch milliseconds, ISO 8601 timestamp.'
+          type: string
+      - description: Optional query parameter. End of the window, as epoch milliseconds or an ISO 8601 timestamp.
+          Omitted means now.
+        in: query
+        name: to
+        schema:
+          description: 'Parsed by the handler: Epoch milliseconds, ISO 8601 timestamp.'
+          type: string
+      - $ref: '#/components/parameters/Repos'
+      - description: Required query parameter. Comma-separated subset of created, lastModified and lastDownloaded.
+          Each named field is both tested against the window and returned.
+        in: query
+        name: dateFields
+        required: true
+        schema:
+          description: Comma-separated field names.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatesSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ArtifactResult+json:
+              schema:
+                $ref: '#/components/schemas/DatesSearchResult'
+          description: Items with a requested date inside the window.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchdates.md
+  /api/search/dependency:
+    get:
+      description: Finds the builds whose recorded dependencies include the artifact with the given SHA-1. Depends
+        on build-info and answers 501 until that lands.
+      operationId: searchDependency
+      parameters:
+      - description: Required query parameter. Hex SHA-1 of the dependency.
+        in: query
+        name: sha1
+        required: true
+        schema:
+          description: Hex SHA-1.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildDependencySearchResult'
+            application/vnd.org.jfrog.artifactory.search.DependencyBuilds+json:
+              schema:
+                $ref: '#/components/schemas/BuildDependencySearchResult'
+          description: Builds that depend on the artifact.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchdependency.md
+      x-tier: stub
+  /api/search/gavc:
+    get:
+      description: Finds items by Maven coordinates in repositories whose layout defines the group, module, version
+        and classifier tokens (Maven, Gradle, Ivy, sbt). At least one coordinate is required. Without specific the
+        search covers local repositories and remote caches and returns file info URIs; with specific=true it also
+        covers remote and virtual repositories and returns the download URL with the extracted ext, version and
+        classifier. Anonymous callers may search when anonymous access is enabled.
+      operationId: searchGavc
+      parameters:
+      - description: Optional query parameter. Group id; * and ? wildcards are allowed.
+        in: query
+        name: g
+        schema:
+          description: Group id pattern.
+          type: string
+      - description: Optional query parameter. Artifact id; * and ? wildcards are allowed.
+        in: query
+        name: a
+        schema:
+          description: Artifact id pattern.
+          type: string
+      - description: Optional query parameter. Version; * and ? wildcards are allowed.
+        in: query
+        name: v
+        schema:
+          description: Version pattern.
+          type: string
+      - description: Optional query parameter. Classifier; * and ? wildcards are allowed.
+        in: query
+        name: c
+        schema:
+          description: Classifier pattern.
+          type: string
+      - $ref: '#/components/parameters/Repos'
+      - description: Optional query parameter. When true the result entries carry downloadUri, ext, version and
+          classifier instead of uri, and remote and virtual repositories are searched too. Defaults to false.
+        in: query
+        name: specific
+        schema:
+          default: false
+          description: Boolean switch for the minimal result shape.
+          type: boolean
+      - $ref: '#/components/parameters/XResultDetail'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GavcSearchResult'
+            application/vnd.org.jfrog.artifactory.search.GavcSearchResult+json:
+              schema:
+                $ref: '#/components/schemas/GavcSearchResult'
+          description: Matching items in the shape selected by specific.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchgavc.md
+  /api/search/latestVersion:
+    get:
+      description: Returns the highest version of a module as plain text, using the repository layout to extract
+        versions and Maven version ordering to compare them. Without v the highest release is returned; with an
+        integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. By default
+        only local repositories and remote caches are consulted; remote=1 also queries the upstream of remote repositories.
+        The response is the bare version string, not JSON. Returns 404 when nothing matches.
+      operationId: searchLatestVersion
+      parameters:
+      - description: Optional query parameter. Organisation (Maven group id).
+        in: query
+        name: g
+        schema:
+          description: Group id.
+          type: string
+      - description: Optional query parameter. Module name (Maven artifact id). Required unless the layout derives
+          it from the group.
+        in: query
+        name: a
+        schema:
+          description: Module name.
+          type: string
+      - description: Optional query parameter. A version pattern; an integration pattern such as 1.0-SNAPSHOT switches
+          the search to integration versions. * and ? wildcards are allowed.
+        in: query
+        name: v
+        schema:
+          description: Version pattern.
+          type: string
+      - description: Optional query parameter. 1 also asks the upstream of remote repositories; 0 (default) uses
+          local repositories and caches only.
+        in: query
+        name: remote
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A bare version string such as 1.4.2.
+                type: string
+          description: The latest version string.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlatestversion.md
+  /api/search/license:
+    get:
+      description: Finds items whose licence properties match the requested statuses. artifactweave reads the licence
+        tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has
+        no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
+      operationId: searchLicense
+      parameters:
+      - description: Optional query parameter. 1 includes items with an unapproved licence. Defaults to 1.
+        in: query
+        name: unapproved
+        schema:
+          default: 1
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. 1 includes items whose licence is unknown. Defaults to 1.
+        in: query
+        name: unknown
+        schema:
+          default: 1
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. 1 includes items with no licence information at all. Defaults to
+          0.
+        in: query
+        name: notfound
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. 1 includes items with a neutral licence. Defaults to 0.
+        in: query
+        name: neutral
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. 1 includes items with an approved licence. Defaults to 0.
+        in: query
+        name: approved
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: 'Optional query parameter. Accepted for compatibility and ignored: artifactweave does not discover
+          licences. Defaults to 0.'
+        in: query
+        name: autofind
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseSearchResult'
+            application/vnd.org.jfrog.artifactory.search.LicenseResult+json:
+              schema:
+                $ref: '#/components/schemas/LicenseSearchResult'
+          description: Items with the requested licence statuses.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlicense.md
+  /api/search/pattern:
+    get:
+      description: Lists files matching an Ant-style path pattern inside one repository. The pattern is prefixed
+        with the repository key and a colon; ** is rejected to keep the search bounded. A named user is required.
+      operationId: searchPattern
+      parameters:
+      - description: Required query parameter. repo-key:path/with/*/wildcards. The * and ? wildcards match within
+          one path segment; ** is not allowed.
+        in: query
+        name: pattern
+        required: true
+        schema:
+          description: Repository key, a colon, then an Ant pattern.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatternSearchResult'
+            application/vnd.org.jfrog.artifactory.search.PatternResultFileSet+json:
+              schema:
+                $ref: '#/components/schemas/PatternSearchResult'
+          description: The repository searched, the pattern, and the matching paths.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchpattern.md
+  /api/search/prop:
+    get:
+      description: Finds items by property values. Every query parameter except repos is read as a property key
+        with a comma-separated list of values; a key without a value matches any value. The search covers local
+        repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access
+        is enabled.
+      operationId: searchProperty
+      parameters:
+      - $ref: '#/components/parameters/Repos'
+      - $ref: '#/components/parameters/XResultDetail'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UriSearchResult'
+            application/vnd.org.jfrog.artifactory.search.MetadataSearchResult+json:
+              schema:
+                $ref: '#/components/schemas/UriSearchResult'
+          description: Items carrying all of the requested properties.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchproperty.md
+  /api/search/usage:
+    get:
+      description: Finds items that have not been downloaded since an instant, which is the raw material for retention
+        decisions. Only items created before createdBefore, or before notUsedSince when it is omitted, are considered.
+        Only local repositories and remote caches are searched. A named user is required.
+      operationId: searchUsage
+      parameters:
+      - description: Required query parameter. Items whose last download is before this instant, as epoch milliseconds,
+          are returned; never-downloaded items qualify.
+        in: query
+        name: notUsedSince
+        required: true
+        schema:
+          description: Epoch milliseconds.
+          format: int64
+          type: integer
+      - description: Optional query parameter. Only consider items created before this instant, as epoch milliseconds.
+          Defaults to the value of notUsedSince.
+        in: query
+        name: createdBefore
+        schema:
+          description: Epoch milliseconds.
+          format: int64
+          type: integer
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsageSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ArtifactUsageResult+json:
+              schema:
+                $ref: '#/components/schemas/UsageSearchResult'
+          description: Items not downloaded since the instant.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchusage.md
+  /api/search/versions:
+    get:
+      description: Lists every version of a module found through the repository layout, newest first. Without v
+        both release and integration versions are returned; with an integration pattern only integration versions
+        are. By default only local repositories and remote caches are consulted; remote=1 also queries the upstream
+        of remote repositories. Virtual repositories may be named in repos.
+      operationId: searchVersions
+      parameters:
+      - description: Optional query parameter. Organisation (Maven group id).
+        in: query
+        name: g
+        schema:
+          description: Group id.
+          type: string
+      - description: Optional query parameter. Module name (Maven artifact id).
+        in: query
+        name: a
+        schema:
+          description: Module name.
+          type: string
+      - description: Optional query parameter. Version pattern; an integration pattern restricts the result to integration
+          versions. * and ? wildcards are allowed.
+        in: query
+        name: v
+        schema:
+          description: Version pattern.
+          type: string
+      - description: Optional query parameter. 1 also asks the upstream of remote repositories; 0 (default) uses
+          local repositories and caches only.
+        in: query
+        name: remote
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - $ref: '#/components/parameters/Repos'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionSearchResult'
+            application/vnd.org.jfrog.artifactory.search.ArtifactVersionsResult+json:
+              schema:
+                $ref: '#/components/schemas/VersionSearchResult'
+          description: The versions found.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - searches
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchversions.md
+  /api/versions/{repo}/{path}:
+    get:
+      description: Returns the highest value of the lowercase version property among items under a path, compared
+        with Maven version ordering, together with the items that carry it. _any for repo searches every repository
+        and _any for path searches every path. Any further query parameter is read as a property the items must
+        also carry, for example os=win. A named user is required. Returns 404 when no item carries the property.
+      operationId: searchLatestVersionByProperties
+      parameters:
+      - description: Required path parameter. Repository key, or _any for every repository.
+        in: path
+        name: repo
+        required: true
+        schema:
+          description: Repository key or _any.
+          type: string
+      - description: Required path parameter. Folder to search under, or _any for every path. May span several segments.
+        in: path
+        name: path
+        required: true
+        schema:
+          description: Repository-relative folder path or _any.
+          type: string
+      - description: Optional query parameter. 0 (default) returns the folder of the latest version; 1 returns the
+          files instead.
+        in: query
+        name: listFiles
+        schema:
+          default: 0
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LatestVersionByPropertiesResult'
+          description: The winning version and its items.
+        '400':
+          $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '500':
+          $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
+      tags:
+      - handwritten
+      - searches
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlatestversionbyproperties.md

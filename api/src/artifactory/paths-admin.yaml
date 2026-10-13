@@ -1,0 +1,1135 @@
+components:
+  parameters:
+    LockCategory:
+      description: Optional query parameter. Restricts the report to locks of one category, for example the scheduler
+        or the blob garbage collector. Omitted means every category. An unknown category returns an empty lock list
+        rather than an error.
+      in: query
+      name: category
+      required: false
+      schema:
+        description: Lock category name, compared case-sensitively.
+        minLength: 1
+        type: string
+  responses:
+    AdminBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The request was malformed or failed validation; the body carries the Artifactory error envelope
+        naming the problem.
+    AdminForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The caller is authenticated but is not an administrator; the body carries the Artifactory error
+        envelope.
+    AdminInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The server failed while processing the request; the body carries the Artifactory error envelope.
+    AdminLegacyBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+      description: The request was malformed; the body carries the error envelope with the legacy error field this
+        family documents.
+    AdminLegacyForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+      description: The caller is not an administrator; the body carries the error envelope with the legacy error
+        field this family documents.
+    AdminLegacyInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+      description: The server failed while processing the request; the body carries the error envelope with the
+        legacy error field this family documents.
+    AdminLegacyUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+      description: Credentials were missing or rejected; the body carries the error envelope with the legacy error
+        field this family documents.
+    AdminNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The target does not exist; the body carries the Artifactory error envelope.
+    AdminNotImplemented:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: artifactweave does not implement this operation; the body carries the Artifactory error envelope
+        with status 501 and a message naming the operation.
+    AdminUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+  schemas:
+    AdminLegacyErrorResponse:
+      description: 'The error body Artifactory documents for its import and export operations: the usual envelope
+        plus an older single-message field. These statuses are documented for parity only; artifactweave answers
+        every import and export call with 501 in the standard envelope.'
+      properties:
+        error:
+          description: Optional within this object. Older single-string form of the error message that some Artifactory
+            versions send alongside or instead of errors.
+          type: string
+        errors:
+          description: Optional within this object. One entry per error; clients read the first.
+          items:
+            description: One error.
+            properties:
+              message:
+                description: Optional within this object. Human-readable explanation.
+                type: string
+              status:
+                description: Optional within this object. The HTTP status code repeated in the body.
+                type: integer
+            type: object
+          type: array
+      type: object
+    ClusterLocksResponse:
+      description: A snapshot of the locks artifactweave currently holds, grouped by process. Artifactory reports
+        PostgreSQL advisory locks across HA nodes here; artifactweave reports the leases in its own database lease
+        table, and because v1 runs as a single process the report always has exactly one node. The shape follows
+        Artifactory so tooling that parses it keeps working.
+      properties:
+        meta:
+          allOf:
+          - $ref: '#/components/schemas/LocksResponseMeta'
+          description: Required within this object. When and where the snapshot was taken.
+        nodes:
+          description: Required within this object. One entry per process that was asked for its locks. Always one
+            entry in v1.
+          items:
+            $ref: '#/components/schemas/NodeLocks'
+          type: array
+        summary:
+          allOf:
+          - $ref: '#/components/schemas/LocksResponseSummary'
+          description: Required within this object. Totals across every reported process.
+        warnings:
+          description: Optional within this object. Conditions that make the snapshot partial. Omitted or empty
+            when the report is complete, which is always the case for a single process.
+          items:
+            $ref: '#/components/schemas/LocksResponseWarning'
+          type: array
+      required:
+      - meta
+      - summary
+      - nodes
+      type: object
+    CurationInterfaceSettings:
+      description: Settings of JFrog Curation, which artifactweave does not implement. Kept so the operations that
+        carry it have a typed body.
+      properties:
+        allowDownloadWhenUnavailable:
+          description: Optional within this object. In Artifactory, whether downloads proceed when the curation
+            service cannot be reached. Ignored by artifactweave.
+          type: boolean
+      type: object
+    ExportSettings:
+      description: Options of a full system export. artifactweave does not implement import or export in v1; the
+        schema is kept so the stubbed operations keep their documented shape.
+      properties:
+        bypassFiltering:
+          description: Optional within this object. In Artifactory, export files without applying content filters.
+          type: boolean
+        createArchive:
+          description: Optional within this object. In Artifactory, write a single zip archive instead of a directory
+            tree.
+          type: boolean
+        excludeContent:
+          description: Optional within this object. In Artifactory, export configuration and metadata without binaries.
+          type: boolean
+        exportPath:
+          description: Required within this object. Server-side directory the export would be written to.
+          type: string
+        failIfEmpty:
+          description: Optional within this object. In Artifactory, fail when there is nothing to export.
+          type: boolean
+        failOnError:
+          description: Optional within this object. In Artifactory, stop at the first error instead of continuing.
+          type: boolean
+        includeMetadata:
+          description: Optional within this object. In Artifactory, include item properties and statistics.
+          type: boolean
+        incremental:
+          description: Optional within this object. In Artifactory, write only what changed since the previous export
+            to the same path.
+          type: boolean
+        m2:
+          description: Optional within this object. In Artifactory, also write Maven 2 compatible metadata files.
+          type: boolean
+        verbose:
+          description: Optional within this object. In Artifactory, log every exported item.
+          type: boolean
+      required:
+      - exportPath
+      type: object
+    ImportSettings:
+      description: Options of a full system import. artifactweave does not implement import or export in v1; the
+        schema is kept so the stubbed operations keep their documented shape.
+      properties:
+        failIfEmpty:
+          description: Optional within this object. In Artifactory, fail when the source holds nothing to import.
+          type: boolean
+        failOnError:
+          description: Optional within this object. In Artifactory, stop at the first error instead of continuing.
+          type: boolean
+        importPath:
+          description: Required within this object. Server-side directory or archive to import from.
+          type: string
+        includeMetadata:
+          description: Optional within this object. In Artifactory, import item properties and statistics as well
+            as binaries.
+          type: boolean
+        verbose:
+          description: Optional within this object. In Artifactory, log every imported item.
+          type: boolean
+      required:
+      - importPath
+      type: object
+    LockEntry:
+      description: One lease held by the reporting process.
+      properties:
+        category:
+          description: Required within this object. The subsystem that took the lease, for example scheduler, gc
+            or replication.
+          minLength: 1
+          type: string
+        key:
+          description: Required within this object. What the lease protects within its category, for example a cleanup
+            policy key or a repository key.
+          minLength: 1
+          type: string
+        lockedSinceEpochMs:
+          description: Required within this object. When the lease was acquired, in milliseconds since the Unix
+            epoch. Same instant as lockedSinceIso.
+          format: int64
+          type: integer
+        lockedSinceIso:
+          description: Required within this object. When the lease was acquired, as an RFC 3339 UTC timestamp. Same
+            instant as lockedSinceEpochMs.
+          format: date-time
+          type: string
+        threadId:
+          description: Required within this object. Artifactory reports the JVM thread that holds the lock. artifactweave
+            has no threads to name and reports a stable numeric identifier of the task holding the lease instead.
+          format: int64
+          type: integer
+        threadName:
+          description: Optional within this object. Human-readable name of the holding task, such as the cleanup
+            policy run it belongs to. Null when the task has no name.
+          nullable: true
+          type: string
+      required:
+      - category
+      - key
+      - lockedSinceEpochMs
+      - lockedSinceIso
+      - threadId
+      type: object
+    LocksFanOutMeta:
+      description: How the report was gathered across processes.
+      properties:
+        enabled:
+          description: Required within this object. Whether the responding process asked other processes for their
+            locks. Always false in v1, which runs one process.
+          type: boolean
+        responded:
+          description: Required within this object. How many other processes answered. Always 0 in v1.
+          type: integer
+        unreachable:
+          description: Required within this object. How many other processes did not answer. Always 0 in v1.
+          type: integer
+      required:
+      - enabled
+      - responded
+      - unreachable
+      type: object
+    LocksResponseMeta:
+      description: When and where the snapshot was taken.
+      properties:
+        fanOut:
+          allOf:
+          - $ref: '#/components/schemas/LocksFanOutMeta'
+          description: Required within this object. How the report was gathered across processes.
+        queriedAt:
+          description: Required within this object. When the snapshot was taken, as an RFC 3339 UTC timestamp.
+          format: date-time
+          type: string
+        queriedByNodeId:
+          description: Required within this object. Identifier of the process that answered, the same value as the
+            service id reported by the system endpoints.
+          minLength: 1
+          type: string
+      required:
+      - queriedAt
+      - queriedByNodeId
+      - fanOut
+      type: object
+    LocksResponseSummary:
+      description: Totals across every reported process.
+      properties:
+        nodesOk:
+          description: Required within this object. Processes that reported their locks. Always 1 in v1.
+          type: integer
+        nodesUnreachable:
+          description: Required within this object. Processes that did not answer. Always 0 in v1.
+          type: integer
+        totalHeldLocks:
+          description: Required within this object. Number of leases held across all reported processes.
+          type: integer
+      required:
+      - totalHeldLocks
+      - nodesOk
+      - nodesUnreachable
+      type: object
+    LocksResponseWarning:
+      description: A condition that makes the snapshot partial.
+      properties:
+        code:
+          description: Required within this object. Machine-readable reason. The only value Artifactory defines
+            reports that cross-node collection was skipped; artifactweave never emits it in v1.
+          enum:
+          - HA_AUTH_FAN_OUT_SKIPPED
+          type: string
+        message:
+          description: Required within this object. Human-readable explanation of the warning.
+          type: string
+      required:
+      - code
+      - message
+      type: object
+    LoggerLevel:
+      description: 'A logback level name. artifactweave maps these onto its slog levels: trace and debug enable
+        debug output, info is the default, warn and error raise the threshold, and fatal is treated as error.'
+      enum:
+      - trace
+      - debug
+      - info
+      - warn
+      - error
+      - fatal
+      type: string
+    LoggerLevelsRequest:
+      description: A temporary override of log levels for named loggers. The override lives only in memory and is
+        never written to configuration.
+      properties:
+        classes:
+          additionalProperties:
+            $ref: '#/components/schemas/LoggerLevel'
+          description: Required within this object. Map from logger name to the level it should log at while the
+            override lasts. Logger names are the dotted package or component names artifactweave logs under (for
+            example artifactweave.remote or artifactweave.server). At most 100 entries; a larger map is rejected
+            with 400. Names that match no logger are accepted and have no effect.
+          maxProperties: 100
+          type: object
+        timer:
+          description: Required within this object. How long the override lasts, in seconds. When it expires every
+            listed logger returns to the level it had before the request. Must be positive.
+          minimum: 1
+          type: integer
+      required:
+      - classes
+      - timer
+      type: object
+    NodeLocks:
+      description: The leases one process holds.
+      properties:
+        locks:
+          description: Required within this object. The leases the process holds, oldest first. Empty when the process
+            holds none or did not answer.
+          items:
+            $ref: '#/components/schemas/LockEntry'
+          type: array
+        nodeId:
+          description: Required within this object. Identifier of the process.
+          minLength: 1
+          type: string
+        status:
+          description: Required within this object. ok when the process reported, unreachable when it did not answer;
+            an unreachable process may still hold leases that are not listed.
+          enum:
+          - ok
+          - unreachable
+          type: string
+      required:
+      - nodeId
+      - status
+      - locks
+      type: object
+paths:
+  /api/artifactexport/repository:
+    post:
+      description: 'Not supported: artifactweave answers 501 because import and export are cut from v1. Back up
+        the database and blob store instead (docs/operations/backup-restore.md).'
+      operationId: exportRepositoryWithMetadata
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The repository export Artifactory would run.
+              properties:
+                action:
+                  description: Required within this object. Always repository.
+                  enum:
+                  - repository
+                  type: string
+                excludeMetadata:
+                  default: false
+                  description: Optional within this object. In Artifactory, export binaries without properties and
+                    statistics.
+                  type: boolean
+                m2:
+                  description: Optional within this object. In Artifactory, also write Maven 2 compatible metadata
+                    files.
+                  type: boolean
+                path:
+                  description: Required within this object. Server-side directory to export to.
+                  type: string
+                repository:
+                  description: Required within this object. Key of the repository to export.
+                  type: string
+                verbose:
+                  description: Optional within this object. In Artifactory, log every exported item.
+                  type: boolean
+              required:
+              - action
+              - path
+              - repository
+              type: object
+        description: What to export and where.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text progress Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminLegacyBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminLegacyUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminLegacyForbidden'
+        '500':
+          $ref: '#/components/responses/AdminLegacyInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Export a repository (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md
+      x-tier: stub
+  /api/curation/interfaceSettings:
+    get:
+      description: 'Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).'
+      operationId: getCurationInterfaceSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurationInterfaceSettings'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Curation settings (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getcurationinterfacesettings.md
+      x-tier: stub
+    put:
+      description: 'Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).'
+      operationId: updateCurationInterfaceSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurationInterfaceSettings'
+        description: The settings Artifactory would store.
+        required: true
+      responses:
+        '200':
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Update Curation settings (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatecurationinterfacesettings.md
+      x-tier: stub
+  /api/export/system:
+    get:
+      description: 'Not supported: artifactweave answers 501 because import and export are cut from v1.'
+      operationId: getExportSystemSettingsExample
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExportSettings'
+            application/vnd.org.jfrog.artifactory.system.ExportSettings+json:
+              schema:
+                $ref: '#/components/schemas/ExportSettings'
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminLegacyBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminLegacyUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminLegacyForbidden'
+        '500':
+          $ref: '#/components/responses/AdminLegacyInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Export settings example (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getexportsystemsettingsexample.md
+      x-tier: stub
+    post:
+      description: 'Not supported: artifactweave answers 501 because import and export are cut from v1. Back up
+        the database and blob store instead (docs/operations/backup-restore.md).'
+      operationId: exportSystem
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportSettings'
+          application/vnd.org.jfrog.artifactory.system.ExportSettings+json:
+            schema:
+              $ref: '#/components/schemas/ExportSettings'
+        description: The export Artifactory would run.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text progress Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminLegacyBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminLegacyUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminLegacyForbidden'
+        '500':
+          $ref: '#/components/responses/AdminLegacyInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Export the system (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/exportsystem.md
+      x-tier: stub
+  /api/import/repositories:
+    post:
+      description: 'Not supported: artifactweave answers 501 because import and export are cut from v1. Upload content
+        with the deploy API or the JFrog CLI instead.'
+      operationId: importRepositoryContent
+      parameters:
+      - description: Required query parameter. Server-side directory to import from.
+        in: query
+        name: path
+        required: true
+        schema:
+          description: Directory path on the server.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. Key of the single repository to import into. Omitted means every
+          repository found under the path.
+        in: query
+        name: repo
+        schema:
+          description: Repository key.
+          type: string
+      - description: Optional query parameter. 1 imports properties and statistics, 0 binaries only.
+        in: query
+        name: metadata
+        schema:
+          default: 1
+          description: Flag, 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      - description: Optional query parameter. 1 logs every imported item.
+        in: query
+        name: verbose
+        schema:
+          default: 0
+          description: Flag, 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text progress Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminLegacyBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminLegacyUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminLegacyForbidden'
+        '500':
+          $ref: '#/components/responses/AdminLegacyInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Import repository content (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/importrepositorycontent.md
+      x-tier: stub
+  /api/import/system:
+    get:
+      description: 'Not supported: artifactweave answers 501 because import and export are cut from v1.'
+      operationId: getImportSystemSettingsExample
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSettings'
+            application/vnd.org.jfrog.artifactory.system.ImportSettings+json:
+              schema:
+                $ref: '#/components/schemas/ImportSettings'
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          $ref: '#/components/responses/AdminLegacyUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminLegacyForbidden'
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The Accept header names a media type the server cannot produce.
+        '500':
+          $ref: '#/components/responses/AdminLegacyInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Import settings example (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getimportsystemsettingsexample.md
+      x-tier: stub
+    post:
+      description: 'Not supported: artifactweave answers 501 because import and export are cut from v1. Restore
+        a database and blob store backup instead (docs/operations/backup-restore.md).'
+      operationId: fullSystemImport
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportSettings'
+          application/vnd.org.jfrog.artifactory.system.ImportSettings+json:
+            schema:
+              $ref: '#/components/schemas/ImportSettings'
+        description: The import Artifactory would run.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text progress Artifactory returns; never produced here.
+                type: string
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminLegacyBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminLegacyUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminLegacyForbidden'
+        '406':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request media type is not one the server accepts.
+        '500':
+          $ref: '#/components/responses/AdminLegacyInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Import the system (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/fullsystemimport.md
+      x-tier: stub
+  /api/system/debug/loggers:
+    delete:
+      description: Ends a temporary logger override set with POST before its timer expires and returns every affected
+        logger to the level it had before. Calling it when no override is active succeeds and changes nothing. Requires
+        an administrator.
+      operationId: deleteLoggerDebugLevels
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A short confirmation message.
+                type: string
+          description: The override, if any, was removed.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+      summary: Clear temporary logger levels
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteloggerdebuglevels.md
+    post:
+      description: 'Raises or lowers the log level of named loggers for a limited time, without changing configuration
+        or restarting, so an operator can collect detailed logs while reproducing a problem. When the timer expires
+        the previous levels return. Only one override is active at a time: a POST while one is active is rejected
+        with 400, so send DELETE first to change it. Requires an administrator.'
+      operationId: setLoggerDebugLevels
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoggerLevelsRequest'
+        description: The loggers to override, their levels and how long the override lasts.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A short confirmation message.
+                type: string
+          description: The override is active.
+        '400':
+          $ref: '#/components/responses/AdminBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+      summary: Set temporary logger levels
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setloggerdebuglevels.md
+  /api/system/debug/loggers/{className}:
+    get:
+      description: Returns the level a named logger currently logs at, including any active temporary override.
+        A name that matches no logger returns the root level rather than 404. Requires an administrator.
+      operationId: getLoggerDebugLevel
+      parameters:
+      - description: Required path parameter. Dotted logger name, for example artifactweave.remote. A single path
+          segment; dots are not separators.
+        in: path
+        name: className
+        required: true
+        schema:
+          description: Logger name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoggerLevel'
+          description: The logger's effective level as a JSON string.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+      summary: Get a logger's level
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getloggerdebuglevel.md
+  /api/system/locks:
+    get:
+      description: Returns a snapshot of the leases artifactweave holds in its database, so an operator can find
+        a stuck scheduler job, cleanup run or replication without querying the database directly. In v1 the report
+        covers the single running process; the response keeps Artifactory's multi-node shape. The snapshot is best
+        effort, not transactional. Requires an administrator. The response shape matches Artifactory's documented
+        lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave
+        reports, and artifactweave serves it regardless.
+      operationId: getClusterLocks
+      parameters:
+      - $ref: '#/components/parameters/LockCategory'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClusterLocksResponse'
+          description: The lock snapshot.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The lease table could not be read, for example because the database is unreachable; the body
+            carries the Artifactory error envelope.
+      summary: List held locks
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getclusterlocks.md
+  /api/system/locks/local:
+    get:
+      description: Same as the lock snapshot but limited to the process that answers, without asking any other process.
+        In v1 the two operations report the same leases. Requires an administrator. The response shape matches Artifactory's
+        documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version
+        artifactweave reports, and artifactweave serves it regardless.
+      operationId: getNodeLocks
+      parameters:
+      - $ref: '#/components/parameters/LockCategory'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeLocks'
+          description: The leases held by the answering process.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '503':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The lease table could not be read; the body carries the Artifactory error envelope.
+      summary: List locks held by this process
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getnodelocks.md
+  /api/system/logs/config:
+    get:
+      description: 'Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard
+        error or the log collector instead.'
+      operationId: getLiveLogsConfig
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The Live Logs configuration Artifactory returns; never produced here.
+                properties:
+                  logs:
+                    description: Optional within this object. The log files that can be streamed.
+                    items:
+                      description: One streamable log file.
+                      type: object
+                    type: array
+                  nodes:
+                    description: Optional within this object. The nodes whose logs can be streamed.
+                    items:
+                      description: One node.
+                      type: object
+                    type: array
+                  refresh_rate_millis:
+                    description: Optional within this object. Suggested polling interval in milliseconds.
+                    type: integer
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Live Logs configuration (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getlivelogsconfig.md
+      x-tier: stub
+  /api/system/logs/data:
+    get:
+      description: 'Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard
+        error or the log collector instead.'
+      operationId: getLiveLogsData
+      parameters:
+      - description: Required query parameter. Identifier of the log file to read.
+        in: query
+        name: id
+        required: true
+        schema:
+          description: Log file identifier.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. Size of the file the caller already holds, so only newer content
+          is returned.
+        in: query
+        name: file_size
+        schema:
+          description: Size in bytes.
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A chunk of log content Artifactory returns; never produced here.
+                properties:
+                  file_size:
+                    description: Optional within this object. Current size of the log file in bytes.
+                    type: integer
+                  last_update_label:
+                    description: Optional within this object. Time of the response, in epoch milliseconds.
+                    type: integer
+                  last_update_modified:
+                    description: Optional within this object. Last modification of the log file, in epoch milliseconds.
+                    type: integer
+                  log_content:
+                    description: Optional within this object. The returned log text.
+                    type: string
+                type: object
+          description: Never returned by artifactweave; documented for parity.
+        '400':
+          $ref: '#/components/responses/AdminBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+        '501':
+          $ref: '#/components/responses/AdminNotImplemented'
+      summary: Live Logs data (not supported)
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getlivelogsdata.md
+      x-tier: stub
+  /api/v1/service_trust/pairing/{usecase}:
+    delete:
+      description: Removes the trust relationship with one peer for the use case and deletes its stored keys. Federations
+        that use the peer stop syncing with it. With `force=true` the local trust is removed even when the peer
+        cannot be told. Administrators only.
+      operationId: unregisterPairingToken
+      parameters:
+      - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
+          trust or `federated-repo/r` for receive-only trust. The value contains a slash, so the route is hand-written.
+          Any other value, including JFrog''s `artifactory-cold` use cases (cold storage here is a blob tier, not
+          a peer, decision 0024), answers 404.'
+        in: path
+        name: usecase
+        required: true
+        schema:
+          description: Use case path.
+          type: string
+      - description: Optional query parameter. When true, remove the local trust even if the peer is unreachable.
+          Defaults to false.
+        in: query
+        name: force
+        schema:
+          default: false
+          description: Remove without the peer.
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Which peer to unpair.
+              properties:
+                base_url:
+                  description: Required within this object. Base URL of the peer to unpair.
+                  type: string
+              required:
+              - base_url
+              type: object
+        description: Which peer to unpair.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Trust was removed.
+                properties:
+                  message:
+                    description: Optional within this object. Confirmation.
+                    type: string
+                type: object
+          description: Trust was removed.
+        '400':
+          $ref: '#/components/responses/AdminBadRequest'
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The use case is not supported or no trust with that peer exists.
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+      summary: Remove trust with a peer
+      tags:
+      - federation
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/unregisterpairingtoken.md
+    post:
+      description: 'Creates a one-time pairing token for establishing trust with another artifactweave instance
+        (decision 0021). The token is a signed JWT whose subject is the administrator who requested it; it can be
+        redeemed once and expires 300 seconds after creation, matching Artifactory''s pairing tokens. An administrator
+        hands it to the peer, which redeems it with the exchange operation; the two instances then hold each other''s
+        keys and authenticate every sync call in both directions. Peers must be artifactweave instances: JFrog Artifactory
+        cannot pair. Administrators only.'
+      operationId: generatePairingToken
+      parameters:
+      - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
+          trust or `federated-repo/r` for receive-only trust. The value contains a slash, so the route is hand-written.
+          Any other value, including JFrog''s `artifactory-cold` use cases (cold storage here is a blob tier, not
+          a peer, decision 0024), answers 404.'
+        in: path
+        name: usecase
+        required: true
+        schema:
+          description: Use case path.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The pairing token.
+                properties:
+                  pairing_token:
+                    description: Required within this object. The signed one-time token. It becomes invalid once
+                      exchanged or 300 seconds after creation, whichever comes first.
+                    type: string
+                required:
+                - pairing_token
+                type: object
+          description: The pairing token.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The use case is not supported.
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+      summary: Generate a pairing token
+      tags:
+      - federation
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md
+    put:
+      description: Redeems a pairing token generated on the peer, completing trust between the two instances for
+        the use case. Run it on the instance that did not generate the token, with the same use case. Administrators
+        only.
+      operationId: exchangePairingToken
+      parameters:
+      - description: 'Required path parameter. The trust use case: `federated-repo/*` for two-way federated repository
+          trust or `federated-repo/r` for receive-only trust. The value contains a slash, so the route is hand-written.
+          Any other value, including JFrog''s `artifactory-cold` use cases (cold storage here is a blob tier, not
+          a peer, decision 0024), answers 404.'
+        in: path
+        name: usecase
+        required: true
+        schema:
+          description: Use case path.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The token generated on the peer.
+              properties:
+                pairing_token:
+                  description: Required within this object. The token generated on the peer.
+                  type: string
+              required:
+              - pairing_token
+              type: object
+        description: The token generated on the peer.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Trust was established.
+                properties:
+                  message:
+                    description: Optional within this object. Confirmation.
+                    type: string
+                type: object
+          description: Trust was established.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The token is malformed, expired, already used or was issued for another use case.
+        '401':
+          $ref: '#/components/responses/AdminUnauthorized'
+        '403':
+          $ref: '#/components/responses/AdminForbidden'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The use case is not supported.
+        '500':
+          $ref: '#/components/responses/AdminInternalServerError'
+      summary: Exchange a pairing token
+      tags:
+      - federation
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/exchangepairingtoken.md

@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated access Go client (make generate).
+package: access
+output: pkg/client/access/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

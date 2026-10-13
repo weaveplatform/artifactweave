@@ -1,0 +1,296 @@
+paths:
+  /api/v1/security/permissions:
+    get:
+      description: Lists every destination permission. Administrators only.
+      operationId: getAllDistributionPermissions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DestinationPermission'
+                type: array
+          description: The permissions.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List destination permissions
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getalldistributionpermissions.md
+  /api/v1/security/permissions/{permission_name}:
+    delete:
+      description: Deletes one destination permission. Administrators only.
+      operationId: deleteDistributionPermission
+      parameters:
+      - description: Required path parameter. Name of the destination permission.
+        in: path
+        name: permission_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+      summary: Delete a destination permission
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletedistributionpermission.md
+    get:
+      description: Returns one destination permission. Administrators only.
+      operationId: getDistributionPermissionByName
+      parameters:
+      - description: Required path parameter. Name of the destination permission.
+        in: path
+        name: permission_name
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DestinationPermission'
+          description: The permission.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+      summary: Get a destination permission
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionpermissionbyname.md
+    put:
+      description: Creates the destination permission, or replaces it when the name exists. A destination permission
+        grants users and groups the right to distribute release bundles to, or delete them from, the edges its destinations
+        match. Administrators only.
+      operationId: setDistributionPermission
+      parameters:
+      - description: Required path parameter. Name of the destination permission.
+        in: path
+        name: permission_name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DestinationPermission'
+        description: The permission.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DestinationPermission'
+          description: The stored permission.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is invalid or has no destinations.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body names a different permission than the path.
+      summary: Create or replace a destination permission
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setdistributionpermission.md
+  /api/v1/security/token:
+    get:
+      description: Lists the tokens issued through the Distribution token operations. They are ordinary artifactweave
+        access tokens (decision 0005), so the Access token list shows them too. Administrators only.
+      operationId: getTokenInfos
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokensResponse'
+          description: The tokens.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Listing tokens needs an administrator.
+      summary: List tokens
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/gettokeninfos.md
+    post:
+      description: JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials`
+        issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token
+        for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+      operationId: createOrRefreshToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              description: Form fields of a token request.
+              properties:
+                access_token:
+                  description: 'Optional within this object. For a refresh: the access token being refreshed.'
+                  type: string
+                expires_in:
+                  default: 0
+                  description: Optional within this object. Lifetime in seconds. Omitted uses the default expiry;
+                    0 means never and needs an administrator.
+                  format: int64
+                  type: integer
+                grant_type:
+                  default: client_credentials
+                  description: Optional within this object. client_credentials to issue a token, refresh_token to
+                    refresh one. Defaults to client_credentials.
+                  enum:
+                  - client_credentials
+                  - refresh_token
+                  type: string
+                refresh_token:
+                  description: 'Optional within this object. For a refresh: the refresh token.'
+                  type: string
+                refreshable:
+                  description: Optional within this object. When true a refresh token is issued too. Defaults to
+                    false.
+                  type: boolean
+                scope:
+                  description: Optional within this object. admin (administrators only) or groups:<names>. Omitted
+                    gives the subject's own permissions.
+                  type: string
+                username:
+                  description: Optional within this object. Subject of the new token. Non-administrators may only
+                    name themselves.
+                  type: string
+              type: object
+        description: The token request.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionTokenResponse'
+          description: The token was issued.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionTokenResponse'
+          description: Documented by JFrog for creation; artifactweave answers 200.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The form is incomplete or the refresh token is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A non-administrator asked for admin scope or another user's token.
+      summary: Create or refresh a token
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createorrefreshtoken.md
+  /api/v1/security/token/revoke:
+    post:
+      description: Revokes a token given either its value (access or refresh token) or its id, in a form body, as
+        in RFC 7009. Administrators only.
+      operationId: revokeToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              description: Form fields of a revocation.
+              properties:
+                token:
+                  description: Optional within this object. The token value, access or refresh, to revoke. Give
+                    this or token_id.
+                  type: string
+                token_id:
+                  description: Optional within this object. Id of the token to revoke. Give this or token.
+                  type: string
+              type: object
+        description: The token to revoke.
+        required: true
+      responses:
+        '200':
+          description: Revoked.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Neither token nor token_id was given.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Revoking tokens needs an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No token with that id.
+      summary: Revoke a token
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/revoketoken.md

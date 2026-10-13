@@ -1,0 +1,236 @@
+# Trash can and garbage collection API. Facts from docs/research/02; prose is ours.
+components:
+  schemas:
+    DeleteDirectoryTrashPropertyRequest:
+      description: Tuning for the trash can compaction task. Every field is optional and defaults as shown.
+      properties:
+        batchSize:
+          default: 1000
+          description: Optional within this object. Records examined per database query. Defaults to 1000;
+            must be positive.
+          format: int32
+          minimum: 1
+          type: integer
+        batchesCount:
+          default: -1
+          description: Optional within this object. Maximum number of queries to run; -1 (the default)
+            means run until nothing is left.
+          format: int32
+          type: integer
+        pauseBetweenBatchesMs:
+          default: 1000
+          description: Optional within this object. Pause in milliseconds between queries so the task
+            does not starve other work. Defaults to 1000; must be positive.
+          format: int32
+          minimum: 1
+          type: integer
+      type: object
+    DeleteDirectoryTrashPropertyResponse:
+      description: Confirmation that the compaction task was queued.
+      properties:
+        info:
+          description: Optional within this object. Human readable confirmation.
+          type: string
+      type: object
+    ErrorDetails:
+      description: One error entry as the trash can operations describe it; the same shape as the entries
+        of the Artifactory error envelope.
+      properties:
+        message:
+          description: Optional within this object. Human readable explanation.
+          type: string
+        status:
+          description: Optional within this object. HTTP status code.
+          type: integer
+      type: object
+paths:
+  /api/deleteDirectoryTrashProperty/start:
+    post:
+      description: Starts a background task that removes redundant directory records the trash can accumulates,
+        which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued;
+        the body carries a confirmation message. On this server the task is a no-op that still reports
+        success, because the item model does not create redundant records.
+      operationId: deleteRedundantRecordsToTrashCanDirectories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteDirectoryTrashPropertyRequest'
+        description: Optional tuning for the task.
+        required: false
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteDirectoryTrashPropertyResponse'
+          description: The task was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is malformed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+      summary: Compact trash can directory records
+      tags:
+      - collection
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteredundantrecordstotrashcandirectories.md
+  /api/system/storage/gc:
+    post:
+      description: Deletes trash can items whose retention has expired and then removes blobs no item
+        references. Admin only. Runs synchronously and answers 200 with no body when the pass finishes;
+        the scheduled pass uses the same code.
+      operationId: runGarbageCollection
+      responses:
+        '200':
+          description: The pass completed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+      summary: Run garbage collection
+      tags:
+      - collection
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/rungarbagecollection.md
+  /api/trash/clean/{repoPath}:
+    delete:
+      description: Removes one trashed item, or a whole trashed folder, so it can no longer be restored.
+        Allowed for admins, project admins of the owning project and callers with Manage or Delete permission
+        on the original repository. Answers 204 with no body.
+      operationId: deleteItemFromTrashCan
+      parameters:
+      - description: Required path parameter. Original repository key followed by the item path, for example
+          npm-local/pkg/-/pkg-1.0.0.tgz. The key alone names the whole trashed repository.
+        in: path
+        name: repoPath
+        required: true
+        schema:
+          description: The parameter value.
+          type: string
+      responses:
+        '204':
+          description: The item was removed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The path is malformed or the caller lacks permission (Artifactory reports permission
+            failures here as 400).
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+      summary: Delete an item from the trash can permanently
+      tags:
+      - collection
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemfromtrashcan.md
+  /api/trash/empty:
+    post:
+      description: Permanently removes every trashed item. Admin only. Answers 202 because the deletion
+        runs in the background; blobs are reclaimed by the next garbage collection pass.
+      operationId: emptyTrashCan
+      responses:
+        '202':
+          description: Emptying was started.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin (Artifactory reports this as 400).
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+      summary: Empty the trash can
+      tags:
+      - collection
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/emptytrashcan.md
+  /api/trash/restore/{fromPath}:
+    post:
+      description: Moves a trashed item or folder back into a repository. The destination may differ from
+        the original so content can be restored into another repository. Allowed for admins, project admins
+        and callers with Manage permission on the destination. Answers 202 with the plain-text message
+        Successfully restored trash items.
+      operationId: restoreItemFromTrashCan
+      parameters:
+      - description: 'Required path parameter. Trashed location: original repository key followed by the
+          item path, or the key alone for everything trashed from that repository.'
+        in: path
+        name: fromPath
+        required: true
+        schema:
+          description: The parameter value.
+          type: string
+      - description: Required query parameter. Destination repository key, optionally followed by a path,
+          for example npm-local2 or npm-local2/restored.
+        in: query
+        name: to
+        required: true
+        schema:
+          description: The parameter value.
+          type: string
+      - description: Optional query parameter. Items moved per database transaction; larger values are
+          faster but hold locks longer. Defaults to the server's batch size.
+        in: query
+        name: transaction-size
+        required: false
+        schema:
+          description: The parameter value.
+          minimum: 1
+          type: integer
+      responses:
+        '202':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: The items were restored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The destination is invalid or the caller lacks permission.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Nothing is trashed at fromPath.
+      summary: Restore an item from the trash can
+      tags:
+      - collection
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/restoreitemfromtrashcan.md
