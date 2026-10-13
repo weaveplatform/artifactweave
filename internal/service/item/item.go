@@ -117,7 +117,15 @@ func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
 	if err != nil {
 		return types.Item{}, err
 	}
-	u, err := s.Blobs.BeginUpload(ctx)
+	// A declared SHA-256 that the repository enforces lets the object stores
+	// write the content key directly: S3 and Azure then skip the copy out of
+	// a temporary object. Under server-generated checksums a mismatch is only
+	// recorded, so there the digest must not become a commit condition.
+	var opts []blob.UploadOption
+	if clientPolicy(d.Repo) && declared.SHA256 != "" {
+		opts = append(opts, blob.WithExpectedSHA256(declared.SHA256))
+	}
+	u, err := s.Blobs.BeginUpload(ctx, opts...)
 	if err != nil {
 		return types.Item{}, fmt.Errorf("item: begin upload: %w", err)
 	}
