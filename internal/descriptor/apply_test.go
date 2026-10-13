@@ -159,6 +159,7 @@ func TestApplyRefusesAndWritesNothing(t *testing.T) {
 		"invalid new":          "localRepositories:\n  bad:\n    type: not-a-type\n",
 		"unknown member":       "virtualRepositories:\n  v:\n    type: generic\n    repositories: [nowhere]\n",
 		"member deleted":       "localRepositories:\n  Mixed-Case: null\nvirtualRepositories:\n  v:\n    type: generic\n    repositories: [Mixed-Case]\n",
+		"missing key pair":     "localRepositories:\n  signed:\n    type: debian\n    primaryKeyPairRef: absent\n",
 		"proxy without host":   "proxies:\n  p:\n    port: 80\n",
 		"proxy bad port":       "proxies:\n  p:\n    host: h\n    port: 70000\n",
 		"proxy fractional":     "proxies:\n  p:\n    host: h\n    port: 80.5\n",

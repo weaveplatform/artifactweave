@@ -90,6 +90,8 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
 	sc.Step(`^I (PUT|POST) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
+	sc.Step(`^I create the RSA key pair "([^"]*)" with alias "([^"]*)" as admin$`, w.createKeyPair)
+	sc.Step(`^I add a generated client certificate "([^"]*)" as admin$`, w.addCertificate)
 	sc.Step(`^I PATCH "([^"]*)" as admin with YAML:$`, w.patchYAMLAsAdmin)
 	sc.Step(`^I PATCH "([^"]*)" as admin with JSON:$`, w.patchJSONAsAdmin)
 	sc.Step(`^I (PUT|HEAD|POST) "([^"]*)" as admin$`, w.sendEmptyAsAdmin)

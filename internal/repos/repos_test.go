@@ -185,3 +185,33 @@ func TestRemoveFailures(t *testing.T) {
 		}
 	}
 }
+
+// failingKeys is a key store whose reads fail.
+type failingKeys struct{ store.KeyStore }
+
+func (failingKeys) Keypair(context.Context, string) (types.Keypair, error) {
+	return types.Keypair{}, errors.New("boom")
+}
+
+func TestCheckKeypairs(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	if err := db.Keys().CreateKeypair(ctx, types.Keypair{Name: "kp"}); err != nil {
+		t.Fatal(err)
+	}
+	ok := repo.Config{Key: "r", PrimaryKeyPairRef: "kp", SecondaryKeyPairRef: "kp"}
+	if err := CheckKeypairs(ctx, db.Keys(), ok); err != nil {
+		t.Fatalf("existing pairs: %v", err)
+	}
+	if err := CheckKeypairs(ctx, db.Keys(), repo.Config{Key: "r"}); err != nil {
+		t.Fatalf("no references: %v", err)
+	}
+	err := CheckKeypairs(ctx, db.Keys(), repo.Config{Key: "r", SecondaryKeyPairRef: "absent"})
+	if err == nil || !strings.Contains(err.Error(), "Key pair 'absent' does not exist") {
+		t.Fatalf("missing pair: %v", err)
+	}
+	if err := CheckKeypairs(ctx, failingKeys{db.Keys()}, ok); err == nil ||
+		!strings.Contains(err.Error(), "boom") {
+		t.Fatalf("store failure: %v", err)
+	}
+}

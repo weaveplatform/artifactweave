@@ -72,6 +72,25 @@ func CheckMembers(c repo.Config, known []repo.Config) error {
 	return nil
 }
 
+// CheckKeypairs rejects signing key references (primaryKeyPairRef,
+// secondaryKeyPairRef) to key pairs that do not exist: a repository would
+// otherwise fail only when it first signs.
+func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) error {
+	for _, ref := range []string{c.PrimaryKeyPairRef, c.SecondaryKeyPairRef} {
+		if ref == "" {
+			continue
+		}
+		_, err := keys.Keypair(ctx, ref)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			return badRequest("Key pair '%s' does not exist", ref)
+		case err != nil:
+			return fmt.Errorf("repos: key pair %s: %w", ref, err)
+		}
+	}
+	return nil
+}
+
 // Merge merges an update body into the stored configuration with
 // Artifactory's rules: a field present replaces the stored value, a field
 // left out keeps it, and null resets it to its default. The key, class and
