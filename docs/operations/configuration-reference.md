@@ -37,7 +37,7 @@ artifactweave has three configuration layers (decision
 | `blob.azure.part_size`, `copy_range_size`, `concurrency` | | | `8MiB`, `100MiB`, `8` | Block size (at most `4000MiB`), the range of each server-side copy call, and how many copy calls run at once |
 | `master_key` | | `ARTIFACTWEAVE_MASTER_KEY` | required | Key for sealed columns (decision 0017): 32 bytes or more, base64 or raw, optionally prefixed with its version as `vN:` (no prefix means version 1) |
 | `master_key_previous` | | `ARTIFACTWEAVE_MASTER_KEY_PREVIOUS` | unset | The key being rotated away from, kept until `artifactweave keys rotate` has re-sealed every value (see below) |
-| `bootstrap.admin_password` | | `ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD` | generated | The seeded `admin` password, read on first start only. When unset, a random password is written to `<data_dir>/initial-admin-password` (mode 0600) and the log names the file, never the password |
+| `bootstrap.admin_password` | | `ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD` | generated | The seeded `admin` password, read on first start only. When unset, a random password is written to `<data_dir>/initial-admin-password` (mode 0600 on Unix) and the log names the file, never the password |
 | `bootstrap.descriptor` | `--bootstrap` | | | Descriptor YAML applied on first start |
 | `docker.subdomain_match` | | | off | Enables the subdomain access method in addition to repository-path routing |
 | `log.level`, `log.format` | | | `info`, `json` | slog settings |

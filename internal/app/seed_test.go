@@ -3,10 +3,12 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -36,14 +38,17 @@ func TestSeedGeneratesAdminPassword(t *testing.T) {
 	cfg := testConfig(t)
 	cfg.DataDir = filepath.Join(cfg.DataDir, "not-yet-created")
 	var logs bytes.Buffer
-	log := slog.New(slog.NewTextHandler(&logs, nil))
+	// JSON, so the test compares the logged path exactly on every OS.
+	log := slog.New(slog.NewJSONHandler(&logs, nil))
 	db := inmem.New()
 	if err := seedPrincipals(ctx, cfg, db, log); err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(cfg.DataDir, InitialPasswordFile)
 	info, err := os.Stat(path)
-	if err != nil || info.Mode().Perm() != 0o600 {
+	// Windows has no POSIX permission bits; the data directory's ACL
+	// protects the file there.
+	if err != nil || (goruntime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 		t.Fatalf("password file %v, %v", info, err)
 	}
 	b, _ := os.ReadFile(path)
@@ -51,7 +56,7 @@ func TestSeedGeneratesAdminPassword(t *testing.T) {
 	if len(password) < 32 || !adminPasswordIs(t, db, password) {
 		t.Fatalf("generated password %q does not log admin in", password)
 	}
-	if !strings.Contains(logs.String(), "level=WARN") || !strings.Contains(logs.String(), path) ||
+	if !loggedWarning(t, logs.Bytes(), path) ||
 		strings.Contains(logs.String(), password) {
 		t.Fatalf("log must name the file, never the password:\n%s", logs.String())
 	}
@@ -162,4 +167,20 @@ func TestSeedErrors(t *testing.T) {
 	if _, err := openRuntime(ctx, cfg, log); err == nil {
 		t.Error("openRuntime ignored a failed seed")
 	}
+}
+
+// loggedWarning reports whether the JSON log holds a warning naming file.
+func loggedWarning(t *testing.T, logs []byte, file string) bool {
+	t.Helper()
+	dec := json.NewDecoder(bytes.NewReader(logs))
+	for dec.More() {
+		var rec struct{ Level, File string }
+		if err := dec.Decode(&rec); err != nil {
+			t.Fatal(err)
+		}
+		if rec.Level == "WARN" && rec.File == file {
+			return true
+		}
+	}
+	return false
 }
