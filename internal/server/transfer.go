@@ -130,7 +130,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		refuseTransfer(w, err.Error())
 		return
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -140,7 +140,8 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		writeErr(w, r, s.itemError(ctx, "resolve source repository", err))
 		return
 	}
-	if !can(from, types.ActionRead) || (move && !can(from, types.ActionDelete)) {
+	if !acc.file(from, srcPath, types.ActionRead) ||
+		(move && !acc.file(from, srcPath, types.ActionDelete)) {
 		writeErr(w, r, denied(p))
 		return
 	}
@@ -169,7 +170,13 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		)
 		return
 	}
-	if !can(target, types.ActionWrite) {
+	// The rights are checked where the source lands: inside the target
+	// folder when the target names one (a trailing slash, or the root).
+	dest := toPath
+	if into || toPath == "" {
+		dest = path.Join(toPath, path.Base(srcPath))
+	}
+	if !acc.file(target, dest, types.ActionWrite) {
 		writeErr(w, r, denied(p))
 		return
 	}
@@ -177,7 +184,7 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		From:       item.Target{Repo: from, Cached: cached, Path: srcPath},
 		To:         item.Target{Repo: target, Path: toPath},
 		IntoFolder: into, Move: move, Dry: dry, FailFast: failFast,
-		TranslateLayouts: !suppress, CanOverwrite: can(target, types.ActionDelete),
+		TranslateLayouts: !suppress, CanOverwrite: acc.file(target, dest, types.ActionDelete),
 		By: p.Name,
 	})
 	switch {
@@ -246,7 +253,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		writeErr(w, r, err)
 		return
 	}
-	caller, can, err := s.itemCaller(ctx, st)
+	caller, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -256,7 +263,7 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 		writeErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
-	if !can(c, types.ActionRead) {
+	if !acc.folder(c, p, types.ActionRead) {
 		writeErr(w, r, denied(caller))
 		return
 	}
@@ -287,7 +294,8 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	var files []types.Item
 	var total int64
 	for _, it := range tree {
-		if !it.Folder {
+		// Files the caller may not read are left out of the archive.
+		if !it.Folder && acc.file(c, it.FullPath(), types.ActionRead) {
 			files = append(files, it)
 			total += it.Size
 		}

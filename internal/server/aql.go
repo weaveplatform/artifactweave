@@ -90,9 +90,8 @@ func aqlMessage(err error) string {
 	return err.Error()
 }
 
-// readable keeps the rows of repositories p may read. The filter runs after
-// offset and limit, so a page can come back short; path-level filtering
-// arrives with full permission evaluation in P4.
+// readable keeps the rows p may read, by repository and path. The filter
+// runs after offset and limit, so a page can come back short.
 func readable(
 	r *http.Request,
 	st store.Store,
@@ -100,9 +99,9 @@ func readable(
 	hits []aql.Hit,
 ) ([]aql.Hit, error) {
 	ctx := r.Context()
-	can, err := auth.RepoChecker(ctx, st.Permissions(), p)
+	acc, err := accessFor(ctx, st, p)
 	if err != nil {
-		return nil, fmt.Errorf("permissions: %w", err)
+		return nil, err
 	}
 	configs, err := st.Repos().List(ctx, store.RepoFilter{})
 	if err != nil {
@@ -114,7 +113,8 @@ func readable(
 	}
 	out := hits[:0]
 	for _, h := range hits {
-		if c, ok := byKey[h.Item.RepoKey]; ok && can(c, types.ActionRead) {
+		c, ok := byKey[h.Item.RepoKey]
+		if ok && acc.item(c, h.Item.FullPath(), h.Item.Folder, types.ActionRead) {
 			out = append(out, h)
 		}
 	}

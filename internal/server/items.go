@@ -153,20 +153,20 @@ func splitValues(v string) []string {
 	return append(out, cur.String())
 }
 
-// itemCaller returns the caller and a permission check for an item request.
+// itemCaller returns the caller and its permissions for an item request.
 func (s artifactoryService) itemCaller(
 	ctx context.Context,
 	st store.Store,
-) (auth.Principal, func(repo.Config, types.Actions) bool, error) {
+) (auth.Principal, access, error) {
 	p, err := principal(ctx)
 	if err != nil {
-		return p, nil, err
+		return p, access{}, err
 	}
-	can, err := auth.RepoChecker(ctx, st.Permissions(), p)
+	a, err := accessFor(ctx, st, p)
 	if err != nil {
-		return p, nil, s.internalError(ctx, "item permissions", err)
+		return p, access{}, s.internalError(ctx, "item permissions", err)
 	}
-	return p, can, nil
+	return p, a, nil
 }
 
 // resolveRepo returns the repository a key names and whether the key is a
@@ -265,7 +265,7 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -278,7 +278,7 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, s.itemError(ctx, "resolve deploy target", err))
 		return
 	}
-	if !can(c, types.ActionWrite) {
+	if !acc.item(c, req.path, req.folder, types.ActionWrite) {
 		writeErr(w, r, denied(p))
 		return
 	}
@@ -292,7 +292,8 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 		strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true")
 	existing, err := st.Items().Get(ctx, c.Key, false, req.path)
 	switch {
-	case err == nil && !existing.Folder && !req.folder && !explode && !can(c, types.ActionDelete):
+	case err == nil && !existing.Folder && !req.folder && !explode &&
+		!acc.file(c, req.path, types.ActionDelete):
 		// Overwriting replaces content, which needs the right to delete it.
 		writeErr(w, r, denied(p))
 		return
@@ -308,8 +309,9 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 		it, err = svc.Explode(ctx, item.Explode{
 			Deploy: s.deployRequest(r, t, req, p),
 			Atomic: strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true"),
-			// Replacing files needs the right to delete them, as a deploy does.
-			CanOverwrite: can(c, types.ActionDelete),
+			// Replacing files needs the right to delete them, as a deploy does;
+			// it is checked at the archive's path, not per entry.
+			CanOverwrite: acc.file(c, req.path, types.ActionDelete),
 		})
 	case strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true"):
 		it, err = svc.DeployByChecksum(ctx, s.deployRequest(r, t, req, p))
@@ -458,7 +460,7 @@ func lookup(
 	c repo.Config,
 	cached bool,
 	p string,
-	can func(repo.Config, types.Actions) bool,
+	acc access,
 	seen map[string]bool,
 ) (found, error) {
 	if seen[c.Key] {
@@ -480,10 +482,10 @@ func lookup(
 		if err != nil {
 			return found{}, fmt.Errorf("member %s of %s: %w", key, c.Key, err)
 		}
-		if !can(m, types.ActionRead) {
+		if !acc.folder(m, p, types.ActionRead) {
 			continue
 		}
-		f, err := lookup(ctx, st, m, false, p, can, seen)
+		f, err := lookup(ctx, st, m, false, p, acc, seen)
 		if err == nil || !errors.Is(err, store.ErrNotFound) {
 			return f, err
 		}
@@ -505,7 +507,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -515,7 +517,10 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, s.itemError(ctx, "resolve repository", err))
 		return
 	}
-	if !can(c, types.ActionRead) {
+	// A folder check first: the path may be a file or a folder, and in a
+	// virtual repository the item lives in a member. The exact right is
+	// checked once the item is found.
+	if !acc.folder(c, req.path, types.ActionRead) {
 		writeErr(w, r, denied(p))
 		return
 	}
@@ -525,27 +530,36 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 			r,
 			st,
 			found{repo: c, item: types.Item{RepoKey: c.Key, Cached: cached, Folder: true}},
+			acc,
 		)
 		return
 	}
-	f, err := lookup(ctx, st, c, cached, req.path, can, map[string]bool{})
+	f, err := lookup(ctx, st, c, cached, req.path, acc, map[string]bool{})
 	if errors.Is(err, store.ErrNotFound) {
 		// "<archive>!/<entry>" names an entry inside an archive file; a path
 		// that exists as an item is served as one first.
 		if archive, entry, ok := strings.Cut(req.path, "!/"); ok {
-			a, err := lookup(ctx, st, c, cached, archive, can, map[string]bool{})
+			a, err := lookup(ctx, st, c, cached, archive, acc, map[string]bool{})
 			if err != nil {
 				writeErr(w, r, itemNotFound())
+				return
+			}
+			if !acc.file(a.repo, a.item.FullPath(), types.ActionRead) {
+				writeErr(w, r, denied(p))
 				return
 			}
 			s.getArchiveEntry(w, r, st, a, entry)
 			return
 		}
-		s.getSidecar(w, r, st, c, cached, req.path, can)
+		s.getSidecar(w, r, st, c, cached, req.path, acc)
 		return
 	}
 	if err != nil {
 		writeErr(w, r, s.internalError(ctx, "lookup item", err))
+		return
+	}
+	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
+		writeErr(w, r, denied(p))
 		return
 	}
 	if ok, err := matchesMatrix(ctx, st, f.item, req); err != nil {
@@ -556,7 +570,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if f.item.Folder {
-		s.listFolder(w, r, st, f)
+		s.listFolder(w, r, st, f, acc)
 		return
 	}
 	s.serveFile(w, r, st, f, p)
@@ -615,15 +629,17 @@ func (s artifactoryService) getSidecar(
 	c repo.Config,
 	cached bool,
 	p string,
-	can func(repo.Config, types.Actions) bool,
+	acc access,
 ) {
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
 		writeErr(w, r, itemNotFound())
 		return
 	}
-	f, err := lookup(r.Context(), st, c, cached, artifact, can, map[string]bool{})
-	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" {
+	f, err := lookup(r.Context(), st, c, cached, artifact, acc, map[string]bool{})
+	// A file the caller may not read has no visible checksum either.
+	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" ||
+		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {
 		writeErr(w, r, itemNotFound())
 		return
 	}
@@ -726,6 +742,7 @@ func (s artifactoryService) listFolder(
 	r *http.Request,
 	st store.Store,
 	f found,
+	acc access,
 ) {
 	ctx := r.Context()
 	folder := f.item.FullPath()
@@ -748,6 +765,11 @@ func (s artifactoryService) listFolder(
 	fmt.Fprintf(&b, "<!DOCTYPE html>\n<html><head><title>Index of %s</title></head><body>\n", title)
 	fmt.Fprintf(&b, "<h1>Index of %s</h1>\n<pre>", title)
 	for _, c := range children {
+		// Children the caller may not see are left out; a folder shows when
+		// something below it is readable.
+		if !acc.item(f.repo, c.FullPath(), c.Folder, types.ActionRead) {
+			continue
+		}
 		href, text := url.PathEscape(c.Name), c.Name
 		if c.Folder {
 			href, text = href+"/", text+"/"
@@ -776,7 +798,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -791,7 +813,7 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("Cannot delete from the virtual repository '%s'", c.Key)))
 		return
 	}
-	if !can(c, types.ActionDelete) {
+	if !acc.file(c, req.path, types.ActionDelete) {
 		writeErr(w, r, denied(p))
 		return
 	}

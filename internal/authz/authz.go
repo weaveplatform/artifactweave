@@ -70,6 +70,9 @@ type Decider struct {
 	// artifact entries allow.
 	filter []types.ScopeEntry
 	scope  *types.Scope
+	// groups are the groups the subject acts through once the scope has
+	// narrowed them.
+	groups []string
 }
 
 // New reads the permissions that apply to s and returns its Decider.
@@ -83,6 +86,7 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 		d.filter = sc.artifact
 	}
 	groups := sc.groups(s.Groups)
+	d.groups = groups
 	user := ""
 	if sc.user {
 		user = s.Name
@@ -118,6 +122,30 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 
 // Admin reports whether the subject acts as an administrator.
 func (d *Decider) Admin() bool { return d.admin }
+
+// Groups returns the groups the subject acts through: all of its groups, or
+// those a token scope names.
+func (d *Decider) Groups() []string { return slices.Clone(d.groups) }
+
+// RepoVisible reports whether the subject may see repo in a listing and read
+// its configuration (decision 0006). An administrator sees everything. A
+// token scope with repo entries sees exactly the repositories they name.
+// Otherwise the subject sees a repository it may read anywhere in, and every
+// repository through the system:info:r scope.
+func (d *Decider) RepoVisible(repo Repo) bool {
+	if d.admin {
+		return true
+	}
+	if d.scope != nil {
+		for _, e := range d.scope.Entries {
+			if e.Kind == types.ScopeRepo {
+				return d.RepoConfig(repo.Key)
+			}
+		}
+	}
+	return d.AllowsFolder(types.ResourceArtifact, repo, "", types.ActionRead) ||
+		d.System("info", types.ScopeRead)
+}
 
 // Actions returns every action the subject holds on path in repo's
 // resource. folder is true for a folder, which is also visible when a
@@ -229,6 +257,13 @@ func covers(target string, repo Repo) bool {
 		class = "remote"
 	}
 	return types.MatchesRepository(target, key, class)
+}
+
+// TargetAllows reports whether a permission target's include and exclude
+// patterns admit path, a folder admitting what lies below it.
+func TargetAllows(t types.Target, path string, folder bool) bool {
+	return rule{include: compileAll(t.Include, "**"), exclude: compileAll(t.Exclude, "")}.
+		allows(path, folder)
 }
 
 func compileAll(patterns []string, fallback string) []Pattern {
