@@ -58,6 +58,16 @@ type User struct {
 	Roles                    RoleFlags
 	LastLoggedIn             time.Time
 	Created                  time.Time
+	// FailedLogins counts consecutive failed password checks; the user lock
+	// policy locks the account when it reaches the limit, and a successful
+	// login or an unlock resets it.
+	FailedLogins int
+	// PasswordChanged is when the internal password was last set; the
+	// password expiration policy measures its age from here.
+	PasswordChanged time.Time
+	// PasswordExpired forces a password change: set by the expirePassword
+	// endpoint, cleared by unexpirePassword or a new password.
+	PasswordExpired bool
 }
 
 // Group is a set of users that permissions and roles can name.

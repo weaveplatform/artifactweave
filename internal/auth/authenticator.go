@@ -54,6 +54,7 @@ type Authenticator struct {
 	// does not tell which user names exist.
 	dummy  []byte
 	tokens TokenVerifier
+	policy policyCache
 }
 
 // NewAuthenticator returns an Authenticator over users and settings.
@@ -99,6 +100,12 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 	if err != nil {
 		return Principal{}, fmt.Errorf("auth: user %s: %w", name, err)
 	}
+	if u.Status == types.UserLocked {
+		// Answered like a wrong password, after the same work, so neither
+		// the message nor the timing tells that the account exists.
+		_, _ = a.check(ctx, a.dummy, password)
+		return Principal{}, ErrBadCredentials
+	}
 	if len(u.PasswordHash) == 0 || u.InternalPasswordDisabled ||
 		(u.Status != "" && u.Status != types.UserEnabled) {
 		return Principal{}, ErrBadCredentials
@@ -106,20 +113,18 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 	now := a.now()
 	key := cacheKey(u.PasswordHash, password)
 	if a.cache.has(key, now) {
-		return principalOf(u), nil
+		return a.accept(ctx, u, now, false)
 	}
 	ok, err := a.check(ctx, u.PasswordHash, password)
 	switch {
 	case errors.Is(err, ErrHashFormat), err == nil && !ok:
+		a.recordFailure(ctx, u.Name)
 		return Principal{}, ErrBadCredentials
 	case err != nil:
 		return Principal{}, err
 	}
 	a.cache.add(key, now)
-	// Once per cache fill rather than per request, and best effort: a failed
-	// write must not fail the login.
-	_ = a.users.RecordLogin(ctx, u.Name, now)
-	return principalOf(u), nil
+	return a.accept(ctx, u, now, true)
 }
 
 // AnonymousAllowed reports whether requests without credentials act as the

@@ -2,6 +2,7 @@ package storetest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"testing"
@@ -15,6 +16,7 @@ import (
 // material.
 func runIdentity(t *testing.T, newStore Factory) {
 	t.Run("Users", func(t *testing.T) { testUsers(t, newStore(t)) })
+	t.Run("UserLockout", func(t *testing.T) { testUserLockout(t, newStore(t)) })
 	t.Run("Groups", func(t *testing.T) { testGroups(t, newStore(t)) })
 	t.Run("Memberships", func(t *testing.T) { testMemberships(t, newStore(t)) })
 	t.Run("Permissions", func(t *testing.T) { testPermissions(t, newStore(t)) })
@@ -108,6 +110,7 @@ func testUsers(t *testing.T, s store.Store) {
 	// Update replaces fields and memberships; a missing group changes nothing.
 	alice.Email, alice.Groups, alice.Status = "a@example.org", []string{"g2"}, types.UserLocked
 	alice.PasswordHash = nil
+	alice.FailedLogins, alice.PasswordChanged, alice.PasswordExpired = 2, at(3), true
 	must(t, us.Update(ctx, alice))
 	same(t, "Update", alice, get[types.User](t)(us.Get(ctx, "alice")))
 	bad := alice
@@ -117,7 +120,7 @@ func testUsers(t *testing.T, s store.Store) {
 	wantErr(t, us.Update(ctx, user(1, "nobody")), store.ErrNotFound)
 
 	must(t, us.RecordLogin(ctx, "alice", at(5)))
-	alice.LastLoggedIn = at(5)
+	alice.LastLoggedIn, alice.FailedLogins = at(5), 0
 	same(t, "RecordLogin", alice, get[types.User](t)(us.Get(ctx, "alice")))
 	wantErr(t, us.RecordLogin(ctx, "nobody", at(5)), store.ErrNotFound)
 
@@ -681,4 +684,68 @@ func testSigningKeys(t *testing.T, s store.Store) {
 	wantErr(t, ks.DeleteSigningKey(ctx, "b"), store.ErrNotFound)
 	_, err = ks.DefaultSigningKey(ctx)
 	wantErr(t, err, store.ErrNotFound)
+}
+
+func testUserLockout(t *testing.T, s store.Store) {
+	ctx := context.Background()
+	us := s.Users()
+	for i, n := range []string{"ann", "ben", "cat", "dan"} {
+		must(t, us.Create(ctx, user(i, n)))
+	}
+	disabled := get[types.User](t)(us.Get(ctx, "dan"))
+	disabled.Status = types.UserDisabled
+	must(t, us.Update(ctx, disabled))
+
+	// Failed logins count up and lock at the limit; zero never locks.
+	for i, want := range []bool{false, false, true} {
+		locked, err := us.RecordFailedLogin(ctx, "ann", 3)
+		if err != nil || locked != want {
+			t.Fatalf("ann's failure %d: locked %v, %v", i+1, locked, err)
+		}
+	}
+	if locked, err := us.RecordFailedLogin(ctx, "ben", 0); err != nil || locked {
+		t.Fatalf("no limit locked ben: %v, %v", locked, err)
+	}
+	// A disabled account stays disabled rather than becoming locked.
+	if locked, err := us.RecordFailedLogin(ctx, "dan", 1); err != nil || locked {
+		t.Fatalf("a disabled user was locked: %v, %v", locked, err)
+	}
+	if _, err := us.RecordFailedLogin(ctx, "nobody", 1); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("an unknown user: %v", err)
+	}
+	ann := get[types.User](t)(us.Get(ctx, "ann"))
+	if ann.Status != types.UserLocked || ann.FailedLogins != 3 {
+		t.Fatalf("ann = %s with %d failures", ann.Status, ann.FailedLogins)
+	}
+	if _, err := us.RecordFailedLogin(ctx, "cat", 1); err != nil {
+		t.Fatal(err)
+	}
+	same(t, "Locked", []string{"ann", "cat"}, get[[]string](t)(us.Locked(ctx)))
+
+	// Unlocking named users ignores unknown names and resets counters.
+	must(t, us.Unlock(ctx, "ann", "nobody"))
+	ann = get[types.User](t)(us.Get(ctx, "ann"))
+	if ann.Status != types.UserEnabled || ann.FailedLogins != 0 {
+		t.Fatalf("unlocked ann = %s with %d failures", ann.Status, ann.FailedLogins)
+	}
+	same(t, "Locked after one unlock", []string{"cat"}, get[[]string](t)(us.Locked(ctx)))
+
+	// Unlocking everyone also clears counters of users below the limit and
+	// leaves disabled users disabled.
+	must(t, us.Unlock(ctx))
+	same(t, "Locked after unlocking all", []string{}, get[[]string](t)(us.Locked(ctx)))
+	if ben := get[types.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
+		t.Fatalf("ben's failures were not cleared: %d", ben.FailedLogins)
+	}
+	if dan := get[types.User](t)(us.Get(ctx, "dan")); dan.Status != types.UserDisabled {
+		t.Fatalf("unlock changed a disabled user: %s", dan.Status)
+	}
+	// A successful login resets the counter.
+	if _, err := us.RecordFailedLogin(ctx, "ben", 5); err != nil {
+		t.Fatal(err)
+	}
+	must(t, us.RecordLogin(ctx, "ben", at(9)))
+	if ben := get[types.User](t)(us.Get(ctx, "ben")); ben.FailedLogins != 0 {
+		t.Fatalf("a login did not reset ben's failures: %d", ben.FailedLogins)
+	}
 }

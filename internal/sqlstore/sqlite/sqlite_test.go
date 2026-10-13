@@ -60,8 +60,15 @@ func TestMigrationsUpDownUp(t *testing.T) {
 	if err != nil || cur != latest || latest == 0 {
 		t.Fatalf("Version = %d, %d, %v", cur, latest, err)
 	}
+	// Versions may skip numbers (parallel branches reserve them), so count
+	// the applied migrations rather than assuming 1..latest.
+	var applied int
+	if err := s.DB().QueryRowContext(ctx, "SELECT COUNT(*) FROM schema_migrations").
+		Scan(&applied); err != nil || applied == 0 {
+		t.Fatalf("applied migrations = %d, %v", applied, err)
+	}
 	down, err := sqlcommon.Rollback(ctx, s.DB(), sqlite.Dialect, 0)
-	if err != nil || len(down) != latest {
+	if err != nil || len(down) != applied {
 		t.Fatalf("Rollback = %v, %v", down, err)
 	}
 	// Every table is gone, so nothing but the version table is left.
@@ -73,7 +80,7 @@ func TestMigrationsUpDownUp(t *testing.T) {
 		t.Fatalf("%d tables left after rolling back, %v", n, err)
 	}
 	up, err := sqlcommon.Migrate(ctx, s.DB(), sqlite.Dialect)
-	if err != nil || len(up) != latest {
+	if err != nil || len(up) != applied {
 		t.Fatalf("Migrate = %v, %v", up, err)
 	}
 }

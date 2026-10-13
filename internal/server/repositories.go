@@ -80,6 +80,12 @@ func repositoriesSlash(next http.Handler) http.Handler {
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
+		if r.Method == http.MethodPut && policyPaths[r.URL.Path] {
+			if err := normalizePolicyBody(r); err != nil {
+				bindingError(http.StatusBadRequest)(w, r, err)
+				return
+			}
+		}
 		if r.Method == http.MethodPost && isRepositoryUpdate(r.URL.Path) {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
