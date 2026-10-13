@@ -398,6 +398,11 @@ func (a archiveStore) items() *table[int64, types.ArchivedItem] {
 // ColdBlobs implements store.ArchiveStore.
 func (a archiveStore) ColdBlobs() store.BlobIndex { return blobIndex{s: a.s, table: "cold_blobs"} }
 
+// ColdReplicas implements store.ArchiveStore.
+func (a archiveStore) ColdReplicas() store.ReplicaIndex {
+	return replicaIndex{s: a.s, table: "cold_blob_replicas"}
+}
+
 func (a archiveStore) CreatePolicy(ctx context.Context, p types.ArchivePolicy) error {
 	return a.s.do(ctx, func() error {
 		if a.policies().has(p.Key) {

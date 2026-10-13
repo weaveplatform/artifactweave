@@ -634,6 +634,11 @@ type archiveStore struct{ s *Store }
 // ColdBlobs implements store.ArchiveStore.
 func (a archiveStore) ColdBlobs() store.BlobIndex { return blobIndex{s: a.s, table: "cold_blobs"} }
 
+// ColdReplicas implements store.ArchiveStore.
+func (a archiveStore) ColdReplicas() store.ReplicaIndex {
+	return replicaIndex{s: a.s, table: "cold_blob_replicas"}
+}
+
 var archivePolicyCols = []string{
 	"key", "family", "description", "enabled", "cron_exp", "project_key", "duration_minutes",
 	"expiration_months", "skip_trashcan", "created_at", "updated_at", "criteria",

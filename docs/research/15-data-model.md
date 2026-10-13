@@ -606,7 +606,7 @@ Debug logger overrides (`/api/system/debug/loggers`) are deliberately not persis
 
 ### 4.1 As built in P2 (2026-10-13)
 
-P2 created 71 tables in five migrations per dialect (`internal/sqlstore/{sqlite,postgres}/migrations/0001_content` to
+P2 created 71 tables in five migrations per dialect (73 with migration 0006 for blob mirroring) (`internal/sqlstore/{sqlite,postgres}/migrations/0001_content` to
 `0005_enterprise`); both dialects define the same tables and indexes, and the PostgreSQL contract run passes
 against PostgreSQL 17. Where the physical schema differs from the table above, the domain types in `pkg/types`
 decided:
@@ -625,6 +625,7 @@ decided:
 | `tokens (token_hash, refresh_hash, reference_hash)` | `access_digest`, `refresh_digest`, `reference_digest`, unique and NULL when unset; `issued_at` never NULL | NULLs sort differently on the two engines and the token list pages by `(issued_at, id)` |
 | `webhooks`, `project_repositories` | add `description`, `debug`, `created_at`, `updated_at`; `environments` document and `updated_at` | fields of `WebhookSubscription` and `RepositoryAssignment` |
 | `worker_executions (payload, result, logs)` | binary columns; `trigger_kind`, `filter_doc` renamed | non-UTF-8 bytes must round-trip; `trigger` and `filter` are SQL keywords |
+| (none) | `blob_replicas` and `cold_blob_replicas` (migration 0006) | which mirror members hold which blobs, with state, size, attempts and last error ([0028](decisions/0028-blob-mirroring.md)); `updated_at` is 0 when unset so the repair queue pages identically on every engine |
 | `builds`, `build_artifacts`, `build_dependencies`, `build_promotions` | not created | build-info has no oracle block and no domain type yet; its tables arrive with P5 in a new migration once a live capture fixes the shape |
 
 Conventions every table follows: times are BIGINT Unix microseconds (NULL for unset), durations BIGINT

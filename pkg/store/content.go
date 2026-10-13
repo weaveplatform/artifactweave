@@ -152,6 +152,43 @@ type BlobIndex interface {
 	Totals(ctx context.Context) (count, bytes int64, err error)
 }
 
+// ReplicaFilter narrows replica listings; empty fields match everything.
+type ReplicaFilter struct {
+	Member string
+	States []types.ReplicaState
+}
+
+// ReplicaCount is one member's number of replicas in one state and their
+// combined size, for the storage summary.
+type ReplicaCount struct {
+	Member string
+	State  types.ReplicaState
+	Count  int64
+	Bytes  int64
+}
+
+// ReplicaIndex records which mirror members hold which blobs (decision 0028):
+// the blob_replicas table, and cold_blob_replicas for the archive tier.
+type ReplicaIndex interface {
+	// Put creates or replaces the record (r.SHA256, r.Member); ErrInvalid
+	// without both.
+	Put(ctx context.Context, r types.BlobReplica) error
+	// Get returns one record.
+	Get(ctx context.Context, sha256, member string) (types.BlobReplica, error)
+	// ForBlob returns a blob's records ordered by member.
+	ForBlob(ctx context.Context, sha256 string) ([]types.BlobReplica, error)
+	// List returns matching records oldest update first, by (Updated, SHA256,
+	// Member), which is the order the repair worker drains them in.
+	List(ctx context.Context, f ReplicaFilter, p Page) ([]types.BlobReplica, string, error)
+	// Delete removes one record.
+	Delete(ctx context.Context, sha256, member string) error
+	// DeleteBlob removes every record of a blob and returns how many.
+	DeleteBlob(ctx context.Context, sha256 string) (int64, error)
+	// Counts returns the number and size of records per member and state,
+	// ordered by (member, state).
+	Counts(ctx context.Context) ([]ReplicaCount, error)
+}
+
 // Upload is a blob upload session that outlives one request: a Docker
 // chunked upload, the CLI's multipart upload, or an S3 multipart session.
 // State is the blob backend's own session record, opaque here.
