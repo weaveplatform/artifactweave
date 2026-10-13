@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"gopkg.in/yaml.v3"
 )
 
 func writeFile(t *testing.T, content string) string {
@@ -77,6 +78,30 @@ blob:
     endpoint: http://minio:9000
     region: eu-west-1
     path_style: true
+  gcs:
+    bucket: g
+    prefix: gp
+    endpoint: http://gcs:4443
+    credentials_file: /srv/sa.json
+    google_access_id: aw@p.iam.gserviceaccount.com
+    part_size: 32MiB
+  azure:
+    account: acct
+    endpoint: https://acct.blob.core.windows.net/
+    container: c
+    prefix: ap
+    credential: managed_identity
+    account_key: ak
+    sas_token: st
+    connection_string: cs
+    managed_identity_client_id: mi
+    part_size: 16MiB
+    copy_range_size: 64MiB
+    concurrency: 4
+cold_blob:
+  backend: gcs
+  gcs:
+    bucket: archive
 master_key: k
 master_key_previous: kp
 bootstrap:
@@ -102,7 +127,16 @@ log:
 			Endpoint:  "http://minio:9000",
 			Region:    "eu-west-1",
 			PathStyle: true,
+		}, GCS: BlobGCSConfig{
+			Bucket: "g", Prefix: "gp", Endpoint: "http://gcs:4443", CredentialsFile: "/srv/sa.json",
+			GoogleAccessID: "aw@p.iam.gserviceaccount.com", PartSize: 32 << 20,
+		}, Azure: BlobAzureConfig{
+			Account: "acct", Endpoint: "https://acct.blob.core.windows.net/", Container: "c",
+			Prefix: "ap", Credential: "managed_identity", AccountKey: "ak", SASToken: "st",
+			ConnectionString: "cs", ManagedIdentityClientID: "mi", PartSize: 16 << 20,
+			CopyRangeSize: 64 << 20, Concurrency: 4,
 		}},
+		ColdBlob:  BlobConfig{Backend: "gcs", GCS: BlobGCSConfig{Bucket: "archive"}},
 		MasterKey: "k", MasterKeyPrevious: "kp",
 		Bootstrap: BootstrapConfig{AdminPassword: "pw", Descriptor: "/srv/desc.yaml"},
 		Docker:    DockerConfig{SubdomainMatch: true},
@@ -119,19 +153,27 @@ log:
 func TestEnvCoversEveryKey(t *testing.T) {
 	env := map[string]string{}
 	for _, k := range keys {
-		env[envName(k)] = "true"
-		if strings.Contains(k, "listen") {
+		switch {
+		case strings.Contains(k, "listen"):
 			env[envName(k)] = ":1"
+		case strings.HasSuffix(k, "_size"):
+			env[envName(k)] = "8MiB"
+		case strings.HasSuffix(k, ".concurrency"):
+			env[envName(k)] = "3"
+		default:
+			// String keys accept "true" as a plain string; the booleans parse it.
+			env[envName(k)] = "true"
 		}
 	}
-	// Non-boolean keys accept "true" as a plain string; the two booleans parse it.
 	cfg := Default()
 	for _, k := range keys {
 		if err := set(&cfg, k, env[envName(k)]); err != nil {
 			t.Fatalf("set %s: %v", k, err)
 		}
 	}
-	if !cfg.Docker.SubdomainMatch || !cfg.Blob.S3.PathStyle || cfg.Blob.S3.Bucket != "true" {
+	if !cfg.Docker.SubdomainMatch || !cfg.Blob.S3.PathStyle || cfg.Blob.S3.Bucket != "true" ||
+		cfg.Blob.GCS.PartSize != 8<<20 || cfg.ColdBlob.Azure.Concurrency != 3 ||
+		cfg.ColdBlob.Azure.AccountKey != "true" {
 		t.Fatalf("env keys not applied: %+v", cfg)
 	}
 }
@@ -193,8 +235,75 @@ func TestBadValues(t *testing.T) {
 		},
 		{
 			"unknown blob",
-			LoadOptions{Flags: map[string]string{"blob.backend": "gcs"}},
+			LoadOptions{Flags: map[string]string{"blob.backend": "ftp"}},
 			ErrUnknownBlob,
+		},
+		{"empty blob", LoadOptions{Flags: map[string]string{"blob.backend": ""}}, ErrUnknownBlob},
+		{
+			"unknown cold blob",
+			LoadOptions{Flags: map[string]string{"cold_blob.backend": "tape"}},
+			ErrUnknownBlob,
+		},
+		{
+			"gcs without bucket",
+			LoadOptions{Flags: map[string]string{"blob.backend": "gcs"}},
+			ErrMissingBucket,
+		},
+		{
+			"gcs part size not aligned",
+			LoadOptions{Flags: map[string]string{
+				"blob.backend": "gcs", "blob.gcs.bucket": "b", "blob.gcs.part_size": "1000000",
+			}},
+			ErrInvalidValue,
+		},
+		{"azure without container", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.account": "a",
+		}}, ErrMissingValue},
+		{"azure without account", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c",
+		}}, ErrMissingValue},
+		{"azure shared key without key", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c", "blob.azure.account": "a",
+			"blob.azure.credential": "shared_key",
+		}}, ErrMissingValue},
+		{"azure sas without token", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c", "blob.azure.account": "a",
+			"blob.azure.credential": "sas",
+		}}, ErrMissingValue},
+		{"azure connection string missing", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c",
+			"blob.azure.credential": "connection_string",
+		}}, ErrMissingValue},
+		{"azure unknown credential", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c", "blob.azure.account": "a",
+			"blob.azure.credential": "password",
+		}}, ErrInvalidValue},
+		{"azure part too large", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c", "blob.azure.account": "a",
+			"blob.azure.part_size": "5GiB",
+		}}, ErrInvalidValue},
+		{"azure copy range too large", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c", "blob.azure.account": "a",
+			"blob.azure.copy_range_size": "5GiB",
+		}}, ErrInvalidValue},
+		{"azure negative concurrency", LoadOptions{Flags: map[string]string{
+			"blob.backend": "azure", "blob.azure.container": "c", "blob.azure.account": "a",
+			"blob.azure.concurrency": "-1",
+		}}, ErrInvalidValue},
+		{
+			"bad size",
+			LoadOptions{Flags: map[string]string{"blob.gcs.part_size": "lots"}},
+			ErrInvalidValue,
+		},
+		{
+			"bad concurrency",
+			LoadOptions{Flags: map[string]string{"blob.azure.concurrency": "many"}},
+			ErrInvalidValue,
+		},
+		{
+			"unknown blob key",
+			LoadOptions{Flags: map[string]string{"blob.gcs.region": "x"}},
+			ErrUnknownKey,
 		},
 		{
 			"s3 without bucket",
@@ -248,8 +357,11 @@ func TestStringRedactsSecrets(t *testing.T) {
 	cfg.MasterKey = "topsecret"
 	cfg.Bootstrap.AdminPassword = "hunter2"
 	cfg.Database.DSN = "postgres://user:hunter3@db:5432/aw?sslmode=disable"
+	cfg.Blob.Azure.AccountKey = "azkey4"
+	cfg.ColdBlob.Azure.SASToken = "sastoken5"
+	cfg.ColdBlob.Azure.ConnectionString = "connstr6"
 	s := cfg.String()
-	for _, secret := range []string{"topsecret", "hunter2", "hunter3"} {
+	for _, secret := range []string{"topsecret", "hunter2", "hunter3", "azkey4", "sastoken5", "connstr6"} {
 		if strings.Contains(s, secret) {
 			t.Fatalf("summary leaks %q:\n%s", secret, s)
 		}
@@ -287,5 +399,69 @@ func TestSQLitePath(t *testing.T) {
 	cfg.Database.DSN = "file:/tmp/x.db"
 	if got := cfg.SQLitePath(); got != "/tmp/x.db" {
 		t.Fatalf("file DSN = %q", got)
+	}
+}
+
+func TestAzureCredentialDefaults(t *testing.T) {
+	for want, a := range map[string]BlobAzureConfig{
+		AzureConnectionString: {ConnectionString: "x"},
+		AzureSharedKey:        {AccountKey: "x"},
+		AzureSAS:              {SASToken: "x"},
+		AzureDefault:          {},
+		AzureWorkloadIdentity: {Credential: AzureWorkloadIdentity, AccountKey: "ignored"},
+	} {
+		if got := a.EffectiveCredential(); got != want {
+			t.Errorf("%+v: credential %q, want %q", a, got, want)
+		}
+	}
+	ok := BlobConfig{Backend: "azure", Azure: BlobAzureConfig{
+		Container: "c", ConnectionString: "UseThis",
+	}}
+	if errs := ok.validate("blob", true); len(errs) != 0 {
+		t.Fatalf("connection string alone is enough: %v", errs)
+	}
+	ok.Azure = BlobAzureConfig{Container: "c", Account: "a", Credential: AzureManagedIdentity}
+	if errs := ok.validate("blob", true); len(errs) != 0 {
+		t.Fatalf("managed identity with an account: %v", errs)
+	}
+	if errs := (BlobConfig{}).validate("cold_blob", false); len(errs) != 0 {
+		t.Fatalf("an unconfigured archive tier is valid: %v", errs)
+	}
+}
+
+func TestByteSize(t *testing.T) {
+	for in, want := range map[string]ByteSize{
+		"0": 0, "1024": 1024, "512KiB": 512 << 10, "16MiB": 16 << 20, "2GiB": 2 << 30,
+		" 8 MiB ": 8 << 20, "100B": 100,
+	} {
+		got, err := ParseByteSize(in)
+		if err != nil || got != want {
+			t.Errorf("ParseByteSize(%q) = %d, %v; want %d", in, got, err, want)
+		}
+	}
+	for _, bad := range []string{"", "-1", "1.5MiB", "MiB", "16TB", "9999999999GiB"} {
+		if _, err := ParseByteSize(bad); err == nil {
+			t.Errorf("ParseByteSize(%q) accepted", bad)
+		}
+	}
+	for size, want := range map[ByteSize]string{
+		0: "0", 100: "100", 1 << 10: "1KiB", 3 << 20: "3MiB", 1 << 30: "1GiB", (1 << 20) + 1: "1048577",
+	} {
+		if got := size.String(); got != want {
+			t.Errorf("%d.String() = %q, want %q", size, got, want)
+		}
+	}
+	var out struct {
+		Size ByteSize `yaml:"size"`
+	}
+	if err := yaml.Unmarshal([]byte("size: 4MiB\n"), &out); err != nil || out.Size != 4<<20 {
+		t.Fatalf("yaml = %d, %v", out.Size, err)
+	}
+	if err := yaml.Unmarshal([]byte("size: huge\n"), &out); err == nil {
+		t.Fatal("yaml accepted a bad size")
+	}
+	b, err := yaml.Marshal(out)
+	if err != nil || strings.TrimSpace(string(b)) != "size: 4MiB" {
+		t.Fatalf("marshal = %q, %v", b, err)
 	}
 }

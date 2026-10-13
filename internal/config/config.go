@@ -39,13 +39,16 @@ const (
 // same dotted key names are used by the flag overlay and, upper-cased with
 // the prefix, by the environment.
 type Config struct {
-	Listen    string         `yaml:"listen"`
-	BaseURL   string         `yaml:"base_url"`
-	DataDir   string         `yaml:"data_dir"`
-	Compat    CompatConfig   `yaml:"compat"`
-	Database  DatabaseConfig `yaml:"database"`
-	Blob      BlobConfig     `yaml:"blob"`
-	MasterKey string         `yaml:"master_key"`
+	Listen   string         `yaml:"listen"`
+	BaseURL  string         `yaml:"base_url"`
+	DataDir  string         `yaml:"data_dir"`
+	Compat   CompatConfig   `yaml:"compat"`
+	Database DatabaseConfig `yaml:"database"`
+	Blob     BlobConfig     `yaml:"blob"`
+	// ColdBlob is the archive tier (decision 0024); an empty backend means
+	// none is configured.
+	ColdBlob  BlobConfig `yaml:"cold_blob"`
+	MasterKey string     `yaml:"master_key"`
 	// MasterKeyPrevious is the key being rotated away from; it is kept
 	// until `artifactweave keys rotate` has re-sealed every value.
 	MasterKeyPrevious string          `yaml:"master_key_previous"`
@@ -65,28 +68,6 @@ type CompatConfig struct {
 type DatabaseConfig struct {
 	Driver string `yaml:"driver"`
 	DSN    string `yaml:"dsn"`
-}
-
-// BlobConfig selects the blob store.
-type BlobConfig struct {
-	Backend string       `yaml:"backend"`
-	FS      BlobFSConfig `yaml:"fs"`
-	S3      BlobS3Config `yaml:"s3"`
-}
-
-// BlobFSConfig is the local disk backend.
-type BlobFSConfig struct {
-	Root string `yaml:"root"`
-}
-
-// BlobS3Config is the S3-compatible backend. Credentials come from the AWS
-// SDK's own chain, never from this file.
-type BlobS3Config struct {
-	Bucket    string `yaml:"bucket"`
-	Prefix    string `yaml:"prefix"`
-	Endpoint  string `yaml:"endpoint"`
-	Region    string `yaml:"region"`
-	PathStyle bool   `yaml:"path_style"`
 }
 
 // BootstrapConfig seeds the first start.
@@ -125,7 +106,8 @@ var (
 	ErrUnknownDriver = errors.New("unknown database driver")
 	ErrMissingDSN    = errors.New("database.dsn is required for postgres")
 	ErrUnknownBlob   = errors.New("unknown blob backend")
-	ErrMissingBucket = errors.New("blob.s3.bucket is required for the s3 backend")
+	ErrMissingBucket = errors.New("a bucket is required for this blob backend")
+	ErrMissingValue  = errors.New("a required configuration value is missing")
 	ErrBadListen     = errors.New("listen is not a host:port address")
 	ErrBadBaseURL    = errors.New("base_url must be an absolute http or https URL")
 	ErrMissingKey    = errors.New("master_key is required (set ARTIFACTWEAVE_MASTER_KEY)")
@@ -192,17 +174,15 @@ func loadFile(cfg *Config, path string) error {
 }
 
 // keys lists every settable dotted key. Order matters only for determinism.
-var keys = []string{
+var keys = append(append([]string{
 	"listen", "base_url", "data_dir",
 	"compat.artifactory_version",
 	"database.driver", "database.dsn",
-	"blob.backend", "blob.fs.root",
-	"blob.s3.bucket", "blob.s3.prefix", "blob.s3.endpoint", "blob.s3.region", "blob.s3.path_style",
 	"master_key", "master_key_previous",
 	"bootstrap.admin_password", "bootstrap.descriptor",
 	"docker.subdomain_match",
 	"log.level", "log.format",
-}
+}, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
 	return EnvPrefix + strings.ToUpper(strings.ReplaceAll(key, ".", "_"))
@@ -211,6 +191,12 @@ func envName(key string) string {
 // set assigns one dotted key. Booleans parse strictly so "yes" in an
 // environment variable fails loudly instead of being read as false.
 func set(cfg *Config, key, value string) error {
+	if sub, ok := strings.CutPrefix(key, "blob."); ok {
+		return setBlob(&cfg.Blob, sub, key, value)
+	}
+	if sub, ok := strings.CutPrefix(key, "cold_blob."); ok {
+		return setBlob(&cfg.ColdBlob, sub, key, value)
+	}
 	switch key {
 	case "listen":
 		cfg.Listen = value
@@ -224,20 +210,6 @@ func set(cfg *Config, key, value string) error {
 		cfg.Database.Driver = value
 	case "database.dsn":
 		cfg.Database.DSN = value
-	case "blob.backend":
-		cfg.Blob.Backend = value
-	case "blob.fs.root":
-		cfg.Blob.FS.Root = value
-	case "blob.s3.bucket":
-		cfg.Blob.S3.Bucket = value
-	case "blob.s3.prefix":
-		cfg.Blob.S3.Prefix = value
-	case "blob.s3.endpoint":
-		cfg.Blob.S3.Endpoint = value
-	case "blob.s3.region":
-		cfg.Blob.S3.Region = value
-	case "blob.s3.path_style":
-		return setBool(&cfg.Blob.S3.PathStyle, key, value)
 	case "master_key":
 		cfg.MasterKey = value
 	case "master_key_previous":
@@ -288,15 +260,8 @@ func (c Config) Validate() error {
 	default:
 		errs = append(errs, fmt.Errorf("%w: %q", ErrUnknownDriver, c.Database.Driver))
 	}
-	switch c.Blob.Backend {
-	case "fs":
-	case "s3":
-		if c.Blob.S3.Bucket == "" {
-			errs = append(errs, ErrMissingBucket)
-		}
-	default:
-		errs = append(errs, fmt.Errorf("%w: %q", ErrUnknownBlob, c.Blob.Backend))
-	}
+	errs = append(errs, c.Blob.validate("blob", true)...)
+	errs = append(errs, c.ColdBlob.validate("cold_blob", false)...)
 	switch c.Log.Level {
 	case "debug", "info", "warn", "error":
 	default:
@@ -353,6 +318,8 @@ func (c Config) String() string {
 	r.MasterKeyPrevious = redact(c.MasterKeyPrevious)
 	r.Bootstrap.AdminPassword = redact(c.Bootstrap.AdminPassword)
 	r.Database.DSN = redactDSN(c.Database.DSN)
+	r.Blob = c.Blob.redacted()
+	r.ColdBlob = c.ColdBlob.redacted()
 	out, err := yaml.Marshal(r)
 	if err != nil {
 		// yaml.Marshal of a plain struct cannot fail; keep the signature honest.
