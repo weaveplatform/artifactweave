@@ -47,6 +47,7 @@ func statusTable() []statusCase {
 		itemStatusRows(),
 		storageStatusRows(),
 		transferStatusRows(),
+		trashStatusRows(),
 	)
 }
 
@@ -341,6 +342,8 @@ var implementedHandwritten = map[string]bool{
 	"POST /artifactory/api/move/{srcRepoKey}/{srcFilePath}":  true,
 	"GET /artifactory/api/archive/download/{repoKey}/{path}": true,
 	"GET /artifactory/{repoKey}/{archivePath}!/{entryPath}":  true,
+	"POST /artifactory/api/zap/{repoPath}":                   true,
+	"GET /artifactory/api/storage/auto-trashcan":             true,
 }
 
 func descriptorStatusRows() []statusCase {

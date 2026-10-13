@@ -127,6 +127,9 @@ func (w *world) start() error {
 	w.server.Env = append(os.Environ(),
 		"ARTIFACTWEAVE_MASTER_KEY="+testMasterKey,
 		"ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD="+testAdminPassword,
+		// A scenario that collects garbage collects what it has just released,
+		// rather than waiting out the production grace period.
+		"ARTIFACTWEAVE_GC_GRACE_PERIOD=1ms",
 	)
 	if coverDir != "" {
 		w.server.Env = append(w.server.Env, "GOCOVERDIR="+coverDir)
