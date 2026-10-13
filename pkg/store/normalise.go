@@ -54,6 +54,14 @@ func copyValue(v reflect.Value, norm bool) reflect.Value {
 	case reflect.Slice:
 		if !v.IsNil() {
 			out.Set(reflect.MakeSlice(v.Type(), v.Len(), v.Len()))
+			// Bytes hold nothing to normalise, and an upload session's state
+			// can be megabytes (an S3 session keeps its pending part):
+			// copying it a reflected element at a time took minutes under
+			// -race.
+			if v.Type().Elem().Kind() == reflect.Uint8 {
+				reflect.Copy(out, v)
+				break
+			}
 			for i := range v.Len() {
 				out.Index(i).Set(copyValue(v.Index(i), norm))
 			}

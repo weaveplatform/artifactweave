@@ -8,8 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/testcontainers/testcontainers-go"
-	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
@@ -17,32 +15,16 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
-// minioImage is pinned by digest so a MinIO release cannot change S3
-// behaviour under the suite; bump it deliberately. MinIO stopped publishing
-// minio/minio on Docker Hub and its quay.io images need credentials, so the
-// suite uses Chainguard's public build (the server binary, entrypoint
-// minio).
-const minioImage = "cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56"
-
 // TestContractOnMinIO runs the contract against a real S3 implementation with
 // S3's real 5 MiB part floor, so multipart, copy and presigned GETs are
 // exercised end to end. It needs Docker and skips without it (decision
 // record 0015); CI runs it on Linux.
 func TestContractOnMinIO(t *testing.T) {
-	containertest.RequireLinux(t)
+	minio := containertest.MinIO(t)
 	ctx := context.Background()
-	ctr, err := tcminio.Run(ctx, minioImage)
-	testcontainers.CleanupContainer(t, ctr)
-	if err != nil {
-		t.Fatalf("start minio: %v", err)
-	}
-	endpoint, err := ctr.ConnectionString(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
 	client, presign, err := NewClient(ctx, ClientConfig{
-		Endpoint: "http://" + endpoint, Region: "us-east-1", PathStyle: true,
-		AccessKey: ctr.Username, SecretKey: ctr.Password,
+		Endpoint: minio.URL, Region: "us-east-1", PathStyle: true,
+		AccessKey: minio.User, SecretKey: minio.Password,
 	})
 	if err != nil {
 		t.Fatal(err)

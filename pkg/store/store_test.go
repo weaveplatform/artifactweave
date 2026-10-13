@@ -53,6 +53,7 @@ type deep struct {
 	Map   map[string][]int
 	Empty []int
 	Nil   []int
+	Bytes []byte
 	When  time.Time
 	Zero  time.Time
 	hide  int
@@ -68,6 +69,7 @@ func TestCloneAndNormalise(t *testing.T) {
 		Ptr:   &d,
 		Map:   map[string][]int{"k": {1}},
 		Empty: []int{},
+		Bytes: []byte("state"),
 		When:  at,
 		hide:  7,
 	}
@@ -80,6 +82,10 @@ func TestCloneAndNormalise(t *testing.T) {
 	*c.Ptr = 0
 	if in.Map["k"][0] != 1 || in.Any.([]int)[0] != 1 || *in.Ptr != d { //nolint:forcetypeassert // fixture
 		t.Fatal("Clone shares memory with its input")
+	}
+	c.Bytes[0] = 'S'
+	if string(in.Bytes) != "state" {
+		t.Fatalf("Clone shares a byte slice with its input: %q", in.Bytes)
 	}
 	if c.Empty == nil || c.Nil != nil || c.None != nil {
 		t.Fatal("Clone must keep empty and nil apart")
