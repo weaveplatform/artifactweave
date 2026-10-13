@@ -24,4 +24,4 @@ exclude:
     - ^internal/sqlstore/sqltest/
     # Skips container tests where Docker cannot run Linux containers; its
     # branches are the skip paths of other platforms.
-    - ^internal/containertest/
+    - ^pkg/containertest/

@@ -15,8 +15,8 @@ import (
 
 	tcpostgres "github.com/testcontainers/testcontainers-go/modules/postgres"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/containertest"
 	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/containertest"
 )
 
 // postgresImage is pinned so a PostgreSQL release cannot change behaviour
