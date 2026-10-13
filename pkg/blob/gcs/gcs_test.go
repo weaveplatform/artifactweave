@@ -69,7 +69,7 @@ func TestNewValidates(t *testing.T) {
 		t.Fatal("a nil API must be refused")
 	}
 	s, err := New(newFake(), Options{Prefix: "/a/b", Sessions: sessions})
-	if err != nil || s.prefix != "a/b/" || s.partSize != DefaultPartSize {
+	if err != nil || s.prefix != "a/b/" || s.PartSize() != DefaultPartSize {
 		t.Fatalf("New = %+v, %v", s, err)
 	}
 }

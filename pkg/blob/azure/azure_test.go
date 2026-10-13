@@ -82,7 +82,8 @@ func TestNewValidates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.prefix != "a/b/" || s.partSize != DefaultPartSize || s.copyRange != DefaultCopyRangeSize ||
+	if s.prefix != "a/b/" || s.PartSize() != DefaultPartSize ||
+		s.copyRange != DefaultCopyRangeSize ||
 		s.concurrency != DefaultConcurrency {
 		t.Fatalf("defaults: %+v", s)
 	}

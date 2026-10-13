@@ -111,6 +111,15 @@ type Presigner interface {
 	PresignGet(ctx context.Context, sha256 string, ttl time.Duration) (string, error)
 }
 
+// PartSizer is implemented by backends that write an upload in parts of a
+// fixed size. Bytes short of a whole part stay pending in the upload's
+// session, which is saved after every Append, so a caller that appends in
+// multiples of PartSize keeps that saved state small. The mirror sizes its
+// chunks by it.
+type PartSizer interface {
+	PartSize() int64
+}
+
 // UploadOption configures BeginUpload.
 type UploadOption func(*UploadOptions)
 

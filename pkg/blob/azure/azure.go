@@ -169,6 +169,7 @@ type Store struct {
 var (
 	_ blob.Store     = (*Store)(nil)
 	_ blob.Presigner = (*Store)(nil)
+	_ blob.PartSizer = (*Store)(nil)
 )
 
 // New returns a store over api.
@@ -208,6 +209,9 @@ func New(api API, o Options) (*Store, error) {
 		concurrency: o.Concurrency, sessions: o.Sessions,
 	}, nil
 }
+
+// PartSize returns the size of the blocks an upload is written in.
+func (s *Store) PartSize() int64 { return s.partSize }
 
 func (s *Store) blobKey(sha string) string { return s.prefix + "sha256/" + sha[:2] + "/" + sha }
 func (s *Store) tempKey(id string) string  { return s.prefix + "_uploads/" + id }

@@ -277,9 +277,9 @@ func (c *clouds) mirror(t *testing.T) *rig {
 			Name: m.name, Zone: m.zone, Store: r.sw[m.name], WriteEnabled: true,
 		})
 	}
-	// The chunk is a multiple of every member's part size, as the defaults
-	// are for S3 and Azure, so a whole-blob append leaves no member a
-	// part-filled tail to save in its session after every chunk.
+	// Smaller than the 10 MiB the mirror would derive from these part sizes,
+	// so the large blob spans several chunks; New checks it is a multiple of
+	// every member's part size, which outage passes through.
 	r.m, err = mirror.New(mirror.Options{
 		Members: members, Redundancy: 3, WriteQuorum: 2, Zone: zoneGCP,
 		ChunkSize: s3Part,
@@ -442,6 +442,9 @@ func (o *outage) Walk(ctx context.Context, fn func(blob.Info) error) error {
 	}
 	return o.inner.Walk(ctx, fn)
 }
+
+// PartSize passes through, so New checks the chunk against the real stores.
+func (o *outage) PartSize() int64 { return o.inner.(blob.PartSizer).PartSize() }
 
 // PresignGet passes through: every backend here presigns, and without it
 // the mirror would report that no member can.
