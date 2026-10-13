@@ -120,6 +120,29 @@ func (r replicaIndex) DeleteBlob(ctx context.Context, sha256 string) (int64, err
 	return n, err
 }
 
+func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int64, error) {
+	var n int64
+	err := r.s.do(ctx, func() error {
+		seen, present, deleting := map[string]bool{}, map[string]int{}, map[string]bool{}
+		for _, v := range r.t().rows {
+			seen[v.SHA256] = true
+			switch v.State {
+			case types.ReplicaPresent:
+				present[v.SHA256]++
+			case types.ReplicaDeleting:
+				deleting[v.SHA256] = true
+			}
+		}
+		for sha := range seen {
+			if !deleting[sha] && present[sha] < redundancy {
+				n++
+			}
+		}
+		return nil
+	})
+	return n, err
+}
+
 func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
 	var out []store.ReplicaCount
 	err := r.s.do(ctx, func() error {

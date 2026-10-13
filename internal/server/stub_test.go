@@ -45,6 +45,7 @@ var implemented = map[string]bool{
 	"POST /artifactory/api/trash/restore/{fromPath}": true,
 	"GET /artifactory/api/storageinfo":               true,
 	"POST /artifactory/api/storageinfo/calculate":    true,
+	"POST /artifactory/api/system/storage/optimize":  true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

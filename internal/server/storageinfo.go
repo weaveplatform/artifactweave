@@ -2,12 +2,16 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 // GetStorageSummaryInfo answers the storage summary. Admin only. It is
@@ -27,7 +31,79 @@ func (s artifactoryService) GetStorageSummaryInfo(
 	if err != nil {
 		return nil, s.internalError(ctx, "storage summary", err)
 	}
-	return artgen.GetStorageSummaryInfo200JSONResponse(storageSummary(sum)), nil
+	if s.cfg.Mirrors == nil {
+		return artgen.GetStorageSummaryInfo200JSONResponse(storageSummary(sum)), nil
+	}
+	mirrors, err := s.cfg.Mirrors.Status(ctx)
+	if err != nil {
+		return nil, s.internalError(ctx, "mirror status", err)
+	}
+	return summaryWithMirrors{storageSummary(sum), mirrorSummaries(mirrors)}, nil
+}
+
+// OptimizeSystemStorage starts a repair pass on every blob mirror at once,
+// as Artifactory's optimize starts its sharding repair (7.104.5). Admin
+// only. The acknowledgement texts are artifactweave's: the spec documents
+// only a plain-text body.
+func (s artifactoryService) OptimizeSystemStorage(
+	ctx context.Context,
+	_ artgen.OptimizeSystemStorageRequestObject,
+) (artgen.OptimizeSystemStorageResponseObject, error) {
+	if err := adminOnly(ctx); err != nil {
+		return nil, err
+	}
+	if s.cfg.Mirrors == nil {
+		return artgen.OptimizeSystemStorage200TextResponse(
+			"No blob mirror is configured; nothing to optimize"), nil
+	}
+	s.cfg.Mirrors.Optimize()
+	return artgen.OptimizeSystemStorage200TextResponse("Blob mirror repair started"), nil
+}
+
+// summaryWithMirrors is the storage summary plus blobMirrors, an
+// artifactweave extension (decision 0028): Artifactory reports nothing per
+// shard, and JFrog clients ignore fields they do not know. Both embedded
+// documents are flattened into one JSON object.
+type summaryWithMirrors struct {
+	artgen.StorageSummaryInfo
+	wire.StorageSummaryMirrors
+}
+
+func (r summaryWithMirrors) VisitGetStorageSummaryInfoResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	return json.NewEncoder(w).Encode(r) //nolint:wrapcheck // the response is already committed
+}
+
+func mirrorSummaries(mirrors []MirrorStatus) wire.StorageSummaryMirrors {
+	out := make([]wire.BlobMirror, 0, len(mirrors))
+	for _, m := range mirrors {
+		bm := wire.BlobMirror{
+			Tier: m.Tier, Zone: m.Zone, Redundancy: m.Redundancy, WriteQuorum: m.WriteQuorum,
+			UnderReplicatedBlobs: m.UnderReplicated,
+			Members:              make([]wire.BlobMirrorMember, 0, len(m.Members)),
+		}
+		for _, mem := range m.Members {
+			reps := map[string]wire.ReplicaTally{}
+			for _, st := range []types.ReplicaState{
+				types.ReplicaPresent, types.ReplicaPending, types.ReplicaDeleting, types.ReplicaFailed,
+			} {
+				reps[string(st)] = wire.ReplicaTally{Size: humanBytes(0)}
+			}
+			for _, c := range mem.Replicas {
+				reps[string(c.State)] = wire.ReplicaTally{
+					Count: c.Count, Bytes: c.Bytes, Size: humanBytes(c.Bytes),
+				}
+			}
+			bm.Members = append(bm.Members, wire.BlobMirrorMember{
+				Name: mem.Name, Zone: mem.Zone, Backend: mem.Kind,
+				WriteEnabled: mem.WriteEnabled, Available: mem.Available,
+				AverageLatencyMs: mem.Latency.Milliseconds(), Replicas: reps,
+			})
+		}
+		out = append(out, bm)
+	}
+	return wire.StorageSummaryMirrors{BlobMirrors: out}
 }
 
 // RefreshStorageSummaryInfo acknowledges a recalculation. The summary is

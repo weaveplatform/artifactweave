@@ -194,6 +194,11 @@ type ReplicaIndex interface {
 	// Counts returns the number and size of records per member and state,
 	// ordered by (member, state).
 	Counts(ctx context.Context) ([]ReplicaCount, error)
+	// UnderReplicated counts the blobs with fewer than redundancy present
+	// records. A blob with a deleting record is being deleted and is not
+	// counted; neither is a blob with no records at all, which the repair
+	// worker's backfill brings into the index.
+	UnderReplicated(ctx context.Context, redundancy int) (int64, error)
 }
 
 // Upload is a blob upload session that outlives one request: a Docker

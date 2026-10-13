@@ -119,6 +119,16 @@ func testReplicas(t *testing.T, r store.ReplicaIndex) {
 		{Member: "gcp", State: types.ReplicaPresent, Count: 1, Bytes: 10},
 	}, counts)
 
+	// Blob 1 has two present copies (aws, gcp), blob 2 one, 3 none and 4
+	// none. A deleting record takes blob 5 out of the count.
+	must(t, r.Put(ctx, replica(5, "aws", types.ReplicaDeleting, 6)))
+	for redundancy, want := range map[int]int64{1: 2, 2: 3, 3: 4} {
+		if n := get[int64](t)(r.UnderReplicated(ctx, redundancy)); n != want {
+			t.Fatalf("UnderReplicated(%d) = %d, want %d", redundancy, n, want)
+		}
+	}
+	must(t, r.Delete(ctx, replica(5, "aws", "", 0).SHA256, "aws"))
+
 	must(t, r.Delete(ctx, failed.SHA256, "gcp"))
 	wantErr(t, r.Delete(ctx, failed.SHA256, "gcp"), store.ErrNotFound)
 	n, err := r.DeleteBlob(ctx, fixtures[0].SHA256)

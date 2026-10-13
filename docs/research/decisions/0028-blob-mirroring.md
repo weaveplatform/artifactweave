@@ -79,8 +79,23 @@ writes.
 - Surplus copies are never deleted automatically; removing a member is an explicit job
   that runs only after the remaining copies are verified.
 
-**Administration.** The storage summary reports each member's status, usage and
-under-replicated count, which Artifactory's does not.
+**Administration.** Artifactory's storage summary has nothing per shard. artifactweave's
+adds one field, which JFrog clients ignore:
+- **`GET /api/storageinfo`** gains `blobMirrors` when a tier is a mirror. A summary without
+  mirrors is unchanged. There is one entry per mirrored tier (`blob`, `cold_blob`), with:
+  - `tier`, `zone`, `redundancy` and `writeQuorum`;
+  - `underReplicatedBlobs`: blobs with fewer present copies than the redundancy, not
+    counting blobs being deleted;
+  - `members`, each with `name`, `zone`, `backend`, `writeEnabled`, `available` (false
+    while its breaker is open) and `averageLatencyMs`;
+  - each member's `replicas`, keyed by state (`present`, `pending`, `deleting`,
+    `failed`), each with `count`, `bytes` and a human-formatted `size`.
+  Records of members no longer configured are not listed.
+- **`POST /api/system/storage/optimize`** (admin) queues a repair pass on every mirror at
+  once and answers `200` "Blob mirror repair started". A pass already queued counts.
+  Without a mirror it answers `200` "No blob mirror is configured; nothing to optimize".
+  The spec documents only a plain-text acknowledgement, so both texts are
+  artifactweave's.
 
 ## Rationale
 

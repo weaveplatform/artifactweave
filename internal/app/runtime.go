@@ -31,6 +31,7 @@ type runtime struct {
 	location         usage.Location
 	gc               *gc.Collector
 	mirrors          []*mirror.Store
+	admin            *mirrorAdmin
 	stopLoops        context.CancelFunc
 	loops            sync.WaitGroup
 }
@@ -79,12 +80,21 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		store: st, auth: authn, closeStore: st.Close, blobs: hot.store, coldBlobs: cold.store,
 		location: hotTier.location(), gc: collector, stopLoops: stop,
 	}
-	for _, m := range []*mirror.Store{hot.mirror, cold.mirror} {
-		if m == nil {
+	for _, t := range []struct {
+		name string
+		m    *mirror.Store
+	}{{hotTier.section, hot.mirror}, {coldTier.section, cold.mirror}} {
+		if t.m == nil {
 			continue
 		}
-		rt.mirrors = append(rt.mirrors, m)
-		rt.loops.Go(func() { _ = m.RunRepair(lctx, repairEvery, nil) })
+		if rt.admin == nil {
+			rt.admin = &mirrorAdmin{}
+		}
+		// One slot: an optimize while a pass is already queued adds nothing.
+		trigger := make(chan struct{}, 1)
+		rt.admin.tiers = append(rt.admin.tiers, mirrorTier{t.name, t.m, trigger})
+		rt.mirrors = append(rt.mirrors, t.m)
+		rt.loops.Go(func() { _ = t.m.RunRepair(lctx, repairEvery, trigger) })
 	}
 	rt.loops.Go(func() { _ = collector.Loop(lctx, cfg.GC.Interval, logGC(log)) })
 	return rt, nil
