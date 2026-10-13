@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -33,13 +34,34 @@ type world struct {
 	t      *testing.T
 	url    string
 	server *exec.Cmd
-	stderr bytes.Buffer
+	stderr syncBuffer
 	status int
 	header http.Header
 	body   []byte
 	lastRC int
 	// dir holds the files a scenario writes, for {dir} in jf arguments.
 	dir string
+	// next holds headers for the next request only.
+	next map[string]string
+}
+
+// syncBuffer is the server's stderr: the process writes it from exec's
+// copying goroutine while steps read the access log.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 func newWorld(t *testing.T) *world { return &world{t: t} }
@@ -60,6 +82,13 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I (PUT|POST) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
 	sc.Step(`^I PATCH "([^"]*)" as admin with YAML:$`, w.patchYAMLAsAdmin)
+	sc.Step(`^I (PUT|HEAD) "([^"]*)" as admin$`, w.sendEmptyAsAdmin)
+	sc.Step(`^the next request has header "([^"]*)" "([^"]*)"$`, w.nextHeader)
+	sc.Step(`^a file "([^"]*)" of (\d+) bytes$`, w.writeSizedFile)
+	sc.Step(`^the files "([^"]*)" and "([^"]*)" are identical$`, w.filesIdentical)
+	sc.Step(`^the output contains "([^"]*)"$`, w.outputContains)
+	sc.Step(`^the server answered (\d+) to ([A-Z]+) "([^"]*)"$`, w.serverAnswered)
+	sc.Step(`^the server never answered (\d+) to ([A-Z]+) "([^"]*)"$`, w.serverNeverAnswered)
 	sc.Step(`^a file "([^"]*)" with content:$`, w.writeFile)
 	sc.Step(`^the response status is (\d+)$`, w.statusIs)
 	sc.Step(`^the response body is "([^"]*)"$`, w.bodyIs)
@@ -186,6 +215,111 @@ func (w *world) deleteAsAdmin(path string) error {
 	})
 }
 
+func (w *world) sendEmptyAsAdmin(method, path string) error {
+	return w.send(method, path, "", func(r *http.Request) {
+		r.SetBasicAuth("admin", testAdminPassword)
+	})
+}
+
+func (w *world) nextHeader(name, value string) error {
+	if w.next == nil {
+		w.next = map[string]string{}
+	}
+	w.next[name] = value
+	return nil
+}
+
+// writeSizedFile writes size bytes of a repeating pattern, enough to pass
+// the CLI's checksum-deploy and split-download thresholds.
+func (w *world) writeSizedFile(name string, size int) error {
+	b := make([]byte, size)
+	for i := range b {
+		b[i] = byte('a' + i%26)
+	}
+	return w.writeFile(name, &godog.DocString{Content: string(b)})
+}
+
+func (w *world) filesIdentical(a, b string) error {
+	x, err := os.ReadFile(filepath.Join(w.dir, a))
+	if err != nil {
+		return err
+	}
+	y, err := os.ReadFile(filepath.Join(w.dir, b))
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(x, y) {
+		return fmt.Errorf("%s (%d bytes) and %s (%d bytes) differ", a, len(x), b, len(y))
+	}
+	return nil
+}
+
+func (w *world) outputContains(want string) error {
+	if !strings.Contains(string(w.body), want) {
+		return fmt.Errorf("output does not contain %q:\n%s", want, w.body)
+	}
+	return nil
+}
+
+// answers reads the server's JSON access log for the statuses it gave a
+// method and path. Matrix parameters are ignored: on CI the JFrog CLI appends
+// vcs.* build properties (";vcs.branch=...") to every upload URL, which a
+// scenario cannot know in advance.
+func (w *world) answers(method, path string) []int {
+	var out []int
+	for _, line := range strings.Split(w.stderr.String(), "\n") {
+		var rec struct {
+			Msg, Method, Path string
+			Status            int
+		}
+		if json.Unmarshal([]byte(line), &rec) != nil || rec.Msg != "request" ||
+			rec.Method != method {
+			continue
+		}
+		if logged, _, _ := strings.Cut(rec.Path, ";"); logged == path {
+			out = append(out, rec.Status)
+		}
+	}
+	return out
+}
+
+func (w *world) serverAnswered(status int, method, path string) error {
+	got := w.answers(method, path)
+	for _, s := range got {
+		if s == status {
+			return nil
+		}
+	}
+	return fmt.Errorf("%s %s was answered %v, not %d; requests logged: %v",
+		method, path, got, status, w.requests(method))
+}
+
+// requests lists the logged requests of a method, for failure messages.
+func (w *world) requests(method string) []string {
+	var out []string
+	for _, line := range strings.Split(w.stderr.String(), "\n") {
+		var rec struct {
+			Msg, Method, Path string
+			Status            int
+		}
+		if json.Unmarshal([]byte(line), &rec) == nil && rec.Msg == "request" &&
+			rec.Method == method {
+			out = append(out, fmt.Sprintf("%s=%d", rec.Path, rec.Status))
+		}
+	}
+	return out
+}
+
+func (w *world) serverNeverAnswered(status int, method, path string) error {
+	got := w.answers(method, path)
+	for _, s := range got {
+		if s == status {
+			return fmt.Errorf("%s %s was answered %v, including %d", method, path, got, status)
+		}
+	}
+	return nil
+}
+
 // writeFile writes a scenario file, such as a jf repository template, under
 // the scenario's directory.
 func (w *world) writeFile(name string, content *godog.DocString) error {
@@ -217,6 +351,10 @@ func (w *world) send(method, path, body string, prepare func(*http.Request)) err
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	for k, v := range w.next {
+		req.Header.Set(k, v)
+	}
+	w.next = nil
 	prepare(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

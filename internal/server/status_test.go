@@ -7,9 +7,10 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -38,7 +39,12 @@ type statusCase struct {
 func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); return m }
 
 func statusTable() []statusCase {
-	return slices.Concat(systemStatusRows(), repositoryStatusRows(), descriptorStatusRows())
+	return slices.Concat(
+		systemStatusRows(),
+		repositoryStatusRows(),
+		descriptorStatusRows(),
+		itemStatusRows(),
+	)
 }
 
 func systemStatusRows() []statusCase {
@@ -78,14 +84,9 @@ func statusFixture(t *testing.T, anonymous bool) http.Handler {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
-	if _, err := auth.Seed(ctx, db, "pw", time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	hash, err := auth.HashPassword("pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Users().Create(ctx, types.User{Name: "user", PasswordHash: hash}); err != nil {
+	cheapSeed(t, db)
+	if err := db.Users().
+		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
@@ -107,11 +108,80 @@ func statusFixture(t *testing.T, anonymous bool) http.Handler {
 			t.Fatal(err)
 		}
 	}
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	items := &item.Service{Store: db, Blobs: blobs}
+	libs, err := db.Repos().Get(ctx, "libs-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"fixture/get.txt", "fixture/del.txt"} {
+		if _, err := items.Deploy(ctx, item.Deploy{
+			Target: item.Target{Repo: libs, Path: p}, Body: strings.NewReader("fixture"),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(Config{CompatVersion: "7.155.0", Store: db, Auth: a})
+	return New(Config{CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a})
+}
+
+func itemStatusRows() []statusCase {
+	const (
+		put    = "PUT /artifactory/{repoKey}/{filePath}"
+		get    = "GET /artifactory/{repoKey}/{filePath}"
+		head   = "HEAD /artifactory/{repoKey}/{filePath}"
+		remove = "DELETE /artifactory/{repoKey}/{filePath}"
+		aqlOp  = "POST /artifactory/api/search/aql"
+		upl    = "GET /artifactory/api/v1/uploads/config"
+		lib    = "/artifactory/libs-local"
+		q      = `items.find({"repo":"libs-local"}).include("repo","path","name")`
+	)
+	return []statusCase{
+		{put, lib + "/new/a.txt", "admin", "a", 201},
+		{put, lib + "/new/dir/", "admin", "", 201},
+		{put, lib + "/", "admin", "a", 400},
+		{put, lib + "/fixture/get.txt/below", "admin", "a", 409},
+		{put, "/artifactory/remote-private/a.txt", "admin", "a", 405},
+		{put, "/artifactory/missing/a.txt", "admin", "a", 404},
+		{put, lib + "/new/b.txt", "user", "a", 403},
+		{put, lib + "/new/b.txt", "anonymous", "a", 401},
+		{put, lib + "/new/b.txt", "", "a", 401},
+
+		{get, lib + "/fixture/get.txt", "admin", "", 200},
+		{get, lib + "/fixture/get.txt.sha256", "admin", "", 200},
+		{get, lib + "/fixture/", "admin", "", 200},
+		{get, lib + "/fixture/absent", "admin", "", 404},
+		{get, "/artifactory/missing/a.txt", "admin", "", 404},
+		{get, lib + "/fixture/get.txt", "user", "", 403},
+		{get, lib + "/fixture/get.txt", "anonymous", "", 401},
+		{get, lib + "/fixture/get.txt", "", "", 401},
+
+		{head, lib + "/fixture/get.txt", "admin", "", 200},
+		{head, lib + "/fixture/absent", "admin", "", 404},
+		{head, lib + "/fixture/get.txt", "", "", 401},
+
+		{remove, lib + "/fixture/del.txt", "admin", "", 204},
+		{remove, lib + "/fixture/absent", "admin", "", 404},
+		{remove, "/artifactory/virt/x", "admin", "", 405},
+		{remove, lib + "/fixture/get.txt", "user", "", 403},
+		{remove, lib + "/fixture/get.txt", "anonymous", "", 401},
+		{remove, lib + "/fixture/get.txt", "", "", 401},
+
+		{aqlOp, "/artifactory/api/search/aql", "admin", q, 200},
+		{aqlOp, "/artifactory/api/search/aql", "user", q, 200},
+		{aqlOp, "/artifactory/api/search/aql", "admin", "items.find(", 400},
+		{aqlOp, "/artifactory/api/search/aql", "anonymous", q, 401},
+		{aqlOp, "/artifactory/api/search/aql", "", q, 401},
+
+		{upl, "/artifactory/api/v1/uploads/config", "admin", "", 200},
+		{upl, "/artifactory/api/v1/uploads/config", "", "", 401},
+	}
 }
 
 func repositoryStatusRows() []statusCase {
@@ -245,6 +315,11 @@ func TestStatusTable(t *testing.T) {
 // the guard below holds them to the same rule as the generated ones.
 var implementedHandwritten = map[string]bool{
 	"PATCH /artifactory/api/system/configuration": true,
+	"PUT /artifactory/{repoKey}/{filePath}":       true,
+	"GET /artifactory/{repoKey}/{filePath}":       true,
+	"HEAD /artifactory/{repoKey}/{filePath}":      true,
+	"DELETE /artifactory/{repoKey}/{filePath}":    true,
+	"POST /artifactory/api/search/aql":            true,
 }
 
 func descriptorStatusRows() []statusCase {

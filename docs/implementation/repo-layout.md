@@ -37,9 +37,9 @@ internal/
   descriptor/                  # Artifactory YAML descriptor import, XML descriptor export
   wire/
     artifactory/ access/ legacy/  # JSON wire models with JFrog's field names (tagliatelle ignored here only)
-  server/                      # chi router, middleware, auth, baseurl resolver, errors table
+  server/                      # chi router, middleware, auth, baseurl resolver, errors table,
+                               # and the hand-written item-path handlers beside the generated ones
     gen/                       # generated strict servers, one package per spec
-    items/                     # hand-written item-path handlers (storage, copy/move, zap, trash, metadata)
     docker/                    # /v2 routing for the repository-path access method
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator

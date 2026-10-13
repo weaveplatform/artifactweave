@@ -13253,6 +13253,26 @@ paths:
       summary: Readiness probe
       tags:
         - system
+  /api/v1/uploads/config:
+    get:
+      description: Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+      operationId: getUploadsConfig
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadsConfig'
+          description: The multipart upload configuration.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+      summary: Multipart upload configuration
+      tags:
+        - storage
   /api/v2/federation/status/repo/{repoKey}:
     get:
       deprecated: true
@@ -21192,6 +21212,13 @@ components:
                 type: array
           description: Optional within this object. Map from property key to the new value. A string sets a single value, an array sets multiple values, and `null` removes the key. An empty map is rejected with 400.
           type: object
+      type: object
+    UploadsConfig:
+      description: Whether the server accepts the JFrog CLI's multipart upload protocol.
+      properties:
+        supported:
+          description: Optional within this object. Always false here, so the CLI uploads large files in one request.
+          type: boolean
       type: object
     UriSearchResult:
       description: 'The common search result: a list of file info URIs. With X-Result-Detail each entry also carries the file info fields and, when requested, a properties map.'
