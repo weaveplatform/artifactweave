@@ -1078,6 +1078,10 @@ func (UnimplementedStrict) GetSystemReadiness(context.Context, GetSystemReadines
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetUploadsConfig(context.Context, GetUploadsConfigRequestObject) (GetUploadsConfigResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetFederatedRepositoryStatusV2(context.Context, GetFederatedRepositoryStatusV2RequestObject) (GetFederatedRepositoryStatusV2ResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

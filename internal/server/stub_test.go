@@ -36,6 +36,8 @@ var implemented = map[string]bool{
 	"PUT /artifactory/api/v2/repositories/batch":                       true,
 	"POST /artifactory/api/v2/repositories/batch":                      true,
 	"DELETE /artifactory/api/v2/repositories/batch":                    true,
+
+	"GET /artifactory/api/v1/uploads/config": true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

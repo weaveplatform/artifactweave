@@ -5489,6 +5489,12 @@ type UpdatePropertiesRequest_Props_AdditionalProperties struct {
 	union json.RawMessage
 }
 
+// UploadsConfig Whether the server accepts the JFrog CLI's multipart upload protocol.
+type UploadsConfig struct {
+	// Supported Optional within this object. Always false here, so the CLI uploads large files in one request.
+	Supported *bool `json:"supported,omitempty"`
+}
+
 // UriSearchResult The common search result: a list of file info URIs. With X-Result-Detail each entry also carries the file info fields and, when requested, a properties map.
 type UriSearchResult struct {
 	// Results Optional within this object. One entry per matching item; empty when nothing matched.
@@ -10810,6 +10816,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/system/readiness (the `GetSystemReadiness` operationId).
 	GetSystemReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetUploadsConfig Multipart upload configuration
+	//
+	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+	//
+	// Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
+	GetUploadsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFederatedRepositoryStatusV2 Get federated repository sync status (version 2)
 	//
@@ -17474,6 +17487,23 @@ func (c *Client) GetSystemLiveness(ctx context.Context, reqEditors ...RequestEdi
 // Corresponds with GET /api/v1/system/readiness (the `GetSystemReadiness` operationId).
 func (c *Client) GetSystemReadiness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSystemReadinessRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetUploadsConfig Multipart upload configuration
+//
+// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+//
+// Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
+func (c *Client) GetUploadsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetUploadsConfigRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -30827,6 +30857,33 @@ func NewGetSystemReadinessRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetUploadsConfigRequest constructs an http.Request for the GetUploadsConfig method
+func NewGetUploadsConfigRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/uploads/config")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetFederatedRepositoryStatusV2Request constructs an http.Request for the GetFederatedRepositoryStatusV2 method
 func NewGetFederatedRepositoryStatusV2Request(server string, repoKey string) (*http.Request, error) {
 	var err error
@@ -36190,6 +36247,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/system/readiness (the `GetSystemReadiness` operationId).
 	GetSystemReadinessWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSystemReadinessResponse, error)
+
+	// GetUploadsConfigWithResponse Multipart upload configuration
+	//
+	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
+	GetUploadsConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUploadsConfigResponse, error)
 
 	// GetFederatedRepositoryStatusV2WithResponse Get federated repository sync status (version 2)
 	//
@@ -54676,6 +54742,54 @@ func (r GetSystemReadinessResponse) ContentType() string {
 	return ""
 }
 
+type GetUploadsConfigResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UploadsConfig
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetUploadsConfigResponse) GetJSON200() *UploadsConfig {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetUploadsConfigResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetBody returns the raw response body bytes
+func (r GetUploadsConfigResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetUploadsConfigResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetUploadsConfigResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetUploadsConfigResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetFederatedRepositoryStatusV2Response struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -62733,6 +62847,21 @@ func (c *ClientWithResponses) GetSystemReadinessWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseGetSystemReadinessResponse(rsp)
+}
+
+// GetUploadsConfigWithResponse Multipart upload configuration
+//
+// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
+func (c *ClientWithResponses) GetUploadsConfigWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetUploadsConfigResponse, error) {
+	rsp, err := c.GetUploadsConfig(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetUploadsConfigResponse(rsp)
 }
 
 // GetFederatedRepositoryStatusV2WithResponse Get federated repository sync status (version 2)
@@ -77259,6 +77388,39 @@ func ParseGetSystemReadinessResponse(rsp *http.Response) (*GetSystemReadinessRes
 
 	case rsp.StatusCode == 500:
 		break // No content-type
+
+	}
+
+	return response, nil
+}
+
+// ParseGetUploadsConfigResponse parses an HTTP response from a GetUploadsConfigWithResponse call
+func ParseGetUploadsConfigResponse(rsp *http.Response) (*GetUploadsConfigResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetUploadsConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UploadsConfig
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
 
 	}
 

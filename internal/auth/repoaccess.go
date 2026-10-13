@@ -9,39 +9,61 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// RepoReader returns whether p may read a repository, at repository level:
-// an admin reads every repository; anyone else needs READ on the artifact
-// resource of a permission granted to their user or one of their groups
-// whose targets name the repository, ANY, or ANY LOCAL or ANY REMOTE for its
-// class. Include and exclude patterns are not evaluated: READ anywhere in a
-// repository is enough to see it, and path-level checks arrive with full
-// permission evaluation in P4. The permissions are read once, so a list
-// checks every repository against one snapshot.
+// RepoReader returns whether p may read a repository (RepoChecker with
+// READ). A list checks every repository against one permission snapshot.
 func RepoReader(
 	ctx context.Context,
 	perms store.PermissionStore,
 	p Principal,
 ) (func(repo.Config) bool, error) {
+	can, err := RepoChecker(ctx, perms, p)
+	if err != nil {
+		return nil, err
+	}
+	return func(c repo.Config) bool { return can(c, types.ActionRead) }, nil
+}
+
+// RepoChecker returns whether p holds an action on a repository, at
+// repository level: an admin holds every action; anyone else needs the
+// action on the artifact resource of a permission granted to their user or
+// one of their groups whose targets name the repository, ANY, or ANY LOCAL
+// or ANY REMOTE for its class. Include and exclude patterns are not
+// evaluated: the action anywhere in a repository is enough, and path-level
+// checks arrive with full permission evaluation in P4. The permissions are
+// read once, so every check uses one snapshot.
+func RepoChecker(
+	ctx context.Context,
+	perms store.PermissionStore,
+	p Principal,
+) (func(repo.Config, types.Actions) bool, error) {
 	if p.Admin {
-		return func(repo.Config) bool { return true }, nil
+		return func(repo.Config, types.Actions) bool { return true }, nil
 	}
 	granted, err := perms.ForPrincipal(ctx, p.Name, p.Groups)
 	if err != nil {
 		return nil, fmt.Errorf("auth: permissions of %s: %w", p.Name, err)
 	}
-	var targets []string
+	type grant struct {
+		target  string
+		actions types.Actions
+	}
+	var grants []grant
 	for _, perm := range granted {
 		res, ok := perm.Resources[types.ResourceArtifact]
-		if !ok || !grantsRead(res.Actions, p) {
+		if !ok {
+			continue
+		}
+		actions := held(res.Actions, p)
+		if actions == 0 {
 			continue
 		}
 		for target := range res.Targets {
-			targets = append(targets, target)
+			grants = append(grants, grant{target: target, actions: actions})
 		}
 	}
-	return func(c repo.Config) bool {
-		for _, target := range targets {
-			if covers(target, c) {
+	return func(c repo.Config, want types.Actions) bool {
+		for _, g := range grants {
+			if g.actions.Has(want) && covers(g.target, c) {
 				return true
 			}
 		}
@@ -49,16 +71,13 @@ func RepoReader(
 	}, nil
 }
 
-func grantsRead(g types.Grants, p Principal) bool {
-	if g.Users[p.Name].Has(types.ActionRead) {
-		return true
-	}
+// held is every action g grants p, directly or through a group.
+func held(g types.Grants, p Principal) types.Actions {
+	a := g.Users[p.Name]
 	for _, group := range p.Groups {
-		if g.Groups[group].Has(types.ActionRead) {
-			return true
-		}
+		a |= g.Groups[group]
 	}
-	return false
+	return a
 }
 
 // covers reports whether a permission target includes c. Federated

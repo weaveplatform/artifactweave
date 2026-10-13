@@ -86,6 +86,7 @@ func New(cfg Config) http.Handler {
 	r.Get("/router/api/v1/system/health", routerHealth)
 	r.With(bodyLimit(managementBodyLimit)).
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
+	artSvc.registerItemRoutes(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service
