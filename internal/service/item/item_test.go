@@ -7,12 +7,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"testing/iotest"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -145,6 +147,67 @@ func TestDeployChecksums(t *testing.T) {
 	it, err := w.deploy("x.bin", "data", wrong)
 	if err != nil || it.Original.SHA1 != wrong.SHA1 || it.Actual.SHA1 != sums("data").SHA1 {
 		t.Fatalf("server policy: %+v %v", it, err)
+	}
+}
+
+// recordingBlobStore records the expected SHA-256 of every BeginUpload.
+type recordingBlobStore struct {
+	blob.Store
+	expected *[]string
+}
+
+func (r recordingBlobStore) BeginUpload(
+	ctx context.Context,
+	o ...blob.UploadOption,
+) (blob.Upload, error) {
+	opts, err := blob.ResolveOptions(o...)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // test fake
+	}
+	*r.expected = append(*r.expected, opts.ExpectedSHA256)
+	return r.Store.BeginUpload(ctx, o...) //nolint:wrapcheck // test fake
+}
+
+// TestDeployDeclaresSHA256 checks that an enforced declared SHA-256 reaches
+// the blob store, so object stores write the content key directly.
+func TestDeployDeclaresSHA256(t *testing.T) {
+	w := newWorld(t)
+	var expected []string
+	w.svc.Blobs = recordingBlobStore{w.svc.Blobs, &expected}
+	ctx := context.Background()
+	c := sums("data")
+
+	if _, err := w.deploy("ok.bin", "data", types.Checksums{SHA256: c.SHA256}); err != nil {
+		t.Fatal(err)
+	}
+	// A wrong declaration is refused as before, and nothing is stored.
+	wrong := strings.Repeat("0", 64)
+	if _, err := w.deploy("bad.bin", "other", types.Checksums{SHA256: wrong}); !errors.Is(
+		err, ErrChecksumMismatch,
+	) {
+		t.Fatalf("wrong sha256: %v", err)
+	}
+	if ok, err := w.svc.Blobs.Exists(ctx, sums("other").SHA256); err != nil || ok {
+		t.Fatalf("a rejected deploy stored its content: %v %v", ok, err)
+	}
+	if _, err := w.db.Items().Get(ctx, "libs", false, "bad.bin"); !errors.Is(
+		err, store.ErrNotFound,
+	) {
+		t.Fatal("a rejected deploy stored the item")
+	}
+	// Only a SHA-1 declared: nothing to pass.
+	if _, err := w.deploy("sha1.bin", "data", types.Checksums{SHA1: c.SHA1}); err != nil {
+		t.Fatal(err)
+	}
+	// Under server-generated checksums a mismatch is only recorded, so the
+	// declared digest must not reach the blob store.
+	w.loc.ChecksumPolicyType = repo.ServerGeneratedChecksums
+	it, err := w.deploy("server.bin", "data", types.Checksums{SHA256: wrong})
+	if err != nil || it.Original.SHA256 != wrong || it.Actual.SHA256 != c.SHA256 {
+		t.Fatalf("server policy: %+v %v", it, err)
+	}
+	if want := []string{c.SHA256, wrong, "", ""}; !slices.Equal(expected, want) {
+		t.Fatalf("BeginUpload saw expected digests %q, want %q", expected, want)
 	}
 }
 

@@ -15,7 +15,10 @@ The contract asks four things of a backend:
 - Chunks arrive in any size (Docker PATCH, the JFrog CLI's multipart upload).
 - Blobs reach many GiB.
 - The content-addressed name (`sha256/<ab>/<hex>`) is known only at commit, unless the
-  client declared the digest up front.
+  client declared the digest up front. A deploy passes a declared `X-Checksum-Sha256` to
+  `BeginUpload` when the repository enforces client checksums (the default), so S3 and
+  Azure write the content key directly and skip the copy out of a temporary object; under
+  `server-generated-checksums` a declared value is only recorded and is not passed.
 
 [Research 18](../18-cloud-blob-storage.md) records what each service and its official Go
 SDK offer.
