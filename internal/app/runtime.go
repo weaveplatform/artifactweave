@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -28,6 +29,7 @@ var repairEvery = mirror.DefaultRepairInterval
 type runtime struct {
 	store            store.Store
 	auth             *auth.Authenticator
+	tokens           *token.Service // issues and verifies access tokens
 	closeStore       func() error
 	blobs, coldBlobs blob.Store
 	location         usage.Location
@@ -57,7 +59,13 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err := applyBootstrap(ctx, cfg, st, log); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
-	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{Hash: authHash})
+	tokens, err := openTokens(ctx, st)
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{
+		Hash: authHash, Tokens: tokens,
+	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
@@ -95,8 +103,16 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// the HTTP server has drained.
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	rt := &runtime{
-		store: st, auth: authn, closeStore: st.Close, blobs: hot.store, coldBlobs: cold.store,
-		location: hotTier.location(), gc: collector, multipart: parts, stopLoops: stop,
+		store:      st,
+		auth:       authn,
+		tokens:     tokens,
+		closeStore: st.Close,
+		blobs:      hot.store,
+		coldBlobs:  cold.store,
+		location:   hotTier.location(),
+		gc:         collector,
+		multipart:  parts,
+		stopLoops:  stop,
 	}
 	for _, t := range []struct {
 		name string

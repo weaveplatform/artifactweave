@@ -67,6 +67,9 @@ type Report struct {
 	// Pruned counts tombstones dropped and revived rows forgotten after
 	// tombstoneRetention.
 	Pruned int64
+	// TokensExpired counts access-token records removed after their refresh
+	// grace ran out.
+	TokensExpired int64
 }
 
 // Options configures New. Zero values mean the defaults.
@@ -138,6 +141,7 @@ func (c *Collector) Run(ctx context.Context) (Report, error) {
 	var errs []error
 	for _, step := range []func(context.Context, *Report) error{
 		c.purgeTrash, c.reapUploads, c.finishDeleting, c.collectIndexed, c.collectOrphans, c.prune,
+		c.expireTokens,
 	} {
 		errs = append(errs, step(ctx, &rep))
 		if held, err := c.renew(ctx); err != nil || !held {
@@ -159,6 +163,18 @@ func (c *Collector) renew(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("gc: lease: %w", err)
 	}
 	return held, nil
+}
+
+// expireTokens removes token records whose refresh token can no longer be
+// used: a refresh is accepted for types.DefaultRefreshGrace after the token
+// expires, so the record is kept that long.
+func (c *Collector) expireTokens(ctx context.Context, rep *Report) error {
+	n, err := c.store.Tokens().DeleteExpired(ctx, c.now().Add(-types.DefaultRefreshGrace))
+	rep.TokensExpired += n
+	if err != nil {
+		return fmt.Errorf("gc: expired tokens: %w", err)
+	}
+	return nil
 }
 
 func (c *Collector) purgeTrash(ctx context.Context, rep *Report) error {

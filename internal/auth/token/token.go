@@ -1,0 +1,422 @@
+// Package token issues and verifies Access tokens (decision 0005): RS256
+// JWTs signed with a per-instance key, reference tokens and refresh tokens.
+// Only digests of tokens are stored; the store record (token_id, subject,
+// scope, expiry) is what revocation removes.
+package token
+
+import (
+	"cmp"
+	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+var (
+	// ErrInvalidRequest reports an issue request the service refuses.
+	ErrInvalidRequest = errors.New("invalid token request")
+	// ErrNeverExpiresAdminOnly refuses a token that never expires to a
+	// caller who is not an administrator.
+	ErrNeverExpiresAdminOnly = fmt.Errorf(
+		"%w: only an administrator may issue a token that never expires",
+		ErrInvalidRequest,
+	)
+	// ErrNotRevocable refuses to revoke a token shorter than the revocable
+	// threshold that was not forced revocable.
+	ErrNotRevocable = errors.New("token is not revocable")
+
+	errMalformed = fmt.Errorf("%w: malformed", auth.ErrInvalidToken)
+	errBadKey    = errors.New("bad signing key")
+)
+
+const (
+	// DefaultAudience is the audience Access gives a token issued without one.
+	DefaultAudience = "*@*"
+	// touchEvery bounds how often verification writes LastUsed, so a busy
+	// CLI does not turn every request into a write.
+	touchEvery = time.Minute
+	alphanum   = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+)
+
+// Options configures New. Zero values mean the defaults.
+type Options struct {
+	// Now supplies the time; nil means time.Now.
+	Now func() time.Time
+	// KeyBits is the RSA key size; zero means DefaultKeyBits. Only tests set
+	// it, to keep key generation cheap.
+	KeyBits int
+}
+
+// Service issues and verifies tokens over a store.
+type Service struct {
+	st     store.Store
+	now    func() time.Time
+	bits   int
+	issuer string
+
+	mu   sync.Mutex
+	keys keyset
+}
+
+// New returns a Service. The instance identity must exist: the issuer is
+// jfac@<the instance's id>. The first signing key is created when there is
+// none.
+func New(ctx context.Context, st store.Store, o Options) (*Service, error) {
+	id, err := st.Instance().Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("token: instance identity: %w", err)
+	}
+	if o.Now == nil {
+		o.Now = time.Now
+	}
+	s := &Service{
+		st: st, now: o.Now, bits: cmp.Or(o.KeyBits, DefaultKeyBits),
+		issuer: "jfac@" + strings.TrimPrefix(id.InstanceID, "jfrt@"),
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.reload(ctx); err != nil {
+		return nil, err
+	}
+	if s.keys.active == "" {
+		if err := s.createKey(ctx); err != nil {
+			return nil, err
+		}
+		if err := s.reload(ctx); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
+}
+
+// Issuer is this instance's Access service id, the iss of its tokens.
+func (s *Service) Issuer() string { return s.issuer }
+
+func (s *Service) reload(ctx context.Context) error {
+	ks, err := s.load(ctx)
+	if err != nil {
+		return err
+	}
+	s.keys = ks
+	return nil
+}
+
+// Request asks for a token for a user.
+type Request struct {
+	Username string
+	// Scope defaults to applied-permissions/user.
+	Scope types.Scope
+	// ExpiresIn defaults to token.default_expiry (types.DefaultTokenExpiry
+	// when unset); zero means never and needs ByAdmin.
+	ExpiresIn      *time.Duration
+	Refreshable    bool
+	ForceRevocable bool
+	Audience       string
+	Description    string
+	ProjectKey     string
+	// IncludeReference also issues a reference token.
+	IncludeReference bool
+	// ByAdmin is whether the caller is an administrator.
+	ByAdmin bool
+}
+
+// Issued is a new token and its secrets, which are never stored and so
+// cannot be shown again.
+type Issued struct {
+	Record         types.Token
+	AccessToken    string
+	RefreshToken   string
+	ReferenceToken string
+	// ExpiresIn is the lifetime in seconds; zero means never.
+	ExpiresIn int64
+}
+
+// Issue creates a token.
+func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
+	if r.Username == "" || strings.Contains(r.Username, "/") {
+		return Issued{}, fmt.Errorf("%w: a user name is required", ErrInvalidRequest)
+	}
+	expiresIn, err := s.expiresIn(ctx, r.ExpiresIn)
+	if err != nil {
+		return Issued{}, err
+	}
+	if expiresIn == 0 && !r.ByAdmin {
+		return Issued{}, ErrNeverExpiresAdminOnly
+	}
+	scope := r.Scope
+	if len(scope.Entries) == 0 {
+		scope = types.UserScope()
+	}
+	// Seconds: the claims carry whole seconds, and the record matches them.
+	now := s.now().Truncate(time.Second)
+	rec := types.Token{
+		ID:          newUUID(),
+		Subject:     s.issuer + "/users/" + r.Username,
+		Scope:       scope,
+		Audience:    cmp.Or(r.Audience, DefaultAudience),
+		Description: r.Description,
+		ProjectKey:  r.ProjectKey,
+		IssuedAt:    now,
+		Refreshable: r.Refreshable,
+		Revocable:   types.Revocable(expiresIn, types.DefaultRevocableThreshold, r.ForceRevocable),
+	}
+	if expiresIn > 0 {
+		rec.ExpiresAt = now.Add(expiresIn)
+	}
+	out := Issued{Record: rec, ExpiresIn: int64(expiresIn / time.Second)}
+	s.mu.Lock()
+	keys := s.keys
+	s.mu.Unlock()
+	c := claims{
+		Ver: "2", Sub: rec.Subject, Scp: scope.String(), Aud: rec.Audience, Iss: s.issuer,
+		Iat: now.Unix(), Jti: rec.ID,
+	}
+	if !rec.ExpiresAt.IsZero() {
+		c.Exp = rec.ExpiresAt.Unix()
+	}
+	if out.AccessToken, err = sign(keys.priv, keys.active, c); err != nil {
+		return Issued{}, err
+	}
+	rec.AccessDigest = digest(out.AccessToken)
+	if r.Refreshable {
+		out.RefreshToken = newUUID()
+		rec.RefreshDigest = digest(out.RefreshToken)
+	}
+	if r.IncludeReference {
+		out.ReferenceToken = newReference()
+		rec.ReferenceDigest = digest(out.ReferenceToken)
+	}
+	if err := s.st.Tokens().Create(ctx, rec); err != nil {
+		return Issued{}, fmt.Errorf("token: store: %w", err)
+	}
+	out.Record = rec
+	return out, nil
+}
+
+// expiresIn resolves a requested lifetime.
+func (s *Service) expiresIn(ctx context.Context, req *time.Duration) (time.Duration, error) {
+	if req != nil {
+		if *req < 0 {
+			return 0, fmt.Errorf("%w: expires_in must not be negative", ErrInvalidRequest)
+		}
+		return *req, nil
+	}
+	// token.default_expiry is whole seconds, as the Access configuration
+	// API carries it.
+	var secs int64
+	err := s.st.Settings().Get(ctx, types.SettingDefaultTokenExpiry, &secs)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return types.DefaultTokenExpiry, nil
+	case err != nil:
+		return 0, fmt.Errorf("token: default expiry: %w", err)
+	case secs < 0:
+		return types.DefaultTokenExpiry, nil
+	}
+	return time.Duration(secs) * time.Second, nil
+}
+
+// Verify resolves an access token (a JWT) or a reference token to its
+// record. A token that is malformed, badly signed, signed by an unknown or
+// retired key, expired, or revoked (no record) fails with an error wrapping
+// auth.ErrInvalidToken.
+func (s *Service) Verify(ctx context.Context, raw string) (types.Token, error) {
+	var rec types.Token
+	var err error
+	if types.IsReferenceToken(raw) {
+		rec, err = s.byDigest(ctx, store.DigestReference, raw)
+	} else {
+		rec, err = s.verifyJWT(ctx, raw)
+	}
+	if err != nil {
+		return types.Token{}, err
+	}
+	now := s.now()
+	if rec.Expired(now) {
+		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
+	}
+	if now.Sub(rec.LastUsed) >= touchEvery {
+		// Best effort: a failed write must not fail the request.
+		_ = s.st.Tokens().Touch(ctx, rec.ID, now)
+	}
+	return rec, nil
+}
+
+func (s *Service) verifyJWT(ctx context.Context, raw string) (types.Token, error) {
+	p, err := parse(raw)
+	if err != nil {
+		return types.Token{}, err
+	}
+	if p.header.Alg != algRS256 {
+		return types.Token{}, fmt.Errorf("%w: algorithm %q", auth.ErrInvalidToken, p.header.Alg)
+	}
+	key, err := s.publicKey(ctx, p.header.Kid)
+	if err != nil {
+		return types.Token{}, err
+	}
+	if !p.verify(key) {
+		return types.Token{}, fmt.Errorf("%w: signature", auth.ErrInvalidToken)
+	}
+	var c claims
+	if err := json.Unmarshal(p.payload, &c); err != nil {
+		return types.Token{}, errMalformed
+	}
+	if c.Exp != 0 && !s.now().Before(time.Unix(c.Exp, 0)) {
+		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
+	}
+	rec, err := s.st.Tokens().Get(ctx, c.Jti)
+	if errors.Is(err, store.ErrNotFound) {
+		return types.Token{}, fmt.Errorf("%w: revoked", auth.ErrInvalidToken)
+	}
+	if err != nil {
+		return types.Token{}, fmt.Errorf("token: %w", err)
+	}
+	if rec.Subject != c.Sub {
+		return types.Token{}, fmt.Errorf("%w: subject", auth.ErrInvalidToken)
+	}
+	return rec, nil
+}
+
+// publicKey returns the key with kid, reloading once when it is unknown,
+// because another instance may have rotated.
+func (s *Service) publicKey(ctx context.Context, kid string) (*rsa.PublicKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if k, ok := s.keys.public[kid]; ok {
+		return k, nil
+	}
+	if err := s.reload(ctx); err != nil {
+		return nil, err
+	}
+	if k, ok := s.keys.public[kid]; ok {
+		return k, nil
+	}
+	return nil, fmt.Errorf("%w: unknown key", auth.ErrInvalidToken)
+}
+
+func (s *Service) byDigest(
+	ctx context.Context,
+	kind store.DigestKind,
+	raw string,
+) (types.Token, error) {
+	rec, err := s.st.Tokens().ByDigest(ctx, kind, digest(raw))
+	if errors.Is(err, store.ErrNotFound) {
+		return types.Token{}, fmt.Errorf("%w: unknown token", auth.ErrInvalidToken)
+	}
+	if err != nil {
+		return types.Token{}, fmt.Errorf("token: %w", err)
+	}
+	return rec, nil
+}
+
+// Refresh exchanges a refresh token for a new token with the same subject,
+// scope, lifetime and options, and revokes the old one. A refresh token
+// stays usable for types.DefaultRefreshGrace after its token expires.
+func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, error) {
+	var out Issued
+	err := s.st.Tx(ctx, func(ctx context.Context) error {
+		old, err := s.byDigest(ctx, store.DigestRefresh, refreshToken)
+		if err != nil {
+			return err
+		}
+		if !old.ExpiresAt.IsZero() &&
+			!s.now().Before(old.ExpiresAt.Add(types.DefaultRefreshGrace)) {
+			return fmt.Errorf("%w: refresh token expired", auth.ErrInvalidToken)
+		}
+		sub, err := types.ParseSubject(old.Subject)
+		if err != nil {
+			return fmt.Errorf("%w: %w", auth.ErrInvalidToken, err)
+		}
+		var lifetime time.Duration
+		if !old.ExpiresAt.IsZero() {
+			lifetime = old.ExpiresAt.Sub(old.IssuedAt)
+		}
+		if err := s.st.Tokens().Delete(ctx, old.ID); err != nil {
+			return fmt.Errorf("token: revoke: %w", err)
+		}
+		out, err = s.Issue(ctx, Request{
+			Username: sub.Name, Scope: old.Scope, ExpiresIn: &lifetime, Refreshable: true,
+			ForceRevocable: old.Revocable, Audience: old.Audience, Description: old.Description,
+			ProjectKey: old.ProjectKey, IncludeReference: len(old.ReferenceDigest) > 0,
+			// The lifetime was allowed when the token was first issued.
+			ByAdmin: true,
+		})
+		return err
+	})
+	if err != nil {
+		return Issued{}, fmt.Errorf("token: refresh: %w", err)
+	}
+	return out, nil
+}
+
+// Revoke revokes the token with id.
+func (s *Service) Revoke(ctx context.Context, id string) error {
+	rec, err := s.st.Tokens().Get(ctx, id)
+	if err != nil {
+		return fmt.Errorf("token: %w", err)
+	}
+	return s.revoke(ctx, rec)
+}
+
+// RevokeValue revokes the token whose access or reference token is raw.
+func (s *Service) RevokeValue(ctx context.Context, raw string) error {
+	kind := store.DigestAccess
+	if types.IsReferenceToken(raw) {
+		kind = store.DigestReference
+	}
+	rec, err := s.st.Tokens().ByDigest(ctx, kind, digest(raw))
+	if err != nil {
+		return fmt.Errorf("token: %w", err)
+	}
+	return s.revoke(ctx, rec)
+}
+
+func (s *Service) revoke(ctx context.Context, rec types.Token) error {
+	if !rec.Revocable {
+		return ErrNotRevocable
+	}
+	if err := s.st.Tokens().Delete(ctx, rec.ID); err != nil {
+		return fmt.Errorf("token: revoke: %w", err)
+	}
+	return nil
+}
+
+func digest(raw string) []byte {
+	sum := sha256.Sum256([]byte(raw))
+	return sum[:]
+}
+
+// newUUID returns a random (version 4) UUID, the form of Access token ids.
+func newUUID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+// newReference returns a reference token: "cmVmd" (base64 of "ref") and 59
+// random alphanumerics, the 64-character form clients recognise.
+func newReference() string {
+	out := make([]byte, 0, 64)
+	out = append(out, "cmVmd"...)
+	var b [1]byte
+	for len(out) < 64 {
+		_, _ = rand.Read(b[:])
+		// 248 = 4*62: rejecting the rest keeps every character equally likely.
+		if b[0] < 248 {
+			out = append(out, alphanum[b[0]%62])
+		}
+	}
+	return string(out)
+}

@@ -41,6 +41,25 @@ payload with Go's `base64.RawStdEncoding` (standard alphabet, no padding) and re
 `sub`. Payloads are therefore padded with whitespace until their encoding contains no
 `-`, `_` or `=`, and the subject always contains `/users/<name>`.
 
+*As implemented (#74):* rather than padding until the encoding happens to be clean, the
+payload escapes `>`, `?`, `~`, DEL and every non-ASCII rune inside JSON strings as `\u`
+sequences. In base64 a character is `-` or `_` only when the low six bits of the third
+byte of a group are `111110` or `111111`, and among ASCII bytes only those four have such
+bits; JSON emits them only inside strings. The encoding is therefore clean by
+construction, with no search.
+
+*Keys and lifecycle (#74):*
+- **Signing key:** the RS256 key is a sealed `KeyStore` signing key under the `access-token-`
+  prefix, created on first start.
+- **Rotation:** the replaced keys keep verifying until the latest expiry of the tokens stored
+  at rotation, or for ever when one never expires. The retirement record is the
+  `token.signing_keys` setting.
+- **Issuer and subject:** the issuer is `jfac@<uuid>`, taken from the instance id `jfrt@<uuid>`
+  created at first start.
+- **Records:** every token's record is stored, as only digests of its secrets.
+  Verification needs the record, so revocation is deletion. GC removes records
+  `DefaultRefreshGrace` after expiry, the window in which their refresh token still works.
+
 **Docker token endpoint.** `GET /v2/` without credentials answers `401` with a
 `WWW-Authenticate: Bearer realm=...,service=...` challenge; the realm issues short-lived
 JWTs scoped `repository:<image>:pull,push`. The exact `service` value and `expires_in`

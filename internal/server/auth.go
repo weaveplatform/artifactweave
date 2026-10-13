@@ -1,10 +1,13 @@
 package server
 
 import (
+	"context"
 	"net/http"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // publicRoutes answer without credentials even when anonymous access is off:
@@ -49,20 +52,12 @@ func authenticate(a *auth.Authenticator) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			if user, password, ok := r.BasicAuth(); ok {
-				p, err := a.Basic(ctx, user, password)
+			if p, presented, err := credentials(ctx, a, r); presented {
 				if err != nil {
 					apierror.Write(w, surfaceFor(r.URL.Path), err)
 					return
 				}
 				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
-				return
-			}
-			// Bearer and API-key credentials arrive with tokens (P4). Until
-			// then they cannot verify, and a credential that cannot verify
-			// must not quietly become anonymous.
-			if r.Header.Get("Authorization") != "" || r.Header.Get("X-JFrog-Art-Api") != "" {
-				apierror.Write(w, surfaceFor(r.URL.Path), auth.ErrBadCredentials)
 				return
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
@@ -80,4 +75,42 @@ func authenticate(a *auth.Authenticator) func(http.Handler) http.Handler {
 			}
 		})
 	}
+}
+
+// credentials verifies whatever credential the request presents, reporting
+// presented false when there is none. Every form decision 0005 accepts:
+// Basic with a password, or with an access or reference token as the
+// password (the user name must be the token's subject); Bearer with either
+// token; X-JFrog-Art-Api with a reference token (API keys are retired). A
+// credential that does not verify, or a scheme nothing accepts, answers 401
+// rather than quietly becoming anonymous.
+func credentials(
+	ctx context.Context,
+	a *auth.Authenticator,
+	r *http.Request,
+) (p auth.Principal, presented bool, err error) {
+	if user, password, ok := r.BasicAuth(); ok {
+		if auth.LooksLikeToken(password) {
+			p, err = a.Token(ctx, password, user)
+		} else {
+			p, err = a.Basic(ctx, user, password)
+		}
+		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
+	}
+	if h := r.Header.Get("Authorization"); h != "" {
+		scheme, raw, _ := strings.Cut(h, " ")
+		if !strings.EqualFold(scheme, "Bearer") || raw == "" {
+			return auth.Principal{}, true, auth.ErrBadCredentials
+		}
+		p, err = a.Token(ctx, strings.TrimSpace(raw), "")
+		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
+	}
+	if k := r.Header.Get("X-JFrog-Art-Api"); k != "" {
+		if !types.IsReferenceToken(k) {
+			return auth.Principal{}, true, auth.ErrBadCredentials
+		}
+		p, err = a.Token(ctx, k, "")
+		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
+	}
+	return auth.Principal{}, false, nil
 }
