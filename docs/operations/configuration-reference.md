@@ -41,6 +41,8 @@ artifactweave has three configuration layers (decision
 | `bootstrap.descriptor` | `--bootstrap` (on `serve`) | `ARTIFACTWEAVE_BOOTSTRAP_DESCRIPTOR` | | Descriptor YAML applied once, after the first start's principals; see [Configuration as code](#configuration-as-code) |
 | `docker.subdomain_match` | | | off | Enables the subdomain access method in addition to repository-path routing |
 | `log.level`, `log.format` | | | `info`, `json` | slog settings |
+| `gc.interval` | | `ARTIFACTWEAVE_GC_INTERVAL` | `4h` | Time between scheduled garbage collection passes, Artifactory's default schedule. `POST /api/system/storage/gc` runs a pass at any time (decision 0010) |
+| `gc.grace_period` | | `ARTIFACTWEAVE_GC_GRACE_PERIOD` | `1h` | How long content stays unreferenced before garbage collection deletes it. It must outlast the slowest upload, because content is written before the reference that keeps it |
 | `distribution.import_dir` | | `ARTIFACTWEAVE_DISTRIBUTION_IMPORT_DIR` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
 | `distribution.edge_role` | | | `false` | Makes the instance an edge: ordinary deploys are refused and content arrives only through distribution (decision 0023) |
 | `blob.s3.profile` | | `ARTIFACTWEAVE_BLOB_S3_PROFILE` | default profile | Named profile of the shared AWS configuration, so stores can use different accounts |

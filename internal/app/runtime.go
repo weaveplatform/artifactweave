@@ -9,6 +9,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/service/gc"
+	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
@@ -19,16 +21,18 @@ import (
 // so tests need not wait a minute for one.
 var repairEvery = mirror.DefaultRepairInterval
 
-// runtime is what serve holds open: the metadata store, the blob tiers and
-// the mirrors' repair loops.
+// runtime is what serve holds open: the metadata store, the blob tiers, the
+// garbage collector, and the background loops (mirror repair and GC).
 type runtime struct {
 	store            store.Store
 	auth             *auth.Authenticator
 	closeStore       func() error
 	blobs, coldBlobs blob.Store
+	location         usage.Location
+	gc               *gc.Collector
 	mirrors          []*mirror.Store
-	stopRepair       context.CancelFunc
-	repairing        sync.WaitGroup
+	stopLoops        context.CancelFunc
+	loops            sync.WaitGroup
 }
 
 // openRuntime opens the store (applying pending migrations), builds both
@@ -62,29 +66,36 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	// The cold tier is not collected: nothing writes it until archiving (P16),
+	// which brings the references its collection would have to trust.
+	collector, err := gc.New(st, hot.store, gc.Options{Grace: cfg.GC.GracePeriod, Log: log})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
 	// The loops outlive startup's context and stop only through close, after
 	// the HTTP server has drained.
-	rctx, stop := context.WithCancel(context.WithoutCancel(ctx))
+	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	rt := &runtime{
 		store: st, auth: authn, closeStore: st.Close, blobs: hot.store, coldBlobs: cold.store,
-		stopRepair: stop,
+		location: hotTier.location(), gc: collector, stopLoops: stop,
 	}
 	for _, m := range []*mirror.Store{hot.mirror, cold.mirror} {
 		if m == nil {
 			continue
 		}
 		rt.mirrors = append(rt.mirrors, m)
-		rt.repairing.Go(func() { _ = m.RunRepair(rctx, repairEvery, nil) })
+		rt.loops.Go(func() { _ = m.RunRepair(lctx, repairEvery, nil) })
 	}
+	rt.loops.Go(func() { _ = collector.Loop(lctx, cfg.GC.Interval, logGC(log)) })
 	return rt, nil
 }
 
-// close stops the repair loops, waits until ctx ends for mirror commits still
+// close stops the background loops, waits until ctx ends for mirror commits still
 // running after their quorum (so they are recorded rather than left pending
 // for the repair worker), and closes the store.
 func (rt *runtime) close(ctx context.Context) error {
-	rt.stopRepair()
-	rt.repairing.Wait()
+	rt.stopLoops()
+	rt.loops.Wait()
 	errs := make([]error, 0, len(rt.mirrors)+1)
 	for _, m := range rt.mirrors {
 		errs = append(errs, m.WaitIdle(ctx))

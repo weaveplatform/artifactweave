@@ -19,6 +19,8 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/internal/service/gc"
+	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -42,6 +44,12 @@ type Config struct {
 	Store     store.Store
 	Blobs     blob.Store
 	ColdBlobs blob.Store
+	// GC is the garbage collector the runtime schedules; POST
+	// /api/system/storage/gc runs the same one. Nil builds one per request,
+	// for tests.
+	GC *gc.Collector
+	// BlobLocation describes the hot blob store in the storage summary.
+	BlobLocation usage.Location
 	// Auth verifies credentials. Nil serves every route without
 	// authentication, which only tests do: such a handler has no store and
 	// answers just the system endpoints and the stubs.
@@ -88,6 +96,7 @@ func New(cfg Config) http.Handler {
 		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
 	artSvc.registerItemRoutes(r)
 	artSvc.registerStorageRoutes(r)
+	artSvc.registerTrashRoutes(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

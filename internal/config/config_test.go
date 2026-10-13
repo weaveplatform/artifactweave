@@ -162,7 +162,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"):
 			env[envName(k)] = "3"
-		case strings.HasSuffix(k, ".member_timeout"):
+		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."):
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
@@ -177,7 +177,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 	}
 	if !cfg.Docker.SubdomainMatch || !cfg.Blob.S3.PathStyle || cfg.Blob.S3.Bucket != "true" ||
 		cfg.Blob.GCS.PartSize != 8<<20 || cfg.ColdBlob.Azure.Concurrency != 3 ||
-		cfg.ColdBlob.Azure.AccountKey != "true" {
+		cfg.ColdBlob.Azure.AccountKey != "true" || cfg.GC.Interval != 45*time.Second ||
+		cfg.GC.GracePeriod != 45*time.Second {
 		t.Fatalf("env keys not applied: %+v", cfg)
 	}
 }
@@ -633,5 +634,21 @@ func TestMirrorValidation(t *testing.T) {
 	}
 	if _, err := Load(LoadOptions{Flags: cold}); err != nil {
 		t.Fatalf("a mirrored archive tier: %v", err)
+	}
+}
+
+func TestGCConfig(t *testing.T) {
+	cfg := Default()
+	if err := set(&cfg, "gc.grace_period", "an hour"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("bad duration: %v", err)
+	}
+	cfg.GC.Interval = -time.Second
+	if err := cfg.Validate(); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("negative interval: %v", err)
+	}
+	file := writeFile(t, "gc:\n  interval: 30m\n  grace_period: 5m\n")
+	got, err := Load(LoadOptions{File: file})
+	if err != nil || got.GC.Interval != 30*time.Minute || got.GC.GracePeriod != 5*time.Minute {
+		t.Fatalf("gc from file: %+v, %v", got.GC, err)
 	}
 }

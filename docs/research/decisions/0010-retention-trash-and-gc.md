@@ -33,6 +33,22 @@ follow the documented endpoints and permissions.
 **Garbage collection.** `POST /api/system/storage/gc` removes blobs with no referencing
 item or trash entry and refreshes the storage summary.
 
+**Implementation (P3).**
+- **Trash can.**
+  - Unset, the trash can is on, with Artifactory's 14-day retention.
+  - A trashed file keeps its blob reference, so it stays restorable. Purging an entry, by `clean`, `empty` or expiry, releases that reference.
+  - `restore` takes the newest trashed copy of each path. Without a path in `to`, items return to their original paths; with one, the restored path lands there. A file at the destination is replaced, as a deploy replaces one.
+  - The trash can is listed through the storage API under the `auto-trashcan` key.
+  - Permission failures on `clean`, `empty` and `restore` answer 400, as Artifactory reports them.
+- **Garbage collection** runs every `gc.interval` (4 hours) and on `POST /api/system/storage/gc`, under the `storage-gc` lease. A pass:
+  - purges expired trash entries;
+  - reaps upload sessions untouched for 24 hours;
+  - deletes blobs unreferenced for `gc.grace_period` (an hour);
+  - deletes content the index has no row for, once the walk has seen it unindexed for the grace period across passes. Blob stores keep no times.
+- **Deleting a blob** removes its index row before its content. A checksum deploy finds content only through the index, so once the row is gone the same content has to be uploaded again. The one case that can lose data is a full upload of identical content landing between the row delete and the content delete. The pass checks the index on both sides of the content delete, and reports and logs that case.
+- **The cold tier** is not collected until archiving (P16) writes the references its collection would depend on.
+- **The storage summary** is computed on every request. `calculate` acknowledges and does nothing else.
+
 ## Rationale
 
 Cleanup policies are what the `artifactory_package_cleanup_policy` resource manages and

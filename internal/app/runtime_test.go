@@ -99,7 +99,7 @@ func TestOpenRuntimeErrors(t *testing.T) {
 
 func TestRuntimeCloseReportsStoreError(t *testing.T) {
 	boom := errors.New("boom")
-	rt := &runtime{stopRepair: func() {}, closeStore: func() error { return boom }}
+	rt := &runtime{stopLoops: func() {}, closeStore: func() error { return boom }}
 	if err := rt.close(context.Background()); !errors.Is(err, boom) ||
 		!strings.HasPrefix(err.Error(), "close:") {
 		t.Fatalf("close = %v", err)

@@ -17,6 +17,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -56,6 +57,19 @@ type Config struct {
 	Bootstrap         BootstrapConfig `yaml:"bootstrap"`
 	Docker            DockerConfig    `yaml:"docker"`
 	Log               LogConfig       `yaml:"log"`
+	GC                GCConfig        `yaml:"gc"`
+}
+
+// GCConfig schedules garbage collection (decision 0010). Zero values mean
+// the defaults: a pass every four hours, as Artifactory schedules it, and an
+// hour's grace.
+type GCConfig struct {
+	// Interval is the time between scheduled passes.
+	Interval time.Duration `yaml:"interval"`
+	// GracePeriod is how long unreferenced content is kept before it is
+	// deleted. It must outlast the slowest upload: content is written before
+	// the reference that keeps it.
+	GracePeriod time.Duration `yaml:"grace_period"`
 }
 
 // CompatConfig holds the Artifactory version string reported to clients.
@@ -186,6 +200,7 @@ var keys = append(append([]string{
 	"bootstrap.admin_password", "bootstrap.descriptor",
 	"docker.subdomain_match",
 	"log.level", "log.format",
+	"gc.interval", "gc.grace_period",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -228,9 +243,22 @@ func set(cfg *Config, key, value string) error {
 		cfg.Log.Level = value
 	case "log.format":
 		cfg.Log.Format = value
+	case "gc.interval":
+		return setDuration(&cfg.GC.Interval, key, value)
+	case "gc.grace_period":
+		return setDuration(&cfg.GC.GracePeriod, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
+	return nil
+}
+
+func setDuration(dst *time.Duration, key, value string) error {
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return fmt.Errorf("%w: %s=%q is not a duration", ErrInvalidValue, key, value)
+	}
+	*dst = d
 	return nil
 }
 
@@ -275,6 +303,10 @@ func (c Config) Validate() error {
 	case "json", "text":
 	default:
 		errs = append(errs, fmt.Errorf("%w: log.format %q", ErrInvalidValue, c.Log.Format))
+	}
+	if c.GC.Interval < 0 || c.GC.GracePeriod < 0 {
+		errs = append(errs, fmt.Errorf("%w: gc.interval and gc.grace_period must not be negative",
+			ErrInvalidValue))
 	}
 	return errors.Join(errs...)
 }

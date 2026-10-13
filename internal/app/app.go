@@ -85,6 +85,8 @@ func serve(
 			Blobs:         rt.blobs,
 			ColdBlobs:     rt.coldBlobs,
 			Auth:          rt.auth,
+			GC:            rt.gc,
+			BlobLocation:  rt.location,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return ctx },

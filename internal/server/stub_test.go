@@ -38,6 +38,13 @@ var implemented = map[string]bool{
 	"DELETE /artifactory/api/v2/repositories/batch":                    true,
 
 	"GET /artifactory/api/v1/uploads/config": true,
+
+	"POST /artifactory/api/system/storage/gc":        true,
+	"DELETE /artifactory/api/trash/clean/{repoPath}": true,
+	"POST /artifactory/api/trash/empty":              true,
+	"POST /artifactory/api/trash/restore/{fromPath}": true,
+	"GET /artifactory/api/storageinfo":               true,
+	"POST /artifactory/api/storageinfo/calculate":    true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

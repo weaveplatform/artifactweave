@@ -1,0 +1,511 @@
+package trash_test
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/service/trash"
+	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+type world struct {
+	db    *inmem.Store
+	items *item.Service
+	trash *trash.Service
+	clock time.Time
+	libs  repo.Config
+	other repo.Config
+}
+
+func newWorld(t *testing.T) *world {
+	t.Helper()
+	ctx := context.Background()
+	blobs, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := &world{db: inmem.New(), clock: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)}
+	now := func() time.Time { return w.clock }
+	w.items = &item.Service{Store: w.db, Blobs: blobs, Now: now}
+	w.trash = &trash.Service{Store: w.db, Items: w.items, Now: now, Batch: 2}
+	for _, key := range []string{"libs", "other"} {
+		if err := w.db.Repos().
+			Create(ctx, *repo.Defaults(&repo.Config{Key: key, Class: repo.Local})); err != nil {
+			t.Fatal(err)
+		}
+	}
+	w.libs, _ = w.db.Repos().Get(ctx, "libs")
+	w.other, _ = w.db.Repos().Get(ctx, "other")
+	return w
+}
+
+func (w *world) deploy(
+	t *testing.T,
+	c repo.Config,
+	p, body string,
+	props types.Properties,
+) types.Item {
+	t.Helper()
+	it, err := w.items.Deploy(context.Background(), item.Deploy{
+		Target: item.Target{Repo: c, Path: p}, Body: strings.NewReader(body), Properties: props,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return it
+}
+
+func (w *world) remove(t *testing.T, c repo.Config, p string) {
+	t.Helper()
+	if _, err := w.items.Delete(
+		context.Background(),
+		item.Target{Repo: c, Path: p},
+		"alice",
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (w *world) refs(t *testing.T, sha string) int64 {
+	t.Helper()
+	b, err := w.db.Blobs().Get(context.Background(), sha)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b.Refs
+}
+
+func (w *world) exists(c repo.Config, p string) bool {
+	_, err := w.db.Items().Get(context.Background(), c.Key, false, p)
+	return err == nil
+}
+
+func TestSettings(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	got, err := trash.Settings(ctx, db)
+	if err != nil || !got.Enabled || got.RetentionDays != trash.DefaultRetentionDays {
+		t.Fatalf("unset = %+v, %v", got, err)
+	}
+	if err := db.Settings().Put(ctx, types.SettingTrashcan,
+		types.TrashcanSettings{Enabled: false, RetentionDays: 3}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = trash.Settings(ctx, db); err != nil || got.Enabled || got.RetentionDays != 3 {
+		t.Fatalf("stored = %+v, %v", got, err)
+	}
+	if err := db.Settings().
+		Put(ctx, types.SettingTrashcan, map[string]bool{"enabled": true}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err = trash.Settings(
+		ctx,
+		db,
+	); err != nil ||
+		got.RetentionDays != trash.DefaultRetentionDays {
+		t.Fatalf("no retention stored = %+v, %v", got, err)
+	}
+	if err := db.Settings().Put(ctx, types.SettingTrashcan, "not an object"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := trash.Settings(ctx, db); err == nil {
+		t.Fatal("a malformed setting must fail")
+	}
+}
+
+func TestRestoreToOriginal(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	f := w.deploy(t, w.libs, "a/b/f.txt", "content", types.Properties{"k": {"v"}})
+	w.deploy(t, w.libs, "a/g.txt", "other content", nil)
+	w.remove(t, w.libs, "a")
+	if w.exists(w.libs, "a/b/f.txt") || w.refs(t, f.Actual.SHA256) != 1 {
+		t.Fatal("a trashed file must be gone from the repository and keep its reference")
+	}
+	n, err := w.trash.Restore(ctx, "libs", "a", trash.Destination{Repo: w.libs}, "bob")
+	if err != nil || n != 4 {
+		t.Fatalf("restored %d, %v; want the folders a and a/b and two files", n, err)
+	}
+	got, err := w.db.Items().Get(ctx, "libs", false, "a/b/f.txt")
+	if err != nil || got.Actual.SHA256 != f.Actual.SHA256 || !got.Created.Equal(f.Created) {
+		t.Fatalf("restored %+v, %v", got, err)
+	}
+	props, err := w.db.Items().Properties(ctx, got.ID)
+	if err != nil || props["k"][0] != "v" {
+		t.Fatalf("properties %v, %v", props, err)
+	}
+	if w.refs(t, f.Actual.SHA256) != 1 {
+		t.Fatal("restoring must pass the trash entry's reference on, not take another")
+	}
+	if left, _ := w.trash.Entries(ctx, "libs", ""); len(left) != 0 {
+		t.Fatalf("restored entries left in the trash: %v", left)
+	}
+	if _, err := w.trash.Restore(
+		ctx,
+		"libs",
+		"a",
+		trash.Destination{Repo: w.libs},
+		"bob",
+	); !errors.Is(
+		err,
+		trash.ErrNothingTrashed,
+	) {
+		t.Fatalf("second restore: %v", err)
+	}
+}
+
+func TestRestoreElsewhere(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "a/b/f.txt", "content", nil)
+	w.remove(t, w.libs, "a/b")
+	if _, err := w.trash.Restore(
+		ctx,
+		"libs",
+		"a/b",
+		trash.Destination{Repo: w.other, Path: "x/y"},
+		"bob",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !w.exists(w.other, "x/y") || !w.exists(w.other, "x/y/f.txt") ||
+		w.exists(w.libs, "a/b/f.txt") {
+		t.Fatal("restore into another repository and path")
+	}
+	// A whole repository restored below a path keeps its tree under it.
+	w.deploy(t, w.libs, "top.txt", "top", nil)
+	w.remove(t, w.libs, "top.txt")
+	if _, err := w.trash.Restore(
+		ctx,
+		"libs",
+		"",
+		trash.Destination{Repo: w.other, Path: "all"},
+		"bob",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !w.exists(w.other, "all/top.txt") {
+		t.Fatal("restore of a repository below a path")
+	}
+}
+
+func TestRestoreNewestAndOverwrite(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "f.txt", "first", nil)
+	w.remove(t, w.libs, "f.txt")
+	w.clock = w.clock.Add(time.Hour)
+	second := w.deploy(t, w.libs, "f.txt", "second", nil)
+	w.remove(t, w.libs, "f.txt")
+	current := w.deploy(t, w.libs, "f.txt", "current", nil)
+	if _, err := w.trash.Restore(
+		ctx,
+		"libs",
+		"f.txt",
+		trash.Destination{Repo: w.libs},
+		"bob",
+	); err != nil {
+		t.Fatal(err)
+	}
+	got, err := w.db.Items().Get(ctx, "libs", false, "f.txt")
+	if err != nil || got.Actual.SHA256 != second.Actual.SHA256 {
+		t.Fatalf("restored %+v, %v; want the newest trashed copy", got, err)
+	}
+	if w.refs(t, current.Actual.SHA256) != 0 {
+		t.Fatal("the file a restore replaces releases its reference")
+	}
+	if left, _ := w.trash.Entries(ctx, "libs", "f.txt"); len(left) != 1 {
+		t.Fatalf("the older copy stays in the trash: %v", left)
+	}
+}
+
+func TestRestoreConflict(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "a/f.txt", "content", nil)
+	w.remove(t, w.libs, "a/f.txt")
+	w.deploy(t, w.libs, "a/f.txt/below.txt", "a folder now", nil)
+	_, err := w.trash.Restore(ctx, "libs", "a/f.txt", trash.Destination{Repo: w.libs}, "bob")
+	if !errors.Is(err, item.ErrConflict) {
+		t.Fatalf("restore over a folder: %v", err)
+	}
+	if left, _ := w.trash.Entries(ctx, "libs", ""); len(left) != 1 {
+		t.Fatal("a failed restore keeps its entry")
+	}
+}
+
+func TestRestoreIntoExistingFolder(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	if _, err := w.items.MakeFolder(ctx, item.Target{Repo: w.libs, Path: "d"},
+		types.Properties{"old": {"1"}}, "alice"); err != nil {
+		t.Fatal(err)
+	}
+	w.remove(t, w.libs, "d")
+	keep, err := w.items.MakeFolder(ctx, item.Target{Repo: w.libs, Path: "d"},
+		types.Properties{"new": {"2"}}, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.trash.Restore(
+		ctx,
+		"libs",
+		"d",
+		trash.Destination{Repo: w.libs},
+		"bob",
+	); err != nil {
+		t.Fatal(err)
+	}
+	props, _ := w.db.Items().Properties(ctx, keep.ID)
+	if props["old"][0] != "1" || props["new"][0] != "2" {
+		t.Fatalf("a folder restored onto one recreated since keeps both: %v", props)
+	}
+}
+
+func TestCleanEmptyPurge(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	var shas []string
+	for _, p := range []string{"a/1.txt", "a/2.txt", "b/3.txt"} {
+		shas = append(shas, w.deploy(t, w.libs, p, "content of "+p, nil).Actual.SHA256)
+	}
+	w.remove(t, w.libs, "a")
+	w.remove(t, w.libs, "b")
+	n, err := w.trash.Clean(ctx, "libs", "a")
+	if err != nil || n != 3 || w.refs(t, shas[0]) != 0 || w.refs(t, shas[2]) != 1 {
+		t.Fatalf("clean a: %d, %v", n, err)
+	}
+	if n, err = w.trash.Clean(ctx, "libs", "nothing"); err != nil || n != 0 {
+		t.Fatalf("clean of nothing: %d, %v", n, err)
+	}
+	if n, err = w.trash.Empty(ctx); err != nil || n != 2 || w.refs(t, shas[2]) != 0 {
+		t.Fatalf("empty: %d, %v", n, err)
+	}
+
+	// Expiry follows the retention setting.
+	w.deploy(t, w.libs, "old.txt", "old", nil)
+	w.remove(t, w.libs, "old.txt")
+	w.clock = w.clock.Add(24 * time.Hour)
+	w.deploy(t, w.libs, "new.txt", "new", nil)
+	w.remove(t, w.libs, "new.txt")
+	if err := w.db.Settings().Put(ctx, types.SettingTrashcan,
+		types.TrashcanSettings{Enabled: true, RetentionDays: 1}); err != nil {
+		t.Fatal(err)
+	}
+	w.clock = w.clock.Add(time.Hour)
+	if n, err = w.trash.PurgeExpired(ctx); err != nil || n != 1 {
+		t.Fatalf("purge: %d, %v", n, err)
+	}
+	if left, _ := w.trash.Entries(
+		ctx,
+		"",
+		"",
+	); len(left) != 1 ||
+		left[0].Record.Item.Name != "new.txt" {
+		t.Fatalf("left %v", left)
+	}
+}
+
+func TestChildrenAndFind(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "a/b/f.txt", "f", nil)
+	w.deploy(t, w.libs, "top.txt", "top", nil)
+	w.deploy(t, w.other, "o.txt", "o", nil)
+	w.remove(t, w.libs, "a")
+	w.remove(t, w.libs, "top.txt")
+	w.remove(t, w.other, "o.txt")
+	for dir, want := range map[string][]trash.Child{
+		"":       {{Name: "libs", Folder: true}, {Name: "other", Folder: true}},
+		"libs":   {{Name: "a", Folder: true}, {Name: "top.txt"}},
+		"libs/a": {{Name: "b", Folder: true}},
+		"libs/x": {},
+	} {
+		got, err := w.trash.Children(ctx, dir)
+		if err != nil || len(got) != len(want) {
+			t.Fatalf("%q: %v, %v", dir, got, err)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("%q: %v, want %v", dir, got, want)
+			}
+		}
+	}
+	e, err := w.trash.Find(ctx, "libs", "top.txt")
+	if err != nil || e.DeletedBy != "alice" {
+		t.Fatalf("find %+v, %v", e, err)
+	}
+	if _, err := w.trash.Find(ctx, "libs", "absent"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("find absent: %v", err)
+	}
+}
+
+var errBoom = errors.New("boom")
+
+// failing is an in-memory store whose trash, blob index or settings fail the
+// operations named in fail.
+type failing struct {
+	*inmem.Store
+	fail map[string]error
+}
+
+func (f failing) Trash() store.TrashStore       { return failTrash{f.Store.Trash(), f.fail} }
+func (f failing) Blobs() store.BlobIndex        { return failBlobs{f.Store.Blobs(), f.fail} }
+func (f failing) Settings() store.SettingsStore { return failSettings{f.Store.Settings(), f.fail} }
+
+func (f failing) Tx(ctx context.Context, fn func(context.Context) error) error {
+	return f.Store.Tx(ctx, fn) //nolint:wrapcheck // test double
+}
+
+type failTrash struct {
+	store.TrashStore
+	fail map[string]error
+}
+
+func (f failTrash) List(
+	ctx context.Context,
+	r, p string,
+	pg store.Page,
+) ([]types.TrashEntry, string, error) {
+	if err := f.fail["list"]; err != nil {
+		return nil, "", err
+	}
+	return f.TrashStore.List(ctx, r, p, pg) //nolint:wrapcheck // test double
+}
+
+func (f failTrash) Find(ctx context.Context, r, p string) ([]types.TrashEntry, error) {
+	if err := f.fail["find"]; err != nil {
+		return nil, err
+	}
+	return f.TrashStore.Find(ctx, r, p) //nolint:wrapcheck // test double
+}
+
+func (f failTrash) Expired(
+	ctx context.Context,
+	before time.Time,
+	n int,
+) ([]types.TrashEntry, error) {
+	if err := f.fail["expired"]; err != nil {
+		return nil, err
+	}
+	return f.TrashStore.Expired(ctx, before, n) //nolint:wrapcheck // test double
+}
+
+func (f failTrash) Delete(ctx context.Context, id int64) error {
+	if err := f.fail["delete"]; err != nil {
+		return err
+	}
+	return f.TrashStore.Delete(ctx, id) //nolint:wrapcheck // test double
+}
+
+type failBlobs struct {
+	store.BlobIndex
+	fail map[string]error
+}
+
+func (f failBlobs) Unref(ctx context.Context, sha string, n int64) (types.Blob, error) {
+	if err := f.fail["unref"]; err != nil {
+		return types.Blob{}, err
+	}
+	return f.BlobIndex.Unref(ctx, sha, n) //nolint:wrapcheck // test double
+}
+
+type failSettings struct {
+	store.SettingsStore
+	fail map[string]error
+}
+
+func (f failSettings) Get(ctx context.Context, key string, into any) error {
+	if err := f.fail["settings"]; err != nil {
+		return err
+	}
+	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
+}
+
+func TestStoreFailures(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "a/f.txt", "content", nil)
+	w.remove(t, w.libs, "a")
+	svc := func(fail map[string]error) *trash.Service {
+		st := failing{w.db, fail}
+		return &trash.Service{Store: st, Items: &item.Service{Store: st, Blobs: w.items.Blobs}}
+	}
+	dst := trash.Destination{Repo: w.libs}
+	for name, run := range map[string]func() error{
+		"restore list": func() error {
+			_, err := svc(map[string]error{"list": errBoom}).Restore(ctx, "libs", "a", dst, "bob")
+			return err
+		},
+		"restore drop": func() error {
+			_, err := svc(map[string]error{"delete": errBoom}).Restore(ctx, "libs", "a", dst, "bob")
+			return err
+		},
+		"clean list": func() error {
+			_, err := svc(map[string]error{"list": errBoom}).Clean(ctx, "libs", "a")
+			return err
+		},
+		"clean delete": func() error {
+			_, err := svc(map[string]error{"delete": errBoom}).Clean(ctx, "libs", "a")
+			return err
+		},
+		"clean unref": func() error {
+			_, err := svc(map[string]error{"unref": errBoom}).Clean(ctx, "libs", "a")
+			return err
+		},
+		"empty list": func() error {
+			_, err := svc(map[string]error{"list": errBoom}).Empty(ctx)
+			return err
+		},
+		"purge settings": func() error {
+			_, err := svc(map[string]error{"settings": errBoom}).PurgeExpired(ctx)
+			return err
+		},
+		"purge expired": func() error {
+			_, err := svc(map[string]error{"expired": errBoom}).PurgeExpired(ctx)
+			return err
+		},
+		"children": func() error {
+			_, err := svc(map[string]error{"list": errBoom}).Children(ctx, "libs")
+			return err
+		},
+		"find": func() error {
+			_, err := svc(map[string]error{"find": errBoom}).Find(ctx, "libs", "a")
+			return err
+		},
+	} {
+		if err := run(); !errors.Is(err, errBoom) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	// An entry purged concurrently, or a blob row already gone, is skipped.
+	n, err := svc(map[string]error{"delete": store.ErrNotFound}).Clean(ctx, "libs", "a")
+	if err != nil || n != 0 {
+		t.Fatalf("entries already gone: %d, %v", n, err)
+	}
+	if n, err = svc(
+		map[string]error{"unref": store.ErrNotFound},
+	).Clean(ctx, "libs", "a"); err != nil ||
+		n != 2 {
+		t.Fatalf("blob row already gone: %d, %v", n, err)
+	}
+}
+
+func TestDefaultClock(t *testing.T) {
+	w := newWorld(t)
+	w.clock = time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	w.deploy(t, w.libs, "f.txt", "content", nil)
+	w.remove(t, w.libs, "f.txt") // trashed in 2020, long past retention
+	n, err := (&trash.Service{Store: w.db}).PurgeExpired(context.Background())
+	if err != nil || n != 1 {
+		t.Fatalf("purge against the real clock: %d, %v", n, err)
+	}
+}
