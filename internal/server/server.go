@@ -18,6 +18,8 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Config is what the router needs from the application configuration.
@@ -33,6 +35,12 @@ type Config struct {
 	// Logger receives access and panic logs; nil falls back to slog.Default so
 	// tests and library users need not wire one.
 	Logger *slog.Logger
+	// Store is the metadata store and Blobs the blob store that the content
+	// handlers read and write. ColdBlobs is the archive tier, nil when none
+	// is configured.
+	Store     store.Store
+	Blobs     blob.Store
+	ColdBlobs blob.Store
 }
 
 // managementBodyLimit bounds JSON management requests. 64 MiB covers the

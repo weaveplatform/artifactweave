@@ -1,5 +1,5 @@
-// Package app wires configuration, the HTTP server and (in later phases) the
-// stores and services together. cmd/artifactweave stays a thin cobra shim and
+// Package app wires configuration, the stores and the HTTP server
+// together. cmd/artifactweave stays a thin cobra shim and
 // calls Run; tests drive Run with a fake handler.
 package app
 
@@ -29,14 +29,7 @@ const (
 
 // newHandler builds the HTTP handler. It is a variable so tests can run the
 // server lifecycle without the real router.
-var newHandler = func(cfg config.Config, log *slog.Logger) http.Handler {
-	return server.New(server.Config{
-		BaseURL:       cfg.BaseURL,
-		CompatVersion: cfg.Compat.ArtifactoryVersion,
-		Revision:      buildinfo.Version(),
-		Logger:        log,
-	})
-}
+var newHandler = server.New
 
 // listen and drain are variables so tests can inject a broken listener and a
 // short drain without waiting ten seconds for a timeout.
@@ -45,8 +38,9 @@ var (
 	drain  = drainTimeout
 )
 
-// Run serves until ctx is cancelled, then drains and returns nil. Any
-// listener or serve failure is returned wrapped.
+// Run opens the store and blob stores, serves until ctx is cancelled, then
+// drains and closes them and returns nil. Any startup, listener or serve
+// failure is returned wrapped.
 func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	return run(ctx, cfg, log, nil)
 }
@@ -54,12 +48,41 @@ func Run(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 // run is Run with an optional channel that receives the bound address once
 // the listener is open, so tests can connect without racing the startup.
 func run(ctx context.Context, cfg config.Config, log *slog.Logger, ready chan<- string) error {
+	// The store opens first, so migrations finish before the port accepts
+	// a request.
+	rt, err := openRuntime(ctx, cfg, log)
+	if err != nil {
+		return fmt.Errorf("start: %w", err)
+	}
+	err = serve(ctx, cfg, log, rt, ready)
+	// Mirror commits still running after the drain get as long again to be
+	// recorded.
+	closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), drain)
+	defer cancel()
+	return errors.Join(err, rt.close(closeCtx))
+}
+
+func serve(
+	ctx context.Context,
+	cfg config.Config,
+	log *slog.Logger,
+	rt *runtime,
+	ready chan<- string,
+) error {
 	ln, err := listen("tcp", cfg.Listen)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Listen, err)
 	}
 	srv := &http.Server{
-		Handler:           newHandler(cfg, log),
+		Handler: newHandler(server.Config{
+			BaseURL:       cfg.BaseURL,
+			CompatVersion: cfg.Compat.ArtifactoryVersion,
+			Revision:      buildinfo.Version(),
+			Logger:        log,
+			Store:         rt.store,
+			Blobs:         rt.blobs,
+			ColdBlobs:     rt.coldBlobs,
+		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return ctx },
 	}

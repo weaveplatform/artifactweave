@@ -14,12 +14,22 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/server"
 )
+
+// testConfig is the default configuration with its data directory, and so
+// the SQLite store and the fs blob store, under t's temporary directory.
+func testConfig(t *testing.T) config.Config {
+	t.Helper()
+	cfg := config.Default()
+	cfg.DataDir = t.TempDir()
+	return cfg
+}
 
 func fakeHandler(t *testing.T, body string) {
 	t.Helper()
 	orig := newHandler
-	newHandler = func(config.Config, *slog.Logger) http.Handler {
+	newHandler = func(server.Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = io.WriteString(w, body)
 		})
@@ -31,7 +41,7 @@ func TestRunServesAndDrains(t *testing.T) {
 	fakeHandler(t, "pong")
 	var logBuf bytes.Buffer
 	log := slog.New(slog.NewTextHandler(&logBuf, nil))
-	cfg := config.Default()
+	cfg := testConfig(t)
 	cfg.Listen = "127.0.0.1:0"
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -75,7 +85,7 @@ func TestRunListenFailure(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer func() { _ = ln.Close() }()
-	cfg := config.Default()
+	cfg := testConfig(t)
 	cfg.Listen = ln.Addr().String()
 	err = Run(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err == nil || !strings.Contains(err.Error(), "listen on") {
@@ -87,7 +97,7 @@ func TestRunDrainsInflightRequest(t *testing.T) {
 	var served atomic.Bool
 	release := make(chan struct{})
 	orig := newHandler
-	newHandler = func(config.Config, *slog.Logger) http.Handler {
+	newHandler = func(server.Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			<-release
 			served.Store(true)
@@ -96,7 +106,7 @@ func TestRunDrainsInflightRequest(t *testing.T) {
 	}
 	t.Cleanup(func() { newHandler = orig })
 
-	cfg := config.Default()
+	cfg := testConfig(t)
 	cfg.Listen = "127.0.0.1:0"
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan string, 1)
@@ -147,7 +157,7 @@ func TestRunServeFailure(t *testing.T) {
 		return ln, nil
 	}
 	t.Cleanup(func() { listen = orig })
-	cfg := config.Default()
+	cfg := testConfig(t)
 	cfg.Listen = "127.0.0.1:0"
 	err := Run(context.Background(), cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err == nil || !strings.Contains(err.Error(), "serve:") {
@@ -158,7 +168,7 @@ func TestRunServeFailure(t *testing.T) {
 func TestRunShutdownTimeout(t *testing.T) {
 	release := make(chan struct{})
 	orig := newHandler
-	newHandler = func(config.Config, *slog.Logger) http.Handler {
+	newHandler = func(server.Config) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			<-release
 			_, _ = io.WriteString(w, "late")
@@ -168,7 +178,7 @@ func TestRunShutdownTimeout(t *testing.T) {
 	drain = 20 * time.Millisecond
 	t.Cleanup(func() { newHandler = orig; drain = origDrain; close(release) })
 
-	cfg := config.Default()
+	cfg := testConfig(t)
 	cfg.Listen = "127.0.0.1:0"
 	ctx, cancel := context.WithCancel(context.Background())
 	ready := make(chan string, 1)
@@ -192,7 +202,7 @@ func TestRunShutdownTimeout(t *testing.T) {
 func TestDefaultHandlerIsWired(t *testing.T) {
 	// The real constructor must build without panicking; routing itself is
 	// tested in internal/server.
-	h := newHandler(config.Default(), slog.Default())
+	h := newHandler(server.Config{})
 	if h == nil {
 		t.Fatal("nil handler")
 	}
