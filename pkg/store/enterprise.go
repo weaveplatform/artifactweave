@@ -145,6 +145,9 @@ type ArchiveStore interface {
 
 	// ColdBlobs is the cold tier's blob index.
 	ColdBlobs() BlobIndex
+	// ColdReplicas is the cold tier's replica index, for a mirrored cold
+	// tier.
+	ColdReplicas() ReplicaIndex
 }
 
 // WorkerFilter narrows worker listings.

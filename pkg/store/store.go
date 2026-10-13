@@ -138,6 +138,7 @@ type Store interface {
 	Repos() RepoStore
 	Items() ItemStore
 	Blobs() BlobIndex
+	Replicas() ReplicaIndex
 	Uploads() UploadStore
 	Trash() TrashStore
 	Packages() PackageStore
