@@ -29,9 +29,15 @@ jobs:
     if: inputs.target == 'both' || inputs.target == 'gcs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # id-token lets google-github-actions/auth exchange the job's OIDC token
+    # for the service account (Workload Identity Federation): no stored key.
+    permissions:
+      contents: read
+      id-token: write
     env:
       ARTIFACTWEAVE_TEST_GCS_BUCKET: ${{ vars.CONFORMANCE_GCS_BUCKET }}
-      GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+      ARTIFACTWEAVE_TEST_GCS_ACCESS_ID: ${{ vars.CONFORMANCE_GCP_SERVICE_ACCOUNT }}
+      GCP_WIF_PROVIDER: ${{ vars.CONFORMANCE_GCP_WIF_PROVIDER }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -50,17 +56,20 @@ jobs:
 
       # The tests skip without configuration; a dispatched run that skipped
       # would look like a pass, so missing configuration fails here instead.
-      - name: Write credentials
+      - name: Check configuration
         shell: bash
         run: |
-          if [ -z "$ARTIFACTWEAVE_TEST_GCS_BUCKET" ] || [ -z "$GCP_SERVICE_ACCOUNT_KEY" ]; then
-            echo "::error::Set the CONFORMANCE_GCS_BUCKET variable and the GCP_SERVICE_ACCOUNT_KEY secret"
+          if [ -z "$ARTIFACTWEAVE_TEST_GCS_BUCKET" ] || [ -z "$ARTIFACTWEAVE_TEST_GCS_ACCESS_ID" ] \
+            || [ -z "$GCP_WIF_PROVIDER" ]; then
+            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (deploy/terraform/acceptance outputs)"
             exit 1
           fi
-          key="$RUNNER_TEMP/gcp-key.json"
-          umask 077
-          printf '%s' "$GCP_SERVICE_ACCOUNT_KEY" > "$key"
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$key" >> "$GITHUB_ENV"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.CONFORMANCE_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.CONFORMANCE_GCP_SERVICE_ACCOUNT }}
 
       - name: Contract and probes
         shell: bash
@@ -79,11 +88,6 @@ jobs:
             grep -o 'PROBE .*' "$RUNNER_TEMP/gcs.log" || echo 'no probe output'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Remove credentials
-        if: always()
-        shell: bash
-        run: rm -f "$RUNNER_TEMP/gcp-key.json"
 
   azure:
     name: 'Azure Blob Storage'

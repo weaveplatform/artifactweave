@@ -24,10 +24,14 @@ import (
 // The real-cloud conformance run (issue #12) is opt-in: it needs a bucket
 // and credentials, so it runs only from the manually dispatched
 // cloud-conformance workflow or by hand. Credentials are Application Default
-// Credentials (GOOGLE_APPLICATION_CREDENTIALS pointing at a service-account
-// key, or a GCP runtime identity).
+// Credentials: Workload Identity Federation in the workflow, an impersonated
+// service account locally (deploy/terraform/acceptance), or a key where an
+// organisation still allows them.
 const (
 	envRealBucket = "ARTIFACTWEAVE_TEST_GCS_BUCKET"
+	// envRealAccessID names the service account that signs URLs; needed
+	// when the credentials carry no private key.
+	envRealAccessID = "ARTIFACTWEAVE_TEST_GCS_ACCESS_ID"
 	// realPartSize is the backend's smallest part size, so the contract's
 	// large blob folds (more than 32 parts) without uploading gigabytes.
 	realPartSize = 1 << 20
@@ -76,7 +80,11 @@ func TestContractOnRealGCS(t *testing.T) {
 	var n atomic.Int64
 	blobtest.Run(t, func(t *testing.T) blob.Store {
 		api, err := NewAPI(ctx, bucket, ClientConfig{
-			CredentialsFile: os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+			// Application Default Credentials: a key file, an impersonated
+			// credential or Workload Identity Federation alike. Keys may be
+			// forbidden by organisation policy, so signing names the account
+			// and goes through IAM signBlob when no key is present.
+			GoogleAccessID: os.Getenv(envRealAccessID),
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -136,7 +144,8 @@ func TestRealGCSProbes(t *testing.T) {
 
 	// Can these credentials sign a URL (a key, or IAM signBlob)?
 	url, err := b.SignedURL(prefix+"a", &storage.SignedURLOptions{
-		Method: "GET", Scheme: storage.SigningSchemeV4, Expires: nowPlusMinute(),
+		GoogleAccessID: os.Getenv(envRealAccessID),
+		Method:         "GET", Scheme: storage.SigningSchemeV4, Expires: nowPlusMinute(),
 	})
 	t.Logf("PROBE gcs.signed_url ok=%v error=%v", err == nil && url != "", err)
 
