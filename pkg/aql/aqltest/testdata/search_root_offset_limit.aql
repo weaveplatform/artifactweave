@@ -1,1 +1,1 @@
-items.find({"type":"file","$or":[{"$and":[{"repo":"libs-local","path":".","name":{"$match":"*"}}]},{"$and":[{"repo":"libs-local","path":{"$match":"*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created").sort({"$asc":["name"]}).offset(1).limit(2)
+items.find({"$or":[{"$and":[{"repo":"libs-local","path":{"$match":"*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created").sort({"$asc":["name"]}).offset(1).limit(2)

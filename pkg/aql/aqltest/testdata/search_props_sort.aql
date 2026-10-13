@@ -1,1 +1,1 @@
-items.find({"@build.name":"app","type":"file","$or":[{"$and":[{"repo":"libs-local","path":{"$match":"*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created","property").sort({"$desc":["created"]}).offset(0).transitive().limit(10)
+items.find({"$and":[{"@build.name":"app"}],"$or":[{"$and":[{"repo":"libs-local","path":{"$match":"*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created").sort({"$desc":["created"]}).limit(10)

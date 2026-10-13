@@ -21,7 +21,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P1b Enterprise products: specs and model | Done (2026-10-13) | 574 of 635 JFrog operations at parity, 0 divergent; the 61 in the baseline are Mission Control, MyJFrog, bridges and JFConnect only. Seven services; research 16, decisions 0021 to 0026; 27 new tables in research 15 |
 | P2 Stores | Done (2026-10-13) | Store contracts for every entity in research 15 (27 concerns), in-memory reference store, SQLite and PostgreSQL stores over one dialect layer with 71 tables in five migrations, the `storetest` contract suite (62 subtests) passing on all four backends, `migrate up/down/version`, `keys rotate` with versioned master keys, durable S3 upload sessions; merged coverage 97.7%. Stale-upload reaping moves to the P3 GC task; build-info tables to P5 |
 | P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) landed after P3's storage endpoints (#48) |
-| P3 Repositories, generic artifacts, CLI AQL shape | In progress | Epic #52, one GitHub issue per task (#42 to #51) |
+| P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
 | P4 Identity and authorization | Not started | **M1** |
 | P5 Full AQL, searches, build-info | Not started | |
 | P6 Docker/OCI | Not started | |
@@ -122,7 +122,7 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 **Exit criteria**
 - `make gate` green on the three OS runners plus the Linux acceptance job.
 - `jf rt ping` returns `OK` with the pinned JFrog CLI (verified 2026-10-12 with jf 2.126.0).
-- `terraform plan` with `provider "artifactory"` configured and a `data "artifactory_repositories"` block gets through the provider's configure step: the server log shows `GET /artifactory/api/system/version` and `POST /artifactory/api/system/usage` answered 200 before the data read fails with the Artifactory 404 envelope (verified 2026-10-12 with provider 12.11.14; the read itself is a P3 exit criterion, and the provider sends the path with a trailing slash).
+- `terraform plan` with `provider "artifactory"` configured and a `data "artifactory_repositories"` block gets through the provider's configure step: the server log shows `GET /artifactory/api/system/version` and `POST /artifactory/api/system/usage` answered 200 before the data read fails with the Artifactory 404 envelope (verified 2026-10-12 with provider 12.11.14; the provider sends the path with a trailing slash, and the read itself waits for P4's access tokens, #69).
 - The layout test fails when a forbidden import is added deliberately.
 
 ## P1: Data model and API schemas
@@ -365,9 +365,9 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 10. The exit checks: the JFrog CLI round trip and the Terraform job (#51).
 
 **Exit criteria**
-- `jf rt u/dl/s/cp/mv/del/sp` round-trip a tree, including a checksum-deploy hit for a file over 10 KiB and a split download.
-- `artifactory_local_generic_repository` and `artifactory_item_properties` apply, plan clean, destroy.
-- The status-code table test covers every route in this phase.
+- `jf rt u/dl/s/cp/mv/del/sp` round-trip a tree, including a checksum-deploy hit for a file over 10 KiB and a split download. Met: `round_trip.feature` (#51).
+- Moved to P4 (#69): `artifactory_local_generic_repository` and `artifactory_item_properties` apply, plan clean, destroy. The provider authenticates only with a Bearer access token, which P4 issues. Until then the `terraform` CI job validates the fixture against the mirrored provider (`make terraform`).
+- The status-code table test covers every route in this phase. Met: the guard in `internal/server/status_test.go` fails while an implemented route has no row.
 
 ## P4: Identity and authorization
 
@@ -386,6 +386,7 @@ Decisions: [0005](../research/decisions/0005-authentication-and-tokens.md),
 - `artifactory_user`, `artifactory_managed_user`, `artifactory_group`, `platform_permission`, `artifactory_permission_target`, `artifactory_scoped_token`, `artifactory_keypair`, `platform_group` apply, plan clean, destroy.
 - `jf rt user-create`, `group-create`, `permission-target-create`, `access-token-create` and `jf c add` with the created token work.
 - A token scoped to one repository cannot read another. **M1.**
+- Moved from P3 (#69): the `terraform` CI job mints an admin access token and runs `make terraform TERRAFORM_MODE=apply`. `artifactory_local_generic_repository` and `artifactory_item_properties` apply, `terraform plan` is empty, then destroy, and the job's coverage joins the gate.
 
 ## P5: Full AQL, searches, build-info
 

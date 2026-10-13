@@ -112,12 +112,17 @@ func (s artifactoryService) content() (store.Store, error) {
 
 // internalError logs err and returns a 500 that names nothing internal.
 func (s artifactoryService) internalError(ctx context.Context, op string, err error) error {
-	log := s.cfg.Logger
-	if log == nil {
-		log = slog.Default()
-	}
-	log.ErrorContext(ctx, op, "request_id", requestIDFrom(ctx), "error", err)
+	s.log().ErrorContext(ctx, op, "request_id", requestIDFrom(ctx), "error", err)
 	return apierror.New(http.StatusInternalServerError, "internal error")
+}
+
+// log is the configured logger, or slog's default for handlers built
+// without one in tests.
+func (s artifactoryService) log() *slog.Logger {
+	if s.cfg.Logger == nil {
+		return slog.Default()
+	}
+	return s.cfg.Logger
 }
 
 // adminOnly refuses a caller who is not an administrator (auth.RequireAdmin).

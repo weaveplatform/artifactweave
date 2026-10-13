@@ -1,1 +1,1 @@
-items.find({"type":"any","path":{"$ne":"."},"$or":[{"$and":[{"repo":"libs-local","path":{"$match":"org/*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","type","size")
+items.find({"type":"any","path":{"$ne":"."},"$or":[{"$and":[{"repo":"libs-local","path":"org","name":{"$match":"*"}}]},{"$and":[{"repo":"libs-local","path":{"$match":"org/*"},"name":{"$match":"*"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created")

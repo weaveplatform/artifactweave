@@ -18,12 +18,14 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// The CLI fixtures follow the AQL that jfrog-client-go builds in
-// artifactory/services/utils/aqlquerybuilder.go (research 09): criteria in
-// the CLI's member order, the fixed include list, and the suffix order
-// include, sort, offset, transitive, limit. They are written from that
-// builder's documented shape; issue #51 replaces them with captures of the
-// CLI's own requests.
+// The CLI fixtures are the AQL the pinned JFrog CLI sends, captured from
+// its requests by the acceptance scenario "the query shapes the fixtures
+// capture" (test/acceptance/features/round_trip.feature) over a tree laid
+// out like Seeds. Refresh them when the pinned jf changes:
+//
+//	make capture-aql
+//
+// copies each captured query over the fixture of the same command.
 //
 //go:embed testdata/*.aql
 var cliFS embed.FS
@@ -136,16 +138,24 @@ const (
 	cached = "remote-cache/org/acme/app-1.0.jar"
 )
 
-// cliWant lists the rows of each CLI fixture, by file name.
+// cliWant lists the rows of each CLI fixture, by file name. The
+// *_properties fixtures are the follow-up query the CLI sends to fetch the
+// properties of what a search found.
 var cliWant = map[string][]string{
 	"search_recursive":         {jar, util},
 	"search_props_sort":        {pom, jar},
+	"search_props_properties":  {jar, pom},
 	"search_root_offset_limit": {pom, readme},
+	"search_root_properties":   {jar, pom, util},
 	"download_exclusions":      {jar, util},
-	"delete_any":               {"libs-local/org/acme/lib", jar, pom, util},
-	"copy_move_file":           {jar},
-	"set_props_with_props":     {jar, util},
-	"download_remote_cache":    {cached},
+	// The CLI names a remote repository by its own key, never "-cache", and
+	// repo equality matches the stored key outside its cache, so a download
+	// from a remote finds nothing here. Whether Artifactory's AQL counts the
+	// cache under the remote's key is unverified (issue #51).
+	"download_remote":      {},
+	"delete_any":           {"libs-local/org/acme", "libs-local/org/acme/lib", jar, pom, util},
+	"copy_move_file":       {jar},
+	"set_props_with_props": {jar, util},
 }
 
 // Cases returns the CLI fixtures followed by the cases for each operator
@@ -206,6 +216,8 @@ func Cases() []Case {
 	q("no criteria means files", `items.find()`,
 		jar, pom, util, readme, guide, aUnder, axb, pct, abc, naive, cached)
 	q("offset without limit", `items.find({"repo":"generic-local"}).offset(4)`, abc, naive)
+	q("or joins the members of its objects",
+		`items.find({"repo":"libs-local","$or":[{"name":"readme.md","size":300}]})`, util, readme)
 	q("or of nothing", `items.find({"$or":[]})`)
 	q("and of nothing", `items.find({"$and":[],"repo":"remote-cache"})`, cached)
 	out = append(out, Case{
