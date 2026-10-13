@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -41,6 +42,10 @@ type Config struct {
 	Store     store.Store
 	Blobs     blob.Store
 	ColdBlobs blob.Store
+	// Auth verifies credentials. Nil serves every route without
+	// authentication, which only tests do: such a handler has no store and
+	// answers just the system endpoints and the stubs.
+	Auth *auth.Authenticator
 }
 
 // managementBodyLimit bounds JSON management requests. 64 MiB covers the
@@ -62,6 +67,9 @@ func New(cfg Config) http.Handler {
 		baseurl.Middleware(cfg.BaseURL),
 		normalizeContentType,
 	)
+	if cfg.Auth != nil {
+		r.Use(authenticate(cfg.Auth))
+	}
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 

@@ -67,6 +67,10 @@ const (
 	Generic          PackageType = "generic"
 	VCS              PackageType = "vcs"
 	P2               PackageType = "p2"
+	// BuildInfo is the type of the built-in artifactory-build-info
+	// repository. It is in no AllowedPackageTypes list, so the repositories
+	// API cannot create another.
+	BuildInfo PackageType = "buildinfo"
 )
 
 // ChecksumPolicy governs client-supplied checksums on local repositories.
