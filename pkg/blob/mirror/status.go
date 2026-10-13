@@ -19,6 +19,20 @@ type Status struct {
 	// Redundancy (store.ReplicaIndex.UnderReplicated).
 	UnderReplicated int64
 	Members         []MemberStatus
+	// Removed are members with replica records that are no longer
+	// configured. Repair neither copies to nor reads from them, so a blob
+	// whose only present copy is on one (SoleCopies) is out of the mirror's
+	// reach until the member is configured again.
+	Removed []RemovedMember
+}
+
+// RemovedMember is a member in Status.Removed.
+type RemovedMember struct {
+	Name string
+	// Replicas are its replica records per state, ordered by state.
+	Replicas []store.ReplicaCount
+	// SoleCopies counts the blobs whose only present copy is on it.
+	SoleCopies int64
 }
 
 // MemberStatus is one member's view in Status.
@@ -33,17 +47,24 @@ type MemberStatus struct {
 	Latency time.Duration
 	// Replicas are the member's replica records per state, ordered by state.
 	Replicas []store.ReplicaCount
+	// SoleCopies counts the blobs whose only present copy is on this
+	// member. A drained member (WriteEnabled false) is safe to remove from
+	// the configuration once it is zero.
+	SoleCopies int64
 }
 
-// Status reports the mirror's members and replica records. Records of
-// members no longer configured are left out: they are drained or removed
-// stores the repair worker no longer touches.
+// Status reports the mirror's members, their replica records, and the
+// records of members no longer configured.
 func (s *Store) Status(ctx context.Context) (Status, error) {
 	counts, err := s.replicas.Counts(ctx)
 	if err != nil {
 		return Status{}, fmt.Errorf("blob/mirror: status: %w", err)
 	}
 	under, err := s.replicas.UnderReplicated(ctx, s.redundancy)
+	if err != nil {
+		return Status{}, fmt.Errorf("blob/mirror: status: %w", err)
+	}
+	sole, err := s.replicas.SoleCopies(ctx)
 	if err != nil {
 		return Status{}, fmt.Errorf("blob/mirror: status: %w", err)
 	}
@@ -56,6 +77,7 @@ func (s *Store) Status(ctx context.Context) (Status, error) {
 		ms := MemberStatus{
 			Name: m.Name, Zone: m.Zone, Kind: m.Kind, WriteEnabled: m.WriteEnabled,
 			Available: !m.health.open(now), Latency: m.health.avg(),
+			SoleCopies: sole[m.Name],
 		}
 		for _, c := range counts {
 			if c.Member == m.Name {
@@ -63,6 +85,21 @@ func (s *Store) Status(ctx context.Context) (Status, error) {
 			}
 		}
 		st.Members = append(st.Members, ms)
+	}
+	// Counts are ordered by member, so each removed member's records are
+	// adjacent.
+	for _, c := range counts {
+		if s.byName[c.Member] != nil {
+			continue
+		}
+		if n := len(st.Removed); n == 0 || st.Removed[n-1].Name != c.Member {
+			st.Removed = append(
+				st.Removed,
+				RemovedMember{Name: c.Member, SoleCopies: sole[c.Member]},
+			)
+		}
+		last := &st.Removed[len(st.Removed)-1]
+		last.Replicas = append(last.Replicas, c)
 	}
 	return st, nil
 }

@@ -157,6 +157,31 @@ func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int6
 	return n, r.s.wrap("under-replicated "+r.table, err)
 }
 
+func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) {
+	out := map[string]int64{}
+	err := r.s.rows(ctx, "sole copies "+r.table,
+		"SELECT member, COUNT(*) FROM "+r.table+" WHERE state = 'present' AND sha256 IN"+
+			" (SELECT sha256 FROM "+r.table+" GROUP BY sha256"+
+			" HAVING SUM(CASE WHEN state = 'deleting' THEN 1 ELSE 0 END) = 0"+
+			" AND SUM(CASE WHEN state = 'present' THEN 1 ELSE 0 END) = 1)"+
+			" GROUP BY member", nil,
+		func(rs *sql.Rows) error {
+			var (
+				member string
+				n      int64
+			)
+			if err := rs.Scan(&member, &n); err != nil {
+				return err //nolint:wrapcheck // wrapped by rows
+			}
+			out[member] = n
+			return nil
+		})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
 	var out []store.ReplicaCount
 	err := r.s.rows(ctx, "count "+r.table,

@@ -10,6 +10,7 @@ import (
 
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
@@ -82,28 +83,45 @@ func mirrorSummaries(mirrors []MirrorStatus) wire.StorageSummaryMirrors {
 			Tier: m.Tier, Zone: m.Zone, Redundancy: m.Redundancy, WriteQuorum: m.WriteQuorum,
 			UnderReplicatedBlobs: m.UnderReplicated,
 			Members:              make([]wire.BlobMirrorMember, 0, len(m.Members)),
+			RemovedMembers:       make([]wire.BlobMirrorRemovedMember, 0, len(m.Removed)),
 		}
 		for _, mem := range m.Members {
-			reps := map[string]wire.ReplicaTally{}
-			for _, st := range []types.ReplicaState{
-				types.ReplicaPresent, types.ReplicaPending, types.ReplicaDeleting, types.ReplicaFailed,
-			} {
-				reps[string(st)] = wire.ReplicaTally{Size: humanBytes(0)}
-			}
-			for _, c := range mem.Replicas {
-				reps[string(c.State)] = wire.ReplicaTally{
-					Count: c.Count, Bytes: c.Bytes, Size: humanBytes(c.Bytes),
-				}
-			}
 			bm.Members = append(bm.Members, wire.BlobMirrorMember{
-				Name: mem.Name, Zone: mem.Zone, Backend: mem.Kind,
-				WriteEnabled: mem.WriteEnabled, Available: mem.Available,
-				AverageLatencyMs: mem.Latency.Milliseconds(), Replicas: reps,
+				Name:             mem.Name,
+				Zone:             mem.Zone,
+				Backend:          mem.Kind,
+				WriteEnabled:     mem.WriteEnabled,
+				Available:        mem.Available,
+				AverageLatencyMs: mem.Latency.Milliseconds(),
+				Replicas:         replicaTallies(mem.Replicas),
+				SoleCopies:       mem.SoleCopies,
+			})
+		}
+		for _, rm := range m.Removed {
+			bm.RemovedMembers = append(bm.RemovedMembers, wire.BlobMirrorRemovedMember{
+				Name: rm.Name, Replicas: replicaTallies(rm.Replicas), SoleCopies: rm.SoleCopies,
 			})
 		}
 		out = append(out, bm)
 	}
 	return wire.StorageSummaryMirrors{BlobMirrors: out}
+}
+
+// replicaTallies keys a member's replica counts by state, with all four
+// states present.
+func replicaTallies(counts []store.ReplicaCount) map[string]wire.ReplicaTally {
+	reps := map[string]wire.ReplicaTally{}
+	for _, st := range []types.ReplicaState{
+		types.ReplicaPresent, types.ReplicaPending, types.ReplicaDeleting, types.ReplicaFailed,
+	} {
+		reps[string(st)] = wire.ReplicaTally{Size: humanBytes(0)}
+	}
+	for _, c := range counts {
+		reps[string(c.State)] = wire.ReplicaTally{
+			Count: c.Count, Bytes: c.Bytes, Size: humanBytes(c.Bytes),
+		}
+	}
+	return reps
 }
 
 // RefreshStorageSummaryInfo acknowledges a recalculation. The summary is

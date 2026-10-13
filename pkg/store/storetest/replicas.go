@@ -127,6 +127,14 @@ func testReplicas(t *testing.T, r store.ReplicaIndex) {
 			t.Fatalf("UnderReplicated(%d) = %d, want %d", redundancy, n, want)
 		}
 	}
+	// Blob 2's only present copy is on aws. Blob 1 has two, and blob 6's
+	// deleting record keeps it out though gcp holds its only copy.
+	must(t, r.Put(ctx, replica(6, "gcp", types.ReplicaPresent, 7)))
+	must(t, r.Put(ctx, replica(6, "azure", types.ReplicaDeleting, 7)))
+	same(t, "SoleCopies", map[string]int64{"aws": 1}, get[map[string]int64](t)(r.SoleCopies(ctx)))
+	if _, err := r.DeleteBlob(ctx, replica(6, "", "", 0).SHA256); err != nil {
+		t.Fatal(err)
+	}
 	must(t, r.Delete(ctx, replica(5, "aws", "", 0).SHA256, "aws"))
 
 	must(t, r.Delete(ctx, failed.SHA256, "gcp"))

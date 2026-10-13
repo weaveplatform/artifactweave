@@ -35,11 +35,18 @@ func TestStorageInfoReportsMirrors(t *testing.T) {
 				Replicas: []store.ReplicaCount{
 					{Member: "near", State: types.ReplicaPresent, Count: 2, Bytes: 2048},
 				},
+				SoleCopies: 1,
 			},
 			{Name: "far", Kind: "gcs", Replicas: []store.ReplicaCount{
 				{Member: "far", State: types.ReplicaPending, Count: 1, Bytes: 10},
 			}},
 		},
+		Removed: []mirror.RemovedMember{{
+			Name: "retired", SoleCopies: 3,
+			Replicas: []store.ReplicaCount{
+				{Member: "retired", State: types.ReplicaPresent, Count: 3, Bytes: 30},
+			},
+		}},
 	}}}}
 	h := statusFixture(t, false, withMirrors(fm))
 	rec := do(t, h, http.MethodGet, "/artifactory/api/storageinfo", basic("admin", "pw"), "")
@@ -56,10 +63,16 @@ func TestStorageInfoReportsMirrors(t *testing.T) {
 				Name, Zone, Backend     string
 				WriteEnabled, Available bool
 				AverageLatencyMs        int64
+				SoleCopies              int64
 				Replicas                map[string]struct {
 					Count, Bytes int64
 					Size         string
 				}
+			}
+			RemovedMembers []struct {
+				Name       string
+				SoleCopies int64
+				Replicas   map[string]struct{ Count int64 }
 			}
 		}
 	}
@@ -76,7 +89,10 @@ func TestStorageInfoReportsMirrors(t *testing.T) {
 		near.Name != "near" || near.Backend != "s3" || !near.WriteEnabled || !near.Available ||
 		near.AverageLatencyMs != 12 || near.Replicas["present"].Count != 2 ||
 		near.Replicas["present"].Size != "2 KB" || len(near.Replicas) != 4 ||
-		far.Available || far.Replicas["pending"].Count != 1 || far.Replicas["failed"].Size != "0 bytes" {
+		far.Available || far.Replicas["pending"].Count != 1 || far.Replicas["failed"].Size != "0 bytes" ||
+		near.SoleCopies != 1 || far.SoleCopies != 0 || len(m.RemovedMembers) != 1 ||
+		m.RemovedMembers[0].Name != "retired" || m.RemovedMembers[0].SoleCopies != 3 ||
+		m.RemovedMembers[0].Replicas["present"].Count != 3 || len(m.RemovedMembers[0].Replicas) != 4 {
 		t.Fatalf("summary %s", rec.Body)
 	}
 	fm.err = errors.New("replica index down")
