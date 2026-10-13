@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -62,6 +63,9 @@ type Config struct {
 	// Multipart serves the JFrog CLI's multipart upload protocol; nil
 	// reports it unsupported, so the CLI uploads in one request.
 	Multipart *multipart.Service
+	// Tokens issues, refreshes and revokes access tokens for the token API;
+	// nil answers that API 501.
+	Tokens *token.Service
 	// PasswordHash is the cost of passwords the security API sets; the zero
 	// value is production's. Only Go code can choose another: tests use a
 	// tiny cost.
@@ -125,6 +129,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerStorageRoutes(r)
 	artSvc.registerTrashRoutes(r)
 	artSvc.registerMultipartRoutes(r)
+	artSvc.registerTokenRoutes(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

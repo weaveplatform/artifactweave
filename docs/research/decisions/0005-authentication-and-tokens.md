@@ -60,6 +60,24 @@ construction, with no search.
   Verification needs the record, so revocation is deletion. GC removes records
   `DefaultRefreshGrace` after expiry, the window in which their refresh token still works.
 
+**Token API.** `POST /access/api/v1/tokens` and the legacy form `POST /api/security/token`
+issue tokens from the same service, under these rules:
+- A non-administrator may mint only identity tokens (`applied-permissions/user`) for
+  themselves; an administrator may name any user and any scope.
+- A token whose scope is narrower than its user's identity (groups or resources only) may not
+  mint tokens at all, so a narrowed token cannot obtain a broader one.
+- The refresh grant is authenticated by the refresh token itself, so both create routes let a
+  request through without other credentials, and the handlers require a user for every other
+  grant. A refresh request that sends an expired token in `Authorization` is refused (401) by
+  the middleware before it reaches the handler.
+- Every token has a record. Non-revocable tokens (shorter than the revocable threshold and not
+  `force_revocable`) are left out of the token lists and refuse revocation, as in Artifactory,
+  but still read back by id: the `artifactory_scoped_token` resource reads its token after
+  creating it.
+- `GET /api/security/encryptedPassword` answers, in place of an encrypted password, a
+  non-expiring, revocable reference token bound to the caller. Only a password login may ask
+  for one.
+
 **Docker token endpoint.** `GET /v2/` without credentials answers `401` with a
 `WWW-Authenticate: Bearer realm=...,service=...` challenge; the realm issues short-lived
 JWTs scoped `repository:<image>:pull,push`. The exact `service` value and `expires_in`

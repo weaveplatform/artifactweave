@@ -54,6 +54,7 @@ func statusTable() []statusCase {
 		roleStatusRows(),
 		keypairStatusRows(),
 		securityStatusRows(),
+		tokenStatusRows(),
 	)
 }
 
@@ -145,12 +146,16 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 		types.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
+	tokens := seedTokens(t, db)
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
+		Hash: testHash, Tokens: tokens,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
+		Tokens:    tokens,
 		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
 	}
 	for _, f := range tune {
@@ -381,13 +386,20 @@ func TestStatusTable(t *testing.T) {
 		case "admin", "user":
 			headers = basic(c.as, "pw")
 		}
-		if c.body != "" {
+		body := c.body
+		if body != "" {
 			if headers == nil {
 				headers = map[string]string{}
 			}
 			headers["Content-Type"] = "application/json"
+			// A form: prefix sends the rest form-encoded, for the legacy
+			// token routes.
+			if form, ok := strings.CutPrefix(body, "form:"); ok {
+				headers["Content-Type"] = "application/x-www-form-urlencoded"
+				body = form
+			}
 		}
-		rec := do(t, h, c.method(), c.path, headers, c.body)
+		rec := do(t, h, c.method(), c.path, headers, body)
 		if rec.Code != c.want {
 			t.Errorf("%s %s as %q: status %d, want %d: %s",
 				c.method(), c.path, c.as, rec.Code, c.want, rec.Body)
@@ -398,6 +410,8 @@ func TestStatusTable(t *testing.T) {
 // implementedHandwritten lists the hand-written routes with real handlers;
 // the guard below holds them to the same rule as the generated ones.
 var implementedHandwritten = map[string]bool{
+	"POST /artifactory/api/security/token":                   true,
+	"POST /artifactory/api/security/token/revoke":            true,
 	"PATCH /artifactory/api/system/configuration":            true,
 	"PUT /artifactory/{repoKey}/{filePath}":                  true,
 	"GET /artifactory/{repoKey}/{filePath}":                  true,
