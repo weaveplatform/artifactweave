@@ -60,6 +60,16 @@ const (
 	// call is let through again; Artifactory's state-aware providers re-check
 	// a failed store after the same 15 seconds (checkPeriod).
 	DefaultBreakerCooldown = 15 * time.Second
+	// DefaultRepairBatch is how many replicas one repair pass works on per
+	// step, so a pass holds its lease for a bounded time.
+	DefaultRepairBatch = 100
+	// DefaultRepairMaxAttempts is how many failed copies make a pending
+	// replica failed, for an operator to look at.
+	DefaultRepairMaxAttempts = 10
+	// DefaultRepairBackoff is the wait after a replica's first failed
+	// attempt; it doubles with every attempt up to maxRepairBackoff, so a
+	// copy that keeps failing is not retried in a tight loop.
+	DefaultRepairBackoff = time.Minute
 )
 
 // memberName restricts member names to what configuration keys, environment
@@ -110,6 +120,23 @@ type Options struct {
 	// Now supplies the time for the breaker, latency and replica records;
 	// nil means time.Now.
 	Now func() time.Time
+
+	// The repair worker's settings (repair.go). Blobs and Leases are only
+	// required by Repair: a mirror that never repairs may leave them nil.
+	//
+	// Blobs is the blob index whose reference counts tell a deferred delete
+	// whether the blob was uploaded again since.
+	Blobs store.BlobIndex
+	// Leases holds the lease that keeps two repair passes from overlapping.
+	Leases store.LeaseStore
+	// RepairBatch, RepairMaxAttempts and RepairBackoff tune a pass; zero
+	// means the defaults.
+	RepairBatch       int
+	RepairMaxAttempts int
+	RepairBackoff     time.Duration
+	// OnRepair, when set, receives every pass RunRepair makes, so the server
+	// can log or count them.
+	OnRepair func(RepairReport, error)
 }
 
 // Store is a blob.Store over several member stores.
@@ -133,6 +160,7 @@ type Store struct {
 	// blob back.
 	mu       sync.Mutex
 	inflight map[string]*flight
+	repair   repairState
 }
 
 // flight counts the background commits of one digest. An entry is removed
@@ -223,6 +251,12 @@ func New(o Options) (*Store, error) {
 		threshold: cmp.Or(o.BreakerThreshold, DefaultBreakerThreshold),
 		cooldown:  cmp.Or(o.BreakerCooldown, DefaultBreakerCooldown),
 		now:       o.Now,
+		repair: repairState{
+			blobs: o.Blobs, leases: o.Leases, onRepair: o.OnRepair,
+			batch:       cmp.Or(o.RepairBatch, DefaultRepairBatch),
+			maxAttempts: cmp.Or(o.RepairMaxAttempts, DefaultRepairMaxAttempts),
+			backoff:     cmp.Or(o.RepairBackoff, DefaultRepairBackoff),
+		},
 	}
 	if s.now == nil {
 		s.now = time.Now
@@ -272,7 +306,14 @@ func New(o Options) (*Store, error) {
 			"%w: chunk size, timeouts and breaker settings must be positive",
 			ErrConfig,
 		)
+	case s.repair.batch < 1 || s.repair.maxAttempts < 1 || s.repair.backoff < 0:
+		return nil, fmt.Errorf("%w: repair settings must be positive", ErrConfig)
 	}
+	holder, err := blob.NewUploadID()
+	if err != nil {
+		return nil, fmt.Errorf("blob/mirror: repair holder: %w", err)
+	}
+	s.repair.holder = "mirror-repair-" + holder
 	return s, nil
 }
 
