@@ -79,6 +79,18 @@ writes.
 - Surplus copies are never deleted automatically; removing a member is an explicit job
   that runs only after the remaining copies are verified.
 
+**Removing a member.** Repair works only with configured members. The records of a member
+taken out of `blob.mirror.members` stay in the index, but repair neither copies to that
+member nor reads from it, and backfill ignores its copies. A blob whose only present copy
+is there is out of the mirror's reach until the member is configured again. To remove one
+safely:
+1. Set `write_enabled: false`. Repair then drains it: blobs whose only copies are on it
+   get pending copies on write-enabled members.
+2. Wait until its `soleCopies` in `GET /api/storageinfo` is 0, and its pending records
+   are gone, or run `POST /api/system/storage/optimize` to hurry repair.
+3. Remove it from `blob.mirror.members`. Its records then appear under `removedMembers`
+   until they are deleted; its stored data is not touched.
+
 **Administration.** Artifactory's storage summary has nothing per shard. artifactweave's
 adds one field, which JFrog clients ignore:
 - **`GET /api/storageinfo`** gains `blobMirrors` when a tier is a mirror. A summary without
@@ -89,8 +101,12 @@ adds one field, which JFrog clients ignore:
   - `members`, each with `name`, `zone`, `backend`, `writeEnabled`, `available` (false
     while its breaker is open) and `averageLatencyMs`;
   - each member's `replicas`, keyed by state (`present`, `pending`, `deleting`,
-    `failed`), each with `count`, `bytes` and a human-formatted `size`.
-  Records of members no longer configured are not listed.
+    `failed`), each with `count`, `bytes` and a human-formatted `size`;
+  - each member's `soleCopies`: blobs whose only present copy is on it, so a drained
+    member is safe to remove when this is 0;
+  - `removedMembers`: members with replica records that are no longer configured, each
+    with its `replicas` and `soleCopies`. Their sole copies are blobs the mirror can no
+    longer read (#71).
 - **`POST /api/system/storage/optimize`** (admin) queues a repair pass on every mirror at
   once and answers `200` "Blob mirror repair started". A pass already queued counts.
   Without a mirror it answers `200` "No blob mirror is configured; nothing to optimize".

@@ -220,6 +220,12 @@ type ReplicaIndex interface {
 	// counted; neither is a blob with no records at all, which the repair
 	// worker's backfill brings into the index.
 	UnderReplicated(ctx context.Context, redundancy int) (int64, error)
+	// SoleCopies counts, per member, the blobs whose only present record is
+	// on that member. Blobs being deleted are left out, as UnderReplicated
+	// leaves them out. A member holding sole copies cannot be removed from
+	// a mirror without losing them: repair never reads from a member that
+	// is no longer configured.
+	SoleCopies(ctx context.Context) (map[string]int64, error)
 }
 
 // Upload is a blob upload session that outlives one request: a Docker

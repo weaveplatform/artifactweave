@@ -143,6 +143,28 @@ func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int6
 	return n, err
 }
 
+func (r replicaIndex) SoleCopies(ctx context.Context) (map[string]int64, error) {
+	out := map[string]int64{}
+	err := r.s.do(ctx, func() error {
+		holders, deleting := map[string][]string{}, map[string]bool{}
+		for _, v := range r.t().rows {
+			switch v.State {
+			case types.ReplicaPresent:
+				holders[v.SHA256] = append(holders[v.SHA256], v.Member)
+			case types.ReplicaDeleting:
+				deleting[v.SHA256] = true
+			}
+		}
+		for sha, members := range holders {
+			if len(members) == 1 && !deleting[sha] {
+				out[members[0]]++
+			}
+		}
+		return nil
+	})
+	return out, err
+}
+
 func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
 	var out []store.ReplicaCount
 	err := r.s.do(ctx, func() error {
