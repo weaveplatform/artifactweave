@@ -49,6 +49,7 @@ func identityStore(t *testing.T) *sqlcommon.Store {
 		s.Tokens().Create(ctx, types.Token{ID: "t1", Scope: types.UserScope()}),
 		s.Keys().CreateKeypair(ctx, types.Keypair{Name: "kp", PrivateKey: "secret", Passphrase: "pass"}),
 		s.Keys().PutSigningKey(ctx, types.SigningKey{Alias: "sk", PrivateKey: "secret", IsDefault: true}),
+		s.Keys().PutCertificate(ctx, types.Certificate{Alias: "cert", PEM: "pem", PrivateKey: "secret"}),
 	} {
 		if err != nil {
 			t.Fatal(err)
@@ -212,6 +213,14 @@ func TestIdentityFaults(t *testing.T) {
 		{"signing key clear default", []string{failUpdate("signing_keys")}, func(s store.Store) error {
 			return s.Keys().PutSigningKey(ctx, types.SigningKey{Alias: "new", IsDefault: true})
 		}},
+		{"certificate moved to another row", []string{"UPDATE certificates SET alias = 'moved'"}, func(s store.Store) error {
+			_, err := s.Keys().Certificate(ctx, "moved")
+			return err
+		}},
+		{"certificate list unseal", []string{"UPDATE certificates SET alias = 'moved'"}, func(s store.Store) error {
+			_, err := s.Keys().Certificates(ctx)
+			return err
+		}},
 		{"certificate list", []string{"DROP TABLE certificates"}, func(s store.Store) error {
 			_, err := s.Keys().Certificates(ctx)
 			return err
@@ -248,6 +257,7 @@ func TestSealedIdentityColumns(t *testing.T) {
 		"SELECT private_key FROM keypairs WHERE name = 'kp'",
 		"SELECT passphrase FROM keypairs WHERE name = 'kp'",
 		"SELECT private_key FROM signing_keys WHERE alias = 'sk'",
+		"SELECT private_key FROM certificates WHERE alias = 'cert'",
 	} {
 		var raw []byte
 		if err := s.DB().QueryRowContext(ctx, q).Scan(&raw); err != nil {

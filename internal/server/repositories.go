@@ -620,6 +620,9 @@ func (s artifactoryService) CreateRepository(
 	if err := repos.CheckMembers(c, existing); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
+	if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
+		return nil, fmt.Errorf("repositories: %w", err)
+	}
 	switch err := st.Repos().Create(ctx, c); {
 	case errors.Is(err, store.ErrConflict):
 		return nil, badRequest(msgKeyExists)
@@ -679,6 +682,9 @@ func (s artifactoryService) CreateMultipleRepositories(
 	}
 	for _, c := range prepared {
 		if err := repos.CheckMembers(c, known); err != nil {
+			return nil, fmt.Errorf("repositories: %w", err)
+		}
+		if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
 	}
@@ -764,7 +770,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	if err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := s.checkMembersStored(ctx, st, updated); err != nil {
+	if err := s.checkReferences(ctx, st, updated); err != nil {
 		return nil, err
 	}
 	if err := st.Repos().Update(ctx, updated); err != nil {
@@ -775,11 +781,16 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	), nil
 }
 
-func (s artifactoryService) checkMembersStored(
+// checkReferences rejects an updated configuration whose signing key
+// pairs, or (for a virtual repository) members, do not exist.
+func (s artifactoryService) checkReferences(
 	ctx context.Context,
 	st store.Store,
 	c repo.Config,
 ) error {
+	if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
+		return fmt.Errorf("repositories: %w", err)
+	}
 	if c.Class != repo.Virtual {
 		return nil
 	}
@@ -841,7 +852,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		if err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := s.checkMembersStored(ctx, st, c); err != nil {
+		if err := s.checkReferences(ctx, st, c); err != nil {
 			return nil, err
 		}
 		updated = append(updated, c)

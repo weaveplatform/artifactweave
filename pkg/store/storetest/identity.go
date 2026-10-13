@@ -165,7 +165,12 @@ func testGroups(t *testing.T, s store.Store) {
 	got.Members[0] = "changed"
 	same(t, "Get after mutating a result", wantDevs, get[types.Group](t)(gs.Get(ctx, "devs")))
 	wantErr(t, gs.Create(ctx, group("devs", false)), store.ErrConflict)
-	same(t, "user sees the group", []string{"devs"}, get[types.User](t)(s.Users().Get(ctx, "alice")).Groups)
+	same(
+		t,
+		"user sees the group",
+		[]string{"devs"},
+		get[types.User](t)(s.Users().Get(ctx, "alice")).Groups,
+	)
 
 	devs.Description, devs.Members = "changed", []string{"bob"}
 	must(t, gs.Update(ctx, devs))
@@ -192,7 +197,12 @@ func testGroups(t *testing.T, s store.Store) {
 	_, err = gs.Get(ctx, "devs")
 	wantErr(t, err, store.ErrNotFound)
 	wantErr(t, gs.Delete(ctx, "devs"), store.ErrNotFound)
-	same(t, "memberships removed", []string(nil), get[types.User](t)(s.Users().Get(ctx, "bob")).Groups)
+	same(
+		t,
+		"memberships removed",
+		[]string(nil),
+		get[types.User](t)(s.Users().Get(ctx, "bob")).Groups,
+	)
 }
 
 func testMemberships(t *testing.T, s store.Store) {
@@ -208,25 +218,49 @@ func testMemberships(t *testing.T, s store.Store) {
 	must(t, gs.AddMembers(ctx, "devs", "alice")) // again: not an error
 	must(t, gs.AddMembers(ctx, "ops", "alice"))
 	same(t, "members", []string{"alice", "carol"}, get[types.Group](t)(gs.Get(ctx, "devs")).Members)
-	same(t, "groups", []string{"devs", "ops"}, get[types.User](t)(s.Users().Get(ctx, "alice")).Groups)
+	same(
+		t,
+		"groups",
+		[]string{"devs", "ops"},
+		get[types.User](t)(s.Users().Get(ctx, "alice")).Groups,
+	)
 
 	wantErr(t, gs.AddMembers(ctx, "nope", "alice"), store.ErrNotFound)
 	wantErr(t, gs.AddMembers(ctx, "devs", "bob", "nobody"), store.ErrNotFound)
-	same(t, "failed AddMembers", []string{"alice", "carol"}, get[types.Group](t)(gs.Get(ctx, "devs")).Members)
+	same(
+		t,
+		"failed AddMembers",
+		[]string{"alice", "carol"},
+		get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+	)
 
 	must(t, gs.RemoveMembers(ctx, "devs", "alice", "bob", "nobody"))
-	same(t, "after RemoveMembers", []string{"carol"}, get[types.Group](t)(gs.Get(ctx, "devs")).Members)
+	same(
+		t,
+		"after RemoveMembers",
+		[]string{"carol"},
+		get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+	)
 	wantErr(t, gs.RemoveMembers(ctx, "nope", "alice"), store.ErrNotFound)
 
 	// Replacing a user's groups through Update leaves other members alone.
 	carol := get[types.User](t)(s.Users().Get(ctx, "carol"))
 	carol.Groups = []string{"ops"}
 	must(t, s.Users().Update(ctx, carol))
-	same(t, "devs after carol left", []string(nil), get[types.Group](t)(gs.Get(ctx, "devs")).Members)
+	same(
+		t,
+		"devs after carol left",
+		[]string(nil),
+		get[types.Group](t)(gs.Get(ctx, "devs")).Members,
+	)
 	same(t, "ops", []string{"alice", "carol"}, get[types.Group](t)(gs.Get(ctx, "ops")).Members)
 }
 
-func permission(i int, name string, resources map[types.ResourceType]types.Resource) types.Permission {
+func permission(
+	i int,
+	name string,
+	resources map[types.ResourceType]types.Resource,
+) types.Permission {
 	return types.Permission{
 		Name:        name,
 		Description: "permission " + name,
@@ -252,7 +286,9 @@ func testPermissions(t *testing.T, s store.Store) {
 		},
 		types.ResourceBuild: {
 			Actions: types.Grants{Users: map[string]types.Actions{"bob": types.ActionRead}},
-			Targets: map[string]types.Target{types.BuildInfoRepository: {Include: []string{"app/**"}}},
+			Targets: map[string]types.Target{
+				types.BuildInfoRepository: {Include: []string{"app/**"}},
+			},
 		},
 	})
 	// A grant of no actions grants nothing.
@@ -314,7 +350,11 @@ func testPermissions(t *testing.T, s store.Store) {
 	for i, n := range []string{"c", "a", "b"} {
 		must(t, ps.Create(ctx, permission(i, n, nil)))
 	}
-	all := pages(t, 2, func(p store.Page) ([]types.Permission, string, error) { return ps.List(ctx, p) })
+	all := pages(
+		t,
+		2,
+		func(p store.Page) ([]types.Permission, string, error) { return ps.List(ctx, p) },
+	)
 	same(t, "List order", []string{"a", "b", "c", "deploy", "empty"}, permissionNames(all))
 	same(t, "List record", deploy, all[3])
 	for _, bad := range []string{"%%%", store.Cursor("a", "b")} {
@@ -339,9 +379,12 @@ func scope(t *testing.T, s string) types.Scope {
 
 func token(t *testing.T, id, subject string, issued time.Time) types.Token {
 	return types.Token{
-		ID:              id,
-		Subject:         subject,
-		Scope:           scope(t, `applied-permissions/groups:readers,"Project Admin" repo:libs-local:r,w`),
+		ID:      id,
+		Subject: subject,
+		Scope: scope(
+			t,
+			`applied-permissions/groups:readers,"Project Admin" repo:libs-local:r,w`,
+		),
 		Audience:        "jfrt@*",
 		Description:     "token " + id,
 		ProjectKey:      "proj",
@@ -418,7 +461,11 @@ func testTokens(t *testing.T, s store.Store) {
 	} {
 		must(t, ts.Create(ctx, tk))
 	}
-	all := pages(t, 2, func(p store.Page) ([]types.Token, string, error) { return ts.List(ctx, store.TokenFilter{}, p) })
+	all := pages(
+		t,
+		2,
+		func(p store.Page) ([]types.Token, string, error) { return ts.List(ctx, store.TokenFilter{}, p) },
+	)
 	same(t, "List order", []string{"t0", "t00", "t1", "t2", "t3", "t4"}, tokenIDs(all))
 	mine := pages(t, 1, func(p store.Page) ([]types.Token, string, error) {
 		return ts.List(ctx, store.TokenFilter{Subject: sub}, p)
@@ -440,7 +487,11 @@ func testTokens(t *testing.T, s store.Store) {
 	if n != 2 {
 		t.Fatalf("DeleteExpired removed %d, want 2", n)
 	}
-	rest := pages(t, 10, func(p store.Page) ([]types.Token, string, error) { return ts.List(ctx, store.TokenFilter{}, p) })
+	rest := pages(
+		t,
+		10,
+		func(p store.Page) ([]types.Token, string, error) { return ts.List(ctx, store.TokenFilter{}, p) },
+	)
 	same(t, "after DeleteExpired", []string{"t0", "t00", "t3", "t4"}, tokenIDs(rest))
 
 	must(t, ts.Delete(ctx, "t3"))
@@ -478,7 +529,12 @@ func testKeypairs(t *testing.T, s store.Store) {
 	must(t, ks.CreateKeypair(ctx, plain))
 	same(t, "Keypair without passphrase", plain, get[types.Keypair](t)(ks.Keypair(ctx, "plain")))
 
-	same(t, "Keypairs", []types.Keypair{keypair("gpg"), plain, keypair("rsa")}, get[[]types.Keypair](t)(ks.Keypairs(ctx)))
+	same(
+		t,
+		"Keypairs",
+		[]types.Keypair{keypair("gpg"), plain, keypair("rsa")},
+		get[[]types.Keypair](t)(ks.Keypairs(ctx)),
+	)
 
 	upd := keypair("rsa")
 	upd.PrivateKey, upd.Passphrase, upd.Alias = "rotated", "new-pass", "new-alias"
@@ -496,6 +552,7 @@ func certificate(i int, alias string) types.Certificate {
 	return types.Certificate{
 		Alias:       alias,
 		PEM:         "-----BEGIN CERTIFICATE-----\n" + alias,
+		PrivateKey:  "-----BEGIN PRIVATE KEY-----\n" + alias,
 		IssuedTo:    "CN=" + alias,
 		IssuedBy:    "CN=Example CA",
 		IssuedOn:    at(i),
@@ -514,12 +571,22 @@ func testCertificates(t *testing.T, s store.Store) {
 	b.PEM, b.IssuedOn = "replaced", at(7)
 	must(t, ks.PutCertificate(ctx, b))
 	same(t, "replaced Certificate", b, get[types.Certificate](t)(ks.Certificate(ctx, "b")))
-	same(t, "Certificates", []types.Certificate{a, b}, get[[]types.Certificate](t)(ks.Certificates(ctx)))
+	same(
+		t,
+		"Certificates",
+		[]types.Certificate{a, b},
+		get[[]types.Certificate](t)(ks.Certificates(ctx)),
+	)
 	_, err := ks.Certificate(ctx, "nope")
 	wantErr(t, err, store.ErrNotFound)
 	must(t, ks.DeleteCertificate(ctx, "a"))
 	wantErr(t, ks.DeleteCertificate(ctx, "a"), store.ErrNotFound)
-	same(t, "Certificates after delete", []types.Certificate{b}, get[[]types.Certificate](t)(ks.Certificates(ctx)))
+	same(
+		t,
+		"Certificates after delete",
+		[]types.Certificate{b},
+		get[[]types.Certificate](t)(ks.Certificates(ctx)),
+	)
 }
 
 func trustedKey(i int, kid, alias string) types.TrustedKey {
@@ -548,7 +615,12 @@ func testTrustedKeys(t *testing.T, s store.Store) {
 	wantErr(t, ks.CreateTrustedKey(ctx, trustedKey(4, "k4", "edge")), store.ErrConflict)
 	_, err := ks.TrustedKey(ctx, "k4")
 	wantErr(t, err, store.ErrNotFound)
-	same(t, "TrustedKeys", []types.TrustedKey{k1, k2, k3}, get[[]types.TrustedKey](t)(ks.TrustedKeys(ctx)))
+	same(
+		t,
+		"TrustedKeys",
+		[]types.TrustedKey{k1, k2, k3},
+		get[[]types.TrustedKey](t)(ks.TrustedKeys(ctx)),
+	)
 	must(t, ks.DeleteTrustedKey(ctx, "k2"))
 	wantErr(t, ks.DeleteTrustedKey(ctx, "k2"), store.ErrNotFound)
 	// The alias is free again once its key is gone.
@@ -574,13 +646,27 @@ func testSigningKeys(t *testing.T, s store.Store) {
 	must(t, ks.PutSigningKey(ctx, signingKey("a", true)))
 	must(t, ks.PutSigningKey(ctx, signingKey("c", false)))
 	same(t, "SigningKey", signingKey("a", true), get[types.SigningKey](t)(ks.SigningKey(ctx, "a")))
-	same(t, "DefaultSigningKey", signingKey("a", true), get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)))
+	same(
+		t,
+		"DefaultSigningKey",
+		signingKey("a", true),
+		get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
+	)
 
 	// A new default clears the old one.
 	must(t, ks.PutSigningKey(ctx, signingKey("b", true)))
-	same(t, "SigningKeys", []types.SigningKey{signingKey("a", false), signingKey("b", true), signingKey("c", false)},
-		get[[]types.SigningKey](t)(ks.SigningKeys(ctx)))
-	same(t, "new default", signingKey("b", true), get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)))
+	same(
+		t,
+		"SigningKeys",
+		[]types.SigningKey{signingKey("a", false), signingKey("b", true), signingKey("c", false)},
+		get[[]types.SigningKey](t)(ks.SigningKeys(ctx)),
+	)
+	same(
+		t,
+		"new default",
+		signingKey("b", true),
+		get[types.SigningKey](t)(ks.DefaultSigningKey(ctx)),
+	)
 
 	// Replacing the default key keeps it the default.
 	b := signingKey("b", true)

@@ -202,6 +202,9 @@ func planRepos(
 		if err := repos.CheckMembers(op.cfg, known); err != nil {
 			return nil, nil, entryError(op.name, err)
 		}
+		if err := repos.CheckKeypairs(ctx, st.Keys(), op.cfg); err != nil {
+			return nil, nil, entryError(op.name, err)
+		}
 	}
 	return deletes, writes, nil
 }

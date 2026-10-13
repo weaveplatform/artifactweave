@@ -534,7 +534,7 @@ timestamps are UTC; identifiers are the wire identities above.
 | `api_keys` | shim only; no table in v1 | | |
 | `keypairs` | `name PK, type, alias, public_key, private_key (sealed), passphrase (sealed)` | vault refs | |
 | `repository_keypairs` | `repo_key, role (primary/secondary), keypair_name` | | |
-| `certificates` | `alias PK, pem, issued_to, issued_by, issued_on, valid_until, fingerprint` | | derived columns parsed once |
+| `certificates` | `alias PK, pem, private_key (sealed), issued_to, issued_by, issued_on, valid_until, fingerprint` | | derived columns parsed once; `pem` holds the certificate chain and `private_key` its key (migration 0008) |
 | `roles` | `name PK, type, description` | `environments[], actions[]` | global roles |
 | `environments` | `name PK, project_key (null = global)` | | |
 | `projects` | `key PK, display_name, description, storage_quota_bytes, soft_limit, quota_email` | `admin_privileges` | |

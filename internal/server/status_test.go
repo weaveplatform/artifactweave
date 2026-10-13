@@ -52,6 +52,7 @@ func statusTable() []statusCase {
 		mirrorStatusRows(),
 		multipartStatusRows(),
 		roleStatusRows(),
+		keypairStatusRows(),
 	)
 }
 
@@ -116,6 +117,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 			t.Fatal(err)
 		}
 	}
+	seedKeys(t, db)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

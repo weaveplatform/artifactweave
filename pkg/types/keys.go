@@ -32,12 +32,14 @@ type Keypair struct {
 	Passphrase string `json:"-"`
 }
 
-// Certificate is a trusted CA certificate for outbound TLS. Every field but
-// Alias and PEM is parsed from the PEM once at upload, so listings never
-// re-parse.
+// Certificate is a client certificate that remote repositories present to
+// upstreams (clientTlsCertificate). PEM holds the certificate chain and
+// PrivateKey its key, sealed at rest (decision 0017). Every other field is
+// parsed from the PEM once at upload, so listings never re-parse.
 type Certificate struct {
 	Alias       string
 	PEM         string
+	PrivateKey  string `json:"-"`
 	IssuedTo    string
 	IssuedBy    string
 	IssuedOn    time.Time

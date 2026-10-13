@@ -20,6 +20,7 @@ const (
 	purposeKeypairPassphrase = "keypairs.passphrase"
 	purposeSigningPrivate    = "signing_keys.private_key"
 	purposeSigningPassphrase = "signing_keys.passphrase"
+	purposeCertificateKey    = "certificates.private_key"
 )
 
 // Tokens implements store.Store.
@@ -304,16 +305,18 @@ func (ks keys) DeleteKeypair(ctx context.Context, name string) error {
 	)
 }
 
-const certificateCols = "alias, pem, issued_to, issued_by, issued_on, valid_until, fingerprint"
+const certificateCols = "alias, pem, private_key, issued_to, issued_by, issued_on, valid_until, fingerprint"
 
-func scanCertificate(row interface{ Scan(...any) error }) (types.Certificate, error) {
+func (ks keys) scanCertificate(row interface{ Scan(...any) error }) (types.Certificate, error) {
 	var (
 		c         types.Certificate
+		key       []byte
 		on, until sql.NullInt64
 	)
 	if err := row.Scan(
 		&c.Alias,
 		&c.PEM,
+		&key,
 		&c.IssuedTo,
 		&c.IssuedBy,
 		&on,
@@ -323,16 +326,23 @@ func scanCertificate(row interface{ Scan(...any) error }) (types.Certificate, er
 		return c, err //nolint:wrapcheck // wrapped by the caller
 	}
 	c.IssuedOn, c.ValidUntil = fromMicros(on), fromMicros(until)
-	return c, nil
+	var err error
+	c.PrivateKey, err = ks.s.unseal(purposeCertificateKey, c.Alias, key)
+	return c, err
 }
 
 func (ks keys) PutCertificate(ctx context.Context, c types.Certificate) error {
-	_, err := ks.s.exec(
+	key, err := ks.s.seal(purposeCertificateKey, c.Alias, c.PrivateKey)
+	if err != nil {
+		return err
+	}
+	_, err = ks.s.exec(
 		ctx,
 		"put certificate "+c.Alias,
 		Upsert("certificates", strings.Split(certificateCols, ", "), []string{"alias"}),
 		c.Alias,
 		c.PEM,
+		key,
 		c.IssuedTo,
 		c.IssuedBy,
 		micros(c.IssuedOn),
@@ -343,7 +353,7 @@ func (ks keys) PutCertificate(ctx context.Context, c types.Certificate) error {
 }
 
 func (ks keys) Certificate(ctx context.Context, alias string) (types.Certificate, error) {
-	c, err := scanCertificate(ks.s.q(ctx).QueryRowContext(ctx,
+	c, err := ks.scanCertificate(ks.s.q(ctx).QueryRowContext(ctx,
 		ks.s.d.Rebind("SELECT "+certificateCols+" FROM certificates WHERE alias = ?"), alias))
 	return c, ks.s.wrap(fmt.Sprintf("get certificate %q", alias), err)
 }
@@ -353,7 +363,7 @@ func (ks keys) Certificates(ctx context.Context) ([]types.Certificate, error) {
 	err := ks.s.rows(ctx, "list certificates",
 		"SELECT "+certificateCols+" FROM certificates ORDER BY alias", nil,
 		func(r *sql.Rows) error {
-			c, err := scanCertificate(r)
+			c, err := ks.scanCertificate(r)
 			out = append(out, c)
 			return err
 		})
