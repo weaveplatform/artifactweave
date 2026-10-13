@@ -181,7 +181,7 @@ staged under a temporary name must be copied server-side.
 |---|---|---|
 | Copy Blob (`StartCopyFromURL`) | asynchronous and best-effort; for block blobs it "creates a committed blob of zero length before returning", visible while pending; a failed copy leaves an empty blob; a second copy to the destination gets 409 ([MS:copy-blob]); **[probe]** Azurite always completes it synchronously, so tests never see the pending state | rejected: a zero-length placeholder breaks content-addressed `Exists` |
 | Copy Blob From URL (`CopyFromURL`) | synchronous, source ≤ 256 MiB ([MS:copy-blob-from-url]); the page contradicts itself on whether Shared Key authorises a same-account source | usable below 256 MiB once verified on real Azure |
-| Put Block From URL (`StageBlockFromURL`) ranges into the final name, then one commit | synchronous per range; the final blob stays invisible until the atomic commit; the source must be public, carry a SAS, or be authorised with `x-ms-copy-source-authorization: Bearer` (version 2020-10-02 and later); Shared Key on the destination does not authorise the source ([MS:put-block-from-url]); maximum range per call is stated as both 100 MiB and 4,000 MiB on the same page; **[probe]** Azurite 3.37.0 returns `403 CannotVerifyCopySource` without a source SAS and succeeds with one | **chosen**: 100 MiB ranges in parallel with `SourceIfMatch` on the temporary blob's ETag |
+| Put Block From URL (`StageBlockFromURL`) ranges into the final name, then one commit | synchronous per range; the final blob stays invisible until the atomic commit; the source must be public, carry a SAS, or be authorised with `x-ms-copy-source-authorization: Bearer` (version 2020-10-02 and later); Shared Key on the destination does not authorise the source ([MS:put-block-from-url]); maximum range per call is stated as both 100 MiB and 4,000 MiB on the same page; **[probe]** Azurite 3.37.0 returns `403 CannotVerifyCopySource` without a source SAS and succeeds with one | **chosen**: ranges of up to 4,000 MiB (the limit the real service enforces, §4) in parallel with `SourceIfMatch` on the temporary blob's ETag |
 | Pointer blob or metadata | no copy, but doubles round trips on every read and needs its own garbage collection | rejected |
 | Hierarchical-namespace rename (`x-ms-rename-source`) | atomic, but needs the azdatalake SDK and a DFS endpoint ([path-create]) | possible later fast path |
 
@@ -354,7 +354,7 @@ accounts and logs one `PROBE` line per question:
 | 5 | `gcs.signed_url` |
 
 The backends do not depend on the answers:
-- The Azure backend copies in 100 MiB ranges.
+- The Azure backend copied in 100 MiB ranges; it now uses 4,000 MiB, the verified limit.
 - It always authorises copy sources explicitly, with a service SAS or an Entra bearer token.
 - It treats `BlobAlreadyExists` and `ConditionNotMet` alike on a must-not-exist write.
 - The GCS backend checks the composed size and CRC32C itself.
@@ -378,8 +378,26 @@ acceptance service account by impersonation, because the organisation enforces
 | Composites | No MD5; `componentCount` is reported | As expected: the contract computes its own digests |
 
 A 40 MiB deploy through the local container (`make gcp-smoke`) stored one object composed
-from three parts (16, 16 and 8 MiB) and left nothing under `_uploads/`. The Azure questions
-(1 to 3) remain open until an Azure account is configured.
+from three parts (16, 16 and 8 MiB) and left nothing under `_uploads/`.
+
+### Azure answers (2026-10-13)
+
+The blob contract passed in full (15 subtests) against a real StorageV2 account in
+`uksouth` (`deploy/terraform/acceptance-azure`), with Shared Key disabled. It used Entra ID
+through `DefaultAzureCredential`, and presigned URLs from user delegation keys fetched over
+HTTPS.
+
+| Question | Answer | Consequence |
+|---|---|---|
+| 1: Put Block From URL range | 4,000 MiB, the limit the documentation also states: ranges of 100, 101, 256 and 1,024 MiB and 4,000 MiB are accepted (the last in about 14 s server-side), and 4,001 MiB is refused with `CannotVerifyCopySource`. The probe assembles a 4,100 MiB source server-side, so it uploads nothing more than 101 MiB (`ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES=1`) | `copy_range_size` now defaults to 4,000 MiB: a commit copies up to about 3.9 GiB per call, so a 10 GiB blob takes three calls instead of 103 |
+| 2: Copy Blob From URL with a Shared Key source | Not asked: an account without Shared Key can't answer it | Moot, because the backend always authorises a copy source explicitly: a service SAS, a user delegation SAS, the configured SAS, or `x-ms-copy-source-authorization` under Entra ID |
+| 3: Put Blob with `If-None-Match: *` over uncommitted blocks | Accepted: real Azure stores the blob, where Azurite answers 409 | A must-not-exist small-blob write isn't blocked by blocks a crashed upload left staged under that name |
+
+Running the backend on a container SAS (`blob.azure.credential: sas`, the local container's
+mode) found a bug: the copy source carried the SAS twice, and every copy into place failed
+with `CannotVerifyCopySource`. It's fixed in `sourceURL`. A deploy without a declared
+digest stages into a temporary blob and copies it into place, so the 40 MiB smoke blob was
+committed as one block copied by a single range.
 
 ## Sources
 

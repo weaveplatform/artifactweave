@@ -261,7 +261,10 @@ func (a *sdkAPI) sourceURL(
 		}
 		return u + "?" + qp, nil
 	case a.sasToken != "":
-		return u + "?" + a.sasToken, nil
+		// The container client was built on a URL carrying the SAS, so
+		// its blob URLs carry it already; appending it again breaks the
+		// source's signature (CannotVerifyCopySource).
+		return u, nil
 	case a.cred != nil:
 		tok, err := a.cred.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{storageScope}})
 		if err != nil {

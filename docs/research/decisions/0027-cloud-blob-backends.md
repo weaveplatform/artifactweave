@@ -84,7 +84,7 @@ SDK offer.
 - **Commit without a declared digest:**
   1. The blocks were staged on the temporary blob; commit that first.
   2. Copy it into the final name with parallel `StageBlockFromURL` calls, each covering
-     `copy_range_size` (100 MiB by default), with bounded concurrency and
+     `copy_range_size` (4,000 MiB by default, the service's limit), with bounded concurrency and
      `SourceIfMatch` on the temporary blob's ETag.
   3. The source is authorised with a service SAS when the store has the account key, or
      with a bearer token under Entra ID.

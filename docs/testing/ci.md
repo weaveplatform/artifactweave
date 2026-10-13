@@ -60,9 +60,9 @@ A run whose variables or secrets are missing fails rather than skipping.
 | `CONFORMANCE_GCS_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/terraform/acceptance`) |
 | `CONFORMANCE_GCP_SERVICE_ACCOUNT` | variable | The service account the job acts as (`terraform output service_account`). It has `roles/storage.objectAdmin` on the bucket and signs URLs through IAM `signBlob` as itself |
 | `CONFORMANCE_GCP_WIF_PROVIDER` | variable | The Workload Identity Federation provider (`terraform output workload_identity_provider`). The job exchanges its GitHub OIDC token for the service account, so no key is stored; organisations enforcing `iam.disableServiceAccountKeyCreation` allow no keys anyway |
-| `CONFORMANCE_AZURE_ACCOUNT` | variable | Storage account name, with Shared Key access enabled |
-| `CONFORMANCE_AZURE_CONTAINER` | variable | An existing container in that account |
-| `AZURE_STORAGE_ACCOUNT_KEY` | secret | An account key; the probes sign copy sources with it |
+| `CONFORMANCE_AZURE_ACCOUNT` | variable | The storage account (`terraform output account` in `deploy/terraform/acceptance-azure`). It allows no Shared Key |
+| `CONFORMANCE_AZURE_CONTAINER` | variable | The container in that account |
+| `CONFORMANCE_AZURE_CLIENT_ID`, `CONFORMANCE_AZURE_TENANT_ID`, `CONFORMANCE_AZURE_SUBSCRIPTION_ID` | variables | The managed identity the job logs in as with `azure/login` (OpenID Connect), with Storage Blob Data Contributor on the account. Its federated credential trusts this repository's `cloud-conformance` environment, which the job declares |
 
 Give both stores a lifecycle rule that deletes `conformance/` objects after a day, in
 case a cancelled run skips its cleanup. On GCS, a bucket with soft delete enabled bills
@@ -77,18 +77,24 @@ ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/terraform/acceptance 
 GOOGLE_APPLICATION_CREDENTIALS=deploy/terraform/acceptance/.secrets/container-credentials.json \
   go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
 
-ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=myaccount \
-ARTIFACTWEAVE_TEST_AZURE_CONTAINER=conformance \
-ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY=... \
+make azure-conformance   # or, by hand, after az login:
+ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/terraform/acceptance-azure output -raw account) \
+ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
   go test -count=1 -v -run 'TestContractOnRealAzure|TestRealAzureProbes' ./pkg/blob/azure/
 ```
 
 The GCS run acts as the acceptance service account through the impersonated credentials
 `up.sh` writes from your own Application Default Credentials
 (`gcloud auth application-default login`); `deploy/terraform/acceptance` creates the
-bucket, the account and the federation for the workflow. Without the Azure account key, the contract
-authenticates with `DefaultAzureCredential` (`az login`, with Storage Blob Data
-Contributor on the container), and the probes skip.
+bucket, the account and the federation for the workflow.
+
+The Azure run authenticates with `DefaultAzureCredential`: your `az login` locally, the
+`azure/login` OIDC session in the workflow. Both hold Storage Blob Data Contributor on the
+account, and the probes sign copy sources with a user delegation SAS from it. An
+`ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY`, for an account that still allows Shared Key, switches
+the contract and probes to that key instead. `make azure-conformance` refuses to run unless
+the Azure CLI's active subscription is the acceptance one
+(`deploy/terraform/acceptance-azure`).
 
 ## Terraform fixture
 

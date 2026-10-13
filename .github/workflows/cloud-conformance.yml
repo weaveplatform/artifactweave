@@ -94,10 +94,27 @@ jobs:
     if: inputs.target == 'both' || inputs.target == 'azure'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Azure matches the federated credential's subject exactly; running in an
+    # environment gives the subject repo:<repo>:environment:cloud-conformance
+    # whatever branch or event dispatched the run.
+    environment: cloud-conformance
+    # id-token lets azure/login exchange the job's OIDC token for the
+    # managed identity (workload identity federation): no stored secret, and
+    # the storage account allows no Shared Key anyway.
+    permissions:
+      contents: read
+      id-token: write
     env:
       ARTIFACTWEAVE_TEST_AZURE_ACCOUNT: ${{ vars.CONFORMANCE_AZURE_ACCOUNT }}
       ARTIFACTWEAVE_TEST_AZURE_CONTAINER: ${{ vars.CONFORMANCE_AZURE_CONTAINER }}
-      ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY: ${{ secrets.AZURE_STORAGE_ACCOUNT_KEY }}
+      # The Put Block From URL ranges up to 4,000 MiB are copied server-side
+      # from a 101 MiB upload: they cost about a minute, not traffic.
+      ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES: '1'
+      # Not the AZURE_* names: DefaultAzureCredential reads those and would
+      # try other credential types before the Azure CLI login.
+      CONFORMANCE_AZURE_CLIENT_ID: ${{ vars.CONFORMANCE_AZURE_CLIENT_ID }}
+      CONFORMANCE_AZURE_TENANT_ID: ${{ vars.CONFORMANCE_AZURE_TENANT_ID }}
+      CONFORMANCE_AZURE_SUBSCRIPTION_ID: ${{ vars.CONFORMANCE_AZURE_SUBSCRIPTION_ID }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -114,16 +131,26 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      # The probes sign copy sources with the account key, so the key is
-      # required here even though the contract alone could use Entra ID.
       - name: Check configuration
         shell: bash
         run: |
-          if [ -z "$ARTIFACTWEAVE_TEST_AZURE_ACCOUNT" ] || [ -z "$ARTIFACTWEAVE_TEST_AZURE_CONTAINER" ] \
-            || [ -z "$ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY" ]; then
-            echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT and CONFORMANCE_AZURE_CONTAINER variables and the AZURE_STORAGE_ACCOUNT_KEY secret"
-            exit 1
-          fi
+          for v in ARTIFACTWEAVE_TEST_AZURE_ACCOUNT ARTIFACTWEAVE_TEST_AZURE_CONTAINER \
+            CONFORMANCE_AZURE_CLIENT_ID CONFORMANCE_AZURE_TENANT_ID CONFORMANCE_AZURE_SUBSCRIPTION_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT, CONFORMANCE_AZURE_CONTAINER, CONFORMANCE_AZURE_CLIENT_ID, CONFORMANCE_AZURE_TENANT_ID and CONFORMANCE_AZURE_SUBSCRIPTION_ID variables (make azure-github-vars)"
+              exit 1
+            fi
+          done
+
+      # The tests authenticate with DefaultAzureCredential, which finds this
+      # Azure CLI login; the probes sign copy sources with a user delegation
+      # key from it.
+      - name: Authenticate to Azure
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.CONFORMANCE_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.CONFORMANCE_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.CONFORMANCE_AZURE_SUBSCRIPTION_ID }}
 
       - name: Contract and probes
         shell: bash

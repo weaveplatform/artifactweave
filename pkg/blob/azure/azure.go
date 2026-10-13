@@ -105,10 +105,11 @@ const (
 	// DefaultPartSize keeps the pending tail a session stores small while
 	// allowing blobs of about 390 GiB within Azure's 50,000 blocks.
 	DefaultPartSize = 8 << 20
-	// DefaultCopyRangeSize is the range each Put Block From URL copies. The
-	// documentation gives both 100 MiB and 4,000 MiB as the limit; 100 MiB
-	// is the one that holds either way (research 18).
-	DefaultCopyRangeSize = 100 << 20
+	// DefaultCopyRangeSize is the range each Put Block From URL copies: the
+	// service's limit. The documentation gives both 100 MiB and 4,000 MiB;
+	// the real service accepts 4,000 MiB (about 14 s server-side) and refuses
+	// 4,001 MiB (research 18 §4), so a commit makes as few calls as it can.
+	DefaultCopyRangeSize = 4000 << 20
 	// DefaultConcurrency bounds the parallel Put Block From URL calls of one
 	// commit.
 	DefaultConcurrency = 8
