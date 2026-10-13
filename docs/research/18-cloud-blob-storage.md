@@ -12,7 +12,8 @@ what the two services and their official Go SDKs offer for the blob contract in
 - Blobs reach many GiB.
 - The content-addressed name is known only at commit.
 
-Decision [0027](decisions/0027-cloud-blob-backends.md) records the design that follows.
+Decision [0027](decisions/0027-cloud-blob-backends.md) records the backend design and
+decision [0028](decisions/0028-blob-mirroring.md) the mirroring that section 3 informs.
 
 Source abbreviations:
 
@@ -278,7 +279,61 @@ from 7.125.4 ([azure-workload-identity]).
 - **Accounts without Shared Key:** where Shared Key is disallowed, service and account SAS are rejected. Copy-source authorisation and presigning then need a bearer token or a user delegation SAS.
 - **Hierarchical-namespace accounts:** the block APIs work, but listing returns directory entries, and empty directories remain after deletes ([data-lake-storage-known-issues]).
 
-## 3. Open questions for a real-cloud check
+## 3. Mirroring blobs across stores, clouds and regions
+
+### 3.1 How Artifactory does it
+
+Artifactory spreads binaries over several storage units with the `sharding` binary provider:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `redundancy` | 1 (2 on `sharding-cluster`) | copies kept per binary; must not exceed the number of mounts [sharding] [sharding-cluster] |
+| `lenientLimit` | 0, meaning "use redundancy" (`sharding-cluster`: 1) | minimum shards that must be available for uploads to continue; the write must reach every available shard and a later balance restores redundancy [sharding] |
+| `readBehavior` | roundRobin; `zone`; `crossNetworkStrategy` on clusters | how reads pick a shard [sharding] [sharding-cluster] |
+| `writeBehavior` | roundRobin; also freeSpace, percentageFreeSpace, zone variants | where new copies go [sharding] |
+| `concurrentStreamWaitTimeout` | 30,000 ms | one upload stream is buffered and fanned out to R writer threads; the write counts when all finish [sharding] |
+| `maxBalancingRunTime`, `balancerThreads` | no limit, 1 | the balancer that restores redundancy [sharding] |
+| sub-provider `zone`, `checkPeriod` (15 s), `writeEnabled` (since 6.18) | | a shard's zone, its health re-check interval, and a read-only drain switch that still lets GC delete [state-aware] [state-aware-s3] |
+| `shared.node.crossZoneOrder` | | the order zones are written in [sharding] |
+
+**Cloud sharding.**
+- `s3-sharding` (Artifactory 7.31.10) shards across several S3 buckets, one `state-aware-s3` per bucket. JFrog's own example spans us-east-1 and us-west-1 [s3-templates].
+- The GCS and Azure "cluster" templates shard across cluster nodes in front of one bucket or container [gcs-cluster] [azure-cluster].
+- No documented chain mixes S3, GCS and Azure; `state-aware-s3` "will always be used with S3 sharding" [state-aware-s3].
+
+**Weaknesses.**
+- **No copy index.** "Artifactory does not know which shards hold your binaries" [filestore-whitepaper], so reads and repair probe the shards.
+- **Repair waits for garbage collection.** Missing copies were restored only by balancing sessions started after a full garbage collection, about every 80 hours by default, until 7.104.5 made `POST /api/system/storage/optimize` start one at once [balancing] [optimize].
+- **Topology changes apply to new data only** on S3 shards [s3-templates].
+- **Automatic removal of surplus copies lost data.** It deleted data when combined with bucket replication (KB 000006410) [kb-6410].
+- **Storage summary:** `GET /api/storageinfo` has no per-shard detail [storageinfo].
+- **Signed URLs:** which shard's URL a redirect uses is undocumented.
+
+**Related features copy between instances, not inside one filestore.** These are
+repository replication, federated repositories and Edge. JFrog advises against running
+its replication on top of S3 cross-region replication [replication].
+
+### 3.2 Cloud-native replication
+
+| Feature | Behaviour | Fit |
+|---|---|---|
+| S3 Cross-Region and Same-Region Replication | asynchronous; versioning on both buckets; existing objects need Batch Replication; RTC targets 15 minutes [s3-replication] [s3-rtc] | a member may be a replication source; its replica never counts as one of our copies |
+| S3 Multi-Region Access Points | route to the nearest bucket without knowing where an object is, so a read can miss while replication lags; CopyObject only as a destination [s3-mrap] | regional buckets work better as separate members |
+| GCS dual-region and multi-region buckets | strongly consistent everywhere; asynchronous geo replication, turbo replication with a 15-minute RPO on dual-region [gcs-availability] [gcs-consistency] | a dual-region bucket is one member with geo redundancy built in |
+| Azure GRS, RA-GRS, GZRS, object replication | asynchronous to a fixed paired region or to at most two destination accounts; object-replication destinations reject writes [azure-redundancy] [azure-object-replication] | an RA-GZRS account is one member; a replication destination cannot be a writable member |
+
+None of these replicates across clouds.
+
+### 3.3 Go concerns for parallel writes
+
+- **Fan-out:**
+  - `io.MultiWriter` writes to each writer in turn and stops at the first error.
+  - `io.Pipe` has no buffer, so the slowest member gates all of them (Go `io/multi.go`, `io/pipe.go`).
+  - Handing one immutable part-sized buffer to each member's `Append` in parallel avoids both problems.
+- **Quorum:** `errgroup.WithContext` cancels its context on the first error and on `Wait`. A quorum write must not cancel healthy members, and a winning lazy read must not lose its context (`golang.org/x/sync/errgroup`). Per-member contexts and a results channel fit better.
+- **Libraries:** `errors.Join` replaces multierror libraries. A per-member circuit breaker is small enough to write rather than import.
+
+## 4. Open questions for a real-cloud check
 
 1. **Azure:** the Put Block From URL maximum range, 100 MiB or 4,000 MiB.
 2. **Azure:** whether Copy Blob From URL accepts Shared Key authorisation of a same-account source.
@@ -305,6 +360,28 @@ to settle these.
 - [lifecycle]: https://docs.cloud.google.com/storage/docs/lifecycle
 - [pricing]: https://cloud.google.com/storage/pricing
 - [google-storage-v2]: https://docs.jfrog.com/installation/docs/google-storage-binary-provider-native-client-template
+
+**Mirroring (Artifactory and cloud replication)**
+- [sharding]: https://docs.jfrog.com/installation/docs/configure-a-sharding-binary-provider
+- [sharding-cluster]: https://docs.jfrog.com/installation/docs/sharding-cluster-binary-provider
+- [state-aware]: https://docs.jfrog.com/installation/docs/state-aware-binary-provider
+- [state-aware-s3]: https://docs.jfrog.com/installation/docs/state-aware-s3-binary-provider
+- [s3-templates]: https://docs.jfrog.com/installation/docs/s3-binary-storage-templates
+- [gcs-cluster]: https://docs.jfrog.com/installation/docs/google-storage-v2-cluster-binary-provider
+- [azure-cluster]: https://docs.jfrog.com/installation/docs/azure-blob-storage-cluster-v2-binary-provider
+- [balancing]: https://docs.jfrog.com/installation/docs/using-balancing-to-recover-from-mount-failure
+- [optimize]: https://docs.jfrog.com/artifactory/reference/optimizesystemstorage
+- [storageinfo]: https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo
+- [filestore-whitepaper]: https://jfrog.com/whitepaper/best-practices-for-managing-your-artifactory-filestore/
+- [kb-6410]: https://jfrog.com/help/r/artifactory-s3-bucket-content-deleted-by-artifactory-from-backend/artifactory-s3-bucket-content-deleted-by-artifactory-from-backend
+- [replication]: https://docs.jfrog.com/artifactory/docs/repository-replication
+- [s3-replication]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication.html
+- [s3-rtc]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html
+- [s3-mrap]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/MultiRegionAccessPointRequestRouting.html
+- [gcs-availability]: https://docs.cloud.google.com/storage/docs/availability-durability
+- [gcs-consistency]: https://docs.cloud.google.com/storage/docs/consistency
+- [azure-redundancy]: https://learn.microsoft.com/en-us/azure/storage/common/storage-redundancy
+- [azure-object-replication]: https://learn.microsoft.com/en-us/azure/storage/blobs/object-replication-overview
 
 **Azure Blob Storage**
 - [MS:put-block]: https://learn.microsoft.com/en-us/rest/api/storageservices/put-block
