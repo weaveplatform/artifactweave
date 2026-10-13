@@ -60,7 +60,9 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (Principal,
 	if u.Status != "" && u.Status != types.UserEnabled {
 		return Principal{}, ErrBadCredentials
 	}
-	return tokenPrincipal(u, t.Scope), nil
+	p := tokenPrincipal(u, t.Scope)
+	p.TokenID = t.ID
+	return p, nil
 }
 
 // tokenPrincipal applies the parts of a scope that decide who the request

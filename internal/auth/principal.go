@@ -22,6 +22,10 @@ type Principal struct {
 	// permissions. Scopes only narrow (decision 0005); the permission
 	// evaluator applies them.
 	Scope types.Scope
+	// TokenID is the id of the access or reference token the request
+	// presented; empty for a password or anonymous request. The token API's
+	// "me" resolves to it, and encryptedPassword refuses token callers.
+	TokenID string
 }
 
 // Anonymous is the principal of a request without credentials when

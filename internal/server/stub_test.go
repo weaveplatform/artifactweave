@@ -92,6 +92,15 @@ var implemented = map[string]bool{
 	"GET /artifactory/api/system/security/certificates":                       true,
 	"POST /artifactory/api/system/security/certificates/{certificateAlias}":   true,
 	"DELETE /artifactory/api/system/security/certificates/{certificateAlias}": true,
+	"GET /access/api/v1/tokens":                                               true,
+	"POST /access/api/v1/tokens":                                              true,
+	"DELETE /access/api/v1/tokens/revoke":                                     true,
+	"GET /access/api/v1/tokens/{tokenId}":                                     true,
+	"DELETE /access/api/v1/tokens/{tokenId}":                                  true,
+	"GET /access/api/v1/config/token/default_expiry":                          true,
+	"PUT /access/api/v1/config/token/default_expiry":                          true,
+	"GET /artifactory/api/security/token":                                     true,
+	"GET /artifactory/api/security/encryptedPassword":                         true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

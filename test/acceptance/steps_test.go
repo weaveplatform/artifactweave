@@ -49,6 +49,12 @@ type world struct {
 	dir string
 	// next holds headers for the next request only.
 	next map[string]string
+	// jfHome is the JFrog CLI's configuration for the scenario, so a
+	// server added by jf c add is there for the commands after it.
+	jfHome string
+	// vars holds values kept from command output, for {name} in jf
+	// arguments.
+	vars map[string]string
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -114,6 +120,10 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the JFrog CLI is available$`, w.jfAvailable)
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
+	sc.Step(
+		`^I keep the JSON field "([^"]*)" of the (?:output|response) as "([^"]*)"$`,
+		w.keepOutputField,
+	)
 }
 
 // start launches the binary on a free port and waits for readiness.
@@ -555,20 +565,30 @@ func (w *world) jfAvailable() error {
 }
 
 // runJF runs the JFrog CLI with {url} replaced by the registry's Artifactory
-// base, {password} by the seeded admin's and {dir} by the scenario's file
-// directory. JFROG_CLI_HOME_DIR isolates the CLI's config from the
-// developer's.
+// base, {platform} by its platform base, {password} by the seeded admin's,
+// {dir} by the scenario's file directory and {name} by a value kept from
+// earlier output. JFROG_CLI_HOME_DIR isolates the CLI's config from the
+// developer's; it lasts for the scenario.
 func (w *world) runJF(args string) error {
-	home, err := os.MkdirTemp("", "jfrog-home-")
-	if err != nil {
-		return err
+	if w.jfHome == "" {
+		home, err := os.MkdirTemp("", "jfrog-home-")
+		if err != nil {
+			return err
+		}
+		w.t.Cleanup(func() { _ = os.RemoveAll(home) })
+		w.jfHome = home
 	}
-	w.t.Cleanup(func() { _ = os.RemoveAll(home) })
-	argv := strings.Fields(strings.NewReplacer(
-		"{url}", w.url+"/artifactory",
+	home := w.jfHome
+	pairs := []string{
+		"{url}", w.url + "/artifactory",
+		"{platform}", w.url,
 		"{password}", testAdminPassword,
 		"{dir}", w.dir,
-	).Replace(args))
+	}
+	for k, v := range w.vars {
+		pairs = append(pairs, "{"+k+"}", v)
+	}
+	argv := strings.Fields(strings.NewReplacer(pairs...).Replace(args))
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
 	// Relative file specs resolve against the scenario's files, so an
 	// upload of "org/*" keeps the tree's layout under the target.
@@ -577,6 +597,8 @@ func (w *world) runJF(args string) error {
 		os.Environ(),
 		"JFROG_CLI_HOME_DIR="+home,
 		"JFROG_CLI_REPORT_USAGE=false",
+		// The CLI's own update check calls GitHub; tests stay offline.
+		"JFROG_CLI_AVOID_NEW_VERSION_WARNING=true",
 		"CI=true",
 	)
 	out, err := cmd.CombinedOutput()
@@ -608,4 +630,30 @@ func freePort() (int, error) {
 		return 0, errors.New("listener address is not TCP")
 	}
 	return addr.Port, nil
+}
+
+// keepOutputField keeps a string field of the JSON object in the last
+// command's output (which may surround it with log lines) or the last
+// response's body.
+func (w *world) keepOutputField(field, name string) error {
+	out := string(w.body)
+	// Log lines can carry JSON of their own, so try each object in turn.
+	for i := strings.Index(out, "{"); i >= 0; {
+		var obj map[string]any
+		if json.NewDecoder(strings.NewReader(out[i:])).Decode(&obj) == nil {
+			if v, ok := obj[field].(string); ok && v != "" {
+				if w.vars == nil {
+					w.vars = map[string]string{}
+				}
+				w.vars[name] = v
+				return nil
+			}
+		}
+		next := strings.Index(out[i+1:], "{")
+		if next < 0 {
+			break
+		}
+		i += 1 + next
+	}
+	return fmt.Errorf("no JSON object with a string field %q in the output:\n%s", field, out)
 }

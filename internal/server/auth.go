@@ -23,6 +23,10 @@ var publicRoutes = map[string]bool{
 	"GET /router/api/v1/system/health":              true,
 	"POST /artifactory/api/system/usage":            true,
 	"POST /jfconnect/api/v1/backoffice/metrics/log": true,
+	// Token creation, because a refresh grant carries its own credential,
+	// the refresh token; the handlers require a user for every other grant.
+	"POST /access/api/v1/tokens":           true,
+	"POST /artifactory/api/security/token": true,
 }
 
 // selfAuthenticated routes verify their own credential, so the middleware
