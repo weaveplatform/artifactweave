@@ -4,7 +4,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -18,13 +17,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/config"
 )
 
-// exitNotImplemented is returned by commands whose phase has not landed, so
-// scripts can tell "not yet" (2) from a real failure (1).
-const exitNotImplemented = 2
-
-var errNotImplemented = errors.New("not implemented")
-
-// flagKeys maps persistent flags to the dotted config keys they override.
+// flagKeys maps flags to the dotted config keys they override.
 // Secrets have no flags on purpose: they would end up in shell history.
 var flagKeys = map[string]string{
 	"listen":     "listen",
@@ -32,24 +25,14 @@ var flagKeys = map[string]string{
 	"data-dir":   "data_dir",
 	"log-level":  "log.level",
 	"log-format": "log.format",
+	"bootstrap":  "bootstrap.descriptor",
 }
 
 func main() {
 	if err := newRoot().Execute(); err != nil {
-		var ni *notImplementedError
-		if errors.As(err, &ni) {
-			fmt.Fprintln(os.Stderr, err)
-			os.Exit(exitNotImplemented)
-		}
 		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
-}
-
-type notImplementedError struct{ phase, what string }
-
-func (e *notImplementedError) Error() string {
-	return fmt.Sprintf("%s lands in %s: %v", e.what, e.phase, errNotImplemented)
 }
 
 func newRoot() *cobra.Command {
@@ -92,7 +75,7 @@ func newRoot() *cobra.Command {
 }
 
 func serveCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.Command {
-	return &cobra.Command{
+	c := &cobra.Command{
 		Use:   "serve",
 		Short: "Run the registry",
 		RunE: func(cmd *cobra.Command, _ []string) error {
@@ -112,6 +95,8 @@ func serveCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.C
 			return nil
 		},
 	}
+	c.Flags().String("bootstrap", "", "descriptor YAML applied once, on the first start")
+	return c
 }
 
 func migrateCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.Command {
@@ -173,14 +158,24 @@ func configCmd(load func(*cobra.Command, string) (config.Config, error)) *cobra.
 			return nil
 		},
 	})
-	c.AddCommand(&cobra.Command{
+	var dryRun bool
+	apply := &cobra.Command{
 		Use:   "apply <file>",
-		Short: "Apply an Artifactory YAML descriptor",
+		Short: "Apply an Artifactory YAML descriptor to the store, printing what changed",
 		Args:  cobra.ExactArgs(1),
-		RunE: func(*cobra.Command, []string) error {
-			return &notImplementedError{phase: "P2", what: "descriptor apply"}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := load(cmd, "")
+			if err != nil {
+				return err
+			}
+			return app.ApplyDescriptor( //nolint:wrapcheck // names the command
+				cmd.Context(), cfg, args[0], dryRun, cmd.OutOrStdout(),
+			)
 		},
-	})
+	}
+	apply.Flags().
+		BoolVar(&dryRun, "dry-run", false, "check the descriptor and print what would change, writing nothing")
+	c.AddCommand(apply)
 	return c
 }
 

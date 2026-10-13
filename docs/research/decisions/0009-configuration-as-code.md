@@ -26,7 +26,8 @@ Three layers feed one internal configuration:
    accepted by `PATCH /artifactory/api/system/configuration` with `application/yaml`,
    by `artifactweave config apply <file>` and by `--bootstrap <file>` at start. A `null`
    value deletes an element. Secret values may be written as `${ENV_VAR}` references.
-   `artifactweave config validate` checks a file without applying it.
+   `artifactweave config apply --dry-run` checks a file against the current state without
+   applying it.
 3. **The REST and Terraform APIs**, which are the same service layer the descriptor
    calls.
 

@@ -38,7 +38,7 @@ artifactweave has three configuration layers (decision
 | `master_key` | | `ARTIFACTWEAVE_MASTER_KEY` | required | Key for sealed columns (decision 0017): 32 bytes or more, base64 or raw, optionally prefixed with its version as `vN:` (no prefix means version 1) |
 | `master_key_previous` | | `ARTIFACTWEAVE_MASTER_KEY_PREVIOUS` | unset | The key being rotated away from, kept until `artifactweave keys rotate` has re-sealed every value (see below) |
 | `bootstrap.admin_password` | | `ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD` | generated | The seeded `admin` password, read on first start only. When unset, a random password is written to `<data_dir>/initial-admin-password` (mode 0600 on Unix) and the log names the file, never the password |
-| `bootstrap.descriptor` | `--bootstrap` | | | Descriptor YAML applied on first start |
+| `bootstrap.descriptor` | `--bootstrap` (on `serve`) | `ARTIFACTWEAVE_BOOTSTRAP_DESCRIPTOR` | | Descriptor YAML applied once, after the first start's principals; see [Configuration as code](#configuration-as-code) |
 | `docker.subdomain_match` | | | off | Enables the subdomain access method in addition to repository-path routing |
 | `log.level`, `log.format` | | | `info`, `json` | slog settings |
 | `distribution.import_dir` | | `ARTIFACTWEAVE_DISTRIBUTION_IMPORT_DIR` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
@@ -111,6 +111,51 @@ Without credentials, only the probes and version reads (`system/ping`, `system/v
 readiness, liveness, router health) and the usage sinks answer, until anonymous access is
 turned on. Token authentication (`Bearer`, `X-JFrog-Art-Api`) arrives with P4; until then
 those headers are refused.
+
+## Configuration as code
+
+Repositories, proxies, property sets and layouts are declared in Artifactory's YAML
+descriptor format (decision 0009). The same code applies it in three places:
+
+- `PATCH /artifactory/api/system/configuration` with an admin's credentials, for pipelines
+  and the `artifactory_*` configuration resources.
+- `artifactweave config apply <file>`, which writes to the store the application
+  configuration names, as `migrate` does. It needs the master key (descriptors carry
+  passwords, which are sealed) but no admin credentials, and it can prepare a store before
+  the first start. `--dry-run` checks the whole file against the current state and prints
+  what would change without writing anything. It exits 1 on any error, naming the entry.
+- `bootstrap.descriptor`, applied once after the first start's principals are seeded. A
+  marker records the file and its SHA-256, so a later start never re-applies it, even if
+  the file changed. A descriptor that cannot be applied stops the start.
+
+The descriptor is a patch:
+
+- Named entries that do not exist are created; existing ones are updated field by field,
+  omitted keys are untouched, and `key: null` deletes the entry or resets the field.
+- An empty document is refused (`400`); Artifactory reads it as "delete every repository".
+- Repository entries use the YAML spellings (`type`, `repoLayout`, `xray.enabled`, and the
+  `helm`, `nuget`, `vcs`, `externalDependencies`, `bower`, `composer`, `pypi` and
+  `virtualCacheConfig` blocks) or the JSON API's field names, and are checked with the
+  same rules as the repositories API. An unknown field is refused.
+- Values written as `${NAME}` are read from the environment of the process applying the
+  descriptor; an unset variable is an error, not an empty value.
+- The whole patch is checked first and written in one transaction, so a descriptor with
+  one bad entry changes nothing. An entry that would not change is not written, so applying
+  the same descriptor again reports everything as unchanged.
+
+| Section | Applied as |
+|---|---|
+| `localRepositories`, `remoteRepositories`, `virtualRepositories` | Repositories. A virtual repository may list members created by the same patch; deleting a repository removes it from the virtual repositories that list it |
+| `proxies` | Proxy settings; `password` is sealed and never stored in the document |
+| `propertySets` | Property sets |
+| `repoLayouts` | Repository layouts, checked by compiling `artifactPathPattern` and the descriptor pattern |
+
+Every other section is accepted and named as ignored in the summary, but not stored:
+sections such as `mailServer` and `security` carry passwords that must not reach the
+database unsealed. They gain an effect as their features land.
+
+The answer is a plain-text summary naming the entries created, updated, deleted and
+unchanged, and the sections ignored.
 
 ## Schema migrations
 

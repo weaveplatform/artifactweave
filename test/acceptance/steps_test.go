@@ -59,9 +59,11 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
 	sc.Step(`^I (PUT|POST) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
+	sc.Step(`^I PATCH "([^"]*)" as admin with YAML:$`, w.patchYAMLAsAdmin)
 	sc.Step(`^a file "([^"]*)" with content:$`, w.writeFile)
 	sc.Step(`^the response status is (\d+)$`, w.statusIs)
 	sc.Step(`^the response body is "([^"]*)"$`, w.bodyIs)
+	sc.Step(`^the response body contains "([^"]*)"$`, w.bodyContains)
 	sc.Step(`^the JSON field "([^"]*)" equals "([^"]*)"$`, w.jsonFieldEquals)
 	sc.Step(`^the JSON field "([^"]*)" is not empty$`, w.jsonFieldNotEmpty)
 	sc.Step(`^the JSON field "([^"]*)" exists$`, w.jsonFieldExists)
@@ -169,6 +171,15 @@ func (w *world) sendAsAdmin(method, path string, body *godog.DocString) error {
 	})
 }
 
+// patchYAMLAsAdmin sends a configuration descriptor, which is YAML, not
+// JSON.
+func (w *world) patchYAMLAsAdmin(path string, body *godog.DocString) error {
+	return w.send(http.MethodPatch, path, body.Content, func(r *http.Request) {
+		r.SetBasicAuth("admin", testAdminPassword)
+		r.Header.Set("Content-Type", "application/yaml")
+	})
+}
+
 func (w *world) deleteAsAdmin(path string) error {
 	return w.send(http.MethodDelete, path, "", func(r *http.Request) {
 		r.SetBasicAuth("admin", testAdminPassword)
@@ -234,6 +245,13 @@ func (w *world) statusIsNot(unwanted int) error {
 func (w *world) headerContains(name, want string) error {
 	if got := w.header.Get(name); !strings.Contains(got, want) {
 		return fmt.Errorf("header %s is %q, want it to contain %q", name, got, want)
+	}
+	return nil
+}
+
+func (w *world) bodyContains(want string) error {
+	if !strings.Contains(string(w.body), want) {
+		return fmt.Errorf("body %q does not contain %q", w.body, want)
 	}
 	return nil
 }

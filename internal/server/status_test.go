@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"slices"
 	"strings"
@@ -37,7 +38,7 @@ type statusCase struct {
 func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); return m }
 
 func statusTable() []statusCase {
-	return slices.Concat(systemStatusRows(), repositoryStatusRows())
+	return slices.Concat(systemStatusRows(), repositoryStatusRows(), descriptorStatusRows())
 }
 
 func systemStatusRows() []statusCase {
@@ -240,10 +241,33 @@ func TestStatusTable(t *testing.T) {
 	}
 }
 
+// implementedHandwritten lists the hand-written routes with real handlers;
+// the guard below holds them to the same rule as the generated ones.
+var implementedHandwritten = map[string]bool{
+	"PATCH /artifactory/api/system/configuration": true,
+}
+
+func descriptorStatusRows() []statusCase {
+	const patch = "PATCH /artifactory/api/system/configuration"
+	const path = "/artifactory/api/system/configuration"
+	return []statusCase{
+		{patch, path, "admin", "localRepositories:\n  patch-local:\n    type: generic\n", 200},
+		{patch, path, "admin", "localRepositories:\n  patch-bad:\n    nonsense: 1\n", 400},
+		{patch, path, "", "localRepositories: {}", 401},
+		{patch, path, "anonymous", "localRepositories: {}", 401},
+		{patch, path, "user", "localRepositories: {}", 403},
+	}
+}
+
 func TestStatusTableCoversImplemented(t *testing.T) {
 	covered := map[string]bool{}
 	for _, c := range statusTable() {
 		covered[c.route] = true
+	}
+	for route := range maps.Keys(implementedHandwritten) {
+		if !covered[route] {
+			t.Errorf("%s is implemented but has no row in the status-code table", route)
+		}
 	}
 	for route := range implemented {
 		if !covered[route] {

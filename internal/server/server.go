@@ -84,6 +84,8 @@ func New(cfg Config) http.Handler {
 	r.Post("/jfconnect/api/v1/backoffice/metrics/log", sinkHandler)
 	r.Get("/access/api/v1/system/ping", pingHandler)
 	r.Get("/router/api/v1/system/health", routerHealth)
+	r.With(bodyLimit(managementBodyLimit)).
+		Patch("/artifactory/api/system/configuration", artSvc.patchConfiguration)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service
