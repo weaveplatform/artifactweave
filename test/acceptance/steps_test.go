@@ -262,7 +262,9 @@ func (w *world) outputContains(want string) error {
 }
 
 // answers reads the server's JSON access log for the statuses it gave a
-// method and path.
+// method and path. Matrix parameters are ignored: on CI the JFrog CLI appends
+// vcs.* build properties (";vcs.branch=...") to every upload URL, which a
+// scenario cannot know in advance.
 func (w *world) answers(method, path string) []int {
 	var out []int
 	for _, line := range strings.Split(w.stderr.String(), "\n") {
@@ -270,8 +272,11 @@ func (w *world) answers(method, path string) []int {
 			Msg, Method, Path string
 			Status            int
 		}
-		if json.Unmarshal([]byte(line), &rec) == nil && rec.Msg == "request" &&
-			rec.Method == method && rec.Path == path {
+		if json.Unmarshal([]byte(line), &rec) != nil || rec.Msg != "request" ||
+			rec.Method != method {
+			continue
+		}
+		if logged, _, _ := strings.Cut(rec.Path, ";"); logged == path {
 			out = append(out, rec.Status)
 		}
 	}
