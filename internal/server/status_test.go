@@ -44,6 +44,7 @@ func statusTable() []statusCase {
 		repositoryStatusRows(),
 		descriptorStatusRows(),
 		itemStatusRows(),
+		storageStatusRows(),
 	)
 }
 
@@ -314,12 +315,16 @@ func TestStatusTable(t *testing.T) {
 // implementedHandwritten lists the hand-written routes with real handlers;
 // the guard below holds them to the same rule as the generated ones.
 var implementedHandwritten = map[string]bool{
-	"PATCH /artifactory/api/system/configuration": true,
-	"PUT /artifactory/{repoKey}/{filePath}":       true,
-	"GET /artifactory/{repoKey}/{filePath}":       true,
-	"HEAD /artifactory/{repoKey}/{filePath}":      true,
-	"DELETE /artifactory/{repoKey}/{filePath}":    true,
-	"POST /artifactory/api/search/aql":            true,
+	"PATCH /artifactory/api/system/configuration":          true,
+	"PUT /artifactory/{repoKey}/{filePath}":                true,
+	"GET /artifactory/{repoKey}/{filePath}":                true,
+	"HEAD /artifactory/{repoKey}/{filePath}":               true,
+	"DELETE /artifactory/{repoKey}/{filePath}":             true,
+	"POST /artifactory/api/search/aql":                     true,
+	"GET /artifactory/api/storage/{repoKey}/{itemPath}":    true,
+	"PUT /artifactory/api/storage/{repoKey}/{itemPath}":    true,
+	"DELETE /artifactory/api/storage/{repoKey}/{itemPath}": true,
+	"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}": true,
 }
 
 func descriptorStatusRows() []statusCase {
@@ -348,5 +353,59 @@ func TestStatusTableCoversImplemented(t *testing.T) {
 		if !covered[route] {
 			t.Errorf("%s is implemented but has no row in the status-code table", route)
 		}
+	}
+}
+
+func storageStatusRows() []statusCase {
+	const (
+		get   = "GET /artifactory/api/storage/{repoKey}/{itemPath}"
+		put   = "PUT /artifactory/api/storage/{repoKey}/{itemPath}"
+		del   = "DELETE /artifactory/api/storage/{repoKey}/{itemPath}"
+		patch = "PATCH /artifactory/api/metadata/{repoKey}/{itemPath}"
+		file  = "/artifactory/api/storage/libs-local/fixture/get.txt"
+		meta  = "/artifactory/api/metadata/libs-local/fixture/get.txt"
+	)
+	return []statusCase{
+		{get, file, "admin", "", 200},
+		{get, "/artifactory/api/storage/libs-local", "admin", "", 200},
+		{get, "/artifactory/api/storage/libs-local/fixture?list&deep=1", "admin", "", 200},
+		{get, file + "?stats", "admin", "", 200},
+		{get, file + "?lastModified", "admin", "", 200},
+		{get, file + "?permissions", "admin", "", 200},
+		{get, file + "?properties", "admin", "", 404},
+		{get, file + "?properties&stats", "admin", "", 400},
+		{get, file + "?deep=1", "admin", "", 400},
+		{get, file + "?list", "admin", "", 400},
+		{get, "/artifactory/api/storage/libs-local/absent", "admin", "", 404},
+		{get, "/artifactory/api/storage/missing/x", "admin", "", 404},
+		{get, file, "user", "", 403},
+		{get, file, "anonymous", "", 401},
+		{get, file, "", "", 401},
+
+		{put, file + "?properties=a=1;b=2,3", "admin", "", 204},
+		{get, file + "?properties", "admin", "", 200},
+		{put, file + "?properties=k", "admin", "", 400},
+		{put, "/artifactory/api/storage/virt/x?properties=k=v", "admin", "", 400},
+		{put, "/artifactory/api/storage/remote-private/x?properties=k=v", "admin", "", 400},
+		{put, "/artifactory/api/storage/libs-local/absent?properties=k=v", "admin", "", 404},
+		{put, file + "?properties=k=v", "user", "", 403},
+		{put, file + "?properties=k=v", "anonymous", "", 401},
+		{put, file + "?properties=k=v", "", "", 401},
+
+		{del, file + "?properties=a", "admin", "", 204},
+		{del, file, "admin", "", 400},
+		{del, "/artifactory/api/storage/virt/x?properties=k", "admin", "", 400},
+		{del, "/artifactory/api/storage/libs-local/absent?properties=k", "admin", "", 404},
+		{del, file + "?properties=k", "user", "", 403},
+		{del, file + "?properties=k", "anonymous", "", 401},
+		{del, file + "?properties=k", "", "", 401},
+
+		{patch, meta, "admin", `{"props":{"c":"x","b":null}}`, 204},
+		{patch, meta, "admin", `{"props":{}}`, 400},
+		{patch, "/artifactory/api/metadata/virt/x", "admin", `{"props":{"k":"v"}}`, 400},
+		{patch, "/artifactory/api/metadata/libs-local/absent", "admin", `{"props":{"k":"v"}}`, 404},
+		{patch, meta, "user", `{"props":{"k":"v"}}`, 403},
+		{patch, meta, "anonymous", `{"props":{"k":"v"}}`, 401},
+		{patch, meta, "", `{"props":{"k":"v"}}`, 401},
 	}
 }

@@ -60,7 +60,12 @@ type itemRequest struct {
 // and the matrix parameters (";key=value" after any segment). It works on
 // the escaped path, so an encoded ";" or "/" in a name stays part of it.
 func parseItemPath(r *http.Request) (itemRequest, error) {
-	escaped := strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/")
+	return parseEscapedItemPath(strings.TrimPrefix(r.URL.EscapedPath(), "/artifactory/"))
+}
+
+// parseEscapedItemPath parses an escaped "{repoKey}/{path}", as found after
+// a route's prefix.
+func parseEscapedItemPath(escaped string) (itemRequest, error) {
 	req := itemRequest{
 		folder: strings.HasSuffix(escaped, "/"), props: types.Properties{},
 		mandatory: map[string]bool{},
