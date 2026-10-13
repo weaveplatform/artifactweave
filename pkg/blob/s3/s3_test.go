@@ -79,7 +79,7 @@ func TestNewValidates(t *testing.T) {
 		t.Errorf("nil client: %v", err)
 	}
 	s, err := New(newFake(), Options{Bucket: "b", Prefix: "/a/b", Sessions: states})
-	if err != nil || s.prefix != "a/b/" || s.partSize != DefaultPartSize {
+	if err != nil || s.prefix != "a/b/" || s.PartSize() != DefaultPartSize {
 		t.Fatalf("defaults: %+v %v", s, err)
 	}
 }

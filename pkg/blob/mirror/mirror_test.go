@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -587,6 +588,89 @@ func TestNewValidates(t *testing.T) {
 	})
 	if err != nil || s.redundancy != 3 || s.quorum != 2 || s.chunk != DefaultChunkSize {
 		t.Fatalf("defaults: %+v %v", s, err)
+	}
+}
+
+func TestChunkSize(t *testing.T) {
+	const mib = 1 << 20
+	sized := func(parts ...int64) []Member {
+		ms := []Member{{Name: "unsized", Store: newFake()}}
+		for i, p := range parts {
+			ms = append(ms, Member{Name: fmt.Sprintf("m%d", i), Store: parted{newFake(), p}})
+		}
+		return ms
+	}
+	for name, tc := range map[string]struct {
+		explicit int64
+		members  []Member
+		want     int64
+	}{
+		"unsized members":    {members: sized(), want: DefaultChunkSize},
+		"backend defaults":   {members: sized(8*mib, 8*mib, 16*mib), want: 16 * mib},
+		"small parts":        {members: sized(256<<10, mib), want: DefaultChunkSize},
+		"rounded up":         {members: sized(3 * mib), want: 9 * mib},
+		"no common divisor":  {members: sized(5*mib, 16*mib), want: 80 * mib},
+		"zero part ignored":  {members: sized(0), want: DefaultChunkSize},
+		"explicit multiple":  {explicit: 32 * mib, members: sized(8*mib, 16*mib), want: 32 * mib},
+		"explicit unchecked": {explicit: 1000, members: sized(), want: 1000},
+	} {
+		if got, err := chunkSize(tc.explicit, tc.members); err != nil || got != tc.want {
+			t.Errorf("%s: chunk %d, %v; want %d", name, got, err, tc.want)
+		}
+	}
+	for name, tc := range map[string]struct {
+		explicit int64
+		members  []Member
+	}{
+		"negative":                {explicit: -1, members: sized()},
+		"explicit not a multiple": {explicit: 24 * mib, members: sized(8*mib, 16*mib)},
+		"common multiple too big": {members: sized(5*mib, 7*mib, 11*mib)},
+		"one part too big":        {members: sized(MaxDerivedChunkSize + 1)},
+	} {
+		if got, err := chunkSize(tc.explicit, tc.members); !errors.Is(err, ErrConfig) {
+			t.Errorf("%s: chunk %d, %v; want ErrConfig", name, got, err)
+		}
+	}
+}
+
+// TestAppendsAlignWithPartSizes checks what the derived chunk is for: every
+// member receives appends that are whole parts, save the last, so no member
+// session is left holding a partial part between chunks.
+func TestAppendsAlignWithPartSizes(t *testing.T) {
+	const mib = 1 << 20
+	parts := []int64{3 * mib, mib}
+	var ms []Member
+	var stores []*fake
+	for i, p := range parts {
+		f := newFake()
+		stores = append(stores, f)
+		ms = append(
+			ms,
+			Member{Name: fmt.Sprintf("m%d", i), Store: parted{f, p}, WriteEnabled: true},
+		)
+	}
+	s, _ := newMirror(t, ms, func(o *Options) { o.ChunkSize = 0 })
+	if s.chunk != 9*mib {
+		t.Fatalf("chunk %d, want 9 MiB: the default 8 MiB is not a multiple of 3 MiB", s.chunk)
+	}
+	put(t, s, blobtest.Content(39, 2*int(s.chunk)+123))
+	for i, f := range stores {
+		f.mu.Lock()
+		got := slices.Clone(f.appends)
+		f.mu.Unlock()
+		if len(got) != 3 || got[2] != 123 {
+			t.Fatalf("m%d appends %v, want two chunks and a 123-byte tail", i, got)
+		}
+		for _, n := range got[:2] {
+			if int64(n)%parts[i] != 0 {
+				t.Errorf(
+					"m%d got a %d-byte append, not a multiple of its %d-byte parts",
+					i,
+					n,
+					parts[i],
+				)
+			}
+		}
 	}
 }
 

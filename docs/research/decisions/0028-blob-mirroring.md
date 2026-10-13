@@ -97,8 +97,12 @@ sharding.
   one mirror can mix them, which Artifactory cannot.
 - **No automatic deletion of copies,** to avoid the documented data loss.
 
-**Chunk-level fan-out** keeps one upload's memory bounded by the part size, and lets each
-member's session resume independently.
+**Chunk-level fan-out** keeps one upload's memory bounded by one chunk, and lets each
+member's session resume independently. The chunk is the smallest multiple of every member's
+part size that is at least 8 MiB. A chunk that left a member a partial part would keep those
+bytes pending in its session, and a durable session writes them to the database after every
+chunk. The s3 and azure defaults (8 MiB) with the gcs default (16 MiB) give a 16 MiB chunk.
+Part sizes that need a chunk above 256 MiB stop the mirror from starting (issue #39).
 
 **Alternatives considered:**
 - *All members must succeed:* the strongest guarantee, but any one outage stops all

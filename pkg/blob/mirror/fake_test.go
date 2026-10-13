@@ -27,6 +27,8 @@ type fake struct {
 	calls   map[string]int
 	fail    map[string]failure
 	delay   map[string]time.Duration
+	// appends records the length of every Append, in order.
+	appends []int
 }
 
 type failure struct {
@@ -190,6 +192,14 @@ func (f *fake) Walk(ctx context.Context, fn func(blob.Info) error) error {
 // presigner is a fake that can presign.
 type presigner struct{ *fake }
 
+// parted is a fake that writes in parts of a fixed size.
+type parted struct {
+	*fake
+	part int64
+}
+
+func (p parted) PartSize() int64 { return p.part }
+
 func (p presigner) PresignGet(ctx context.Context, sha string, _ time.Duration) (string, error) {
 	if err := p.enter(ctx, "presign"); err != nil {
 		return "", err
@@ -250,6 +260,7 @@ func (u *fakeUpload) Append(ctx context.Context, r io.Reader) (int64, error) {
 	u.f.mu.Lock()
 	defer u.f.mu.Unlock()
 	u.buf = append(u.buf, b...)
+	u.f.appends = append(u.f.appends, len(b))
 	return int64(len(b)), nil
 }
 

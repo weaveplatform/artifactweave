@@ -49,10 +49,15 @@ const (
 	// DefaultMemberTimeout is how long members still committing after the
 	// quorum may finish before their copy is left to the repair worker.
 	DefaultMemberTimeout = 30 * time.Second
-	// DefaultChunkSize bounds the buffer one upload hands to every member at
-	// once, so a mirrored upload holds one chunk in memory, not one per
-	// member.
+	// DefaultChunkSize is the smallest chunk New derives. A chunk is the
+	// buffer one upload hands to every member at once, so a mirrored upload
+	// holds one chunk in memory, not one per member.
 	DefaultChunkSize = 8 << 20
+	// MaxDerivedChunkSize caps the chunk New derives from the members' part
+	// sizes. Part sizes whose least common multiple is larger (5, 7 and 11
+	// MiB need 385 MiB) would cost that much memory per upload, and are
+	// almost certainly a mistake.
+	MaxDerivedChunkSize = 256 << 20
 	// DefaultBreakerThreshold is the consecutive failures that open a
 	// member's breaker.
 	DefaultBreakerThreshold = 5
@@ -106,7 +111,11 @@ type Options struct {
 	// MemberTimeout bounds how long members may finish after the quorum;
 	// zero means DefaultMemberTimeout.
 	MemberTimeout time.Duration
-	// ChunkSize is the fan-out buffer; zero means DefaultChunkSize.
+	// ChunkSize is the fan-out buffer. Zero derives it: the smallest
+	// multiple of every member's part size (blob.PartSizer) that is at least
+	// DefaultChunkSize, so the s3 and azure defaults (8 MiB) with the gcs
+	// default (16 MiB) give 16 MiB. An explicit size must be a multiple of
+	// every member's part size.
 	ChunkSize int64
 	// Sessions keeps the mirror's own upload sessions (the member upload
 	// IDs). Members keep their own sessions.
@@ -247,7 +256,7 @@ func New(o Options) (*Store, error) {
 		byName: map[string]*member{}, inflight: map[string]*flight{},
 		redundancy: o.Redundancy, quorum: o.WriteQuorum,
 		zone: o.Zone, memberTimeout: cmp.Or(o.MemberTimeout, DefaultMemberTimeout),
-		chunk: cmp.Or(o.ChunkSize, DefaultChunkSize), sessions: o.Sessions, replicas: o.Replicas,
+		sessions: o.Sessions, replicas: o.Replicas,
 		threshold: cmp.Or(o.BreakerThreshold, DefaultBreakerThreshold),
 		cooldown:  cmp.Or(o.BreakerCooldown, DefaultBreakerCooldown),
 		now:       o.Now,
@@ -283,6 +292,10 @@ func New(o Options) (*Store, error) {
 			writable++
 		}
 	}
+	var err error
+	if s.chunk, err = chunkSize(o.ChunkSize, o.Members); err != nil {
+		return nil, err
+	}
 	if s.redundancy == 0 {
 		s.redundancy = len(s.members)
 	}
@@ -301,9 +314,9 @@ func New(o Options) (*Store, error) {
 			ErrConfig, writable, s.quorum)
 	case s.sessions == nil || s.replicas == nil:
 		return nil, fmt.Errorf("%w: session store and replica index are required", ErrConfig)
-	case s.chunk < 1 || s.memberTimeout < 0 || s.threshold < 1 || s.cooldown < 0:
+	case s.memberTimeout < 0 || s.threshold < 1 || s.cooldown < 0:
 		return nil, fmt.Errorf(
-			"%w: chunk size, timeouts and breaker settings must be positive",
+			"%w: timeouts and breaker settings must be positive",
 			ErrConfig,
 		)
 	case s.repair.batch < 1 || s.repair.maxAttempts < 1 || s.repair.backoff < 0:
@@ -315,6 +328,56 @@ func New(o Options) (*Store, error) {
 	}
 	s.repair.holder = "mirror-repair-" + holder
 	return s, nil
+}
+
+// chunkSize returns the fan-out chunk for explicit (zero to derive it) over
+// members. A chunk that is not a multiple of a member's part size leaves a
+// partial part pending in that member's session after every chunk, and a
+// durable session writes those pending bytes to the database each time.
+func chunkSize(explicit int64, members []Member) (int64, error) {
+	if explicit < 0 {
+		return 0, fmt.Errorf("%w: chunk size %d must be positive", ErrConfig, explicit)
+	}
+	common := int64(1)
+	for _, m := range members {
+		ps, ok := m.Store.(blob.PartSizer)
+		if !ok || ps.PartSize() < 1 {
+			continue
+		}
+		part := ps.PartSize()
+		if explicit > 0 {
+			if explicit%part != 0 {
+				return 0, fmt.Errorf(
+					"%w: chunk size %d is not a multiple of member %q's part size %d",
+					ErrConfig,
+					explicit,
+					m.Name,
+					part,
+				)
+			}
+			continue
+		}
+		// common/g*part is the least common multiple; dividing first keeps
+		// the comparison from overflowing.
+		g := gcd(common, part)
+		if common/g > MaxDerivedChunkSize/part {
+			return 0, fmt.Errorf("%w: the members' part sizes need a chunk above %d bytes;"+
+				" give them part sizes that divide one another, or set the chunk size",
+				ErrConfig, MaxDerivedChunkSize)
+		}
+		common = common / g * part
+	}
+	if explicit > 0 {
+		return explicit, nil
+	}
+	return (DefaultChunkSize + common - 1) / common * common, nil
+}
+
+func gcd(a, b int64) int64 {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
 }
 
 // health is a member's breaker and observed latency. The breaker opens after
