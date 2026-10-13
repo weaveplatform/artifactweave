@@ -65,6 +65,10 @@ vuln:
 	$(GO) tool govulncheck ./...
 
 ## build: cross-compile every cmd/* binary for each release platform into bin/ (CGO disabled)
+# disable_grpc_modules drops the Cloud Storage SDK's gRPC direct-path
+# imports, which the HTTP client the gcs backend uses never needs; a client
+# links 29 MB instead of 47 MB (decision 0027).
+BUILD_TAGS := disable_grpc_modules
 build:
 	@mkdir -p $(BIN_DIR)
 	@for d in $$(find cmd -mindepth 1 -maxdepth 1 -type d); do \
@@ -72,7 +76,7 @@ build:
 		for p in $(PLATFORMS); do \
 			os=$${p%/*}; arch=$${p#*/}; ext=; [ $$os = windows ] && ext=.exe; \
 			echo "$$name $$os/$$arch"; \
-			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -ldflags "$(LDFLAGS)" \
+			CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch $(GO) build -trimpath -tags $(BUILD_TAGS) -ldflags "$(LDFLAGS)" \
 				-o $(BIN_DIR)/$$name-$$os-$$arch$$ext ./$$d || exit 1; \
 		done; \
 	done
