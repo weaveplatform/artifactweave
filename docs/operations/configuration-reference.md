@@ -23,9 +23,18 @@ artifactweave has three configuration layers (decision
 | `compat.artifactory_version` | | `ARTIFACTWEAVE_COMPAT_ARTIFACTORY_VERSION` | `7.155.0` | Version string reported to clients (decision 0005) |
 | `database.driver` | | | `sqlite` | `sqlite` or `postgres` |
 | `database.dsn` | | `ARTIFACTWEAVE_DATABASE_DSN` | `<data_dir>/artifactweave.db` | SQLite file path (an optional `file:` prefix is ignored) or PostgreSQL connection URL |
-| `blob.backend` | | | `fs` | `fs` or `s3` |
-| `blob.fs.root` | | | `./data/blobs` | Local blob directory |
-| `blob.s3.*` | | `AWS_*` | | Bucket, prefix, endpoint, region, path style |
+| `blob.backend` | | `ARTIFACTWEAVE_BLOB_BACKEND` | `fs` | `fs`, `s3`, `gcs` or `azure` (decision [0027](../research/decisions/0027-cloud-blob-backends.md)) |
+| `blob.fs.root` | | `ARTIFACTWEAVE_BLOB_FS_ROOT` | `./data/blobs` | Local blob directory |
+| `blob.s3.bucket`, `prefix`, `endpoint`, `region`, `path_style` | | `ARTIFACTWEAVE_BLOB_S3_*`; credentials `AWS_*` | | S3-compatible store; `bucket` required |
+| `blob.gcs.bucket`, `prefix`, `endpoint` | | `ARTIFACTWEAVE_BLOB_GCS_*` | | Google Cloud Storage; `bucket` required; `endpoint` only for emulators |
+| `blob.gcs.credentials_file` | | `ARTIFACTWEAVE_BLOB_GCS_CREDENTIALS_FILE` | Application Default Credentials | Service-account key file; empty uses ADC, which covers GKE Workload Identity |
+| `blob.gcs.google_access_id` | | | from the credentials | Service account that signs download URLs when the credentials do not name one |
+| `blob.gcs.part_size` | | | `16MiB` | Upload part size; a multiple of `256KiB`, at least `1MiB` |
+| `blob.azure.account`, `endpoint`, `container`, `prefix` | | `ARTIFACTWEAVE_BLOB_AZURE_*` | endpoint `https://<account>.blob.core.windows.net/` | Azure Blob Storage; `container` and an account or endpoint required |
+| `blob.azure.credential` | | `ARTIFACTWEAVE_BLOB_AZURE_CREDENTIAL` | from the secrets set | `shared_key`, `sas`, `connection_string`, `default` (the Azure SDK chain), `managed_identity` or `workload_identity`; empty picks the kind of the secret that is set, else `default` |
+| `blob.azure.account_key`, `sas_token`, `connection_string` | | `ARTIFACTWEAVE_BLOB_AZURE_ACCOUNT_KEY` and so on | | Secrets: set them in the environment rather than the file; redacted from every summary |
+| `blob.azure.managed_identity_client_id` | | | | User-assigned managed identity |
+| `blob.azure.part_size`, `copy_range_size`, `concurrency` | | | `8MiB`, `100MiB`, `8` | Block size (at most `4000MiB`), the range of each server-side copy call, and how many copy calls run at once |
 | `master_key` | | `ARTIFACTWEAVE_MASTER_KEY` | required | Key for sealed columns (decision 0017): 32 bytes or more, base64 or raw, optionally prefixed with its version as `vN:` (no prefix means version 1) |
 | `master_key_previous` | | `ARTIFACTWEAVE_MASTER_KEY_PREVIOUS` | unset | The key being rotated away from, kept until `artifactweave keys rotate` has re-sealed every value (see below) |
 | `bootstrap.admin_password` | | `ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD` | | Sets the seeded `admin` password on first start |
@@ -34,7 +43,7 @@ artifactweave has three configuration layers (decision
 | `log.level`, `log.format` | | | `info`, `json` | slog settings |
 | `distribution.import_dir` | | `ARTIFACTWEAVE_DISTRIBUTION_IMPORT_DIR` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
 | `distribution.edge_role` | | | `false` | Makes the instance an edge: ordinary deploys are refused and content arrives only through distribution (decision 0023) |
-| `cold_blob.backend`, `cold_blob.fs.root`, `cold_blob.s3.*` | | `AWS_*` | unset | Cold blob tier for archive policies, same backends and keys as `blob` (an S3 storage class can be set); without it archive runs fail with a clear error (decision 0024) |
+| `cold_blob.*` | | `ARTIFACTWEAVE_COLD_BLOB_*` | unset | Cold blob tier for archive policies: the same backends and keys as `blob`; an empty `cold_blob.backend` means none is configured, and archive runs then fail with a clear error (decision 0024) |
 | `peer.outbox_retention` | | | `168h` | How long outbox entries are kept for a peer that has not acknowledged them; a peer behind the window needs a full sync (decision 0021) |
 | `workers.timeout` | | | `20s` | Overall wall-clock limit per worker execution (decision 0026) |
 | `workers.call_timeout` | | | `5s` | Wall-clock limit per call into the worker |
@@ -47,6 +56,9 @@ artifactweave has three configuration layers (decision
 | `workers.queue_timeout` | | | `30s` | How long an execution may wait for a free helper before failing |
 | `workers.host_recycle_after` | | | `1000` | Executions after which a helper is replaced |
 | `workers.http_allow_list` | | | empty | Hosts a worker's outbound HTTP client may reach; loopback and link-local are always refused (decision 0026) |
+
+Sizes (`part_size`, `copy_range_size`) are a number of bytes or a number with a binary
+suffix: `512KiB`, `16MiB`, `1GiB`.
 
 Secrets inside descriptor files may be written as `${ENV_NAME}` references.
 
