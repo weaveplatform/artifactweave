@@ -93,6 +93,11 @@ jobs:
           version: ${{ steps.lintver.outputs.version }}
           args: --config=.golangci.yml --new=false --fix=false
 
+      # The bundled specs, generated servers, clients and 501 stubs are
+      # committed; a fragment edit without `make generate` fails here.
+      - name: Generated code is current
+        run: make verify-generate
+
   vuln:
     name: 'govulncheck'
     runs-on: ubuntu-latest
@@ -137,9 +142,104 @@ jobs:
       - name: Build every cmd/* binary for every release platform (CGO disabled)
         run: make build
 
+  # Acceptance runs the real binary with the real clients (decision 0015).
+  # It is Linux-only: the macOS runners have no Docker daemon and the Windows
+  # runners only run Windows containers, so the container-backed scenarios
+  # cannot run there. The unit matrix still covers those OSes through fakes.
+  acceptance:
+    name: 'Acceptance (Linux, real clients)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      # A pinned jf binary rather than jfrog/setup-jfrog-cli: Dependabot only
+      # maintains pins for actions already in use, and the release metadata at
+      # releases.jfrog.io publishes the sha256 we verify here.
+      - name: JFrog CLI (pinned)
+        env:
+          JF_VERSION: '2.126.0'
+          JF_SHA256: 'fd2725b3a501df99b2c4fa577044d1c8efb7d8a23d6c40b1fe19231eed51929a'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/jf" \
+            "https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/${JF_VERSION}/jfrog-cli-linux-amd64/jf"
+          echo "${JF_SHA256}  $RUNNER_TEMP/jf" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/jf"
+          echo "ARTIFACTWEAVE_JF_BIN=$RUNNER_TEMP/jf" >> "$GITHUB_ENV"
+
+      - name: Acceptance features (coverage-instrumented binary)
+        run: make accept
+
+      - name: Upload acceptance coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-accept
+          path: cover/accept
+          include-hidden-files: true
+          retention-days: 7
+
+  # Parity against JFrog's published OpenAPI definitions (decision 0001).
+  # The definitions are proprietary, so they are cached per run under the
+  # gitignored .specoracle directory and never committed; the committed
+  # artefact is api/parity-baseline.json, which names only paths, fields and
+  # status codes. It is a required check from P1 on: the baseline lists only
+  # out-of-scope products, so any new gap or divergence in the authored specs
+  # fails the gate. docs.jfrog.com is contacted only on a cache miss (a change
+  # to tools/specoracle/main.go or a bumped key); if that fetch fails, rerun
+  # the job rather than removing it from the gate.
+  parity:
+    name: 'Spec parity (JFrog oracle)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      # The cache key changes with the index list in tools/specoracle, so a
+      # new API family triggers a fresh crawl. Bump the trailing version to
+      # force a re-crawl when JFrog's documentation changes.
+      - name: Oracle cache
+        id: oracle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .specoracle
+          key: specoracle-${{ hashFiles('tools/specoracle/main.go') }}-v1
+
+      - name: Fetch JFrog definitions (cache miss only)
+        if: steps.oracle.outputs.cache-hit != 'true'
+        run: make oracle-fetch
+
+      - name: Spec parity against the baseline
+        run: go test ./api/ -run TestSpecParity -v
+
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
-    needs: [unit]
+    # The download pattern cover-* picks up the unit directories from every OS
+    # and the acceptance directory, so one merge enforces the gate over all.
+    needs: [unit, acceptance]
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -169,7 +269,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [unit, lint, vuln, build, coverage]
+    needs: [unit, lint, vuln, build, acceptance, coverage, parity]
     runs-on: ubuntu-latest
     steps:
       - name: Every gate job passed

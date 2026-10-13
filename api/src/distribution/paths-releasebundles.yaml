@@ -1,0 +1,736 @@
+paths:
+  /api/release/import:
+    post:
+      description: Imports an archive produced by the export operation, typically on an air-gapped instance. The
+        archive must already be in the instance's release bundle import directory. The signature is verified against
+        this instance's trusted keys (so the signing key's public part must have been propagated or added first),
+        every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names,
+        and the version is recorded. With `dry_run` all checks run and nothing is written. JFrog documents this
+        path under the Distribution prefix although Artifactory serves it; artifactweave serves it here.
+      operationId: importReleaseBundleV1Version
+      parameters:
+      - description: Required query parameter. Name of the exported zip, which must already be in the instance's
+          release bundle import directory.
+        in: query
+        name: file_name
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. When true every check runs and nothing is imported. Defaults to false.
+        in: query
+        name: dry_run
+        required: false
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Summary of the import.
+                properties:
+                  message:
+                    description: Optional within this object. What was imported, or validated in a dry run.
+                    type: string
+                type: object
+          description: Imported, or validated in a dry run.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The file is missing or unreadable, the signature does not verify, or a checksum does not
+            match.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Importing needs an administrator.
+      summary: Import an exported release bundle v1 archive
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/importreleasebundlev1version.md
+  /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}:
+    delete:
+      description: Deletes the exported zip of the version from the export directory. The version itself is untouched.
+      operationId: deleteExportedReleaseBundleV1File
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      responses:
+        '200':
+          description: Deleted, or there was no archive to delete.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Delete an exported release bundle archive
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteexportedreleasebundlev1file.md
+    post:
+      description: Starts an asynchronous export of a signed version to one zip archive holding the signed manifest,
+        its signature and every artifact, for carrying to an instance with no network path to this one. Poll the
+        status operation; the archive is written to the instance's export directory.
+      operationId: exportReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
+          when the key has one; never logged or stored.
+        in: header
+        name: X-GPG-PASSPHRASE
+        schema:
+          type: string
+        x-secret: true
+      responses:
+        '202':
+          description: Export started.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The version is not signed, or an export of it is already running.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Export a release bundle v1 version for air-gapped transfer
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/exportreleasebundlev1version.md
+  /api/v1/export/release_bundle/{release_bundle_name}/{release_bundle_version}/status:
+    get:
+      description: Reports how far the export of a version has got.
+      operationId: getExportedReleaseBundleV1Status
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Export state.
+                properties:
+                  status:
+                    description: Optional within this object. NOT_EXPORTED, IN_PROGRESS, COMPLETED or FAILED.
+                    enum:
+                    - IN_PROGRESS
+                    - NOT_EXPORTED
+                    - FAILED
+                    - COMPLETED
+                    type: string
+                type: object
+          description: The current export state.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Get the export status of a release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getexportedreleasebundlev1status.md
+  /api/v1/release_bundle:
+    get:
+      description: Lists the release bundle v1 versions on this instance, one entry per version, newest first. Use
+        `start_pos` to page.
+      operationId: getAllBundles
+      parameters:
+      - description: Optional query parameter. Zero-based offset into the list, for paging. Defaults to 0.
+        in: query
+        name: start_pos
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Release bundle versions.
+                items:
+                  description: One version.
+                  properties:
+                    name:
+                      description: Optional within this object. Name of the bundle.
+                      type: string
+                    status:
+                      description: Optional within this object. State of the version.
+                      type: string
+                    version:
+                      description: Optional within this object. Version within the name.
+                      type: string
+                  type: object
+                type: array
+          description: One entry per version.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List release bundle v1 versions
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundles-1.md
+    post:
+      description: 'Creates a release bundle version: an immutable manifest of the artifacts selected by the spec''s
+        AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds.
+        When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with
+        the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version
+        is returned without storing anything. A name and version pair is unique; creating an existing pair answers
+        400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision
+        0023), and the artifacts stay in their repositories.'
+      operationId: createReleaseBundleV1Version
+      parameters:
+      - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
+          when the key has one; never logged or stored.
+        in: header
+        name: X-GPG-PASSPHRASE
+        schema:
+          type: string
+        x-secret: true
+      - $ref: '#/components/parameters/projectQuery'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseBundleCreation'
+        description: The bundle to create.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleV1Version'
+          description: 'Dry run only: the version that would be created; nothing is stored.'
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleV1Version'
+          description: The version was created (and signed when sign_immediately was true).
+          headers:
+            X-Checksum-Sha256:
+              description: SHA-256 of the signed manifest, present when the version was signed by this call.
+              schema:
+                type: string
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is invalid, or a query is invalid or selects nothing.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A version with this name and version already exists.
+      summary: Create a release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createreleasebundlev1version.md
+  /api/v1/release_bundle/distribution:
+    get:
+      description: Lists the distribution trackers of every release bundle v1 version, newest first.
+      operationId: getDistributionStatusDetails
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DistributionStatus'
+                type: array
+          description: One entry per tracker.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List distribution statuses
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetails.md
+  /api/v1/release_bundle/{release_bundle_name}:
+    delete:
+      description: Deletes every version of the named release bundle from this instance, with the same rules as
+        deleting one version.
+      operationId: deleteAllReleaseBundleV1Versions
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - description: Optional query parameter. Accepted for compatibility with JFrog, where true archives the version
+          instead of deleting it. artifactweave deletes the version either way.
+        in: query
+        name: archive
+        schema:
+          type: boolean
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Delete every version of a release bundle
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteallreleasebundlev1versions.md
+    get:
+      description: Lists every version of the named release bundle, newest first.
+      operationId: getReleaseBundleV1VersionsByName
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - description: Optional query parameter. Zero-based offset into the list, for paging. Defaults to 0.
+        in: query
+        name: start_pos
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Versions of one bundle.
+                items:
+                  description: One version.
+                  properties:
+                    created:
+                      description: Optional within this object. When the version was created, RFC 3339.
+                      format: date-time
+                      type: string
+                    status:
+                      description: Optional within this object. State of the version.
+                      type: string
+                    version:
+                      description: Optional within this object. The version.
+                      type: string
+                  type: object
+                type: array
+          description: One entry per version.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No release bundle has that name.
+      summary: List the versions of one release bundle
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsbyname.md
+  /api/v1/release_bundle/{release_bundle_name}/LATEST:
+    get:
+      description: Returns the newest version of the named release bundle by creation time. A version literally
+        named `LATEST` cannot be read through the version path for the same reason.
+      operationId: getLatestReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleV1Version'
+          description: The newest version.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No release bundle has that name.
+      summary: Get the latest version of a release bundle
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getlatestreleasebundlev1version.md
+  /api/v1/release_bundle/{release_bundle_name}/distribution:
+    get:
+      description: Lists the distribution trackers of every version of the named release bundle, newest first.
+      operationId: getDistributionStatusDetailsByReleaseBundleV1Name
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DistributionStatus'
+                type: array
+          description: One entry per tracker.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List distribution statuses of a release bundle
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1name.md
+  /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}:
+    delete:
+      description: Deletes one version from this instance. The artifacts are not deleted; they stay in their repositories
+        under their own retention. Copies already on edges are untouched; remove those with the edge delete operation
+        first.
+      operationId: deleteReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - description: Optional query parameter. Accepted for compatibility with JFrog, where true archives the version
+          instead of deleting it. artifactweave deletes the version either way.
+        in: query
+        name: archive
+        schema:
+          type: boolean
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Delete a release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1version.md
+    get:
+      description: Returns a version's details and artifact list. With `format=jws` or `format=jose` the signed
+        manifest is returned instead, as the compact JWS string or the JOSE JSON serialisation, which is what edges
+        verify; those formats need a signed version.
+      operationId: getReleaseBundleV1VersionDetails
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - description: Optional query parameter. json (the default) returns the version details; jws returns the signed
+          manifest in JWS JSON serialization (header, payload, signature); jose returns it as a compact JWS string.
+        in: query
+        name: format
+        schema:
+          default: json
+          description: Response form.
+          enum:
+          - json
+          - jws
+          - jose
+          type: string
+      responses:
+        '200':
+          content:
+            application/jose:
+              schema:
+                description: The signed manifest as a compact JWS string (header.payload.signature).
+                type: string
+            application/jose+json:
+              schema:
+                description: The signed manifest in JWS JSON serialization.
+                properties:
+                  header:
+                    description: Required within this object. Base64url protected header.
+                    type: string
+                  payload:
+                    description: Required within this object. Base64url manifest.
+                    type: string
+                  signature:
+                    description: Required within this object. Base64url signature.
+                    type: string
+                required:
+                - header
+                - payload
+                - signature
+                type: object
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleV1Version'
+          description: The version, or the signed manifest when a format was requested.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No such version, or a signed form was requested for an OPEN version.
+      summary: Get a release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versiondetails.md
+    head:
+      description: Answers with the sha256 of the version's signed manifest in the X-Checksum-Sha256 header and
+        no body. Edges and clients use it to compare versions without downloading them.
+      operationId: getReleaseBundleV1VersionSha256
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      responses:
+        '200':
+          description: The checksum is in the X-Checksum-Sha256 header.
+          headers:
+            X-Checksum-Sha256:
+              description: sha256 of the signed manifest.
+              schema:
+                type: string
+        '401':
+          description: Credentials were missing or rejected.
+        '404':
+          description: No such version, or it is not signed yet.
+      summary: Get the checksum of a release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev1versionsha256.md
+    put:
+      description: Replaces the content of a version that has not been signed. The body has the same shape as for
+        creation, and its name and version must match the path. Signed versions are immutable and answer 400.
+      operationId: updateReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
+          when the key has one; never logged or stored.
+        in: header
+        name: X-GPG-PASSPHRASE
+        schema:
+          type: string
+        x-secret: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseBundleUpdate'
+        description: The new content of the version.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleV1Version'
+          description: The updated version.
+          headers:
+            X-Checksum-Sha256:
+              description: SHA-256 of the signed manifest, present when the version was signed by this call.
+              schema:
+                type: string
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is invalid, or the version is already signed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Update an unsigned release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev1version.md
+  /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution:
+    get:
+      description: Lists the distribution trackers of one release bundle version, newest first.
+      operationId: getDistributionStatusDetailsByReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DistributionStatus'
+                type: array
+          description: One entry per tracker.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List distribution statuses of a version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1version.md
+  /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/distribution/{distribution_tracker}:
+    get:
+      description: Returns one tracker with the status of the transfer to each of its edges.
+      operationId: getDistributionStatusDetailsByReleaseBundleV1TrackerId
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/distributionTrackerPath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionProgress'
+          description: The tracker and its per-edge progress.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Get a distribution tracker
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbyreleasebundlev1trackerid.md
+  /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/sign:
+    post:
+      description: Signs an OPEN version with the default GPG key, or with the key whose passphrase is sent in X-GPG-PASSPHRASE,
+        producing a JWS over the manifest, and records the manifest in the storing repository. A version must be
+        signed before it can be distributed or exported and is immutable afterwards. Signing an already signed version
+        is rejected with 400.
+      operationId: signReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
+          when the key has one; never logged or stored.
+        in: header
+        name: X-GPG-PASSPHRASE
+        schema:
+          type: string
+        x-secret: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Where to record the signed manifest.
+              properties:
+                storing_repository:
+                  description: Optional within this object. Release bundles repository that records the manifest;
+                    null or omitted means the instance default.
+                  nullable: true
+                  type: string
+              type: object
+        description: Optional storing repository.
+        required: false
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseBundleV1Version'
+          description: The signed version.
+          headers:
+            X-Checksum-Sha256:
+              description: SHA-256 of the signed manifest, present when the version was signed by this call.
+              schema:
+                type: string
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No signing key is configured, the passphrase is wrong, or the version is already signed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Sign a release bundle v1 version
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/signreleasebundlev1version.md
+  /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan:
+    post:
+      description: Asks Xray to scan the version's artifacts. artifactweave has no Xray (research 10), so this operation
+        answers 501.
+      operationId: triggerXrayScanReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Not returned by artifactweave.
+                type: object
+          description: Not returned by artifactweave; JFrog answers 200 when the scan is queued.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: Scan a release bundle v1 version with Xray
+      tags:
+      - release-bundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/triggerxrayscanreleasebundlev1version.md
+      x-tier: stub

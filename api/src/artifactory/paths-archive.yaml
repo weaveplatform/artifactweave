@@ -1,0 +1,2016 @@
+components:
+  responses:
+    ArchiveBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The request was malformed or failed validation. The body carries the Artifactory error envelope.
+    ArchiveConflict:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: A policy with this key already exists. The body carries the Artifactory error envelope.
+    ArchiveForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The caller is neither a platform administrator nor, for a project-scoped policy, an administrator
+        of that project. The body carries the Artifactory error envelope.
+    ArchiveInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The server failed while handling the request. The body carries the Artifactory error envelope.
+    ArchiveNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: No policy, run or report matches the key or id given. The body carries the Artifactory error
+        envelope.
+    ArchiveUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: Credentials were missing or rejected. The body carries the Artifactory error envelope.
+    ColdStorageBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+      description: The request was malformed or failed validation. The body carries the cold storage error body.
+    ColdStorageConflict:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+      description: A policy with this key already exists. The body carries the cold storage error body.
+    ColdStorageForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+      description: The caller is neither a platform administrator nor, for a project-scoped policy, an administrator
+        of that project. The body carries the cold storage error body.
+    ColdStorageInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+      description: The server failed while handling the request. The body carries the cold storage error body.
+    ColdStorageNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+      description: No policy, run or report matches the key or id given. The body carries the cold storage error
+        body.
+    ColdStorageUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ColdStorageErrorResponse'
+      description: Credentials were missing or rejected. The body carries the cold storage error body.
+  schemas:
+    ArchiveCriterion:
+      description: A list of values with the and/or toggle JFrog's archive form shows for each criterion.
+      properties:
+        operator:
+          description: Optional within this object. OR (the default) selects items matching any value; AND only
+            items matching all of them.
+          enum:
+          - OR
+          - AND
+          type: string
+        values:
+          description: Required within this object. Repository keys, or Ant-style patterns for the pattern criteria.
+          items:
+            description: One value or pattern.
+            type: string
+          type: array
+      required:
+      - values
+      type: object
+    ArchiveExecutionStatus:
+      description: State of one archive or restore execution.
+      properties:
+        completedNumberOfArtifacts:
+          description: Optional within this object. Artifacts handled successfully so far.
+          format: int64
+          type: integer
+        destination:
+          description: Optional within this object. For restores, where the content was written.
+          type: string
+        destinationConfiguration:
+          description: 'Optional within this object. For restores, which destination rule applied: original, central
+            or fallback.'
+          type: string
+        failedNumberOfArtifacts:
+          description: Optional within this object. Artifacts that could not be handled.
+          format: int64
+          type: integer
+        failureByteSize:
+          description: Optional within this object. Bytes that could not be handled.
+          format: int64
+          type: integer
+        finishTime:
+          description: Optional within this object. When the execution ended, in epoch milliseconds; absent while
+            running.
+          format: int64
+          type: integer
+        policyKey:
+          description: Optional within this object. Policy that ran; empty for restores.
+          type: string
+        progressPercentage:
+          description: Optional within this object. Progress from 0 to 100.
+          type: integer
+        startTime:
+          description: Optional within this object. When the execution started, in epoch milliseconds.
+          format: int64
+          type: integer
+        state:
+          description: Optional within this object. Where the execution stands.
+          enum:
+          - PENDING
+          - IN_PROGRESS
+          - IN_PROGRESS_WITH_ERRORS
+          - COMPLETE
+          - COMPLETE_WITH_ERRORS
+          - FAILED
+          type: string
+        successByteSize:
+          description: Optional within this object. Bytes handled successfully.
+          format: int64
+          type: integer
+        totalByteSize:
+          description: Optional within this object. Bytes selected.
+          format: int64
+          type: integer
+        totalNumberOfArtifacts:
+          description: Optional within this object. Artifacts selected for the execution.
+          format: int64
+          type: integer
+      type: object
+    ArchiveLastRunStatus:
+      description: Outcome of a policy's most recent run.
+      properties:
+        completedNumberOfArtifacts:
+          description: Optional within this object. Artifacts handled successfully so far.
+          format: int64
+          type: integer
+        failedNumberOfArtifacts:
+          description: Optional within this object. Artifacts that could not be handled.
+          format: int64
+          type: integer
+        failureByteSize:
+          description: Optional within this object. Bytes that could not be handled.
+          format: int64
+          type: integer
+        finishTime:
+          description: Optional within this object. When the execution ended, in epoch milliseconds; absent while
+            running.
+          format: int64
+          type: integer
+        migrationIdentifier:
+          description: Optional within this object. Identifier of the run.
+          type: string
+        policyName:
+          description: Optional within this object. Key of the policy.
+          type: string
+        progressPercentage:
+          description: Optional within this object. Progress from 0 to 100.
+          type: integer
+        startTime:
+          description: Optional within this object. When the execution started, in epoch milliseconds.
+          format: int64
+          type: integer
+        state:
+          description: Optional within this object. Where the execution stands.
+          enum:
+          - PENDING
+          - IN_PROGRESS
+          - IN_PROGRESS_WITH_ERRORS
+          - COMPLETE
+          - COMPLETE_WITH_ERRORS
+          - FAILED
+          type: string
+        successByteSize:
+          description: Optional within this object. Bytes handled successfully.
+          format: int64
+          type: integer
+        totalByteSize:
+          description: Optional within this object. Bytes selected.
+          format: int64
+          type: integer
+        totalNumberOfArtifacts:
+          description: Optional within this object. Artifacts selected for the execution.
+          format: int64
+          type: integer
+        triggeredBy:
+          description: Optional within this object. User that started the run, or the scheduler.
+          type: string
+      type: object
+    ArchivePackageSearchCriteria:
+      description: Package selection for a cold storage policy with packageRetention true.
+      properties:
+        componentName:
+          description: Optional within this object. Package name; * and ? wildcards are allowed.
+          type: string
+        createdBefore:
+          description: Optional within this object. Select versions created before this time, in epoch milliseconds.
+          format: int64
+          type: integer
+        downloadedBefore:
+          description: Optional within this object. Select versions last downloaded before this time, in epoch milliseconds.
+          format: int64
+          type: integer
+        packageRepos:
+          description: Optional within this object. Repository keys to search.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        packageType:
+          description: Optional within this object. Package type to archive, for example docker.
+          type: string
+        version:
+          description: Optional within this object. Version; * and ? wildcards are allowed.
+          type: string
+      type: object
+    ArchivePackageSearchRequest:
+      description: Which archived package versions to find.
+      properties:
+        archiveTimeFrom:
+          description: Optional within this object. Earliest archive time, in epoch milliseconds.
+          format: int64
+          type: integer
+        archiveTimeTo:
+          description: Optional within this object. Latest archive time, in epoch milliseconds.
+          format: int64
+          type: integer
+        name:
+          description: Required within this object. Package name; * and ? wildcards are allowed.
+          type: string
+        packageType:
+          description: Required within this object. Package type, for example docker.
+          type: string
+        repositories:
+          description: Required within this object. Repository keys the versions were archived from.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        version:
+          description: Optional within this object. Version; * and ? wildcards are allowed. Omit for every version.
+          type: string
+      required:
+      - packageType
+      - repositories
+      - name
+      type: object
+    ArchivePackageSearchResults:
+      description: Archived package versions matching a search.
+      properties:
+        range:
+          description: Optional within this object. Paging of the result.
+          properties:
+            end_pos:
+              description: Optional within this object. Offset after the last result.
+              type: integer
+            start_pos:
+              description: Optional within this object. Offset of the first result.
+              type: integer
+            total:
+              description: Optional within this object. Number of results returned.
+              type: integer
+          type: object
+        results:
+          description: Optional within this object. Matching versions, newest archive first.
+          items:
+            description: One archived version.
+            properties:
+              archivingTime:
+                description: Optional within this object. When it was archived, in epoch milliseconds.
+                format: int64
+                type: integer
+              manifestName:
+                description: Optional within this object. Manifest of the archived version; pass it to the package
+                  restore operation.
+                type: string
+              originalRepository:
+                description: Optional within this object. Repository the version was archived from.
+                type: string
+              packageName:
+                description: Optional within this object. Package name.
+                type: string
+              packageType:
+                description: Optional within this object. Package type.
+                type: string
+              version:
+                description: Optional within this object. Version.
+                type: string
+            type: object
+          type: array
+      type: object
+    ArchivePoliciesView:
+      description: Compact listing of smart archiving policies for display.
+      properties:
+        policies:
+          description: Optional within this object. Policies matching the filters, ordered by key.
+          items:
+            description: One policy.
+            properties:
+              enabled:
+                description: Optional within this object. Whether the policy may run.
+                type: boolean
+              itemType:
+                description: Optional within this object. What the policy acts on; always package.
+                type: string
+              lastRunData:
+                description: Optional within this object. Outcome of the most recent run, absent when the policy
+                  never ran.
+                properties:
+                  dryRun:
+                    description: Optional within this object. Whether that run was a dry run.
+                    type: boolean
+                  lastRunTime:
+                    description: Optional within this object. When that run started, in epoch milliseconds.
+                    format: int64
+                    type: integer
+                  status:
+                    description: Optional within this object. Final or current status of that run, one of the run
+                      states.
+                    type: string
+                type: object
+              nextRunTime:
+                description: Optional within this object. Next scheduled run in epoch milliseconds, absent without
+                  a schedule.
+                format: int64
+                type: integer
+              policyName:
+                description: Optional within this object. Key of the policy.
+                type: string
+            type: object
+          type: array
+      type: object
+    ArchivePolicyRequest:
+      description: A cold storage archive policy as written by create and update. In artifactweave the cold store
+        is a second blob store configured on the same instance (for example an S3 bucket with an archive storage
+        class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+      properties:
+        aqlQuery:
+          description: Optional within this object. AQL items query selecting the artifacts to archive. Use either
+            this or searchCriteriaForm; not valid with packageRetention.
+          type: string
+        cronExp:
+          description: Required within this object. Quartz cron expression for scheduled runs (decision 0010).
+          type: string
+        description:
+          description: Optional within this object. Free text shown with the policy.
+          type: string
+        durationInMinutes:
+          description: Optional within this object. Longest a run may take before it is stopped. Artifacts already
+            moved stay archived.
+          format: int64
+          type: integer
+        enabled:
+          description: Required within this object. Whether the policy may run. A disabled policy rejects triggers.
+          type: boolean
+        expirationTimeInMonths:
+          description: Optional within this object. Months after which archived content is deleted from the cold
+            tier for good. Omit to keep archived content indefinitely.
+          format: int64
+          type: integer
+        key:
+          description: Required within this object. Identifier of the policy. Must equal the policyKey path parameter.
+          type: string
+        packageRetention:
+          description: Optional within this object. When true the policy archives whole package versions selected
+            by packageSearchCriteriaForm; when false, the default, it archives individual artifacts selected by
+            aqlQuery or searchCriteriaForm.
+          type: boolean
+        packageSearchCriteriaForm:
+          allOf:
+          - $ref: '#/components/schemas/ArchivePackageSearchCriteria'
+          description: Optional within this object. Package selection; used when packageRetention is true.
+        searchCriteriaForm:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveSearchCriteriaForm'
+          description: Optional within this object. Artifact selection as a form; use either this or aqlQuery.
+        skipTrashcan:
+          description: Optional within this object. When true the hot copy is released immediately instead of passing
+            through the trash can. Defaults to false.
+          type: boolean
+      required:
+      - key
+      - enabled
+      - cronExp
+      type: object
+    ArchivePolicyResponse:
+      description: A cold storage archive policy as stored, with its run state. In artifactweave the cold store
+        is a second blob store configured on the same instance (for example an S3 bucket with an archive storage
+        class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+      properties:
+        aqlQuery:
+          description: Optional within this object. AQL items query selecting the artifacts to archive. Use either
+            this or searchCriteriaForm; not valid with packageRetention.
+          type: string
+        cronExp:
+          description: Optional within this object. Quartz cron expression for scheduled runs (decision 0010).
+          type: string
+        description:
+          description: Optional within this object. Free text shown with the policy.
+          type: string
+        durationInMinutes:
+          description: Optional within this object. Longest a run may take before it is stopped. Artifacts already
+            moved stay archived.
+          format: int64
+          type: integer
+        enabled:
+          description: Optional within this object. Whether the policy may run. A disabled policy rejects triggers.
+          type: boolean
+        expirationTimeInMonths:
+          description: Optional within this object. Months after which archived content is deleted from the cold
+            tier for good. Omit to keep archived content indefinitely.
+          format: int64
+          type: integer
+        key:
+          description: Optional within this object. Identifier of the policy. Must equal the policyKey path parameter.
+          type: string
+        lastRunStatus:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveLastRunStatus'
+          description: Optional within this object. Outcome of the most recent run; absent before the first.
+        nextExecutionTime:
+          description: Optional within this object. Next scheduled run in epoch milliseconds, derived from cronExp.
+          format: int64
+          type: integer
+        packageRetention:
+          description: Optional within this object. When true the policy archives whole package versions selected
+            by packageSearchCriteriaForm; when false, the default, it archives individual artifacts selected by
+            aqlQuery or searchCriteriaForm.
+          type: boolean
+        packageSearchCriteriaForm:
+          allOf:
+          - $ref: '#/components/schemas/ArchivePackageSearchCriteria'
+          description: Optional within this object. Package selection; used when packageRetention is true.
+        searchCriteriaForm:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveSearchCriteriaForm'
+          description: Optional within this object. Artifact selection as a form; use either this or aqlQuery.
+        skipTrashcan:
+          description: Optional within this object. When true the hot copy is released immediately instead of passing
+            through the trash can. Defaults to false.
+          type: boolean
+      type: object
+    ArchivePreview:
+      description: Estimate of what a policy would archive now.
+      properties:
+        count:
+          description: Optional within this object. Number of candidates.
+          format: int64
+          type: integer
+        totalSize:
+          description: Optional within this object. Their total size in bytes.
+          format: int64
+          type: integer
+      type: object
+    ArchivePropertyCriterion:
+      description: Property conditions with the and/or toggle.
+      properties:
+        operator:
+          description: Optional within this object. OR (the default) matches an item with any listed property; AND
+            requires all of them.
+          enum:
+          - OR
+          - AND
+          type: string
+        properties:
+          additionalProperties:
+            description: Accepted values for one property key.
+            items:
+              description: One accepted value; * matches any.
+              type: string
+            type: array
+          description: Required within this object. Map from property key to accepted values.
+          type: object
+      required:
+      - properties
+      type: object
+    ArchiveRestorePackagesRequest:
+      description: Which archived package versions to bring back and where.
+      properties:
+        fallbackDestinationPath:
+          description: Optional within this object. With restoreToOriginal, where to restore when the original repository
+            no longer exists; must start with a repository key.
+          type: string
+        manifestPaths:
+          description: Required within this object. Manifests of the archived versions to restore, as returned in
+            manifestName by the package archive search. Each manifest lists the files of one version.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        newDestinationPath:
+          description: Optional within this object. Restore under this repository path instead of the original location;
+            must start with a repository key. Required unless restoreToOriginal is true.
+          type: string
+        restoreToOriginal:
+          description: Optional within this object. When true, restore into the repository and path each version
+            came from. Required unless newDestinationPath is set.
+          type: boolean
+      required:
+      - manifestPaths
+      type: object
+    ArchiveRestoreStarted:
+      description: Answer to a package restore.
+      properties:
+        responseMessage:
+          description: Optional within this object. Human readable confirmation.
+          type: string
+        runSummaryId:
+          description: Optional within this object. Identifier of the restore run, usable with the summary report
+            operation.
+          type: integer
+      type: object
+    ArchiveRunStopRequest:
+      description: Body of the stop-run operation.
+      properties:
+        action:
+          description: Required within this object. Always stop.
+          enum:
+          - stop
+          type: string
+      required:
+      - action
+      type: object
+    ArchiveRunSummaryReport:
+      description: Summary of one smart archiving run.
+      properties:
+        executionSummary:
+          description: Optional within this object. Timing of the run.
+          properties:
+            durationMillis:
+              description: Optional within this object. Elapsed time in milliseconds.
+              type: integer
+            finishedAt:
+              description: Optional within this object. When the run ended, absent while running.
+              format: date-time
+              type: string
+            startedAt:
+              description: Optional within this object. When the run started.
+              format: date-time
+              type: string
+          type: object
+        policySummary:
+          description: Optional within this object. Which run this is.
+          properties:
+            dryRun:
+              description: Optional within this object. Whether the run only reported what it would archive.
+              type: boolean
+            policyName:
+              description: Optional within this object. Key of the policy.
+              type: string
+            runId:
+              description: Optional within this object. Identifier of the run.
+              type: integer
+            status:
+              description: Optional within this object. Final or current status of the run.
+              type: string
+            triggeredBy:
+              description: Optional within this object. User that started the run, or the scheduler.
+              type: string
+          type: object
+        processedItemsSummary:
+          description: Optional within this object. What the run processed.
+          properties:
+            failedItems:
+              description: Optional within this object. Versions that could not be archived; the report lists why.
+              type: integer
+            itemType:
+              description: Optional within this object. Always package.
+              type: string
+            processedItems:
+              description: Optional within this object. Versions archived, or in a dry run versions that would be.
+              type: integer
+            processedPhysicalSizeBytes:
+              description: Optional within this object. Bytes of distinct blobs moved to the cold tier.
+              type: integer
+            processedVirtualSizeBytes:
+              description: Optional within this object. Bytes counted per item, including blobs shared between items.
+              type: integer
+            totalItems:
+              description: Optional within this object. Package versions the policy selected.
+              type: integer
+          type: object
+        runConfiguration:
+          description: Optional within this object. The policy as it stood when the run started.
+          properties:
+            cleanupCriteria:
+              additionalProperties: true
+              description: Optional within this object. The search criteria in effect, in the shape of ArchiveSearchCriteria.
+              type: object
+            createdAt:
+              description: Optional within this object. When the policy was created.
+              format: date-time
+              type: string
+            createdBy:
+              description: Optional within this object. Who created the policy.
+              type: string
+            description:
+              description: Optional within this object. The policy description.
+              type: string
+            modifiedAt:
+              description: Optional within this object. When the policy last changed.
+              format: date-time
+              type: string
+            modifiedBy:
+              description: Optional within this object. Who last changed the policy.
+              type: string
+            schedule:
+              description: Optional within this object. Scheduling in effect.
+              properties:
+                cronExpression:
+                  description: Optional within this object. The cron expression, empty for on-demand policies.
+                  type: string
+                maxRunDurationMillis:
+                  description: Optional within this object. The duration limit in milliseconds.
+                  type: integer
+              type: object
+            skipTrashCan:
+              description: Optional within this object. The skipTrashcan setting in effect.
+              type: boolean
+            target:
+              additionalProperties: true
+              description: Optional within this object. The repositories and projects in scope, as resolved at run
+                time.
+              type: object
+          type: object
+      type: object
+    ArchiveRunTriggered:
+      description: Answer to a manual run.
+      properties:
+        triggerId:
+          description: Optional within this object. Identifier of the run; pass it to the summary report, report
+            download and stop operations.
+          type: integer
+      type: object
+    ArchiveSearchCriteria:
+      description: 'Which package versions a smart archiving policy selects. Selection runs over the package index
+        (decision 0018): a version qualifies when it matches every inclusion, no exclusion, and every age condition
+        given. The newest version of a package is never archived.'
+      properties:
+        createdBeforeInDays:
+          description: Optional within this object. Select versions created at least this many days before the run
+            starts. A day is 24 hours counted back from the run.
+          type: integer
+        excludedPackageVersions:
+          description: Optional within this object. Versions to protect, exact or with a leading or trailing wildcard.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        excludedPackages:
+          description: Optional within this object. Exact package names to leave alone. Patterns are not accepted
+            here.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        excludedProperties:
+          additionalProperties:
+            items:
+              description: One value.
+              type: string
+            type: array
+          description: Optional within this object. Property key to values that protect a version from archiving,
+            matched on the lead file.
+          type: object
+        excludedRepos:
+          description: Optional within this object. Repository keys or patterns removed from repos. Defaults to
+            none.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        includeAllProjects:
+          description: Optional within this object. Global policies only. When true the policy covers repositories
+            of every project. Defaults to false.
+          type: boolean
+        includedPackageVersions:
+          description: Optional within this object. Versions to include, exact or with a leading or trailing wildcard
+            such as 1.* or *-rc.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        includedPackages:
+          description: Required within this object. Exactly one package name or pattern to include; ** includes
+            every package.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        includedProjects:
+          description: Optional within this object. Global policies only. Project keys whose repositories are covered;
+            the key default stands for repositories assigned to no project.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        includedProperties:
+          additionalProperties:
+            items:
+              description: One value.
+              type: string
+            type: array
+          description: Optional within this object. Property key to accepted values, matched on the package's lead
+            file. A version qualifies when any listed value is present.
+          type: object
+        keepLastNVersions:
+          description: Optional within this object. Keep this many of the newest versions of each package, ordered
+            by the package type's version comparator, whatever the other conditions say.
+          type: integer
+        lastDownloadedBeforeInDays:
+          description: Optional within this object. Select versions not downloaded for at least this many days.
+            A version never downloaded counts from its creation.
+          type: integer
+        packageTypes:
+          description: Required within this object. Package types the policy covers, for example docker or npm.
+            At least one.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        repos:
+          description: Required within this object. Repository keys or wildcard patterns the policy covers. At least
+            one; ** covers every repository the caller may manage.
+          items:
+            description: One entry.
+            type: string
+          type: array
+      required:
+      - packageTypes
+      - repos
+      - includedPackages
+      type: object
+    ArchiveSearchCriteriaForm:
+      additionalProperties: true
+      description: Artifact selection for a non-package archive policy, the alternative to aqlQuery. JFrog documents
+        the form's fields (include and exclude repositories, path patterns, artifact name patterns and properties,
+        each with an and/or toggle, plus deployed-before and last-downloaded-before ages) but not their JSON names,
+        so the names below are artifactweave's and are unverified against Artifactory. Unknown keys are stored unchanged;
+        converting a form that contains one fails with 400 naming it.
+      properties:
+        deployedBeforeInDays:
+          description: Optional within this object. Only artifacts deployed at least this many days ago. Omitted
+            means no age condition.
+          minimum: 0
+          type: integer
+        excludedNamePatterns:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveCriterion'
+          description: Optional within this object. Ant patterns over the file name whose matches are never archived.
+        excludedPathPatterns:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveCriterion'
+          description: Optional within this object. Ant patterns over the path whose matches are never archived.
+        excludedProperties:
+          allOf:
+          - $ref: '#/components/schemas/ArchivePropertyCriterion'
+          description: Optional within this object. Properties that exempt an artifact from archiving.
+        excludedRepositories:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveCriterion'
+          description: Optional within this object. Repositories removed from the candidates.
+        includedNamePatterns:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveCriterion'
+          description: Optional within this object. Ant patterns over the artifact file name; only matching artifacts
+            are candidates.
+        includedPathPatterns:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveCriterion'
+          description: Optional within this object. Ant patterns over the path inside the repository; only matching
+            artifacts are candidates.
+        includedProperties:
+          allOf:
+          - $ref: '#/components/schemas/ArchivePropertyCriterion'
+          description: Optional within this object. Properties an artifact must carry to be archived.
+        includedRepositories:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveCriterion'
+          description: Optional within this object. Repositories whose artifacts are candidates. At least this or
+            excludedRepositories should be set; empty means every local repository.
+        lastDownloadedBeforeInDays:
+          description: Optional within this object. Only artifacts last downloaded at least this many days ago,
+            or never downloaded. Omitted means no condition.
+          minimum: 0
+          type: integer
+      type: object
+      x-unverified: true
+    ArchiveSearchResults:
+      description: Archived items matching an AQL query, in AQL's result shape.
+      properties:
+        range:
+          description: Optional within this object. Paging of the result.
+          properties:
+            end_pos:
+              description: Optional within this object. Offset after the last result.
+              type: integer
+            start_pos:
+              description: Optional within this object. Offset of the first result.
+              type: integer
+            total:
+              description: Optional within this object. Number of results returned.
+              type: integer
+          type: object
+        results:
+          description: Optional within this object. Matching archived items.
+          items:
+            additionalProperties: true
+            description: One archived item with the fields the query included.
+            type: object
+          type: array
+      type: object
+    ColdStorageErrorResponse:
+      description: Error body for the /api/retention operations. Artifactory's cold storage service documents a
+        flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added,
+        so clients written against either form read the same failure.
+      properties:
+        error:
+          description: Optional within this object. Short symbolic form of the failure, such as NOT_FOUND, for clients
+            of the cold storage envelope.
+          type: string
+        errors:
+          description: Required within this object. One entry per error; clients of the standard envelope read the
+            first.
+          items:
+            description: One error.
+            properties:
+              message:
+                description: Required within this object. Human readable explanation.
+                type: string
+              status:
+                description: Required within this object. The HTTP status code repeated in the body.
+                type: integer
+            required:
+            - status
+            - message
+            type: object
+          type: array
+        message:
+          description: Optional within this object. Human readable explanation, identical to the first entry of
+            errors.
+          type: string
+      required:
+      - errors
+      type: object
+    ColdStorageNamespace:
+      description: The namespace that prefixes archived paths.
+      properties:
+        jfrogColdStorageNamespaceId:
+          description: Optional within this object. Identifier generated by this instance the first time content
+            is archived and stable afterwards. Archived paths are reported as <namespace>/<repository>/<path>; restore
+            requests may omit it (see addNamespace). The field keeps JFrog's name for client compatibility.
+          type: string
+      type: object
+    ColdStorageRestoreAccepted:
+      description: Answer to a restore request.
+      properties:
+        response:
+          description: Optional within this object. Human readable confirmation.
+          type: string
+        restore_operation_id:
+          description: Optional within this object. Identifier of the restore execution, as listed by the restore
+            status operation.
+          type: string
+      type: object
+    ColdStorageRestoreRequest:
+      description: Which archived items to bring back and where.
+      properties:
+        addNamespace:
+          description: Optional within this object. When true, the default, the server prefixes each path with the
+            cold storage namespace; set false when the paths already include it.
+          type: boolean
+        centralDestinationPath:
+          description: Optional within this object. Repository key to restore everything into, keeping each item's
+            path. Required unless restoreToOriginal is true.
+          type: string
+        fallbackDestinationPath:
+          description: Optional within this object. With restoreToOriginal, where to restore items whose repository
+            no longer exists; must start with a repository key.
+          type: string
+        itemsToRestore:
+          description: Required within this object. Paths to restore, each <repository>/<path>; folder paths end
+            with a slash and restore everything below them.
+          items:
+            description: One entry.
+            type: string
+          type: array
+        restoreToOriginal:
+          description: Optional within this object. Restore each item to its original repository and path. Required
+            unless centralDestinationPath is set.
+          type: boolean
+        restoreType:
+          description: Required within this object. Restore whole package versions or individual artifacts.
+          enum:
+          - PACKAGE_RESTORE
+          - ARTIFACT_RESTORE
+          type: string
+      required:
+      - restoreType
+      - itemsToRestore
+      type: object
+    SmartArchivingPolicy:
+      description: A package-level archiving policy. Each run moves the selected package versions from the hot blob
+        store to the cold tier and leaves a tombstone in the hot index so search and restore still find them. In
+        artifactweave the cold store is a second blob store configured on the same instance (for example an S3 bucket
+        with an archive storage class), not a separate cold instance (decision 0024); the API behaves as Artifactory
+        documents.
+      properties:
+        cronExp:
+          description: Optional within this object. Quartz cron expression for scheduled runs (decision 0010). Omit
+            to run the policy only on demand.
+          type: string
+        description:
+          description: Optional within this object. Free text shown with the policy.
+          type: string
+        durationInMinutes:
+          description: Optional within this object. Longest a run may take before it is stopped, at most 300. Versions
+            already moved stay archived.
+          type: integer
+        enabled:
+          description: Optional within this object. Whether scheduled and manual runs are allowed. Must be false
+            or absent on create, as in Artifactory; switch it with the enablement operation.
+          type: boolean
+        key:
+          description: 'Required within this object. Identifier of the policy: at least three characters of letters,
+            digits, underscore and hyphen. Must equal the policyKey path parameter on create and update.'
+          type: string
+        projectKey:
+          description: Optional within this object. Project that owns the policy. Set only for project-level policies;
+            omit for global ones.
+          type: string
+        searchCriteria:
+          allOf:
+          - $ref: '#/components/schemas/ArchiveSearchCriteria'
+          description: Required within this object. What the policy selects.
+        skipTrashcan:
+          description: Optional within this object. When false, the default, the hot copy of each archived version
+            passes through the trash can before its blob is released, so it can still be restored from there for
+            the trash retention period. When true the hot copy is released at once; the cold copy remains restorable
+            either way.
+          type: boolean
+      required:
+      - key
+      - searchCriteria
+      type: object
+paths:
+  /api/archive/v2/packages/policies:
+    get:
+      description: Returns every smart archiving policy, or with projectKey the policies of that project. Platform
+        administrators manage every policy; project administrators manage the policies of their own projects. In
+        Artifactory this API exists on Cloud from 7.111; artifactweave serves it on every install.
+      operationId: getAllSmartArchivingPolicies
+      parameters:
+      - description: Optional query parameter. Project whose policies are meant. Required for project administrators;
+          a platform administrator who omits it acts on global policies.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/SmartArchivingPolicy'
+                type: array
+          description: The policies, ordered by key.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: List smart archiving policies
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallsmartarchivingpolicies.md
+  /api/archive/v2/packages/policies/forceDisableAll:
+    put:
+      description: Sets enabled to false on every global smart archiving policy, so no scheduled or manual run starts.
+        Runs already in progress continue; stop them separately. Platform administrators only.
+      operationId: disableAllSmartArchivingPolicies
+      responses:
+        '200':
+          description: Every global policy is now disabled.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Disable every smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/disableallsmartarchivingpolicies.md
+  /api/archive/v2/packages/policies/runs/downloadReport:
+    get:
+      description: 'Returns the CSV report of one smart archiving run: one row per selected package version with
+        the outcome. Platform administrators manage every policy; project administrators manage the policies of
+        their own projects.'
+      operationId: downloadSmartArchivingPolicyRunReport
+      parameters:
+      - description: Required query parameter. Key of the policy that ran.
+        in: query
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      - description: Required query parameter. Identifier of the run, the triggerId of the run operation.
+        in: query
+        name: runId
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: The CSV report.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Download a run report
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/downloadsmartarchivingpolicyrunreport.md
+  /api/archive/v2/packages/policies/runs/forceStopAll:
+    put:
+      description: Asks every running global smart archiving policy to stop. Each run ends after the version it
+        is moving; versions already moved stay archived. Platform administrators only.
+      operationId: stopAllRunningSmartArchivingPolicies
+      responses:
+        '202':
+          description: Stop requested for every running policy.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Stop every running smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/stopallrunningsmartarchivingpolicies.md
+  /api/archive/v2/packages/policies/runs/summaryReports:
+    get:
+      description: Returns the summary of one smart archiving run, or of a package restore run. Platform administrators
+        manage every policy; project administrators manage the policies of their own projects.
+      operationId: viewSmartArchivingPolicyRunSummaryReport
+      parameters:
+      - description: Required query parameter. Identifier of the run.
+        in: query
+        name: triggerId
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveRunSummaryReport'
+          description: The summary.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: View a run summary
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/viewsmartarchivingpolicyrunsummaryreport.md
+  /api/archive/v2/packages/policies/runs/{runId}:
+    put:
+      description: Stops one run. The run ends after the version it is moving; it cannot be resumed, and versions
+        already moved stay archived. Platform administrators manage every policy; project administrators manage
+        the policies of their own projects.
+      operationId: stopRunningSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Identifier of the run, the triggerId of the run operation.
+        in: path
+        name: runId
+        required: true
+        schema:
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchiveRunStopRequest'
+        description: The stop action.
+        required: true
+      responses:
+        '202':
+          description: Stop requested.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Stop a running smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/stoprunningsmartarchivingpolicy.md
+  /api/archive/v2/packages/policies/view:
+    get:
+      description: Returns a compact listing of policies with their last and next run, filtered by item type and
+        key. Platform administrators manage every policy; project administrators manage the policies of their own
+        projects.
+      operationId: viewSmartArchivingPolicies
+      parameters:
+      - description: Optional query parameter. Comma separated item types; only package exists.
+        in: query
+        name: itemTypes
+        schema:
+          type: string
+      - description: Optional query parameter. Return only policies whose key contains this text.
+        in: query
+        name: policyKey
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePoliciesView'
+          description: The matching policies.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: View smart archiving policies
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/viewsmartarchivingpolicies.md
+  /api/archive/v2/packages/policies/{policyKey}:
+    delete:
+      description: Deletes a policy. A running policy cannot be deleted (400); stop it first. Archived content is
+        not affected. Platform administrators manage every policy; project administrators manage the policies of
+        their own projects.
+      operationId: deleteSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Key of the smart archiving policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      responses:
+        '200':
+          description: The policy is deleted.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Delete a smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletesmartarchivingpolicy.md
+    get:
+      description: Returns one policy. Platform administrators manage every policy; project administrators manage
+        the policies of their own projects.
+      operationId: getSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Key of the smart archiving policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmartArchivingPolicy'
+          description: The policy.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Get a smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getsmartarchivingpolicy.md
+    post:
+      description: 'Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory.
+        The key in the body must equal the path. Platform administrators manage every policy; project administrators
+        manage the policies of their own projects.'
+      operationId: createSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Key of the smart archiving policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmartArchivingPolicy'
+        description: The policy to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmartArchivingPolicy'
+          description: The policy as stored.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '409':
+          $ref: '#/components/responses/ArchiveConflict'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Create a smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createsmartarchivingpolicy.md
+    put:
+      description: Replaces a policy's configuration. A running policy cannot be updated (400). enabled is ignored
+        here; use the enablement operation. Platform administrators manage every policy; project administrators
+        manage the policies of their own projects.
+      operationId: updateSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Key of the smart archiving policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SmartArchivingPolicy'
+        description: The full new configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SmartArchivingPolicy'
+          description: The policy as stored.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Update a smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatesmartarchivingpolicy.md
+  /api/archive/v2/packages/policies/{policyKey}/enablement:
+    post:
+      description: Switches whether a policy may run on its schedule or on demand. Platform administrators manage
+        every policy; project administrators manage the policies of their own projects.
+      operationId: enableDisableSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Key of the smart archiving policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: New enablement state.
+              properties:
+                enabled:
+                  description: Required within this object. True allows the policy to run; false blocks it.
+                  type: boolean
+              required:
+              - enabled
+              type: object
+        description: The new state.
+        required: true
+      responses:
+        '200':
+          description: The state is changed.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Enable or disable a smart archiving policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/enabledisablesmartarchivingpolicy.md
+  /api/archive/v2/packages/policies/{policyKey}/run:
+    put:
+      description: Starts a run of an enabled policy in the background and returns its id. A dry run selects and
+        reports without moving anything. A policy already running is rejected with 400. Platform administrators
+        manage every policy; project administrators manage the policies of their own projects.
+      operationId: runSmartArchivingPolicy
+      parameters:
+      - description: Required path parameter. Key of the smart archiving policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          minLength: 3
+          type: string
+      - description: Optional query parameter. When true, report what would be archived without archiving. Defaults
+          to false.
+        in: query
+        name: dryRun
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveRunTriggered'
+          description: The run started.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '404':
+          $ref: '#/components/responses/ArchiveNotFound'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Run a smart archiving policy now
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/runsmartarchivingpolicy.md
+  /api/archive/v2/restore/packages:
+    post:
+      description: Copies the files of archived package versions from the cold tier back into the hot store and
+        recreates their items, at the original location or a new one. The cold copy is kept. Platform administrators
+        manage every policy; project administrators manage the policies of their own projects.
+      operationId: restoreArchivedPackages
+      parameters:
+      - description: Optional query parameter. Project whose policies are meant. Required for project administrators;
+          a platform administrator who omits it acts on global policies.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchiveRestorePackagesRequest'
+        description: What to restore and where.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveRestoreStarted'
+          description: The restore run started.
+        '400':
+          $ref: '#/components/responses/ArchiveBadRequest'
+        '401':
+          $ref: '#/components/responses/ArchiveUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArchiveForbidden'
+        '500':
+          $ref: '#/components/responses/ArchiveInternalServerError'
+      summary: Restore archived package versions
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/restorearchivedpackages.md
+  /api/retention/archive/executions:
+    get:
+      description: Returns archive executions that started within a time window, optionally for one policy. Platform
+        administrators only.
+      operationId: getArchivePolicyStatus
+      parameters:
+      - description: Optional query parameter. Start of the window in epoch milliseconds.
+        in: query
+        name: from
+        schema:
+          type: string
+      - description: Optional query parameter. End of the window in epoch milliseconds.
+        in: query
+        name: to
+        schema:
+          type: string
+      - description: Optional query parameter. Return only executions of policies whose key contains this text.
+        in: query
+        name: searchStr
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ArchiveExecutionStatus'
+                type: array
+          description: The executions, newest first.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: List archive executions
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getarchivepolicystatus.md
+  /api/retention/archive/policies:
+    get:
+      description: Returns every cold storage archive policy with its run state. Platform administrators only. In
+        Artifactory this API needs an Enterprise licence and a separate cold instance; artifactweave serves it on
+        every install against its cold tier.
+      operationId: getAllArchivePolicies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ArchivePolicyResponse'
+                type: array
+          description: The policies, ordered by key.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: List cold storage archive policies
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallarchivepolicies.md
+  /api/retention/archive/policies/convertToAql:
+    post:
+      description: Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based
+        policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's
+        JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with
+        400. Platform administrators only.
+      operationId: convertSearchCriteriaToAql
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: JSON text of an ArchiveSearchCriteriaForm.
+              type: string
+        description: The search criteria form (the same document as searchCriteriaForm, ArchiveSearchCriteriaForm)
+          serialised as JSON and sent as text/plain, as JFrog's definition specifies.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+          description: The AQL items query, returned as a JSON string.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Convert a search criteria form to AQL
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/convertsearchcriteriatoaql.md
+  /api/retention/archive/policies/preview:
+    post:
+      description: Estimates how many items, and how many bytes, a policy would archive if it ran now, without saving
+        or running it. Platform administrators only.
+      operationId: previewArchivePolicyByModel
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: A policy definition evaluated without saving it.
+              properties:
+                aqlQuery:
+                  description: Optional within this object. AQL items query selecting the artifacts to archive.
+                    Use either this or searchCriteriaForm; not valid with packageRetention.
+                  type: string
+                cronExp:
+                  description: Optional within this object. Quartz cron expression for scheduled runs (decision
+                    0010).
+                  type: string
+                description:
+                  description: Optional within this object. Free text shown with the policy.
+                  type: string
+                durationInMinutes:
+                  description: Optional within this object. Longest a run may take before it is stopped. Artifacts
+                    already moved stay archived.
+                  format: int64
+                  type: integer
+                enabled:
+                  description: Optional within this object. Whether the policy may run. A disabled policy rejects
+                    triggers.
+                  type: boolean
+                expirationTimeInMonths:
+                  description: Optional within this object. Months after which archived content is deleted from
+                    the cold tier for good. Omit to keep archived content indefinitely.
+                  format: int64
+                  type: integer
+                key:
+                  description: Optional within this object. Identifier of the policy. Must equal the policyKey path
+                    parameter.
+                  type: string
+                packageRetention:
+                  description: Optional within this object. When true the policy archives whole package versions
+                    selected by packageSearchCriteriaForm; when false, the default, it archives individual artifacts
+                    selected by aqlQuery or searchCriteriaForm.
+                  type: boolean
+                packageSearchCriteriaForm:
+                  allOf:
+                  - $ref: '#/components/schemas/ArchivePackageSearchCriteria'
+                  description: Optional within this object. Package selection; used when packageRetention is true.
+                searchCriteriaForm:
+                  allOf:
+                  - $ref: '#/components/schemas/ArchiveSearchCriteriaForm'
+                  description: Optional within this object. Artifact selection as a form; use either this or aqlQuery.
+                skipTrashcan:
+                  description: Optional within this object. When true the hot copy is released immediately instead
+                    of passing through the trash can. Defaults to false.
+                  type: boolean
+              type: object
+        description: The policy to evaluate; key, enabled and cronExp are not needed.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePreview'
+          description: The estimate.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Preview a policy that is not saved
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/previewarchivepolicybymodel.md
+  /api/retention/archive/policies/{policyKey}:
+    delete:
+      description: Deletes a policy. Content it archived stays in the cold tier. Platform administrators only.
+      operationId: deleteArchivePolicy
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: The policy is deleted; the body is a short confirmation.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '404':
+          $ref: '#/components/responses/ColdStorageNotFound'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Delete a cold storage archive policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletearchivepolicy.md
+    get:
+      description: Returns one policy with its run state. Platform administrators only.
+      operationId: getArchivePolicy
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePolicyResponse'
+          description: The policy.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '404':
+          $ref: '#/components/responses/ColdStorageNotFound'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Get a cold storage archive policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getarchivepolicy.md
+    post:
+      description: 'Creates a policy. Exactly one selection is required: aqlQuery or searchCriteriaForm for artifact
+        policies, packageSearchCriteriaForm for package policies. Platform administrators only.'
+      operationId: createArchivePolicy
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchivePolicyRequest'
+        description: The policy to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePolicyResponse'
+          description: The policy as stored.
+        '400':
+          $ref: '#/components/responses/ColdStorageBadRequest'
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '409':
+          $ref: '#/components/responses/ColdStorageConflict'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Create a cold storage archive policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createarchivepolicy.md
+    put:
+      description: Replaces a policy's configuration. Platform administrators only.
+      operationId: updateArchivePolicy
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchivePolicyRequest'
+        description: The full new configuration.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePolicyResponse'
+          description: The policy as stored.
+        '400':
+          $ref: '#/components/responses/ColdStorageBadRequest'
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '404':
+          $ref: '#/components/responses/ColdStorageNotFound'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Update a cold storage archive policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatearchivepolicy.md
+  /api/retention/archive/policies/{policyKey}/preview:
+    post:
+      description: Estimates how many items, and how many bytes, a saved policy would archive if it ran now. Platform
+        administrators only.
+      operationId: previewArchivePolicyByKey
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePreview'
+          description: The estimate.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '404':
+          $ref: '#/components/responses/ColdStorageNotFound'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Preview a saved policy
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/previewarchivepolicybykey.md
+  /api/retention/archive/policies/{policyKey}/stop:
+    post:
+      description: Asks the running execution of a policy to stop after the item it is moving. Platform administrators
+        only.
+      operationId: stopArchivePolicy
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Stop requested.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '404':
+          $ref: '#/components/responses/ColdStorageNotFound'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Stop a cold storage policy execution
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/stoparchivepolicy.md
+  /api/retention/archive/policies/{policyKey}/trigger:
+    post:
+      description: Starts an execution of an enabled policy in the background; follow it with the executions listing.
+        Platform administrators only.
+      operationId: runArchivePolicy
+      parameters:
+      - description: Required path parameter. Key of the cold storage archive policy.
+        in: path
+        name: policyKey
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: The execution was submitted; the body is a short confirmation.
+        '400':
+          $ref: '#/components/responses/ColdStorageBadRequest'
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '404':
+          $ref: '#/components/responses/ColdStorageNotFound'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Run a cold storage policy now
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/runarchivepolicy.md
+  /api/retention/namespace:
+    get:
+      description: Returns the namespace that prefixes archived paths in search results and restore requests. Platform
+        administrators only.
+      operationId: getNamespace
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColdStorageNamespace'
+          description: The namespace.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Get the cold storage namespace
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getnamespace.md
+  /api/retention/restore:
+    post:
+      description: Copies archived artifacts or package versions from the cold tier back into the hot store in the
+        background, to their original location, a fallback, or one central repository. The cold copy is kept. Platform
+        administrators only.
+      operationId: restoreFromArchive
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ColdStorageRestoreRequest'
+        description: What to restore and where.
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ColdStorageRestoreAccepted'
+          description: The restore was started.
+        '400':
+          $ref: '#/components/responses/ColdStorageBadRequest'
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Restore archived items
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/restorefromarchive.md
+  /api/retention/restore/executions:
+    get:
+      description: Returns restore executions that started within a time window. Platform administrators only.
+      operationId: getRestoreProcessStatus
+      parameters:
+      - description: Optional query parameter. Start of the window in epoch milliseconds.
+        in: query
+        name: from
+        schema:
+          type: string
+      - description: Optional query parameter. End of the window in epoch milliseconds.
+        in: query
+        name: to
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ArchiveExecutionStatus'
+                type: array
+          description: The executions, newest first.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: List restore executions
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getrestoreprocessstatus.md
+  /api/retention/search:
+    post:
+      description: Runs an AQL items query against archived items only, with the same grammar and limits as the
+        AQL search (decision 0012). Platform administrators only. Served by the hand-written AQL handler because
+        the body is AQL text.
+      operationId: searchArchives
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        description: The AQL query.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchiveSearchResults'
+          description: The matching archived items.
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Search archived items with AQL
+      tags:
+      - archive
+      - handwritten
+      x-handwritten: true
+      x-oracle-source: https://docs.jfrog.com/administration/reference/searcharchives.md
+  /api/retention/searchPackages:
+    post:
+      description: Finds archived package versions by type, repository, name, version and archive time. Platform
+        administrators see global archives; with projectKey, a project's. Project administrators must pass projectKey.
+      operationId: searchPackageArchives
+      parameters:
+      - description: Optional query parameter. Search only archives of this project.
+        in: query
+        name: projectKey
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchivePackageSearchRequest'
+        description: The search.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArchivePackageSearchResults'
+          description: The matching versions.
+        '400':
+          $ref: '#/components/responses/ColdStorageBadRequest'
+        '401':
+          $ref: '#/components/responses/ColdStorageUnauthorized'
+        '403':
+          $ref: '#/components/responses/ColdStorageForbidden'
+        '500':
+          $ref: '#/components/responses/ColdStorageInternalServerError'
+      summary: Search archived package versions
+      tags:
+      - archive
+      x-oracle-source: https://docs.jfrog.com/administration/reference/searchpackagearchives.md

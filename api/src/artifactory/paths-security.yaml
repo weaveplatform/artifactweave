@@ -1,0 +1,2908 @@
+components:
+  responses:
+    SecurityBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The request body or parameters are invalid.
+    SecurityForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The caller is authenticated but lacks the admin role or the Manage permission the operation requires.
+    SecurityInternalServerError:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: artifactweave failed while serving the request.
+    SecurityNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The named resource does not exist.
+    SecurityUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: No credentials were supplied or they were rejected.
+  schemas:
+    ApiKeyResponse:
+      description: The API key of the calling user. API keys reached end of life in Artifactory at the end of 2024;
+        artifactweave never issues one.
+      properties:
+        apiKey:
+          description: Optional within this object. The key value. Keys that clients recognise start with AKCp8
+            and are at least 73 characters long. artifactweave returns this field only from the shim responses that
+            report no key exists, so it is never populated.
+          type: string
+      type: object
+    CertificateInfo:
+      description: A client certificate that remote repositories may present to upstreams through clientTlsCertificate.
+      properties:
+        certificateAlias:
+          description: Optional within this object. Alias used as the identifier and referenced by repositories.
+          type: string
+        fingerPrint:
+          description: Optional within this object. SHA-256 fingerprint. The Terraform provider matches this key
+            case-insensitively, so the spelling is kept as documented.
+          type: string
+        issuedBy:
+          description: Optional within this object. Issuer of the certificate.
+          type: string
+        issuedOn:
+          description: Optional within this object. Not-before time.
+          format: date-time
+          type: string
+        issuedTo:
+          description: Optional within this object. Subject of the certificate.
+          type: string
+        validUntil:
+          description: Optional within this object. Not-after time.
+          format: date-time
+          type: string
+      type: object
+    GroupConfiguration:
+      description: The legacy group document. The Access v2 group is the same record with snake_case names.
+      properties:
+        adminPrivileges:
+          description: Optional within this object. Members act as admins. Defaults to false.
+          type: boolean
+        autoJoin:
+          description: Optional within this object. New users join automatically. Defaults to false. The seeded
+            readers group has it set.
+          type: boolean
+        description:
+          description: Optional within this object. Free-text description.
+          type: string
+        name:
+          description: Optional within this object. Group name, the identifier. Must equal the path parameter on
+            PUT and POST.
+          type: string
+        policyManager:
+          description: Optional within this object. Xray role flag, stored without effect.
+          type: boolean
+        realm:
+          description: Optional within this object. Server-owned realm, internal for local groups. Ignored on write.
+          type: string
+        realmAttributes:
+          description: Optional within this object. Server-owned realm detail for external groups; empty for local
+            groups.
+          type: string
+        reportsManager:
+          description: Optional within this object. Xray role flag, stored without effect.
+          type: boolean
+        userNames:
+          description: Optional within this object. Member user names. Returned only when the read passes includeUsers=true.
+            On PUT it replaces the membership and the response is 201.
+          items:
+            description: A user name.
+            type: string
+          type: array
+        watchManager:
+          description: Optional within this object. Xray role flag, stored without effect.
+          type: boolean
+      type: object
+    GroupListItem:
+      description: One entry of the legacy group listing.
+      properties:
+        name:
+          description: Optional within this object. Group name.
+          type: string
+        uri:
+          description: Optional within this object. Absolute URL of the group's detail operation.
+          format: uri
+          type: string
+      type: object
+    KeyPairInput:
+      description: A signing key pair used for Debian, Alpine, RPM, Helm provenance and Terraform provider signing.
+        Private material is write-only and stored as a sealed column (decision 0017).
+      properties:
+        alias:
+          description: Required within this object. Alias embedded in the public key material and shown to package
+            clients; not an identifier.
+          type: string
+        pairName:
+          description: Required within this object. Unique name of the pair; it is the identifier in every other
+            key-pair operation and in a repository's primaryKeyPairRef and secondaryKeyPairRef fields.
+          type: string
+        pairType:
+          description: Required within this object. RSA for Debian, Alpine and RPM signing, GPG for Helm provenance
+            and Terraform provider registries.
+          enum:
+          - RSA
+          - GPG
+          type: string
+        passphrase:
+          description: Optional within this object. Passphrase protecting privateKey, if any. Stored sealed and
+            never returned.
+          type: string
+          writeOnly: true
+        privateKey:
+          description: Required within this object. PEM or ASCII-armored private key. Accepted on create, update
+            and verify, never returned.
+          type: string
+          writeOnly: true
+        publicKey:
+          description: Required within this object. PEM or ASCII-armored public key. This is the only key material
+            a read returns.
+          type: string
+        vaultKey:
+          description: Optional within this object. Name of an external vault key to use instead of privateKey.
+            Accepted for wire compatibility; artifactweave has no vault integration in v1 and rejects a pair that
+            sets it without privateKey with 400.
+          type: string
+        vaultPublicKey:
+          description: Optional within this object. Location of the public key in an external vault when vaultKey
+            is used. Accepted and ignored in v1.
+          properties:
+            key:
+              description: Optional within this object. Field name inside the vault entry.
+              type: string
+            path:
+              description: Optional within this object. Vault path holding the key.
+              type: string
+          type: object
+      required:
+      - pairName
+      - pairType
+      - alias
+      - privateKey
+      - publicKey
+      type: object
+    KeyPairSummary:
+      description: The readable projection of a key pair. Reads never include private material or the passphrase.
+      properties:
+        alias:
+          description: Optional within this object. Alias embedded in the key.
+          type: string
+        pairName:
+          description: Optional within this object. Pair name, the identifier.
+          type: string
+        pairType:
+          description: Optional within this object. RSA or GPG.
+          type: string
+        publicKey:
+          description: Optional within this object. The public key material.
+          type: string
+      type: object
+    LegacyTokenDetails:
+      description: One token in the legacy listing.
+      properties:
+        expiry:
+          description: Optional within this object. Expiry as Unix seconds; absent for non-expiring tokens.
+          type: integer
+        issued_at:
+          description: Optional within this object. Issue time as Unix seconds.
+          type: integer
+        issuer:
+          description: Optional within this object. Issuing service id, for example jfrt@ followed by the service
+            id.
+          type: string
+        refreshable:
+          description: Optional within this object. Whether a refresh token was issued.
+          type: boolean
+        subject:
+          description: Optional within this object. Subject in the form jfac@<id>/users/<name>.
+          type: string
+        token_id:
+          description: Optional within this object. Identifier used to revoke the token.
+          type: string
+      type: object
+    LegacyTokenList:
+      description: The legacy token listing.
+      properties:
+        tokens:
+          description: Optional within this object. Tokens visible to the caller; admins see all.
+          items:
+            $ref: '#/components/schemas/LegacyTokenDetails'
+          type: array
+      type: object
+    LegacyTokenResponse:
+      description: The legacy token create or refresh response. The same token is also visible through /access/api/v1/tokens.
+      properties:
+        access_token:
+          description: Optional within this object. The JWT access token.
+          type: string
+        expires_in:
+          description: Optional within this object. Lifetime in seconds; 0 means the token never expires.
+          type: integer
+        refresh_token:
+          description: Optional within this object. Present only when refreshable was true.
+          type: string
+        scope:
+          description: Optional within this object. The granted scope string.
+          type: string
+        token_type:
+          description: Optional within this object. Always Bearer.
+          type: string
+      type: object
+    PasswordExpirationPolicy:
+      description: Platform-wide password expiry. JFrog's documentation shows the values as quoted strings, but
+        the artifactory_password_expiration_policy Terraform resource decodes enabled as a boolean and passwordMaxAge
+        as an integer, so artifactweave emits real JSON types and accepts either form on input.
+      properties:
+        enabled:
+          description: Optional within this object. Whether internal passwords expire. Defaults to false. Accepted
+            as true or "true".
+          type: boolean
+        notifyByEmail:
+          description: Optional within this object. Whether users are emailed before expiry. Defaults to true and
+            has no effect until a mail server is configured.
+          type: boolean
+        passwordMaxAge:
+          description: Optional within this object. Days a password stays valid once enabled. Defaults to 60. Accepted
+            as a number or a numeric string.
+          type: integer
+      type: object
+    PermissionTarget:
+      description: 'A version 1 permission target: repository targets plus include and exclude patterns and per-principal
+        action codes. Virtual repositories cannot be targets. artifactweave stores every target in the Access v2
+        shape and converts on the wire (decision 0006).'
+      properties:
+        excludesPattern:
+          description: Optional within this object. Comma-separated Ant patterns excluded from the target. Defaults
+            to the empty string.
+          type: string
+        includesPattern:
+          description: Optional within this object. Comma-separated Ant patterns of paths the target covers. Defaults
+            to "**" (everything).
+          type: string
+        name:
+          description: Optional within this object. Target name. The path parameter wins when both are present;
+            a mismatch is a 400.
+          type: string
+        principals:
+          description: Optional within this object. The grants. Omitted or empty means the target grants nothing
+            until Access v2 or a later PUT populates it.
+          properties:
+            groups:
+              additionalProperties:
+                description: Action codes granted to one group.
+                items:
+                  description: One action code; see users.
+                  enum:
+                  - m
+                  - d
+                  - w
+                  - n
+                  - r
+                  - mxm
+                  - x
+                  type: string
+                type: array
+              description: Optional within this object. Map from group name to the action codes granted to its members.
+              type: object
+            users:
+              additionalProperties:
+                description: Action codes granted to one user.
+                items:
+                  description: 'One action code: r read, w deploy, n annotate, d delete, m manage, mxm manage Xray
+                    metadata, x distribute.'
+                  enum:
+                  - m
+                  - d
+                  - w
+                  - n
+                  - r
+                  - mxm
+                  - x
+                  type: string
+                type: array
+              description: Optional within this object. Map from user name to the action codes granted to that user.
+              type: object
+          type: object
+        repositories:
+          description: Required within this object. Repository keys the target applies to. The literals ANY, ANY
+            LOCAL and ANY REMOTE expand to every repository of that class, including remote caches. A virtual key
+            is rejected with 400.
+          items:
+            description: A repository key or one of the ANY literals.
+            type: string
+          type: array
+      required:
+      - repositories
+      type: object
+    PermissionTargetListItem:
+      description: One entry of a permission target listing.
+      properties:
+        name:
+          description: Optional within this object. Target name.
+          type: string
+        uri:
+          description: Optional within this object. Absolute URL of the target's detail operation, built from the
+            resolved base URL.
+          format: uri
+          type: string
+      type: object
+    PermissionTargetV2:
+      description: A version 2 permission target with separate sections for repositories, builds and release bundles.
+        This is the shape the JFrog CLI and the artifactory_permission_target resource send. Keys mix kebab-case
+        and camelCase exactly as Artifactory does.
+      properties:
+        build:
+          allOf:
+          - $ref: '#/components/schemas/PermissionTargetV2Section'
+          description: Optional within this object. Grants on build-info. Its repositories list is fixed to artifactory-build-info;
+            any other value is a 400. A PUT that omits this section deletes it.
+        name:
+          description: Optional within this object. Target name, at most 64 characters. The path parameter wins;
+            a mismatch is a 400.
+          type: string
+        releaseBundle:
+          allOf:
+          - $ref: '#/components/schemas/PermissionTargetV2Section'
+          description: Optional within this object. Grants on release bundles. Accepted and stored for compatibility;
+            release bundles are out of scope in v1, so the section has no effect. A PUT that omits it deletes it.
+        repo:
+          allOf:
+          - $ref: '#/components/schemas/PermissionTargetV2Section'
+          description: 'Optional within this object. One section of a version 2 target: targets, patterns and grants.'
+      type: object
+    PermissionTargetV2Section:
+      description: 'One section of a version 2 target: targets, patterns and grants.'
+      properties:
+        actions:
+          description: Optional within this object. The grants, by user and by group.
+          properties:
+            groups:
+              additionalProperties:
+                description: Action names granted to one group.
+                items:
+                  description: One action name; see users.
+                  enum:
+                  - read
+                  - write
+                  - annotate
+                  - delete
+                  - manage
+                  - managedXrayMeta
+                  - distribute
+                  type: string
+                type: array
+              description: Optional within this object. Map from group name to granted action names.
+              type: object
+            users:
+              additionalProperties:
+                description: Action names granted to one user.
+                items:
+                  description: One action name. managedXrayMeta and distribute are accepted and stored but have
+                    no effect in artifactweave.
+                  enum:
+                  - read
+                  - write
+                  - annotate
+                  - delete
+                  - manage
+                  - managedXrayMeta
+                  - distribute
+                  type: string
+                type: array
+              description: Optional within this object. Map from user name to granted action names.
+              type: object
+          type: object
+        exclude-patterns:
+          description: Optional within this object. Ant patterns excluded from the section. Defaults to [""], which
+            excludes nothing.
+          items:
+            description: One Ant exclude pattern.
+            type: string
+          type: array
+        include-patterns:
+          description: Optional within this object. Ant patterns, each at most 1024 characters, of paths the section
+            covers. Defaults to ["**"].
+          items:
+            description: One Ant include pattern.
+            type: string
+          type: array
+        repositories:
+          description: Optional within this object. Repository keys or the literals ANY, ANY LOCAL and ANY REMOTE.
+            Required in practice for the repo section; an empty list grants nothing.
+          items:
+            description: A repository key or one of the ANY literals.
+            type: string
+          type: array
+      type: object
+    SecurityInfoMessage:
+      description: A confirmation message returned by several mutating operations.
+      properties:
+        info:
+          description: Optional within this object. Human-readable confirmation of what changed. Clients do not
+            parse it.
+          type: string
+      type: object
+    SecurityStatusMessage:
+      description: A status code plus message pair.
+      properties:
+        message:
+          description: Optional within this object. Human-readable detail.
+          type: string
+        status:
+          description: Optional within this object. Outcome word such as success; mirrors the HTTP status rather
+            than adding information.
+          type: string
+      type: object
+    TrustedKey:
+      description: A stored trusted public key.
+      properties:
+        alias:
+          description: Optional within this object. The alias given on upload.
+          type: string
+        fingerprint:
+          description: Optional within this object. Fingerprint derived from the key.
+          type: string
+        issued_by:
+          description: Optional within this object. Key owner read from the key.
+          type: string
+        issued_on:
+          description: Optional within this object. Key creation time read from the key.
+          format: date-time
+          type: string
+        key:
+          description: Optional within this object. The ASCII-armored public key.
+          type: string
+        kid:
+          description: Optional within this object. Server-assigned key identifier used to delete the key.
+          type: string
+        valid_until:
+          description: Optional within this object. Key expiry read from the key; absent when it never expires.
+          format: date-time
+          type: string
+      type: object
+    TrustedKeyInput:
+      description: A public GPG key trusted for verifying signed release bundles.
+      properties:
+        alias:
+          description: Required within this object. Human-readable alias; must be unique.
+          type: string
+        public_key:
+          description: Required within this object. ASCII-armored public key.
+          type: string
+      required:
+      - alias
+      - public_key
+      type: object
+    TrustedKeyList:
+      description: The trusted key listing.
+      properties:
+        keys:
+          description: Optional within this object. Every stored trusted key.
+          items:
+            $ref: '#/components/schemas/TrustedKey'
+          type: array
+      type: object
+    UserConfiguration:
+      description: The legacy user document. On PUT the fields name, email and password are required; on POST only
+        the supplied fields change. Reads never return password. The Access v2 user is the same record with snake_case
+        names and lower-case status values.
+      properties:
+        admin:
+          description: Optional within this object. Grants every permission. Defaults to false. The seeded admin
+            user cannot be demoted while it is the last admin.
+          type: boolean
+        disableUIAccess:
+          description: Optional within this object. Stored for compatibility; artifactweave has no UI, so it has
+            no effect. Defaults to false.
+          type: boolean
+        email:
+          description: Optional within this object. Email address. Required on PUT.
+          type: string
+        groups:
+          description: Optional within this object. Group names the user belongs to. On PUT the list replaces the
+            membership; unknown groups are a 400.
+          items:
+            description: A group name.
+            type: string
+          type: array
+        internalPasswordDisabled:
+          description: Optional within this object. When true the user authenticates only through tokens or an external
+            realm and password is not required. Defaults to false.
+          type: boolean
+        lastLoggedIn:
+          description: Optional within this object. Server-owned time of the last successful authentication in ISO-8601
+            with milliseconds. Absent until the user has logged in.
+          format: date-time
+          type: string
+        mfaStatus:
+          description: Optional within this object. Server-owned multi-factor state. Always NONE in artifactweave,
+            which has no MFA.
+          enum:
+          - NONE
+          - ENABLED
+          - DISABLED
+          type: string
+        name:
+          description: Optional within this object. User name, the identifier. Must equal the path parameter on
+            PUT and POST.
+          type: string
+        password:
+          description: Optional within this object. Clear-text password, hashed with Argon2id on receipt and never
+            returned. Required on PUT unless internalPasswordDisabled is true.
+          type: string
+          writeOnly: true
+        policyManager:
+          description: Optional within this object. Xray role flag, stored and echoed but without effect.
+          type: boolean
+        policyViewer:
+          description: Optional within this object. Xray role flag, stored and echoed but without effect.
+          type: boolean
+        profileUpdatable:
+          description: Optional within this object. Whether the user may change their own profile and password.
+            Defaults to true.
+          type: boolean
+        realm:
+          description: Optional within this object. Server-owned authentication realm, internal for local users.
+            Ignored on write.
+          type: string
+        reportsManager:
+          description: Optional within this object. Xray role flag, stored and echoed but without effect.
+          type: boolean
+        status:
+          description: Optional within this object. Server-owned account state in the upper-case legacy spelling;
+            Access v2 reports the same state in lower case.
+          enum:
+          - ENABLED
+          - DISABLED
+          - LOCKED
+          type: string
+        watchManager:
+          description: Optional within this object. Xray role flag, stored and echoed but without effect.
+          type: boolean
+      type: object
+    UserListItem:
+      description: One entry of the legacy user listing.
+      properties:
+        name:
+          description: Optional within this object. User name.
+          type: string
+        realm:
+          description: Optional within this object. Authentication realm, internal for local users.
+          type: string
+        uri:
+          description: Optional within this object. Absolute URL of the user's detail operation.
+          format: uri
+          type: string
+      type: object
+    UserLockPolicy:
+      description: Account lockout after failed logins.
+      properties:
+        enabled:
+          description: Optional within this object. Whether accounts lock. Defaults to false.
+          type: boolean
+        loginAttempts:
+          description: Optional within this object. Failed attempts before the account locks. Defaults to 5; must
+            be at least 1 when enabled.
+          type: integer
+      type: object
+paths:
+  /api/gpg/key/private:
+    put:
+      description: Stores the instance-wide GPG private key used to sign Debian and Alpine metadata. Admin only.
+        The key is sealed at rest and never returned.
+      operationId: setGpgPrivateKey
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: ASCII-armored private key block.
+              type: string
+        description: The ASCII-armored private key.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The key was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the GPG private key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgprivatekey.md
+  /api/gpg/key/public:
+    get:
+      description: Returns the instance-wide GPG public key so package clients can verify signed metadata. Readable
+        by any authenticated user; 404 until a key is set.
+      operationId: getGpgPublicKey
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: ASCII-armored public key block.
+                type: string
+          description: The public key.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get the GPG public key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getgpgpublickey.md
+    put:
+      description: Stores the instance-wide GPG public key that matches the private key. Admin only.
+      operationId: setGpgPublicKey
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: ASCII-armored public key block.
+              type: string
+        description: The ASCII-armored public key.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The key was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the GPG public key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgpublickey.md
+  /api/gpg/passphrase:
+    put:
+      description: Stores the passphrase protecting the GPG private key. Admin only. The value travels in a header
+        rather than the body and is sealed at rest.
+      operationId: setGpgPassPhrase
+      parameters:
+      - description: Required header parameter. The passphrase for the stored private key.
+        in: header
+        name: X-GPG-PASSPHRASE
+        required: true
+        schema:
+          description: Passphrase text.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The passphrase was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the GPG passphrase
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setgpgpassphrase.md
+  /api/security/apiKey:
+    delete:
+      deprecated: true
+      description: Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are
+        no keys to revoke, so artifactweave answers 200 with an informational message for compatibility with scripts
+        that call it unconditionally.
+      operationId: revokeApiKey
+      parameters:
+      - description: Optional query parameter. 1 revokes every user's key and requires the admin role; 0 or absent
+          revokes only the caller's key.
+        in: query
+        name: deleteAll
+        required: false
+        schema:
+          description: 0 or 1.
+          enum:
+          - 0
+          - 1
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityInfoMessage'
+          description: Nothing was revoked because no keys exist.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Revoke the caller's API key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/revokeapikey.md
+      x-tier: shim
+    get:
+      deprecated: true
+      description: Returns the caller's API key. Because artifactweave never issues keys this always answers 404,
+        which is the documented response when no key exists; the JFrog CLI treats it as "no key".
+      operationId: getApiKey
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+          description: Documented success shape; artifactweave never returns it.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get the caller's API key (always absent)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getapikey.md
+      x-tier: shim
+    post:
+      deprecated: true
+      description: Legacy API-key creation. Artifactory disables it by default since 7.98 and the keys reached end
+        of life; artifactweave always answers 400 with the message "API key creation is disabled". Use an access
+        token or a reference token from /access/api/v1/tokens instead. jfrog-client-go expects 201 on success, which
+        never happens here.
+      operationId: createApiKey
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+          description: Documented success shape; artifactweave never returns it.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create an API key (disabled)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createapikey.md
+      x-tier: shim
+    put:
+      deprecated: true
+      description: Legacy key rotation. artifactweave answers 400 "API key creation is disabled" because no user
+        ever holds a key.
+      operationId: regenerateApiKey
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiKeyResponse'
+          description: Documented success shape; artifactweave never returns it.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Regenerate an API key (disabled)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/regenerateapikey.md
+      x-tier: shim
+  /api/security/apiKey/{username}:
+    delete:
+      deprecated: true
+      description: Admin-only revocation of a named user's key. Answers 200 with an informational message when the
+        user exists and 404 when it does not; there is never a key to remove.
+      operationId: revokeUserApiKey
+      parameters:
+      - description: Required path parameter. The user whose key is revoked.
+        in: path
+        name: username
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityInfoMessage'
+          description: Nothing was revoked because no keys exist.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Revoke another user's API key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/revokeuserapikey.md
+      x-tier: shim
+  /api/security/configuration/passwordExpirationPolicy:
+    get:
+      description: Returns the platform-wide password expiry settings. Admin only. The same policy is visible in
+        the security section of the YAML descriptor.
+      operationId: getPasswordExpirationPolicy
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordExpirationPolicy'
+          description: The current policy.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get the password expiration policy
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpasswordexpirationpolicy.md
+    put:
+      description: Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values,
+        because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+      operationId: setPasswordExpirationPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordExpirationPolicy'
+        description: The complete policy.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordExpirationPolicy'
+          description: The stored policy.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the password expiration policy
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setpasswordexpirationpolicy.md
+  /api/security/encryptedPassword:
+    get:
+      deprecated: true
+      description: Artifactory returns an opaque encrypted password that clients can use in place of the clear-text
+        one. artifactweave returns a reference token bound to the caller instead, which every client accepts wherever
+        the encrypted password was accepted. The caller must authenticate with Basic credentials; token authentication
+        is a 400.
+      operationId: getUserEncryptedPassword
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A reference token usable as a password.
+                type: string
+          description: The substitute credential.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get an encrypted form of the caller's password
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getuserencryptedpassword.md
+      x-tier: shim
+  /api/security/groups:
+    get:
+      deprecated: true
+      description: Lists every group with its detail URL. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/groups;
+        kept for the JFrog CLI. Not in the oracle; from docs/research/05.
+      operationId: getGroups
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Groups sorted by name.
+                items:
+                  $ref: '#/components/schemas/GroupListItem'
+                type: array
+            application/vnd.org.jfrog.artifactory.security.Groups+json:
+              schema:
+                description: Groups sorted by name.
+                items:
+                  $ref: '#/components/schemas/GroupListItem'
+                type: array
+          description: Every group.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List groups (legacy)
+      tags:
+      - security
+  /api/security/groups/{groupName}:
+    delete:
+      deprecated: true
+      description: Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
+        Not in the oracle; from docs/research/05.
+      operationId: deleteGroup
+      parameters:
+      - description: Required path parameter. The group name.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          description: A group name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The group was removed.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a group (legacy)
+      tags:
+      - security
+    get:
+      deprecated: true
+      description: Returns the legacy group document. Admin only. Members are included only when includeUsers=true;
+        the Terraform provider always sends the parameter. Not in the oracle; from docs/research/05.
+      operationId: getGroupDetails
+      parameters:
+      - description: Required path parameter. The group name.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          description: A group name.
+          type: string
+      - description: Optional query parameter. true adds userNames to the response; false or absent omits it.
+        in: query
+        name: includeUsers
+        required: false
+        schema:
+          description: Whether to include members.
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupConfiguration'
+            application/vnd.org.jfrog.artifactory.security.Group+json:
+              schema:
+                $ref: '#/components/schemas/GroupConfiguration'
+          description: The group.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get a group (legacy)
+      tags:
+      - security
+    post:
+      deprecated: true
+      description: Changes only the fields present in the body; userNames, when present, replaces the membership.
+        Admin only. Not in the oracle; from docs/research/05.
+      operationId: updateGroup
+      parameters:
+      - description: Required path parameter. The group name.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          description: A group name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupConfiguration'
+          application/vnd.org.jfrog.artifactory.security.Group+json:
+            schema:
+              $ref: '#/components/schemas/GroupConfiguration'
+        description: The fields to change.
+        required: true
+      responses:
+        '200':
+          description: The group was updated.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Update a group (legacy)
+      tags:
+      - security
+    put:
+      deprecated: true
+      description: Creates the group or replaces every field of an existing one, including the membership when userNames
+        is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on
+        create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from
+        docs/research/05.
+      operationId: createOrReplaceGroup
+      parameters:
+      - description: Required path parameter. The group name; must equal name in the body.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          description: A group name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupConfiguration'
+          application/vnd.org.jfrog.artifactory.security.Group+json:
+            schema:
+              $ref: '#/components/schemas/GroupConfiguration'
+        description: The complete group.
+        required: true
+      responses:
+        '201':
+          description: The group was created or replaced.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create or replace a group (legacy)
+      tags:
+      - security
+  /api/security/keypair:
+    get:
+      description: Lists every key pair without private material. Admin only.
+      operationId: getAllKeyPairs
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Key pair summaries, sorted by name.
+                items:
+                  $ref: '#/components/schemas/KeyPairSummary'
+                type: array
+          description: Every key pair.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List key pairs
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getallkeypairs.md
+    post:
+      description: Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private
+        and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform
+        resource requires.
+      operationId: createKeyPair
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyPairInput'
+        description: The key pair to store.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                description: An empty object.
+                type: object
+          description: The pair was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create a key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createkeypair.md
+    put:
+      description: Replaces the pair named by pairName in the body. Admin only. The pair must exist (404) and the
+        keys must match (400). Repositories referencing the pair pick up the new material immediately.
+      operationId: updateKeyPair
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyPairInput'
+        description: The replacement pair; pairName selects which one.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyPairSummary'
+          description: The stored summary.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Replace a key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updatekeypair.md
+  /api/security/keypair/public/repositories/{repoKey}:
+    get:
+      description: Returns the public half of the repository's primary key pair, which package clients fetch to
+        verify signed metadata. Needs read permission on the repository; anonymous when the repository is anonymously
+        readable. 404 when no pair is assigned.
+      operationId: getKeyPairPublicKeyPerRepository
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: PEM or ASCII-armored public key.
+                type: string
+          description: The public key.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get the public key assigned to a repository
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository.md
+  /api/security/keypair/verify:
+    post:
+      description: Checks that the private and public keys in the body belong together and that the passphrase,
+        if given, unlocks the private key. Nothing is stored. Admin only. A mismatch is a 400 whose message names
+        the problem.
+      operationId: verifyKeyPair
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyPairInput'
+        description: The pair to check.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The keys match.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Verify that a key pair matches
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/verifykeypair.md
+  /api/security/keypair/{keyPairName}:
+    delete:
+      description: Removes the pair. Admin only. A pair still referenced by a repository's primaryKeyPairRef or
+        secondaryKeyPairRef is refused with 400 so signed repositories never lose their key silently.
+      operationId: deleteKeyPair
+      parameters:
+      - description: Required path parameter. The pair name.
+        in: path
+        name: keyPairName
+        required: true
+        schema:
+          description: A key pair name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The pair was removed.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletekeypair.md
+    get:
+      description: Returns the readable projection of one pair. Admin only. The Terraform provider reads this after
+        every create.
+      operationId: getKeyPair
+      parameters:
+      - description: Required path parameter. The pair name.
+        in: path
+        name: keyPairName
+        required: true
+        schema:
+          description: A key pair name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyPairSummary'
+          description: The pair.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get a key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getkeypair.md
+  /api/security/keys/trusted:
+    get:
+      description: Lists the public keys trusted for release-bundle signature verification. Admin only. Served so
+        the artifactory_distribution_public_key resource can read back what it created; release bundles themselves
+        are out of scope in v1. Not in the oracle; shape from docs/research/05 and the provider source.
+      operationId: getTrustedKeys
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustedKeyList'
+          description: Every trusted key.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List trusted public keys
+      tags:
+      - security
+    post:
+      description: Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key
+        resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+      operationId: setDistributionPublicGpgKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrustedKeyInput'
+        description: The key to trust.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustedKey'
+          description: Documented success shape; artifactweave answers 201 instead.
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustedKey'
+          description: The key was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Add a trusted public key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setdistributionpublicgpgkey.md
+  /api/security/keys/trusted/{keyId}:
+    delete:
+      description: Removes a trusted key by its kid. Admin only. Answers 204; the provider accepts 200 or 204. Not
+        in the oracle; from docs/research/05.
+      operationId: deleteTrustedKey
+      parameters:
+      - description: Required path parameter. The kid returned when the key was stored.
+        in: path
+        name: keyId
+        required: true
+        schema:
+          description: A key identifier.
+          type: string
+      responses:
+        '204':
+          description: The key was removed.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a trusted public key
+      tags:
+      - security
+  /api/security/lockedUsers:
+    get:
+      description: Returns the names of users locked by the user lock policy. Admin only. The JFrog CLI prints this
+        list for jf rt users-locked style commands.
+      operationId: getLockedOutUsers
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: User names, sorted.
+                items:
+                  description: A user name.
+                  type: string
+                type: array
+          description: Locked user names, possibly empty.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List locked-out users
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getlockedoutusers.md
+  /api/security/permissions:
+    get:
+      description: Lists every target by name and detail URL, including targets created through the v2 or Access
+        APIs. Admin only.
+      operationId: getPermissionTargets
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Targets sorted by name.
+                items:
+                  $ref: '#/components/schemas/PermissionTargetListItem'
+                type: array
+            application/vnd.org.jfrog.artifactory.security.PermissionTargets+json:
+              schema:
+                description: Targets sorted by name.
+                items:
+                  $ref: '#/components/schemas/PermissionTargetListItem'
+                type: array
+          description: Every target.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List permission targets (v1)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargets.md
+  /api/security/permissions/{permissionTargetName}:
+    delete:
+      description: Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote
+        targets can be deleted; anonymous access then grants nothing until they are recreated.
+      operationId: deletePermissionTarget
+      parameters:
+      - description: Required path parameter. The target name.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The target was removed.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a permission target (v1)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontarget.md
+    get:
+      description: 'Returns the target projected to the v1 shape: only its repository section, with action names
+        mapped back to the single-letter codes. Admin only.'
+      operationId: getPermissionTargetDetails
+      parameters:
+      - description: Required path parameter. The target name.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionTarget'
+            application/vnd.org.jfrog.artifactory.security.PermissionTarget+json:
+              schema:
+                $ref: '#/components/schemas/PermissionTarget'
+          description: The target.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get a permission target (v1)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetails.md
+    put:
+      description: Creates the target or replaces its repository section; build and release bundle sections set
+        through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories
+        are a 400. Answers 200 with a confirmation message.
+      operationId: createOrReplacePermissionTarget
+      parameters:
+      - description: Required path parameter. The target name; wins over name in the body.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionTarget'
+          application/vnd.org.jfrog.artifactory.security.PermissionTarget+json:
+            schema:
+              $ref: '#/components/schemas/PermissionTarget'
+        description: The v1 target.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityInfoMessage'
+          description: The target was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create or replace a permission target (v1)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createorreplacepermissiontarget.md
+  /api/security/token:
+    get:
+      deprecated: true
+      description: Lists tokens in the legacy shape; admins see every token, other users only their own. The same
+        data is served by GET /access/api/v1/tokens. Not in the oracle; from docs/research/05.
+      operationId: getLegacyTokens
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegacyTokenList'
+          description: The tokens.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List access tokens (legacy)
+      tags:
+      - security
+    post:
+      deprecated: true
+      description: The form-encoded predecessor of POST /access/api/v1/tokens, still implemented by the JFrog CLI
+        and not on JFrog's deprecation page. Issues the same JWT the Access endpoint issues. Admins may mint tokens
+        for any username and scope; other users only an identity token for themselves. Legacy scope forms member-of-groups:<g>,
+        api:* and jfrt@<id>:admin are translated to their Access equivalents. Hand-written because the body is form-encoded.
+        Not in the oracle; from docs/research/05 and 09.
+      operationId: createLegacyToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              description: The legacy token request.
+              properties:
+                access_token:
+                  description: Optional within this object. The expiring access token; required with grant_type
+                    refresh_token.
+                  type: string
+                audience:
+                  description: Optional within this object. Audience pattern, default "*@*".
+                  type: string
+                expires_in:
+                  description: Optional within this object. Lifetime in seconds. Defaults to the platform default
+                    expiry; 0 (never) is admin only.
+                  type: integer
+                grant_type:
+                  description: Optional within this object. client_credentials (default) mints a token; refresh_token
+                    exchanges refresh_token and access_token for a new pair.
+                  enum:
+                  - client_credentials
+                  - refresh_token
+                  type: string
+                refresh_token:
+                  description: Optional within this object. The refresh token; required with grant_type refresh_token.
+                  type: string
+                refreshable:
+                  description: Optional within this object. Whether to issue a refresh token. Defaults to false.
+                  type: boolean
+                scope:
+                  description: Optional within this object. Legacy or Access scope string. Defaults to applied-permissions/user.
+                  type: string
+                username:
+                  description: Optional within this object. Subject of the token. Defaults to the caller; non-admins
+                    cannot name anyone else.
+                  type: string
+              type: object
+        description: Form fields.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LegacyTokenResponse'
+          description: The new token.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create or refresh an access token (legacy)
+      tags:
+      - handwritten
+      - security
+      x-handwritten: true
+  /api/security/token/revoke:
+    post:
+      deprecated: true
+      description: Revokes a token by value or by id. Admins may revoke any token, other users only their own. Answers
+        200 even when the token was already revoked or never existed, as Artifactory does. Hand-written because
+        the body is form-encoded. Not in the oracle; from docs/research/05.
+      operationId: revokeLegacyToken
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              description: The revocation request.
+              properties:
+                token:
+                  description: Optional within this object. The JWT or reference token to revoke.
+                  type: string
+                token_id:
+                  description: Optional within this object. The token id to revoke.
+                  type: string
+              type: object
+        description: Form fields; exactly one of token or token_id.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The token is revoked, or was not valid to begin with.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Revoke an access token (legacy)
+      tags:
+      - handwritten
+      - security
+      x-handwritten: true
+  /api/security/unlockAllUsers:
+    post:
+      description: Clears every account lock. Admin only.
+      operationId: unlockAllLockedOutUsers
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: All locks were cleared.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unlock every user
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/unlockalllockedoutusers.md
+  /api/security/unlockUsers:
+    post:
+      description: Clears the lock on each named user. Admin only. Unknown names are ignored so a stale list does
+        not fail the whole call; an empty array is a 400.
+      operationId: unlockLockedOutUsers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: User names.
+              items:
+                description: A user name.
+                type: string
+              type: array
+        description: The users to unlock.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The users were unlocked.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unlock users
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/unlocklockedoutusers.md
+  /api/security/unlockUsers/{userName}:
+    post:
+      deprecated: true
+      description: The older form the JFrog CLI still sends, with the user in the path and no body. Behaves like
+        the array form for one user. Not in the oracle; from docs/research/09.
+      operationId: unlockLockedOutUser
+      parameters:
+      - description: Required path parameter. The user to unlock.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The user was unlocked, or was not locked.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unlock one user (path form)
+      tags:
+      - security
+  /api/security/userLockPolicy:
+    get:
+      description: Returns the lockout settings. Admin only.
+      operationId: getUserLockPolicy
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLockPolicy'
+          description: The current policy.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get the user lock policy
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getuserlockpolicy.md
+    put:
+      description: Replaces the lockout settings. Admin only. Disabling the policy also clears existing locks.
+      operationId: configureUserLockPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLockPolicy'
+        description: The complete policy.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The policy was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the user lock policy
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/configureuserlockpolicy.md
+  /api/security/users:
+    get:
+      deprecated: true
+      description: Lists every user with its detail URL and realm. Admin only. Deprecated by JFrog in favour of
+        GET /access/api/v2/users; kept because the JFrog CLI calls it. Not in the oracle; from docs/research/05.
+      operationId: getUsers
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Users sorted by name.
+                items:
+                  $ref: '#/components/schemas/UserListItem'
+                type: array
+            application/vnd.org.jfrog.artifactory.security.Users+json:
+              schema:
+                description: Users sorted by name.
+                items:
+                  $ref: '#/components/schemas/UserListItem'
+                type: array
+          description: Every user.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List users (legacy)
+      tags:
+      - security
+  /api/security/users/authorization/expirePassword:
+    post:
+      description: Forces each named user to change their password at the next login. Admin only. Unknown users
+        are reported in the message rather than failing the call.
+      operationId: expirePasswordForMultipleUsers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: User names.
+              items:
+                description: A user name.
+                type: string
+              type: array
+        description: The users whose passwords expire.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecurityStatusMessage'
+          description: The passwords were expired.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Expire passwords
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/expirepasswordformultipleusers.md
+  /api/security/users/authorization/unexpirePassword/{userName}:
+    post:
+      deprecated: true
+      description: Clears the forced password change for one user. Admin only. JFrog marks it slated for removal;
+        kept for script compatibility.
+      operationId: unexpirePasswordForSingleUser
+      parameters:
+      - description: Required path parameter. The user name.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The password is no longer expired.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unexpire a password
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/unexpirepasswordforsingleuser.md
+  /api/security/users/{userName}:
+    delete:
+      deprecated: true
+      description: Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users
+        cannot be deleted (400). Not in the oracle; from docs/research/05.
+      operationId: deleteUser
+      parameters:
+      - description: Required path parameter. The user name.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The user was removed.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a user (legacy)
+      tags:
+      - security
+    get:
+      description: Returns the legacy user document without the password. Admin only. The seeded anonymous user
+        is readable here, which is how artifactory_anonymous_user works.
+      operationId: getUserDetails
+      parameters:
+      - description: Required path parameter. The user name.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserConfiguration'
+            application/vnd.org.jfrog.artifactory.security.Users+json:
+              schema:
+                $ref: '#/components/schemas/UserConfiguration'
+          description: The user.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get a user (legacy)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getuserdetails-1.md
+    post:
+      deprecated: true
+      description: Changes only the fields present in the body. Admin only. groups, when present, replaces the membership.
+        Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+      operationId: updateUser
+      parameters:
+      - description: Required path parameter. The user name.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserConfiguration'
+          application/vnd.org.jfrog.artifactory.security.User+json:
+            schema:
+              $ref: '#/components/schemas/UserConfiguration'
+        description: The fields to change.
+        required: true
+      responses:
+        '200':
+          description: The user was updated.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Update a user (legacy)
+      tags:
+      - security
+    put:
+      deprecated: true
+      description: Creates the user, or replaces every field of an existing one. Admin only. name, email and password
+        are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the
+        user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour
+        of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+      operationId: createOrReplaceUser
+      parameters:
+      - description: Required path parameter. The user name; must equal name in the body.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserConfiguration'
+          application/vnd.org.jfrog.artifactory.security.User+json:
+            schema:
+              $ref: '#/components/schemas/UserConfiguration'
+        description: The complete user.
+        required: true
+      responses:
+        '201':
+          description: The user was created or replaced.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create or replace a user (legacy)
+      tags:
+      - security
+  /api/system/decrypt:
+    post:
+      description: In Artifactory this rewrites the configuration descriptor with clear-text secrets. artifactweave
+        keeps secrets sealed at all times (decision 0017), so the call is accepted and answers DONE without changing
+        anything; the descriptor export masks secrets regardless.
+      operationId: deactivateArtifactoryKeyEncryption
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: The word DONE.
+                type: string
+          description: Accepted.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Deactivate key encryption
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deactivateartifactorykeyencryption.md
+      x-tier: shim
+  /api/system/encrypt:
+    post:
+      description: The counterpart of decrypt. Secrets are always sealed, so the call answers DONE and changes nothing.
+      operationId: activateArtifactoryKeyEncryption
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: The word DONE.
+                type: string
+          description: Accepted.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Activate key encryption
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/activateartifactorykeyencryption.md
+      x-tier: shim
+  /api/system/security/certificates:
+    get:
+      description: Lists the client certificates remote repositories can present to upstreams. Admin only. The artifactory_certificate
+        resource reads the list after every create and matches fingerPrint case-insensitively.
+      operationId: getCertificates
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Certificates sorted by alias.
+                items:
+                  $ref: '#/components/schemas/CertificateInfo'
+                type: array
+          description: Every certificate.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List client certificates
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getcertificates.md
+  /api/system/security/certificates/{certificateAlias}:
+    delete:
+      description: Removes the certificate. Admin only. A certificate still referenced by a remote repository is
+        refused with 400.
+      operationId: deleteCertificate
+      parameters:
+      - description: Required path parameter. The alias.
+        in: path
+        name: certificateAlias
+        required: true
+        schema:
+          description: A certificate alias.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Outcome of the removal.
+                properties:
+                  message:
+                    description: Optional within this object. Confirmation text.
+                    type: string
+                  status:
+                    description: Optional within this object. HTTP status repeated in the body.
+                    type: integer
+                type: object
+          description: The certificate was removed.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a client certificate
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletecertificate.md
+    post:
+      description: Stores a PEM bundle holding the certificate and its private key under the alias. Admin only.
+        The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an
+        existing alias is replaced. The documented request media type is application/text; text/plain is accepted
+        as well.
+      operationId: addCertificate
+      parameters:
+      - description: Required path parameter. Alias that repositories reference in clientTlsCertificate.
+        in: path
+        name: certificateAlias
+        required: true
+        schema:
+          description: A certificate alias.
+          type: string
+      requestBody:
+        content:
+          application/text:
+            schema:
+              description: PEM certificate followed by its private key.
+              format: binary
+              type: string
+        description: The PEM bundle.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Outcome of the import.
+                properties:
+                  message:
+                    description: Optional within this object. One line per stored certificate.
+                    items:
+                      description: A confirmation line.
+                      type: string
+                    type: array
+                  status:
+                    description: Optional within this object. HTTP status repeated in the body.
+                    type: integer
+                type: object
+          description: The certificate was stored.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Add a client certificate
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/addcertificate.md
+  /api/system/service_id:
+    get:
+      description: Returns the instance identity in the form jfrt@<uuid>. Admin only. The uuid is generated at first
+        start and is the issuer in every token subject.
+      operationId: getServiceId
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: jfrt@ followed by a uuid.
+                type: string
+          description: The service id.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get the service id
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getserviceid-1.md
+  /api/v2/repositories/{repoName}/keyPairs:
+    post:
+      description: Sets the repository's primary key pair to the named pair. Needs the admin role. Equivalent to
+        setting primaryKeyPairRef in the repository configuration. An unknown pair or repository is a 400.
+      operationId: setRepositoryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: An existing key pair name.
+              type: string
+        description: The key pair name.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The pair was assigned.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Assign a key pair to a repository
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setrepositorykey.md
+  /api/v2/repositories/{repoName}/keyPairs/primary:
+    delete:
+      description: Clears primaryKeyPairRef; the pair itself is kept. Admin only. 404 when no primary pair is set.
+      operationId: deletePrimaryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The primary pair was unset.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unset the primary key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleteprimarykey.md
+    post:
+      description: Sets primaryKeyPairRef. Admin only. Metadata signed from now on uses this pair; existing signatures
+        are not regenerated until a reindex.
+      operationId: setPrimaryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: An existing key pair name.
+              type: string
+        description: The key pair name.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The primary pair was set.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the primary key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setprimarykey.md
+  /api/v2/repositories/{repoName}/keyPairs/primary/public:
+    get:
+      description: Returns the public half of the repository's primary pair. Needs read permission on the repository.
+        404 when no primary pair is set.
+      operationId: downloadPrimaryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: PEM or ASCII-armored public key.
+                type: string
+          description: The public key.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Download the primary public key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/downloadprimarykey.md
+  /api/v2/repositories/{repoName}/keyPairs/promote:
+    post:
+      description: Makes the secondary pair primary and clears the secondary slot, the rotation step after a new
+        pair was staged as secondary. Admin only. 400 when no secondary pair is set, 404 when the repository does
+        not exist.
+      operationId: promoteSecondaryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The secondary pair is now primary.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Promote the secondary key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/promotesecondarykey.md
+  /api/v2/repositories/{repoName}/keyPairs/secondary:
+    delete:
+      description: Clears secondaryKeyPairRef. Admin only. 404 when none is set.
+      operationId: deleteSecondaryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The secondary pair was unset.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unset the secondary key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletesecondarykey.md
+    post:
+      description: Sets secondaryKeyPairRef, the staging slot for key rotation. Admin only. Clients that fetch both
+        public keys can verify metadata signed by either pair during the rotation.
+      operationId: setSecondaryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              description: An existing key pair name.
+              type: string
+        description: The key pair name.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The secondary pair was set.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Set the secondary key pair
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/setsecondarykey.md
+  /api/v2/repositories/{repoName}/keyPairs/secondary/public:
+    get:
+      description: Returns the public half of the secondary pair. Needs read permission on the repository. 404 when
+        no secondary pair is set.
+      operationId: downloadSecondaryPublicKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: PEM or ASCII-armored public key.
+                type: string
+          description: The public key.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Download the secondary public key
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/downloadsecondarypublickey.md
+  /api/v2/repositories/{repoName}/keyPairs/{keyName}:
+    delete:
+      description: Clears whichever slot (primary or secondary) references the named pair. Admin only. 404 when
+        the pair is not assigned to the repository.
+      operationId: deleteRepositoryKey
+      parameters:
+      - description: Required path parameter. The repository key.
+        in: path
+        name: repoName
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      - description: Required path parameter. The assigned key pair name.
+        in: path
+        name: keyName
+        required: true
+        schema:
+          description: A key pair name.
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation text.
+                type: string
+          description: The pair was unassigned.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Unassign a key pair from a repository
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deleterepositorykey.md
+  /api/v2/security/permissions:
+    get:
+      description: Lists every target by name and detail URL. Admins see all; other users see the targets they hold
+        Manage on.
+      operationId: getPermissionTargetsV2
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Targets sorted by name.
+                items:
+                  $ref: '#/components/schemas/PermissionTargetListItem'
+                type: array
+            application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json:
+              schema:
+                description: Targets sorted by name.
+                items:
+                  $ref: '#/components/schemas/PermissionTargetListItem'
+                type: array
+          description: The visible targets.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List permission targets (v2)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsv2.md
+  /api/v2/security/permissions/groups/{groupName}:
+    get:
+      description: Returns every target in which the group appears in any section's actions. Admin only.
+      operationId: getPermissionTargetsByGroupV2
+      parameters:
+      - description: Required path parameter. The group name.
+        in: path
+        name: groupName
+        required: true
+        schema:
+          description: A group name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Targets sorted by name.
+                items:
+                  $ref: '#/components/schemas/PermissionTargetV2'
+                type: array
+          description: The matching targets; empty when none.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List targets granting a group
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsbygroupv2.md
+  /api/v2/security/permissions/users/{userName}:
+    get:
+      description: Returns every target in which the user appears directly in any section's actions; grants inherited
+        through groups are not expanded. Admin only.
+      operationId: getPermissionTargetsByUserV2
+      parameters:
+      - description: Required path parameter. The user name.
+        in: path
+        name: userName
+        required: true
+        schema:
+          description: A user name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Targets sorted by name.
+                items:
+                  $ref: '#/components/schemas/PermissionTargetV2'
+                type: array
+          description: The matching targets; empty when none.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: List targets granting a user
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsbyuserv2.md
+  /api/v2/security/permissions/{permissionTargetName}:
+    delete:
+      description: Removes the target and every section. Answers 200 with no body. Admins and holders of Manage
+        on the target may call it.
+      operationId: deletePermissionTargetV2
+      parameters:
+      - description: Required path parameter. The target name.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      responses:
+        '200':
+          description: The target was removed.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Delete a permission target (v2)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontargetv2.md
+    get:
+      description: Returns the target with every section. Admins and holders of Manage on the target may read it.
+      operationId: getPermissionTargetDetailsV2
+      parameters:
+      - description: Required path parameter. The target name.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionTargetV2'
+            application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json:
+              schema:
+                $ref: '#/components/schemas/PermissionTargetV2'
+          description: The target.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Get a permission target (v2)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetailsv2.md
+    head:
+      description: 200 when the target exists, 404 when it does not, with no body. The artifactory_permission_target
+        resource uses it before every create.
+      operationId: permissionTargetExistenceCheckV2
+      parameters:
+      - description: Required path parameter. The target name.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      responses:
+        '200':
+          description: The target exists.
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          description: The caller may not inspect targets.
+        '404':
+          description: No target has that name.
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Check that a permission target exists (v2)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/permissiontargetexistencecheckv2.md
+    post:
+      description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409, which
+        jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build
+        section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64
+        characters are a 400.'
+      operationId: createPermissionTargetV2
+      parameters:
+      - description: Required path parameter. The target name; wins over name in the body.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionTargetV2'
+          application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json:
+            schema:
+              $ref: '#/components/schemas/PermissionTargetV2'
+        description: The v2 target.
+        required: true
+      responses:
+        '201':
+          description: The target was created.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A target with that name already exists.
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create a permission target (v2)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createpermissiontargetv2.md
+    put:
+      description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept.
+        Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an
+        existing target may call it. Validation is the same as for create.'
+      operationId: createOrReplacePermissionTargetV2
+      parameters:
+      - description: Required path parameter. The target name; wins over name in the body.
+        in: path
+        name: permissionTargetName
+        required: true
+        schema:
+          description: A permission target name.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermissionTargetV2'
+          application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json:
+            schema:
+              $ref: '#/components/schemas/PermissionTargetV2'
+        description: The complete v2 target.
+        required: true
+      responses:
+        '200':
+          description: The target was created or replaced.
+        '400':
+          $ref: '#/components/responses/SecurityBadRequest'
+        '401':
+          $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
+        '404':
+          $ref: '#/components/responses/SecurityNotFound'
+        '500':
+          $ref: '#/components/responses/SecurityInternalServerError'
+      summary: Create or replace a permission target (v2)
+      tags:
+      - security
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2.md

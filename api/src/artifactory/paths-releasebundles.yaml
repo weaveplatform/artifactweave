@@ -1,0 +1,1097 @@
+paths:
+  /api/release/bundles:
+    get:
+      description: Lists the release bundles v1 held on this instance, grouped by bundle name with every version.
+        `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default,
+        lists bundles this instance received as an edge (decision 0023). Only bundles the caller may read are returned.
+      operationId: getAllBundles
+      parameters:
+      - description: 'Optional query parameter. Which side of distribution to list: `target` for received bundles
+          or `source` for bundles created here. Defaults to `target`.'
+        in: query
+        name: type
+        schema:
+          default: target
+          description: Distribution side.
+          enum:
+          - target
+          - source
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Release bundles grouped by name.
+                properties:
+                  bundles:
+                    additionalProperties:
+                      description: The versions of one bundle.
+                      items:
+                        description: One bundle version.
+                        properties:
+                          created:
+                            description: Optional within this object. RFC 3339 time the version was created on the
+                              instance that signed it.
+                            format: date-time
+                            type: string
+                          status:
+                            description: Optional within this object. State of the version on this instance. JFrog
+                              documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS
+                              while a received version is still arriving and FAILED when receiving or storing failed.
+                            type: string
+                          version:
+                            description: Optional within this object. The bundle version string.
+                            type: string
+                        type: object
+                      type: array
+                    description: Optional within this object. Map from bundle name to its versions, newest first.
+                    type: object
+                type: object
+          description: The bundles, grouped by name.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List release bundles
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundles.md
+      x-unverified: true
+  /api/release/bundles/source/{bundleName}/{bundleVersion}:
+    delete:
+      description: 'Deletes one version of a source release bundle: its signed manifest in the `releasebundles`
+        repository and its record. The artifacts the bundle pinned stay in their repositories, and copies already
+        distributed to edges are untouched; remove those through the Distribution API. Requires the delete action
+        on release bundles.'
+      operationId: deleteReleaseBundleVersion
+      parameters:
+      - description: Required path parameter. Name of the release bundle.
+        in: path
+        name: bundleName
+        required: true
+        schema:
+          description: Bundle name.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Version to delete.
+        in: path
+        name: bundleVersion
+        required: true
+        schema:
+          description: Bundle version.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Confirmation message.
+                type: string
+          description: The version was deleted; the body is a short confirmation.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No source bundle with that name and version exists.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Delete a source release bundle version
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundleversion.md
+  /api/release/bundles/{bundleName}:
+    get:
+      description: Lists every version of one release bundle held on this instance, whether created here or received,
+        newest first.
+      operationId: getAllBundleVersions
+      parameters:
+      - description: Required path parameter. Name of the release bundle.
+        in: path
+        name: bundleName
+        required: true
+        schema:
+          description: Bundle name.
+          minLength: 1
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The versions of one bundle.
+                properties:
+                  versions:
+                    description: Optional within this object. The versions, newest first.
+                    items:
+                      description: One bundle version.
+                      properties:
+                        created:
+                          description: Optional within this object. RFC 3339 time the version was created on the
+                            instance that signed it.
+                          format: date-time
+                          type: string
+                        status:
+                          description: Optional within this object. State of the version on this instance. JFrog
+                            documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS
+                            while a received version is still arriving and FAILED when receiving or storing failed.
+                          type: string
+                        version:
+                          description: Optional within this object. The bundle version string.
+                          type: string
+                      type: object
+                    type: array
+                type: object
+          description: The versions of the bundle.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No bundle with that name exists on this instance.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List the versions of a release bundle
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallbundleversions.md
+      x-unverified: true
+  /api/release/bundles/{bundleName}/{bundleVersion}:
+    get:
+      description: Returns one release bundle version. With `format=json`, or without `format`, the response is
+        the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`),
+        which an edge verifies against the distributing instance's public signing key before accepting any content
+        (decision 0023).
+      operationId: getReleaseBundleVersion
+      parameters:
+      - description: Required path parameter. Name of the release bundle.
+        in: path
+        name: bundleName
+        required: true
+        schema:
+          description: Bundle name.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Version to return.
+        in: path
+        name: bundleVersion
+        required: true
+        schema:
+          description: Bundle version.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. json returns the decoded manifest; jws returns the signed manifest
+          as a compact JWS string, which the JFrog CLI verifies against the distributing key. Omitted is treated
+          as json.
+        in: query
+        name: format
+        schema:
+          default: json
+          description: Response form.
+          enum:
+          - jws
+          - json
+          type: string
+        x-unverified: true
+      responses:
+        '200':
+          content:
+            application/jose:
+              schema:
+                description: The signed manifest as a compact JWS (header.payload.signature). The payload claims
+                  are id, name, version, created, description, release_notes {content, syntax}, type, signature
+                  and artifacts [{repo_path, checksum, download_token}]; jfrog-client-go parses exactly these (ReleaseBundleModel).
+                type: string
+            application/json:
+              schema:
+                description: The decoded release bundle manifest.
+                properties:
+                  artifacts:
+                    description: Optional within this object. The artifacts the bundle pins, each by path and checksum.
+                      The list is fixed once the bundle is signed.
+                    items:
+                      description: One pinned artifact.
+                      properties:
+                        checksum:
+                          description: Optional within this object. SHA-256 of the artifact. An edge rejects content
+                            whose digest differs.
+                          type: string
+                        props:
+                          description: Optional within this object. Properties recorded with the artifact when the
+                            bundle was created, as key and values objects.
+                          items:
+                            description: One property entry.
+                            type: object
+                          type: array
+                        repo_path:
+                          description: Optional within this object. `<repo>/<path>` of the artifact on the source
+                            instance.
+                          type: string
+                      type: object
+                    type: array
+                  created:
+                    description: Optional within this object. RFC 3339 time the bundle was created.
+                    format: date-time
+                    type: string
+                  description:
+                    description: Optional within this object. Free text given when the bundle was created.
+                    type: string
+                  name:
+                    description: Optional within this object. Bundle name.
+                    type: string
+                  version:
+                    description: Optional within this object. Bundle version.
+                    type: string
+                type: object
+          description: The manifest, decoded or signed depending on `format`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No bundle with that name and version exists.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get a release bundle version
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundleversion.md
+  /api/release/import:
+    post:
+      description: Imports a release bundle version from an exported archive, the air-gapped path between instances.
+        Send the archive as the `application/octet-stream` body, or send an empty JSON object and name a file in
+        the instance's import directory (`<data_dir>/import`) with `file_name`; that file is deleted after a successful
+        import. With `dry_run=true` the archive is checked (signature, manifest, checksums of the contained artifacts)
+        and nothing is stored. The import runs in the background; follow it with the import status operation. Release
+        bundles v2 archives are rejected with 400.
+      operationId: importReleaseBundleVersion
+      parameters:
+      - description: Optional query parameter. Name of an archive in the import directory. Required when the body
+          is JSON; ignored when the archive is the body.
+        in: query
+        name: file_name
+        schema:
+          description: Archive file name.
+          type: string
+      - description: Optional query parameter. When true, validate the archive and store nothing. Defaults to false.
+        in: query
+        name: dry_run
+        schema:
+          default: false
+          description: Validate only.
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Empty object; the archive is read from the import directory.
+              type: object
+          application/octet-stream:
+            schema:
+              description: The exported release bundle archive.
+              format: binary
+              type: string
+        description: The exported archive, or an empty JSON object when `file_name` names a file in the import directory.
+        required: false
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                description: Acknowledgement; its fields are not specified.
+                type: object
+          description: The import was accepted and runs in the background.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The archive is invalid, its signature does not verify, it holds a release bundle v2, or neither
+            a body nor `file_name` was given.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Import a release bundle version
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/importreleasebundleversion.md
+  /api/release/import/{name}/{version}/status:
+    get:
+      description: Reports the progress of an import started with the import operation, by bundle name and version.
+      operationId: getReleaseBundleVersionImportStatus
+      parameters:
+      - description: Required path parameter. Name of the imported bundle.
+        in: path
+        name: name
+        required: true
+        schema:
+          description: Bundle name.
+          minLength: 1
+          type: string
+      - description: Required path parameter. Version of the imported bundle.
+        in: path
+        name: version
+        required: true
+        schema:
+          description: Bundle version.
+          minLength: 1
+          type: string
+      - description: Optional query parameter. Response format. Only `json` is supported.
+        in: query
+        name: format
+        schema:
+          default: json
+          description: Response format.
+          enum:
+          - json
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Import progress.
+                properties:
+                  status:
+                    description: Optional within this object. IN_PROGRESS while the import runs, COMPLETED once
+                      the version is stored, FAILED when validation or storage failed, and NOT_EXPORTED when no
+                      import of that name and version has been started. NOT_EXPORTED takes the place that NOT_TRIGGERED
+                      has in the export status.
+                    enum:
+                    - IN_PROGRESS
+                    - NOT_EXPORTED
+                    - FAILED
+                    - COMPLETED
+                    type: string
+                type: object
+          description: The import progress.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No import of that name and version is known.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get release bundle import status
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundleversionimportstatus.md
+      x-unverified: true
+  /api/v1/bundle/retention/audit:
+    get:
+      description: 'Lists past retention operations on release bundles v1: deletions and keep or unkeep markings,
+        newest first by default.'
+      operationId: getRetentionOperationsHistory
+      parameters:
+      - description: Optional query parameter. Number of entries to skip before the page starts. Defaults to 0.
+        in: query
+        name: offset
+        schema:
+          default: 0
+          description: Number of entries to skip before the page starts.
+          type: integer
+      - description: Optional query parameter. Maximum number of entries to return. Defaults to 100.
+        in: query
+        name: limit
+        schema:
+          default: 100
+          description: Maximum number of entries to return.
+          type: integer
+      - description: Optional query parameter. Field to sort by. Defaults to `created`.
+        in: query
+        name: order_by
+        schema:
+          default: created
+          description: Field to sort by.
+          enum:
+          - bundle_name
+          - bundle_version
+          - operation
+          - created
+          - created_by
+          type: string
+      - description: Optional query parameter. Sort direction, `asc` or `desc`. Defaults to `desc`.
+        in: query
+        name: direction
+        schema:
+          default: desc
+          description: Sort direction, `asc` or `desc`.
+          enum:
+          - asc
+          - desc
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A page of retention history.
+                properties:
+                  items:
+                    description: Optional within this object. The entries on this page.
+                    items:
+                      description: One retention operation.
+                      properties:
+                        bundle_name:
+                          description: Optional within this object. Bundle the operation applied to.
+                          type: string
+                        bundle_version:
+                          description: Optional within this object. Version the operation applied to.
+                          type: string
+                        created:
+                          description: Optional within this object. RFC 3339 time of the operation.
+                          format: date-time
+                          type: string
+                        created_by:
+                          description: Optional within this object. User who requested it, or the system user for
+                            scheduled retention runs.
+                          type: string
+                        operation:
+                          description: Optional within this object. `DELETE`, `KEEP` or `UNKEEP`.
+                          enum:
+                          - DELETE
+                          - KEEP
+                          - UNKEEP
+                          type: string
+                      type: object
+                    type: array
+                  total:
+                    description: Optional within this object. Number of entries across all pages, for paging.
+                    type: integer
+                type: object
+          description: One page of history entries.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List release bundle retention history
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getretentionoperationshistory.md
+  /api/v1/bundle/retention/config:
+    get:
+      description: Returns the release bundle v1 retention configuration (decision 0023).
+      operationId: getRetentionPolicyConfiguration
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Retention configuration.
+                properties:
+                  automatic:
+                    description: Optional within this object. When true a scheduled job deletes versions that exceed
+                      the configured limits.
+                    type: boolean
+                  cron_pattern:
+                    description: Optional within this object. Quartz cron expression for the scheduled job (decision
+                      0010).
+                    type: string
+                  max_days_to_keep:
+                    description: Optional within this object. Versions older than this many days become deletion
+                      candidates. Zero means no age limit.
+                    type: integer
+                  max_deletions_per_background_run:
+                    description: Optional within this object. Upper bound on deletions in one scheduled run, so
+                      a large backlog drains over several runs.
+                    type: integer
+                  num_of_versions_to_keep_per_release_bundle:
+                    description: Optional within this object. Newest versions kept per bundle name; older versions
+                      become deletion candidates. Zero means no version limit.
+                    type: integer
+                type: object
+          description: The configuration.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get release bundle retention configuration
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getretentionpolicyconfiguration.md
+    post:
+      description: Updates the retention configuration. Only fields present in the body change. A field cannot be
+        cleared, only overwritten with a new value. Administrators only.
+      operationId: setRetentionPolicyConfiguration
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The fields to change.
+              properties:
+                automatic:
+                  description: Optional within this object. When true a scheduled job deletes versions that exceed
+                    the configured limits.
+                  type: boolean
+                cron_pattern:
+                  description: Optional within this object. Quartz cron expression for the scheduled job.
+                  type: string
+                max_days_to_keep:
+                  description: Optional within this object. Age in days after which versions become deletion candidates.
+                    Zero means no age limit.
+                  type: integer
+                max_deletions_per_background_run:
+                  description: Optional within this object. Upper bound on deletions in one scheduled run.
+                  type: integer
+                num_of_versions_to_keep_per_release_bundle:
+                  description: Optional within this object. Newest versions to keep per bundle name. Zero means
+                    no version limit.
+                  type: integer
+              type: object
+        description: The fields to change.
+        required: true
+      responses:
+        '200':
+          description: The configuration was stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A value is invalid, for example a malformed cron expression or a negative count.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Update release bundle retention configuration
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setretentionpolicyconfiguration.md
+  /api/v1/bundle/retention/config/enable:
+    get:
+      description: Reports whether retention is enabled. While it is disabled, keep markings are not enforced and
+        any version can be deleted.
+      operationId: queryStatusOfRetentionService
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Enablement state.
+                properties:
+                  enable:
+                    description: Optional within this object. True when retention, and with it keep protection,
+                      is active.
+                    type: boolean
+                type: object
+          description: The enablement state.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Get whether release bundle retention is enabled
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/querystatusofretentionservice.md
+    post:
+      description: Turns retention on or off. Turning it off also lifts keep protection. Administrators only.
+      operationId: setRetentionPoliciesToEnabled
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The new state.
+              properties:
+                enable:
+                  description: Required within this object. True to enable retention, false to disable it.
+                  type: boolean
+              required:
+              - enable
+              type: object
+        description: The new state.
+        required: true
+      responses:
+        '200':
+          description: The state was changed.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Enable or disable release bundle retention
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/setretentionpoliciestoenabled.md
+  /api/v1/bundle/retention/delete:
+    post:
+      description: Deletes the listed bundle versions and records each deletion in the retention history. While
+        retention is enabled, versions marked keep are skipped. With `dryRun=true` the request is checked and nothing
+        is deleted. Administrators only.
+      operationId: deleteReleaseBundles
+      parameters:
+      - description: Optional query parameter. When true, check the request and delete nothing. Defaults to false.
+        in: query
+        name: dryRun
+        schema:
+          default: false
+          description: When true, check the request and delete nothing.
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: The versions to delete.
+              items:
+                description: One version to delete.
+                properties:
+                  bundle_name:
+                    description: Required within this object. Bundle name.
+                    type: string
+                  bundle_version:
+                    description: Required within this object. Bundle version.
+                    type: string
+                required:
+                - bundle_name
+                - bundle_version
+                type: object
+              type: array
+        description: The versions to delete.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Result of the deletion; its fields are not specified.
+                type: object
+          description: The deletion was performed or, for a dry run, validated.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Delete release bundle versions through retention
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundles.md
+  /api/v1/bundle/retention/keep:
+    post:
+      description: Marks bundle versions to be kept indefinitely, or removes that marking. While retention is enabled,
+        kept versions are never deleted by retention.
+      operationId: markReleaseBundlesToKeepOrDontKeep
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Versions to protect and versions to release.
+              properties:
+                keep:
+                  description: Optional within this object. Versions to protect from retention.
+                  items:
+                    description: One version.
+                    properties:
+                      bundle_name:
+                        description: Required within this object. Bundle name.
+                        type: string
+                      bundle_version:
+                        description: Required within this object. Bundle version.
+                        type: string
+                    required:
+                    - bundle_name
+                    - bundle_version
+                    type: object
+                  type: array
+                unkeep:
+                  description: Optional within this object. Versions to release from protection.
+                  items:
+                    description: One version.
+                    properties:
+                      bundle_name:
+                        description: Required within this object. Bundle name.
+                        type: string
+                      bundle_version:
+                        description: Required within this object. Bundle version.
+                        type: string
+                    required:
+                    - bundle_name
+                    - bundle_version
+                    type: object
+                  type: array
+              type: object
+        description: Versions to protect and versions to release.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Result; its fields are not specified.
+                type: object
+          description: The markings were applied.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: Mark release bundle versions keep or unkeep
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/markreleasebundlestokeepordontkeep.md
+  /api/v1/bundle/retention/report:
+    post:
+      description: Lists the bundle versions one retention rule would delete, without deleting anything, so an administrator
+        can review candidates first.
+      operationId: getConfiguredRetentionPoliciesList
+      parameters:
+      - description: Optional query parameter. Number of entries to skip before the page starts. Defaults to 0.
+        in: query
+        name: offset
+        schema:
+          default: 0
+          description: Number of entries to skip before the page starts.
+          type: integer
+      - description: Optional query parameter. Maximum number of entries to return. Defaults to 100.
+        in: query
+        name: limit
+        schema:
+          default: 100
+          description: Maximum number of entries to return.
+          type: integer
+      - description: Optional query parameter. Field to sort by. Defaults to `distribution_time`.
+        in: query
+        name: order_by
+        schema:
+          default: distribution_time
+          description: Field to sort by.
+          enum:
+          - bundle_name
+          - bundle_version
+          - distribution_time
+          - keep
+          type: string
+      - description: Optional query parameter. Sort direction, `asc` or `desc`. Defaults to `asc`.
+        in: query
+        name: direction
+        schema:
+          default: asc
+          description: Sort direction, `asc` or `desc`.
+          enum:
+          - asc
+          - desc
+          type: string
+      - description: Optional query parameter. Case-insensitive pattern over bundle name and version, where `*`
+          matches any run of characters. Defaults to `*`.
+        in: query
+        name: pattern
+        schema:
+          default: '*'
+          description: Case-insensitive pattern over bundle name and version, where `*` matches any run of characters.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Which rule to evaluate.
+              properties:
+                include_keep:
+                  description: Optional within this object. When true, versions marked keep are listed too and flagged
+                    by `keep`. Defaults to false.
+                  type: boolean
+                type:
+                  description: 'Required within this object. The rule to evaluate: `MAX_VERSIONS_PER_RELEASE_BUNDLE`
+                    or `MAX_DAYS_TO_KEEP`.'
+                  enum:
+                  - MAX_VERSIONS_PER_RELEASE_BUNDLE
+                  - MAX_DAYS_TO_KEEP
+                  type: string
+              required:
+              - type
+              type: object
+        description: Which rule to evaluate.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A page of retention candidates.
+                properties:
+                  items:
+                    description: Optional within this object. The candidates on this page.
+                    items:
+                      description: One candidate version.
+                      properties:
+                        bundle_name:
+                          description: Optional within this object. Bundle name.
+                          type: string
+                        bundle_version:
+                          description: Optional within this object. Bundle version.
+                          type: string
+                        creation_time:
+                          description: Optional within this object. Time the version was created, in epoch milliseconds.
+                          type: integer
+                        distribution_time:
+                          description: Optional within this object. Time the version was distributed or received,
+                            in epoch milliseconds.
+                          type: integer
+                        keep:
+                          description: Optional within this object. True when the version is marked keep.
+                          type: boolean
+                      type: object
+                    type: array
+                  total:
+                    description: Optional within this object. Number of candidates across all pages.
+                    type: integer
+                type: object
+          description: One page of candidates.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or a value is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The operation is not available in this instance's configuration.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while handling the request.
+      summary: List release bundle retention candidates
+      tags:
+      - releasebundles
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getconfiguredretentionpolicieslist.md

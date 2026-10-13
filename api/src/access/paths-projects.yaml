@@ -1,0 +1,1811 @@
+# Projects: create and administer projects, their members and roles, and assign or share
+# repositories with them. Facts come from the oracle (projects-jfrog-platform-projects-api
+# family); the prose is ours (docs/research/07-webhooks-retention-projects.md, decision 0013).
+# Project environments live in paths-identity.yaml with the global environments. Status
+# codes are the ones the jfrog/project Terraform provider hard-checks.
+components:
+  schemas:
+    Project:
+      description: A project as the server returns it.
+      properties:
+        admin_privileges:
+          description: >-
+            Optional within this object. The project admin privileges in effect, granular flags
+            resolved.
+          properties:
+            create_local_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create local repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            create_remote_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create remote repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            create_virtual_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create virtual
+                repositories. Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_local_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete local repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_remote_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete remote repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_virtual_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete virtual
+                repositories. Defaults to true when any granular flag is set on create.
+              type: boolean
+            index_resources:
+              description: >-
+                Optional within this object. Project admins may mark the project's resources for
+                indexing. Stored and echoed; artifactweave has no indexing service. Defaults to
+                true.
+              type: boolean
+            manage_members:
+              description: >-
+                Optional within this object. Project admins may add and remove members and change
+                their roles. Defaults to true.
+              type: boolean
+            manage_remote_repository:
+              description: >-
+                Optional within this object. Legacy flag. When no granular flag is set it controls
+                creating and deleting remote repositories. Defaults to true.
+              type: boolean
+            manage_resources:
+              description: >-
+                Optional within this object. Legacy flag. When no granular flag is set it controls
+                creating and deleting local and virtual repositories. Defaults to true.
+              type: boolean
+          type: object
+        description:
+          description: Optional within this object. The description.
+          type: string
+        display_name:
+          description: Optional within this object. The display name.
+          type: string
+        project_key:
+          description: Optional within this object. The project key.
+          type: string
+        soft_limit:
+          description: Optional within this object. Whether the quota only warns.
+          type: boolean
+        storage_quota_bytes:
+          description: Optional within this object. The quota in bytes; -1 when unlimited.
+          type: integer
+        storage_quota_email_notification:
+          description: Optional within this object. Whether quota warnings are emailed.
+          type: boolean
+      type: object
+    ProjectCreateRequest:
+      description: Body for creating a project.
+      properties:
+        admin_privileges:
+          description: >-
+            Optional within this object. What project admins may do in this project. Two forms
+            exist: the legacy flags (manage_resources, manage_remote_repository) and six granular
+            repository flags. When none of the six granular flags is set, the legacy flags decide
+            them; when at least one is set, the legacy repository mapping is ignored and each
+            granular flag applies on its own. Omitted grants everything.
+          properties:
+            create_local_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create local repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            create_remote_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create remote repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            create_virtual_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create virtual
+                repositories. Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_local_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete local repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_remote_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete remote repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_virtual_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete virtual
+                repositories. Defaults to true when any granular flag is set on create.
+              type: boolean
+            index_resources:
+              default: true
+              description: >-
+                Optional within this object. Project admins may mark the project's resources for
+                indexing. Stored and echoed; artifactweave has no indexing service. Defaults to
+                true.
+              type: boolean
+            manage_members:
+              default: true
+              description: >-
+                Optional within this object. Project admins may add and remove members and change
+                their roles. Defaults to true.
+              type: boolean
+            manage_remote_repository:
+              default: true
+              description: >-
+                Optional within this object. Legacy flag. When no granular flag is set it controls
+                creating and deleting remote repositories. Defaults to true.
+              type: boolean
+            manage_resources:
+              default: true
+              description: >-
+                Optional within this object. Legacy flag. When no granular flag is set it controls
+                creating and deleting local and virtual repositories. Defaults to true.
+              type: boolean
+          type: object
+        description:
+          description: Optional within this object. Free text describing the project.
+          type: string
+        display_name:
+          description: >-
+            Required within this object. Human-readable project name, unique on the server.
+          type: string
+        project_key:
+          description: >-
+            Required within this object. Project key: 2 to 32 characters, lower-case letters,
+            digits and hyphens, starting with a letter. Immutable. Repositories created in the
+            project carry it as a prefix (<project_key>-...), and its build-info repository is
+            <project_key>-build-info.
+          type: string
+          pattern: ^[a-z][a-z0-9-]{1,31}$
+        storage_quota_bytes:
+          description: >-
+            Optional within this object. Storage quota in bytes for everything stored in the project's
+            repositories. -1 or omitted means unlimited. Deployments warn at 75 percent of the
+            quota and are refused at 100 percent unless soft_limit is true.
+          type: integer
+        soft_limit:
+          type: boolean
+          description: >-
+            Optional within this object. When true the quota only warns: deployments continue
+            past 100 percent. Defaults to false, which refuses deployments once the quota is reached.
+        storage_quota_email_notification:
+          type: boolean
+          description: >-
+            Optional within this object. When true, project admins are emailed when usage passes
+            the warning threshold. Defaults to false.
+      required:
+        - project_key
+        - display_name
+      type: object
+    ProjectGroup:
+      description: A group's membership in a project.
+      properties:
+        name:
+          description: Optional within this object. Group name.
+          type: string
+        roles:
+          description: Optional within this object. Project roles the group holds.
+          items:
+            type: string
+          type: array
+      type: object
+    ProjectGroupUpdate:
+      description: Body for adding a group to a project or replacing its project roles.
+      properties:
+        roles:
+          description: >-
+            Optional within this object. Names of the project roles held, predefined or custom.
+            Replaces the current list. At least one role.
+          items:
+            type: string
+          type: array
+      type: object
+    ProjectRole:
+      description: >-
+        A role available in a project: a named set of actions limited to environments.
+      properties:
+        actions:
+          description: Optional within this object. Actions the role grants.
+          items:
+            type: string
+          type: array
+        description:
+          description: Optional within this object. Free text describing the role.
+          type: string
+        environments:
+          description: >-
+            Optional within this object. Environments the role's repository actions apply to.
+          items:
+            type: string
+          type: array
+        name:
+          description: Optional within this object. Role name, unique within the project.
+          type: string
+        type:
+          description: >-
+            Optional within this object. PREDEFINED for the built-in project roles (Project Admin,
+            Developer, Contributor, Viewer, Release Manager, Security Manager, Application Admin),
+            CUSTOM for a role defined in this project, CUSTOM_GLOBAL for a global custom role
+            made available in the project.
+          enum:
+            - PREDEFINED
+            - CUSTOM
+            - CUSTOM_GLOBAL
+          type: string
+      type: object
+    ProjectRoleCreate:
+      description: Body for creating a custom project role.
+      properties:
+        actions:
+          description: >-
+            Optional within this object. Actions the role grants. Project roles use the 32 project
+            actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY,
+            MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE,
+            DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD,
+            ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE,
+            TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE,
+            MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY,
+            POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY,
+            MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action
+            and is rejected here. Pipeline and security actions are stored and echoed but grant
+            nothing in artifactweave.
+          items:
+            type: string
+          type: array
+        description:
+          description: Optional within this object. Free text describing the role.
+          type: string
+        environments:
+          description: >-
+            Optional within this object. Environments the role's repository actions apply to,
+            for example DEV or PROD. A member holding the role gets its actions only on repositories
+            in these environments.
+          items:
+            type: string
+          type: array
+        name:
+          description: >-
+            Required within this object. Role name, unique within the project. Immutable; it is
+            the {role} path parameter afterwards.
+          type: string
+        type:
+          description: Required within this object. Must be CUSTOM.
+          type: string
+      required:
+        - name
+        - type
+      type: object
+    ProjectRoleUpdate:
+      description: >-
+        Body for replacing a custom project role. Only CUSTOM roles can be changed.
+      properties:
+        actions:
+          description: >-
+            Optional within this object. Actions the role grants. Project roles use the 32 project
+            actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY,
+            MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE,
+            DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD,
+            ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE,
+            TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE,
+            MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY,
+            POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY,
+            MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action
+            and is rejected here. Pipeline and security actions are stored and echoed but grant
+            nothing in artifactweave.
+          items:
+            type: string
+          type: array
+        description:
+          description: Optional within this object. Free text describing the role.
+          type: string
+        environments:
+          description: >-
+            Optional within this object. Environments the role's repository actions apply to,
+            for example DEV or PROD. A member holding the role gets its actions only on repositories
+            in these environments.
+          items:
+            type: string
+          type: array
+        type:
+          description: >-
+            Required within this object. Must be CUSTOM; predefined and global roles cannot be
+            changed through a project.
+          type: string
+      required:
+        - type
+      type: object
+    ProjectUpdateRequest:
+      description: >-
+        Body for replacing a project's settings. The key is immutable and comes from the path.
+        Omitted fields keep their stored values.
+      properties:
+        admin_privileges:
+          description: >-
+            Optional within this object. What project admins may do in this project. Two forms
+            exist: the legacy flags (manage_resources, manage_remote_repository) and six granular
+            repository flags. When none of the six granular flags is set, the legacy flags decide
+            them; when at least one is set, the legacy repository mapping is ignored and each
+            granular flag applies on its own. Granular flags omitted on update keep their stored
+            values.
+          properties:
+            create_local_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create local repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            create_remote_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create remote repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            create_virtual_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may create virtual
+                repositories. Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_local_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete local repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_remote_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete remote repositories.
+                Defaults to true when any granular flag is set on create.
+              type: boolean
+            delete_virtual_repository:
+              description: >-
+                Optional within this object. Granular flag: project admins may delete virtual
+                repositories. Defaults to true when any granular flag is set on create.
+              type: boolean
+            index_resources:
+              description: >-
+                Optional within this object. Project admins may mark the project's resources for
+                indexing. Stored and echoed; artifactweave has no indexing service. Defaults to
+                true.
+              type: boolean
+            manage_members:
+              description: >-
+                Optional within this object. Project admins may add and remove members and change
+                their roles. Defaults to true.
+              type: boolean
+            manage_remote_repository:
+              description: >-
+                Optional within this object. Legacy flag. When no granular flag is set it controls
+                creating and deleting remote repositories. Defaults to true.
+              type: boolean
+            manage_resources:
+              description: >-
+                Optional within this object. Legacy flag. When no granular flag is set it controls
+                creating and deleting local and virtual repositories. Defaults to true.
+              type: boolean
+          type: object
+        description:
+          description: Optional within this object. Free text describing the project.
+          type: string
+        display_name:
+          description: >-
+            Optional within this object. Human-readable project name, unique on the server.
+          type: string
+        storage_quota_bytes:
+          description: >-
+            Optional within this object. Storage quota in bytes for everything stored in the project's
+            repositories. -1 or omitted means unlimited. Deployments warn at 75 percent of the
+            quota and are refused at 100 percent unless soft_limit is true.
+          type: integer
+        soft_limit:
+          type: boolean
+          description: >-
+            Optional within this object. When true the quota only warns: deployments continue
+            past 100 percent. Defaults to false, which refuses deployments once the quota is reached.
+        storage_quota_email_notification:
+          type: boolean
+          description: >-
+            Optional within this object. When true, project admins are emailed when usage passes
+            the warning threshold. Defaults to false.
+      type: object
+    ProjectUser:
+      description: A user's membership in a project.
+      properties:
+        name:
+          description: Optional within this object. Username.
+          type: string
+        roles:
+          description: >-
+            Optional within this object. Project roles the user holds directly; roles inherited
+            through groups are not listed.
+          items:
+            type: string
+          type: array
+      type: object
+    ProjectUserUpdate:
+      description: Body for adding a user to a project or replacing their project roles.
+      properties:
+        roles:
+          description: >-
+            Optional within this object. Names of the project roles held, predefined or custom.
+            Replaces the current list. At least one role.
+          items:
+            type: string
+          type: array
+      type: object
+paths:
+  /api/v1/projects:
+    get:
+      description: >-
+        Returns every project for a platform admin, and only the projects they administer for
+        a project admin.
+      operationId: getProjectsList
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Project'
+                type: array
+          description: The projects; an empty array when there are none.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectslist.md
+      summary: List projects
+    post:
+      description: >-
+        Creates a project with no members, the predefined roles and no repositories. The key is
+        immutable afterwards. Requires a platform admin.
+      operationId: createProject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+        description: The project to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: The project was created; the body is the stored project.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A project with this key or display name already exists.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/createproject.md
+      summary: Create a project
+  /api/v1/projects/_/attach/repositories/{repoName}:
+    delete:
+      description: >-
+        Removes the repository from the project that owns it. Sharing with other projects is kept.
+        The repository's projectKey is cleared synchronously. Requires a platform admin.
+      operationId: unassignProjectFromRepository
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The repository is no longer assigned.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: >-
+        https://docs.jfrog.com/projects/reference/unassignprojectfromrepository.md
+      summary: Unassign a repository from its project
+  /api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey}:
+    put:
+      description: >-
+        Makes targetProjectKey the owner of the repository, moving it from its current project
+        when force is true. The assignment is visible synchronously: when the call returns, the
+        repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey,
+        because the jfrog/project Terraform provider polls that field right after this call. The
+        repository key is not renamed. Requires a platform admin.
+      operationId: attachRepositoryToProject
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+        - description: >-
+            Required path parameter. Key of the project the repository is assigned to or shared
+            with.
+          in: path
+          name: targetProjectKey
+          required: true
+          schema:
+            type: string
+        - description: >-
+            Optional query parameter. When true, a repository already assigned to another project
+            is moved; without it such an attach is rejected with 400. Defaults to false.
+          in: query
+          name: force
+          schema:
+            type: boolean
+      responses:
+        '204':
+          description: The repository is assigned to the project.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/attachrepositorytoproject.md
+      summary: Assign a repository to a project
+  /api/v1/projects/_/repositories/{repoName}:
+    get:
+      description: >-
+        Reports which project owns the repository and which projects it is shared with. Requires
+        a platform admin.
+      operationId: getProjectRepositoryStatus
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  assigned_to:
+                    description: >-
+                      Optional within this object. Key of the project that owns the repository;
+                      absent when it is not assigned.
+                    type: string
+                  environments:
+                    description: >-
+                      Optional within this object. Environments the repository belongs to, DEV
+                      when none was set.
+                    items:
+                      type: string
+                    type: array
+                  resource_name:
+                    description: Optional within this object. The repository key.
+                    type: string
+                  shared_read_only:
+                    description: >-
+                      Optional within this object. Whether the sharing grants read access only.
+                    type: boolean
+                  shared_with_all_projects:
+                    description: >-
+                      Optional within this object. Whether the repository is shared with every
+                      project.
+                    type: boolean
+                  shared_with_projects:
+                    description: >-
+                      Optional within this object. Keys of the projects the repository is shared
+                      with one by one.
+                    items:
+                      type: string
+                    type: array
+                type: object
+          description: The repository's assignment and sharing.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrepositorystatus.md
+      summary: Get a repository's project status
+  /api/v1/projects/_/share/repositories/{repoName}:
+    delete:
+      description: >-
+        Removes the share-with-all setting. Shares with individual projects remain. Requires a
+        platform admin.
+      operationId: unshareRepositoryWithAllProjects
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The share-with-all setting was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: >-
+        https://docs.jfrog.com/projects/reference/unsharerepositorywithallprojects.md
+      summary: Stop sharing a repository with every project
+    put:
+      description: >-
+        Lets members of every project use the local or remote repository according to their roles
+        in their own project. The owning project is unchanged. Requires a platform admin.
+      operationId: shareRepositoryWithAllProjects
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The repository is shared with every project.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: >-
+        https://docs.jfrog.com/projects/reference/sharerepositorywithallprojects.md
+      summary: Share a repository with every project
+  /api/v1/projects/_/share/repositories/{repoName}/{targetProjectKey}:
+    delete:
+      description: Removes the share with the target project. Requires a platform admin.
+      operationId: unshareRepositoryWithTargetProject
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+        - description: >-
+            Required path parameter. Key of the project the repository is assigned to or shared
+            with.
+          in: path
+          name: targetProjectKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The share was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: >-
+        https://docs.jfrog.com/projects/reference/unsharerepositorywithtargetproject.md
+      summary: Stop sharing a repository with one project
+    put:
+      description: >-
+        Lets members of the target project use the local or remote repository according to their
+        roles there, read-only when readOnly is true. Requires a platform admin.
+      operationId: shareRepositoryWithTargetProject
+      parameters:
+        - description: Required path parameter. Key of the repository.
+          in: path
+          name: repoName
+          required: true
+          schema:
+            type: string
+        - description: >-
+            Required path parameter. Key of the project the repository is assigned to or shared
+            with.
+          in: path
+          name: targetProjectKey
+          required: true
+          schema:
+            type: string
+        - description: >-
+            Optional query parameter. When true the target project's members get read access only,
+            whatever their roles. Defaults to false.
+          in: query
+          name: readOnly
+          schema:
+            type: boolean
+      responses:
+        '204':
+          description: The repository is shared with the project.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: >-
+        https://docs.jfrog.com/projects/reference/sharerepositorywithtargetproject.md
+      summary: Share a repository with one project
+  /api/v1/projects/{projectKey}:
+    delete:
+      description: >-
+        Deletes the project, its custom roles and memberships. The project's repositories are
+        not deleted: they are unassigned and keep their keys. Deleting a project that still owns
+        repositories is allowed. Requires a platform admin.
+      operationId: deleteProject
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The project was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/deleteproject.md
+      summary: Delete a project
+    get:
+      description: >-
+        Returns one project. Requires a platform admin or an admin of the project.
+      operationId: getProject
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: The project.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getproject.md
+      summary: Get a project
+    put:
+      description: >-
+        Changes the project's display name, description, quota and admin privileges. The key cannot
+        change. Lowering the quota below current usage is accepted and blocks further deployments
+        until usage drops (unless soft_limit is true). Requires a platform admin.
+      operationId: updateProject
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateRequest'
+        description: The settings to change.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+          description: The project was updated; the body is the stored project.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/updateproject.md
+      summary: Update a project
+  /api/v1/projects/{projectKey}/groups:
+    get:
+      description: >-
+        Returns the groups holding a role in the project, with their roles. Requires a platform
+        admin, or a project admin of this project with the manage_members privilege. A token scoped
+        project:<key>/members/groups:r is also accepted.
+      operationId: getProjectGroups
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  members:
+                    description: Optional within this object. Groups with a role in the project.
+                    items:
+                      $ref: '#/components/schemas/ProjectGroup'
+                    type: array
+                type: object
+          description: The project's groups.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroups.md
+      summary: List project groups
+  /api/v1/projects/{projectKey}/groups/{group}:
+    delete:
+      description: >-
+        Removes the group's roles in the project. Requires a platform admin, or a project admin
+        of this project with the manage_members privilege.
+      operationId: deleteProjectGroup
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Name of the member group.
+          in: path
+          name: group
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The group was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectgroup.md
+      summary: Remove a group from a project
+    get:
+      description: >-
+        Returns one group's roles in the project. Requires a platform admin, or a project admin
+        of this project with the manage_members privilege.
+      operationId: getProjectGroup
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Name of the member group.
+          in: path
+          name: group
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectGroup'
+          description: The membership.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The project does not exist or the group holds no role in it.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectgroup.md
+      summary: Get a project group
+    put:
+      description: >-
+        Adds the group to the project with the given roles, or replaces the roles of a member
+        group. The group must exist; every role must exist in the project. Requires a platform
+        admin, or a project admin of this project with the manage_members privilege.
+      operationId: updateProjectGroup
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Name of the member group.
+          in: path
+          name: group
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectGroupUpdate'
+        description: The roles the group should hold.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectGroup'
+          description: The membership was stored; the body echoes it.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectgroup.md
+      summary: Add a group to a project or set its roles
+  /api/v1/projects/{projectKey}/roles:
+    get:
+      description: >-
+        Returns every role usable in the project: the predefined roles, the project's custom roles
+        and global custom roles. Requires a platform admin or an admin of the project. A token
+        scoped project:<key>/roles:r is also accepted.
+      operationId: getProjectRoles
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ProjectRole'
+                type: array
+          description: The roles.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectroles.md
+      summary: List project roles
+    post:
+      description: >-
+        Defines a CUSTOM role in the project. Unknown actions and unknown environments are rejected
+        with 400; a name already used in the project is rejected with 400. Requires a platform
+        admin, or a project admin of this project with the manage_members privilege.
+      operationId: createProjectRole
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRoleCreate'
+        description: The role to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectRole'
+          description: The role was created; the body is the stored role.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/createprojectrole.md
+      summary: Create a custom project role
+  /api/v1/projects/{projectKey}/roles/{role}:
+    delete:
+      description: >-
+        Deletes a CUSTOM role and removes it from every member that held it. Predefined roles
+        cannot be deleted (400). Requires a platform admin, or a project admin of this project
+        with the manage_members privilege.
+      operationId: deleteProjectRole
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Name of the project role.
+          in: path
+          name: role
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The role was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectrole.md
+      summary: Delete a custom project role
+    get:
+      description: >-
+        Returns one role usable in the project. Requires a platform admin or an admin of the project.
+      operationId: getProjectRole
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Name of the project role.
+          in: path
+          name: role
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectRole'
+          description: The role.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectrole.md
+      summary: Get a project role
+    put:
+      description: >-
+        Replaces the role's description, environments and actions. Only CUSTOM roles can be changed;
+        members holding the role get the new actions at once. Requires a platform admin, or a
+        project admin of this project with the manage_members privilege.
+      operationId: updateProjectRole
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Name of the project role.
+          in: path
+          name: role
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRoleUpdate'
+        description: The complete new role.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectRole'
+          description: The role was replaced; the body is the stored role.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/updateprojectrole.md
+      summary: Replace a custom project role
+  /api/v1/projects/{projectKey}/users:
+    get:
+      description: >-
+        Returns the users holding a direct role in the project, with their roles. Requires a platform
+        admin, or a project admin of this project with the manage_members privilege. A token scoped
+        project:<key>/members/users:r is also accepted.
+      operationId: getProjectUsers
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  members:
+                    description: Optional within this object. Users with a direct role in the
+                      project.
+                    items:
+                      $ref: '#/components/schemas/ProjectUser'
+                    type: array
+                type: object
+          description: The project's users.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectusers.md
+      summary: List project users
+  /api/v1/projects/{projectKey}/users/{user}:
+    delete:
+      description: >-
+        Removes the user's direct roles in the project. Roles held through groups remain. Requires
+        a platform admin, or a project admin of this project with the manage_members privilege.
+      operationId: deleteProjectUser
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Username of the member.
+          in: path
+          name: user
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: The user was removed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/deleteprojectuser.md
+      summary: Remove a user from a project
+    get:
+      description: >-
+        Returns one user's roles in the project. Requires a platform admin, or a project admin
+        of this project with the manage_members privilege.
+      operationId: getProjectUser
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Username of the member.
+          in: path
+          name: user
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectUser'
+          description: The membership.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The project does not exist or the user holds no role in it.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectuser.md
+      summary: Get a project user
+    put:
+      description: >-
+        Adds the user to the project with the given roles, or replaces the roles of an existing
+        member. The user must exist; every role must exist in the project. Requires a platform
+        admin, or a project admin of this project with the manage_members privilege.
+      operationId: addOrUpdateProjectUser
+      parameters:
+        - description: Required path parameter. Key of the project.
+          in: path
+          name: projectKey
+          required: true
+          schema:
+            type: string
+        - description: Required path parameter. Username of the member.
+          in: path
+          name: user
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUserUpdate'
+        description: The roles the user should hold.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectUser'
+          description: The membership was stored; the body echoes it.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The request is malformed or fails validation; the error message names the problem.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The project, member, role or repository named in the path does not exist.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/addorupdateprojectuser.md
+      summary: Add a user to a project or set their roles
+  /api/v2/projects:
+    get:
+      description: >-
+        Returns, one cursor page at a time, the projects in which the named global role is assigned
+        to a member. Requires a platform admin.
+      operationId: getProjectsForRole
+      parameters:
+        - description: >-
+            Required query parameter. Name of a global role; only global roles are accepted.
+          in: query
+          name: role_name
+          required: true
+          schema:
+            type: string
+        - description: >-
+            Optional query parameter. Maximum number of projects in the page. Defaults to 1000;
+            at least 1.
+          in: query
+          name: limit
+          schema:
+            default: 1000
+            minimum: 1
+            type: integer
+        - description: >-
+            Optional query parameter. When true, projects are ordered by name descending. Defaults
+            to false.
+          in: query
+          name: descending_order
+          schema:
+            type: boolean
+        - description: >-
+            Optional query parameter. The cursor from the previous page. Omitted starts at the
+            first page.
+          in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                properties:
+                  cursor:
+                    description: >-
+                      Optional within this object. Pass as cursor to fetch the next page; absent
+                      on the last page.
+                    type: string
+                  projects:
+                    description: >-
+                      Optional within this object. Projects in this page where the role is used.
+                    items:
+                      properties:
+                        name:
+                          description: Optional within this object. Project display name.
+                          type: string
+                        projectKey:
+                          description: Optional within this object. Project key.
+                          type: string
+                      type: object
+                    type: array
+                type: object
+          description: One page of projects.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials, or the credentials are invalid or expired.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: >-
+            The caller lacks the privilege this operation needs (see the description).
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No global role exists with this name.
+      tags:
+        - projects
+      x-oracle-source: https://docs.jfrog.com/projects/reference/getprojectsforrole.md
+      summary: List projects that use a global role

@@ -1,0 +1,911 @@
+components:
+  schemas:
+    AllEntityTypesSummaryResponse:
+      description: Sync counts per entity type across the topology.
+      properties:
+        entity_types:
+          description: 'Required within this object. One entry per monitored entity type: users, groups, permissions,
+            tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. artifactweave
+            replicates users, groups, permissions and tokens through Access federation (decision 0025); the other
+            types are accepted and report zero counts until their replication exists.'
+          items:
+            $ref: '#/components/schemas/EntityTypeSummary'
+          type: array
+        timestamp:
+          description: Required within this object. Server-owned. RFC 3339 time the counts were computed.
+          format: date-time
+          type: string
+      required:
+      - entity_types
+      - timestamp
+      type: object
+    CreateTopologyRequest:
+      description: 'A new topology: a named set of instances that federate identity with each other.'
+      properties:
+        description:
+          description: Optional within this object. Free text.
+          type: string
+        name:
+          description: Required within this object. Display name. The topology key is derived from it and must be
+            unique.
+          type: string
+        sites:
+          description: Required within this object. The instances in the topology; at least two, each named once.
+          items:
+            $ref: '#/components/schemas/SiteRequest'
+          type: array
+      required:
+      - name
+      - sites
+      type: object
+    EntityDetailResponse:
+      description: Delivery state of one entity to every target, including failure reasons.
+      properties:
+        entity_id:
+          description: Required within this object. The entity's business id.
+          type: string
+        entity_type:
+          description: Required within this object. The entity type public key.
+          type: string
+        targets:
+          description: Required within this object. Delivery state per target.
+          items:
+            $ref: '#/components/schemas/TargetSyncStatus'
+          type: array
+      required:
+      - entity_id
+      - entity_type
+      - targets
+      type: object
+    EntityListItem:
+      description: One entity and its per-target states.
+      properties:
+        entity_id:
+          description: Required within this object. The entity's business id, such as a username.
+          type: string
+        entity_type:
+          description: Required within this object. The entity type public key.
+          type: string
+        targets:
+          description: Optional within this object. Delivery state per target.
+          items:
+            $ref: '#/components/schemas/TargetSyncStatus'
+          type: array
+      required:
+      - entity_id
+      - entity_type
+      type: object
+    EntityListResponse:
+      description: A page of monitored entities.
+      properties:
+        entities:
+          description: Required within this object. Entities on this page.
+          items:
+            $ref: '#/components/schemas/EntityListItem'
+          type: array
+        next_page_token:
+          description: Required within this object. Opaque token for the next page; empty on the last page.
+          type: string
+        total_count:
+          description: Required within this object. Entities matching the filters across all pages.
+          format: int64
+          type: integer
+      required:
+      - entities
+      - next_page_token
+      - total_count
+      type: object
+    EntityTypeSummary:
+      description: Counts for one monitored entity type.
+      properties:
+        counts:
+          allOf:
+          - $ref: '#/components/schemas/StatusCounts'
+          description: Required within this object. Counts across every target in the topology.
+        entity_type:
+          description: Required within this object. The entity type public key.
+          type: string
+      required:
+      - entity_type
+      - counts
+      type: object
+    JPDLocation:
+      description: Where an instance runs, as configured on that instance.
+      properties:
+        city_name:
+          description: Optional within this object. City name; empty when not configured.
+          type: string
+        country_code:
+          description: Optional within this object. ISO 3166-1 alpha-2 country code; empty when not configured.
+          type: string
+      type: object
+    JPDResponse:
+      description: 'One instance known to this instance: itself or a paired peer.'
+      properties:
+        base_url:
+          description: Optional within this object. The public base URL the instance reports for itself; may differ
+            from url behind a proxy.
+          type: string
+        id:
+          description: Optional within this object. Server-owned. The instance's service id.
+          type: string
+        licenses:
+          description: Optional within this object. Licence entries; one artifactweave entry.
+          items:
+            $ref: '#/components/schemas/License'
+          type: array
+        local:
+          description: Optional within this object. True for the instance answering the request.
+          type: boolean
+        location:
+          allOf:
+          - $ref: '#/components/schemas/JPDLocation'
+          description: Optional within this object. Configured location of the instance.
+        name:
+          description: Optional within this object. Display name of the instance.
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/JPDStatus'
+          description: Optional within this object. Last observed reachability.
+        url:
+          description: Optional within this object. URL this instance uses to reach it.
+          type: string
+      type: object
+    JPDStatus:
+      description: Reachability of an instance as last observed over the peer protocol.
+      properties:
+        code:
+          description: 'Optional within this object. ONLINE: reachable and trusted. OFFLINE: not reachable. PARTIAL:
+            reachable but reporting an unhealthy service. UNAUTHORIZED: reachable but the pairing keys are no longer
+            accepted.'
+          enum:
+          - ONLINE
+          - OFFLINE
+          - PARTIAL
+          - UNAUTHORIZED
+          type: string
+        message:
+          description: Optional within this object. Explanation for any code other than ONLINE; empty otherwise.
+          type: string
+      type: object
+    License:
+      description: A licence entry reported for an instance.
+      properties:
+        type:
+          description: Optional within this object. Licence type. artifactweave has no licence tiers and always
+            reports artifactweave.
+          type: string
+      type: object
+    SiteRequest:
+      description: A site to include in a topology.
+      properties:
+        site_name:
+          description: Required within this object. Name of a known instance (this one or a paired peer, as listed
+            by GET /grid/api/v1/jpds). Unknown names answer 400 with a detail entry.
+          type: string
+      required:
+      - site_name
+      type: object
+    StatusCounts:
+      description: Sync outcome counts for one entity type.
+      properties:
+        failure:
+          description: Required within this object. Entity and target pairs whose last delivery failed.
+          format: int64
+          type: integer
+        in_progress:
+          description: Required within this object. Pairs with a delivery queued or under way.
+          format: int64
+          type: integer
+        success:
+          description: Required within this object. Pairs whose last delivery was acknowledged.
+          format: int64
+          type: integer
+      required:
+      - failure
+      - in_progress
+      - success
+      type: object
+    TargetSyncStatus:
+      description: Delivery state of one entity from one site to another, taken from the peer outbox acknowledgements
+        (decision 0021).
+      properties:
+        modified:
+          description: Optional within this object. RFC 3339 time the status last changed.
+          format: date-time
+          type: string
+        source_jpd_id:
+          description: Required within this object. Service id of the sending instance.
+          type: string
+        source_site_name:
+          description: Optional within this object. Name of the sending site.
+          type: string
+        status:
+          description: 'Required within this object. pending: queued, not yet sent. sent: delivered, not yet acknowledged.
+            in_progress: being retried. success: acknowledged. failure: retries exhausted; see status_description.'
+          enum:
+          - success
+          - failure
+          - in_progress
+          - pending
+          - sent
+          type: string
+        status_description:
+          description: Optional within this object. The last error for failure; empty otherwise.
+          type: string
+        target_jpd_id:
+          description: Required within this object. Service id of the receiving instance.
+          type: string
+        target_site_name:
+          description: Optional within this object. Name of the receiving site.
+          type: string
+      required:
+      - source_jpd_id
+      - target_jpd_id
+      - status
+      type: object
+    TopologiesListResponse:
+      description: Every topology on this instance.
+      properties:
+        topologies:
+          description: Required within this object. The topologies ordered by key.
+          items:
+            $ref: '#/components/schemas/TopologyResponse'
+          type: array
+        total:
+          description: Required within this object. Number of topologies returned.
+          type: integer
+      required:
+      - topologies
+      - total
+      type: object
+    TopologyResponse:
+      description: A stored topology.
+      properties:
+        created:
+          description: Optional within this object. Server-owned. RFC 3339 creation time.
+          format: date-time
+          type: string
+        description:
+          description: Optional within this object. Free text; empty when none.
+          type: string
+        key:
+          description: Required within this object. Server-owned. Identifier derived from the name at creation and
+            used in /topology/{key}.
+          type: string
+        modified:
+          description: Optional within this object. Server-owned. RFC 3339 time of the last change.
+          format: date-time
+          type: string
+        name:
+          description: Required within this object. Display name.
+          type: string
+        sites:
+          description: Required within this object. The sites and their state.
+          items:
+            $ref: '#/components/schemas/TopologySiteResponse'
+          type: array
+      required:
+      - key
+      - name
+      - sites
+      type: object
+    TopologySiteResponse:
+      description: One site of a stored topology and its federation state.
+      properties:
+        is_current:
+          description: Optional within this object. True for the instance answering the request.
+          type: boolean
+        location:
+          allOf:
+          - $ref: '#/components/schemas/JPDLocation'
+          description: Optional within this object. Configured location of the site.
+        site_name:
+          description: Optional within this object. The instance name.
+          type: string
+        status:
+          description: Optional within this object. Connected when Access federation between this site and the others
+            in the topology is configured and reachable; Disconnected otherwise, with the reason in status_description.
+            A store that succeeds can still leave a site Disconnected.
+          enum:
+          - Connected
+          - Disconnected
+          type: string
+        status_description:
+          description: Optional within this object. Why a site is Disconnected; empty when Connected.
+          type: string
+      type: object
+    TopologyValidationError:
+      description: The /grid error envelope with per-site validation details; nothing was stored.
+      properties:
+        code:
+          description: Required within this object. A symbolic code such as VALIDATION_FAILED.
+          type: string
+        details:
+          description: Optional within this object. One entry per failing site pair.
+          items:
+            $ref: '#/components/schemas/ValidationDetail'
+          type: array
+        message:
+          description: Required within this object. Human readable summary.
+          type: string
+      required:
+      - code
+      - message
+      type: object
+    UpdateTopologyRequest:
+      description: Partial update of a topology; omitted fields keep their values. The key never changes, even when
+        name does.
+      properties:
+        description:
+          description: Optional within this object. New description.
+          type: string
+        name:
+          description: Optional within this object. New display name.
+          type: string
+        sites:
+          description: Optional within this object. Replaces the full site list; sites left out are disconnected
+            from the topology.
+          items:
+            $ref: '#/components/schemas/SiteRequest'
+          type: array
+      type: object
+    ValidationDetail:
+      description: Why one pair of sites failed validation.
+      properties:
+        description:
+          description: Optional within this object. Human readable explanation.
+          type: string
+        source_site:
+          description: Optional within this object. The site the check ran from.
+          type: string
+        status:
+          description: Optional within this object. Short status of the failed check, such as unreachable or untrusted.
+          type: string
+        target_site:
+          description: Optional within this object. The site that failed.
+          type: string
+      type: object
+paths:
+  /api/v1/jpds:
+    get:
+      description: 'Lists the instances this instance knows: itself and every paired peer artifactweave instance
+        (decision 0025). JFrog lists the deployments known to Mission Control; artifactweave has no Mission Control,
+        so the peer table is the source. Filters accept * wildcards. Administrators only.'
+      operationId: listJPDs
+      parameters:
+      - description: Optional query parameter. Filter on instance name; * matches any run of characters.
+        in: query
+        name: name
+        required: false
+        schema:
+          type: string
+      - description: Optional query parameter. Filter on instance tag. artifactweave instances carry no tags, so
+          only * (or omitting the filter) matches anything.
+        in: query
+        name: tag
+        required: false
+        schema:
+          type: string
+      - description: Optional query parameter. Filter on instance URL; * matches any run of characters.
+        in: query
+        name: url
+        required: false
+        schema:
+          type: string
+      - description: Optional query parameter. Filter on status code.
+        in: query
+        name: status
+        required: false
+        schema:
+          enum:
+          - ONLINE
+          - OFFLINE
+          - PARTIAL
+          - UNAUTHORIZED
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Instances ordered by name.
+                items:
+                  $ref: '#/components/schemas/JPDResponse'
+                type: array
+          description: Matching instances; an empty array when none match.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A filter is invalid, for example an unknown status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: List known instances
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/listjpds.md
+  /api/v1/topology:
+    get:
+      description: Returns every topology defined on this instance. Administrators only.
+      operationId: listGridTopologies
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologiesListResponse'
+          description: The topologies.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: List topologies
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/listgridtopologies.md
+    post:
+      description: Stores a topology and configures Access federation between every pair of its sites, so identity
+        changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived;
+        artifactweave lowercases the name and replaces each run of characters other than letters and digits with
+        a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails
+        afterwards; check each site's status in the response. Administrators only.
+      operationId: createGridTopology
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTopologyRequest'
+        description: The topology to create.
+        required: true
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResponse'
+          description: Topology stored; per-site status reports whether federation was configured.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyValidationError'
+          description: Validation failed and nothing was stored; details lists the failing site pairs.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A topology with the derived key already exists.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: Create a topology
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/creategridtopology.md
+      x-unverified: true
+  /api/v1/topology/{key}:
+    delete:
+      description: Removes a topology and the Access federation it configured between its sites. Identities already
+        replicated stay on each site. Administrators only.
+      operationId: deleteGridTopology
+      parameters:
+      - description: Required path parameter. Key of the topology.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Topology deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No topology has this key.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResponse'
+          description: The topology was kept because removing Access federation from one or more sites failed. The
+            body is the stored topology; each failed site shows Disconnected with the reason in status_description.
+            Retry the delete to finish removal.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: Delete a topology
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletegridtopology.md
+    get:
+      description: Returns one topology with the current state of each site. Administrators only.
+      operationId: getGridTopology
+      parameters:
+      - description: Required path parameter. Key of the topology.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResponse'
+          description: The topology.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No topology has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: Get a topology
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getgridtopology.md
+    patch:
+      description: 'Changes the name, description or site list. A new site list is applied as a whole: added sites
+        are federated with the others and removed sites are disconnected. As with creation, a site whose federation
+        fails after the store is reported Disconnected rather than failing the call. Administrators only.'
+      operationId: updateGridTopology
+      parameters:
+      - description: Required path parameter. Key of the topology.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTopologyRequest'
+        description: The fields to change.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResponse'
+          description: Topology updated; per-site status reports the federation state.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyValidationError'
+          description: Validation failed and nothing was changed; details lists the failing site pairs.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No topology has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: Update a topology
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/updategridtopology.md
+  /api/v1/topology/{key}/monitoring/entities:
+    get:
+      description: Lists entities of one type with their delivery state to each target in the topology, newest change
+        first, one page at a time. Administrators only.
+      operationId: getMonitoringEntityList
+      parameters:
+      - description: Required path parameter. Key of the topology.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      - description: 'Required query parameter. Entity type public key: users, groups, permissions, tokens, projects,
+          environments, roles, projectGroups, projectUsers and projectResources. artifactweave replicates users,
+          groups, permissions and tokens through Access federation (decision 0025); the other types are accepted
+          and report zero counts until their replication exists.'
+        in: query
+        name: entity_type
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. Return only entities with at least one target in this state; omitted
+          means any state.
+        in: query
+        name: status
+        required: false
+        schema:
+          enum:
+          - failure
+          - success
+          - in_progress
+          type: string
+      - description: Optional query parameter. The next_page_token from the previous page; omitted for the first
+          page.
+        in: query
+        name: page_token
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityListResponse'
+          description: A page of entities.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Missing or unsupported entity_type, an invalid status or an invalid page_token.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No topology has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: List monitored entities
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringentitylist.md
+  /api/v1/topology/{key}/monitoring/entities/summary:
+    get:
+      description: Returns failure, in-progress and success counts per entity type across every target in the topology,
+        optionally limited to a modification window. Administrators only.
+      operationId: getMonitoringSummary
+      parameters:
+      - description: Required path parameter. Key of the topology.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      - description: Optional query parameter. RFC 3339 time; only entities modified after it are counted.
+        in: query
+        name: modified_after
+        required: false
+        schema:
+          format: date-time
+          type: string
+      - description: Optional query parameter. RFC 3339 time; only entities modified before it are counted. Must
+          be later than modified_after when both are given.
+        in: query
+        name: modified_before
+        required: false
+        schema:
+          format: date-time
+          type: string
+      - description: Optional query parameter. When true, also count the project-scoped types projectUsers, projectGroups
+          and projectResources. Defaults to false.
+        in: query
+        name: show_system_entities
+        required: false
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllEntityTypesSummaryResponse'
+          description: The counts.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An invalid or inverted time window.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No topology has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: Summarise entity sync
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringsummary.md
+  /api/v1/topology/{key}/monitoring/entities/{entity_type}/{entity_id}:
+    get:
+      description: Returns the delivery state of one entity to every target in the topology, including the last
+        error for failed targets. Administrators only.
+      operationId: getMonitoringEntityDetail
+      parameters:
+      - description: Required path parameter. Key of the topology.
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      - description: Required path parameter. Entity type public key, such as users.
+        in: path
+        name: entity_type
+        required: true
+        schema:
+          type: string
+      - description: Required path parameter. The entity's business id, such as a username or group name.
+        in: path
+        name: entity_id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntityDetailResponse'
+          description: Per-target state of the entity.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unsupported entity type.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an administrator.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No topology has this key, or the entity is unknown.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected server error.
+      summary: Get one entity's sync state
+      tags:
+      - topology
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getmonitoringentitydetail.md

@@ -1,0 +1,528 @@
+paths:
+  /api/v1/distribution/edge_nodes:
+    get:
+      description: 'Lists the edges this instance can distribute to: artifactweave instances paired with it in the
+        edge role (decision 0021), with the name and service id each declared at pairing.'
+      operationId: getDistributionEdgeNodes
+      parameters:
+      - description: Optional query parameter. Maximum number of edges to return. Omitted returns all.
+        in: query
+        name: limit
+        schema:
+          type: integer
+      - description: Optional query parameter. When true the list also contains this instance as the source. Defaults
+          to false.
+        in: query
+        name: include_source_artifactory
+        schema:
+          default: false
+          type: boolean
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EdgeNodesInfo'
+          description: The edge peers.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: List edge nodes
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionedgenodes.md
+  /api/v1/distribution/{release_bundle_name}/{release_bundle_version}:
+    post:
+      description: 'Sends a signed version to the edges the distribution rules select and returns a tracker. The
+        transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the
+        signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys
+        and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired
+        in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and
+        nothing is sent.'
+      operationId: distributeReleaseBundleV1Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DistributionRequest'
+        description: Which edges to distribute to.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: 'Dry run: the edges that would be targeted.'
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: Distribution started; poll the tracker named by `id`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller has no destination permission covering one of the selected edges.
+      summary: Distribute a release bundle v1 version
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev1version.md
+  /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/abort:
+    put:
+      description: 'Stops the in-progress distribution of the version: transfers not yet finished are cancelled
+        and the affected edges discard what they had partly received. Edges that already completed keep the version.'
+      operationId: abortReleaseBundleV1Distribution
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PlatformServiceInstance'
+                type: array
+          description: Abort signalled; the body lists the edges told to stop.
+        '204':
+          description: Nothing was in progress.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Abort a release bundle v1 distribution
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev1distribution.md
+  /api/v1/distribution/{release_bundle_name}/{release_bundle_version}/delete:
+    post:
+      description: Removes a distributed version from the edges the rules select. Each edge deletes the version
+        and the artifacts that no other version on that edge still needs. With `on_success=delete` the version is
+        also deleted here once every selected edge has confirmed. With `dry_run` the selected edges are returned
+        and nothing changes.
+      operationId: deleteReleaseBundleV1VersionFromDistributionEdges
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteReleaseBundleRequest'
+        description: Which edges to delete from.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: 'Dry run: the edges that would be affected.'
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: Deletion started; poll the tracker named by `id`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller has no destination permission with `delete` covering one of the selected edges.
+      summary: Delete a release bundle v1 version from edges
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deletereleasebundlev1versionfromdistributionedges.md
+  /api/v1/dynamic/distribute:
+    post:
+      description: Creates a release bundle version from the spec with a generated name and version, signs it with
+        the default GPG key and distributes it to the edges the rules select, all in one request. The rules and
+        edge requirements are those of the ordinary distribute operation.
+      operationId: distributeDynamicReleaseBundleV1
+      parameters:
+      - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
+          when the key has one; never logged or stored.
+        in: header
+        name: X-GPG-PASSPHRASE
+        schema:
+          type: string
+        x-secret: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DynamicDistributionRequest'
+        description: What to bundle and where to send it.
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DynamicDistributionResponse'
+          description: The version was created and signed and its distribution started.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The spec or rules are invalid, or signing failed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Create, sign and distribute a release bundle in one call
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributedynamicreleasebundlev1.md
+  /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version}:
+    put:
+      description: Aborts an in-progress Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's
+        Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an
+        artifactweave instance. The operation is specified so the Distribution surface stays complete and answers
+        501.
+      operationId: abortReleaseBundleV2Distribution
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/repositoryKeyQuery'
+      - $ref: '#/components/parameters/projectQuery'
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/PlatformServiceInstance'
+                type: array
+          description: Accepted; the work continues asynchronously.
+        '204':
+          description: Done; no body.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: Abort a Release Bundle v2 distribution
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/abortreleasebundlev2distribution.md
+      x-tier: stub
+  /api/v2/distribution/distribute/{release_bundle_name}/{release_bundle_version}:
+    post:
+      description: Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle
+        service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave
+        instance. The operation is specified so the Distribution surface stays complete and answers 501.
+      operationId: distributeReleaseBundleV2Version
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/repositoryKeyQuery'
+      - $ref: '#/components/parameters/projectQuery'
+      - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
+          when the key has one; never logged or stored.
+        in: header
+        name: X-GPG-PASSPHRASE
+        schema:
+          type: string
+        x-secret: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RBv2DistributionRequest'
+        description: Which edges to distribute to.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: Success.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or failed validation; the body explains which.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request conflicts with the current state.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: Distribute a Release Bundle v2 version
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributereleasebundlev2version.md
+      x-tier: stub
+  /api/v2/distribution/remote_delete/{release_bundle_name}/{release_bundle_version}:
+    post:
+      description: Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle
+        service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave
+        instance. The operation is specified so the Distribution surface stays complete and answers 501.
+      operationId: remoteDeleteReleaseBundleV2Distribution
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/repositoryKeyQuery'
+      - $ref: '#/components/parameters/projectQuery'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RBv2RemoteDeleteRequest'
+        description: Which edges to delete from.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: Success.
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionResponse'
+          description: Accepted; the work continues asynchronously.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: Delete a Release Bundle v2 version from edges
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/remotedeletereleasebundlev2distribution.md
+      x-tier: stub
+  /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}:
+    get:
+      description: Lists the distribution trackers of a Release Bundle v2 version. Release Bundles v2 are created
+        by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can
+        exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete
+        and answers 501.
+      operationId: getReleaseBundleV2DistributionTrackers
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/repositoryKeyQuery'
+      - $ref: '#/components/parameters/projectQuery'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/DistributionTrackerSimple'
+                type: array
+          description: Success.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: List Release Bundle v2 distribution trackers
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreleasebundlev2distributiontrackers.md
+      x-tier: stub
+  /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}:
+    get:
+      description: Returns one Release Bundle v2 distribution tracker. Release Bundles v2 are created by JFrog's
+        Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an
+        artifactweave instance. The operation is specified so the Distribution surface stays complete and answers
+        501.
+      operationId: getDistributionStatusDetailsByTrackerId
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/distributionTrackerPath'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionProgress'
+          description: Success.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: Get a Release Bundle v2 distribution tracker
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionstatusdetailsbytrackerid.md
+      x-tier: stub
+  /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}/priority:
+    put:
+      description: Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created
+        by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can
+        exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete
+        and answers 501.
+      operationId: updateReleaseBundleV2DistributionPriority
+      parameters:
+      - $ref: '#/components/parameters/releaseBundleNamePath'
+      - $ref: '#/components/parameters/releaseBundleVersionPath'
+      - $ref: '#/components/parameters/distributionTrackerPath'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DistributionPriorityUpdateRequest'
+        description: The new priorities.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionPriorityUpdateResponse'
+          description: Success.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or failed validation; the body explains which.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Not implemented by artifactweave; see the operation description.
+      summary: Change the priority of a Release Bundle v2 distribution
+      tags:
+      - distribution
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatereleasebundlev2distributionpriority.md
+      x-tier: stub

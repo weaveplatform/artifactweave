@@ -69,6 +69,22 @@ linters:
   settings:
     nakedret:
       max-func-lines: 40
+    tagliatelle:
+      case:
+        # The project's own JSON and YAML (application configuration,
+        # internal APIs) use snake_case, matching hostweave.
+        rules:
+          json: snake
+          yaml: snake
+        # Wire-model packages mirror JFrog's JSON names (camelCase with
+        # kebab-case and snake_case mixed into the same structs), which no
+        # single case rule can express; decision record 0002 limits the
+        # exception to these packages.
+        overrides:
+          - pkg: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+            ignore: true
+          - pkg: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types/wire
+            ignore: true
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:

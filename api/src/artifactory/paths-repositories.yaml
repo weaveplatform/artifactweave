@@ -1,0 +1,2367 @@
+components:
+  parameters:
+    repoKey:
+      description: Required path parameter. The repository key.
+      in: path
+      name: repoKey
+      required: true
+      schema:
+        description: The repository key.
+        type: string
+  schemas:
+    ArtifactDeleteFailure:
+      description: One artifact that could not be deleted while removing a repository.
+      properties:
+        message:
+          description: Required within this object. Why the artifact could not be deleted.
+          type: string
+        status:
+          description: Required within this object. HTTP style status code describing the failure.
+          type: integer
+      required:
+      - message
+      - status
+      type: object
+    BatchRepositoryConfigurationArray:
+      description: 'Request body of the batch create and update operations: one configuration per repository, mixed
+        classes and package types allowed.'
+      items:
+        $ref: '#/components/schemas/RepositoryConfiguration'
+      type: array
+    ChecksumPolicyType:
+      description: How a client-supplied checksum that disagrees with the uploaded bytes is handled. client-checksums
+        rejects, server-generated-checksums accepts and records both values.
+      enum:
+      - client-checksums
+      - server-generated-checksums
+      type: string
+    FederatedRepositoryConfiguration:
+      description: 'Configuration of a federated repository: a local repository whose content and metadata are kept
+        in sync with copies on other artifactweave instances (decision 0022). Members are artifactweave peers that
+        trust each other through pairing (decision 0021); JFrog Artifactory instances cannot be members. Deploys,
+        deletes, moves, copies and property changes on any member are sent to the others as ordered events; where
+        two members change the same item, the change with the later event time wins and the originating instance
+        id breaks ties. A full sync repairs members that missed events.'
+      properties:
+        archiveBrowsingEnabled:
+          description: Optional within this object. When true the contents of zip, tar and similar archives may
+            be browsed and fetched through the archive entry URL. Defaults to false because it serves untrusted
+            content inline.
+          type: boolean
+        blackedOut:
+          description: Optional within this object. When true the repository refuses every download and deploy.
+            Defaults to false.
+          type: boolean
+        blockPushingSchema1:
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
+            Defaults to false; artifactweave never accepts schema 1 regardless. Artifactory renders this boolean
+            as the strings "true" or "false" on federated repositories; the server accepts either form on input
+            and echoes the string form here.
+          type: string
+        calculateYumMetadata:
+          description: Optional within this object. When true RPM metadata is regenerated automatically on deploy.
+            Defaults to false. Not implemented for RPM in v1 but stored.
+          type: boolean
+        cdnRedirect:
+          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted
+            and stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Artifactory
+            renders this boolean as the strings "true" or "false" on federated repositories; the server accepts
+            either form on input and echoes the string form here.
+          type: string
+        checksumPolicyType:
+          allOf:
+          - $ref: '#/components/schemas/ChecksumPolicyType'
+          description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded
+            bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
+        debianTrivialLayout:
+          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
+            Stored for compatibility.
+          type: boolean
+        description:
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          type: string
+        disableProxy:
+          description: Optional within this object. When true the platform default proxy is not used even if one
+            is configured. Defaults to false.
+          type: boolean
+        dockerApiVersion:
+          description: Optional within this object. Docker registry API version served. Only V2 exists; V1 was removed
+            by Artifactory.
+          enum:
+          - V2
+          type: string
+        dockerTagRetention:
+          description: Optional within this object. Number of unique tags to keep per Docker image when maxUniqueTags
+            is applied. Defaults to 1.
+          type: integer
+        downloadRedirect:
+          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
+            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Artifactory
+            renders this boolean as the strings "true" or "false" on federated repositories; the server accepts
+            either form on input and echoes the string form here.
+          type: string
+        enableFileListsIndexing:
+          description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
+            Artifactory renders this boolean as the strings "true" or "false" on federated repositories; the server
+            accepts either form on input and echoes the string form here.
+          type: string
+        encryptStates:
+          description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
+            Defaults to true. The terraformbackend package type is not supported in v1 and the field is stored only.
+          type: boolean
+        environments:
+          description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
+            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
+            after.
+          items:
+            description: Optional within this object. An environment name.
+            type: string
+          type: array
+        excludesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected
+            on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
+          type: string
+        forceConanAuthentication:
+          description: Optional within this object. When true anonymous Conan requests receive 401. Stored for compatibility;
+            Conan is not served.
+          type: boolean
+        forceMetadataNameVersion:
+          description: Optional within this object. When true a Helm chart file name must match the name and version
+            inside Chart.yaml or the upload is rejected. Defaults to false.
+          type: boolean
+        forceNonDuplicateChart:
+          description: Optional within this object. When true uploading a Helm chart whose name and version already
+            exist is rejected with 403. Defaults to false.
+          type: boolean
+        forceNugetAuthentication:
+          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
+            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          type: boolean
+        forceP2Authentication:
+          description: Optional within this object. When true anonymous P2 requests receive 401. Stored for compatibility;
+            P2 is not served.
+          type: boolean
+        handleReleases:
+          description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to
+            true.
+          type: boolean
+        handleSnapshots:
+          description: Optional within this object. Whether Maven snapshot artifacts may be deployed. Defaults to
+            true.
+          type: boolean
+        includesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least
+            one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
+          type: string
+        key:
+          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
+            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
+            created inside a project are prefixed with the project key followed by a hyphen.
+          type: string
+        maxUniqueSnapshots:
+          description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
+            ones are deleted five minutes after a deploy. 0 (the default) keeps everything and the effective minimum
+            is 2.
+          type: integer
+        maxUniqueTags:
+          description: Optional within this object. Maximum tags kept per Docker image; older tags are deleted when
+            a push exceeds it. 0 (the default) keeps everything.
+          type: integer
+        members:
+          description: Optional within this object. The federation members, including this instance. Each must be
+            an artifactweave instance paired with this one for the `federated-repo/*` or `federated-repo/r` use
+            case; an unpaired member is rejected with 400. Adding a member starts a full sync to it; removing one
+            stops sync without deleting its copy. Every member must share the repository's package type and, inside
+            a project, its project key.
+          items:
+            description: One federation member.
+            properties:
+              enabled:
+                description: Optional within this object. Whether sync with this member is on. Always rendered as
+                  the strings "true" or "false"; defaults to "true". Turning it off queues no events for the member
+                  until it is turned on again, after which a full sync catches it up.
+                type: string
+              url:
+                description: Required within this object. Full URL of the member repository on its instance, `<base
+                  URL>/artifactory/<repo key>`. The repository key may differ between members.
+                type: string
+            required:
+            - url
+            type: object
+          type: array
+        notes:
+          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          type: string
+        optionalIndexCompressionFormats:
+          description: Optional within this object. Additional compression formats generated for Debian index files,
+            for example bz2 or lzma. Stored for compatibility.
+          items:
+            description: Optional within this object. A compression format name.
+            type: string
+          type: array
+        packageType:
+          allOf:
+          - $ref: '#/components/schemas/PackageTypeFederated'
+          description: Optional within this object. Package types a federated repository may serve. terraformbackend
+            and swift are not allowed.
+        primaryKeyPairRef:
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that
+            need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
+          type: string
+        priorityResolution:
+          description: Optional within this object. When true a virtual repository resolves this member before members
+            without the flag. Defaults to false. Rendered as a JSON boolean on federated repositories; the server
+            also accepts the strings "true" and "false" on input.
+          type: boolean
+        projectKey:
+          description: Optional within this object. Key of the project that owns the repository. When set, environments
+            must also be set, and the repository key must carry the project prefix. Changing it moves the repository
+            between projects.
+          type: string
+        propertySets:
+          description: Optional within this object. Names of property sets whose predefined properties are offered
+            for items in this repository. Each name must exist in the property sets configuration.
+          items:
+            description: Optional within this object. A property set name.
+            type: string
+          type: array
+        proxy:
+          description: Optional within this object. Name of a configured proxy used for outbound connections. Must
+            exist in the proxies configuration. Only meaningful on remote and federated repositories.
+          type: string
+        rclass:
+          description: Required within this object. The repository class. It selects which of the class-specific
+            fields apply and how the string-typed booleans are rendered on read. Always federated for this schema.
+          enum:
+          - federated
+          type: string
+        repoLayoutRef:
+          description: Optional within this object. Name of the repository layout that parses paths into org, module,
+            revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
+            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+          type: string
+        secondaryKeyPairRef:
+          description: Optional within this object. Name of a second signing key pair, used while rotating the primary.
+            Must name an existing key pair.
+          type: string
+        signedUrlTtl:
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued
+            for this repository. Returned for compatibility; the configured value cannot be changed through this
+            API.
+          readOnly: true
+          type: integer
+        snapshotVersionBehavior:
+          description: 'Optional within this object. Naming of deployed Maven snapshots: unique (the default since
+            7.41) rewrites the file name with a timestamp and build number, non-unique keeps the literal -SNAPSHOT
+            name and overwrites, deployer keeps whatever the client sent.'
+          enum:
+          - unique
+          - non-unique
+          - deployer
+          type: string
+        suppressPomConsistencyChecks:
+          description: Optional within this object. When true a POM whose coordinates disagree with its deploy path
+            is accepted instead of rejected. Defaults to false.
+          type: boolean
+        xrayDataTtl:
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned for compatibility
+            only.
+          readOnly: true
+          type: integer
+        xrayIndex:
+          description: Optional within this object. Whether JFrog Xray should index this repository. artifactweave
+            stores and echoes the flag because the Terraform providers set it, but never scans. Defaults to false.
+          type: boolean
+        yumRootDepth:
+          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored
+            for compatibility.
+          type: integer
+      required:
+      - key
+      - rclass
+      type: object
+      x-go-type: repo.Config
+      x-go-type-import:
+        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+    LocalRepositoryConfiguration:
+      description: 'Configuration of a local repository: the server stores uploads and generates the format''s metadata
+        itself. Fields outside the common set apply to specific package types and are ignored for others.'
+      properties:
+        archiveBrowsingEnabled:
+          description: Optional within this object. When true the contents of zip, tar and similar archives may
+            be browsed and fetched through the archive entry URL. Defaults to false because it serves untrusted
+            content inline.
+          type: boolean
+        blackedOut:
+          description: Optional within this object. When true the repository refuses every download and deploy.
+            Defaults to false.
+          type: boolean
+        blockPushingSchema1:
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
+            Defaults to false; artifactweave never accepts schema 1 regardless. Artifactory renders this boolean
+            as the strings "true" or "false" on local repositories; the server accepts either form on input and
+            echoes the string form here.
+          type: string
+        calculateYumMetadata:
+          description: Optional within this object. When true RPM metadata is regenerated automatically on deploy.
+            Defaults to false. Not implemented for RPM in v1 but stored.
+          type: boolean
+        cdnRedirect:
+          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted
+            and stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Artifactory
+            renders this boolean as the strings "true" or "false" on local repositories; the server accepts either
+            form on input and echoes the string form here.
+          type: string
+        checksumPolicyType:
+          allOf:
+          - $ref: '#/components/schemas/ChecksumPolicyType'
+          description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded
+            bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
+        contentSynchronisation:
+          description: Optional within this object. Smart remote repository settings used when the upstream is another
+            Artifactory or artifactweave. enabled turns the feature on; statistics.enabled forwards download counts
+            upstream; properties.enabled syncs item properties; source.originAbsenceDetection removes cached items
+            the upstream no longer has.
+          properties:
+            enabled:
+              description: Optional within this object. Turns smart remote behaviour on. Defaults to false.
+              type: boolean
+            properties:
+              description: Optional within this object. Property synchronisation.
+              properties:
+                enabled:
+                  description: Optional within this object. When true item properties are copied from the upstream.
+                    Defaults to false.
+                  type: boolean
+              type: object
+            source:
+              description: Optional within this object. Upstream absence handling.
+              properties:
+                originAbsenceDetection:
+                  description: Optional within this object. When true cached items deleted upstream are removed
+                    locally. Defaults to false.
+                  type: boolean
+              type: object
+            statistics:
+              description: Optional within this object. Download statistics forwarding.
+              properties:
+                enabled:
+                  description: Optional within this object. When true download counts are reported to the upstream.
+                    Defaults to false.
+                  type: boolean
+              type: object
+          type: object
+        debianTrivialLayout:
+          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
+            Stored for compatibility.
+          type: boolean
+        description:
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          type: string
+        dockerApiVersion:
+          description: Optional within this object. Docker registry API version served. Only V2 exists; V1 was removed
+            by Artifactory.
+          enum:
+          - V2
+          type: string
+        dockerTagRetention:
+          description: Optional within this object. Number of unique tags to keep per Docker image when maxUniqueTags
+            is applied. Defaults to 1.
+          type: integer
+        downloadRedirect:
+          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
+            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Artifactory
+            renders this boolean as the strings "true" or "false" on local repositories; the server accepts either
+            form on input and echoes the string form here.
+          type: string
+        enableFileListsIndexing:
+          description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
+            Artifactory renders this boolean as the strings "true" or "false" on local repositories; the server
+            accepts either form on input and echoes the string form here.
+          type: string
+        encryptStates:
+          description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
+            Defaults to true. The terraformbackend package type is not supported in v1 and the field is stored only.
+          type: boolean
+        environments:
+          description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
+            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
+            after.
+          items:
+            description: Optional within this object. An environment name.
+            type: string
+          type: array
+        excludesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected
+            on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
+          type: string
+        forceConanAuthentication:
+          description: Optional within this object. When true anonymous Conan requests receive 401. Stored for compatibility;
+            Conan is not served.
+          type: boolean
+        forceMetadataNameVersion:
+          description: Optional within this object. When true a Helm chart file name must match the name and version
+            inside Chart.yaml or the upload is rejected. Defaults to false.
+          type: boolean
+        forceNonDuplicateChart:
+          description: Optional within this object. When true uploading a Helm chart whose name and version already
+            exist is rejected with 403. Defaults to false.
+          type: boolean
+        forceNugetAuthentication:
+          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
+            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          type: boolean
+        forceP2Authentication:
+          description: Optional within this object. When true anonymous P2 requests receive 401. Stored for compatibility;
+            P2 is not served.
+          type: boolean
+        handleReleases:
+          description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to
+            true.
+          type: boolean
+        handleSnapshots:
+          description: Optional within this object. Whether Maven snapshot artifacts may be deployed. Defaults to
+            true.
+          type: boolean
+        includesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least
+            one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
+          type: string
+        key:
+          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
+            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
+            created inside a project are prefixed with the project key followed by a hyphen.
+          type: string
+        maxUniqueSnapshots:
+          description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
+            ones are deleted five minutes after a deploy. 0 (the default) keeps everything and the effective minimum
+            is 2.
+          type: integer
+        maxUniqueTags:
+          description: Optional within this object. Maximum tags kept per Docker image; older tags are deleted when
+            a push exceeds it. 0 (the default) keeps everything.
+          type: integer
+        notes:
+          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          type: string
+        optionalIndexCompressionFormats:
+          description: Optional within this object. Additional compression formats generated for Debian index files,
+            for example bz2 or lzma. Stored for compatibility.
+          items:
+            description: Optional within this object. A compression format name.
+            type: string
+          type: array
+        packageType:
+          allOf:
+          - $ref: '#/components/schemas/PackageTypeLocal'
+          description: Optional within this object. Package types a local repository may serve. The server additionally
+            accepts bazelmodules, which the documentation lists but the crawled schema omits.
+        primaryKeyPairRef:
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that
+            need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
+          type: string
+        priorityResolution:
+          description: Optional within this object. When true a virtual repository resolves this member before members
+            without the flag. Defaults to false. Artifactory renders this boolean as the strings "true" or "false"
+            on local repositories; the server accepts either form on input and echoes the string form here.
+          type: string
+        projectKey:
+          description: Optional within this object. Key of the project that owns the repository. When set, environments
+            must also be set, and the repository key must carry the project prefix. Changing it moves the repository
+            between projects.
+          type: string
+        propertySets:
+          description: Optional within this object. Names of property sets whose predefined properties are offered
+            for items in this repository. Each name must exist in the property sets configuration.
+          items:
+            description: Optional within this object. A property set name.
+            type: string
+          type: array
+        rclass:
+          description: Required within this object. The repository class. It selects which of the class-specific
+            fields apply and how the string-typed booleans are rendered on read. Always local for this schema.
+          enum:
+          - local
+          type: string
+        repoLayoutRef:
+          description: Optional within this object. Name of the repository layout that parses paths into org, module,
+            revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
+            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+          type: string
+        secondaryKeyPairRef:
+          description: Optional within this object. Name of a second signing key pair, used while rotating the primary.
+            Must name an existing key pair.
+          type: string
+        signedUrlTtl:
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued
+            for this repository. Returned for compatibility; the configured value cannot be changed through this
+            API.
+          readOnly: true
+          type: integer
+        snapshotVersionBehavior:
+          description: 'Optional within this object. Naming of deployed Maven snapshots: unique (the default since
+            7.41) rewrites the file name with a timestamp and build number, non-unique keeps the literal -SNAPSHOT
+            name and overwrites, deployer keeps whatever the client sent.'
+          enum:
+          - unique
+          - non-unique
+          - deployer
+          type: string
+        suppressPomConsistencyChecks:
+          description: Optional within this object. When true a POM whose coordinates disagree with its deploy path
+            is accepted instead of rejected. Defaults to false.
+          type: boolean
+        terraformType:
+          description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry
+            endpoints. Local repositories only. The server accepts module and provider in any letter case and echoes
+            upper case, because the JFrog Terraform provider sends lower case.
+          enum:
+          - MODULE
+          - PROVIDER
+          type: string
+        xrayDataTtl:
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned for compatibility
+            only.
+          readOnly: true
+          type: integer
+        xrayIndex:
+          description: Optional within this object. Whether JFrog Xray should index this repository. artifactweave
+            stores and echoes the flag because the Terraform providers set it, but never scans. Defaults to false.
+          type: boolean
+        yumRootDepth:
+          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored
+            for compatibility.
+          type: integer
+      required:
+      - key
+      - rclass
+      type: object
+      x-go-type: repo.Config
+      x-go-type-import:
+        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+    PackageTypeFederated:
+      description: Package types a federated repository may serve. terraformbackend and swift are not allowed.
+      enum:
+      - alpine
+      - maven
+      - gradle
+      - ivy
+      - sbt
+      - helm
+      - helmoci
+      - huggingfaceml
+      - cargo
+      - cocoapods
+      - opkg
+      - rpm
+      - nuget
+      - cran
+      - gems
+      - npm
+      - bower
+      - debian
+      - composer
+      - oci
+      - pypi
+      - docker
+      - vagrant
+      - gitlfs
+      - go
+      - ansible
+      - conan
+      - conda
+      - chef
+      - puppet
+      - generic
+      type: string
+    PackageTypeLocal:
+      description: Package types a local repository may serve. The server additionally accepts bazelmodules, which
+        the documentation lists but the crawled schema omits.
+      enum:
+      - alpine
+      - cargo
+      - composer
+      - bower
+      - chef
+      - cocoapods
+      - conan
+      - conda
+      - cran
+      - debian
+      - docker
+      - helm
+      - helmoci
+      - huggingfaceml
+      - gems
+      - gitlfs
+      - go
+      - gradle
+      - ivy
+      - maven
+      - npm
+      - nuget
+      - oci
+      - opkg
+      - pub
+      - puppet
+      - pypi
+      - rpm
+      - sbt
+      - swift
+      - terraform
+      - terraformbackend
+      - vagrant
+      - ansible
+      - generic
+      type: string
+    PackageTypeRemote:
+      description: Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs
+        and p2 are accepted for compatibility but not served.
+      enum:
+      - alpine
+      - cargo
+      - composer
+      - bower
+      - chef
+      - cocoapods
+      - conan
+      - conda
+      - cran
+      - debian
+      - docker
+      - helm
+      - helmoci
+      - huggingfaceml
+      - gems
+      - gitlfs
+      - go
+      - gradle
+      - ivy
+      - maven
+      - npm
+      - nuget
+      - oci
+      - opkg
+      - pub
+      - puppet
+      - pypi
+      - rpm
+      - sbt
+      - swift
+      - terraform
+      - ansible
+      - generic
+      type: string
+    PackageTypeVirtual:
+      description: Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend
+        cannot be aggregated.
+      enum:
+      - alpine
+      - composer
+      - bower
+      - chef
+      - conan
+      - conda
+      - cran
+      - debian
+      - docker
+      - helm
+      - helmoci
+      - huggingfaceml
+      - gems
+      - gitlfs
+      - go
+      - gradle
+      - ivy
+      - maven
+      - npm
+      - nuget
+      - oci
+      - pub
+      - puppet
+      - pypi
+      - rpm
+      - sbt
+      - swift
+      - terraform
+      - ansible
+      - generic
+      type: string
+    PomRepositoryReferencesCleanupPolicy:
+      description: What a virtual repository does to repository references inside served POMs.
+      enum:
+      - discard_active_reference
+      - discard_any_reference
+      - nothing
+      type: string
+    RemoteRepoChecksumPolicyType:
+      description: How checksum files missing or wrong on the upstream are treated by a remote repository.
+      enum:
+      - generate-if-absent
+      - fail
+      - ignore-and-generate
+      - pass-thru
+      type: string
+    RemoteRepositoryConfiguration:
+      description: 'Configuration of a remote repository: a proxy and cache of an upstream registry. The cache is
+        addressed as <key>-cache in item paths and search results but is not itself a repository.'
+      properties:
+        allowAnyHostAuth:
+          description: Optional within this object. When true credentials are sent to any host the upstream redirects
+            to, not only the configured one. Defaults to false.
+          type: boolean
+        assumedOfflinePeriodSecs:
+          description: Optional within this object. Seconds the upstream is assumed offline after a connection failure,
+            during which only the cache is served. Defaults to 300.
+          type: integer
+        blackedOut:
+          description: Optional within this object. When true the repository refuses every download and deploy.
+            Defaults to false.
+          type: boolean
+        blockMismatchingMimeTypes:
+          description: Optional within this object. When true a response whose Content-Type disagrees with the extension
+            is rejected. Defaults to true.
+          type: boolean
+        blockPushingSchema1:
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
+            Defaults to false; artifactweave never accepts schema 1 regardless. Rendered as a JSON boolean on remote
+            repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
+        bowerRegistryUrl:
+          description: Optional within this object. Upstream Bower registry URL. Stored for compatibility; Bower
+            is not served.
+          type: string
+        bypassHeadRequests:
+          description: Optional within this object. When true the server skips the HEAD probe before fetching and
+            issues GET directly. Defaults to false.
+          type: boolean
+        cdnRedirect:
+          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted
+            and stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Rendered as
+            a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
+        chartsBaseUrl:
+          description: Optional within this object. Base URL that Helm chart entries in a proxied index.yaml are
+            rewritten against when the upstream uses relative URLs.
+          type: string
+        clientTlsCertificate:
+          description: Optional within this object. Alias of a client certificate from the certificates store presented
+            to the upstream. Empty means none.
+          type: string
+        composerRegistryUrl:
+          description: Optional within this object. Upstream Composer registry URL. Stored for compatibility; Composer
+            is not served.
+          type: string
+        contentSynchronisation:
+          description: Optional within this object. Smart remote repository settings used when the upstream is another
+            Artifactory or artifactweave. enabled turns the feature on; statistics.enabled forwards download counts
+            upstream; properties.enabled syncs item properties; source.originAbsenceDetection removes cached items
+            the upstream no longer has.
+          properties:
+            enabled:
+              description: Optional within this object. Turns smart remote behaviour on. Defaults to false.
+              type: boolean
+            properties:
+              description: Optional within this object. Property synchronisation.
+              properties:
+                enabled:
+                  description: Optional within this object. When true item properties are copied from the upstream.
+                    Defaults to false.
+                  type: boolean
+              type: object
+            source:
+              description: Optional within this object. Upstream absence handling.
+              properties:
+                originAbsenceDetection:
+                  description: Optional within this object. When true cached items deleted upstream are removed
+                    locally. Defaults to false.
+                  type: boolean
+              type: object
+            statistics:
+              description: Optional within this object. Download statistics forwarding.
+              properties:
+                enabled:
+                  description: Optional within this object. When true download counts are reported to the upstream.
+                    Defaults to false.
+                  type: boolean
+              type: object
+          type: object
+        customHttpHeaders:
+          description: Optional within this object. Headers added to every upstream request. Each entry has name,
+            value and sensitive; sensitive values are masked on read.
+          items:
+            properties:
+              name:
+                description: Required within this object. Header name.
+                type: string
+              sensitive:
+                description: Optional within this object. When true the value is stored sealed and returned masked.
+                  Defaults to false.
+                type: boolean
+              value:
+                description: Required within this object. Header value. Masked on read when sensitive is true.
+                type: string
+            required:
+            - name
+            - value
+            type: object
+          type: array
+        description:
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          type: string
+        disableProxy:
+          description: Optional within this object. When true the platform default proxy is not used even if one
+            is configured. Defaults to false.
+          type: boolean
+        disableUrlNormalization:
+          description: Optional within this object. When true the upstream path is sent exactly as requested without
+            normalising duplicate slashes or dot segments. Defaults to false.
+          type: boolean
+        dockerProjectId:
+          description: Optional within this object. Google Artifact Registry project id used when the upstream is
+            Google. Stored for compatibility.
+          type: string
+        downloadContextPath:
+          description: Optional within this object. Path of NuGet package downloads below the upstream URL. Defaults
+            to api/v2/package.
+          type: string
+        downloadRedirect:
+          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
+            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered
+            as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on
+            input.
+          type: boolean
+        enableCookieManagement:
+          description: Optional within this object. When true upstream cookies are stored and replayed. Defaults
+            to false.
+          type: boolean
+        enableTokenAuthentication:
+          description: Optional within this object. When true the Docker token flow is used against the upstream;
+            required for Docker Hub. Defaults to false.
+          type: boolean
+        environments:
+          description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
+            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
+            after.
+          items:
+            description: Optional within this object. An environment name.
+            type: string
+          type: array
+        excludesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected
+            on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
+          type: string
+        externalDependenciesEnabled:
+          description: Optional within this object. When true the server follows references to other hosts that
+            package metadata points at, limited by externalDependenciesPatterns. Defaults to false.
+          type: boolean
+        externalDependenciesPatterns:
+          description: Optional within this object. Allow-list of URL patterns for external dependencies, for example
+            **/github.com/**.
+          items:
+            description: Optional within this object. A URL pattern such as **/github.com/**.
+            type: string
+          type: array
+        feedContextPath:
+          description: Optional within this object. Path of the NuGet v2 feed below the upstream URL. Defaults to
+            api/v2.
+          type: string
+        fetchJarsEagerly:
+          description: Optional within this object. When true a Maven JAR is fetched as soon as its POM is requested.
+            Defaults to false.
+          type: boolean
+        fetchSourcesEagerly:
+          description: Optional within this object. When true a Maven sources JAR is fetched together with the main
+            artifact. Defaults to false.
+          type: boolean
+        forceConanAuthentication:
+          description: Optional within this object. When true anonymous Conan requests receive 401. Stored for compatibility;
+            Conan is not served.
+          type: boolean
+        forceNugetAuthentication:
+          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
+            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          type: boolean
+        forceP2Authentication:
+          description: Optional within this object. When true anonymous P2 requests receive 401. Stored for compatibility;
+            P2 is not served.
+          type: boolean
+        gitRegistryUrl:
+          description: Optional within this object. Upstream git registry URL for Bower. Stored for compatibility.
+          type: string
+        handleReleases:
+          description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to
+            true.
+          type: boolean
+        handleSnapshots:
+          description: Optional within this object. Whether Maven snapshot artifacts may be deployed. Defaults to
+            true.
+          type: boolean
+        hardFail:
+          description: Optional within this object. When true an upstream failure makes the request fail instead
+            of falling back to the cache or the next virtual member. Defaults to false.
+          type: boolean
+        includesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least
+            one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
+          type: string
+        key:
+          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
+            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
+            created inside a project are prefixed with the project key followed by a hyphen.
+          type: string
+        listRemoteFolderItems:
+          description: Optional within this object. When true folder listings include items that exist upstream
+            but are not cached. Defaults to false.
+          type: boolean
+        localAddress:
+          description: Optional within this object. Local network interface address to bind outbound connections
+            to. Empty means any.
+          type: string
+        maxUniqueSnapshots:
+          description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
+            ones are deleted five minutes after a deploy. 0 (the default) keeps everything and the effective minimum
+            is 2.
+          type: integer
+        metadataRetrievalTimeoutSecs:
+          description: Optional within this object. Seconds to wait for metadata from the upstream before giving
+            up. Defaults to 60.
+          type: integer
+        mismatchingMimeTypesOverrideList:
+          description: Optional within this object. Comma-separated media types allowed despite blockMismatchingMimeTypes.
+          type: string
+        missedRetrievalCachePeriodSecs:
+          description: Optional within this object. Seconds a failed lookup is remembered so repeated requests for
+            a missing item do not hit the upstream. Defaults to 1800, and to 600 for go.
+          type: integer
+        notes:
+          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          type: string
+        offline:
+          description: Optional within this object. When true the upstream is never contacted and only cached items
+            are served. Defaults to false.
+          type: boolean
+        packageType:
+          allOf:
+          - $ref: '#/components/schemas/PackageTypeRemote'
+          description: Optional within this object. Package types a remote repository may serve. terraformbackend
+            and vagrant are not allowed; vcs and p2 are accepted for compatibility but not served.
+        password:
+          description: 'Optional within this object. Password or token for upstream authentication. Write only:
+            reads return a masked value, and an omitted field on update keeps the stored secret.'
+          type: string
+        priorityResolution:
+          description: Optional within this object. When true a virtual repository resolves this member before members
+            without the flag. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also
+            accepts the strings "true" and "false" on input.
+          type: boolean
+        projectKey:
+          description: Optional within this object. Key of the project that owns the repository. When set, environments
+            must also be set, and the repository key must carry the project prefix. Changing it moves the repository
+            between projects.
+          type: string
+        propertySets:
+          description: Optional within this object. Names of property sets whose predefined properties are offered
+            for items in this repository. Each name must exist in the property sets configuration.
+          items:
+            description: Optional within this object. A property set name.
+            type: string
+          type: array
+        proxy:
+          description: Optional within this object. Name of a configured proxy used for outbound connections. Must
+            exist in the proxies configuration. Only meaningful on remote and federated repositories.
+          type: string
+        pyPIRegistryUrl:
+          description: Optional within this object. Base URL of the PyPI registry whose simple index is proxied.
+            Defaults to https://pypi.org.
+          type: string
+        pyPIRepositorySuffix:
+          description: Optional within this object. Path suffix of the simple index on the registry. Defaults to
+            simple.
+          type: string
+        queryParams:
+          description: Optional within this object. Query string appended to every upstream request, without the
+            leading question mark.
+          type: string
+        rclass:
+          description: Required within this object. The repository class. It selects which of the class-specific
+            fields apply and how the string-typed booleans are rendered on read. Always remote for this schema.
+          enum:
+          - remote
+          type: string
+        rejectInvalidJars:
+          description: Optional within this object. When true a fetched JAR that fails zip validation is discarded.
+            Defaults to false.
+          type: boolean
+        remoteRepoChecksumPolicyType:
+          allOf:
+          - $ref: '#/components/schemas/RemoteRepoChecksumPolicyType'
+          description: Optional within this object. How checksum files missing or wrong on the upstream are treated
+            by a remote repository.
+        remoteRepoLayoutRef:
+          description: Optional within this object. Layout of the upstream repository when it differs from repoLayoutRef,
+            so paths can be translated. Defaults to the empty string, meaning the same layout.
+          type: string
+        repoLayoutRef:
+          description: Optional within this object. Name of the repository layout that parses paths into org, module,
+            revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
+            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+          type: string
+        retrievalCachePeriodSecs:
+          description: Optional within this object. Seconds a cached non-unique resource such as maven-metadata.xml,
+            a packument or an index file is served before the upstream is asked again. Defaults to 7200, and to
+            21600 for docker, oci and helmoci. Unique binaries never expire.
+          type: integer
+        shareConfiguration:
+          description: Optional within this object. When true the sanitised configuration is exposed through the
+            deprecated shared configuration endpoint. Defaults to false.
+          type: boolean
+        signedUrlTtl:
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued
+            for this repository. Returned for compatibility; the configured value cannot be changed through this
+            API.
+          readOnly: true
+          type: integer
+        socketTimeoutMillis:
+          description: Optional within this object. Upstream connect and read timeout in milliseconds. Defaults
+            to 15000.
+          type: integer
+        storeArtifactsLocally:
+          description: Optional within this object. When true (the default) fetched artifacts are stored in the
+            cache; when false they are streamed through without caching.
+          type: boolean
+        suppressPomConsistencyChecks:
+          description: Optional within this object. When true a POM whose coordinates disagree with its deploy path
+            is accepted instead of rejected. Defaults to false.
+          type: boolean
+        symbolServerUrl:
+          description: Optional within this object. URL of the upstream NuGet symbol server, if any.
+          type: string
+        synchronizeProperties:
+          description: Optional within this object. When true properties set on the upstream Artifactory are copied
+            with the artifact. Defaults to false.
+          type: boolean
+        terraformProvidersUrl:
+          description: Optional within this object. URL from which Terraform provider binaries are downloaded, for
+            example https://releases.hashicorp.com.
+          type: string
+        terraformRegistryUrl:
+          description: Optional within this object. URL of the upstream Terraform registry used for discovery, for
+            example https://registry.terraform.io.
+          type: string
+        unusedArtifactsCleanupPeriodHours:
+          description: Optional within this object. Hours after which cached artifacts that were not requested are
+            deleted. 0 (the default) disables cleanup.
+          type: integer
+        url:
+          description: Required within this object. Upstream registry URL, for example https://registry-1.docker.io
+            or https://repo1.maven.org/maven2/. Required on create and must be absolute.
+          format: uri
+          type: string
+        username:
+          description: Optional within this object. Username for upstream authentication. Sent with password as
+            HTTP Basic unless enableTokenAuthentication applies.
+          type: string
+        v3FeedUrl:
+          description: Optional within this object. URL of the upstream NuGet v3 service index. Defaults to https://api.nuget.org/v3/index.json.
+          type: string
+        vcsGitDownloadUrl:
+          description: Optional within this object. Custom download URL template when vcsGitProvider is CUSTOM.
+            Stored for compatibility.
+          type: string
+        vcsGitProvider:
+          description: Optional within this object. Hosting provider used to build download URLs for VCS-backed
+            remotes. Defaults to GITHUB. Stored for compatibility.
+          enum:
+          - GITHUB
+          - GITHUBENTERPRISE
+          - BITBUCKET
+          - OLDSTASH
+          - STASH
+          - ARTIFACTORY
+          - CUSTOM
+          type: string
+        vcsType:
+          description: Optional within this object. Version control system behind a VCS-backed remote. Only GIT
+            exists. Stored for compatibility; VCS remotes are not served in v1.
+          enum:
+          - GIT
+          type: string
+        xrayDataTtl:
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned for compatibility
+            only.
+          readOnly: true
+          type: integer
+        xrayIndex:
+          description: Optional within this object. Whether JFrog Xray should index this repository. artifactweave
+            stores and echoes the flag because the Terraform providers set it, but never scans. Defaults to false.
+          type: boolean
+      required:
+      - key
+      - rclass
+      - url
+      type: object
+      x-go-type: repo.Config
+      x-go-type-import:
+        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+    RemoveRepositoryFailureReport:
+      description: Report returned when deleting a repository did not fully succeed. The configuration is kept whenever
+        this shape is returned.
+      properties:
+        deleteArtifactsFailureCount:
+          description: Required within this object. Total artifacts that could not be removed; may exceed the length
+            of errors, which is a capped sample.
+          format: int64
+          type: integer
+        deletedArtifactsCount:
+          description: Required within this object. Artifacts removed before the failure.
+          format: int64
+          type: integer
+        errors:
+          description: Required within this object. Capped sample of individual deletion failures.
+          items:
+            $ref: '#/components/schemas/ArtifactDeleteFailure'
+          type: array
+        repoKey:
+          description: Required within this object. Key of the repository the delete targeted.
+          type: string
+        statusMsg:
+          description: Required within this object. Summary of the outcome.
+          type: string
+        success:
+          description: Required within this object. Always false in this shape.
+          enum:
+          - false
+          type: boolean
+      required:
+      - deleteArtifactsFailureCount
+      - deletedArtifactsCount
+      - errors
+      - repoKey
+      - statusMsg
+      - success
+      type: object
+    RemoveRepositorySuccessReport:
+      description: Report returned when a repository and all of its content were removed, or when the key did not
+        exist.
+      properties:
+        deletedArtifactsCount:
+          description: Required within this object. Artifacts removed.
+          format: int64
+          type: integer
+        repoKey:
+          description: Required within this object. Key of the repository the delete targeted.
+          type: string
+        statusMsg:
+          description: Required within this object. Summary of the outcome.
+          type: string
+        success:
+          description: Required within this object. Always true in this shape.
+          enum:
+          - true
+          type: boolean
+      required:
+      - deletedArtifactsCount
+      - repoKey
+      - statusMsg
+      - success
+      type: object
+    RepoBulkRemovalFailFastReport:
+      description: Report returned when a batch delete was rejected before any repository was touched, for example
+        an empty key list or a protected repository in the list.
+      properties:
+        statusMessage:
+          description: Required within this object. Why the batch was rejected.
+          type: string
+      required:
+      - statusMessage
+      type: object
+    RepoBulkRemovalReport:
+      description: 'Outcome of a batch delete. One report per requested key in request order; the HTTP status summarises
+        them: 200 all succeeded, 207 mixed, 403, 409, 424 or 500 all failed for that reason.'
+      properties:
+        reports:
+          description: Required within this object. Per-repository success or failure reports in request order.
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/RemoveRepositorySuccessReport'
+            - $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          type: array
+        statusMessage:
+          description: Required within this object. Overall outcome of the batch.
+          type: string
+      required:
+      - reports
+      - statusMessage
+      type: object
+    RepositoryConfiguration:
+      description: A repository configuration of any class, discriminated by rclass. This is the shape every create,
+        update and read operation uses; the class-specific schemas list the fields each class honours.
+      discriminator:
+        mapping:
+          federated: '#/components/schemas/FederatedRepositoryConfiguration'
+          local: '#/components/schemas/LocalRepositoryConfiguration'
+          remote: '#/components/schemas/RemoteRepositoryConfiguration'
+          virtual: '#/components/schemas/VirtualRepositoryConfiguration'
+        propertyName: rclass
+      oneOf:
+      - $ref: '#/components/schemas/LocalRepositoryConfiguration'
+      - $ref: '#/components/schemas/RemoteRepositoryConfiguration'
+      - $ref: '#/components/schemas/VirtualRepositoryConfiguration'
+      - $ref: '#/components/schemas/FederatedRepositoryConfiguration'
+      x-go-type: repo.Config
+      x-go-type-import:
+        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+    SharedRemoteRepositoryConfiguration:
+      additionalProperties: true
+      description: 'Sanitised view of a remote repository returned by the deprecated shared configuration endpoint:
+        credentials and proxy settings are removed.'
+      properties:
+        key:
+          description: Optional within this object. The repository key.
+          type: string
+        url:
+          description: Optional within this object. The upstream URL.
+          format: uri
+          type: string
+      type: object
+    VirtualRepositoryConfiguration:
+      description: 'Configuration of a virtual repository: an ordered aggregation of other repositories behind one
+        URL. Uploads go to defaultDeploymentRepo; metadata is merged across members.'
+      properties:
+        artifactoryRequestsCanRetrieveRemoteArtifacts:
+          description: Optional within this object. When true requests that originate from another Artifactory instance
+            may trigger remote fetches through this virtual repository. Defaults to false.
+          type: boolean
+        debianDefaultArchitectures:
+          description: Optional within this object. Comma-separated architectures used when generating aggregated
+            Debian metadata. Stored for compatibility.
+          type: string
+        debianTrivialLayout:
+          description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
+            Stored for compatibility.
+          type: boolean
+        defaultDeploymentRepo:
+          description: Optional within this object. Key of the member that receives uploads sent to the virtual
+            repository. Must be one of repositories and must not be a remote.
+          type: string
+        description:
+          description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+          type: string
+        dockerApiVersion:
+          description: Optional within this object. Docker registry API version served. Only V2 exists; V1 was removed
+            by Artifactory.
+          enum:
+          - V2
+          type: string
+        environments:
+          description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
+            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
+            after.
+          items:
+            description: Optional within this object. An environment name.
+            type: string
+          type: array
+        excludesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; matching paths are rejected
+            on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
+          type: string
+        externalDependenciesEnabled:
+          description: Optional within this object. When true the server follows references to other hosts that
+            package metadata points at, limited by externalDependenciesPatterns. Defaults to false.
+          type: boolean
+        externalDependenciesPatterns:
+          description: Optional within this object. Allow-list of URL patterns for external dependencies, for example
+            **/github.com/**.
+          items:
+            description: Optional within this object. A URL pattern such as **/github.com/**.
+            type: string
+          type: array
+        externalDependenciesRemoteRepo:
+          description: Optional within this object. Key of the remote repository through which external dependencies
+            are fetched.
+          type: string
+        forceMavenAuthentication:
+          description: Optional within this object. When true anonymous Maven requests receive 401 so the client
+            authenticates. Defaults to false.
+          type: boolean
+        forceNugetAuthentication:
+          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
+            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          type: boolean
+        hideUnauthorizedResources:
+          description: Optional within this object. When true items in members the caller may not read are omitted
+            from listings instead of producing 403. Defaults to false.
+          type: boolean
+        includesPattern:
+          description: Optional within this object. Comma-separated Ant-style patterns; only paths matching at least
+            one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
+          type: string
+        key:
+          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
+            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
+            created inside a project are prefixed with the project key followed by a hyphen.
+          type: string
+        keyPair:
+          description: Optional within this object. Name of the key pair used to sign aggregated metadata where
+            the format needs it.
+          type: string
+        notes:
+          description: Optional within this object. Free text for operators. Not interpreted by the server.
+          type: string
+        optionalIndexCompressionFormats:
+          description: Optional within this object. Additional compression formats generated for Debian index files,
+            for example bz2 or lzma. Stored for compatibility.
+          items:
+            description: Optional within this object. A compression format name.
+            type: string
+          type: array
+        packageType:
+          allOf:
+          - $ref: '#/components/schemas/PackageTypeVirtual'
+          description: Optional within this object. Package types a virtual repository may serve. cargo, cocoapods,
+            opkg, vagrant and terraformbackend cannot be aggregated.
+        pomRepositoryReferencesCleanupPolicy:
+          allOf:
+          - $ref: '#/components/schemas/PomRepositoryReferencesCleanupPolicy'
+          description: Optional within this object. What a virtual repository does to repository references inside
+            served POMs.
+        primaryKeyPairRef:
+          description: Optional within this object. Name of the key pair used to sign metadata for formats that
+            need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
+          type: string
+        projectKey:
+          description: Optional within this object. Key of the project that owns the repository. When set, environments
+            must also be set, and the repository key must carry the project prefix. Changing it moves the repository
+            between projects.
+          type: string
+        rclass:
+          description: Required within this object. The repository class. It selects which of the class-specific
+            fields apply and how the string-typed booleans are rendered on read. Always virtual for this schema.
+          enum:
+          - virtual
+          type: string
+        repoLayoutRef:
+          description: Optional within this object. Name of the repository layout that parses paths into org, module,
+            revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
+            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+          type: string
+        repositories:
+          description: Required within this object. Ordered keys of the member repositories. Resolution tries members
+            in this order; local, remote and other virtual repositories may be mixed, and every key must exist and
+            serve the same package type family.
+          items:
+            description: Optional within this object. A member repository key.
+            type: string
+          type: array
+        resolveDockerTagsByTimestamp:
+          description: Optional within this object. When true a Docker tag present in several members resolves to
+            the most recently pushed one instead of the first member. Defaults to false.
+          type: boolean
+        secondaryKeyPairRef:
+          description: Optional within this object. Name of a second signing key pair, used while rotating the primary.
+            Must name an existing key pair.
+          type: string
+        useNamespaces:
+          description: Optional within this object. When true Helm charts are addressed as member/chart so charts
+            with the same name in different members stay distinct. Defaults to false.
+          type: boolean
+        virtualRetrievalCachePeriodSecs:
+          description: Optional within this object. Seconds aggregated metadata such as a merged index.yaml or packument
+            is cached before the members are consulted again. Defaults to 7200.
+          type: integer
+      required:
+      - key
+      - rclass
+      - repositories
+      type: object
+      x-go-type: repo.Config
+      x-go-type-import:
+        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+paths:
+  /api/repositories:
+    get:
+      description: Returns minimal details for every repository the caller may see, optionally filtered by class,
+        package type and project. Admins, and tokens scoped artifact:*:r or system:info:r, see every repository;
+        other callers see the repositories they can read. The type value is lower case here but upper case in the
+        response. Remote caches are never listed.
+      operationId: getRepositoriesByTypeAndProject
+      parameters:
+      - description: Optional query parameter. Repository class to list. distribution is accepted for compatibility
+          and always yields an empty list.
+        in: query
+        name: type
+        schema:
+          description: The parameter value.
+          enum:
+          - local
+          - remote
+          - virtual
+          - federated
+          - distribution
+          type: string
+      - description: Optional query parameter. Package type to list. Any package type the server knows is accepted,
+          not only the enumerated values, because the documented enumeration is stale.
+        in: query
+        name: packageType
+        schema:
+          description: The parameter value.
+          enum:
+          - bower
+          - cargo
+          - chef
+          - cocoapods
+          - composer
+          - conan
+          - cran
+          - debian
+          - docker
+          - gems
+          - gitlfs
+          - go
+          - gradle
+          - helm
+          - ivy
+          - maven
+          - nuget
+          - opkg
+          - p2
+          - pub
+          - puppet
+          - pypi
+          - rpm
+          - sbt
+          - swift
+          - terraform
+          - vagrant
+          - yum
+          - generic
+          type: string
+      - description: Optional query parameter. Project key; only repositories assigned to that project are listed.
+        in: query
+        name: project
+        schema:
+          description: The parameter value.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: The repository list.
+                items:
+                  description: Minimal details of one repository.
+                  properties:
+                    description:
+                      description: Optional within this object. The repository description, when set.
+                      type: string
+                    key:
+                      description: Required within this object. The repository key.
+                      type: string
+                    packageType:
+                      description: Required within this object. The package type.
+                      type: string
+                    type:
+                      description: 'Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.'
+                      type: string
+                    url:
+                      description: Required within this object. Absolute URL of the repository root on this server,
+                        built from the resolved base URL.
+                      format: uri
+                      type: string
+                  required:
+                  - key
+                  - packageType
+                  - type
+                  - url
+                  type: object
+                type: array
+            application/vnd.org.jfrog.artifactory.repositories.RepositoryDetailsList+json:
+              schema:
+                description: The repository list.
+                items:
+                  description: Minimal details of one repository.
+                  properties:
+                    description:
+                      description: Optional within this object. The repository description, when set.
+                      type: string
+                    key:
+                      description: Required within this object. The repository key.
+                      type: string
+                    packageType:
+                      description: Required within this object. The package type.
+                      type: string
+                    type:
+                      description: 'Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.'
+                      type: string
+                    url:
+                      description: Required within this object. Absolute URL of the repository root on this server,
+                        built from the resolved base URL.
+                      format: uri
+                      type: string
+                  required:
+                  - key
+                  - packageType
+                  - type
+                  - url
+                  type: object
+                type: array
+          description: The matching repositories, as plain JSON or the vendor list media type when the client asks
+            for it.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not list repositories.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: List repositories
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md
+  /api/repositories/configurations:
+    get:
+      description: Returns the full configuration of every repository grouped by class. Admin only. The groups are
+        always present even when empty; RELEASE_BUNDLE is always empty because release bundle repositories are not
+        supported.
+      operationId: getAllRepositoryConfigurations
+      parameters:
+      - description: Optional query parameter. Comma-separated package types to include.
+        in: query
+        name: packageType
+        schema:
+          description: The parameter value.
+          type: string
+      - description: Optional query parameter. Comma-separated classes to include, in lower case.
+        in: query
+        name: repoType
+        schema:
+          description: The parameter value.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Configurations grouped by class.
+                properties:
+                  FEDERATED:
+                    description: Required within this object. Federated repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  LOCAL:
+                    description: Required within this object. Local repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  RELEASE_BUNDLE:
+                    description: Required within this object. Always empty on this server.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  REMOTE:
+                    description: Required within this object. Remote repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  VIRTUAL:
+                    description: Required within this object. Virtual repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                required:
+                - FEDERATED
+                - LOCAL
+                - RELEASE_BUNDLE
+                - REMOTE
+                - VIRTUAL
+                type: object
+            application/vnd.org.jfrog.artifactory.repositories.RepositoryConfigurationsList+json:
+              schema:
+                description: Configurations grouped by class.
+                properties:
+                  FEDERATED:
+                    description: Required within this object. Federated repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  LOCAL:
+                    description: Required within this object. Local repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  RELEASE_BUNDLE:
+                    description: Required within this object. Always empty on this server.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  REMOTE:
+                    description: Required within this object. Remote repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                  VIRTUAL:
+                    description: Required within this object. Virtual repositories.
+                    items:
+                      $ref: '#/components/schemas/RepositoryConfiguration'
+                    type: array
+                required:
+                - FEDERATED
+                - LOCAL
+                - RELEASE_BUNDLE
+                - REMOTE
+                - VIRTUAL
+                type: object
+          description: Configurations grouped by upper-case class.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: List every repository configuration
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getallrepositoryconfigurations.md
+  /api/repositories/existence:
+    get:
+      description: Reports whether at least one repository of the given classes exists, optionally within one project.
+        Admin only.
+      operationId: checkIfRepositoryExists
+      parameters:
+      - description: Optional query parameter. Classes to look for; repeat the parameter for several. releaseBundle
+          is accepted and never matches. Omitting it checks every class.
+        in: query
+        name: type
+        schema:
+          description: The parameter value.
+          items:
+            description: One value.
+            enum:
+            - local
+            - remote
+            - virtual
+            - federated
+            - releaseBundle
+            type: string
+          type: array
+      - description: Optional query parameter. Restricts the check to repositories assigned to this project; omitted
+          means every project and unassigned repositories.
+        in: query
+        name: projectKey
+        schema:
+          description: The parameter value.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Result of the existence check.
+                properties:
+                  exists:
+                    description: Required within this object. True when at least one repository matched.
+                    type: boolean
+                  matchingRepoTypes:
+                    description: Required within this object. Upper-case classes that were checked.
+                    items:
+                      description: Optional within this object. An upper-case class.
+                      type: string
+                    type: array
+                  projectKey:
+                    description: Optional within this object. The project key the check was scoped to, when one
+                      was given.
+                    type: string
+                required:
+                - exists
+                - matchingRepoTypes
+                type: object
+          description: The result of the check.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Check whether repositories exist
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/checkifrepositoryexists.md
+  /api/repositories/{remoteRepoName}/configuration:
+    get:
+      deprecated: true
+      description: Returns the sanitised configuration of a remote repository that has shareConfiguration enabled.
+        Deprecated by Artifactory in favour of the ordinary read; kept so old clients keep working. Non-admin callers
+        get the sanitised view only.
+      operationId: getRemoteRepositoryConfiguration
+      parameters:
+      - description: Required path parameter. Key of the remote repository.
+        in: path
+        name: remoteRepoName
+        required: true
+        schema:
+          description: The parameter value.
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedRemoteRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.SharedRemoteRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/SharedRemoteRepositoryConfiguration'
+          description: The sanitised configuration.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not shared and the caller is not an admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No remote repository has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Shared remote repository configuration (deprecated)
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getremoterepositoryconfiguration.md
+  /api/repositories/{repoKey}:
+    delete:
+      description: 'Removes the configuration and every item in the repository, moving items through the trash can
+        when it is enabled. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already
+        running for this key (retry later), 207 some items could not be removed and the configuration was kept,
+        404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository
+        also removes its cache; deleting a virtual repository removes only the aggregation.'
+      operationId: deleteRepository
+      parameters:
+      - $ref: '#/components/parameters/repoKey'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositorySuccessReport'
+          description: Configuration and content removed.
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositorySuccessReport'
+          description: A delete is already in progress; retry later.
+        '207':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          description: Some items could not be removed; the configuration was kept.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          description: The key is blank or names a protected repository.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          description: The caller is not an admin, or every item failed to delete.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositorySuccessReport'
+          description: No repository has this key.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          description: An import is running or a hook vetoed the delete.
+        '424':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          description: A federated member could not be detached.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemoveRepositoryFailureReport'
+          description: Unexpected failure.
+      summary: Delete a repository
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepository.md
+    get:
+      description: Returns the stored configuration with defaults filled in. Admins and tokens scoped repo:<key>:r
+        receive every field; other callers that can read the repository receive the public subset (key, rclass,
+        packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers
+        are masked for everyone. The vendor media type for the repository's class is returned when the client asks
+        for it.
+      operationId: getRepositoryConfiguration
+      parameters:
+      - $ref: '#/components/parameters/repoKey'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/FederatedRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/LocalRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/RemoteRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/VirtualRepositoryConfiguration'
+          description: The configuration.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read this repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Read a repository configuration
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md
+    post:
+      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep
+        their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable
+        and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret.
+        Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation,
+        which is what the JFrog CLI and Terraform provider expect.'
+      operationId: updateRepositoryConfiguration
+      parameters:
+      - $ref: '#/components/parameters/repoKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/FederatedRepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/LocalRepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/RemoteRepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/VirtualRepositoryConfiguration'
+        description: The repository configuration, in any of the listed media types.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Updated; the body is a plain-text confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is invalid or changes an immutable field.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Update a repository configuration
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration.md
+    put:
+      description: 'Creates a repository with the configuration in the body. The key in the path wins over the body.
+        Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache
+        periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual
+        needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the
+        string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not
+        201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted
+        as the request content type.'
+      operationId: createRepository
+      parameters:
+      - $ref: '#/components/parameters/repoKey'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/FederatedRepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/LocalRepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/RemoteRepositoryConfiguration'
+          application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/VirtualRepositoryConfiguration'
+        description: The repository configuration, in any of the listed media types.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Created; the body is a plain-text confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The key already exists or the configuration is invalid.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Create a repository
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createrepository.md
+  /api/v2/repositories/batch:
+    delete:
+      description: 'Deletes each listed repository independently and reports per key. The HTTP status summarises
+        the batch: 200 all removed (a missing key still counts as removed), 207 mixed, 400 the list is empty or
+        contains a protected repository (fail-fast shape), and 403, 409, 424 or 500 when every repository failed
+        for that reason. Admin only.'
+      operationId: deleteRepositories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Keys of the repositories to delete. At least one, each non-empty.
+              items:
+                description: A repository key.
+                minLength: 1
+                type: string
+              minItems: 1
+              type: array
+        description: Keys of the repositories to delete. At least one, each non-empty.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoBulkRemovalReport'
+          description: Every repository was removed.
+        '207':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoBulkRemovalReport'
+          description: Some repositories were removed and some were not.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoBulkRemovalFailFastReport'
+          description: Empty list or a protected repository; nothing was deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                description: Either the fail-fast or the per-repository report.
+                oneOf:
+                - $ref: '#/components/schemas/RepoBulkRemovalFailFastReport'
+                - $ref: '#/components/schemas/RepoBulkRemovalReport'
+          description: The caller is not an admin (fail-fast shape) or every delete was forbidden (per-repository
+            shape).
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoBulkRemovalReport'
+          description: Every delete conflicted with a running import or a hook veto.
+        '424':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoBulkRemovalReport'
+          description: Every delete failed detaching federated members.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoBulkRemovalReport'
+          description: Every delete failed unexpectedly.
+      summary: Delete several repositories
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepositories.md
+    get:
+      description: Returns the configurations of the named repositories as a map keyed by repository key. Keys that
+        do not exist are omitted. Admins receive every field; other callers receive the public subset. At most 100
+        names per call.
+      operationId: getBatchOfRepositoriesByName
+      parameters:
+      - description: Required query parameter. Repository keys to return, comma-separated or repeated. At most 100.
+        in: query
+        name: names
+        required: true
+        schema:
+          description: The parameter value.
+          items:
+            description: One value.
+            type: string
+          type: array
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  $ref: '#/components/schemas/RepositoryConfiguration'
+                description: Configurations keyed by repository key.
+                type: object
+          description: Configurations keyed by repository key.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No names were given or more than the limit.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read repositories.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Read several repository configurations
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md
+    post:
+      description: 'Applies one update per configuration in the body, with the same merge rules as the single update.
+        Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is
+        returned. Each configuration must carry its key. Admin only.'
+      operationId: updateMultipleRepositories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+        description: The repository configuration, in any of the listed media types.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Every configuration was updated; the body is a plain-text confirmation.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A configuration is invalid or lacks a key; nothing was changed.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A key does not exist; nothing was changed.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Update several repository configurations
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatemultiplerepositories.md
+    put:
+      description: 'Creates every configuration in the body in one request, mixed classes and package types allowed.
+        Validation runs on the whole batch first: if any configuration is invalid or any key exists nothing is created.
+        Answers 201 with one plain-text line per repository. Admin only.'
+      operationId: createMultipleRepositories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+          application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json:
+            schema:
+              $ref: '#/components/schemas/BatchRepositoryConfigurationArray'
+        description: The repository configuration, in any of the listed media types.
+        required: true
+      responses:
+        '201':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Every repository was created; one plain-text line each.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A configuration is invalid or lacks a key; nothing was created.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not an admin.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A key already exists; nothing was created.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Create several repositories
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/createmultiplerepositories.md
+  /api/v2/repositories/{repoKey}:
+    get:
+      description: Like the ordinary read but returns only the fields that apply to the repository's package type,
+        so a generic repository has no Maven or Docker fields in the response. Access rules are the same as the
+        ordinary read.
+      operationId: getRepositoryConfigurationV2
+      parameters:
+      - $ref: '#/components/parameters/repoKey'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/FederatedRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/LocalRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/RemoteRepositoryConfiguration'
+            application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json:
+              schema:
+                $ref: '#/components/schemas/VirtualRepositoryConfiguration'
+          description: The configuration limited to relevant fields.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The credentials were rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not read this repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has this key.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Unexpected failure.
+      summary: Read a repository configuration (package-type view)
+      tags:
+      - repositories
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md

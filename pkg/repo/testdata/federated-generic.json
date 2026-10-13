@@ -1,0 +1,16 @@
+{
+  "key": "generic-fed",
+  "rclass": "federated",
+  "packageType": "generic",
+  "repoLayoutRef": "simple-default",
+  "priorityResolution": false,
+  "downloadRedirect": "false",
+  "cdnRedirect": "false",
+  "enableFileListsIndexing": "true",
+  "members": [
+    {"url": "https://a.example.com/artifactory/generic-fed", "enabled": "true"},
+    {"url": "https://b.example.com/artifactory/generic-fed", "enabled": "false"}
+  ],
+  "proxy": "",
+  "disableProxy": false
+}

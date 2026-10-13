@@ -1,0 +1,14 @@
+openapi: 3.0.3
+info:
+  title: artifactweave Workers-compatible REST API
+  version: 0.1.0
+  description: >-
+    The serverless worker surface: worker definitions, the action catalogue, test, execute, rerun and execution history (decision 0026), served under /worker. Paths and shapes mirror JFrog's documented API
+    (docs/research/16). Authored by the artifactweave project; cites JFrog's
+    documentation and copies nothing from it.
+servers:
+  - url: /worker
+    description: The worker service prefix on the single artifactweave listener.
+tags:
+  - name: handwritten
+    description: Marker tag. Operations with this tag are implemented by hand and excluded from generation.

@@ -1,0 +1,11 @@
+openapi: 3.0.3
+info:
+  title: artifactweave Event-compatible REST API
+  version: 0.1.0
+  description: >-
+    The webhook subscription surface served under /event. Operations land in P11
+    (docs/implementation/plan.md); this document holds the shared error schema so the
+    generation pipeline and the client package exist from the start.
+servers:
+  - url: /event
+    description: The Event service prefix on the single artifactweave listener.

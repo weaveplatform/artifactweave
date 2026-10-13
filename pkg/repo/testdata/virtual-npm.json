@@ -1,0 +1,18 @@
+{
+  "key": "npm",
+  "rclass": "virtual",
+  "packageType": "npm",
+  "includesPattern": "**/*",
+  "excludesPattern": "",
+  "repoLayoutRef": "npm-default",
+  "repositories": ["npm-local", "npm-remote"],
+  "defaultDeploymentRepo": "npm-local",
+  "artifactoryRequestsCanRetrieveRemoteArtifacts": false,
+  "virtualRetrievalCachePeriodSecs": 600,
+  "externalDependenciesEnabled": true,
+  "externalDependenciesPatterns": ["**/github.com/**"],
+  "externalDependenciesRemoteRepo": "github-remote",
+  "hideUnauthorizedResources": false,
+  "priorityResolution": false,
+  "downloadRedirect": false
+}

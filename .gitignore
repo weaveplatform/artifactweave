@@ -1,5 +1,7 @@
 # Binaries
 /bin/
+# `go build ./tools/specoracle` from the repository root
+/specoracle
 *.exe
 *.exe~
 *.dll
@@ -21,3 +23,7 @@ go.work.sum
 .vscode/
 *.swp
 .DS_Store
+
+# JFrog's OpenAPI definitions are proprietary. The parity oracle caches them
+# locally as a test oracle only (make oracle-fetch); they are never committed.
+/.specoracle/

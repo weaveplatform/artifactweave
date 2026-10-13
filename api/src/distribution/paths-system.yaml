@@ -1,0 +1,606 @@
+paths:
+  /api/v1/maintenance/distributeByLastDays:
+    post:
+      description: Redistributes to one edge every release bundle version distributed in a window of days ending
+        on `date`, for example after the edge was rebuilt. The window length runs from 1 to the configured maximum,
+        7 by default. Administrators only.
+      operationId: distributeByLastDays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DistributeByLastDaysRequest'
+        description: The window and the edge.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributeByLastDaysResult'
+          description: The distributions started.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The date or window is invalid, or the edge is unknown.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Redistribute recent release bundles to an edge
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributebylastdays.md
+  /api/v1/maintenance/execute/{actionType}:
+    post:
+      description: Runs a maintenance action using a token from the token operation, sent as the plain-text body.
+        UNLOCK_STUCK releases every stuck distribution so it can be retried or cleaned up; STOP_ALL force-stops
+        every in-progress distribution, ends every non-final tracker and empties the pending work queue. `dryRun`
+        defaults to true and reports what would change without changing it. Administrators only.
+      operationId: executeMaintenanceAction
+      parameters:
+      - description: 'Required path parameter. The maintenance action: UNLOCK_STUCK or STOP_ALL.'
+        in: path
+        name: actionType
+        required: true
+        schema:
+          enum:
+          - STOP_ALL
+          - UNLOCK_STUCK
+          type: string
+      - description: Optional query parameter. When true, the default, the action is simulated and the report shows
+          what would change. Pass false to perform it.
+        in: query
+        name: dryRun
+        required: false
+        schema:
+          default: true
+          type: boolean
+      requestBody:
+        content:
+          text/plain:
+            schema:
+              type: string
+        description: The maintenance token from the token operation, as plain text.
+        required: true
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/UnlockStuckReport'
+                - $ref: '#/components/schemas/ForceStopAllReport'
+          description: The action ran (or was simulated); the body reports what it affected.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The token is missing, expired, already used or for another action.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Run a maintenance action
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/executemaintenanceaction.md
+  /api/v1/maintenance/generate_token/{actionType}:
+    get:
+      description: Issues a single-use token for one maintenance action. The token expires after 3 minutes and must
+        be sent as the body of the execute operation, which makes running a destructive action a deliberate two-step
+        process. Administrators only.
+      operationId: generateMaintenanceExecutionToken
+      parameters:
+      - description: 'Required path parameter. The maintenance action: UNLOCK_STUCK or STOP_ALL.'
+        in: path
+        name: actionType
+        required: true
+        schema:
+          enum:
+          - STOP_ALL
+          - UNLOCK_STUCK
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: A maintenance token.
+                properties:
+                  token:
+                    description: Optional within this object. Single-use token, valid for 3 minutes, to send as
+                      the body of the execute operation.
+                    type: string
+                type: object
+          description: The token.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or failed validation; the body explains which.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Get a maintenance token
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/generatemaintenanceexecutiontoken.md
+  /api/v1/maintenance/stuck_distributions:
+    get:
+      description: Lists distributions stuck in a non-final state, for example after an edge disappeared mid-transfer.
+        Unlock them with the UNLOCK_STUCK maintenance action. Administrators only.
+      operationId: getStuckDistributions
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/StuckDistribution'
+                type: array
+          description: The stuck distributions.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: List stuck distributions
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstuckdistributions.md
+  /api/v1/metrics:
+    get:
+      description: Returns the release bundle and distribution counters in OpenMetrics text, using JFrog's `jfds_`
+        metric names so existing dashboards keep working. Administrators only.
+      operationId: getOpenMetricsForDistribution
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: The metrics.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Reading metrics needs an administrator.
+      summary: Get distribution metrics
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsfordistribution.md
+  /api/v1/system/info:
+    get:
+      description: Returns the version, service id and health of the distribution service. `status` is UNSTABLE,
+        with `message` naming the failing dependency, when the database or blob store is unavailable.
+      operationId: getDistributionSystemInfo
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+          description: The system information.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+      summary: Get distribution system information
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsysteminfo.md
+  /api/v1/system/ping:
+    get:
+      description: Answers 200 with message OK when the instance's distribution features are usable, meaning the
+        database and blob store are reachable. In artifactweave the distribution service is the instance itself.
+        Anonymous callers may use it unless anonymous access is disabled.
+      operationId: distributionPing
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageStatusResponse'
+          description: Healthy.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A dependency is unavailable; the message names it.
+      summary: Ping the distribution service
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributionping.md
+  /api/v1/system/settings:
+    get:
+      description: Returns the distribution settings. Administrators only.
+      operationId: getDistributionSystemSettings
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemSettings'
+          description: The settings.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Get distribution settings
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/getdistributionsystemsettings.md
+    post:
+      description: Replaces the distribution settings. Administrators only.
+      operationId: updateDistributionSystemSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SystemSettings'
+        description: The new settings.
+        required: true
+      responses:
+        '200':
+          description: Updated.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+      summary: Update distribution settings
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatedistributionsystemsettings.md
+  /api/v1/system/support/bundle:
+    post:
+      description: 'Collects a support bundle under a generated id: logs for a date window, the configuration with
+        every secret masked, system information and goroutine dumps, as selected. Administrators only.'
+      operationId: createSupportBundle
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportBundleCreateRequest'
+        description: What to collect.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleCreateResponse'
+          description: The bundle was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The request was malformed or failed validation; the body explains which.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An internal error; the body explains it.
+      summary: Create a support bundle
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createdistributionsupportbundle.md
+  /api/v1/system/support/bundle/{bundle_id}:
+    delete:
+      description: Deletes one support bundle. Administrators only.
+      operationId: deleteSupportBundle
+      parameters:
+      - description: Required path parameter. Id of the support bundle.
+        in: path
+        name: bundle_id
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An internal error; the body explains it.
+      summary: Delete a support bundle
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/deletedistributionsupportbundle.md
+    get:
+      description: Returns one support bundle's metadata. Administrators only.
+      operationId: getSupportBundleInfo
+      parameters:
+      - description: Required path parameter. Id of the support bundle.
+        in: path
+        name: bundle_id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleInfo'
+          description: The bundle.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An internal error; the body explains it.
+      summary: Get a support bundle
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getdistributionsupportbundleinfo.md
+    put:
+      description: Collects a support bundle as the create operation does, under the id in the path.
+      operationId: createSpecificSupportBundle
+      parameters:
+      - description: Required path parameter. Id of the support bundle.
+        in: path
+        name: bundle_id
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupportBundleCreateRequest'
+        description: What to collect.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleCreateResponse'
+          description: The bundle was created.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body is invalid or the id is in use.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An internal error; the body explains it.
+      summary: Create a support bundle with a given id
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/createspecificdistributionsupportbundle.md
+  /api/v1/system/support/bundle/{bundle_id}/archive:
+    get:
+      description: Downloads one support bundle as a zip archive. Administrators only.
+      operationId: downloadSupportBundle
+      parameters:
+      - description: Required path parameter. Id of the support bundle.
+        in: path
+        name: bundle_id
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                format: binary
+                type: string
+          description: The archive.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The named resource does not exist.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An internal error; the body explains it.
+      summary: Download a support bundle
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/downloaddistributionsupportbundle.md
+  /api/v1/system/support/bundles:
+    get:
+      description: Lists the support bundles on this instance. Administrators only.
+      operationId: listSupportBundles
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportBundleList'
+          description: The bundles.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs. Distribution administration needs an
+            administrator; distributing and deleting need a destination permission covering every selected edge.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: An internal error; the body explains it.
+      summary: List support bundles
+      tags:
+      - system
+      x-oracle-source: https://docs.jfrog.com/administration/reference/listdistributionsupportbundles.md

@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated grid Go client (make generate).
+package: grid
+output: pkg/client/grid/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten

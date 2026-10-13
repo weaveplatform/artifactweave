@@ -1,0 +1,28 @@
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      description: 'The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints
+        error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend
+        on its fields. JFrog''s own MCP client reads errors[0].message and falls back to message. artifactweave
+        answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message
+        JFrog''s wording.'
+      x-unverified: true
+      required:
+      - errors
+      properties:
+        errors:
+          type: array
+          description: Required within this object. One entry per error; clients read the first.
+          items:
+            type: object
+            required:
+            - code
+            - message
+            properties:
+              code:
+                type: string
+                description: Required within this object. A symbolic code such as NOT_FOUND.
+              message:
+                type: string
+                description: Required within this object. Human readable explanation.

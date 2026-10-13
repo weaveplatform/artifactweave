@@ -1,0 +1,10 @@
+# oapi-codegen configuration for the generated pfed Go client (make generate).
+package: pfed
+output: pkg/client/pfed/client.gen.go
+generate:
+  models: true
+  client: true
+output-options:
+  skip-prune: true
+  exclude-tags:
+    - handwritten
