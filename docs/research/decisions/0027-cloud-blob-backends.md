@@ -57,7 +57,9 @@ SDK offer.
     so there is never a copy.
 - **Abort:** deletes the session's objects, tolerating not-found.
 - **Reads:**
-  - A lazy reader over `NewRangeReader` with `ReadCompressed(true)`, reopened on `Seek`.
+  - A lazy reader over `NewRangeReader`, reopened on `Seek`. Writes never set a content
+    encoding, so GCS never transcodes a blob; `ReadCompressed(true)` is not used because
+    the SDK refuses it with JSON reads.
   - Stat, Exists and Delete use object attributes; Delete treats not-found as success.
   - Walk lists `sha256/` only, with the attribute selection limited to name and size.
 - **Presigning:** V4 signed GET URLs. Local signing when a key is configured, otherwise

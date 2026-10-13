@@ -68,7 +68,7 @@ about $0.003 at $0.005 per 1,000.
 ### 1.3 Reads, writes and retries
 
 - **Ranged reads:** `NewRangeReader(ctx, offset, length)`. A negative length reads to the end (GCS-SDK/reader.go:102-130).
-- **Transcoding:** an object stored with `Content-Encoding: gzip` is served whole whatever range is requested. `ReadCompressed(true)` prevents decompression (reader.go:108-112; storage.go:1172-1177). Blobs must never carry a content encoding.
+- **Transcoding:** an object stored with `Content-Encoding: gzip` is served whole whatever range is requested. `ReadCompressed(true)` prevents decompression (reader.go:108-112; storage.go:1172-1177), but with JSON reads the SDK refuses it client-side ("custom Accept-Encoding headers not allowed"; found by the emulator run of the gcs backend), so the safeguard is that blobs never carry a content encoding.
 - **Reopening:** the reader pins the first response's generation as a precondition when it reopens (http_client.go:1618-1628).
 - **Sentinel errors:** `ErrObjectNotExist` and `ErrBucketNotExist` (storage.go:67-73). Other errors are `*googleapi.Error` (doc.go:275-312).
 - **Small uploads:** `Writer.ChunkSize` defaults to 16 MiB. Content smaller than `ChunkSize` goes as one buffered, retryable request. Content of exactly `ChunkSize` or more becomes a resumable upload, because end of input is only seen on the next read (API/internal/gensupport/media.go:121-133,194-199; buffer.go:53-68). So a part is written with `ChunkSize` rounded up to a multiple of 256 KiB above its length. `ChunkSize = 0` streams with no retry (writer.go:106-111).
