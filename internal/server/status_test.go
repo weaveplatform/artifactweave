@@ -139,7 +139,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 		types.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

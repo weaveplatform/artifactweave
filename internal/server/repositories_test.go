@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -35,18 +34,16 @@ func newRepoWorld(t *testing.T) *repoWorld {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
-	if _, err := auth.Seed(ctx, db, "pw", time.Now()); err != nil {
-		t.Fatal(err)
+	cheapSeed(t, db)
+	reader := types.User{
+		Name:         "reader",
+		PasswordHash: cheapHash,
+		Groups:       []string{auth.ReadersGroup},
 	}
-	hash, err := auth.HashPassword("pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	reader := types.User{Name: "reader", PasswordHash: hash, Groups: []string{auth.ReadersGroup}}
 	if err := db.Users().Create(ctx, reader); err != nil {
 		t.Fatal(err)
 	}
-	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{})
+	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{Hash: testHash})
 	if err != nil {
 		t.Fatal(err)
 	}

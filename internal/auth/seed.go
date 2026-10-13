@@ -55,7 +55,21 @@ func Seed(ctx context.Context, st store.Store, adminPassword string, now time.Ti
 	if err != nil {
 		return false, err
 	}
-	err = st.Tx(ctx, func(ctx context.Context) error {
+	return SeedHashed(ctx, st, hash, now)
+}
+
+// SeedHashed is Seed with the admin password already hashed (HashPassword or
+// HashPasswordWith).
+func SeedHashed(
+	ctx context.Context,
+	st store.Store,
+	adminHash []byte,
+	now time.Time,
+) (bool, error) {
+	if seeded, err := Seeded(ctx, st); err != nil || seeded {
+		return false, err
+	}
+	err := st.Tx(ctx, func(ctx context.Context) error {
 		// Checked again inside the transaction for a seed that committed
 		// while the hash was computed.
 		seeded, err := Seeded(ctx, st)
@@ -65,7 +79,7 @@ func Seed(ctx context.Context, st store.Store, adminPassword string, now time.Ti
 		if seeded {
 			return errAlreadySeeded
 		}
-		return seed(ctx, st, hash, now)
+		return seed(ctx, st, adminHash, now)
 	})
 	switch {
 	case err == nil:

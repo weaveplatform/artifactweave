@@ -19,17 +19,32 @@ import (
 // string this package can verify.
 var ErrHashFormat = errors.New("auth: unsupported password hash")
 
-// hashParams are Argon2id's cost parameters.
-type hashParams struct {
-	memory  uint32 // KiB
-	time    uint32
-	threads uint8
+// HashParams are Argon2id's cost parameters. The zero value means the
+// production parameters; the only other use is tests, which hash with tiny
+// costs to stay fast. Nothing in configuration or on the command line can
+// set them: verification reads the cost from each stored hash, so a cheap
+// hash only ever comes from code that asked for one.
+type HashParams struct {
+	MemoryKiB uint32
+	Time      uint32
+	Threads   uint8
 }
 
-// defaultParams is RFC 9106's second recommended option (64 MiB, three
+// productionParams is RFC 9106's second recommended option (64 MiB, three
 // passes, four lanes), for memory-constrained servers. Its cost per check is
 // why verified credentials are cached (Authenticator).
-var defaultParams = hashParams{memory: 64 << 10, time: 3, threads: 4}
+func productionParams() HashParams { return HashParams{MemoryKiB: 64 << 10, Time: 3, Threads: 4} }
+
+// defaultParams is what the zero HashParams means; the package's own tests
+// lower it in TestMain.
+var defaultParams = productionParams()
+
+func (p HashParams) orDefault() HashParams {
+	if p == (HashParams{}) {
+		return defaultParams
+	}
+	return p
+}
 
 // maxMemory bounds the memory a stored hash may ask for, so a tampered row
 // cannot make one login allocate gigabytes.
@@ -42,19 +57,22 @@ const (
 
 var b64 = base64.RawStdEncoding
 
-// HashPassword returns the Argon2id hash of password in PHC form.
+// HashPassword returns the Argon2id hash of password in PHC form, with the
+// production parameters.
 func HashPassword(password string) ([]byte, error) {
-	return hashWith(defaultParams, password)
+	return HashPasswordWith(HashParams{}, password)
 }
 
-func hashWith(p hashParams, password string) ([]byte, error) {
+// HashPasswordWith is HashPassword with the given parameters.
+func HashPasswordWith(p HashParams, password string) ([]byte, error) {
+	p = p.orDefault()
 	salt := make([]byte, saltLen)
 	if _, err := rand.Read(salt); err != nil {
 		return nil, fmt.Errorf("auth: salt: %w", err)
 	}
-	key := argon2.IDKey([]byte(password), salt, p.time, p.memory, p.threads, keyLen)
+	key := argon2.IDKey([]byte(password), salt, p.Time, p.MemoryKiB, p.Threads, keyLen)
 	return fmt.Appendf(nil, "$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s",
-		argon2.Version, p.memory, p.time, p.threads,
+		argon2.Version, p.MemoryKiB, p.Time, p.Threads,
 		b64.EncodeToString(salt), b64.EncodeToString(key)), nil
 }
 
@@ -64,12 +82,12 @@ func CheckPassword(stored []byte, password string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	got := argon2.IDKey([]byte(password), salt, p.time, p.memory, p.threads, keyLen)
+	got := argon2.IDKey([]byte(password), salt, p.Time, p.MemoryKiB, p.Threads, keyLen)
 	return subtle.ConstantTimeCompare(got, want) == 1, nil
 }
 
-func parseHash(s string) (hashParams, []byte, []byte, error) {
-	var p hashParams
+func parseHash(s string) (HashParams, []byte, []byte, error) {
+	var p HashParams
 	parts := strings.Split(s, "$")
 	if len(parts) != 6 || parts[0] != "" || parts[1] != "argon2id" ||
 		parts[2] != fmt.Sprintf("v=%d", argon2.Version) {
@@ -78,12 +96,12 @@ func parseHash(s string) (hashParams, []byte, []byte, error) {
 	if _, err := fmt.Sscanf(
 		parts[3],
 		"m=%d,t=%d,p=%d",
-		&p.memory,
-		&p.time,
-		&p.threads,
+		&p.MemoryKiB,
+		&p.Time,
+		&p.Threads,
 	); err != nil ||
-		p.memory == 0 || p.memory > maxMemory || p.time == 0 ||
-		p.threads == 0 {
+		p.MemoryKiB == 0 || p.MemoryKiB > maxMemory || p.Time == 0 ||
+		p.Threads == 0 {
 		return p, nil, nil, ErrHashFormat
 	}
 	salt, err := b64.DecodeString(parts[4])
