@@ -45,7 +45,7 @@ they start with `/access`.
 | `jf rt upload` | `PUT <repo>/<path>[;prop=val;...]` with headers `X-Checksum-Sha1`, `X-Checksum-Md5` and `X-Checksum` (sha256; Artifactory also accepts `X-Checksum-Sha256`) | 200, 201 or 202 | properties travel as matrix parameters |
 | | checksum deploy: the same PUT with `X-Checksum-Deploy: true` first, for files of 10 KiB or more | 2xx means done; **any** other status falls through to the real upload | disabled when exploding archives |
 | | `X-Explode-Archive: true` for `--explode`; trailing `/` creates a folder | 201 for the folder PUT | |
-| | multipart, for files ≥200 MiB when the version is ≥7.82.2: `GET api/v1/uploads/config` | **200** with `{"supported":false}` disables cleanly; 404 or 501 fails the upload | `POST api/v1/uploads/create?repoKey=&repoPath=&partSizeMB=`, `.../urlPart?partNumber=`, `PUT <url>`, `POST .../complete?sha1=` (202, with `X-Checksum-Deploy-Token`), `.../status`, `.../abort` |
+| | multipart, for files ≥ `--min-split` (200 MiB) when the version is ≥7.82.2: `GET api/v1/uploads/config` | **200** with `{"supported":true}` turns it on, `false` disables it cleanly; 404 or 501 fails the upload | see [Multipart upload](#multipart-upload) |
 | `jf rt download` | AQL (below), then `GET <repo>/<path>`; `HEAD` reads `Content-Length`, `Accept-Ranges: bytes` and `X-Checksum-Md5/Sha1/Sha256`; split downloads send `Range: bytes=a-b` | 200, 206 for ranges | |
 | `jf rt search`, `delete`, `copy`, `move`, `set-props`, `delete-props`, `download` spec resolution | `POST api/search/aql` with `Content-Type: text/plain`; `GET api/storage/<repo>/<path>[?list&deep=1&listFolders=1&depth=&includeRootPath=1]`; `GET api/storage/<repo>/<path>?properties`; `GET api/storageinfo`, `POST api/storageinfo/calculate` | 200 | build-scoped searches use the `artifact.module.build.*`, `dependency.module.build.*` and `release_artifact.release.*` fields and read the `<project>-build-info` repository (default `artifactory-build-info`) |
 | `jf rt delete` | `DELETE <repo>/<path>` | **204** | `HEAD` before a retry |
@@ -61,6 +61,49 @@ they start with `/access`.
 | `jf rt permission-target-*` | `GET api/v2/security/permissions`; `GET/POST/PUT/DELETE api/v2/security/permissions/<name>` with `{name, repo:{include-patterns,exclude-patterns,repositories,actions:{users:{u:[perm]},groups:{}}}, build:{}, releaseBundle:{}}` | POST 201 (409 treated as "exists"), PUT 200, GET 200, DELETE 200 | permissions `read, annotate, write, delete, manage, managedXrayMeta, distribute` |
 | `jf rt access-token-create`, `jf c add` | `POST /access/api/v1/tokens` with `{grant_type,username,scope,expires_in,refreshable,audience,description,project_key,include_reference_token,refresh_token}`; `GET /access/api/v1/tokens[/{id}]`; `DELETE /access/api/v1/tokens/{id}`; `POST /access/api/v1/oidc/token` | 200 | response `{token_id,access_token,refresh_token,expires_in,scope,token_type:"Bearer",reference_token}` |
 | legacy tokens and API keys | `POST api/security/token` (form-encoded create or refresh, still implemented and not on JFrog's deprecation page), `GET api/security/token`, `POST api/security/token/revoke`; `POST/PUT/GET/DELETE api/security/apiKey` | token 200; API-key POST **201** | artifactweave answers API-key creation with 400 |
+
+### Multipart upload
+
+The protocol below is what jfrog-client-go `artifactory/services/utils/multipartupload.go`
+drives, at the commit the pinned `jf` 2.126.0 uses (`0646d7b50f9a`). artifactweave serves it
+(#70, `internal/service/multipart`).
+
+| Step | Request | Expected |
+|---|---|---|
+| Version gate | `GET api/system/version` | ≥ 7.82.2, or a single-request upload |
+| Config | `GET api/v1/uploads/config` | 200 `{"supported":true}` |
+| Create | `POST api/v1/uploads/create?repoKey=&repoPath=&partSizeMB=`, with the caller's credentials | 200 `{"token"}` |
+| Part URL | `POST api/v1/uploads/urlPart?partNumber=n` (from 1), with `Authorization: Bearer <token>` | 200 `{"url"}` |
+| Part | `PUT <url>` with the part's bytes and **no credentials**, up to `--split-count` (5) at once, in any order. A failed part is retried | 200 |
+| Complete | `POST api/v1/uploads/complete?sha1=<file sha1>`, Bearer | **202** |
+| Status | `POST api/v1/uploads/status`, Bearer, polled every 5 s | 200 `{status, error, progress, checksumToken}`. `QUEUED` and `PROCESSING` keep polling. `FINISHED` stops. `RETRYABLE_ERROR`, or a 503, makes the CLI complete again. `NON_RETRYABLE_ERROR` fails the upload |
+| Store the item | the checksum deploy (`PUT <repo>/<path>;props` with `X-Checksum-Deploy: true`, the checksum headers and `X-Checksum-Deploy-Token: <checksumToken>`) | 201 |
+| Abort | `POST api/v1/uploads/abort`, Bearer, on any failure | **204** |
+
+**Sizes:** parts are `--chunk-size` MiB (default 20), and the last part is shorter. Explode
+uploads never use multipart, and files over 5 TiB don't either.
+
+**How artifactweave serves it:**
+- **Where parts go.** Artifactory hands out presigned S3 URLs, and the object store
+  assembles the parts. artifactweave hands out its own part URLs instead, signed with HMAC
+  for one upload and one part. It keeps one `blob.Store` upload session per file
+  (decision 0004), so every backend accepts multipart, the mirror included.
+- **Out-of-order parts.** They're staged under `<data_dir>/multipart/<upload>/` and appended
+  in order. Only parts that arrive ahead of a missing one wait on disk, about
+  `--split-count` × the part size.
+- **Durability.** The session lives in the `uploads` table. A part's file is removed only
+  after the session records the part. The blob upload's own size shows how much of the next
+  part an interrupted append already stored, so a part is never appended twice, and an
+  upload survives a restart.
+- **Completion** runs in the background: append, commit checked against the SHA-1, then index
+  the content with no references. The checksum deploy then adds the item's reference.
+- **The token** stands in for Bearer access tokens until P4. The auth middleware passes the
+  token-carrying routes and the part `PUT` through, and the multipart service verifies the
+  token and the signature itself.
+- **Clean-up.** GC hands stale sessions to the service's reaper, which removes the staged
+  parts and aborts the blob upload. Startup sweeps staging left by a crash.
+- **One instance.** Staging is on local disk, so all of an upload's requests must reach the
+  same instance. A load balancer in front of several instances needs sticky routing.
 
 Sources: `artifactory/services/{ping,system,upload,download,aqlquerybuilder,searchutil,delete,movecopy,props,buildinfo,discardBuilds,promote,dockerpromote,repository,deleterepository,createreplication,users,groups,permissiontarget,security}.go`,
 `artifactory/services/utils/{artifactoryutils,multipartupload}.go`,

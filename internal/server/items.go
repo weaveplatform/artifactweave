@@ -803,12 +803,12 @@ func (s artifactoryService) deleteItem(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GetUploadsConfig tells the JFrog CLI that multipart upload is not
-// available, so it uploads large files in one request (research 09).
-func (artifactoryService) GetUploadsConfig(
+// GetUploadsConfig tells the JFrog CLI whether to upload large files in
+// parts (internal/service/multipart) or in one request (research 09).
+func (s artifactoryService) GetUploadsConfig(
 	context.Context,
 	artgen.GetUploadsConfigRequestObject,
 ) (artgen.GetUploadsConfigResponseObject, error) {
-	supported := false
+	supported := s.cfg.Multipart != nil
 	return artgen.GetUploadsConfig200JSONResponse{Supported: &supported}, nil
 }

@@ -73,6 +73,11 @@ type Report struct {
 type Options struct {
 	Grace        time.Duration
 	UploadExpiry time.Duration
+	// Reapers discard stale upload sessions of other kinds, keyed by the
+	// session's Backend: a JFrog CLI multipart session holds staged parts
+	// on local disk as well as a blob upload. Sessions of a backend with no
+	// reaper are blob store uploads.
+	Reapers map[string]func(context.Context, store.Upload) error
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 }
@@ -85,6 +90,7 @@ type Collector struct {
 	trash        *trash.Service
 	grace        time.Duration
 	uploadExpiry time.Duration
+	reapers      map[string]func(context.Context, store.Upload) error
 	now          func() time.Time
 	holder       string
 
@@ -109,6 +115,7 @@ func New(st store.Store, blobs blob.Store, o Options) (*Collector, error) {
 		store: st, blobs: blobs, trash: &trash.Service{Store: st, Now: o.Now},
 		grace:        cmp.Or(o.Grace, DefaultGrace),
 		uploadExpiry: cmp.Or(o.UploadExpiry, DefaultUploadExpiry),
+		reapers:      o.Reapers,
 		now:          o.Now, holder: "storage-gc-" + id,
 		orphans: map[string]time.Time{},
 	}, nil
@@ -173,6 +180,13 @@ func (c *Collector) reapUploads(ctx context.Context, rep *Report) error {
 		}
 		reaped := 0
 		for _, u := range stale {
+			if reap, ok := c.reapers[u.Backend]; ok {
+				if err := reap(ctx, u); err != nil {
+					return fmt.Errorf("gc: reap %s upload %s: %w", u.Backend, u.ID, err)
+				}
+				reaped++
+				continue
+			}
 			if up, err := c.blobs.ResumeUpload(ctx, u.ID); err == nil {
 				_ = up.Abort(ctx)
 			}

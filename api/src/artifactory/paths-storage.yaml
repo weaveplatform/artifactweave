@@ -807,8 +807,40 @@ components:
       description: Whether the server accepts the JFrog CLI's multipart upload protocol.
       properties:
         supported:
-          description: Optional within this object. Always false here, so the CLI uploads large files in one request.
+          description: Optional within this object. True when the server can stage parts, which it can whenever a
+            blob store is configured; the JFrog CLI then uploads files of 200 MiB or more in parts.
           type: boolean
+      type: object
+    MultipartUploadToken:
+      description: A multipart upload's token, which authorises its other calls.
+      properties:
+        token:
+          description: Optional within this object. The upload token, sent as a Bearer token.
+          type: string
+      type: object
+    MultipartUploadPartUrl:
+      description: Where to PUT one part.
+      properties:
+        url:
+          description: Optional within this object. Absolute URL for the part, signed for that upload and part.
+          type: string
+      type: object
+    MultipartUploadStatus:
+      description: State of a multipart upload's assembly.
+      properties:
+        status:
+          description: Optional within this object. `PARTS`, `PROCESSING`, `FINISHED`, `RETRYABLE_ERROR`,
+            `NON_RETRYABLE_ERROR` or `ABORTED`.
+          type: string
+        error:
+          description: Optional within this object. Why the assembly failed.
+          type: string
+        progress:
+          description: Optional within this object. Share of the parts assembled, in percent.
+          type: integer
+        checksumToken:
+          description: Optional within this object. Token for the checksum deploy that follows a finished upload.
+          type: string
       type: object
     UpdatePropertiesRequest:
       description: Partial update of an item's properties. Keys not mentioned are left as they are.
@@ -2198,8 +2230,9 @@ paths:
   /api/v1/uploads/config:
     get:
       description: Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB
-        or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404
-        or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+        or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart,
+        complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The
+        endpoint is not in JFrog's published reference.
       operationId: getUploadsConfig
       responses:
         '200':
@@ -2217,6 +2250,248 @@ paths:
       summary: Multipart upload configuration
       tags:
       - storage
+  /api/v1/uploads/create:
+    post:
+      description: Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository, as for a deploy. Once the parts are complete the CLI checksum-deploys the file, which creates the item. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      operationId: createMultipartUpload
+      parameters:
+      - description: Required query parameter. Repository to deploy to.
+        in: query
+        name: repoKey
+        required: true
+        schema:
+          description: Repository to deploy to.
+          type: string
+      - description: Required query parameter. Path of the file in the repository.
+        in: query
+        name: repoPath
+        required: true
+        schema:
+          description: Path of the file in the repository.
+          type: string
+      - description: Required query parameter. Size of every part but the last, in MiB.
+        in: query
+        name: partSizeMB
+        required: true
+        schema:
+          description: Size of every part but the last, in MiB.
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipartUploadToken'
+          description: The upload token.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A missing or invalid parameter, or a repository that takes no deploys.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No credentials or invalid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller may not deploy to the repository.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository does not exist.
+      summary: Start a multipart upload
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+  /api/v1/uploads/urlPart:
+    post:
+      description: Returns the URL to PUT one part to. Authenticates with the upload token create returned, as a Bearer token. The URL carries a signature for that upload and part, because the CLI sends the part without credentials. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      operationId: getMultipartUploadPartUrl
+      parameters:
+      - description: Required query parameter. Number of the part, from 1.
+        in: query
+        name: partNumber
+        required: true
+        schema:
+          description: Number of the part, from 1.
+          type: integer
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipartUploadPartUrl'
+          description: The part URL.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A missing or invalid part number.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload token does not verify.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload no longer accepts parts.
+      summary: URL for one part
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+  /api/v1/uploads/part:
+    put:
+      description: Receives one part, in any order. The URL comes from urlPart and authorises the request; no credentials are sent. A part already appended is accepted again and ignored. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      operationId: putMultipartUploadPart
+      parameters:
+      - description: Required query parameter. Upload the part belongs to.
+        in: query
+        name: upload
+        required: true
+        schema:
+          description: Upload the part belongs to.
+          type: string
+      - description: Required query parameter. Number of the part, from 1.
+        in: query
+        name: partNumber
+        required: true
+        schema:
+          description: Number of the part, from 1.
+          type: integer
+      - description: Required query parameter. Signature urlPart issued for this upload and part.
+        in: query
+        name: signature
+        required: true
+        schema:
+          description: Signature urlPart issued for this upload and part.
+          type: string
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              format: binary
+              type: string
+        description: The part's bytes.
+        required: true
+      responses:
+        '200':
+          description: The part is stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The part is empty or larger than the part size.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The signature does not verify.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload no longer accepts parts.
+      summary: Upload one part
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+  /api/v1/uploads/complete:
+    post:
+      description: Starts assembling the parts, checked against the file's SHA-1, and returns at once; the CLI then polls status. Completing again after a retryable error starts over. Authenticates with the upload token create returned, as a Bearer token. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      operationId: completeMultipartUpload
+      parameters:
+      - description: Required query parameter. SHA-1 of the whole file, in hex.
+        in: query
+        name: sha1
+        required: true
+        schema:
+          description: SHA-1 of the whole file, in hex.
+          type: string
+      responses:
+        '202':
+          description: The assembly started, or is already running or finished.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A missing or malformed SHA-1.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload token does not verify.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload failed or was aborted.
+      summary: Complete a multipart upload
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+  /api/v1/uploads/status:
+    post:
+      description: Reports the assembly as `PROCESSING` with a progress percentage, `FINISHED` with a checksum token for the checksum deploy that follows, `RETRYABLE_ERROR` (the CLI completes again), or `NON_RETRYABLE_ERROR`. Authenticates with the upload token create returned, as a Bearer token. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      operationId: getMultipartUploadStatus
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipartUploadStatus'
+          description: The status.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload token does not verify.
+      summary: Status of a multipart upload
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
+  /api/v1/uploads/abort:
+    post:
+      description: Discards the upload's parts and session. The CLI calls it when any step fails. Authenticates with the upload token create returned, as a Bearer token. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      operationId: abortMultipartUpload
+      responses:
+        '204':
+          description: The upload is discarded.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The upload token does not verify.
+      summary: Abort a multipart upload
+      tags:
+      - storage
+      - handwritten
+      x-handwritten: true
   /api/zap/{repoPath}:
     post:
       description: Marks the cached metadata under a path of a remote repository's cache as expired, so the next

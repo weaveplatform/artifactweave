@@ -181,6 +181,45 @@ func TestReapUploads(t *testing.T) {
 	}
 }
 
+// TestReapers checks that a stale session of a backend with a reaper is
+// handed to it, and that a reaper's failure fails the step.
+func TestReapers(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	old := w.now().Add(-48 * time.Hour)
+	if err := w.db.Uploads().Put(ctx, store.Upload{
+		ID: "mp", Backend: "jfrog-multipart", Started: old, Updated: old,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var reaped []string
+	boom := errors.New("boom")
+	fail := true
+	c, err := gc.New(
+		w.db,
+		w.blobs,
+		gc.Options{Now: w.now, Reapers: map[string]func(context.Context, store.Upload) error{
+			"jfrog-multipart": func(ctx context.Context, u store.Upload) error {
+				if fail {
+					return boom
+				}
+				reaped = append(reaped, u.ID)
+				return w.db.Uploads().Delete(ctx, u.ID)
+			},
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Run(ctx); !errors.Is(err, boom) {
+		t.Fatalf("a failing reaper fails the pass: %v", err)
+	}
+	fail = false
+	if rep := run(t, c); rep.UploadsReaped != 1 || len(reaped) != 1 || reaped[0] != "mp" {
+		t.Fatalf("reaped %v, %+v", reaped, rep)
+	}
+}
+
 func TestOrphans(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()

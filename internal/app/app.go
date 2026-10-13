@@ -88,6 +88,7 @@ func serve(
 			GC:            rt.gc,
 			BlobLocation:  rt.location,
 			Mirrors:       rt.mirrorsAdmin(),
+			Multipart:     rt.multipart,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return ctx },

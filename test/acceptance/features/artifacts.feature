@@ -39,7 +39,7 @@ Feature: Deploy and download generic artifacts
     When I GET "/artifactory/generic-local/dir/hello.txt" as admin
     Then the response status is 404
     When I GET "/artifactory/api/v1/uploads/config" as admin
-    Then the JSON field "supported" equals "false"
+    Then the JSON field "supported" equals "true"
 
   @jf
   Scenario: jf rt u with a checksum deploy, jf rt s, and a split jf rt dl

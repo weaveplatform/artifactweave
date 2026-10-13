@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -49,6 +50,7 @@ func statusTable() []statusCase {
 		transferStatusRows(),
 		trashStatusRows(),
 		mirrorStatusRows(),
+		multipartStatusRows(),
 	)
 }
 
@@ -143,11 +145,59 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a}
+	cfg := Config{
+		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a,
+		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+	}
 	for _, f := range tune {
 		f(&cfg)
 	}
 	return New(cfg)
+}
+
+// multipartStatusRows covers the JFrog CLI multipart upload routes. Only
+// create authenticates as other routes do; the rest answer 401 without a
+// valid upload token or part signature, whatever other credentials are sent.
+func multipartStatusRows() []statusCase {
+	const (
+		create   = "POST " + uploadsCreate
+		urlPart  = "POST " + uploadsURLPart
+		part     = "PUT " + uploadsPart
+		complete = "POST " + uploadsComplete
+		status   = "POST " + uploadsStatus
+		abort    = "POST " + uploadsAbort
+		c        = uploadsCreate + "?repoKey=libs-local&repoPath=big/file.bin&partSizeMB=1"
+	)
+	return []statusCase{
+		{create, c, "admin", "", 200},
+		{create, uploadsCreate + "?repoKey=libs-local&partSizeMB=1", "admin", "", 400},
+		{create, uploadsCreate + "?repoKey=libs-local&repoPath=f&partSizeMB=0", "admin", "", 400},
+		{
+			create,
+			uploadsCreate + "?repoKey=libs-local&repoPath=a/../b&partSizeMB=1",
+			"admin",
+			"",
+			400,
+		},
+		{create, uploadsCreate + "?repoKey=missing&repoPath=f&partSizeMB=1", "admin", "", 404},
+		{
+			create,
+			uploadsCreate + "?repoKey=remote-private&repoPath=f&partSizeMB=1",
+			"admin",
+			"",
+			405,
+		},
+		{create, c, "user", "", 403},
+		{create, c, "anonymous", "", 401},
+		{create, c, "", "", 401},
+		{urlPart, uploadsURLPart + "?partNumber=1", "admin", "", 401},
+		{urlPart, uploadsURLPart + "?partNumber=x", "", "", 400},
+		{part, uploadsPart + "?upload=x&partNumber=1&signature=y", "", "part", 401},
+		{part, uploadsPart + "?upload=x&partNumber=y&signature=y", "", "part", 401},
+		{complete, uploadsComplete + "?sha1=abc", "", "", 401},
+		{status, uploadsStatus, "", "", 401},
+		{abort, uploadsAbort, "", "", 401},
+	}
 }
 
 func mirrorStatusRows() []statusCase {
@@ -358,6 +408,12 @@ var implementedHandwritten = map[string]bool{
 	"POST /artifactory/api/move/{srcRepoKey}/{srcFilePath}":  true,
 	"GET /artifactory/api/archive/download/{repoKey}/{path}": true,
 	"GET /artifactory/{repoKey}/{archivePath}!/{entryPath}":  true,
+	"POST " + uploadsCreate:                                  true,
+	"POST " + uploadsURLPart:                                 true,
+	"PUT " + uploadsPart:                                     true,
+	"POST " + uploadsComplete:                                true,
+	"POST " + uploadsStatus:                                  true,
+	"POST " + uploadsAbort:                                   true,
 	"POST /artifactory/api/zap/{repoPath}":                   true,
 	"GET /artifactory/api/storage/auto-trashcan":             true,
 }
