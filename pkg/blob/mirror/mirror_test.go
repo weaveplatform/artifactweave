@@ -76,6 +76,11 @@ func TestContractOnFilesystemsAndFake(t *testing.T) {
 		}
 		ms = append(ms, Member{Name: "cloud", Store: presigner{newFake()}, WriteEnabled: true})
 		s, _ := newMirror(t, ms, nil)
+		// The member left after the quorum commits in the background. It
+		// must finish before the temp dirs are removed (cleanups run last
+		// registered first): Windows cannot remove a directory that a
+		// straggler is still renaming a blob into.
+		t.Cleanup(func() { _ = s.WaitIdle(context.Background()) })
 		return s
 	}, contractOptions)
 }
@@ -319,6 +324,30 @@ func TestDeleteWaitsForStragglers(t *testing.T) {
 		synctest.Wait()
 		if ok, err := s.Exists(ctx, sha); err != nil || ok || f[2].has(sha) {
 			t.Fatalf("the straggler brought the blob back: %v %v %v", ok, err, f[2].has(sha))
+		}
+	})
+}
+
+func TestWaitIdle(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		f, ms := fakes(3, false)
+		s, r := newMirror(t, ms, nil)
+		if err := s.WaitIdle(ctx); err != nil {
+			t.Fatalf("nothing running: %v", err)
+		}
+		f[2].slow("commit", 10*time.Second)
+		sha := put(t, s, blobtest.Content(15, 64)).Digests.SHA256
+		short, cancel := context.WithTimeout(ctx, time.Second)
+		defer cancel()
+		if err := s.WaitIdle(short); !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("WaitIdle gives up when its context ends first: %v", err)
+		}
+		if err := s.WaitIdle(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if got := states(t, r, sha)["m2"]; got != types.ReplicaPresent {
+			t.Fatalf("WaitIdle returned before the straggler was recorded: %v", got)
 		}
 	})
 }
