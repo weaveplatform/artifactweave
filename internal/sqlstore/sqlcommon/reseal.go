@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/crypt"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // sealedColumn is one column holding sealed values: the purpose and the row

@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // ErrInvalidWorker reports a worker definition or state the runtime refuses.

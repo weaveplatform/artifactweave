@@ -3,9 +3,9 @@ package inmem_test
 import (
 	"testing"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store/inmem"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store/storetest"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
 func TestContract(t *testing.T) {

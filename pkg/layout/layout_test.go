@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/layout"
+	"github.com/weaveplatform/artifactweave/pkg/layout"
 )
 
 func mustLookup(t *testing.T, name string) *layout.Layout {

@@ -23,7 +23,7 @@ help:
 ## init: rename the module after creating a repository from the template (make init NAME=<repo>)
 init:
 	@test -n "$(NAME)" || { echo "usage: make init NAME=<repository name>"; exit 1; }
-	@grep -rl --exclude-dir=.git weaveplatform-artifact-registry . | xargs sed -i.bak 's/weaveplatform-artifact-registry/$(NAME)/g'
+	@grep -rl --exclude-dir=.git artifactweave . | xargs sed -i.bak 's/artifactweave/$(NAME)/g'
 	@find . -name '*.bak' -not -path './.git/*' -delete
 	$(GO) mod tidy
 	@echo "renamed to github.com/weaveplatform/$(NAME); review README.md and CODEOWNERS"

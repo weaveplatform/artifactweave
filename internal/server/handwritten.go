@@ -10,8 +10,8 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/api"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/api"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 )
 
 // registerHandwrittenStubs gives every spec operation marked x-handwritten a

@@ -13,9 +13,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/app"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/buildinfo"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/app"
+	"github.com/weaveplatform/artifactweave/internal/buildinfo"
+	"github.com/weaveplatform/artifactweave/internal/config"
 )
 
 // exitNotImplemented is returned by commands whose phase has not landed, so

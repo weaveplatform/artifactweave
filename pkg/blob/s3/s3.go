@@ -38,7 +38,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
 
 // API is the subset of *s3.Client the store uses, so tests can substitute a

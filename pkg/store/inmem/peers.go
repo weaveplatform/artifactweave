@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Table names of the peers group; the same names as the SQL tables.

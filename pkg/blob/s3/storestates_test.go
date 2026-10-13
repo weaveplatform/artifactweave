@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob/blobtest"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 // TestContractWithStoreStates runs the blob contract with sessions kept in

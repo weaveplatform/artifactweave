@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestParseScope(t *testing.T) {

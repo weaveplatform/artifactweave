@@ -10,8 +10,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 )
 
 func newStore(t *testing.T) *Store {

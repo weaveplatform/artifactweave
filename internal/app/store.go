@@ -8,11 +8,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/config"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/crypt"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/postgres"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
 )
 
 // ErrUnknownMigration reports a migrate action other than up, down or

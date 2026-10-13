@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 )
 
 // surfaceFor picks the error envelope from the request path. Clients parse

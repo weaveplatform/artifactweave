@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/api"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/specoracle"
+	"github.com/weaveplatform/artifactweave/api"
+	"github.com/weaveplatform/artifactweave/internal/specoracle"
 )
 
 // specFiles must match tools/specoracle so the test and the report agree.

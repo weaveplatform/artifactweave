@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // VersionComparator orders the versions of one package (decision 0018).

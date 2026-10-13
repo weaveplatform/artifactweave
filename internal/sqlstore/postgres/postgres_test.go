@@ -8,12 +8,12 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/crypt"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/postgres"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqltest"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store/storetest"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/postgres"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
 func TestContract(t *testing.T) {

@@ -20,7 +20,7 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Store is an in-memory store.Store. The zero value is not usable; call New.

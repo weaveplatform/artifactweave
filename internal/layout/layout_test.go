@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-const module = "github.com/weaveplatform/weaveplatform-artifact-registry"
+const module = "github.com/weaveplatform/artifactweave"
 
 // forbidden maps a directory prefix (relative to the module root) to the
 // import prefixes its packages must not use. pkg/ is the public library and

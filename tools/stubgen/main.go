@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/stubgen"
+	"github.com/weaveplatform/artifactweave/internal/stubgen"
 )
 
 func main() {

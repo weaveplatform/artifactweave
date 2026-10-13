@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/config"
 )
 
 func fakeHandler(t *testing.T, body string) {

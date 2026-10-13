@@ -12,9 +12,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/buildinfo"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/config"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server"
+	"github.com/weaveplatform/artifactweave/internal/buildinfo"
+	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/server"
 )
 
 const (

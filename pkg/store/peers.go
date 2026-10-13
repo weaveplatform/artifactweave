@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // InstanceStore persists this instance's peer identity (decision 0021), a

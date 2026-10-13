@@ -13,7 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 )
 
 //go:embed migrations/*.sql

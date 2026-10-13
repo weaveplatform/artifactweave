@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"strings"
 
-	accessgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/access"
-	artgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/artifactory"
-	distributiongen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/distribution"
-	eventgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/event"
-	gridgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/grid"
-	pfedgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/pfed"
-	workergen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/worker"
+	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
+	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
+	eventgen "github.com/weaveplatform/artifactweave/internal/server/gen/event"
+	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
+	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
+	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 )
 
 // versionMediaType is the vendor type Artifactory advertises for the version

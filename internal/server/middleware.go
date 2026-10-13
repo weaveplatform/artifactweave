@@ -13,7 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 )
 
 // requestIDHeader is what Artifactory's own responses carry, so logs on both

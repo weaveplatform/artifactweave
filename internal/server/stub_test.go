@@ -10,7 +10,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 )
 
 // implemented lists the generated operations that have real handlers. Every

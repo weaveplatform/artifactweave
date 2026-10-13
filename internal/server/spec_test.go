@@ -13,14 +13,14 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/api"
-	accessgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/access"
-	artgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/artifactory"
-	distributiongen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/distribution"
-	eventgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/event"
-	gridgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/grid"
-	pfedgen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/pfed"
-	workergen "github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/api"
+	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
+	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
+	eventgen "github.com/weaveplatform/artifactweave/internal/server/gen/event"
+	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
+	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
+	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 )
 
 // specFiles is every bundled service spec, so a new service is checked

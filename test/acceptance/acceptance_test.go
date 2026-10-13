@@ -20,7 +20,7 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const module = "github.com/weaveplatform/weaveplatform-artifact-registry"
+const module = "github.com/weaveplatform/artifactweave"
 
 // binary is the built artifactweave path.
 var binary string

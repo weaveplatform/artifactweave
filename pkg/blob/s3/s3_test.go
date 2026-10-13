@@ -11,8 +11,8 @@ import (
 
 	"github.com/aws/smithy-go"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 )
 
 var errInjected = errors.New("injected")

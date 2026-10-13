@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 var t0 = time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)

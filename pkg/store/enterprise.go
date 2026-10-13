@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // BundleFilter narrows release bundle listings.
