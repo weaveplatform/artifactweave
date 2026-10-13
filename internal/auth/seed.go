@@ -108,7 +108,7 @@ func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) 
 	for _, u := range []types.User{
 		{
 			Name: AdminUser, PasswordHash: adminHash, Admin: true, ProfileUpdatable: true,
-			Realm: "internal", Status: types.UserEnabled, Created: now,
+			Realm: "internal", Status: types.UserEnabled, Created: now, PasswordChanged: now,
 		},
 		// No password: anonymous never logs in, it is what a request without
 		// credentials acts as when anonymous access is on.

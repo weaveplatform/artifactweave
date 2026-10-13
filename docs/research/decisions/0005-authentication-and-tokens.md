@@ -67,7 +67,23 @@ are captured from a live Artifactory before they are fixed.
 
 **Passwords** are hashed with Argon2id. Lock policy and expiration policy follow the
 legacy security API shapes (real JSON booleans and integers, as the Terraform provider
-decodes them).
+decodes them; string spellings such as `"true"` and `"60"` are accepted on write).
+
+**Account policies** are enforced by the authenticator:
+- **The user lock policy** (`enabled`, `loginAttempts`, default 5) counts consecutive
+  wrong passwords only while it is enabled. Each failure is counted and, at the limit,
+  the account locked, in one database statement, so concurrent attempts cannot all
+  stay below it. A correct password resets the count.
+- **A locked account** answers exactly as a wrong password does, after the same
+  hashing work, so neither the message nor the timing tells that the account exists.
+  Unlocking (one, several or all users) and disabling the policy clear locks.
+- **A password expires** when an administrator expires it (whatever the policy) or
+  when the expiration policy is enabled and the password is older than
+  `passwordMaxAge` days. Age counts from the recorded change, so passwords set before
+  it was recorded never expire on their own. Expiry is reported only after the
+  password verifies.
+- **The policies are cached** for 10 seconds per instance. A change made through an
+  instance applies there at once, and elsewhere within the 10 seconds.
 
 **API keys** are shims: creation answers `400` with a message that API keys are retired,
 lookup answers `404`, and `X-JFrog-Art-Api` accepts reference tokens.

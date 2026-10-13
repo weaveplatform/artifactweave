@@ -62,6 +62,10 @@ type Config struct {
 	// Multipart serves the JFrog CLI's multipart upload protocol; nil
 	// reports it unsupported, so the CLI uploads in one request.
 	Multipart *multipart.Service
+	// PasswordHash is the cost of passwords the security API sets; the zero
+	// value is production's. Only Go code can choose another: tests use a
+	// tiny cost.
+	PasswordHash auth.HashParams
 }
 
 // Mirrors is what the storage endpoints need from the runtime's blob

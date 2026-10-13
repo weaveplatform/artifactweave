@@ -53,6 +53,7 @@ func statusTable() []statusCase {
 		multipartStatusRows(),
 		roleStatusRows(),
 		keypairStatusRows(),
+		securityStatusRows(),
 	)
 }
 
@@ -149,7 +150,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 		t.Fatal(err)
 	}
 	cfg := Config{
-		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a,
+		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
 		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
 	}
 	for _, f := range tune {

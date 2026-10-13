@@ -101,7 +101,8 @@ func (s *Store) addMembers(ctx context.Context, group string, users []string) er
 type users struct{ s *Store }
 
 const userCols = "name, email, password_hash, admin, profile_updatable, internal_password_disabled, " +
-	"disable_ui_access, realm, status, mfa, last_logged_in_at, created_at, roles"
+	"disable_ui_access, realm, status, mfa, last_logged_in_at, created_at, roles, " +
+	"failed_logins, password_changed_at, password_expired"
 
 func userArgs(u types.User) []any {
 	var hash any
@@ -112,6 +113,7 @@ func userArgs(u types.User) []any {
 		u.Name, u.Email, hash, u.Admin, u.ProfileUpdatable, u.InternalPasswordDisabled,
 		u.DisableUIAccess, u.Realm, string(u.Status), string(u.MFA),
 		micros(u.LastLoggedIn), micros(u.Created), mustJSON(u.Roles),
+		u.FailedLogins, micros(u.PasswordChanged), u.PasswordExpired,
 	}
 }
 
@@ -120,15 +122,17 @@ func scanUser(row interface{ Scan(...any) error }) (types.User, error) {
 		u                 types.User
 		status, mfa       string
 		lastLogin, create sql.NullInt64
+		changed           sql.NullInt64
 		roles             sql.NullString
 	)
 	if err := row.Scan(&u.Name, &u.Email, &u.PasswordHash, &u.Admin, &u.ProfileUpdatable,
 		&u.InternalPasswordDisabled, &u.DisableUIAccess, &u.Realm, &status, &mfa,
-		&lastLogin, &create, &roles); err != nil {
+		&lastLogin, &create, &roles, &u.FailedLogins, &changed, &u.PasswordExpired); err != nil {
 		return u, err //nolint:wrapcheck // wrapped by the caller
 	}
 	u.Status, u.MFA = types.UserStatus(status), types.MFAStatus(mfa)
 	u.LastLoggedIn, u.Created = fromMicros(lastLogin), fromMicros(create)
+	u.PasswordChanged = fromMicros(changed)
 	if len(u.PasswordHash) == 0 {
 		u.PasswordHash = nil
 	}
@@ -252,8 +256,72 @@ func (us users) List(ctx context.Context, p store.Page) ([]types.User, string, e
 }
 
 func (us users) RecordLogin(ctx context.Context, name string, at time.Time) error {
-	return us.s.execOne(ctx, fmt.Sprintf("record login %q", name),
-		"UPDATE users SET last_logged_in_at = ? WHERE name = ?", micros(at), name)
+	return us.s.execOne(
+		ctx,
+		fmt.Sprintf("record login %q", name),
+		"UPDATE users SET last_logged_in_at = ?, failed_logins = 0 WHERE name = ?",
+		micros(at),
+		name,
+	)
+}
+
+// RecordFailedLogin counts and locks in one statement, so concurrent wrong
+// passwords cannot each read the old count and all stay below the limit.
+func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error) {
+	var locked bool
+	err := us.s.Tx(ctx, func(ctx context.Context) error {
+		if err := us.s.execOne(ctx, fmt.Sprintf("record failed login %q", name),
+			"UPDATE users SET failed_logins = failed_logins + 1, status = CASE "+
+				"WHEN ? > 0 AND failed_logins + 1 >= ? AND status IN ('', ?) THEN ? "+
+				"ELSE status END WHERE name = ?",
+			lockAt, lockAt, string(types.UserEnabled), string(types.UserLocked), name); err != nil {
+			return err
+		}
+		var status string
+		if err := us.s.q(ctx).QueryRowContext(ctx,
+			us.s.d.Rebind("SELECT status FROM users WHERE name = ?"),
+			name).
+			Scan(&status); err != nil {
+			return us.s.wrap(fmt.Sprintf("read user %q", name), err)
+		}
+		locked = status == string(types.UserLocked)
+		return nil
+	})
+	return locked, err
+}
+
+func (us users) Unlock(ctx context.Context, names ...string) error {
+	unlock := "UPDATE users SET failed_logins = 0, status = CASE WHEN status = ? THEN ? ELSE status END"
+	args := []any{string(types.UserLocked), string(types.UserEnabled)}
+	if len(names) == 0 {
+		_, err := us.s.exec(
+			ctx,
+			"unlock users",
+			unlock+" WHERE status = ? OR failed_logins > 0",
+			append(args, string(types.UserLocked))...)
+		return err
+	}
+	for _, n := range names {
+		args = append(args, n)
+	}
+	_, err := us.s.exec(ctx, "unlock users",
+		unlock+" WHERE name IN ("+Placeholders(len(names))+")", args...)
+	return err
+}
+
+func (us users) Locked(ctx context.Context) ([]string, error) {
+	out := []string{}
+	err := us.s.rows(ctx, "list locked users",
+		"SELECT name FROM users WHERE status = ? ORDER BY name", []any{string(types.UserLocked)},
+		func(r *sql.Rows) error {
+			var n string
+			if err := r.Scan(&n); err != nil {
+				return err //nolint:wrapcheck // wrapped by rows
+			}
+			out = append(out, n)
+			return nil
+		})
+	return out, err
 }
 
 // --- Groups ----------------------------------------------------------------

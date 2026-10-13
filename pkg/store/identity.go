@@ -21,8 +21,19 @@ type UserStore interface {
 	Delete(ctx context.Context, name string) error
 	// List returns users ordered by name.
 	List(ctx context.Context, p Page) ([]types.User, string, error)
-	// RecordLogin sets LastLoggedIn.
+	// RecordLogin sets LastLoggedIn and resets FailedLogins.
 	RecordLogin(ctx context.Context, name string, at time.Time) error
+	// RecordFailedLogin adds one to FailedLogins in one atomic step and,
+	// when lockAt is positive and the count reaches it, sets an enabled
+	// user's Status to locked. It reports whether the user is locked
+	// afterwards. ErrNotFound when the user does not exist.
+	RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error)
+	// Unlock sets locked users among names back to enabled and resets
+	// their FailedLogins; with no names it unlocks every locked user.
+	// Unknown names are ignored.
+	Unlock(ctx context.Context, names ...string) error
+	// Locked returns the names of locked users, ordered.
+	Locked(ctx context.Context) ([]string, error)
 }
 
 // GroupStore persists groups.

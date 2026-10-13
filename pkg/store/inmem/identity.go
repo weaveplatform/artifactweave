@@ -164,9 +164,65 @@ func (us users) RecordLogin(ctx context.Context, name string, at time.Time) erro
 			return notFound("user", name)
 		}
 		u.LastLoggedIn = at
+		u.FailedLogins = 0
 		us.s.usersT().put(name, u)
 		return nil
 	})
+}
+
+func (us users) RecordFailedLogin(ctx context.Context, name string, lockAt int) (bool, error) {
+	var locked bool
+	err := us.s.do(ctx, func() error {
+		u, ok := us.s.usersT().get(name)
+		if !ok {
+			return notFound("user", name)
+		}
+		u.FailedLogins++
+		enabled := u.Status == "" || u.Status == types.UserEnabled
+		if lockAt > 0 && u.FailedLogins >= lockAt && enabled {
+			u.Status = types.UserLocked
+		}
+		locked = u.Status == types.UserLocked
+		us.s.usersT().put(name, u)
+		return nil
+	})
+	return locked, err
+}
+
+func (us users) Unlock(ctx context.Context, names ...string) error {
+	return us.s.do(ctx, func() error {
+		want := map[string]bool{}
+		for _, n := range names {
+			want[n] = true
+		}
+		for _, u := range us.s.usersT().all(nil, compareByKey(userName)) {
+			switch {
+			case len(names) > 0 && !want[u.Name]:
+				continue
+			case len(names) == 0 && u.Status != types.UserLocked && u.FailedLogins == 0:
+				continue
+			}
+			if u.Status == types.UserLocked {
+				u.Status = types.UserEnabled
+			}
+			u.FailedLogins = 0
+			us.s.usersT().put(u.Name, u)
+		}
+		return nil
+	})
+}
+
+func (us users) Locked(ctx context.Context) ([]string, error) {
+	out := []string{}
+	err := us.s.do(ctx, func() error {
+		for _, u := range us.s.usersT().all(nil, compareByKey(userName)) {
+			if u.Status == types.UserLocked {
+				out = append(out, u.Name)
+			}
+		}
+		return nil
+	})
+	return out, err
 }
 
 // --- Groups ----------------------------------------------------------------
