@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 func TestPage(t *testing.T) {

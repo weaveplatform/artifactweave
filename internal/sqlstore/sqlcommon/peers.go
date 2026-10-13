@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // purposeInstanceKey seals the instance's Ed25519 private key; the row id is

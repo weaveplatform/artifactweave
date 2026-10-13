@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // Repos implements store.Store.

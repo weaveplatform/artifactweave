@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types/wire"
+	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 // ErrLossyProjection reports a permission the requested legacy form cannot

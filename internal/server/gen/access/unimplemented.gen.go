@@ -5,7 +5,7 @@ package access
 import (
 	"context"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 )
 
 // UnimplementedStrict answers 501 for every strict operation. Services embed it and

@@ -11,9 +11,9 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	tcminio "github.com/testcontainers/testcontainers-go/modules/minio"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob/blobtest"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/containertest"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
 // minioImage is pinned by digest so a MinIO release cannot change S3

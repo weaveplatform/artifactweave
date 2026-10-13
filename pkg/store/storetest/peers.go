@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // runPeers covers the peer protocol's records (decision 0021), federated

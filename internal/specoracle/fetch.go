@@ -26,7 +26,7 @@ import (
 
 // DefaultUserAgent identifies the fetcher to docs.jfrog.com so a polite
 // operator can find us if the crawl misbehaves.
-const DefaultUserAgent = "artifactweave-specoracle (https://github.com/weaveplatform/weaveplatform-artifact-registry)"
+const DefaultUserAgent = "artifactweave-specoracle (https://github.com/weaveplatform/artifactweave)"
 
 // ManifestFile is the name of the manifest written into the cache directory.
 // Its presence is how TestSpecParity decides whether a cache exists.

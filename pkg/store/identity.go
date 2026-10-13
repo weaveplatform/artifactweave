@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // UserStore persists users. A user's Groups are its memberships, kept in

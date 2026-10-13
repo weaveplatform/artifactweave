@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // backendName marks the upload sessions this backend owns in the shared

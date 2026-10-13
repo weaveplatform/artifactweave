@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/crypt"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
 // ErrNoKeyring reports a sealed value read by a store opened without a

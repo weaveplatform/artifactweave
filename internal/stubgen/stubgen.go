@@ -106,7 +106,7 @@ func Generate(pkg string, methods []Method) ([]byte, error) {
 	if len(methods) > 0 {
 		b.WriteString("import (\n\t\"context\"\n\n")
 		b.WriteString(
-			"\t\"github.com/weaveplatform/weaveplatform-artifact-registry/internal/server/apierror\"\n)\n\n",
+			"\t\"github.com/weaveplatform/artifactweave/internal/server/apierror\"\n)\n\n",
 		)
 	}
 	fmt.Fprintf(

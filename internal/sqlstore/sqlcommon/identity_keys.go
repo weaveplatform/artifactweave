@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Seal purposes of the key material columns (decision 0017). The row id is

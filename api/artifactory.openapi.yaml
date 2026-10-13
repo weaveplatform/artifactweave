@@ -18425,7 +18425,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+        path: github.com/weaveplatform/artifactweave/pkg/repo
     FileInfo:
       description: Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
       properties:
@@ -19178,7 +19178,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+        path: github.com/weaveplatform/artifactweave/pkg/repo
     LockEntry:
       description: One lease held by the reporting process.
       properties:
@@ -20408,7 +20408,7 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+        path: github.com/weaveplatform/artifactweave/pkg/repo
     RemoveRepositoryFailureReport:
       description: Report returned when deleting a repository did not fully succeed. The configuration is kept whenever this shape is returned.
       properties:
@@ -20696,7 +20696,7 @@ components:
         - $ref: '#/components/schemas/FederatedRepositoryConfiguration'
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+        path: github.com/weaveplatform/artifactweave/pkg/repo
     RepositorySummary:
       description: Per-repository row of the storage summary. The list ends with a synthetic row whose `repoKey` is `TOTAL`.
       properties:
@@ -21449,4 +21449,4 @@ components:
       type: object
       x-go-type: repo.Config
       x-go-type-import:
-        path: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+        path: github.com/weaveplatform/artifactweave/pkg/repo

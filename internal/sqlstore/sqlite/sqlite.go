@@ -20,7 +20,7 @@ import (
 	msqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 )
 
 //go:embed migrations/*.sql

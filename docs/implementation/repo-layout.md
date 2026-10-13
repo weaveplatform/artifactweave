@@ -4,7 +4,7 @@ This is the package tree the [implementation plan](plan.md) builds. Import tiers
 enforced by a test in `internal/layout` (P0): `pkg/` never imports `internal/` or
 `cmd/`, and `internal/format/*` never imports `internal/server`.
 
-Module: `github.com/weaveplatform/weaveplatform-artifact-registry` (Go 1.27). One module,
+Module: `github.com/weaveplatform/artifactweave` (Go 1.27). One module,
 one binary.
 
 ```text

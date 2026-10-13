@@ -81,9 +81,9 @@ linters:
         # single case rule can express; decision record 0002 limits the
         # exception to these packages.
         overrides:
-          - pkg: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo
+          - pkg: github.com/weaveplatform/artifactweave/pkg/repo
             ignore: true
-          - pkg: github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types/wire
+          - pkg: github.com/weaveplatform/artifactweave/pkg/types/wire
             ignore: true
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)

@@ -107,7 +107,7 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 
 **Tasks**
-1. `make init NAME=weaveplatform-artifact-registry`; this documentation set; `CODEOWNERS`.
+1. `make init NAME=artifactweave`; this documentation set; `CODEOWNERS`.
 2. `pkg/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that preserves JFrog's string-typed booleans per rclass, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
 3. `pkg/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
 4. `internal/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.

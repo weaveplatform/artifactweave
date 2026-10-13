@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/crypt"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlcommon"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqlite"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/internal/sqlstore/sqltest"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store/storetest"
+	"github.com/weaveplatform/artifactweave/internal/crypt"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlite"
+	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqltest"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/storetest"
 )
 
 // keyring seals secret columns in the contract runs, so the sealed paths are

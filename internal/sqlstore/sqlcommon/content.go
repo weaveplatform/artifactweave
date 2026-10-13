@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/store"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // purposeRepoPassword is the sealing purpose of a remote repository's

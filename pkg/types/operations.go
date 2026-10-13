@@ -3,7 +3,7 @@ package types
 import (
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // CleanupItemType is what a cleanup policy deletes.

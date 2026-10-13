@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types/wire"
+	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 // ErrInvalidTimestamp reports a timestamp a wire form could not have sent.

@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
 
 // Options tunes the suite for a backend.

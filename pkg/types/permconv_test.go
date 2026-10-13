@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types/wire"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 func TestActionsSpellings(t *testing.T) {

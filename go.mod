@@ -1,4 +1,4 @@
-module github.com/weaveplatform/weaveplatform-artifact-registry
+module github.com/weaveplatform/artifactweave
 
 go 1.27
 

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // ErrInvalidMemberURL reports a federation member URL that does not name a

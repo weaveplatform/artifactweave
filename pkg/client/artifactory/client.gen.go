@@ -17,7 +17,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/oapi-codegen/runtime"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
 // Defines values for ArchiveCriterionOperator.

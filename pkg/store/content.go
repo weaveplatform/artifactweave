@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/repo"
-	"github.com/weaveplatform/weaveplatform-artifact-registry/pkg/types"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // RepoFilter narrows repository listings; empty fields match everything.
