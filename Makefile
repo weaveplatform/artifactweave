@@ -89,6 +89,14 @@ build:
 		done; \
 	done
 
+## docker: build the container image from the Dockerfile, tagged with the version
+docker:
+	docker build -t artifactweave:$(VERSION) --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) .
+
+## gcp-<target>: run a target of deploy/terraform/acceptance (the GCS acceptance environment), e.g. make gcp-up
+gcp-%:
+	$(MAKE) -C deploy/terraform/acceptance $*
+
 ## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
 # Authors edit fragments (one per API family) so families can be written in
 # parallel; the bundled file is what codegen and the parity test read.
@@ -138,4 +146,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform capture-aql
+.PHONY: docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform capture-aql

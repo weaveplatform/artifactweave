@@ -1,0 +1,12 @@
+.git
+.claude
+.specoracle
+/bin/
+/cover/
+/specoracle
+**/.terraform
+**/*.tfstate*
+**/.secrets
+**/.local
+*.test
+*.out

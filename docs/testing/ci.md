@@ -57,8 +57,9 @@ A run whose variables or secrets are missing fails rather than skipping.
 
 | Name | Kind | Value |
 |---|---|---|
-| `CONFORMANCE_GCS_BUCKET` | variable | An existing bucket |
-| `GCP_SERVICE_ACCOUNT_KEY` | secret | JSON key of a service account with `roles/storage.objectAdmin` on the bucket. The key also signs URLs locally, so no `signBlob` permission is needed |
+| `CONFORMANCE_GCS_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/terraform/acceptance`) |
+| `CONFORMANCE_GCP_SERVICE_ACCOUNT` | variable | The service account the job acts as (`terraform output service_account`). It has `roles/storage.objectAdmin` on the bucket and signs URLs through IAM `signBlob` as itself |
+| `CONFORMANCE_GCP_WIF_PROVIDER` | variable | The Workload Identity Federation provider (`terraform output workload_identity_provider`). The job exchanges its GitHub OIDC token for the service account, so no key is stored; organisations enforcing `iam.disableServiceAccountKeyCreation` allow no keys anyway |
 | `CONFORMANCE_AZURE_ACCOUNT` | variable | Storage account name, with Shared Key access enabled |
 | `CONFORMANCE_AZURE_CONTAINER` | variable | An existing container in that account |
 | `AZURE_STORAGE_ACCOUNT_KEY` | secret | An account key; the probes sign copy sources with it |
@@ -70,8 +71,10 @@ the deleted temporary parts for the retention period.
 The same tests run from a workstation. They skip unless their variables are set:
 
 ```bash
-ARTIFACTWEAVE_TEST_GCS_BUCKET=my-bucket \
-GOOGLE_APPLICATION_CREDENTIALS=key.json \
+cd deploy/terraform/acceptance && ./up.sh && cd -   # writes .secrets/container-credentials.json
+ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/terraform/acceptance output -raw bucket) \
+ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/terraform/acceptance output -raw service_account) \
+GOOGLE_APPLICATION_CREDENTIALS=deploy/terraform/acceptance/.secrets/container-credentials.json \
   go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
 
 ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=myaccount \
@@ -80,8 +83,10 @@ ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY=... \
   go test -count=1 -v -run 'TestContractOnRealAzure|TestRealAzureProbes' ./pkg/blob/azure/
 ```
 
-Without `GOOGLE_APPLICATION_CREDENTIALS`, GCS uses Application Default Credentials
-(`gcloud auth application-default login`). Without the Azure account key, the contract
+The GCS run acts as the acceptance service account through the impersonated credentials
+`up.sh` writes from your own Application Default Credentials
+(`gcloud auth application-default login`); `deploy/terraform/acceptance` creates the
+bucket, the account and the federation for the workflow. Without the Azure account key, the contract
 authenticates with `DefaultAzureCredential` (`az login`, with Storage Blob Data
 Contributor on the container), and the probes skip.
 

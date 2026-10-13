@@ -351,7 +351,7 @@ accounts and logs one `PROBE` line per question:
 | 2 | `azure.copy_from_url.shared_key_source_without_sas` |
 | 3 | `azure.put_blob_if_none_match_over_uncommitted` |
 | 4 | `gcs.compose.wrong_crc32c`, `gcs.compose.stale_source_generation`, `gcs.compose.destination_exists` |
-| 5 | `gcs.signed_url`, run locally as the federated principal; the workflow signs with a service-account key, so its run does not answer this |
+| 5 | `gcs.signed_url` |
 
 The backends do not depend on the answers:
 - The Azure backend copies in 100 MiB ranges.
@@ -361,6 +361,25 @@ The backends do not depend on the answers:
 
 The answers record the real behaviour and show whether those defensive choices can be
 relaxed.
+
+### GCS answers (2026-10-13)
+
+The blob contract passed in full (17 subtests) against a real bucket in `europe-west2`
+(`deploy/terraform/acceptance`), with signed URLs fetched over HTTPS. The run acted as the
+acceptance service account by impersonation, because the organisation enforces
+`iam.disableServiceAccountKeyCreation`, so no key was involved.
+
+| Question | Answer | Consequence |
+|---|---|---|
+| 4: compose with a wrong CRC32C | Accepted: compose ignores a supplied CRC32C, as the JSON API documentation says. The SDK comment claiming it is rejected is wrong | The backend's own size and CRC32C check after compose is required, not merely defensive |
+| 4: stale source generation | Rejected with 404 `notFound`, not 412 | Translated to not-found; parts are written must-not-exist, so a stale generation means a lost part and the upload fails |
+| 4: destination exists | 412 `conditionNotMet` | Translated to `ErrPrecondition`: the blob is already stored |
+| 5: signing without a key | Works through IAM `signBlob` as the service account (`google_access_id`), once the account holds Service Account Token Creator on itself | Keyless installs (impersonation locally, Workload Identity Federation in CI and on GKE) presign; a federated principal that impersonates no service account still cannot sign |
+| Composites | No MD5; `componentCount` is reported | As expected: the contract computes its own digests |
+
+A 40 MiB deploy through the local container (`make gcp-smoke`) stored one object composed
+from three parts (16, 16 and 8 MiB) and left nothing under `_uploads/`. The Azure questions
+(1 to 3) remain open until an Azure account is configured.
 
 ## Sources
 
