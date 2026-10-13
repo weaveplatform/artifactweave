@@ -48,6 +48,7 @@ func statusTable() []statusCase {
 		storageStatusRows(),
 		transferStatusRows(),
 		trashStatusRows(),
+		mirrorStatusRows(),
 	)
 }
 
@@ -84,7 +85,7 @@ func systemStatusRows() []statusCase {
 // "user" (password "pw") in no group, and the repositories the rows use.
 // Each row that changes state uses keys no other row touches, so the rows
 // run in any order against one store.
-func statusFixture(t *testing.T, anonymous bool) http.Handler {
+func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Handler {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -142,7 +143,22 @@ func statusFixture(t *testing.T, anonymous bool) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(Config{CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a})
+	cfg := Config{CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a}
+	for _, f := range tune {
+		f(&cfg)
+	}
+	return New(cfg)
+}
+
+func mirrorStatusRows() []statusCase {
+	const optimize = "POST /artifactory/api/system/storage/optimize"
+	const path = "/artifactory/api/system/storage/optimize"
+	return []statusCase{
+		{optimize, path, "admin", "", 200},
+		{optimize, path, "user", "", 403},
+		{optimize, path, "anonymous", "", 401},
+		{optimize, path, "", "", 401},
+	}
 }
 
 func itemStatusRows() []statusCase {

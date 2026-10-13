@@ -93,6 +93,9 @@ type Member struct {
 	// WriteEnabled lets the member receive new copies. A member with it
 	// false is drained: it serves reads but gets nothing new.
 	WriteEnabled bool
+	// Kind names the member's backend (fs, s3, gcs, azure) for Status; the
+	// mirror itself does not use it.
+	Kind string
 }
 
 // Options configures New.

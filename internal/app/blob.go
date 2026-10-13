@@ -119,7 +119,7 @@ func (t blobTier) openMirror(
 			return nil, err
 		}
 		members = append(members, mirror.Member{
-			Name: name, Zone: sc.Zone, Store: s, WriteEnabled: sc.Writable(),
+			Name: name, Zone: sc.Zone, Store: s, WriteEnabled: sc.Writable(), Kind: sc.Backend,
 		})
 	}
 	redundancy, quorum := mc.Effective()

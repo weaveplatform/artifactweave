@@ -147,6 +147,16 @@ func (r replicaIndex) DeleteBlob(ctx context.Context, sha256 string) (int64, err
 	return r.s.exec(ctx, "delete "+r.table, "DELETE FROM "+r.table+" WHERE sha256 = ?", sha256)
 }
 
+func (r replicaIndex) UnderReplicated(ctx context.Context, redundancy int) (int64, error) {
+	var n int64
+	err := r.s.q(ctx).QueryRowContext(ctx, r.s.d.Rebind(
+		"SELECT COUNT(*) FROM (SELECT sha256 FROM "+r.table+" GROUP BY sha256"+
+			" HAVING SUM(CASE WHEN state = 'deleting' THEN 1 ELSE 0 END) = 0"+
+			" AND SUM(CASE WHEN state = 'present' THEN 1 ELSE 0 END) < ?) under"),
+		redundancy).Scan(&n)
+	return n, r.s.wrap("under-replicated "+r.table, err)
+}
+
 func (r replicaIndex) Counts(ctx context.Context) ([]store.ReplicaCount, error) {
 	var out []store.ReplicaCount
 	err := r.s.rows(ctx, "count "+r.table,

@@ -5,6 +5,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -54,6 +56,23 @@ type Config struct {
 	// authentication, which only tests do: such a handler has no store and
 	// answers just the system endpoints and the stubs.
 	Auth *auth.Authenticator
+	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
+	Mirrors Mirrors
+}
+
+// Mirrors is what the storage endpoints need from the runtime's blob
+// mirrors (#18).
+type Mirrors interface {
+	// Optimize asks every mirror for an immediate repair pass.
+	Optimize()
+	// Status returns each mirror's status.
+	Status(ctx context.Context) ([]MirrorStatus, error)
+}
+
+// MirrorStatus is one tier's mirror: "blob" or "cold_blob".
+type MirrorStatus struct {
+	Tier string
+	mirror.Status
 }
 
 // managementBodyLimit bounds JSON management requests. 64 MiB covers the
