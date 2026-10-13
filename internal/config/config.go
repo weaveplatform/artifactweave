@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -135,7 +136,10 @@ func Load(opts LoadOptions) (Config, error) {
 		}
 	}
 	if opts.Env != nil {
-		for _, k := range keys {
+		// Named stores exist only once the file declares them, so their keys
+		// are generated after it has been read.
+		dynamic := append(storeKeys("blob", cfg.Blob), storeKeys("cold_blob", cfg.ColdBlob)...)
+		for _, k := range append(slices.Clone(keys), dynamic...) {
 			if v, ok := opts.Env(envName(k)); ok {
 				if err := set(&cfg, k, v); err != nil {
 					return Config{}, err

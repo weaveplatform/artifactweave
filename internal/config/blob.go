@@ -2,15 +2,27 @@ package config
 
 import (
 	"fmt"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
 // BlobConfig selects one blob store: the hot store (blob) or the archive
-// tier (cold_blob).
+// tier (cold_blob). Backend is fs, s3, gcs or azure for a single store, or
+// mirror to keep every blob in several of the named Stores (decision 0028).
 type BlobConfig struct {
+	BlobBackendConfig `yaml:",inline"`
+	// Stores are named stores, the members a mirror chooses from.
+	Stores map[string]BlobStoreConfig `yaml:"stores"`
+	Mirror BlobMirrorConfig           `yaml:"mirror"`
+}
+
+// BlobBackendConfig is one store's backend and its settings.
+type BlobBackendConfig struct {
 	Backend string          `yaml:"backend"`
 	FS      BlobFSConfig    `yaml:"fs"`
 	S3      BlobS3Config    `yaml:"s3"`
@@ -18,19 +30,71 @@ type BlobConfig struct {
 	Azure   BlobAzureConfig `yaml:"azure"`
 }
 
+// BlobStoreConfig is a named store: a backend with its zone (a region or
+// site label the mirror orders reads and writes by) and whether it accepts
+// new copies.
+type BlobStoreConfig struct {
+	BlobBackendConfig `       yaml:",inline"`
+	Zone              string `yaml:"zone"`
+	// WriteEnabled false drains the store: no new copies, reads continue.
+	// Unset means true.
+	WriteEnabled *bool `yaml:"write_enabled"`
+}
+
+// Writable reports whether the store accepts new copies.
+func (s BlobStoreConfig) Writable() bool { return s.WriteEnabled == nil || *s.WriteEnabled }
+
+// BlobMirrorConfig is the mirror (decision 0028).
+type BlobMirrorConfig struct {
+	// Members names the stores that hold copies.
+	Members []string `yaml:"members"`
+	// Redundancy is the number of copies of each blob; zero means every
+	// member.
+	Redundancy int `yaml:"redundancy"`
+	// WriteQuorum is how many copies must be stored before an upload
+	// succeeds; zero means Redundancy-1 (at least 1), so one member down
+	// does not stop uploads.
+	WriteQuorum int `yaml:"write_quorum"`
+	// Zone is this instance's zone; members in it are preferred.
+	Zone string `yaml:"zone"`
+	// MemberTimeout bounds how long a member may finish after the quorum;
+	// zero means 30s.
+	MemberTimeout time.Duration `yaml:"member_timeout"`
+}
+
+// Effective returns the redundancy and write quorum with their defaults
+// applied for the configured members.
+func (m BlobMirrorConfig) Effective() (redundancy, quorum int) {
+	redundancy, quorum = m.Redundancy, m.WriteQuorum
+	if redundancy == 0 {
+		redundancy = len(m.Members)
+	}
+	if quorum == 0 {
+		quorum = max(1, redundancy-1)
+	}
+	return redundancy, quorum
+}
+
+// storeName restricts store names so they map to environment variables and
+// to upload-session backend names unambiguously.
+var storeName = regexp.MustCompile(`^[a-z0-9_]{1,32}$`)
+
 // BlobFSConfig is the local disk backend.
 type BlobFSConfig struct {
 	Root string `yaml:"root"`
 }
 
 // BlobS3Config is the S3-compatible backend. Credentials come from the AWS
-// SDK's own chain, never from this file.
+// SDK's own chain, never from this file; Profile selects a named profile of
+// the shared AWS configuration, so mirror members can use different
+// accounts.
 type BlobS3Config struct {
 	Bucket    string `yaml:"bucket"`
 	Prefix    string `yaml:"prefix"`
 	Endpoint  string `yaml:"endpoint"`
 	Region    string `yaml:"region"`
 	PathStyle bool   `yaml:"path_style"`
+	Profile   string `yaml:"profile"`
 }
 
 // BlobGCSConfig is the Google Cloud Storage backend (decision 0027).
@@ -89,18 +153,34 @@ const (
 	azureMaxCopyCall = 4000 << 20
 )
 
-// blobKeys lists the settable keys of one blob section.
+// mirrorKeys are the mirror settings of a blob section.
+var mirrorKeys = []string{
+	"mirror.members", "mirror.redundancy", "mirror.write_quorum", "mirror.zone",
+	"mirror.member_timeout",
+}
+
+// blobKeys lists the static settable keys of one blob section.
 func blobKeys(prefix string) []string {
-	sub := []string{
-		"backend", "fs.root",
-		"s3.bucket", "s3.prefix", "s3.endpoint", "s3.region", "s3.path_style",
-		"gcs.bucket", "gcs.prefix", "gcs.endpoint", "gcs.credentials_file",
-		"gcs.google_access_id", "gcs.part_size",
-		"azure.account", "azure.endpoint", "azure.container", "azure.prefix",
-		"azure.credential", "azure.account_key", "azure.sas_token", "azure.connection_string",
-		"azure.managed_identity_client_id", "azure.part_size", "azure.copy_range_size",
-		"azure.concurrency",
+	return prefixed(prefix, append(backendKeys(), mirrorKeys...))
+}
+
+// storeKeys lists the keys of the named stores a blob section declares, for
+// the environment pass after the file has been read.
+func storeKeys(prefix string, b BlobConfig) []string {
+	names := make([]string, 0, len(b.Stores))
+	for name := range b.Stores {
+		names = append(names, name)
 	}
+	slices.Sort(names)
+	fields := append(backendKeys(), "zone", "write_enabled")
+	out := make([]string, 0, len(names)*len(fields))
+	for _, name := range names {
+		out = append(out, prefixed(prefix+".stores."+name, fields)...)
+	}
+	return out
+}
+
+func prefixed(prefix string, sub []string) []string {
 	out := make([]string, len(sub))
 	for i, k := range sub {
 		out[i] = prefix + "." + k
@@ -108,9 +188,92 @@ func blobKeys(prefix string) []string {
 	return out
 }
 
+// backendKeys lists the keys of one backend definition.
+func backendKeys() []string {
+	return []string{
+		"backend", "fs.root",
+		"s3.bucket", "s3.prefix", "s3.endpoint", "s3.region", "s3.path_style", "s3.profile",
+		"gcs.bucket", "gcs.prefix", "gcs.endpoint", "gcs.credentials_file",
+		"gcs.google_access_id", "gcs.part_size",
+		"azure.account", "azure.endpoint", "azure.container", "azure.prefix",
+		"azure.credential", "azure.account_key", "azure.sas_token", "azure.connection_string",
+		"azure.managed_identity_client_id", "azure.part_size", "azure.copy_range_size",
+		"azure.concurrency",
+	}
+}
+
 // setBlob assigns one key of a blob section; sub is the key without the
-// section prefix and key the full name for errors.
+// section prefix and key the full name for errors. A key of an undeclared
+// store declares it, so flags can add a store.
 func setBlob(b *BlobConfig, sub, key, value string) error {
+	if rest, ok := strings.CutPrefix(sub, "stores."); ok {
+		name, field, ok := strings.Cut(rest, ".")
+		if !ok {
+			return fmt.Errorf("%w: %q", ErrUnknownKey, key)
+		}
+		if b.Stores == nil {
+			b.Stores = map[string]BlobStoreConfig{}
+		}
+		st := b.Stores[name]
+		if err := st.set(field, key, value); err != nil {
+			return err
+		}
+		b.Stores[name] = st
+		return nil
+	}
+	switch sub {
+	case "mirror.members":
+		b.Mirror.Members = nil
+		for m := range strings.SplitSeq(value, ",") {
+			if m = strings.TrimSpace(m); m != "" {
+				b.Mirror.Members = append(b.Mirror.Members, m)
+			}
+		}
+		return nil
+	case "mirror.zone":
+		b.Mirror.Zone = value
+		return nil
+	case "mirror.redundancy", "mirror.write_quorum":
+		n, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("%w: %s=%q is not an integer", ErrInvalidValue, key, value)
+		}
+		if sub == "mirror.redundancy" {
+			b.Mirror.Redundancy = n
+		} else {
+			b.Mirror.WriteQuorum = n
+		}
+		return nil
+	case "mirror.member_timeout":
+		d, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("%w: %s=%q is not a duration", ErrInvalidValue, key, value)
+		}
+		b.Mirror.MemberTimeout = d
+		return nil
+	}
+	return b.set(sub, key, value)
+}
+
+// set assigns one key of a named store.
+func (st *BlobStoreConfig) set(field, key, value string) error {
+	switch field {
+	case "zone":
+		st.Zone = value
+		return nil
+	case "write_enabled":
+		var v bool
+		if err := setBool(&v, key, value); err != nil {
+			return err
+		}
+		st.WriteEnabled = &v
+		return nil
+	}
+	return st.BlobBackendConfig.set(field, key, value)
+}
+
+// set assigns one key of a backend definition.
+func (b *BlobBackendConfig) set(sub, key, value string) error {
 	str := map[string]*string{
 		"backend":                          &b.Backend,
 		"fs.root":                          &b.FS.Root,
@@ -118,6 +281,7 @@ func setBlob(b *BlobConfig, sub, key, value string) error {
 		"s3.prefix":                        &b.S3.Prefix,
 		"s3.endpoint":                      &b.S3.Endpoint,
 		"s3.region":                        &b.S3.Region,
+		"s3.profile":                       &b.S3.Profile,
 		"gcs.bucket":                       &b.GCS.Bucket,
 		"gcs.prefix":                       &b.GCS.Prefix,
 		"gcs.endpoint":                     &b.GCS.Endpoint,
@@ -167,11 +331,101 @@ func setBlob(b *BlobConfig, sub, key, value string) error {
 // hot store and means "not configured" for the archive tier.
 func (b BlobConfig) validate(prefix string, required bool) []error {
 	var errs []error
+	names := make([]string, 0, len(b.Stores))
+	for name := range b.Stores {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+	for _, name := range names {
+		sp := prefix + ".stores." + name
+		if !storeName.MatchString(name) {
+			errs = append(errs, fmt.Errorf("%w: store name %q must be 1 to 32 of a-z, 0-9 and _",
+				ErrInvalidValue, name))
+		}
+		st := b.Stores[name]
+		if st.Backend == "" || st.Backend == "mirror" {
+			errs = append(errs, fmt.Errorf("%w: %s.backend %q (a store is fs, s3, gcs or azure)",
+				ErrUnknownBlob, sp, st.Backend))
+			continue
+		}
+		errs = append(errs, st.validate(sp)...)
+	}
 	switch b.Backend {
 	case "":
 		if required {
 			errs = append(errs, fmt.Errorf("%w: %s.backend is empty", ErrUnknownBlob, prefix))
 		}
+	case "mirror":
+		errs = append(errs, b.validateMirror(prefix)...)
+	default:
+		errs = append(errs, b.BlobBackendConfig.validate(prefix)...)
+	}
+	return errs
+}
+
+// validateMirror checks the mirror settings against the declared stores.
+func (b BlobConfig) validateMirror(prefix string) []error {
+	var errs []error
+	m := b.Mirror
+	if len(m.Members) == 0 {
+		errs = append(errs, fmt.Errorf("%w: %s.mirror.members", ErrMissingValue, prefix))
+	}
+	seen := map[string]bool{}
+	writable := 0
+	for _, name := range m.Members {
+		st, ok := b.Stores[name]
+		switch {
+		case !ok:
+			errs = append(
+				errs,
+				fmt.Errorf("%w: %s.mirror.members names %q, which %s.stores does not declare",
+					ErrInvalidValue, prefix, name, prefix),
+			)
+		case seen[name]:
+			errs = append(
+				errs,
+				fmt.Errorf("%w: %s.mirror.members lists %q twice", ErrInvalidValue, prefix, name),
+			)
+		case st.Writable():
+			writable++
+		}
+		seen[name] = true
+	}
+	r, w := m.Effective()
+	switch {
+	case len(m.Members) == 0:
+	case r < 1 || r > len(m.Members):
+		errs = append(
+			errs,
+			fmt.Errorf("%w: %s.mirror.redundancy %d must be between 1 and the %d members",
+				ErrInvalidValue, prefix, r, len(m.Members)),
+		)
+	case w < 1 || w > r:
+		errs = append(
+			errs,
+			fmt.Errorf("%w: %s.mirror.write_quorum %d must be between 1 and the redundancy %d",
+				ErrInvalidValue, prefix, w, r),
+		)
+	case writable < w:
+		errs = append(
+			errs,
+			fmt.Errorf("%w: %s.mirror has %d write-enabled members, fewer than the write quorum %d",
+				ErrInvalidValue, prefix, writable, w),
+		)
+	}
+	if m.MemberTimeout < 0 {
+		errs = append(
+			errs,
+			fmt.Errorf("%w: %s.mirror.member_timeout %s", ErrInvalidValue, prefix, m.MemberTimeout),
+		)
+	}
+	return errs
+}
+
+// validate checks one backend definition.
+func (b BlobBackendConfig) validate(prefix string) []error {
+	var errs []error
+	switch b.Backend {
 	case "fs":
 	case "s3":
 		if b.S3.Bucket == "" {
@@ -276,8 +530,21 @@ func (a BlobAzureConfig) EffectiveCredential() string {
 	}
 }
 
-// redacted returns b with its secrets replaced.
+// redacted returns b with its secrets replaced, the named stores' included.
 func (b BlobConfig) redacted() BlobConfig {
+	b.BlobBackendConfig = b.BlobBackendConfig.redacted()
+	if b.Stores != nil {
+		stores := make(map[string]BlobStoreConfig, len(b.Stores))
+		for name, st := range b.Stores {
+			st.BlobBackendConfig = st.redacted()
+			stores[name] = st
+		}
+		b.Stores = stores
+	}
+	return b
+}
+
+func (b BlobBackendConfig) redacted() BlobBackendConfig {
 	b.Azure.AccountKey = redact(b.Azure.AccountKey)
 	b.Azure.SASToken = redact(b.Azure.SASToken)
 	b.Azure.ConnectionString = redact(b.Azure.ConnectionString)

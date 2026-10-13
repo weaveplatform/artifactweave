@@ -43,6 +43,14 @@ artifactweave has three configuration layers (decision
 | `log.level`, `log.format` | | | `info`, `json` | slog settings |
 | `distribution.import_dir` | | `ARTIFACTWEAVE_DISTRIBUTION_IMPORT_DIR` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
 | `distribution.edge_role` | | | `false` | Makes the instance an edge: ordinary deploys are refused and content arrives only through distribution (decision 0023) |
+| `blob.s3.profile` | | `ARTIFACTWEAVE_BLOB_S3_PROFILE` | default profile | Named profile of the shared AWS configuration, so stores can use different accounts |
+| `blob.stores.<name>.*` | | `ARTIFACTWEAVE_BLOB_STORES_<NAME>_*` for stores the file declares | | A named store: `backend` (`fs`, `s3`, `gcs` or `azure`) and that backend's keys as above, `zone` (a region or site label) and `write_enabled` (default `true`; `false` drains the store: no new copies, reads continue). Names are 1 to 32 of `a-z`, `0-9` and `_` |
+| `blob.backend: mirror` | | | | Keep every blob in several named stores (decision [0028](../research/decisions/0028-blob-mirroring.md)) |
+| `blob.mirror.members` | | `ARTIFACTWEAVE_BLOB_MIRROR_MEMBERS` (comma-separated) | | The stores that hold copies |
+| `blob.mirror.redundancy` | | `ARTIFACTWEAVE_BLOB_MIRROR_REDUNDANCY` | every member | Copies of each blob; fewer than the members places copies zone first, then round robin |
+| `blob.mirror.write_quorum` | | `ARTIFACTWEAVE_BLOB_MIRROR_WRITE_QUORUM` | redundancy minus 1, at least 1 | Copies stored before an upload succeeds (Artifactory's `lenientLimit`); missing copies are repaired in the background. The server refuses to start unless 1 ≤ quorum ≤ redundancy ≤ members and at least quorum members are write-enabled |
+| `blob.mirror.zone` | | `ARTIFACTWEAVE_BLOB_MIRROR_ZONE` | | This instance's zone: reads and writes prefer stores in it |
+| `blob.mirror.member_timeout` | | `ARTIFACTWEAVE_BLOB_MIRROR_MEMBER_TIMEOUT` | `30s` | How long a store may finish after the quorum before its copy is left to repair |
 | `cold_blob.*` | | `ARTIFACTWEAVE_COLD_BLOB_*` | unset | Cold blob tier for archive policies: the same backends and keys as `blob`; an empty `cold_blob.backend` means none is configured, and archive runs then fail with a clear error (decision 0024) |
 | `peer.outbox_retention` | | | `168h` | How long outbox entries are kept for a peer that has not acknowledged them; a peer behind the window needs a full sync (decision 0021) |
 | `workers.timeout` | | | `20s` | Overall wall-clock limit per worker execution (decision 0026) |
@@ -56,6 +64,25 @@ artifactweave has three configuration layers (decision
 | `workers.queue_timeout` | | | `30s` | How long an execution may wait for a free helper before failing |
 | `workers.host_recycle_after` | | | `1000` | Executions after which a helper is replaced |
 | `workers.http_allow_list` | | | empty | Hosts a worker's outbound HTTP client may reach; loopback and link-local are always refused (decision 0026) |
+
+A mirror across two AWS regions and an Azure account, where the instance runs in
+`eu-west-1`; the Azure store is draining:
+
+```yaml
+blob:
+  backend: mirror
+  stores:
+    aws_use1: {backend: s3, zone: us-east-1, s3: {bucket: aw-use1, region: us-east-1}}
+    aws_euw1: {backend: s3, zone: eu-west-1, s3: {bucket: aw-euw1, region: eu-west-1}}
+    azure_weu:
+      backend: azure
+      zone: westeurope
+      write_enabled: false
+      azure: {account: awstore, container: blobs, credential: managed_identity}
+  mirror:
+    members: [aws_use1, aws_euw1, azure_weu]
+    zone: eu-west-1
+```
 
 Sizes (`part_size`, `copy_range_size`) are a number of bytes or a number with a binary
 suffix: `512KiB`, `16MiB`, `1GiB`.
