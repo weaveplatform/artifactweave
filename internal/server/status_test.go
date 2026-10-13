@@ -51,6 +51,7 @@ func statusTable() []statusCase {
 		trashStatusRows(),
 		mirrorStatusRows(),
 		multipartStatusRows(),
+		roleStatusRows(),
 	)
 }
 

@@ -46,6 +46,16 @@ var implemented = map[string]bool{
 	"GET /artifactory/api/storageinfo":               true,
 	"POST /artifactory/api/storageinfo/calculate":    true,
 	"POST /artifactory/api/system/storage/optimize":  true,
+
+	"GET /access/api/v1/environments":                           true,
+	"POST /access/api/v1/environments":                          true,
+	"DELETE /access/api/v1/environments/{environmentName}":      true,
+	"POST /access/api/v1/environments/{environmentName}/rename": true,
+	"GET /access/api/v1/roles":                                  true,
+	"POST /access/api/v1/roles":                                 true,
+	"GET /access/api/v1/roles/{role}":                           true,
+	"PUT /access/api/v1/roles/{role}":                           true,
+	"DELETE /access/api/v1/roles/{role}":                        true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the
