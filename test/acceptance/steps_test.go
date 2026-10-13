@@ -24,6 +24,9 @@ import (
 // nothing because the data directory is a temp dir deleted after the run.
 const testMasterKey = "acceptance-master-key-0123456789abcdef0123456789abcdef"
 
+// testAdminPassword is the seeded admin's password (bootstrap.admin_password).
+const testAdminPassword = "acceptance-admin"
+
 // world is one scenario's state.
 type world struct {
 	t      *testing.T
@@ -31,6 +34,7 @@ type world struct {
 	server *exec.Cmd
 	stderr bytes.Buffer
 	status int
+	header http.Header
 	body   []byte
 	lastRC int
 }
@@ -45,6 +49,10 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	})
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
+	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
+	sc.Step(`^I GET "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.getAs)
+	sc.Step(`^the response status is not (\d+)$`, w.statusIsNot)
+	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, w.headerContains)
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
 	sc.Step(`^the response status is (\d+)$`, w.statusIs)
 	sc.Step(`^the response body is "([^"]*)"$`, w.bodyIs)
@@ -76,7 +84,10 @@ func (w *world) start() error {
 		"--base-url", w.url,
 		"--log-format", "json",
 	)
-	w.server.Env = append(os.Environ(), "ARTIFACTWEAVE_MASTER_KEY="+testMasterKey)
+	w.server.Env = append(os.Environ(),
+		"ARTIFACTWEAVE_MASTER_KEY="+testMasterKey,
+		"ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD="+testAdminPassword,
+	)
 	if coverDir != "" {
 		w.server.Env = append(w.server.Env, "GOCOVERDIR="+coverDir)
 	}
@@ -127,6 +138,19 @@ func (w *world) get(path string) error {
 	return w.request(http.MethodGet, path, "")
 }
 
+func (w *world) getAsAdmin(path string) error {
+	return w.getAs(path, "admin", testAdminPassword)
+}
+
+func (w *world) getAs(path, user, password string) error {
+	return w.send(
+		http.MethodGet,
+		path,
+		"",
+		func(r *http.Request) { r.SetBasicAuth(user, password) },
+	)
+}
+
 // post takes the body as a Gherkin docstring: JSON in an inline quoted
 // argument would need escaping that godog's step regex cannot match.
 func (w *world) post(path string, body *godog.DocString) error {
@@ -134,6 +158,10 @@ func (w *world) post(path string, body *godog.DocString) error {
 }
 
 func (w *world) request(method, path, body string) error {
+	return w.send(method, path, body, func(*http.Request) {})
+}
+
+func (w *world) send(method, path, body string, prepare func(*http.Request)) error {
 	req, err := http.NewRequestWithContext(
 		context.Background(),
 		method,
@@ -146,12 +174,13 @@ func (w *world) request(method, path, body string) error {
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	prepare(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()
-	w.status = resp.StatusCode
+	w.status, w.header = resp.StatusCode, resp.Header
 	w.body, err = io.ReadAll(resp.Body)
 	return err
 }
@@ -159,6 +188,20 @@ func (w *world) request(method, path, body string) error {
 func (w *world) statusIs(want int) error {
 	if w.status != want {
 		return fmt.Errorf("status %d, want %d; body: %s", w.status, want, w.body)
+	}
+	return nil
+}
+
+func (w *world) statusIsNot(unwanted int) error {
+	if w.status == unwanted {
+		return fmt.Errorf("status %d; body: %s", w.status, w.body)
+	}
+	return nil
+}
+
+func (w *world) headerContains(name, want string) error {
+	if got := w.header.Get(name); !strings.Contains(got, want) {
+		return fmt.Errorf("header %s is %q, want it to contain %q", name, got, want)
 	}
 	return nil
 }

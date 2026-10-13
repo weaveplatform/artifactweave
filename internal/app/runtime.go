@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -22,6 +23,7 @@ var repairEvery = mirror.DefaultRepairInterval
 // the mirrors' repair loops.
 type runtime struct {
 	store            store.Store
+	auth             *auth.Authenticator
 	closeStore       func() error
 	blobs, coldBlobs blob.Store
 	mirrors          []*mirror.Store
@@ -41,6 +43,13 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, err
 	}
+	if err := seedPrincipals(ctx, cfg, st, log); err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	authn, err := auth.NewAuthenticator(st.Users(), st.Settings(), auth.Options{})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
 	hotTier, coldTier := tiers(cfg, st)
 	hot, err := hotTier.open(ctx, st, log)
 	if err != nil {
@@ -54,7 +63,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	// the HTTP server has drained.
 	rctx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	rt := &runtime{
-		store: st, closeStore: st.Close, blobs: hot.store, coldBlobs: cold.store,
+		store: st, auth: authn, closeStore: st.Close, blobs: hot.store, coldBlobs: cold.store,
 		stopRepair: stop,
 	}
 	for _, m := range []*mirror.Store{hot.mirror, cold.mirror} {

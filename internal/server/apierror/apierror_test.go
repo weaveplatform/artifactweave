@@ -167,3 +167,23 @@ func mustJSON(t *testing.T, v any) []byte {
 	}
 	return b
 }
+
+func TestUnauthorizedChallenges(t *testing.T) {
+	rec := httptest.NewRecorder()
+	Write(rec, Artifactory, New(http.StatusUnauthorized, "Bad credentials"))
+	if got := rec.Header().Get("WWW-Authenticate"); got != BasicChallenge {
+		t.Fatalf("challenge %q", got)
+	}
+	// A handler that challenges for another scheme keeps its own.
+	rec = httptest.NewRecorder()
+	rec.Header().Set("WWW-Authenticate", `Bearer realm="https://reg/v2/token"`)
+	Write(rec, OCI, New(http.StatusUnauthorized, "token required"))
+	if got := rec.Header().Get("WWW-Authenticate"); got != `Bearer realm="https://reg/v2/token"` {
+		t.Fatalf("challenge replaced: %q", got)
+	}
+	rec = httptest.NewRecorder()
+	Write(rec, Artifactory, New(http.StatusForbidden, "Forbidden"))
+	if got := rec.Header().Get("WWW-Authenticate"); got != "" {
+		t.Fatalf("a 403 challenged: %q", got)
+	}
+}
