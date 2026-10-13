@@ -22,6 +22,20 @@ var implemented = map[string]bool{
 	"GET /artifactory/api/v1/system/readiness": true,
 	"GET /artifactory/api/v1/system/liveness":  true,
 	"GET /access/api/v1/system/version":        true,
+
+	"GET /artifactory/api/repositories":                                true,
+	"GET /artifactory/api/repositories/configurations":                 true,
+	"GET /artifactory/api/repositories/existence":                      true,
+	"GET /artifactory/api/repositories/{remoteRepoName}/configuration": true,
+	"GET /artifactory/api/repositories/{repoKey}":                      true,
+	"PUT /artifactory/api/repositories/{repoKey}":                      true,
+	"POST /artifactory/api/repositories/{repoKey}":                     true,
+	"DELETE /artifactory/api/repositories/{repoKey}":                   true,
+	"GET /artifactory/api/v2/repositories/{repoKey}":                   true,
+	"GET /artifactory/api/v2/repositories/batch":                       true,
+	"PUT /artifactory/api/v2/repositories/batch":                       true,
+	"POST /artifactory/api/v2/repositories/batch":                      true,
+	"DELETE /artifactory/api/v2/repositories/batch":                    true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

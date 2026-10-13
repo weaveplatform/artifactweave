@@ -67,7 +67,7 @@ func TestAuthentication(t *testing.T) {
 			"GET", protected, basic("ghost", "pw"),
 			want{http.StatusUnauthorized, true, "Bad credentials"},
 		},
-		"admin": {"GET", protected, basic("admin", "pw"), want{status: http.StatusNotImplemented}},
+		"admin": {"GET", protected, basic("admin", "pw"), want{status: http.StatusOK}},
 		"bearer before tokens exist": {
 			"GET", protected,
 			map[string]string{"Authorization": "Bearer abc"},
@@ -114,12 +114,14 @@ func TestAuthentication(t *testing.T) {
 	}
 
 	// With anonymous access on, a request without credentials goes on as
-	// anonymous; handlers decide what anonymous may do.
+	// anonymous; handlers decide what anonymous may do. The seeded Any
+	// Remote grant covers no repository here, so the list is empty.
 	if err := db.Settings().
 		Put(context.Background(), types.SettingAnonymousAccess, true); err != nil {
 		t.Fatal(err)
 	}
-	if rec := do(t, h, "GET", protected, nil, ""); rec.Code != http.StatusNotImplemented {
+	if rec := do(t, h, "GET", protected, nil, ""); rec.Code != http.StatusOK ||
+		rec.Body.String() != "[]\n" {
 		t.Fatalf("anonymous on: %d %s", rec.Code, rec.Body)
 	}
 }

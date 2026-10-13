@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -37,6 +38,8 @@ type world struct {
 	header http.Header
 	body   []byte
 	lastRC int
+	// dir holds the files a scenario writes, for {dir} in jf arguments.
+	dir string
 }
 
 func newWorld(t *testing.T) *world { return &world{t: t} }
@@ -54,6 +57,9 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the response status is not (\d+)$`, w.statusIsNot)
 	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, w.headerContains)
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
+	sc.Step(`^I (PUT|POST) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
+	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
+	sc.Step(`^a file "([^"]*)" with content:$`, w.writeFile)
 	sc.Step(`^the response status is (\d+)$`, w.statusIs)
 	sc.Step(`^the response body is "([^"]*)"$`, w.bodyIs)
 	sc.Step(`^the JSON field "([^"]*)" equals "([^"]*)"$`, w.jsonFieldEquals)
@@ -155,6 +161,32 @@ func (w *world) getAs(path, user, password string) error {
 // argument would need escaping that godog's step regex cannot match.
 func (w *world) post(path string, body *godog.DocString) error {
 	return w.request(http.MethodPost, path, body.Content)
+}
+
+func (w *world) sendAsAdmin(method, path string, body *godog.DocString) error {
+	return w.send(method, path, body.Content, func(r *http.Request) {
+		r.SetBasicAuth("admin", testAdminPassword)
+	})
+}
+
+func (w *world) deleteAsAdmin(path string) error {
+	return w.send(http.MethodDelete, path, "", func(r *http.Request) {
+		r.SetBasicAuth("admin", testAdminPassword)
+	})
+}
+
+// writeFile writes a scenario file, such as a jf repository template, under
+// the scenario's directory.
+func (w *world) writeFile(name string, content *godog.DocString) error {
+	if w.dir == "" {
+		dir, err := os.MkdirTemp("", "artifactweave-files-")
+		if err != nil {
+			return err
+		}
+		w.t.Cleanup(func() { _ = os.RemoveAll(dir) })
+		w.dir = dir
+	}
+	return os.WriteFile(filepath.Join(w.dir, name), []byte(content.Content), 0o600)
 }
 
 func (w *world) request(method, path, body string) error {
@@ -279,14 +311,20 @@ func (w *world) jfAvailable() error {
 }
 
 // runJF runs the JFrog CLI with {url} replaced by the registry's Artifactory
-// base. JFROG_CLI_HOME_DIR isolates the CLI's config from the developer's.
+// base, {password} by the seeded admin's and {dir} by the scenario's file
+// directory. JFROG_CLI_HOME_DIR isolates the CLI's config from the
+// developer's.
 func (w *world) runJF(args string) error {
 	home, err := os.MkdirTemp("", "jfrog-home-")
 	if err != nil {
 		return err
 	}
 	w.t.Cleanup(func() { _ = os.RemoveAll(home) })
-	argv := strings.Fields(strings.ReplaceAll(args, "{url}", w.url+"/artifactory"))
+	argv := strings.Fields(strings.NewReplacer(
+		"{url}", w.url+"/artifactory",
+		"{password}", testAdminPassword,
+		"{dir}", w.dir,
+	).Replace(args))
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
 	cmd.Env = append(
 		os.Environ(),
