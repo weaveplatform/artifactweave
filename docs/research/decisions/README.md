@@ -47,3 +47,5 @@ Status values: Proposed, Accepted, Superseded.
 | 0024 | [Cold storage tier](0024-cold-storage-tier.md) |
 | 0025 | [Platform federation and topology](0025-platform-federation-and-topology.md) |
 | 0026 | [Workers runtime](0026-workers-runtime.md) |
+| 0027 | [Cloud blob backends: Google Cloud Storage and Azure Blob Storage](0027-cloud-blob-backends.md) |
+| 0028 | [Mirroring blobs across stores, clouds and regions](0028-blob-mirroring.md) |

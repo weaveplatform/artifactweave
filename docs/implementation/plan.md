@@ -20,6 +20,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P1 Data model and API schemas | Done (2026-10-13) | Derived from the 637 cached JFrog blocks; full in-scope OpenAPI surface authored with our own field descriptions; parity baseline shrinks accordingly |
 | P1b Enterprise products: specs and model | Done (2026-10-13) | 574 of 635 JFrog operations at parity, 0 divergent; the 61 in the baseline are Mission Control, MyJFrog, bridges and JFConnect only. Seven services; research 16, decisions 0021 to 0026; 27 new tables in research 15 |
 | P2 Stores | Done (2026-10-13) | Store contracts for every entity in research 15 (27 concerns), in-memory reference store, SQLite and PostgreSQL stores over one dialect layer with 71 tables in five migrations, the `storetest` contract suite (62 subtests) passing on all four backends, `migrate up/down/version`, `keys rotate` with versioned master keys, durable S3 upload sessions; merged coverage 97.7%. Stale-upload reaping moves to the P3 GC task; build-info tables to P5 |
+| P2b Cloud blob storage and mirroring | In progress | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22), tracked in GitHub milestone "Cloud blob storage and mirroring"; design in research 18 and decisions 0027 and 0028 |
 | P3 Repositories, generic artifacts, CLI AQL shape | Not started | |
 | P4 Identity and authorization | Not started | **M1** |
 | P5 Full AQL, searches, build-info | Not started | |
@@ -303,6 +304,37 @@ Decisions: [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md),
   library and clear with Go 1.27.2, which CI installs.
 - Moved on: stale upload reaping (the store side, `UploadStore.Stale`, exists) goes to the P3 GC
   task; the build-info tables go to P5 with a new migration once a live capture fixes their shape.
+
+## P2b: Cloud blob storage and mirroring
+
+Decisions: [0027](../research/decisions/0027-cloud-blob-backends.md),
+[0028](../research/decisions/0028-blob-mirroring.md); research
+[18](../research/18-cloud-blob-storage.md).
+
+Requested on 2026-10-13: Google Cloud Storage and Azure Blob Storage beside S3 with the
+same resumable multipart uploads, and an option to mirror every blob into several stores
+across clouds and regions in parallel. The work is tracked as GitHub issues, one PR each:
+
+- Epic #21, cloud backends:
+  - research and decision (#7);
+  - a shared upload-session layer with per-instance upload rows (#8);
+  - `pkg/blob/gcs` (#9);
+  - `pkg/blob/azure` (#10);
+  - configuration (#11);
+  - an opt-in real-cloud conformance workflow (#12).
+- Epic #22, mirroring:
+  - decision (#13);
+  - named stores and mirror configuration (#14);
+  - the `blob_replicas` index (#15);
+  - `pkg/blob/mirror` with quorum writes and failover reads (#16);
+  - the repair worker (#17);
+  - per-member administration once P3 serves the storage endpoints (#18);
+  - a cross-cloud scenario on Linux CI (#19).
+
+**Exit criteria**
+- `blobtest.Run` passes on each backend's fake everywhere and on its emulator on Linux.
+- The mirror keeps accepting uploads with one member down and repairs the missing copy.
+- Coverage is at least 95% total and 90% per package.
 
 ## P3: Repositories, generic artifacts, CLI AQL shape
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
@@ -57,7 +58,7 @@ func TestContractOnMinIO(t *testing.T) {
 		}
 		s, err := New(
 			client,
-			Options{Bucket: bucket, Prefix: "art", States: NewMemoryStates(), Presign: presign},
+			Options{Bucket: bucket, Prefix: "art", Sessions: session.NewMemory(), Presign: presign},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -82,7 +83,7 @@ func TestNewClientBuildsWithoutNetwork(t *testing.T) {
 		aws.ToString(client.Options().BaseEndpoint) != "http://127.0.0.1:1" {
 		t.Fatalf("options not applied: %+v", client.Options())
 	}
-	s, err := New(client, Options{Bucket: "b", States: NewMemoryStates(), Presign: presign})
+	s, err := New(client, Options{Bucket: "b", Sessions: session.NewMemory(), Presign: presign})
 	if err != nil {
 		t.Fatal(err)
 	}

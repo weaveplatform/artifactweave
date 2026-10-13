@@ -23,6 +23,7 @@ type Factory func(t *testing.T) store.Store
 func Run(t *testing.T, newStore Factory) {
 	t.Helper()
 	runCore(t, newStore)
+	runReplicas(t, newStore)
 	runContent(t, newStore)
 	runIdentity(t, newStore)
 	runOperations(t, newStore)
