@@ -82,6 +82,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I (PUT|POST) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
 	sc.Step(`^I PATCH "([^"]*)" as admin with YAML:$`, w.patchYAMLAsAdmin)
+	sc.Step(`^I PATCH "([^"]*)" as admin with JSON:$`, w.patchJSONAsAdmin)
 	sc.Step(`^I (PUT|HEAD) "([^"]*)" as admin$`, w.sendEmptyAsAdmin)
 	sc.Step(`^the next request has header "([^"]*)" "([^"]*)"$`, w.nextHeader)
 	sc.Step(`^a file "([^"]*)" of (\d+) bytes$`, w.writeSizedFile)
@@ -207,6 +208,10 @@ func (w *world) patchYAMLAsAdmin(path string, body *godog.DocString) error {
 		r.SetBasicAuth("admin", testAdminPassword)
 		r.Header.Set("Content-Type", "application/yaml")
 	})
+}
+
+func (w *world) patchJSONAsAdmin(path string, body *godog.DocString) error {
+	return w.sendAsAdmin(http.MethodPatch, path, body)
 }
 
 func (w *world) deleteAsAdmin(path string) error {
