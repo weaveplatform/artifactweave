@@ -53,6 +53,38 @@ evaluator small and makes the legacy shims thin.
 - Build and release-bundle resources are accepted in targets; only the build resource has
   behaviour in v1.
 
+## Implementation notes (`internal/authz`, #75)
+
+These are choices made where no source documents Artifactory's behaviour:
+- **Patterns:**
+  - An empty include list means `**`, Artifactory's default; an empty exclude list excludes
+    nothing.
+  - A trailing `/` means everything below, as in Ant.
+  - `dir/**` also matches `dir` itself.
+- **Folders:** a folder is visible when an include pattern matches it or could match a path
+  below it (Ant's `matchPatternStart`), unless an exclude pattern matches the folder. A
+  listing therefore shows the folders that lead to permitted content.
+- **Remote caches:** `<remote>-cache` resolves to the remote for target matching, so
+  `ANY REMOTE` and the remote's own key cover its cache.
+- **Admin:** the subject's own flag or any of its groups' admin privileges. Under a token
+  scope, the subject acts as an administrator only when the scope keeps applied permissions:
+  `applied-permissions/user` or `admin` for its own flag, or a groups scope naming an admin
+  group.
+- **Token scopes** only remove; the evaluator never adds what the subject does not hold:
+  - `applied-permissions/user` and `applied-permissions/admin` keep the user's own and
+    group grants.
+  - `applied-permissions/groups:…` keeps only the named groups the subject belongs to, and
+    drops the user's direct grants.
+  - `applied-permissions/roles:…` grants nothing until projects arrive (P11).
+  - `artifact:<repo|*>[/<ant path>]:<letters>` entries intersect artifact access with what
+    they name.
+  - A scope of resource entries only reaches artifacts through its artifact entries, and
+    no other resource.
+  - An administrator's resource-only token keeps every action within those entries, but
+    loses the admin-only endpoints.
+- **`repo:<key>:r`** narrows configuration reads to the named repositories. **`system:<area>`**
+  scopes are the only way a non-admin reaches system capabilities.
+
 ## Verification
 
 - A route × principal matrix test over every operation with admin, a scoped user, a group
