@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"gopkg.in/yaml.v3"
@@ -158,8 +159,11 @@ func TestEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = ":1"
 		case strings.HasSuffix(k, "_size"):
 			env[envName(k)] = "8MiB"
-		case strings.HasSuffix(k, ".concurrency"):
+		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
+			strings.HasSuffix(k, ".write_quorum"):
 			env[envName(k)] = "3"
+		case strings.HasSuffix(k, ".member_timeout"):
+			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
 			env[envName(k)] = "true"
@@ -463,5 +467,171 @@ func TestByteSize(t *testing.T) {
 	b, err := yaml.Marshal(out)
 	if err != nil || strings.TrimSpace(string(b)) != "size: 4MiB" {
 		t.Fatalf("marshal = %q, %v", b, err)
+	}
+}
+
+// mirrorFile is a three-cloud mirror: two S3 regions and an Azure account.
+const mirrorFile = `
+blob:
+  backend: mirror
+  stores:
+    aws_use1:
+      backend: s3
+      zone: us-east-1
+      s3:
+        bucket: aw-use1
+        region: us-east-1
+        profile: prod
+    aws_euw1:
+      backend: s3
+      zone: eu-west-1
+      s3:
+        bucket: aw-euw1
+        region: eu-west-1
+    azure_weu:
+      backend: azure
+      zone: westeurope
+      write_enabled: false
+      azure:
+        account: awstore
+        container: blobs
+        account_key: secretkey7
+  mirror:
+    members: [aws_use1, aws_euw1, azure_weu]
+    zone: eu-west-1
+    member_timeout: 45s
+`
+
+func TestMirrorFromFileAndEnv(t *testing.T) {
+	file := writeFile(t, mirrorFile)
+	cfg, err := Load(LoadOptions{File: file, Env: envOf(map[string]string{
+		"ARTIFACTWEAVE_BLOB_STORES_AWS_EUW1_S3_BUCKET":  "aw-euw1-renamed",
+		"ARTIFACTWEAVE_BLOB_STORES_AZURE_WEU_ACCOUNT":   "ignored", // not a key
+		"ARTIFACTWEAVE_BLOB_MIRROR_WRITE_QUORUM":        "2",
+		"ARTIFACTWEAVE_BLOB_STORES_AWS_USE1_S3_PROFILE": "other",
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := cfg.Blob
+	if b.Backend != "mirror" || len(b.Stores) != 3 || b.Mirror.Zone != "eu-west-1" ||
+		b.Mirror.MemberTimeout != 45*time.Second {
+		t.Fatalf("mirror = %+v", b)
+	}
+	if b.Stores["aws_euw1"].S3.Bucket != "aw-euw1-renamed" ||
+		b.Stores["aws_use1"].S3.Profile != "other" {
+		t.Fatalf("environment did not reach the declared stores: %+v", b.Stores)
+	}
+	if !b.Stores["aws_use1"].Writable() || b.Stores["azure_weu"].Writable() {
+		t.Fatal("write_enabled defaults to true and false drains")
+	}
+	if r, w := b.Mirror.Effective(); r != 3 || w != 2 {
+		t.Fatalf("Effective = %d, %d", r, w)
+	}
+	if s := cfg.String(); strings.Contains(s, "secretkey7") {
+		t.Fatalf("store secret leaked:\n%s", s)
+	}
+	// Flags can declare a store and list members as comma-separated names.
+	cfg, err = Load(LoadOptions{File: file, Flags: map[string]string{
+		"blob.stores.local.backend": "fs",
+		"blob.mirror.members":       "aws_use1, local,aws_euw1",
+		"blob.mirror.redundancy":    "2",
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Blob.Mirror.Members; len(got) != 3 || got[1] != "local" {
+		t.Fatalf("members = %v", got)
+	}
+	if r, w := cfg.Blob.Mirror.Effective(); r != 2 || w != 1 {
+		t.Fatalf("Effective = %d, %d", r, w)
+	}
+}
+
+func TestMirrorValidation(t *testing.T) {
+	base := func() map[string]string {
+		return map[string]string{
+			"blob.backend":          "mirror",
+			"blob.stores.a.backend": "fs",
+			"blob.stores.b.backend": "fs",
+			"blob.stores.c.backend": "fs",
+			"blob.mirror.members":   "a,b,c",
+		}
+	}
+	cases := map[string]struct {
+		set  map[string]string
+		want error
+	}{
+		"no members": {map[string]string{"blob.mirror.members": ""}, ErrMissingValue},
+		"unknown member": {
+			map[string]string{"blob.mirror.members": "a,b,z"},
+			ErrInvalidValue,
+		},
+		"duplicate member": {
+			map[string]string{"blob.mirror.members": "a,a,b"},
+			ErrInvalidValue,
+		},
+		"bad store name": {
+			map[string]string{"blob.stores.Bad.backend": "fs"},
+			ErrInvalidValue,
+		},
+		"store without backend": {map[string]string{"blob.stores.d.zone": "x"}, ErrUnknownBlob},
+		"nested mirror": {
+			map[string]string{"blob.stores.d.backend": "mirror"},
+			ErrUnknownBlob,
+		},
+		"store misconfigured": {
+			map[string]string{"blob.stores.d.backend": "s3"},
+			ErrMissingBucket,
+		},
+		"redundancy too high": {
+			map[string]string{"blob.mirror.redundancy": "4"},
+			ErrInvalidValue,
+		},
+		"quorum too high": {
+			map[string]string{"blob.mirror.redundancy": "2", "blob.mirror.write_quorum": "3"},
+			ErrInvalidValue,
+		},
+		"too few writable": {map[string]string{
+			"blob.stores.b.write_enabled": "false", "blob.stores.c.write_enabled": "false",
+			"blob.mirror.write_quorum": "2",
+		}, ErrInvalidValue},
+		"negative timeout": {
+			map[string]string{"blob.mirror.member_timeout": "-1s"},
+			ErrInvalidValue,
+		},
+		"bad timeout": {
+			map[string]string{"blob.mirror.member_timeout": "soon"},
+			ErrInvalidValue,
+		},
+		"bad redundancy": {map[string]string{"blob.mirror.redundancy": "two"}, ErrInvalidValue},
+		"bad write flag": {
+			map[string]string{"blob.stores.a.write_enabled": "maybe"},
+			ErrInvalidValue,
+		},
+		"store key shape":   {map[string]string{"blob.stores.a": "fs"}, ErrUnknownKey},
+		"unknown store key": {map[string]string{"blob.stores.a.region": "x"}, ErrUnknownKey},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			flags := base()
+			for k, v := range tc.set {
+				flags[k] = v
+			}
+			if _, err := Load(LoadOptions{Flags: flags}); !errors.Is(err, tc.want) {
+				t.Fatalf("want %v, got %v", tc.want, err)
+			}
+		})
+	}
+	if _, err := Load(LoadOptions{Flags: base()}); err != nil {
+		t.Fatalf("a valid mirror: %v", err)
+	}
+	cold := base()
+	for k, v := range base() {
+		delete(cold, k)
+		cold["cold_"+k] = v
+	}
+	if _, err := Load(LoadOptions{Flags: cold}); err != nil {
+		t.Fatalf("a mirrored archive tier: %v", err)
 	}
 }
