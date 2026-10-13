@@ -18,13 +18,14 @@ func logGC(log *slog.Logger) func(gc.Report, error) {
 			log.Warn("garbage collection failed", "error", err)
 		case r.Skipped:
 			log.Debug("garbage collection skipped: another instance holds the lease")
-		case r.TrashPurged+r.UploadsReaped+r.BlobsDeleted+r.OrphansDeleted == 0:
+		case r.TrashPurged+r.UploadsReaped+r.BlobsDeleted+r.OrphansDeleted == 0 &&
+			r.TokensExpired == 0:
 			log.Debug("garbage collection: nothing to do")
 		default:
 			log.Info("garbage collection",
 				"trash_purged", r.TrashPurged, "uploads_reaped", r.UploadsReaped,
 				"blobs_deleted", r.BlobsDeleted, "orphans_deleted", r.OrphansDeleted,
-				"bytes_freed", r.BytesFreed, "kept", r.Kept)
+				"bytes_freed", r.BytesFreed, "kept", r.Kept, "tokens_expired", r.TokensExpired)
 		}
 	}
 }

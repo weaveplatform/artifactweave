@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // AnonymousUser is the name of the built-in anonymous user.
@@ -16,6 +17,11 @@ type Principal struct {
 	Admin     bool
 	Anonymous bool
 	Groups    []string
+	// Scope is the scope of the access token the request presented; empty
+	// for a password or anonymous request, which act with the user's full
+	// permissions. Scopes only narrow (decision 0005); the permission
+	// evaluator applies them.
+	Scope types.Scope
 }
 
 // Anonymous is the principal of a request without credentials when

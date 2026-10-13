@@ -39,6 +39,8 @@ type Options struct {
 	// Hash is the cost of the dummy hash checked for unknown users; the
 	// zero value means the production parameters. Tests set tiny costs.
 	Hash HashParams
+	// Tokens verifies access and reference tokens; nil refuses every token.
+	Tokens TokenVerifier
 }
 
 // Authenticator verifies credentials against the user store.
@@ -50,7 +52,8 @@ type Authenticator struct {
 	slots    chan struct{}
 	// dummy is checked for unknown users, so the time a wrong answer takes
 	// does not tell which user names exist.
-	dummy []byte
+	dummy  []byte
+	tokens TokenVerifier
 }
 
 // NewAuthenticator returns an Authenticator over users and settings.
@@ -78,7 +81,7 @@ func NewAuthenticator(
 		o.Concurrency = runtime.GOMAXPROCS(0)
 	}
 	return &Authenticator{
-		users: users, settings: settings, now: o.Now, dummy: dummy,
+		users: users, settings: settings, now: o.Now, dummy: dummy, tokens: o.Tokens,
 		cache: &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
 		slots: make(chan struct{}, o.Concurrency),
 	}, nil
