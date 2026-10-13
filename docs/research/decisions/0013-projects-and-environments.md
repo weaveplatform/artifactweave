@@ -23,7 +23,10 @@ synchronously so a following read shows `projectKey`. Each project gets its
 quota warns and blocks at the documented thresholds.
 
 Global and project environments live in the Access API with the documented endpoints;
-a repository's `environments` field is validated against them.
+a repository's `environments` field is validated against them. Every write path checks
+it: create, update, the batch endpoints and the descriptor. An unknown name answers 400
+"Environment 'X' does not exist" and writes nothing. Accepted names are stored in the
+environment's own spelling, so rename and delete find every repository that uses it.
 
 **Global roles and environments** (`/access/api/v1/roles`, `/access/api/v1/environments`,
 issue #77, `internal/service/roles`):

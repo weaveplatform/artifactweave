@@ -176,7 +176,9 @@ func planRepos(
 			continue
 		}
 		name := c.Section + "." + c.Key
-		op, changed, err := planRepo(c, stored, final)
+		op, changed, err := planRepo(c, stored, final, func(c *repo.Config) error {
+			return repos.CheckEnvironments(ctx, st.Projects(), c)
+		})
 		if err != nil {
 			return nil, nil, entryError(name, err)
 		}
@@ -209,12 +211,23 @@ func planRepos(
 	return deletes, writes, nil
 }
 
-func planRepo(c RepoChange, stored, final map[string]repo.Config) (repoOp, bool, error) {
+// planRepo plans one entry. environments validates the planned environments
+// and rewrites them to their stored spelling before the comparison with the
+// stored configuration, so a descriptor spelling "dev" for DEV is unchanged
+// on the second apply.
+func planRepo(
+	c RepoChange,
+	stored, final map[string]repo.Config,
+	environments func(*repo.Config) error,
+) (repoOp, bool, error) {
 	if cur, ok := stored[c.Key]; ok {
 		// Merge consumes its patch, so it gets a copy.
 		updated, err := repos.Merge(cur, maps.Clone(c.Fields))
 		if err != nil {
 			return repoOp{}, false, err //nolint:wrapcheck // named by entryError
+		}
+		if err := environments(&updated); err != nil {
+			return repoOp{}, false, err
 		}
 		same, err := sameJSON(cur, updated)
 		return repoOp{cfg: updated}, !same, err
@@ -238,8 +251,13 @@ func planRepo(c RepoChange, stored, final map[string]repo.Config) (repoOp, bool,
 	for _, f := range final {
 		all = append(all, f)
 	}
-	cfg, err = repos.PrepareCreate(cfg, all)
-	return repoOp{create: true, cfg: cfg}, true, err //nolint:wrapcheck // named by entryError
+	if cfg, err = repos.PrepareCreate(cfg, all); err != nil {
+		return repoOp{}, false, err //nolint:wrapcheck // named by entryError
+	}
+	if err := environments(&cfg); err != nil {
+		return repoOp{}, false, err
+	}
+	return repoOp{create: true, cfg: cfg}, true, nil
 }
 
 func sameJSON(a, b any) (bool, error) {

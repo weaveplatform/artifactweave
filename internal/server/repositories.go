@@ -629,6 +629,9 @@ func (s artifactoryService) CreateRepository(
 	if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
+	if err := repos.CheckEnvironments(ctx, st.Projects(), &c); err != nil {
+		return nil, fmt.Errorf("repositories: %w", err)
+	}
 	switch err := st.Repos().Create(ctx, c); {
 	case errors.Is(err, store.ErrConflict):
 		return nil, badRequest(msgKeyExists)
@@ -686,11 +689,14 @@ func (s artifactoryService) CreateMultipleRepositories(
 		prepared = append(prepared, c)
 		known = append(known, c)
 	}
-	for _, c := range prepared {
-		if err := repos.CheckMembers(c, known); err != nil {
+	for i := range prepared {
+		if err := repos.CheckMembers(prepared[i], known); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
+		if err := repos.CheckKeypairs(ctx, st.Keys(), prepared[i]); err != nil {
+			return nil, fmt.Errorf("repositories: %w", err)
+		}
+		if err := repos.CheckEnvironments(ctx, st.Projects(), &prepared[i]); err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
 	}
@@ -776,7 +782,7 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	if err != nil {
 		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := s.checkReferences(ctx, st, updated); err != nil {
+	if err := s.checkReferences(ctx, st, &updated); err != nil {
 		return nil, err
 	}
 	if err := st.Repos().Update(ctx, updated); err != nil {
@@ -788,13 +794,17 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 }
 
 // checkReferences rejects an updated configuration whose signing key
-// pairs, or (for a virtual repository) members, do not exist.
+// pairs, environments or (for a virtual repository) members do not exist,
+// and rewrites its environments to their stored spelling.
 func (s artifactoryService) checkReferences(
 	ctx context.Context,
 	st store.Store,
-	c repo.Config,
+	c *repo.Config,
 ) error {
-	if err := repos.CheckKeypairs(ctx, st.Keys(), c); err != nil {
+	if err := repos.CheckKeypairs(ctx, st.Keys(), *c); err != nil {
+		return fmt.Errorf("repositories: %w", err)
+	}
+	if err := repos.CheckEnvironments(ctx, st.Projects(), c); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
 	if c.Class != repo.Virtual {
@@ -804,7 +814,7 @@ func (s artifactoryService) checkReferences(
 	if err != nil {
 		return s.internalError(ctx, "list repositories", err)
 	}
-	if err := repos.CheckMembers(c, known); err != nil {
+	if err := repos.CheckMembers(*c, known); err != nil {
 		return fmt.Errorf("repositories: %w", err)
 	}
 	return nil
@@ -858,7 +868,7 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		if err != nil {
 			return nil, fmt.Errorf("repositories: %w", err)
 		}
-		if err := s.checkReferences(ctx, st, c); err != nil {
+		if err := s.checkReferences(ctx, st, &c); err != nil {
 			return nil, err
 		}
 		updated = append(updated, c)
