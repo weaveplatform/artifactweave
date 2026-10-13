@@ -13,6 +13,8 @@ import (
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
+	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 var errInjected = errors.New("injected")
@@ -33,11 +35,11 @@ func small(t *testing.T) {
 	swap(t, &minPartSize, 1)
 }
 
-func newFakeStore(t *testing.T, f *fakeS3, states UploadStateStore) *Store {
+func newFakeStore(t *testing.T, f *fakeS3, states session.Store) *Store {
 	t.Helper()
 	small(t)
 	if states == nil {
-		states = NewMemoryStates()
+		states = session.NewMemory()
 	}
 	s, err := New(
 		f,
@@ -45,7 +47,7 @@ func newFakeStore(t *testing.T, f *fakeS3, states UploadStateStore) *Store {
 			Bucket:   "b",
 			Prefix:   "art",
 			PartSize: testPart,
-			States:   states,
+			Sessions: states,
 			Presign:  fakePresign{},
 		},
 	)
@@ -62,21 +64,21 @@ func TestContractOnFake(t *testing.T) {
 }
 
 func TestNewValidates(t *testing.T) {
-	states := NewMemoryStates()
+	states := session.NewMemory()
 	cases := map[string]Options{
-		"no bucket":  {States: states},
+		"no bucket":  {Sessions: states},
 		"no states":  {Bucket: "b"},
-		"small part": {Bucket: "b", States: states, PartSize: 1 << 20},
+		"small part": {Bucket: "b", Sessions: states, PartSize: 1 << 20},
 	}
 	for name, o := range cases {
 		if _, err := New(newFake(), o); !errors.Is(err, ErrConfig) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
-	if _, err := New(nil, Options{Bucket: "b", States: states}); !errors.Is(err, ErrConfig) {
+	if _, err := New(nil, Options{Bucket: "b", Sessions: states}); !errors.Is(err, ErrConfig) {
 		t.Errorf("nil client: %v", err)
 	}
-	s, err := New(newFake(), Options{Bucket: "b", Prefix: "/a/b", States: states})
+	s, err := New(newFake(), Options{Bucket: "b", Prefix: "/a/b", Sessions: states})
 	if err != nil || s.prefix != "a/b/" || s.partSize != DefaultPartSize {
 		t.Fatalf("defaults: %+v %v", s, err)
 	}
@@ -247,7 +249,7 @@ func TestAppendFailures(t *testing.T) {
 		}
 	})
 	t.Run("state save fails", func(t *testing.T) {
-		st := &flakyStates{MemoryStates: NewMemoryStates()}
+		st := &flakyStates{Memory: session.NewMemory()}
 		s := newFakeStore(t, newFake(), st)
 		u, _ := s.BeginUpload(ctx)
 		st.failPut = errInjected
@@ -274,22 +276,22 @@ type errReader struct{}
 func (errReader) Read([]byte) (int, error) { return 0, errInjected }
 
 type flakyStates struct {
-	*MemoryStates
+	*session.Memory
 	failPut, failDelete error
 }
 
-func (f *flakyStates) Put(ctx context.Context, st UploadState) error {
+func (f *flakyStates) Put(ctx context.Context, id string, state []byte, size int64) error {
 	if f.failPut != nil {
 		return f.failPut
 	}
-	return f.MemoryStates.Put(ctx, st)
+	return f.Memory.Put(ctx, id, state, size)
 }
 
 func (f *flakyStates) Delete(ctx context.Context, id string) error {
 	if f.failDelete != nil {
 		return f.failDelete
 	}
-	return f.MemoryStates.Delete(ctx, id)
+	return f.Memory.Delete(ctx, id)
 }
 
 func TestCommitFailures(t *testing.T) {
@@ -323,7 +325,7 @@ func TestCommitFailures(t *testing.T) {
 		})
 	}
 	t.Run("state forget fails", func(t *testing.T) {
-		st := &flakyStates{MemoryStates: NewMemoryStates()}
+		st := &flakyStates{Memory: session.NewMemory()}
 		s := newFakeStore(t, newFake(), st)
 		u, _ := s.BeginUpload(ctx)
 		st.failDelete = errInjected
@@ -332,7 +334,7 @@ func TestCommitFailures(t *testing.T) {
 		}
 	})
 	t.Run("state save after final part fails", func(t *testing.T) {
-		st := &flakyStates{MemoryStates: NewMemoryStates()}
+		st := &flakyStates{Memory: session.NewMemory()}
 		s := newFakeStore(t, newFake(), st)
 		u, _ := s.BeginUpload(ctx)
 		if _, err := u.Append(ctx, bytes.NewReader(big)); err != nil {
@@ -359,15 +361,22 @@ func TestCommitFailures(t *testing.T) {
 
 func TestResumeWithDamagedState(t *testing.T) {
 	ctx := context.Background()
-	st := NewMemoryStates()
+	st := session.NewMemory()
 	s := newFakeStore(t, newFake(), st)
 	u, _ := s.BeginUpload(ctx)
-	saved, _ := st.Get(ctx, u.ID())
-	saved.Hasher = []byte("junk")
-	_ = st.Put(ctx, saved)
+	_ = st.Put(ctx, u.ID(), []byte(`{"hasher":"anVuaw=="}`), 0)
 	if _, err := s.ResumeUpload(ctx, u.ID()); !errors.Is(err, blob.ErrUploadUnknown) {
 		t.Fatal(err)
 	}
+}
+
+// TestContractWithDurableSessions runs the contract with sessions kept in the
+// metadata store's uploads table, as the server configures it.
+func TestContractWithDurableSessions(t *testing.T) {
+	small(t)
+	blobtest.Run(t, func(t *testing.T) blob.Store {
+		return newFakeStore(t, newFake(), session.InUploads(inmem.New().Uploads(), "s3:test"))
+	}, blobtest.Options{LargeSize: 2*testPart + 7})
 }
 
 func TestReadErrors(t *testing.T) {
@@ -495,26 +504,5 @@ func TestTranslate(t *testing.T) {
 		if !errors.Is(translate(&smithy.GenericAPIError{Code: code}), want) {
 			t.Errorf("%s", code)
 		}
-	}
-}
-
-func TestMemoryStatesCopies(t *testing.T) {
-	ctx := context.Background()
-	m := NewMemoryStates()
-	st := UploadState{ID: "a", Pending: []byte("xy"), Parts: []Part{{Number: 1}}}
-	_ = m.Put(ctx, st)
-	st.Pending[0] = 'z'
-	got, err := m.Get(ctx, "a")
-	if err != nil || string(got.Pending) != "xy" {
-		t.Fatalf("Put must copy: %q %v", got.Pending, err)
-	}
-	got.Parts[0].Number = 9
-	again, _ := m.Get(ctx, "a")
-	if again.Parts[0].Number != 1 {
-		t.Fatal("Get must copy")
-	}
-	_ = m.Delete(ctx, "a")
-	if _, err := m.Get(ctx, "a"); !errors.Is(err, blob.ErrUploadUnknown) {
-		t.Fatal(err)
 	}
 }

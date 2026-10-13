@@ -12,9 +12,9 @@
 //     last to be at least 5 MiB, which is why appends are buffered rather than
 //     uploaded as they arrive: Docker clients PATCH in chunks of any size.
 //   - The multipart upload ID, the part list, the pending tail and the hash
-//     state are saved through an UploadStateStore after every append, so a
-//     session resumes in a later request (decision record 0004 puts this state
-//     in the metadata database).
+//     state are saved through a session.Store after every append, so a
+//     session resumes in a later request (decision 0027; session.InUploads
+//     keeps it in the metadata database).
 //   - At commit the content key is known. If the client declared the digest
 //     up front the multipart upload already targets the content key; otherwise
 //     it targets a temporary key and is copied into place, with a multipart
@@ -29,7 +29,6 @@ import (
 	"io"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -39,6 +38,7 @@ import (
 	"github.com/aws/smithy-go"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
+	"github.com/weaveplatform/artifactweave/pkg/blob/session"
 )
 
 // API is the subset of *s3.Client the store uses, so tests can substitute a
@@ -133,8 +133,9 @@ type Options struct {
 	// PartSize is the multipart part size; zero means DefaultPartSize. S3
 	// rejects parts under 5 MiB, so smaller values are refused.
 	PartSize int64
-	// States holds upload sessions between requests.
-	States UploadStateStore
+	// Sessions holds upload sessions between requests; session.InUploads
+	// with a backend name such as "s3:<store name>" keeps them durable.
+	Sessions session.Store
 	// Presign enables PresignGet when set.
 	Presign PresignAPI
 }
@@ -146,7 +147,7 @@ type Store struct {
 	bucket   string
 	prefix   string
 	partSize int64
-	states   UploadStateStore
+	sessions session.Store
 }
 
 var (
@@ -156,8 +157,8 @@ var (
 
 // New returns a store over api.
 func New(api API, o Options) (*Store, error) {
-	if api == nil || o.Bucket == "" || o.States == nil {
-		return nil, fmt.Errorf("%w: client, bucket and upload state store are required", ErrConfig)
+	if api == nil || o.Bucket == "" || o.Sessions == nil {
+		return nil, fmt.Errorf("%w: client, bucket and session store are required", ErrConfig)
 	}
 	if o.PartSize == 0 {
 		o.PartSize = DefaultPartSize
@@ -176,206 +177,75 @@ func New(api API, o Options) (*Store, error) {
 	}
 	return &Store{
 		api: api, presign: o.Presign, bucket: o.Bucket, prefix: prefix,
-		partSize: o.PartSize, states: o.States,
+		partSize: o.PartSize, sessions: o.Sessions,
 	}, nil
 }
 
 func (s *Store) blobKey(sha string) string { return s.prefix + "sha256/" + sha[:2] + "/" + sha }
 func (s *Store) tempKey(id string) string  { return s.prefix + "_uploads/" + id }
 
-// UploadState is what an upload session persists between requests.
-type UploadState struct {
-	ID string
+// multipart is the s3 backend's part of a session: the multipart upload
+// once the first full part starts it. The json tags are the storage format.
+type multipart struct {
 	// Key is the object the multipart upload writes; empty until it starts.
-	Key string
-	// MultipartID is S3's upload ID; empty until the first full part.
-	MultipartID string
-	Parts       []Part
-	// Size counts every appended byte, uploaded or pending.
-	Size int64
-	// Hasher is the saved blob.Hasher state.
-	Hasher []byte
-	// Pending is the tail not yet uploaded, shorter than the part size.
-	Pending  []byte
-	Expected string
+	Key string `json:"key,omitempty"`
+	// UploadID is S3's multipart upload ID; empty until the first full part.
+	UploadID string `json:"upload_id,omitempty"`
+	Parts    []part `json:"parts,omitempty"`
 }
 
-// Part is one uploaded part.
-type Part struct {
-	Number int32
-	ETag   string
-}
-
-// UploadStateStore keeps sessions between requests. Get returns an error
-// wrapping blob.ErrUploadUnknown for an unknown ID.
-type UploadStateStore interface {
-	Put(ctx context.Context, st UploadState) error
-	Get(ctx context.Context, id string) (UploadState, error)
-	Delete(ctx context.Context, id string) error
-}
-
-// MemoryStates is an UploadStateStore in process memory. Sessions do not
-// survive a restart; it serves tests and runs until the metadata store
-// provides a durable one.
-type MemoryStates struct {
-	mu sync.Mutex
-	m  map[string]UploadState
-}
-
-// NewMemoryStates returns an empty MemoryStates.
-func NewMemoryStates() *MemoryStates { return &MemoryStates{m: map[string]UploadState{}} }
-
-// Put stores a copy of st.
-func (m *MemoryStates) Put(_ context.Context, st UploadState) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	st.Parts = append([]Part(nil), st.Parts...)
-	st.Pending = append([]byte(nil), st.Pending...)
-	m.m[st.ID] = st
-	return nil
-}
-
-// Get returns a copy of the session.
-func (m *MemoryStates) Get(_ context.Context, id string) (UploadState, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	st, ok := m.m[id]
-	if !ok {
-		return UploadState{}, fmt.Errorf("%w: %s", blob.ErrUploadUnknown, id)
-	}
-	st.Parts = append([]Part(nil), st.Parts...)
-	st.Pending = append([]byte(nil), st.Pending...)
-	return st, nil
-}
-
-// Delete forgets a session.
-func (m *MemoryStates) Delete(_ context.Context, id string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	delete(m.m, id)
-	return nil
+// part is one uploaded part.
+type part struct {
+	Number int32  `json:"number"`
+	ETag   string `json:"etag"`
 }
 
 type upload struct {
 	s  *Store
-	st UploadState
-	h  *blob.Hasher
+	ss *session.Session[multipart]
 }
 
 // BeginUpload starts a session.
 func (s *Store) BeginUpload(ctx context.Context, opts ...blob.UploadOption) (blob.Upload, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("blob/s3: begin: %w", err)
-	}
-	o, err := blob.ResolveOptions(opts...)
+	ss, err := session.Begin[multipart](ctx, s.sessions, opts...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("blob/s3: %w", err)
 	}
-	id, err := blob.NewUploadID()
-	if err != nil {
-		return nil, err
-	}
-	u := &upload{s: s, st: UploadState{ID: id, Expected: o.ExpectedSHA256}, h: blob.NewHasher()}
-	if err := u.save(ctx); err != nil {
-		return nil, err
-	}
-	return u, nil
+	return &upload{s: s, ss: ss}, nil
 }
 
 // ResumeUpload reopens a session.
 func (s *Store) ResumeUpload(ctx context.Context, id string) (blob.Upload, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("blob/s3: resume: %w", err)
-	}
-	if !blob.ValidUploadID(id) {
-		return nil, fmt.Errorf("%w: %q", blob.ErrUploadUnknown, id)
-	}
-	st, err := s.states.Get(ctx, id)
+	ss, err := session.Resume[multipart](ctx, s.sessions, id)
 	if err != nil {
-		return nil, fmt.Errorf("blob/s3: resume: %w", err)
+		return nil, fmt.Errorf("blob/s3: %w", err)
 	}
-	u := &upload{s: s, st: st, h: blob.NewHasher()}
-	if err := u.h.UnmarshalBinary(st.Hasher); err != nil {
-		// Unlike the fs backend there is no local copy of the uploaded parts
-		// to rehash, so a damaged state ends the session.
-		return nil, fmt.Errorf("%w: %s: %w", blob.ErrUploadUnknown, id, err)
-	}
-	return u, nil
+	return &upload{s: s, ss: ss}, nil
 }
 
-func (u *upload) save(ctx context.Context) error {
-	hs, err := u.h.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	u.st.Hasher = hs
-	if err := u.s.states.Put(ctx, u.st); err != nil {
-		return fmt.Errorf("blob/s3: save upload %s: %w", u.st.ID, err)
-	}
-	return nil
-}
-
-func (u *upload) live(ctx context.Context) error {
-	if _, err := u.s.states.Get(ctx, u.st.ID); err != nil {
-		return fmt.Errorf("blob/s3: %w", err)
-	}
-	return nil
-}
-
-func (u *upload) ID() string  { return u.st.ID }
-func (u *upload) Size() int64 { return u.st.Size }
+func (u *upload) ID() string  { return u.ss.ID }
+func (u *upload) Size() int64 { return u.ss.Size }
 
 // Append buffers r and uploads every full part.
 func (u *upload) Append(ctx context.Context, r io.Reader) (int64, error) {
-	if err := ctx.Err(); err != nil {
-		return 0, fmt.Errorf("blob/s3: append: %w", err)
+	n, err := u.ss.Append(ctx, r, u.s.partSize, u.flushPart)
+	if err != nil {
+		return n, fmt.Errorf("blob/s3: append: %w", err)
 	}
-	if err := u.live(ctx); err != nil {
-		return 0, err
-	}
-	var total int64
-	buf := make([]byte, 256<<10)
-	var appendErr error
-	for appendErr == nil {
-		room := int(u.s.partSize) - len(u.st.Pending)
-		n, rerr := r.Read(buf[:min(len(buf), room)])
-		if n > 0 {
-			u.st.Pending = append(u.st.Pending, buf[:n]...)
-			_, _ = u.h.Write(buf[:n])
-			u.st.Size += int64(n)
-			total += int64(n)
-		}
-		if int64(len(u.st.Pending)) >= u.s.partSize {
-			// The bytes stay pending (and hashed) if the part fails, so the
-			// next Append or Commit retries the same part.
-			appendErr = u.flushPart(ctx)
-		}
-		switch {
-		case errors.Is(rerr, io.EOF):
-			rerr = nil
-			if appendErr == nil {
-				return total, u.save(ctx)
-			}
-		case rerr != nil && appendErr == nil:
-			appendErr = fmt.Errorf("blob/s3: read: %w", rerr)
-		}
-	}
-	if err := u.save(ctx); err != nil {
-		return total, errors.Join(appendErr, err)
-	}
-	return total, appendErr
+	return n, nil
 }
 
-// flushPart uploads the pending buffer as the next part, starting the
-// multipart upload on the first one.
-func (u *upload) flushPart(ctx context.Context) error {
-	if u.st.MultipartID == "" {
-		key := u.s.tempKey(u.st.ID)
-		if u.st.Expected != "" {
+// flushPart uploads data as the next part, starting the multipart upload on
+// the first one.
+func (u *upload) flushPart(ctx context.Context, data []byte) error {
+	mp := &u.ss.Data
+	if mp.UploadID == "" {
+		key := u.s.tempKey(u.ss.ID)
+		if u.ss.Expected != "" {
 			// The digest is declared, so the parts can target the content key
 			// and commit needs no copy. Commit verifies before completing, so
 			// a wrong declaration never reaches that key.
-			key = u.s.blobKey(u.st.Expected)
+			key = u.s.blobKey(u.ss.Expected)
 		}
 		out, err := u.s.api.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
 			Bucket: &u.s.bucket, Key: &key,
@@ -383,22 +253,21 @@ func (u *upload) flushPart(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("blob/s3: start multipart: %w", err)
 		}
-		u.st.Key, u.st.MultipartID = key, aws.ToString(out.UploadId)
-		if err := u.save(ctx); err != nil {
-			return err
+		mp.Key, mp.UploadID = key, aws.ToString(out.UploadId)
+		if err := u.ss.Save(ctx); err != nil {
+			return err //nolint:wrapcheck // names the session
 		}
 	}
-	num := int32(len(u.st.Parts) + 1) // #nosec G115 -- S3 caps uploads at 10,000 parts
+	num := int32(len(mp.Parts) + 1) // #nosec G115 -- S3 caps uploads at 10,000 parts
 	out, err := u.s.api.UploadPart(ctx, &s3.UploadPartInput{
-		Bucket: &u.s.bucket, Key: &u.st.Key, UploadId: &u.st.MultipartID,
-		PartNumber: &num, Body: bytes.NewReader(u.st.Pending),
-		ContentLength: aws.Int64(int64(len(u.st.Pending))),
+		Bucket: &u.s.bucket, Key: &mp.Key, UploadId: &mp.UploadID,
+		PartNumber: &num, Body: bytes.NewReader(data),
+		ContentLength: aws.Int64(int64(len(data))),
 	})
 	if err != nil {
 		return fmt.Errorf("blob/s3: upload part %d: %w", num, translate(err))
 	}
-	u.st.Parts = append(u.st.Parts, Part{Number: num, ETag: aws.ToString(out.ETag)})
-	u.st.Pending = u.st.Pending[:0]
+	mp.Parts = append(mp.Parts, part{Number: num, ETag: aws.ToString(out.ETag)})
 	return nil
 }
 
@@ -410,18 +279,16 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	if err := blob.ValidateDigests(want); err != nil {
 		return blob.Info{}, err
 	}
-	if err := u.live(ctx); err != nil {
-		return blob.Info{}, err
+	if err := u.ss.Live(ctx); err != nil {
+		return blob.Info{}, fmt.Errorf("blob/s3: %w", err)
 	}
-	if want.SHA256 == "" {
-		want.SHA256 = u.st.Expected
-	}
-	got := u.h.Sum()
-	if err := blob.Verify(want, got); err != nil {
+	got, err := u.ss.Verify(want)
+	if err != nil {
 		_ = u.Abort(ctx)
 		return blob.Info{}, err
 	}
-	info := blob.Info{Size: u.st.Size, Digests: got}
+	mp := &u.ss.Data
+	info := blob.Info{Size: u.ss.Size, Digests: got}
 	target := u.s.blobKey(got.SHA256)
 	exists, err := u.s.exists(ctx, target)
 	if err != nil {
@@ -430,48 +297,49 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	if exists {
 		return info, u.Abort(ctx)
 	}
-	if u.st.MultipartID == "" {
+	if mp.UploadID == "" {
 		_, err := u.s.api.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: &u.s.bucket, Key: &target, Body: bytes.NewReader(u.st.Pending),
-			ContentLength: aws.Int64(int64(len(u.st.Pending))),
+			Bucket: &u.s.bucket, Key: &target, Body: bytes.NewReader(u.ss.Pending),
+			ContentLength: aws.Int64(int64(len(u.ss.Pending))),
 		})
 		if err != nil {
 			return blob.Info{}, fmt.Errorf("blob/s3: put %s: %w", got.SHA256, err)
 		}
 		return info, u.forget(ctx)
 	}
-	if len(u.st.Pending) > 0 {
-		if err := u.flushPart(ctx); err != nil {
+	if len(u.ss.Pending) > 0 {
+		if err := u.ss.Flush(ctx, u.flushPart); err != nil {
 			return blob.Info{}, err
 		}
-		if err := u.save(ctx); err != nil {
-			return blob.Info{}, err
+		if err := u.ss.Save(ctx); err != nil {
+			return blob.Info{}, fmt.Errorf("blob/s3: %w", err)
 		}
 	}
 	if err := u.complete(ctx); err != nil {
 		return blob.Info{}, err
 	}
-	if u.st.Key != target {
-		if err := u.s.copy(ctx, u.st.Key, target, u.st.Size); err != nil {
+	if mp.Key != target {
+		if err := u.s.copy(ctx, mp.Key, target, u.ss.Size); err != nil {
 			return blob.Info{}, err
 		}
 		if _, err := u.s.api.DeleteObject(
 			ctx,
-			&s3.DeleteObjectInput{Bucket: &u.s.bucket, Key: &u.st.Key},
+			&s3.DeleteObjectInput{Bucket: &u.s.bucket, Key: &mp.Key},
 		); err != nil {
-			return blob.Info{}, fmt.Errorf("blob/s3: remove temporary %s: %w", u.st.Key, err)
+			return blob.Info{}, fmt.Errorf("blob/s3: remove temporary %s: %w", mp.Key, err)
 		}
 	}
 	return info, u.forget(ctx)
 }
 
 func (u *upload) complete(ctx context.Context) error {
-	parts := make([]types.CompletedPart, len(u.st.Parts))
-	for i, p := range u.st.Parts {
+	mp := &u.ss.Data
+	parts := make([]types.CompletedPart, len(mp.Parts))
+	for i, p := range mp.Parts {
 		parts[i] = types.CompletedPart{PartNumber: aws.Int32(p.Number), ETag: aws.String(p.ETag)}
 	}
 	_, err := u.s.api.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
-		Bucket: &u.s.bucket, Key: &u.st.Key, UploadId: &u.st.MultipartID,
+		Bucket: &u.s.bucket, Key: &mp.Key, UploadId: &mp.UploadID,
 		MultipartUpload: &types.CompletedMultipartUpload{Parts: parts},
 	})
 	if err != nil {
@@ -481,17 +349,17 @@ func (u *upload) complete(ctx context.Context) error {
 }
 
 func (u *upload) forget(ctx context.Context) error {
-	if err := u.s.states.Delete(ctx, u.st.ID); err != nil {
-		return fmt.Errorf("blob/s3: forget upload %s: %w", u.st.ID, err)
+	if err := u.ss.Forget(ctx); err != nil {
+		return fmt.Errorf("blob/s3: %w", err)
 	}
 	return nil
 }
 
 // Abort discards the session and any uploaded parts.
 func (u *upload) Abort(ctx context.Context) error {
-	if u.st.MultipartID != "" {
+	if mp := u.ss.Data; mp.UploadID != "" {
 		_, err := u.s.api.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
-			Bucket: &u.s.bucket, Key: &u.st.Key, UploadId: &u.st.MultipartID,
+			Bucket: &u.s.bucket, Key: &mp.Key, UploadId: &mp.UploadID,
 		})
 		if err != nil && !errors.Is(translate(err), blob.ErrUploadUnknown) {
 			return fmt.Errorf("blob/s3: abort multipart: %w", err)
