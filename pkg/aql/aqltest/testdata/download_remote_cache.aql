@@ -1,1 +1,0 @@
-items.find({"type":"file","$or":[{"$and":[{"repo":"remote-cache","path":{"$match":"*"},"name":{"$match":"*.jar"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created")

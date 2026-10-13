@@ -30,6 +30,11 @@ const testMasterKey = "acceptance-master-key-0123456789abcdef0123456789abcdef"
 // testAdminPassword is the seeded admin's password (bootstrap.admin_password).
 const testAdminPassword = "acceptance-admin"
 
+// aqlCapture, when set, is a directory that receives every AQL query the
+// server is sent, one file per query named after its scenario, so the JFrog
+// CLI's real queries can refresh pkg/aql/aqltest/testdata (make capture-aql).
+var aqlCapture = os.Getenv("ARTIFACTWEAVE_AQL_CAPTURE")
+
 // world is one scenario's state.
 type world struct {
 	t      *testing.T
@@ -69,8 +74,11 @@ func newWorld(t *testing.T) *world { return &world{t: t} }
 
 // register binds every step.
 func (w *world) register(sc *godog.ScenarioContext) {
-	sc.After(func(ctx context.Context, _ *godog.Scenario, err error) (context.Context, error) {
+	sc.After(func(ctx context.Context, s *godog.Scenario, err error) (context.Context, error) {
 		w.stop()
+		if aqlCapture != "" {
+			err = errors.Join(err, w.captureAQL(s.Name))
+		}
 		return ctx, err
 	})
 	sc.Step(`^the registry is running$`, w.start)
@@ -88,7 +96,9 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the next request has header "([^"]*)" "([^"]*)"$`, w.nextHeader)
 	sc.Step(`^a file "([^"]*)" of (\d+) bytes$`, w.writeSizedFile)
 	sc.Step(`^the files "([^"]*)" and "([^"]*)" are identical$`, w.filesIdentical)
+	sc.Step(`^the file "([^"]*)" does not exist$`, w.fileAbsent)
 	sc.Step(`^the output contains "([^"]*)"$`, w.outputContains)
+	sc.Step(`^the output does not contain "([^"]*)"$`, w.outputLacks)
 	sc.Step(`^the server answered (\d+) to ([A-Z]+) "([^"]*)"$`, w.serverAnswered)
 	sc.Step(`^the server never answered (\d+) to ([A-Z]+) "([^"]*)"$`, w.serverNeverAnswered)
 	sc.Step(`^a file "([^"]*)" with content:$`, w.writeFile)
@@ -124,6 +134,9 @@ func (w *world) start() error {
 		"--base-url", w.url,
 		"--log-format", "json",
 	)
+	if aqlCapture != "" {
+		w.server.Args = append(w.server.Args, "--log-level", "debug")
+	}
 	w.server.Env = append(os.Environ(),
 		"ARTIFACTWEAVE_MASTER_KEY="+testMasterKey,
 		"ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD="+testAdminPassword,
@@ -264,9 +277,50 @@ func (w *world) filesIdentical(a, b string) error {
 	return nil
 }
 
+func (w *world) fileAbsent(name string) error {
+	if _, err := os.Stat(filepath.Join(w.dir, name)); !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%s exists (%v)", name, err)
+	}
+	return nil
+}
+
 func (w *world) outputContains(want string) error {
 	if !strings.Contains(string(w.body), want) {
 		return fmt.Errorf("output does not contain %q:\n%s", want, w.body)
+	}
+	return nil
+}
+
+func (w *world) outputLacks(unwanted string) error {
+	if strings.Contains(string(w.body), unwanted) {
+		return fmt.Errorf("output contains %q:\n%s", unwanted, w.body)
+	}
+	return nil
+}
+
+// captureAQL writes the AQL queries the server logged at debug level to
+// aqlCapture, numbered in the order they arrived.
+func (w *world) captureAQL(scenario string) error {
+	slug := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			return r
+		}
+		return '_'
+	}, strings.ToLower(scenario))
+	if err := os.MkdirAll(aqlCapture, 0o750); err != nil {
+		return err
+	}
+	n := 0
+	for _, line := range strings.Split(w.stderr.String(), "\n") {
+		var rec struct{ Msg, Query string }
+		if json.Unmarshal([]byte(line), &rec) != nil || rec.Msg != "aql query" {
+			continue
+		}
+		n++
+		name := filepath.Join(aqlCapture, fmt.Sprintf("%s-%02d.aql", slug, n))
+		if err := os.WriteFile(name, []byte(rec.Query), 0o600); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -341,7 +395,11 @@ func (w *world) writeFile(name string, content *godog.DocString) error {
 		w.t.Cleanup(func() { _ = os.RemoveAll(dir) })
 		w.dir = dir
 	}
-	return os.WriteFile(filepath.Join(w.dir, name), []byte(content.Content), 0o600)
+	full := filepath.Join(w.dir, name)
+	if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+		return err
+	}
+	return os.WriteFile(full, []byte(content.Content), 0o600)
 }
 
 // writeZip writes a zip archive with one entry, for explode and archive
@@ -510,6 +568,9 @@ func (w *world) runJF(args string) error {
 		"{dir}", w.dir,
 	).Replace(args))
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
+	// Relative file specs resolve against the scenario's files, so an
+	// upload of "org/*" keeps the tree's layout under the target.
+	cmd.Dir = w.dir
 	cmd.Env = append(
 		os.Environ(),
 		"JFROG_CLI_HOME_DIR="+home,

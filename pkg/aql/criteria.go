@@ -32,16 +32,26 @@ func criterion(m member, depth int) (Node, error) {
 		if m.val.kind != vArray {
 			return nil, syntaxErr(m.val.pos, "%s takes an array of objects", m.key)
 		}
+		if depth+1 > maxDepth {
+			return nil, syntaxErr(m.val.pos, "nesting deeper than %d levels", maxDepth)
+		}
+		// The operator joins every member of every object in its array:
+		// {"$or":[{"path":{"$nmatch":"a"},"name":{"$nmatch":"b"}}]} is
+		// path-or-name, not path-and-name. The JFrog CLI builds each
+		// --exclusions pattern that way, so reading the members as an
+		// implicit $and would exclude everything.
 		children := make([]Node, 0, len(m.val.items))
 		for _, item := range m.val.items {
 			if item.kind != vObject {
 				return nil, syntaxErr(item.pos, "%s takes an array of objects", m.key)
 			}
-			n, err := criteria(item, depth+1)
-			if err != nil {
-				return nil, err
+			for _, im := range item.members {
+				n, err := criterion(im, depth+1)
+				if err != nil {
+					return nil, err
+				}
+				children = append(children, n)
 			}
-			children = append(children, n)
 		}
 		if m.key == "$and" {
 			return And(children), nil

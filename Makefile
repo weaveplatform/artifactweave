@@ -50,6 +50,14 @@ accept:
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -count=1 ./test/acceptance/...
 
+## terraform: validate test/terraform against the pinned provider from a filesystem mirror (TERRAFORM_MODE=apply for the full run, which needs P4 tokens)
+terraform:
+	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate)
+
+## capture-aql: refresh pkg/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
+capture-aql:
+	./test/acceptance/capture-aql.sh
+
 ## cover: merge every cover/* directory and enforce .testcoverage.yml (>=95% total, >=90% per package)
 cover:
 	@dirs=$$(find $(COVER_DIR) -mindepth 1 -maxdepth 1 -type d ! -name '.merged' | paste -sd, -); \
@@ -130,4 +138,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate
+.PHONY: bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform capture-aql

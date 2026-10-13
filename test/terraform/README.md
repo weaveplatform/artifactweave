@@ -1,17 +1,22 @@
 # Terraform fixture
 
-Applies the real `jfrog/artifactory` provider against a running artifactweave. Used by
-the `terraform` CI job from P2 and runnable locally:
+Applies the real `jfrog/artifactory` provider against a running artifactweave:
+- a local generic repository (`artifactory_local_generic_repository`);
+- properties on a file deployed into it (`artifactory_item_properties`).
+
+The `terraform` CI job runs it, and so does `make terraform` locally:
 
 ```sh
-go build -o /tmp/artifactweave ./cmd/artifactweave
-ARTIFACTWEAVE_MASTER_KEY=local /tmp/artifactweave serve --listen 127.0.0.1:18081 --data-dir /tmp/aw &
-cd test/terraform
-terraform init
-terraform plan -var url=http://127.0.0.1:18081 -var access_token=dummy
+make terraform                       # init from the mirror and validate
+make terraform TERRAFORM_MODE=apply  # also apply, require an empty plan, destroy
 ```
 
-Until P2 lands the plan stops at the `artifactory_repositories` data read with the
-Artifactory 404 envelope; the provider's configure step (version and usage calls) has
-already succeeded at that point. The provider mirror used by CI is populated with
-`terraform providers mirror` so the job does not depend on registry.terraform.io.
+`run.sh` installs the provider only from a filesystem mirror. It builds the mirror from the
+pinned release zip, checks it against the SHA-256 in the script, and then checks it against
+the committed `.terraform.lock.hcl`. No run contacts registry.terraform.io.
+
+The provider authenticates only with a Bearer access token (`access_token`). artifactweave
+issues those from P4. Until then the provider's first call is refused with 401, so
+`TERRAFORM_MODE=apply` stops at configure. `TERRAFORM_ACCESS_TOKEN` supplies a token once
+there is one. See [docs/testing/ci.md](../../docs/testing/ci.md#terraform-fixture) for
+moving to a new provider version.

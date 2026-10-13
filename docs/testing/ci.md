@@ -21,7 +21,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries and container-backed Maven, .NET, Node and Python clients; uploads `cover-accept` |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
 | `conformance` | `ubuntu-latest` | P6 | Starts the `-cover` binary with a `docker-local` repo, clones `opencontainers/distribution-spec` at a pinned tag and runs its conformance module with `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials; uploads `cover-conformance` |
-| `terraform` | `ubuntu-latest` | P3 | Applies `test/terraform/` against the binary with a pre-populated provider mirror, then checks `terraform plan` is empty, then destroys |
+| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` provider from a filesystem mirror of its release zip (checked against the release SHA-256 and the committed lock file) and validates `test/terraform/`. From P4 (#69), once the server issues the Bearer tokens the provider sends, it also applies the fixture against a `-cover` binary, requires an empty `terraform plan` and destroys (`run.sh apply`) |
 | `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
 | `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
@@ -85,6 +85,46 @@ Without `GOOGLE_APPLICATION_CREDENTIALS`, GCS uses Application Default Credentia
 authenticates with `DefaultAzureCredential` (`az login`, with Storage Blob Data
 Contributor on the container), and the probes skip.
 
+## Terraform fixture
+
+`make terraform` runs `test/terraform/run.sh`:
+- It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` once into a
+  filesystem mirror, checking it against the SHA-256 pinned in the script.
+- It points `TF_CLI_CONFIG_FILE` at a CLI configuration that installs the provider only from
+  that mirror.
+- It runs `terraform init -lockfile=readonly` and `terraform validate`.
+
+The committed `.terraform.lock.hcl` holds the provider's hashes for linux and darwin on
+amd64 and arm64. To move the provider to a new version:
+1. Update the version in `main.tf`.
+2. Update the checksums in `run.sh` from the release's `SHA256SUMS`.
+3. Regenerate the lock from a mirror holding the four zips:
+   `terraform providers lock -fs-mirror=<mirror> -platform=...`.
+
+`make terraform TERRAFORM_MODE=apply` adds the full run:
+1. Build and start a `-cover` binary.
+2. Apply the repository.
+3. Deploy `fixture.txt`.
+4. Apply its properties.
+5. Require `terraform plan -detailed-exitcode` to exit 0.
+6. Destroy.
+
+The provider authenticates only with a Bearer access token, which P4 adds. Until then the
+provider's first call (`GET /api/system/version`) is refused with 401 and the run stops
+there. Set `TERRAFORM_ACCESS_TOKEN` to supply a token.
+
+## AQL fixtures from the JFrog CLI
+
+`pkg/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one file per command shape.
+With `ARTIFACTWEAVE_JF_BIN` pointing at the pinned binary, `make capture-aql`:
+1. runs the acceptance scenario "the query shapes the fixtures capture", with the server
+   logging every query it is sent at debug level (`ARTIFACTWEAVE_AQL_CAPTURE` names the
+   directory the harness writes them to);
+2. copies each query over its fixture.
+
+Run it whenever the pinned `jf` changes, then check that the expected rows in
+`pkg/aql/aqltest` still hold.
+
 ## Local equivalents
 
 | Command | What |
@@ -93,3 +133,5 @@ Contributor on the container), and the probes skip.
 | `make accept` | The acceptance job (needs Docker) |
 | `make conformance` | The OCI conformance job (needs Docker and network for the spec clone) |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
+| `make terraform` | The terraform job (needs `terraform`; `TERRAFORM_MODE=apply` for the full run) |
+| `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |

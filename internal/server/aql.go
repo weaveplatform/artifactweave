@@ -45,6 +45,9 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, badRequest("reading the query: %v", err))
 		return
 	}
+	// At debug level the queries clients send are kept: the acceptance
+	// suite captures the JFrog CLI's from here as pkg/aql fixtures.
+	s.log().DebugContext(ctx, "aql query", "request_id", requestIDFrom(ctx), "query", string(body))
 	q, err := aql.Parse(string(body))
 	if err != nil {
 		writeErr(w, r, apierror.New(http.StatusBadRequest, aqlMessage(err)))

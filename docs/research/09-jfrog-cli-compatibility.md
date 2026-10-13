@@ -82,20 +82,37 @@ items.find({"$or":[{"$and":[{"repo":"libs","path":{"$match":"org/*"},"name":{"$m
 ```
 
 - Suffix order is `include`, `sort`, `offset`, `transitive`, `limit`.
-- `"type":"any"` is sent unless the spec restricts to files or folders.
-- `"path":{"$ne":"."}` is added when the repository root is excluded.
-- Property criteria are `{"@key":"value"}` objects inside `$and` or `$or`.
 - `"property"` is included only when properties are requested.
 - `.transitive()` is accepted and ignored by artifactweave.
 - The response is `{"results":[...],"range":{"start_pos","end_pos","total","limit"}}`.
+
+The queries jf 2.126.0 actually sends differ from the builder's outline. They were
+captured with `make capture-aql` (the acceptance scenario "the query shapes the fixtures
+capture" with the server logging each query at debug level):
+
+- `jf rt s`, `dl` and `sp` send no `type`, which means files only. `cp`, `mv` and `del`
+  send `"type":"any"`, and `path $ne "."` excludes the repository root.
+- `--props k=v` becomes `"$and":[{"@k":"v"}]` beside the `$or` of path clauses.
+- A command that prints or needs properties sends a second query that fetches them:
+  `"$and":[<the first query's criteria>,{"$or":[{"@*":{"$match":"*"}}]}]`, including
+  `property`.
+- `--transitive` cannot be combined with `--sort-by`; jf refuses the spec.
+- Each `--exclusions` pattern adds its own `"$or"` key at the same level (keys repeat):
+  `"$or":[{"path":{"$nmatch":"p"},"name":{"$nmatch":"n"}}]`, meaning "not both". So an
+  `$and` or `$or` joins every member of every object in its array, not each object as an
+  implicit `$and`. Reading the members as `$and` would exclude every file.
+- A folder pattern such as `org/*` also matches `path:"org"` with any name, so deleting it
+  removes the folders below `org` as well as their files.
+- A remote repository is named by its own key (`"repo":"remote"`), never `<key>-cache`.
 
 Minimum AQL subset for the M1 milestone: the `items` domain, `$and` and `$or`, the
 operators `$eq`, `$ne`, `$match`, `$nmatch`, `$gt`, `$lt`, property criteria `@key`,
 `type` in `any | file | folder`, and the `include`, `sort`, `offset`, `transitive`, `limit`
 suffixes. Build searches add the `builds` domain and the `artifact.module.build.*` fields
 after build-info lands. Every query shape the CLI generates is captured as a fixture under
-`pkg/aql/aqltest/testdata` and executed on both SQL dialects with identical ordered output
-([ADR 0012](decisions/0012-search-and-aql.md)).
+`pkg/aql/aqltest/testdata` and executed on the in-memory store and both SQL dialects with
+identical ordered output ([ADR 0012](decisions/0012-search-and-aql.md)). Refresh the
+fixtures with `make capture-aql` whenever the pinned jf changes.
 
 ## Status-code contract summary
 

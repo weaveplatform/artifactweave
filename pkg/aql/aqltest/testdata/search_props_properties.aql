@@ -1,0 +1,1 @@
+items.find({"$and":[{"$and":[{"@build.name":"app"}],"$or":[{"$and":[{"repo":"libs-local","path":{"$match":"*"},"name":{"$match":"*"}}]}]},{"$or":[{"@*":{"$match":"*"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","property")
