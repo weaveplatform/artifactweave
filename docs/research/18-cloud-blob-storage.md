@@ -341,8 +341,26 @@ None of these replicates across clouds.
 4. **GCS:** compose behaviour with a mismatched CRC32C, and with source generation preconditions.
 5. **GCS:** whether federated Workload Identity principals without a service account can sign URLs.
 
-The opt-in conformance workflow (issue #12) runs the blob contract against real accounts
-to settle these.
+The opt-in `cloud-conformance.yml` workflow (issue #12, see
+[CI](../testing/ci.md#real-cloud-conformance-manual)) runs the blob contract against real
+accounts and logs one `PROBE` line per question:
+
+| Question | Probe |
+|---|---|
+| 1 | `azure.put_block_from_url.101MiB_range` |
+| 2 | `azure.copy_from_url.shared_key_source_without_sas` |
+| 3 | `azure.put_blob_if_none_match_over_uncommitted` |
+| 4 | `gcs.compose.wrong_crc32c`, `gcs.compose.stale_source_generation`, `gcs.compose.destination_exists` |
+| 5 | `gcs.signed_url`, run locally as the federated principal; the workflow signs with a service-account key, so its run does not answer this |
+
+The backends do not depend on the answers:
+- The Azure backend copies in 100 MiB ranges.
+- It always authorises copy sources explicitly, with a service SAS or an Entra bearer token.
+- It treats `BlobAlreadyExists` and `ConditionNotMet` alike on a must-not-exist write.
+- The GCS backend checks the composed size and CRC32C itself.
+
+The answers record the real behaviour and show whether those defensive choices can be
+relaxed.
 
 ## Sources
 
