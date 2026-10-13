@@ -213,7 +213,9 @@ security:
   `urlBase`, `security.anonAccessEnabled`, `security.userLockPolicy`,
   `security.passwordSettings`, `security.ldapSettings`, `security.ldapGroupSettings`
   (LDAP in a later phase), `oauthSettings`, `systemMessageConfig`. Other sections are
-  accepted, stored and echoed without effect, and the response lists them as ignored.
+  accepted without effect and the response lists them as ignored; they are not stored,
+  because some carry passwords. P3 applies the repository sections, `proxies`,
+  `propertySets` and `repoLayouts`; the rest are ignored until their features land.
 - `GET` returns an XML descriptor generated from current state, so that the
   `artifactory_*` configuration resources can read back what they wrote.
 - Secrets inside a descriptor may be given as `${ENV_VAR}` references, resolved at apply

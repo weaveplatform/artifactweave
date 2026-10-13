@@ -16,12 +16,12 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/repos"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
-	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The repositories API (research 02, decision 0003). Every write is for
@@ -47,7 +47,7 @@ const (
 // confirmations of create and update are documented only as plain text, so
 // theirs are our own wording, as are the error messages not listed here.
 const (
-	msgKeyExists  = "Case insensitive repository key already exists"
+	msgKeyExists  = repos.MsgKeyExists
 	msgProtected  = "Cannot delete repository: repository key is blank, trash or support bundle"
 	msgRemoved    = "Repository '%s' and all its content have been removed successfully."
 	msgNoConfig   = "Cannot delete repository: '%s', repository config does not exist"
@@ -55,20 +55,6 @@ const (
 	msgAllRemoved = "All repositories were removed successfully"
 	msgSomeFailed = "Some repositories failed to be removed"
 )
-
-// protectedRepos cannot be deleted: Artifactory's trash can and support
-// bundle repositories, and the built-in build-info repository, which the
-// repositories API cannot create again (its package type is in no allowed
-// list).
-var protectedRepos = []string{"auto-trashcan", "jfrog-support-bundles", types.BuildInfoRepository}
-
-func protectedRepo(key string) bool {
-	return strings.TrimSpace(key) == "" ||
-		slices.ContainsFunc(
-			protectedRepos,
-			func(p string) bool { return strings.EqualFold(p, key) },
-		)
-}
 
 // repositoriesSlash routes /artifactory/api/repositories/ as
 // /artifactory/api/repositories: the Terraform provider lists repositories
@@ -595,36 +581,6 @@ func requestConfigs(bodies ...*[]repo.Config) []repo.Config {
 	return nil
 }
 
-// prepareCreate applies defaults and validates c for creation against the
-// keys already taken (stored and earlier in the same batch).
-func prepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
-	repo.Defaults(&c)
-	if err := repo.Validate(&c); err != nil {
-		return c, badRequest("%s", err.Error())
-	}
-	if slices.ContainsFunc(
-		existing,
-		func(e repo.Config) bool { return strings.EqualFold(e.Key, c.Key) },
-	) {
-		return c, badRequest(msgKeyExists)
-	}
-	return c, nil
-}
-
-// checkMembers rejects a virtual repository whose members or default
-// deployment repository do not exist among known.
-func checkMembers(c repo.Config, known []repo.Config) error {
-	if c.Class != repo.Virtual {
-		return nil
-	}
-	for _, m := range c.Repositories {
-		if !slices.ContainsFunc(known, func(k repo.Config) bool { return k.Key == m }) {
-			return badRequest("Virtual repository member '%s' does not exist", m)
-		}
-	}
-	return nil
-}
-
 func (s artifactoryService) CreateRepository(
 	ctx context.Context,
 	req artgen.CreateRepositoryRequestObject,
@@ -653,11 +609,11 @@ func (s artifactoryService) CreateRepository(
 	if err != nil {
 		return nil, s.internalError(ctx, "list repositories", err)
 	}
-	if c, err = prepareCreate(c, existing); err != nil {
-		return nil, err
+	if c, err = repos.PrepareCreate(c, existing); err != nil {
+		return nil, fmt.Errorf("repositories: %w", err)
 	}
-	if err := checkMembers(c, existing); err != nil {
-		return nil, err
+	if err := repos.CheckMembers(c, existing); err != nil {
+		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	switch err := st.Repos().Create(ctx, c); {
 	case errors.Is(err, store.ErrConflict):
@@ -709,16 +665,16 @@ func (s artifactoryService) CreateMultipleRepositories(
 			return nil, apierror.New(http.StatusConflict,
 				fmt.Sprintf("%s: '%s'", msgKeyExists, c.Key))
 		}
-		c, err := prepareCreate(c, nil)
+		c, err := repos.PrepareCreate(c, nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("repositories: %w", err)
 		}
 		prepared = append(prepared, c)
 		known = append(known, c)
 	}
 	for _, c := range prepared {
-		if err := checkMembers(c, known); err != nil {
-			return nil, err
+		if err := repos.CheckMembers(c, known); err != nil {
+			return nil, fmt.Errorf("repositories: %w", err)
 		}
 	}
 	err = st.Tx(ctx, func(ctx context.Context) error {
@@ -751,66 +707,6 @@ func batchSize(n int) error {
 	}
 	return nil
 }
-
-// applyUpdate merges an update body into the stored configuration with
-// Artifactory's rules: a field present replaces the stored value, a field
-// left out keeps it, and null resets it to its default. The key, class and
-// package type cannot change.
-func applyUpdate(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, error) {
-	for field, current := range map[string]string{
-		"key": stored.Key, "rclass": string(stored.Class), "packageType": string(stored.PackageType),
-	} {
-		raw, ok := patch[field]
-		if !ok || isNull(raw) {
-			delete(patch, field)
-			continue
-		}
-		var v string
-		if err := json.Unmarshal(raw, &v); err != nil {
-			return stored, badRequest("The repository %s cannot be changed", field)
-		}
-		// Empty is no key, class or package type, so it changes nothing; a
-		// re-encoded config carries rclass this way when it was left out.
-		if v == "" {
-			delete(patch, field)
-			continue
-		}
-		if !strings.EqualFold(v, current) {
-			return stored, badRequest("The repository %s cannot be changed", field)
-		}
-	}
-	base, err := json.Marshal(stored)
-	if err != nil {
-		return stored, fmt.Errorf("encode repository: %w", err)
-	}
-	doc := map[string]json.RawMessage{}
-	if err := json.Unmarshal(base, &doc); err != nil {
-		return stored, fmt.Errorf("decode repository: %w", err)
-	}
-	for field, raw := range patch {
-		if isNull(raw) {
-			delete(doc, field)
-		} else {
-			doc[field] = raw
-		}
-	}
-	merged, err := json.Marshal(doc)
-	if err != nil {
-		return stored, fmt.Errorf("encode update: %w", err)
-	}
-	var out repo.Config
-	if err := json.Unmarshal(merged, &out); err != nil {
-		return stored, badRequest("Invalid repository configuration: %s", err.Error())
-	}
-	repo.RestoreSecrets(stored, &out)
-	repo.Defaults(&out)
-	if err := repo.Validate(&out); err != nil {
-		return stored, badRequest("%s", err.Error())
-	}
-	return out, nil
-}
-
-func isNull(raw json.RawMessage) bool { return bytes.Equal(bytes.TrimSpace(raw), []byte("null")) }
 
 // updateBody returns the raw update the middleware saved, or, for a handler
 // reached without it, the decoded body re-encoded (which cannot express
@@ -859,9 +755,9 @@ func (s artifactoryService) UpdateRepositoryConfiguration(
 	if err := json.Unmarshal(body, &patch); err != nil || patch == nil {
 		return nil, badRequest("A repository configuration object is required")
 	}
-	updated, err := applyUpdate(stored, patch)
+	updated, err := repos.Merge(stored, patch)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("repositories: %w", err)
 	}
 	if err := s.checkMembersStored(ctx, st, updated); err != nil {
 		return nil, err
@@ -886,7 +782,10 @@ func (s artifactoryService) checkMembersStored(
 	if err != nil {
 		return s.internalError(ctx, "list repositories", err)
 	}
-	return checkMembers(c, known)
+	if err := repos.CheckMembers(c, known); err != nil {
+		return fmt.Errorf("repositories: %w", err)
+	}
+	return nil
 }
 
 func (s artifactoryService) UpdateMultipleRepositories(
@@ -933,9 +832,9 @@ func (s artifactoryService) UpdateMultipleRepositories(
 		case err != nil:
 			return nil, s.internalError(ctx, "get repository", err)
 		}
-		c, err := applyUpdate(stored, patch)
+		c, err := repos.Merge(stored, patch)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("repositories: %w", err)
 		}
 		if err := s.checkMembersStored(ctx, st, c); err != nil {
 			return nil, err
@@ -956,85 +855,6 @@ func (s artifactoryService) UpdateMultipleRepositories(
 	return artgen.UpdateMultipleRepositories200JSONResponse(
 		fmt.Sprintf("Successfully updated %d repositories", len(updated)),
 	), nil
-}
-
-// removeRepository deletes key with its content, in one transaction: the
-// items of the repository and, for a remote, its cache (dropping their blob
-// references for garbage collection to reclaim), its package index, its
-// place in the virtual repositories that list it, and its configuration.
-// found is false when no configuration exists.
-//
-// Deleted content does not pass through the trash can yet; that arrives with
-// the trash can itself (#48).
-func removeRepository(ctx context.Context, st store.Store, key string) (int64, bool, error) {
-	c, err := st.Repos().Get(ctx, key)
-	if errors.Is(err, store.ErrNotFound) {
-		return 0, false, nil
-	}
-	if err != nil {
-		return 0, true, fmt.Errorf("get repository: %w", err)
-	}
-	var files int64
-	err = st.Tx(ctx, func(ctx context.Context) error {
-		caches := []bool{false}
-		if c.Class == repo.Remote {
-			caches = append(caches, true)
-		}
-		for _, cached := range caches {
-			res, err := st.Items().Delete(ctx, key, cached, "")
-			if err != nil {
-				return fmt.Errorf("delete content: %w", err)
-			}
-			files += res.Files
-			for sha, n := range res.BlobRefs {
-				if _, err := st.Blobs().Unref(ctx, sha, n); err != nil {
-					return fmt.Errorf("release blob %s: %w", sha, err)
-				}
-			}
-		}
-		for {
-			pkgs, _, err := st.Packages().List(ctx, key, store.Page{Limit: 100})
-			if err != nil {
-				return fmt.Errorf("list packages: %w", err)
-			}
-			if len(pkgs) == 0 {
-				break
-			}
-			for _, p := range pkgs {
-				if err := st.Packages().Delete(ctx, p.ID); err != nil {
-					return fmt.Errorf("delete package %s: %w", p.Name, err)
-				}
-			}
-		}
-		including, err := st.Repos().Including(ctx, key)
-		if err != nil {
-			return fmt.Errorf("virtual repositories including %s: %w", key, err)
-		}
-		for _, vk := range including {
-			v, err := st.Repos().Get(ctx, vk)
-			if err != nil {
-				return fmt.Errorf("get %s: %w", vk, err)
-			}
-			v.Repositories = slices.DeleteFunc(
-				v.Repositories,
-				func(m string) bool { return m == key },
-			)
-			if v.DefaultDeploymentRepo == key {
-				v.DefaultDeploymentRepo = ""
-			}
-			if err := st.Repos().Update(ctx, v); err != nil {
-				return fmt.Errorf("update %s: %w", vk, err)
-			}
-		}
-		if err := st.Repos().Delete(ctx, key); err != nil {
-			return fmt.Errorf("delete configuration: %w", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return files, true, fmt.Errorf("delete repository %s: %w", key, err)
-	}
-	return files, true, nil
 }
 
 func removed(key string, files int64) artgen.RemoveRepositorySuccessReport {
@@ -1076,10 +896,10 @@ func (s artifactoryService) DeleteRepository(
 	if err != nil {
 		return nil, err
 	}
-	if protectedRepo(key) {
+	if repos.Protected(key) {
 		return artgen.DeleteRepository400JSONResponse(failed(key, msgProtected)), nil
 	}
-	files, found, err := removeRepository(ctx, st, key)
+	files, found, err := repos.Remove(ctx, st, key)
 	switch {
 	case err != nil:
 		_ = s.internalError(ctx, "delete repository", err)
@@ -1120,14 +940,14 @@ func (s artifactoryService) DeleteRepositories(
 			StatusMessage: "No repositories were given",
 		}, nil
 	}
-	if slices.ContainsFunc(keys, protectedRepo) {
+	if slices.ContainsFunc(keys, repos.Protected) {
 		return artgen.DeleteRepositories400JSONResponse{StatusMessage: msgProtected}, nil
 	}
 	report := artgen.RepoBulkRemovalReport{Reports: []artgen.RepoBulkRemovalReport_Reports_Item{}}
 	failures := 0
 	for _, key := range keys {
 		var item artgen.RepoBulkRemovalReport_Reports_Item
-		files, found, err := removeRepository(ctx, st, key)
+		files, found, err := repos.Remove(ctx, st, key)
 		switch {
 		case err != nil:
 			_ = s.internalError(ctx, "delete repository", err)

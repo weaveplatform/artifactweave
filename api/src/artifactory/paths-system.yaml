@@ -375,7 +375,8 @@ paths:
         and security, each a map keyed by entity name. Named entities that do not exist are created, existing ones
         are updated field by field, omitted keys are untouched, and a key whose value is null is deleted. Repository
         entries use the YAML spellings (type, repoLayout, xray.enabled) and are validated with the same rules as
-        the JSON repositories API. Unknown sections are stored and echoed without effect and named in the response.
+        the JSON repositories API. Other sections are accepted without effect and named in the response; they are
+        not stored, because some (mailServer, security) carry passwords.
         Values of the form ${ENV_VAR} are resolved from the server environment and never written back. Unlike Artifactory,
         an empty document is rejected with 400 instead of deleting every repository. The whole patch is applied
         in one transaction. Admin only.'

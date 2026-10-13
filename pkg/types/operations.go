@@ -195,6 +195,9 @@ const (
 	// SettingSeeded marks that the built-in principals were created, so a
 	// later start never recreates one an administrator removed.
 	SettingSeeded = "bootstrap.seeded"
+	// SettingBootstrapDescriptor marks that bootstrap.descriptor was
+	// applied, so it is applied once.
+	SettingBootstrapDescriptor = "bootstrap.descriptor_applied"
 )
 
 // UserLockPolicy locks an account after repeated failed logins.
