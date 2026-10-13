@@ -37,6 +37,11 @@ unreachable, so the macOS and Windows matrix legs stay green and cover the same 
 through fakes. See decision
 [0015](../research/decisions/0015-testing-and-acceptance.md).
 
+The cross-cloud blob mirror scenario (`TestCrossCloud` in `pkg/blob/mirror`) is one of
+those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
+unit job and skips on macOS and Windows; the emulator images are pinned in
+`pkg/containertest`.
+
 ## Real-cloud conformance (manual)
 
 `cloud-conformance.yml` runs the blob contract (`blobtest.Run`) and the research 18
