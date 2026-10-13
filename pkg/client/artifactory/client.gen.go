@@ -4398,6 +4398,33 @@ type LoggerLevelsRequest struct {
 	Timer int `json:"timer"`
 }
 
+// MultipartUploadPartUrl Where to PUT one part.
+type MultipartUploadPartUrl struct {
+	// Url Optional within this object. Absolute URL for the part, signed for that upload and part.
+	Url *string `json:"url,omitempty"`
+}
+
+// MultipartUploadStatus State of a multipart upload's assembly.
+type MultipartUploadStatus struct {
+	// ChecksumToken Optional within this object. Token for the checksum deploy that follows a finished upload.
+	ChecksumToken *string `json:"checksumToken,omitempty"`
+
+	// Error Optional within this object. Why the assembly failed.
+	Error *string `json:"error,omitempty"`
+
+	// Progress Optional within this object. Share of the parts assembled, in percent.
+	Progress *int `json:"progress,omitempty"`
+
+	// Status Optional within this object. `PARTS`, `PROCESSING`, `FINISHED`, `RETRYABLE_ERROR`, `NON_RETRYABLE_ERROR` or `ABORTED`.
+	Status *string `json:"status,omitempty"`
+}
+
+// MultipartUploadToken A multipart upload's token, which authorises its other calls.
+type MultipartUploadToken struct {
+	// Token Optional within this object. The upload token, sent as a Bearer token.
+	Token *string `json:"token,omitempty"`
+}
+
 // MultipleReplicationConfigRequest Multi-push replication configuration: one schedule fanning out to several targets. Not supported in v1; the operations that take this body answer 501. Use one single-target configuration per repository instead.
 type MultipleReplicationConfigRequest struct {
 	// CronExp Required within this object. Schedule in Quartz cron syntax shared by every target.
@@ -5491,7 +5518,7 @@ type UpdatePropertiesRequest_Props_AdditionalProperties struct {
 
 // UploadsConfig Whether the server accepts the JFrog CLI's multipart upload protocol.
 type UploadsConfig struct {
-	// Supported Optional within this object. Always false here, so the CLI uploads large files in one request.
+	// Supported Optional within this object. True when the server can stage parts, which it can whenever a blob store is configured; the JFrog CLI then uploads files of 200 MiB or more in parts.
 	Supported *bool `json:"supported,omitempty"`
 }
 
@@ -10819,7 +10846,7 @@ type ClientInterface interface {
 
 	// GetUploadsConfig Multipart upload configuration
 	//
-	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
 	//
 	// Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
 	GetUploadsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -17499,7 +17526,7 @@ func (c *Client) GetSystemReadiness(ctx context.Context, reqEditors ...RequestEd
 
 // GetUploadsConfig Multipart upload configuration
 //
-// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
 //
 // Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
 func (c *Client) GetUploadsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -36250,7 +36277,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUploadsConfigWithResponse Multipart upload configuration
 	//
-	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -62851,7 +62878,7 @@ func (c *ClientWithResponses) GetSystemReadinessWithResponse(ctx context.Context
 
 // GetUploadsConfigWithResponse Multipart upload configuration
 //
-// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; a 200 with `supported` false makes it upload in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
 //
 // Returns a wrapper object for the known response body format(s).
 //

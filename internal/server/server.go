@@ -21,6 +21,7 @@ import (
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
+	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
@@ -58,6 +59,9 @@ type Config struct {
 	Auth *auth.Authenticator
 	// Mirrors administers the blob mirrors; nil when no tier is a mirror.
 	Mirrors Mirrors
+	// Multipart serves the JFrog CLI's multipart upload protocol; nil
+	// reports it unsupported, so the CLI uploads in one request.
+	Multipart *multipart.Service
 }
 
 // Mirrors is what the storage endpoints need from the runtime's blob
@@ -116,6 +120,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerItemRoutes(r)
 	artSvc.registerStorageRoutes(r)
 	artSvc.registerTrashRoutes(r)
+	artSvc.registerMultipartRoutes(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

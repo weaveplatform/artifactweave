@@ -70,6 +70,8 @@ sha256 content addressing with sha1 and md5 indexed gives every client what it a
 the JFrog CLI sends all three on upload, Maven wants sha1 and md5, Docker wants sha256.
 An explicit upload-session contract is the only way Docker chunked uploads, S3 multipart
 and the CLI's multipart protocol can share one implementation.
+The CLI's multipart protocol (#70) stages out-of-order parts locally and appends them to
+one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-upload).
 
 **Alternatives considered:**
 - *sha1-keyed filestore like Artifactory*: sha1 is deprecated for integrity and sha256 is

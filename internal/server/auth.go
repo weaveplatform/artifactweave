@@ -22,6 +22,19 @@ var publicRoutes = map[string]bool{
 	"POST /jfconnect/api/v1/backoffice/metrics/log": true,
 }
 
+// selfAuthenticated routes verify their own credential, so the middleware
+// passes them untouched: the multipart upload calls carry the upload token
+// as a Bearer token, which only the multipart service can verify until
+// access tokens arrive (P4), and a part PUT carries a signed URL and no
+// credentials at all, as the CLI sends it.
+var selfAuthenticated = map[string]bool{
+	"POST " + uploadsURLPart:  true,
+	"PUT " + uploadsPart:      true,
+	"POST " + uploadsComplete: true,
+	"POST " + uploadsStatus:   true,
+	"POST " + uploadsAbort:    true,
+}
+
 // authenticate puts the request's principal in its context. Credentials
 // that do not verify answer 401 at once, even on a public route, as
 // Artifactory does: a client with a wrong password learns it on its first
@@ -32,6 +45,10 @@ func authenticate(a *auth.Authenticator) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
+			if selfAuthenticated[r.Method+" "+r.URL.Path] {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if user, password, ok := r.BasicAuth(); ok {
 				p, err := a.Basic(ctx, user, password)
 				if err != nil {

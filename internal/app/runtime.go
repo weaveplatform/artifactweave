@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"sync"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
+	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -30,6 +32,7 @@ type runtime struct {
 	blobs, coldBlobs blob.Store
 	location         usage.Location
 	gc               *gc.Collector
+	multipart        *multipart.Service
 	mirrors          []*mirror.Store
 	admin            *mirrorAdmin
 	stopLoops        context.CancelFunc
@@ -67,9 +70,24 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	// JFrog CLI multipart uploads stage their parts under the data directory
+	// and append them to a hot-tier blob upload. Staging left by a crash
+	// after its session was dropped is swept now; the collector reaps
+	// sessions that go stale.
+	parts := &multipart.Service{
+		Store: st, Blobs: hot.store, Dir: filepath.Join(cfg.DataDir, "multipart"),
+	}
+	if err := parts.Sweep(ctx); err != nil {
+		log.Warn("multipart upload staging sweep failed", "error", err)
+	}
 	// The cold tier is not collected: nothing writes it until archiving (P16),
 	// which brings the references its collection would have to trust.
-	collector, err := gc.New(st, hot.store, gc.Options{Grace: cfg.GC.GracePeriod})
+	collector, err := gc.New(st, hot.store, gc.Options{
+		Grace: cfg.GC.GracePeriod,
+		Reapers: map[string]func(context.Context, store.Upload) error{
+			multipart.Backend: parts.Reap,
+		},
+	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
@@ -78,7 +96,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
 	rt := &runtime{
 		store: st, auth: authn, closeStore: st.Close, blobs: hot.store, coldBlobs: cold.store,
-		location: hotTier.location(), gc: collector, stopLoops: stop,
+		location: hotTier.location(), gc: collector, multipart: parts, stopLoops: stop,
 	}
 	for _, t := range []struct {
 		name string
