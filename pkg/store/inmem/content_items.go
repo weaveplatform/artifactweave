@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -227,6 +228,26 @@ func (i items) FindByChecksum(
 		func(it types.Item) bool { return !it.Folder && match(it.Actual) },
 		func(a, b types.Item) int { return cmp.Compare(a.ID, b.ID) },
 		func(it types.Item) []any { return []any{it.ID} })
+}
+
+func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
+	var out []aql.Hit
+	err := i.s.do(ctx, func() error {
+		rows := i.t().rows
+		props := i.props().rows
+		candidates := make([]aql.Hit, 0, len(rows))
+		for id, it := range rows {
+			candidates = append(candidates, aql.Hit{Item: it, Properties: props[id]})
+		}
+		// Matching reads the stored rows in place; only the hits returned
+		// are copied.
+		out = aql.Select(q, o, candidates)
+		for n := range out {
+			out[n].Properties = store.Clone(out[n].Properties)
+		}
+		return nil
+	})
+	return out, err
 }
 
 func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {

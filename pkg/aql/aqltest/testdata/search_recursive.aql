@@ -1,0 +1,1 @@
+items.find({"type":"file","path":{"$ne":"."},"$or":[{"$and":[{"repo":"libs-local","path":"org/acme","name":{"$match":"*.jar"}}]},{"$and":[{"repo":"libs-local","path":{"$match":"org/acme/*"},"name":{"$match":"*.jar"}}]}]}).include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified","created")

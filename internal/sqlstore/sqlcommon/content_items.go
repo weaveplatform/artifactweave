@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -47,6 +48,80 @@ func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 		updated,
 	)
 	return it, err //nolint:wrapcheck // wrapped by the caller
+}
+
+// Search compiles q for the dialect and loads the properties of the hits
+// in a second query, after offset and limit, as decision 0012 requires.
+func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
+	d := aql.SQLite
+	if i.s.d.Name == "postgres" {
+		d = aql.PostgreSQL
+	}
+	c, err := q.Compile(d, o)
+	if err != nil {
+		return nil, fmt.Errorf("search items: %w", err)
+	}
+	var hits []aql.Hit
+	err = i.s.Tx(ctx, func(ctx context.Context) error {
+		hits = nil
+		if err := i.s.rows(ctx, "search items",
+			"SELECT "+itemCols+" FROM items WHERE "+c.Where+c.Tail, c.Args,
+			func(rs *sql.Rows) error {
+				it, err := scanItem(rs)
+				hits = append(hits, aql.Hit{Item: it})
+				return err
+			}); err != nil {
+			return err
+		}
+		if !q.Properties() {
+			return nil
+		}
+		return i.hitProperties(ctx, hits)
+	})
+	return hits, err
+}
+
+// searchPropertyBatch bounds the IN list of one property query, well under
+// SQLite's and PostgreSQL's parameter limits.
+const searchPropertyBatch = 500
+
+// hitProperties fills each hit's properties.
+func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
+	byID := make(map[int64]int, len(hits))
+	for n, h := range hits {
+		byID[h.Item.ID] = n
+	}
+	for start := 0; start < len(hits); start += searchPropertyBatch {
+		batch := hits[start:min(start+searchPropertyBatch, len(hits))]
+		args := make([]any, len(batch))
+		for n, h := range batch {
+			args[n] = h.Item.ID
+		}
+		err := i.s.rows(ctx, "search item properties",
+			"SELECT item_id, key, value FROM item_properties WHERE item_id IN ("+
+				strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")+
+				") ORDER BY item_id, key, value",
+			args,
+			func(rs *sql.Rows) error {
+				var (
+					id   int64
+					k, v string
+				)
+				if err := rs.Scan(&id, &k, &v); err != nil {
+					return err //nolint:wrapcheck // wrapped by rows
+				}
+				h := &hits[byID[id]]
+				if h.Properties == nil {
+					h.Properties = types.Properties{}
+				}
+				h.Properties[k] = append(h.Properties[k], v)
+				return nil
+			})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // canonical derives Path, Name and Depth from the item's full path.
