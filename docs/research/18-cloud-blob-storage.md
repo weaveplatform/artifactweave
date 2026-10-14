@@ -365,8 +365,9 @@ relaxed.
 ### GCS answers (2026-10-13)
 
 The blob contract passed in full (17 subtests) against a real bucket in `europe-west2`
-(`deploy/terraform/acceptance`), with signed URLs fetched over HTTPS. The run acted as the
-acceptance service account by impersonation, because the organisation enforces
+(`deploy/terraform/acceptance` at the time, now `deploy/platform/terraform/gcp/single-bucket`),
+with signed URLs fetched over HTTPS. The run acted as the acceptance service account by
+impersonation, because the organisation enforces
 `iam.disableServiceAccountKeyCreation`, so no key was involved.
 
 | Question | Answer | Consequence |
@@ -383,7 +384,8 @@ from three parts (16, 16 and 8 MiB) and left nothing under `_uploads/`.
 ### Azure answers (2026-10-13)
 
 The blob contract passed in full (15 subtests) against a real StorageV2 account in
-`uksouth` (`deploy/terraform/acceptance-azure`), with Shared Key disabled. It used Entra ID
+`uksouth` (`deploy/terraform/acceptance-azure` at the time, now
+`deploy/platform/terraform/azure/single-bucket`), with Shared Key disabled. It used Entra ID
 through `DefaultAzureCredential`, and presigned URLs from user delegation keys fetched over
 HTTPS.
 

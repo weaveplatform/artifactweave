@@ -113,13 +113,20 @@ build:
 docker:
 	docker build -t artifactweave:$(VERSION) --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) .
 
-## gcp-<target>: run a target of deploy/terraform/acceptance (the GCS acceptance environment), e.g. make gcp-up
-gcp-%:
-	$(MAKE) -C deploy/terraform/acceptance $*
+## platform-<target>: run a target of a deploy/platform scenario, e.g. make platform-plan SCENARIO=gcp/single-bucket
+PLATFORM_DIR := deploy/platform/terraform
+platform-%:
+	@[ -n "$(SCENARIO)" ] && [ -f $(PLATFORM_DIR)/$(SCENARIO)/Makefile ] || { \
+		echo "set SCENARIO to one of: $$(cd $(PLATFORM_DIR) && ls -d */*/Makefile | sed 's|/Makefile||' | tr '\n' ' ')" >&2; exit 1; }
+	$(MAKE) -C $(PLATFORM_DIR)/$(SCENARIO) $*
 
-## azure-<target>: run a target of deploy/terraform/acceptance-azure (the Azure acceptance environment), e.g. make azure-up
+## gcp-<target>: platform-<target> for gcp/single-bucket (the GCS acceptance environment), e.g. make gcp-up
+gcp-%:
+	$(MAKE) -C $(PLATFORM_DIR)/gcp/single-bucket $*
+
+## azure-<target>: platform-<target> for azure/single-bucket (the Azure acceptance environment), e.g. make azure-up
 azure-%:
-	$(MAKE) -C deploy/terraform/acceptance-azure $*
+	$(MAKE) -C $(PLATFORM_DIR)/azure/single-bucket $*
 
 ## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
 # Authors edit fragments (one per API family) so families can be written in

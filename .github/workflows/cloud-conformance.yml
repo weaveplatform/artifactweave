@@ -64,7 +64,7 @@ jobs:
         run: |
           if [ -z "$ARTIFACTWEAVE_TEST_GCS_BUCKET" ] || [ -z "$ARTIFACTWEAVE_TEST_GCS_ACCESS_ID" ] \
             || [ -z "$GCP_WIF_PROVIDER" ]; then
-            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (deploy/terraform/acceptance outputs)"
+            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (make gcp-github-vars, from deploy/platform/terraform/gcp/single-bucket)"
             exit 1
           fi
 

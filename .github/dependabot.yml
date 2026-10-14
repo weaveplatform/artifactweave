@@ -35,10 +35,10 @@ updates:
   # The infrastructure roots. deploy/artifactweave and test/terraform are left
   # out: test/terraform/run.sh pins their jfrog provider zips by SHA-256,
   # which Dependabot cannot update, so deps-refresh moves version and pin
-  # together. The directories move to deploy/platform/terraform with #125.
+  # together.
   - package-ecosystem: "terraform"
     directories:
-      - "/deploy/terraform/*"
+      - "/deploy/platform/terraform/**"
     schedule:
       interval: "daily"
     ignore:

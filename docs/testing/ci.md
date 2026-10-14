@@ -70,10 +70,10 @@ A run whose variables or secrets are missing fails rather than skipping.
 
 | Name | Kind | Value |
 |---|---|---|
-| `CONFORMANCE_GCS_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/terraform/acceptance`) |
+| `CONFORMANCE_GCS_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/platform/terraform/gcp/single-bucket`) |
 | `CONFORMANCE_GCP_SERVICE_ACCOUNT` | variable | The service account the job acts as (`terraform output service_account`). It has `roles/storage.objectAdmin` on the bucket and signs URLs through IAM `signBlob` as itself |
 | `CONFORMANCE_GCP_WIF_PROVIDER` | variable | The Workload Identity Federation provider (`terraform output workload_identity_provider`). The job exchanges its GitHub OIDC token for the service account, so no key is stored; organisations enforcing `iam.disableServiceAccountKeyCreation` allow no keys anyway |
-| `CONFORMANCE_AZURE_ACCOUNT` | variable | The storage account (`terraform output account` in `deploy/terraform/acceptance-azure`). It allows no Shared Key |
+| `CONFORMANCE_AZURE_ACCOUNT` | variable | The storage account (`terraform output account` in `deploy/platform/terraform/azure/single-bucket`). It allows no Shared Key |
 | `CONFORMANCE_AZURE_CONTAINER` | variable | The container in that account |
 | `CONFORMANCE_AZURE_CLIENT_ID`, `CONFORMANCE_AZURE_TENANT_ID`, `CONFORMANCE_AZURE_SUBSCRIPTION_ID` | variables | The managed identity the job logs in as with `azure/login` (OpenID Connect), with Storage Blob Data Contributor on the account. Its federated credential trusts this repository's `cloud-conformance` environment, which the job declares |
 
@@ -84,21 +84,21 @@ the deleted temporary parts for the retention period.
 The same tests run from a workstation. They skip unless their variables are set:
 
 ```bash
-cd deploy/terraform/acceptance && ./up.sh && cd -   # writes .secrets/container-credentials.json
-ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/terraform/acceptance output -raw bucket) \
-ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/terraform/acceptance output -raw service_account) \
-GOOGLE_APPLICATION_CREDENTIALS=deploy/terraform/acceptance/.secrets/container-credentials.json \
+make gcp-conformance     # or, by hand, after make gcp-credentials (writes .secrets/container-credentials.json):
+ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw bucket) \
+ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
+GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.secrets/container-credentials.json \
   go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
 
 make azure-conformance   # or, by hand, after az login:
-ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/terraform/acceptance-azure output -raw account) \
+ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/platform/terraform/azure/single-bucket output -raw account) \
 ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
   go test -count=1 -v -run 'TestContractOnRealAzure|TestRealAzureProbes' ./pkg/blob/azure/
 ```
 
 The GCS run acts as the acceptance service account through the impersonated credentials
 `up.sh` writes from your own Application Default Credentials
-(`gcloud auth application-default login`); `deploy/terraform/acceptance` creates the
+(`gcloud auth application-default login`); `deploy/platform/terraform/gcp/single-bucket` creates the
 bucket, the account and the federation for the workflow.
 
 The Azure run authenticates with `DefaultAzureCredential`: your `az login` locally, the
@@ -107,7 +107,7 @@ account, and the probes sign copy sources with a user delegation SAS from it. An
 `ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY`, for an account that still allows Shared Key, switches
 the contract and probes to that key instead. `make azure-conformance` refuses to run unless
 the Azure CLI's active subscription is the acceptance one
-(`deploy/terraform/acceptance-azure`).
+(`deploy/platform/terraform/azure/single-bucket`).
 
 ## Terraform scenarios
 
@@ -214,4 +214,5 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
 | `make deploy-check` | The deploy-terraform job (fetches pinned tools into `.tools/`; set `GITHUB_TOKEN` if tflint hits GitHub's rate limit) |
 | `make deploy-docs` | Rewrite the terraform-docs sections of the READMEs |
+| `make platform-<target> SCENARIO=<cloud>/<scenario>` | A target of a `deploy/platform` scenario on a real cloud, for example `platform-plan SCENARIO=gcp/single-bucket`; `gcp-<target>` and `azure-<target>` are short forms for the two `single-bucket` scenarios. CI never runs these |
 | `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |

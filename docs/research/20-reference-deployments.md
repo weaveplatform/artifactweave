@@ -30,12 +30,12 @@ Each claim is labelled:
 
 | Item | Fact | Source |
 |---|---|---|
-| Infrastructure roots | Two: `deploy/terraform/acceptance` (GCP: bucket, service account, GitHub workload identity federation, lifecycle rules) and `deploy/terraform/acceptance-azure` (resource group, storage account with Shared Key disabled, container, user-assigned identity with a federated credential, lifecycle rules). Both keep local state | [S] the two directories |
+| Infrastructure roots | Two: `deploy/terraform/acceptance` (GCP: bucket, service account, GitHub workload identity federation, lifecycle rules) and `deploy/terraform/acceptance-azure` (resource group, storage account with Shared Key disabled, container, user-assigned identity with a federated credential, lifecycle rules). Both keep local state. They now live at `deploy/platform/terraform/gcp/single-bucket` and `deploy/platform/terraform/azure/single-bucket` (#125) | [S] the two directories |
 | Make targets | `gcp-%` and `azure-%` run a target in one fixed directory; paths inside each root climb `../../..` to the repository root | [S] `Makefile`, each root's `Makefile` and `compose.yaml` |
 | App-layer Terraform | `test/terraform` applies the `jfrog/artifactory` provider against a running artifactweave; it provisions no infrastructure | [S] `test/terraform/main.tf`, `run.sh` |
 | CI checks | Nothing formats, validates, lints, scans or tests the `deploy/` roots; Dependabot has no `terraform` ecosystem | [S] `.github/workflows/`, `.github/dependabot.yml` |
-| GCP trust | The provider's `attribute_condition` checks the repository only; the `gcs` job in `cloud-conformance.yml` names no environment | [S] `deploy/terraform/acceptance/main.tf`, `.github/workflows/cloud-conformance.yml` |
-| Azure trust | The federated credential matches `repo:weaveplatform@336817058/artifactweave@1415179278:environment:cloud-conformance` exactly | [S] `deploy/terraform/acceptance-azure/variables.tf`, `main.tf` |
+| GCP trust | The provider's `attribute_condition` checks the repository only; the `gcs` job in `cloud-conformance.yml` names no environment | [S] `deploy/terraform/acceptance/main.tf` (now `deploy/platform/terraform/gcp/single-bucket`), `.github/workflows/cloud-conformance.yml` |
+| Azure trust | The federated credential matches `repo:weaveplatform@336817058/artifactweave@1415179278:environment:cloud-conformance` exactly | [S] `deploy/terraform/acceptance-azure/variables.tf` (now `deploy/platform/terraform/azure/single-bucket`), `main.tf` |
 | AWS | No Terraform and no real-AWS test; S3 is tested against an in-memory fake and MinIO | [S] `pkg/blob/s3/` |
 | Repository | Public; owner ID 336817058, repository ID 1415179278, created 2026-10-12; `GET /repos/{owner}/{repo}/actions/oidc/customization/sub` reports `use_immutable_subject: true` with prefix `repo:weaveplatform@336817058/artifactweave@1415179278` | [S] `gh api`, 2026-10-14 |
 

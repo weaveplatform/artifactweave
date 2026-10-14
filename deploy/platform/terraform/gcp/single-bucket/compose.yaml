@@ -1,10 +1,12 @@
 # artifactweave in a local container, storing blobs in the acceptance bucket.
 # up.sh renders .local/artifactweave.yaml and .local/env from the Terraform
-# outputs first.
+# outputs first. The project name is the one this directory's old name gave
+# it, so a data volume from before the move (acceptance_data) is still found.
+name: acceptance
 services:
   artifactweave:
     build:
-      context: ../../..
+      context: ${ARTIFACTWEAVE_ROOT:?run through make, or set ARTIFACTWEAVE_ROOT to the repository root}
       args:
         VERSION: ${VERSION:-devel}
         COMMIT: ${COMMIT:-unknown}

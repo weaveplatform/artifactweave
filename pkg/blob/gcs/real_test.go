@@ -25,7 +25,7 @@ import (
 // and credentials, so it runs only from the manually dispatched
 // cloud-conformance workflow or by hand. Credentials are Application Default
 // Credentials: Workload Identity Federation in the workflow, an impersonated
-// service account locally (deploy/terraform/acceptance), or a key where an
+// service account locally (deploy/platform/terraform/gcp/single-bucket), or a key where an
 // organisation still allows them.
 const (
 	envRealBucket = "ARTIFACTWEAVE_TEST_GCS_BUCKET"
