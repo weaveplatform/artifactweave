@@ -12,6 +12,7 @@ const (
 	ctxOriginalContentType
 	ctxAccept
 	ctxRawBody
+	ctxCause
 )
 
 func withRequestID(ctx context.Context, id string) context.Context {
@@ -55,4 +56,18 @@ func withRawBody(ctx context.Context, b []byte) context.Context {
 func rawBody(ctx context.Context) []byte {
 	v, _ := ctx.Value(ctxRawBody).([]byte)
 	return v
+}
+
+// withCause gives accessLog's handlers a slot for the error behind a 500
+// that the client sees only as "internal error".
+func withCause(ctx context.Context, slot *error) context.Context {
+	return context.WithValue(ctx, ctxCause, slot)
+}
+
+// noteCause leaves err for accessLog to log with the request. Without it an
+// untyped error that apierror.Write hides reaches no log at all.
+func noteCause(ctx context.Context, err error) {
+	if slot, ok := ctx.Value(ctxCause).(*error); ok {
+		*slot = err
+	}
 }

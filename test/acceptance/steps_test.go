@@ -486,16 +486,45 @@ func (w *world) send(method, path, body string, prepare func(*http.Request)) err
 
 func (w *world) statusIs(want int) error {
 	if w.status != want {
-		return fmt.Errorf("status %d, want %d; body: %s", w.status, want, w.body)
+		return fmt.Errorf("status %d, want %d; body: %s%s", w.status, want, w.body, w.causes())
 	}
 	return nil
 }
 
 func (w *world) statusIsNot(unwanted int) error {
 	if w.status == unwanted {
-		return fmt.Errorf("status %d; body: %s", w.status, w.body)
+		return fmt.Errorf("status %d; body: %s%s", w.status, w.body, w.causes())
 	}
 	return nil
+}
+
+// causes returns, after a 5xx, the server log's ERROR and WARN lines. The
+// body of a 500 says only "internal error"; without these a failure that
+// does not reproduce leaves nothing to go on.
+func (w *world) causes() string {
+	if w.status < http.StatusInternalServerError {
+		return ""
+	}
+	// The access log line reaches w.stderr through exec's copying goroutine,
+	// so it can trail the response by a moment.
+	id := w.header.Get("X-Request-ID")
+	logged := func() bool { return id != "" && strings.Contains(w.stderr.String(), id) }
+	for deadline := time.Now().Add(2 * time.Second); !logged() && time.Now().Before(deadline); {
+		time.Sleep(20 * time.Millisecond)
+	}
+	var b strings.Builder
+	if !logged() {
+		fmt.Fprintf(&b, "\nthe server's log has no line for request %q", id)
+	}
+	for line := range strings.Lines(w.stderr.String()) {
+		if strings.Contains(line, `"level":"ERROR"`) || strings.Contains(line, `"level":"WARN"`) {
+			b.WriteString("\n" + strings.TrimSpace(line))
+		}
+	}
+	if b.Len() == 0 {
+		return "\nthe server logged no error"
+	}
+	return "\nserver log:" + b.String()
 }
 
 func (w *world) headerContains(name, want string) error {
