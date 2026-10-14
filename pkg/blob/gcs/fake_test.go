@@ -238,7 +238,12 @@ func (f *fakeGCS) SignedURL(name string, o SignedURLOptions) (string, error) {
 	if err := f.enter("SignedURL"); err != nil {
 		return "", err
 	}
-	q := url.Values{"X-Goog-Expires": {strconv.Itoa(int(o.TTL.Seconds()))}}
+	// Each signature is distinct, like a real one, so a test can tell a
+	// cached URL from a fresh one.
+	q := url.Values{
+		"X-Fake-Expires":   {strconv.FormatInt(o.Expires.Unix(), 10)},
+		"X-Fake-Signature": {strconv.Itoa(f.calls["SignedURL"])},
+	}
 	if o.ContentDisposition != "" {
 		q.Set("response-content-disposition", o.ContentDisposition)
 	}

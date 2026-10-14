@@ -37,6 +37,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
 // Attrs are the object attributes the store uses.
@@ -77,10 +78,10 @@ type API interface {
 	SignedURL(name string, o SignedURLOptions) (string, error)
 }
 
-// SignedURLOptions describe a signed GET URL: how long it lasts and the
+// SignedURLOptions describe a signed GET URL: when it expires and the
 // response overrides it carries, empty when not wanted.
 type SignedURLOptions struct {
-	TTL                time.Duration
+	Expires            time.Time
 	ContentDisposition string
 	ContentType        string
 }
@@ -128,6 +129,10 @@ type Options struct {
 	// ClientConfig.CanSign: signing needs a key, or credentials that name a
 	// service account and may call IAM signBlob.
 	Presign bool
+	// SignsOverNetwork marks every signature as an IAM signBlob request, so
+	// the store caches the URLs it signs (decision 0029). Set it from
+	// ClientConfig.SignsOverNetwork.
+	SignsOverNetwork bool
 }
 
 // Store is a blob.Store on a GCS bucket.
@@ -137,6 +142,9 @@ type Store struct {
 	partSize int64
 	sessions session.Store
 	presign  bool
+	// signed caches signed URLs when signing is a network call; nil when
+	// it is local and costs nothing to repeat.
+	signed *urlCache
 }
 
 var (
@@ -161,13 +169,17 @@ func New(api API, o Options) (*Store, error) {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
-	return &Store{
+	s := &Store{
 		api:      api,
 		prefix:   prefix,
 		partSize: o.PartSize,
 		sessions: o.Sessions,
 		presign:  o.Presign,
-	}, nil
+	}
+	if o.Presign && o.SignsOverNetwork {
+		s.signed = newURLCache(signedURLCacheSize)
+	}
+	return s, nil
 }
 
 // PartSize returns the size of the parts an upload is written in.
@@ -530,7 +542,8 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign }
 
 // SignURL returns a time-limited GET URL, carrying o's filename and media
-// type as response overrides.
+// type as response overrides. A store that signs over the network issues
+// URLs on windows and reuses one per window (see sign).
 func (s *Store) SignURL(_ context.Context, sha string, o blob.SignOptions) (string, error) {
 	if err := blob.ValidateSHA256(sha); err != nil {
 		return "", err //nolint:wrapcheck // already a blob sentinel
@@ -545,13 +558,45 @@ func (s *Store) SignURL(_ context.Context, sha string, o blob.SignOptions) (stri
 			o.TTL,
 		)
 	}
-	so := SignedURLOptions{TTL: o.TTL, ContentType: o.ContentType}
+	so := SignedURLOptions{ContentType: o.ContentType}
 	if o.Filename != "" {
 		so.ContentDisposition = blob.Disposition(o.Filename)
+	}
+	return s.sign(sha, o, so)
+}
+
+// sign signs so for sha. Signing locally, the URL expires the TTL from now.
+// Signing over the network, it expires at the end of the current window plus
+// the TTL, where windows are TTL long (cdn.Expiry): every request in a
+// window asks for the same URL, so one signBlob request serves the window.
+// A cached URL is handed out only in the window it was signed for, so it
+// always has at least the TTL left. A URL can live up to twice the TTL, so a
+// TTL over half the V4 limit, or under a second, is signed afresh each time.
+func (s *Store) sign(sha string, o blob.SignOptions, so SignedURLOptions) (string, error) {
+	now := time.Now()
+	so.Expires = now.Add(o.TTL)
+	var key urlKey
+	cached := false
+	if s.signed != nil && 2*o.TTL <= maxSignedTTL {
+		if exp, err := cdn.Expiry(now, o.TTL); err == nil {
+			so.Expires, cached = exp, true
+			key = urlKey{
+				sha:         sha,
+				filename:    o.Filename,
+				contentType: o.ContentType,
+				expires:     exp.Unix(),
+			}
+			if url, ok := s.signed.get(key); ok {
+				return url, nil
+			}
+		}
 	}
 	url, err := s.api.SignedURL(s.blobName(sha), so)
 	if err != nil {
 		return "", fmt.Errorf("blob/gcs: sign %s: %w", sha, err)
+	}
+	if cached {
+		s.signed.put(key, url)
 	}
 	return url, nil
 }

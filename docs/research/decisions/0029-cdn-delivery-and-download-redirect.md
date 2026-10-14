@@ -107,13 +107,20 @@ type Signer interface {
   for the CDN signers.
 - A mirror signs with the first member in read order that holds the blob and `Signs` the
   route. Signing never counts against a member's health.
-- A signer whose signing is a network call (gcs through IAM `signBlob`) caches URLs per
-  blob, route, overrides and expiry window.
+- A signer whose signing is a network call caches the URLs it signs, per blob, overrides
+  and expiry window: at most 4096 per store, the least recently used dropped first. That is
+  a gcs store signing through IAM `signBlob`, one request per URL: no local key, and
+  credentials that are impersonated, federated, the metadata server's, or named by
+  `google_access_id` alone. Local signers cache nothing: s3, gcs with a key, and azure,
+  whose user delegation SAS is signed locally with a key fetched about once a week.
 
 **Lifetime.**
 - `download.redirect.ttl` sets the minimum time a URL stays valid when handed out:
   5 minutes by default, at most 7 days (the V4 limit).
-- Storage URLs expire at issue time plus the TTL.
+- Storage URLs expire at issue time plus the TTL, except from a store that caches: those
+  expire on windows like CDN URLs, so one signature serves a window. A cached URL is handed
+  out only in its own window, so it always has at least the TTL left. A TTL over half the
+  V4 limit (3.5 days) is not windowed, so no URL outlives 7 days.
 - CDN URLs expire at the end of the current window plus the TTL, where a window is TTL long
   and starts on a multiple of it. Every client in a window gets the same URL for a blob, so
   edge caches keyed on the full URL still hit.

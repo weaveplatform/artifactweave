@@ -135,18 +135,21 @@ func TestCanSign(t *testing.T) {
 		cfg  ClientConfig
 		adc  string // GOOGLE_APPLICATION_CREDENTIALS contents, "" for none
 		want bool
+		net  bool // signs through IAM signBlob, one request per URL
 	}{
-		{"emulator with a key", ClientConfig{WithoutAuthentication: true, GoogleAccessID: "a", PrivateKey: []byte("k")}, "", true},
-		{"emulator without a key", ClientConfig{WithoutAuthentication: true, GoogleAccessID: "a"}, "", false},
-		{"named account", ClientConfig{GoogleAccessID: "a@p.iam.gserviceaccount.com"}, `{"type":"authorized_user"}`, true},
-		{"service-account key file", ClientConfig{CredentialsFile: "/k.json"}, "", true},
-		{"ADC service account", ClientConfig{}, `{"type":"service_account"}`, true},
-		{"ADC impersonation", ClientConfig{}, `{"type":"impersonated_service_account"}`, true},
-		{"ADC federation naming an account", ClientConfig{}, `{"type":"external_account","service_account_impersonation_url":"https://x"}`, true},
-		{"ADC federation naming none", ClientConfig{}, `{"type":"external_account"}`, false},
-		{"ADC user login", ClientConfig{}, `{"type":"authorized_user"}`, false},
-		{"ADC unreadable JSON", ClientConfig{}, `{`, false},
-		{"metadata server", ClientConfig{}, "", true},
+		{"emulator with a key", ClientConfig{WithoutAuthentication: true, GoogleAccessID: "a", PrivateKey: []byte("k")}, "", true, false},
+		{"emulator without a key", ClientConfig{WithoutAuthentication: true, GoogleAccessID: "a"}, "", false, false},
+		{"named account", ClientConfig{GoogleAccessID: "a@p.iam.gserviceaccount.com"}, `{"type":"authorized_user"}`, true, true},
+		{"named account with an ADC key", ClientConfig{GoogleAccessID: "a@p.iam.gserviceaccount.com"}, `{"type":"service_account"}`, true, false},
+		{"named account, unreadable ADC", ClientConfig{GoogleAccessID: "a@p.iam.gserviceaccount.com"}, `{`, true, true},
+		{"service-account key file", ClientConfig{CredentialsFile: "/k.json"}, "", true, false},
+		{"ADC service account", ClientConfig{}, `{"type":"service_account"}`, true, false},
+		{"ADC impersonation", ClientConfig{}, `{"type":"impersonated_service_account"}`, true, true},
+		{"ADC federation naming an account", ClientConfig{}, `{"type":"external_account","service_account_impersonation_url":"https://x"}`, true, true},
+		{"ADC federation naming none", ClientConfig{}, `{"type":"external_account"}`, false, false},
+		{"ADC user login", ClientConfig{}, `{"type":"authorized_user"}`, false, false},
+		{"ADC unreadable JSON", ClientConfig{}, `{`, false, false},
+		{"metadata server", ClientConfig{}, "", true, true},
 	} {
 		delete(env, "GOOGLE_APPLICATION_CREDENTIALS")
 		if c.adc != "" {
@@ -154,6 +157,9 @@ func TestCanSign(t *testing.T) {
 		}
 		if got := c.cfg.CanSign(); got != c.want {
 			t.Errorf("%s: CanSign = %v, want %v", c.name, got, c.want)
+		}
+		if got := c.cfg.SignsOverNetwork(); got != c.net {
+			t.Errorf("%s: SignsOverNetwork = %v, want %v", c.name, got, c.net)
 		}
 	}
 
