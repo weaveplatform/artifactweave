@@ -20,6 +20,17 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
+# Accepted trivy findings (deploy/check.sh), each with its reason:
+# - GCP-0066: Google-managed encryption keys are enough for acceptance data;
+#   a customer-managed key would add a KMS key ring the tests never exercise.
+# - GCP-0077: no access-log bucket. Cloud Audit Logs record the
+#   administrative calls, and object access logs need a second bucket.
+# - GCP-0078: no versioning. Blobs are content-addressed and never
+#   rewritten, and versioning would keep every deleted upload part, the cost
+#   soft_delete_policy below turns off (research 18).
+#trivy:ignore:GCP-0066
+#trivy:ignore:GCP-0077
+#trivy:ignore:GCP-0078
 resource "google_storage_bucket" "blobs" {
   name                        = "${var.name}-${random_id.suffix.hex}"
   location                    = upper(var.region)
@@ -73,8 +84,6 @@ resource "google_storage_bucket_iam_member" "app" {
   role   = "roles/storage.objectAdmin"
   member = "serviceAccount:${google_service_account.app.email}"
 }
-
-data "google_project" "this" {}
 
 data "google_client_openid_userinfo" "me" {}
 

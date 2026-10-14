@@ -22,11 +22,14 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
 | `conformance` | `ubuntu-latest` | P6 | Starts the `-cover` binary with a `docker-local` repo, clones `opencontainers/distribution-spec` at a pinned tag and runs its conformance module with `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials; uploads `cover-conformance` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario: the `test/terraform/` repositories fixture and `deploy/artifactweave/terraform/identity`. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69 and #85); uploads `cover-terraform` |
+| `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check` over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 | `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
 | `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
 `acceptance`, `acceptance-peers`, `conformance` and `terraform` are listed in the coverage job's `needs`
 and in the `gate` job's `needs`, so the merged coverage includes them and a failure blocks merge.
+`deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
+coverage.
 
 ## Why acceptance runs on Linux only
 
@@ -143,6 +146,39 @@ set. The identity scenario found that the provider creates key pairs with
 `platform_permission` and reads the result back with the `artifactory_permission_target`
 data source, which still calls `/artifactory/api/v2/security/permissions/{name}`.
 
+## Deployment Terraform checks
+
+`deploy/check.sh` (`make deploy-check`, and the `deploy-terraform` job) checks every
+directory under `deploy/` and `test/terraform` that holds `*.tf` files. Roots are found,
+not listed, so moving one needs no change to the script.
+
+| Step | What |
+|---|---|
+| `terraform fmt -check -recursive` | Formatting, including the `tests/*.tftest.hcl` files |
+| `terraform validate` | Each root, with `init -backend=false` against its committed lock file; state and plugins stay in a temporary directory. Roots on the jfrog providers validate through `test/terraform/run.sh`, whose filesystem mirror pins their zips |
+| tflint | Each root, with the rulesets pinned in `.tflint.hcl`. `azurerm_resources_missing_prevent_destroy` is off: every root is created and destroyed on purpose |
+| `trivy config` | Each root, with the checks embedded in the pinned binary (`--skip-check-update`). An accepted finding is a `#trivy:ignore:<id>` comment beside the resource with its reason, so it moves with the root |
+| `terraform test` | Each root with `tests/*.tftest.hcl`. The tests use `mock_provider` and `command = plan`: no credentials and no cloud calls |
+| terraform-docs | Each README with `BEGIN_TF_DOCS` markers is regenerated in a copy, using `.terraform-docs.yml`, and must match the committed file. `make deploy-docs` rewrites them in place |
+
+The script fetches terraform (unless the one on `PATH` is the pinned version), tflint,
+trivy and terraform-docs into the gitignored `.tools/` directory and checks each archive
+against the SHA-256 from its release, so a laptop and CI run the same versions. To move a
+tool, change its version and its four checksums (linux and darwin, amd64 and arm64) in
+`deploy/check.sh`. The rulesets' versions live in `.tflint.hcl`.
+
+Each root's `.terraform.lock.hcl` holds `h1:` hashes for linux and darwin on amd64 and
+arm64. The script shares a provider plugin cache across roots, and Terraform refuses a
+cached provider whose `h1:` hash the lock file lacks, so a lock written on one platform
+fails in CI. After changing a root's providers, run `terraform providers lock
+-platform=linux_amd64 -platform=linux_arm64 -platform=darwin_amd64 -platform=darwin_arm64`
+in it.
+
+Dependabot's `terraform` ecosystem updates the infrastructure roots' providers and lock
+files, minor and patch versions only: a provider major merged on mocked tests alone could
+break a real apply. `deploy/artifactweave` and `test/terraform` are left to `deps-refresh`,
+because `run.sh` pins their provider zips.
+
 ## AQL fixtures from the JFrog CLI
 
 `pkg/aql/aqltest/testdata` holds the AQL the pinned `jf` sends, one file per command shape.
@@ -164,4 +200,6 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | `make conformance` | The OCI conformance job (needs Docker and network for the spec clone) |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
+| `make deploy-check` | The deploy-terraform job (fetches pinned tools into `.tools/`; set `GITHUB_TOKEN` if tflint hits GitHub's rate limit) |
+| `make deploy-docs` | Rewrite the terraform-docs sections of the READMEs |
 | `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |

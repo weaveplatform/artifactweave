@@ -65,6 +65,14 @@ else
 	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate) $(TERRAFORM_SCENARIOS)
 endif
 
+## deploy-check: fmt, validate, tflint, trivy, mocked terraform test and the terraform-docs drift check over deploy/ and test/terraform, with pinned tools in .tools/
+deploy-check:
+	./deploy/check.sh
+
+## deploy-docs: rewrite the terraform-docs sections of the deploy/ READMEs
+deploy-docs:
+	./deploy/check.sh docs
+
 ## capture-aql: refresh pkg/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
 capture-aql:
 	./test/acceptance/capture-aql.sh
@@ -161,4 +169,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform capture-aql
+.PHONY: docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

@@ -1,6 +1,7 @@
 .git
 .claude
 .specoracle
+.tools
 /bin/
 /cover/
 /specoracle

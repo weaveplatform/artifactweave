@@ -14,5 +14,6 @@ output "workload_identity_provider" {
 }
 
 output "store_prefix" {
-  value = var.store_prefix
+  description = "Object prefix the local container writes under (blob.gcs.prefix)."
+  value       = var.store_prefix
 }

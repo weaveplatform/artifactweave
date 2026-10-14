@@ -4,6 +4,7 @@
 # come from variables so the same fixture runs locally and in CI.
 
 terraform {
+  required_version = ">= 1.6"
   required_providers {
     artifactory = {
       source = "jfrog/artifactory"

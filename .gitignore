@@ -27,3 +27,6 @@ go.work.sum
 # JFrog's OpenAPI definitions are proprietary. The parity oracle caches them
 # locally as a test oracle only (make oracle-fetch); they are never committed.
 /.specoracle/
+
+# Pinned tools for make deploy-check (deploy/check.sh fetches them)
+/.tools/

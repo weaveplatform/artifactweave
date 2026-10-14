@@ -1,8 +1,9 @@
 name: go | Quality gate
 
 # Every pull request passes vet, blocking lint, unit tests on Linux, macOS and
-# Windows, govulncheck, a cross-compile of every cmd/* binary, and the merged
-# coverage gate (>=95% total, >=90% per package). The `gate` job is the
+# Windows, govulncheck, a cross-compile of every cmd/* binary, the merged
+# coverage gate (>=95% total, >=90% per package), and static checks with
+# mocked tests over the deployment Terraform. The `gate` job is the
 # single required status check: make it required in branch protection, and
 # add jobs (acceptance against real dependencies in Docker, for example) to
 # its `needs` and to the coverage job as they appear.
@@ -239,6 +240,38 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  # Static checks and mocked tests over every Terraform root in deploy/ and
+  # test/terraform (decision 0030): fmt, validate, tflint, trivy, terraform
+  # test against mocked providers, and the terraform-docs drift check. The
+  # tools are pinned by version and SHA-256 in deploy/check.sh, which
+  # make deploy-check runs locally too. Go is only for run.sh, which
+  # validates the jfrog roots from its filesystem mirror.
+  deploy-terraform:
+    name: 'Deployment Terraform (fmt, validate, tflint, trivy, tests, docs)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Static checks and mocked tests
+        env:
+          # tflint --init fetches the pinned rulesets from GitHub releases;
+          # the token lifts the anonymous rate limit.
+          GITHUB_TOKEN: ${{ github.token }}
+        run: make deploy-check
+
   # Parity against JFrog's published OpenAPI definitions (decision 0001).
   # The definitions are proprietary, so they are cached per run under the
   # gitignored .specoracle directory and never committed; the committed
@@ -319,7 +352,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [unit, lint, vuln, build, acceptance, coverage, parity, terraform]
+    needs: [unit, lint, vuln, build, acceptance, coverage, parity, terraform, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Every gate job passed
