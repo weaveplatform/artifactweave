@@ -66,7 +66,10 @@ SDK offer.
   - Stat, Exists and Delete use object attributes; Delete treats not-found as success.
   - Walk lists `sha256/` only, with the attribute selection limited to name and size.
 - **Presigning:** V4 signed GET URLs. Local signing when a key is configured, otherwise
-  IAM `signBlob`.
+  IAM `signBlob`. The item's filename and media type travel as
+  `response-content-disposition` and `response-content-type` query parameters. With a
+  Cloud CDN key configured, the store also signs Cloud CDN URLs for the object
+  ([0029](0029-cdn-delivery-and-download-redirect.md)).
 - **Client:**
   - The HTTP client with JSON reads.
   - Credentials from Application Default Credentials or a service-account file.
@@ -104,7 +107,11 @@ SDK offer.
 - **Presigning:**
   - A service SAS signed with explicit container and blob names.
   - Or a user delegation SAS from a cached key under Entra ID.
-  - The start time is backdated 15 minutes.
+  - The item's filename and media type travel as `rscd` and `rsct`.
+  - For a storage URL the start time is backdated 15 minutes.
+  - For a Front Door URL the start and expiry are fixed per window and `rscc` caps the
+    edge's cache at the window, so every client in a window gets the same URL and the
+    cached copy expires with it ([0029](0029-cdn-delivery-and-download-redirect.md)).
 - **Credentials:** shared key, connection string, SAS token, `DefaultAzureCredential`,
   managed identity or workload identity.
 

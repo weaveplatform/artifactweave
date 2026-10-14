@@ -52,4 +52,5 @@ Status values: Proposed, Accepted, Superseded.
 | 0026 | [Workers runtime](0026-workers-runtime.md) |
 | 0027 | [Cloud blob backends: Google Cloud Storage and Azure Blob Storage](0027-cloud-blob-backends.md) |
 | 0028 | [Mirroring blobs across stores, clouds and regions](0028-blob-mirroring.md) |
+| 0029 | [CDN delivery and download redirect](0029-cdn-delivery-and-download-redirect.md) |
 | 0030 | [Reference deployments and platform testing](0030-reference-deployments.md) |
