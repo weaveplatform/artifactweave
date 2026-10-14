@@ -183,19 +183,22 @@ Read on 2026-10-14; list prices in USD, first tier.
 
 ## 5. artifactweave today
 
-Main at `00888fc`, after #139:
+At first written for main at `00888fc`, after #139; updated for #146 (the redirect policy)
+and #120 (CloudFront).
 
 | Behaviour | Source |
 |---|---|
-| A GET on a repository with `downloadRedirect` answers 302 to a presigned blob URL; HEAD, and conditional requests that resolve to 304 or 412, are answered locally | `internal/server/items.go` (`serveFile`), `internal/server/redirect.go` |
-| The signed URL lives 5 minutes (`presignTTL`), with no setting | `internal/server/redirect.go` |
+| A GET on a repository with `downloadRedirect` or `cdnRedirect` follows decision 0029's policy: conditional requests that resolve to 304 or 412 are answered locally; a repository with neither flag, a file under `download.redirect.min_size` (1 MiB) and `X-JFrog-Download-Redirect-To: None` stream; otherwise the store's CDN unless the header says `S3`, then storage for `downloadRedirect`, then stream | `internal/server/redirect.go` (`route`, `redirect`) |
+| HEAD is answered locally, never redirected | `internal/server/redirect.go` |
+| The URL lives `download.redirect.ttl`, 5 minutes by default; a CDN URL expires at the end of its TTL-long window plus the TTL | `internal/config`, `pkg/cdn` (`Expiry`) |
+| A 302 carries no `Content-Type`, `Content-Disposition` or `ETag`; the signed URL carries the name and media type as response overrides | `internal/server/redirect.go`, each backend's `SignURL` |
 | A redirected download is counted when it is a whole file or a range starting at byte 0, and `skipUpdateStats=true` opts out | `internal/server/redirect.go` (`countsDownload`) |
 | A signing failure is logged at WARN at most once a minute and the download streams | `internal/server/redirect.go` (`signFailed`) |
-| A 302 still carries the artifact's `Content-Type`, `Content-Disposition` and `ETag`, set before the redirect decision | `internal/server/items.go` (`serveFile`) |
-| `blob.Presigner.PresignGet(ctx, sha256, ttl)` is a type assertion: s3 signs with its presign client; gcs with a key or IAM `signBlob`; azure with a service or user delegation SAS but not on a pre-issued SAS token; fs never | `pkg/blob/blob.go`, [decision 0027](decisions/0027-cloud-blob-backends.md) |
-| A mirror signs with the first member in read order whose signing succeeds, without counting signing against the member's health | `pkg/blob/mirror/read.go` (`PresignGet`) |
-| `cdnRedirect` is accepted, stored and returned, and nothing reads it | `pkg/repo/repo.go` |
-| `X-JFrog-Download-Redirect-To` is not read | `internal/server` |
+| `blob.Signer` is `Signs(via)`, fixed when the store is built, and `SignURL(ctx, sha256, SignOptions)`. Storage URLs: s3 with its presign client; gcs when its credentials can sign; azure unless it runs on a pre-issued SAS; fs never. CDN URLs: s3 with a CloudFront configuration; gcs and azure not yet | `pkg/blob/blob.go`, `pkg/blob/{s3,gcs,azure}` |
+| CloudFront URLs are canned-policy signed with `aws-sdk-go-v2/feature/cloudfront/sign`, SHA-1 or SHA-256, with an RSA or ECDSA key read from a file at start | `pkg/cdn/cloudfront.go`, `internal/app/blob.go` |
+| A mirror signs with the first member in read order that holds the blob and signs the route, without counting signing against the member's health | `pkg/blob/mirror/read.go` (`SignURL`) |
+| The server refuses to start with a CDN on the archive tier, or on the `base_url` host or a subdomain of it | `internal/config/config.go` (`validateCDN`) |
+| A fake CloudFront edge checks signatures and serves blobs from a store; acceptance runs `jf rt dl` of a split download through it, with MinIO behind | `pkg/cdn/cdntest`, `test/acceptance/features/cdn.feature` |
 
 ## Versions at the research baseline
 

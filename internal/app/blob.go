@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"path/filepath"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -17,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/s3"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -170,8 +172,13 @@ func buildBackend(
 		if err != nil {
 			return nil, err //nolint:wrapcheck // wrapped with the key by openBackend
 		}
+		cdnSigner, err := cloudFront(b.S3.CDN.CloudFront)
+		if err != nil {
+			return nil, err
+		}
 		return s3.New(client, s3.Options{ //nolint:wrapcheck // as above
 			Bucket: b.S3.Bucket, Prefix: b.S3.Prefix, Sessions: sessions, Presign: presign,
+			CDN: cdnSigner,
 		})
 	case "gcs":
 		cc := gcs.ClientConfig{
@@ -203,6 +210,27 @@ func buildBackend(
 	default:
 		return nil, fmt.Errorf("%w %q", config.ErrUnknownBlob, b.Backend)
 	}
+}
+
+// cloudFront builds the CloudFront signer c configures, or none. The key
+// file is read and parsed here, at start, so a wrong path or a key in the
+// wrong form fails startup rather than the first download.
+func cloudFront(c config.CloudFrontConfig) (cdn.Signer, error) {
+	if !c.Enabled() {
+		return nil, nil //nolint:nilnil // no CDN is a valid answer
+	}
+	key, err := os.ReadFile(c.PrivateKeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("cloudfront private_key_file: %w", err)
+	}
+	signer, err := cdn.NewCloudFront(cdn.CloudFrontConfig{
+		Domain: c.Domain, KeyPairID: c.KeyPairID, PrivateKey: key, Hash: c.Hash,
+		PathPrefix: c.PathPrefix,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cloudfront: %w", err)
+	}
+	return signer, nil
 }
 
 // azureClient passes only the secret the chosen credential uses: the SDK

@@ -2,6 +2,7 @@ package containertest
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -47,17 +48,31 @@ type MinIOEndpoint struct {
 func MinIO(t *testing.T) MinIOEndpoint {
 	t.Helper()
 	RequireLinux(t)
-	ctx := context.Background()
-	ctr, err := tcminio.Run(ctx, MinIOImage)
-	testcontainers.CleanupContainer(t, ctr)
+	ep, stop, err := RunMinIO(context.Background())
 	if err != nil {
-		t.Fatalf("start minio: %v", err)
+		t.Fatal(err)
+	}
+	t.Cleanup(stop)
+	return ep
+}
+
+// RunMinIO starts MinIO and returns its endpoint and a function that
+// removes it, for callers without a *testing.T such as acceptance steps;
+// check CheckLinux first.
+func RunMinIO(ctx context.Context) (MinIOEndpoint, func(), error) {
+	ctr, err := tcminio.Run(ctx, MinIOImage)
+	stop := func() { _ = testcontainers.TerminateContainer(ctr) }
+	if err != nil {
+		stop()
+		return MinIOEndpoint{}, nil, fmt.Errorf("start minio: %w", err)
 	}
 	endpoint, err := ctr.ConnectionString(ctx)
 	if err != nil {
-		t.Fatalf("minio endpoint: %v", err)
+		stop()
+		return MinIOEndpoint{}, nil, fmt.Errorf("minio endpoint: %w", err)
 	}
-	return MinIOEndpoint{URL: "http://" + endpoint, User: ctr.Username, Password: ctr.Password}
+	return MinIOEndpoint{URL: "http://" + endpoint, User: ctr.Username, Password: ctr.Password},
+		stop, nil
 }
 
 // FakeGCS starts fake-gcs-server for t and returns its JSON API endpoint,

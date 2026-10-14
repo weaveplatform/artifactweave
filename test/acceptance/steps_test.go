@@ -24,6 +24,7 @@ import (
 	"github.com/cucumber/godog"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
+	"github.com/weaveplatform/artifactweave/pkg/cdn/cdntest"
 )
 
 // testMasterKey is a fixed key so scenarios are reproducible; it protects
@@ -61,6 +62,14 @@ type world struct {
 	// issuer is the scenario's fake OIDC provider, nil until a step starts
 	// it; its URL is {issuer}.
 	issuer *idtokentest.Issuer
+	// env is added to the server's environment when it starts, for
+	// scenarios that configure another blob store.
+	env []string
+	// edge is the scenario's fake CDN edge, nil unless a step starts it.
+	edge *cdntest.Edge
+	// closers release what steps started (containers, the edge), after
+	// the server has stopped.
+	closers []func()
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -92,11 +101,16 @@ func (w *world) register(sc *godog.ScenarioContext) {
 			w.issuer.Close()
 			w.issuer = nil
 		}
+		for i := len(w.closers) - 1; i >= 0; i-- {
+			w.closers[i]()
+		}
+		w.closers, w.edge, w.env = nil, nil, nil
 		if aqlCapture != "" {
 			err = errors.Join(err, w.captureAQL(s.Name))
 		}
 		return ctx, err
 	})
+	w.registerCDN(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
@@ -180,6 +194,7 @@ func (w *world) start() error {
 		// rather than waiting out the production grace period.
 		"ARTIFACTWEAVE_GC_GRACE_PERIOD=1ms",
 	)
+	w.server.Env = append(w.server.Env, w.env...)
 	if coverDir != "" {
 		w.server.Env = append(w.server.Env, "GOCOVERDIR="+coverDir)
 	}

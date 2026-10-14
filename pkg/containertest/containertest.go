@@ -8,6 +8,7 @@ package containertest
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/moby/moby/client"
@@ -22,17 +23,25 @@ func RequireLinux(t *testing.T) {
 		t.Skip("short mode")
 	}
 	testcontainers.SkipIfProviderIsNotHealthy(t)
-	ctx := context.Background()
+	if err := CheckLinux(context.Background()); err != nil {
+		t.Skip(err)
+	}
+}
+
+// CheckLinux returns an error unless a Docker daemon that runs Linux
+// containers is available, for callers without a *testing.T.
+func CheckLinux(ctx context.Context) error {
 	cli, err := testcontainers.NewDockerClientWithOpts(ctx)
 	if err != nil {
-		t.Skipf("no Docker client: %v", err)
+		return fmt.Errorf("no Docker client: %w", err)
 	}
 	defer func() { _ = cli.Close() }()
 	res, err := cli.Info(ctx, client.InfoOptions{})
 	if err != nil {
-		t.Skipf("no Docker info: %v", err)
+		return fmt.Errorf("no Docker info: %w", err)
 	}
 	if res.Info.OSType != "linux" {
-		t.Skipf("Docker runs %s containers; this test needs Linux containers", res.Info.OSType)
+		return fmt.Errorf("docker runs %s containers; this needs Linux containers", res.Info.OSType)
 	}
+	return nil
 }

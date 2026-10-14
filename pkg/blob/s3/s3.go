@@ -39,6 +39,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
 // API is the subset of *s3.Client the store uses, so tests can substitute a
@@ -141,12 +142,16 @@ type Options struct {
 	// Presign signs storage URLs when set (blob.Signer); NewClient always
 	// returns one.
 	Presign PresignAPI
+	// CDN signs CDN URLs when set, such as a cdn.CloudFront in front of the
+	// bucket (decision 0029).
+	CDN cdn.Signer
 }
 
 // Store is a blob.Store on an S3 bucket.
 type Store struct {
 	api      API
 	presign  PresignAPI
+	cdn      cdn.Signer
 	bucket   string
 	prefix   string
 	partSize int64
@@ -179,8 +184,13 @@ func New(api API, o Options) (*Store, error) {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
+	if o.CDN != nil {
+		if err := o.CDN.Covers(prefix); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+		}
+	}
 	return &Store{
-		api: api, presign: o.Presign, bucket: o.Bucket, prefix: prefix,
+		api: api, presign: o.Presign, cdn: o.CDN, bucket: o.Bucket, prefix: prefix,
 		partSize: o.PartSize, sessions: o.Sessions,
 	}, nil
 }
@@ -533,8 +543,13 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 }
 
 // Signs reports whether the store signs URLs for via: storage URLs when it
-// has a presign client. It signs no CDN route yet.
-func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign != nil }
+// has a presign client, CDN URLs when it has a CDN signer.
+func (s *Store) Signs(via blob.Via) bool {
+	if via == blob.ViaCDN {
+		return s.cdn != nil
+	}
+	return s.presign != nil
+}
 
 // SignURL returns a time-limited GET URL, carrying o's filename and media
 // type as response overrides.
@@ -544,6 +559,15 @@ func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (st
 	}
 	if !s.Signs(o.Via) {
 		return "", fmt.Errorf("blob/s3: sign %s via %s: %w", sha, o.Via, blob.ErrCannotSign)
+	}
+	if o.Via == blob.ViaCDN {
+		u, err := s.cdn.Sign(s.blobKey(sha), cdn.Request{
+			TTL: o.TTL, Filename: o.Filename, ContentType: o.ContentType,
+		})
+		if err != nil {
+			return "", fmt.Errorf("blob/s3: sign %s via %s: %w", sha, s.cdn.Provider(), err)
+		}
+		return u, nil
 	}
 	if o.TTL <= 0 || o.TTL > maxSignedTTL {
 		return "", fmt.Errorf(
