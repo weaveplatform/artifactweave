@@ -36,7 +36,7 @@ Research baseline: **2026-10-12**.
 | 9 | `<repo>-cache` as a real repository would leak into listings | a repository-key resolver with a `cached` flag ([ADR 0007](decisions/0007-remote-repositories.md)) |
 | 10 | The Terraform backend protocol was undecided | `terraformbackend` cut from v1 |
 | 11 | High availability was asserted without any HA-capable component | the storage record states single-process; HA is a later phase |
-| 12 | Large uploads (S3 multipart, Docker chunks, CLI multipart) were undesigned | a blob upload-session contract; the CLI's multipart probe answers `supported: false` |
+| 12 | Large uploads (S3 multipart, Docker chunks, CLI multipart) were undesigned | a blob upload-session contract; the CLI's multipart probe answered `supported: false` until the multipart protocol landed (#91) and now answers `true` |
 | 13 | Range requests and download redirects were absent | ranged reads and presigned URLs in the blob contract |
 | 14 | Checksum sidecars and `originalChecksums` were undesigned | sidecars served from metadata and validated per `checksumPolicyType` |
 | 15 | AQL-to-SQL dialect traps were unnamed | named in [ADR 0012](decisions/0012-search-and-aql.md); fixtures run on both dialects |
@@ -86,8 +86,9 @@ listing; `?lastModified` needs deploy permission; properties `recursive` default
 PATCH property values may be string, array or null; the folder-download setting; trash
 status codes and permissions; the latest-by-properties response shape; AQL `distinct`
 default and the admin-only `builds` domain; `$rf` unverified; `terraformType` case
-handling; `encryptStates` default true; string-typed booleans per repository class;
-federated `members.enabled` is a string; remote `force*Authentication` fields; JSON keys
+handling; `encryptStates` default true; the repository flags and federated
+`members.enabled` that JFrog's docs type as strings (Artifactory sends booleans, as the
+Terraform apply in #109 showed; [research 03](03-repository-configuration-model.md#typing-traps)); remote `force*Authentication` fields; JSON keys
 known only from the provider; package types allowed per class; OCI end-4c, end-7b and
 `OCI-Subject`; the Docker challenge `service` value unverified; the GOPROXY `|` separator;
 the npm web-login `done` endpoint; npm token endpoints and `api/npm/auth` unverified; npm
@@ -138,7 +139,11 @@ CLI; no SSH-key endpoints exist.
 
 Citing rather than vendoring the proprietary specifications; sha256 content addressing
 with sha1 and md5 indexed; a native permission evaluator rather than a policy language; the
-JWT subject and scope design; events emitted from services rather than handlers; treating
-`federated` as local when the only member is the instance itself; the three configuration
-layers; chi fakes for upstreams; generated code and entry points excluded from coverage;
-Prometheus text at the metrics path regardless of licence tier.
+JWT subject and scope design; events emitted from services rather than handlers; the three
+configuration layers; chi fakes for upstreams; generated code and entry points excluded
+from coverage; Prometheus text at the metrics path regardless of licence tier.
+
+Treating `federated` as local when the only member is the instance itself also survived
+the reviews; the owner withdrew it on 2026-10-13 in favour of federation between
+artifactweave peers ([ADR 0003](decisions/0003-repository-model.md),
+[ADR 0022](decisions/0022-federated-repositories.md)).

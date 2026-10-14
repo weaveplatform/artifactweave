@@ -3704,7 +3704,7 @@ type CopyOrMoveResult struct {
 
 // CreateSignedUrlRequest Request for a time-limited download URL for one artifact. Not supported by artifactweave v1 (Enterprise feature in Artifactory); declared for parity.
 type CreateSignedUrlRequest struct {
-	// Expiry Optional within this object. Absolute expiry as Unix epoch seconds. Mutually exclusive with `valid_for_secs`.
+	// Expiry Optional within this object. Absolute expiry as Unix epoch milliseconds. Mutually exclusive with `valid_for_secs`.
 	Expiry *int64 `json:"expiry,omitempty"`
 
 	// RepoPath Required within this object. `<repoKey>/<path>` of the artifact to sign.

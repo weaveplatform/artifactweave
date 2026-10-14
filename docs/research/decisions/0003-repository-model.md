@@ -7,8 +7,8 @@ Status: Proposed
 Artifactory's repository is the unit everything else hangs off: a key, a class (`rclass`:
 local, remote, virtual, federated), a package type, a layout, include and exclude patterns
 and a long tail of per-type settings. The JSON configuration is what the Terraform
-providers, the JFrog CLI and the YAML descriptor all speak, with typing quirks (some
-booleans are strings on local repositories) and keys that exist only in the Terraform
+providers, the JFrog CLI and the YAML descriptor all speak, with typing quirks (JFrog
+documents some booleans as strings, while Artifactory sends booleans) and keys that exist only in the Terraform
 provider source.
 
 Docker clients need a URL layout. Artifactory offers three (repository path, subdomain and
@@ -71,8 +71,9 @@ rejects such keys.
 
 A single struct that is byte-compatible with the wire format removes a conversion layer
 and lets the same validation serve the REST API, the YAML descriptor and future Go
-consumers. Faithful reproduction of the typing quirks is cheaper than fighting every client
-that round-trips them.
+consumers. Following the types Artifactory actually sends, rather than the documented ones,
+is cheaper than fighting every client that round-trips them: the Terraform provider decodes
+the flags documented as strings into booleans, and its refresh fails on a string (#109).
 
 Repository-path routing is the only Docker method that works on one port with no
 infrastructure, so it is the one a single static binary must own.

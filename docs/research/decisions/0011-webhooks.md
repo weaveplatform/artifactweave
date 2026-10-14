@@ -40,8 +40,9 @@ than explaining a subset. Emitting from services keeps the event stream complete
 the entry point.
 
 **Alternatives considered:**
-- *Workers (JFrog's serverless hooks)*: an Enterprise add-on with a TypeScript runtime;
-  out of scope.
+- *Workers (JFrog's serverless hooks)* in place of webhooks: Workers run user code on
+  platform actions and are decided separately ([0026](0026-workers-runtime.md)); webhooks
+  stay the integration point for external systems.
 
 ## Constraints
 

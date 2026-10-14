@@ -76,7 +76,9 @@ index makes the version rules correct across formats. A Quartz parser is require
 ## Constraints
 
 - Policies run in one process; a second process would double-run them.
-- Cold-storage archive policies and smart archiving are out of scope and answer `501`.
+- Cold-storage archive policies and smart archiving run on this engine and scheduler, but
+  move content to the cold blob tier rather than the trash can
+  ([0024](0024-cold-storage-tier.md)).
 
 ## Verification
 

@@ -69,8 +69,12 @@ envelope is diagnosable; a missing route that returns HTML is not.
   Behaviour that is undocumented and only observable on a live Artifactory is listed in
   [12-open-questions](../12-open-questions.md) and must be captured before it is fixed in
   code.
-- JFrog's wire formats mix camelCase, snake_case and kebab-case field names, string-typed
-  booleans and per-service error envelopes. These are reproduced, not normalised.
+- JFrog's wire formats mix camelCase, snake_case and kebab-case field names and
+  per-service error envelopes. These are reproduced, not normalised. Booleans follow what
+  Artifactory sends rather than JFrog's docs: the repository flags documented as strings
+  are written as booleans and accepted in either spelling, because the Terraform provider
+  decodes them as booleans (#109,
+  [03](../03-repository-configuration-model.md#typing-traps)).
 - Where a product synchronises between instances (federation, distribution, Access
   Federation, topology), compatibility covers the management APIs only; the traffic
   between instances is artifactweave's own protocol

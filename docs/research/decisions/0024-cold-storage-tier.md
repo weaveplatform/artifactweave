@@ -15,8 +15,9 @@ the same instance over a second cold instance.
 
 **Two blob stores.** The application configuration may define a `cold_blob` store next to
 the hot `blob` store ([0004](0004-storage-sql-metadata-and-blobs.md)), using the same
-backends: local disk, or S3 with a storage class such as an archive or infrequent-access
-class. Without a cold store configured, archive policies can be created but runs fail with
+backends: local disk, S3, Google Cloud Storage, Azure Blob Storage or a mirror of them
+([0027](0027-cloud-blob-backends.md), [0028](0028-blob-mirroring.md)), typically a bucket
+or container whose default storage class is an archive or infrequent-access class. Without a cold store configured, archive policies can be created but runs fail with
 a clear error and the namespace endpoint still answers.
 
 **Archiving moves items, not just bytes.** A run selects items or package versions, then
@@ -67,8 +68,8 @@ another instance can be told apart.
 ## Rationale
 
 A cold tier inside the instance delivers the cost saving that motivates cold storage
-without operating a second registry, and S3 storage classes already give the cheaper
-medium. Keeping full metadata in the hot database while the bytes move means search,
+without operating a second registry, and the object stores' archive and infrequent-access
+storage classes already give the cheaper medium. Keeping full metadata in the hot database while the bytes move means search,
 preview and restore never touch the slow tier until content is actually needed. Running
 both JFrog policy families on one engine avoids two archiving implementations for one
 purpose.
@@ -78,8 +79,8 @@ Alternatives considered:
 - *A separate cold artifactweave instance (JFrog's model).* Recorded as a possible later
   option; it would reuse the peer protocol ([0021](0021-peer-trust-and-sync-protocol.md))
   as the transport.
-- *Changing the storage class of objects in place.* Ties archiving to S3 and makes local
-  disk deployments unable to archive.
+- *Changing the storage class of objects in place.* Ties archiving to each provider's
+  storage-class API and makes local disk deployments unable to archive.
 
 ## Constraints
 

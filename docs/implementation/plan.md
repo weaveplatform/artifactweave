@@ -346,7 +346,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 **Tasks**
 1. Repositories API ([research 02](../research/02-artifactory-core-api-inventory.md) A1) including batch endpoints, `existence`, `configurations`, v2 reads, exact status codes.
 2. Items: deploy with checksum headers and matrix properties, checksum deploy, explode archive, folder create, download with `Range` and `Accept-Ranges`, delete, file and folder info, `?list`, `?stats`, `?lastModified`, `?properties`, `?permissions`, set, delete and PATCH properties, copy and move with `dry` and `suppressLayouts`, archive entry download, folder archive download, `zap`, `storageinfo`, trash can and restore, GC (including reaping stale upload sessions found through `UploadStore.Stale`, deferred from P2), `.sha1/.md5/.sha256` sidecars served from metadata and validated per `checksumPolicyType`, matrix-param resolution on GET.
-3. `GET /api/v1/uploads/config` returning `{"supported":false}`.
+3. `GET /api/v1/uploads/config`. It answered `{"supported":false}` until the JFrog CLI multipart protocol landed (#91) and now answers `true`.
 4. Package-index skeleton and the `generic` format handler.
 5. `pkg/aql` limited to the CLI's query shape (`items.find` with `$or`/`$and`, `$match`, `$ne`, `@prop`, `type`, `include`, `sort`, `offset`, `transitive`, `limit`), with fixtures captured from `jf rt s/dl/del/cp/mv/sp` and run on both dialects.
 6. Minimal admin Basic auth and the seeded `admin`, `anonymous`, `readers`, `Anything`, `Any Remote` principals and targets; `artifactory-build-info` repo.
