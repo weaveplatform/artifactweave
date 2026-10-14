@@ -59,7 +59,10 @@ The server refuses to start unless W <= R <= M.
   then healthy members by observed latency.
 - A failure part-way through a read reopens on the next member and seeks to the same
   offset, which is safe because blobs are immutable.
-- Presigned URLs come from the first healthy member in read order that can sign.
+- A redirected download is signed by the first member in read order that holds the blob
+  and signs the route asked for: the object store, or the member's CDN. Each member has its
+  own `cdn` block, so a mirror can put a different CDN in front of each cloud. Signing never
+  counts against a member's health ([0029](0029-cdn-delivery-and-download-redirect.md)).
 
 **Health.** Each member has a circuit breaker: consecutive failures open it, and a timed
 re-check half-opens it. An open member is skipped for reads and treated as down for
@@ -149,7 +152,8 @@ Part sizes that need a chunk above 256 MiB stop the mirror from starting (issue 
 - A quorum write is as slow as the W-th fastest member.
 
 **Presigned URLs.** They bypass the mirror's health checks once handed out. A member that
-fails after signing serves errors until the URL expires.
+fails after signing serves errors until the URL expires, and a CDN may keep serving its
+cached copy for longer ([0029](0029-cdn-delivery-and-download-redirect.md) Constraints).
 
 **Configuration.** Member lists are set in the configuration file only. Environment
 variables can override keys of members the file declares. Credentials come from each

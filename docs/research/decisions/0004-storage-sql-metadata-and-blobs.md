@@ -13,7 +13,8 @@ Artifactory's storage API exposes items with a `path` that has a leading slash, 
 exposes the same items with a parent `path` of `.` for the root and a separate `name`,
 checksum deploy looks up existing binaries by sha1 or sha256, Maven clients PUT `.sha1`
 and `.md5` files beside artifacts, the JFrog CLI downloads with `Range` requests, and
-`downloadRedirect` means a 302 to a signed object-store URL. Large uploads arrive as Docker
+`downloadRedirect` means a 302 to a signed object-store URL or, when the store has one, a CDN
+([0029](0029-cdn-delivery-and-download-redirect.md)). Large uploads arrive as Docker
 chunks and as the CLI's multipart protocol.
 
 ## Decision
@@ -44,7 +45,10 @@ contract:
   multipart upload can resume across requests.
 - `Open(ctx, digest) → io.ReadSeekCloser` so handlers serve `206` with
   `http.ServeContent`; the s3 backend passes `Range` through.
-- `PresignGet(ctx, digest, ttl)` for `downloadRedirect` on object stores.
+- `Signs(via)` and `SignURL(ctx, digest, opts)` for redirected downloads, to the object
+  store or to a CDN in front of it, with the filename and media type as response
+  overrides. `Signs` is fixed at construction, so the server knows without trying whether a
+  store can sign ([0029](0029-cdn-delivery-and-download-redirect.md)).
 - `Delete`, `Exists`, `Stat`.
 
 **Checksum sidecars.** `.sha1`, `.md5`, `.sha256` and `.sha512` files are never stored.

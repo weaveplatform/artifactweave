@@ -18,6 +18,7 @@ Status: skeleton (P0). Completed in P18 before the first release candidate.
 | Registry → upstream registries | Remote repository credentials, proxies, client TLS certificates; upstream content is untrusted until checksummed |
 | Registry → webhook receivers | Outbound HTTP with HMAC signing; receivers are untrusted |
 | Registry → database and blob store | Trusted infrastructure; sealed columns protect secrets at rest |
+| Signed URLs → object stores and CDNs | A redirected download hands the client a time-limited URL to the object store or a CDN, signed after the permission check. Anyone holding the URL can fetch the blob until it expires; the registry cannot revoke it. Front Door validates nothing and serves its cached copy for the exact URL (decision 0029) |
 | Operators → configuration | Strict YAML, descriptor PATCH, Terraform with admin tokens |
 
 ## Threats to analyse (P18)
@@ -32,6 +33,11 @@ Status: skeleton (P0). Completed in P18 before the first release candidate.
 - Denial of service: unbounded uploads, AQL cost, metadata merge storms on virtual
   repositories, webhook retry amplification.
 - Multi-tenancy: project isolation, shared repositories, storage quotas.
+- Signed URL and CDN leakage: URLs in client logs, proxies and CI output; the Front Door
+  exposure window (URL window plus TTL plus edge cache, and stale copies served while the
+  origin errors); a CDN cache policy that keys on the wrong parameters; a Cloud CDN bucket
+  left public; credentials forwarded to a CDN host that is a subdomain of the registry, or
+  in headers Go does not strip (`X-JFrog-Art-Api`) (decision 0029).
 - Workers sandbox: scripts run in helper processes with a 64 MiB per-execution memory cap,
   a 1 s CPU budget, wall-clock limits, no filesystem and an outbound allow-list (decision
   0026). Analyse escape from goja into the helper, abuse of platform calls made on the
@@ -41,5 +47,6 @@ Status: skeleton (P0). Completed in P18 before the first release candidate.
 
 See decisions [0005](../research/decisions/0005-authentication-and-tokens.md),
 [0006](../research/decisions/0006-authorization-native-permission-model.md),
-[0017](../research/decisions/0017-sealed-columns-and-master-key.md) and the body and
+[0017](../research/decisions/0017-sealed-columns-and-master-key.md),
+[0029](../research/decisions/0029-cdn-delivery-and-download-redirect.md) and the body and
 upload limits in [0004](../research/decisions/0004-storage-sql-metadata-and-blobs.md).
