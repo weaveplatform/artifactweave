@@ -1,4 +1,4 @@
-# Azure acceptance environment
+# azure/single-bucket: the Azure acceptance environment
 
 A real Azure storage account for artifactweave's `azure` blob backend. It's used by
 artifactweave running in a local container, by the real-cloud conformance tests run locally,
@@ -44,7 +44,7 @@ In `uksouth`, in resource group `artifactweave-acc-rg`:
 ```bash
 az login
 az account set --subscription c33dbc35-f86d-4b7c-a81e-2a33eb3f7946
-make apply        # or, from the repository root: make azure-apply
+make apply        # from the repository root: make azure-apply, or make platform-apply SCENARIO=azure/single-bucket
 make up           # mints the SAS, builds the image, starts artifactweave on port 8082
 make smoke        # deploys and downloads 40 MiB, then reads the blob's committed block list
 make conformance  # the real-Azure blob contract and probes, as you
@@ -65,6 +65,21 @@ make destroy      # removes everything, the account's blobs included
 - **Git-ignored:** `.local/` (configuration, master key, admin password, SAS) and the
   Terraform state.
 
+
+## Moved from `deploy/terraform/acceptance-azure`
+
+This scenario lived at `deploy/terraform/acceptance-azure` until #125. Terraform state, `.secrets/` and
+`.local/` are git-ignored, so the move left them behind. If an environment is up from the old
+path, move them here before running any target, or Terraform will plan to create everything
+again:
+
+```bash
+old=deploy/terraform/acceptance-azure new=deploy/platform/terraform/azure/single-bucket
+mv "$old"/terraform.tfstate* "$new"/ && mv "$old"/.local "$new"/ 2>/dev/null; rm -rf "$old"/.terraform
+```
+
+Then run `make plan` here; it should show no changes. Both acceptance environments were
+destroyed on 2026-10-14, so there was nothing to move at the time.
 
 ## Inputs, outputs and resources
 

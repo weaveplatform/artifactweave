@@ -152,7 +152,7 @@ caches.
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.
 
-**Dependencies.** Dependabot's `terraform` ecosystem covers `deploy/platform` (the `deploy/terraform` roots until they move there) with major
+**Dependencies.** Dependabot's `terraform` ecosystem covers `deploy/platform` with major
 versions ignored, since a provider major merged on mocked tests alone could break a real
 apply. `deploy/artifactweave` and `test/terraform` are excluded: `run.sh` pins the
 `jfrog/artifactory` provider zip by SHA-256, which Dependabot cannot update, so

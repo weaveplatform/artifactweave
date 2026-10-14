@@ -1,4 +1,4 @@
-# GCS acceptance environment
+# gcp/single-bucket: the GCS acceptance environment
 
 A real Google Cloud Storage bucket for artifactweave's `gcs` blob backend. Three things use it:
 - artifactweave running in a local container;
@@ -29,7 +29,7 @@ Nothing uses a service account key. The organisation enforces
 ```bash
 gcloud auth application-default login          # once
 gcloud auth application-default set-quota-project <project>
-make apply        # or, from the repository root: make gcp-apply
+make apply        # from the repository root: make gcp-apply, or make platform-apply SCENARIO=gcp/single-bucket
 make up           # builds the image, starts artifactweave against the bucket on port 8081
 make smoke        # deploys and downloads 40 MiB through the container
 make conformance  # the real-GCS blob contract and probes
@@ -47,6 +47,21 @@ make destroy      # removes everything, the bucket's objects included
   the database is sealed with that key.
 - **Git-ignored:** `.secrets/`, `.local/` and the Terraform state.
 
+
+## Moved from `deploy/terraform/acceptance`
+
+This scenario lived at `deploy/terraform/acceptance` until #125. Terraform state, `.secrets/` and
+`.local/` are git-ignored, so the move left them behind. If an environment is up from the old
+path, move them here before running any target, or Terraform will plan to create everything
+again:
+
+```bash
+old=deploy/terraform/acceptance new=deploy/platform/terraform/gcp/single-bucket
+mv "$old"/terraform.tfstate* "$new"/ && mv "$old"/{.secrets,.local} "$new"/ 2>/dev/null; rm -rf "$old"/.terraform
+```
+
+Then run `make plan` here; it should show no changes. Both acceptance environments were
+destroyed on 2026-10-14, so there was nothing to move at the time.
 
 ## Inputs, outputs and resources
 

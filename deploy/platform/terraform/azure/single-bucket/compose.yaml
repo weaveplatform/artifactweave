@@ -1,11 +1,12 @@
 # artifactweave in a local container, storing blobs in the acceptance storage
 # account. Port 8082, so it can run beside the GCS environment's 8081.
-# credentials.sh renders .local/ from the Terraform outputs first.
+# credentials.sh renders .local/ from the Terraform outputs first. The project
+# name keeps the data volume (acceptance-azure_data) from before the move.
 name: acceptance-azure
 services:
   artifactweave:
     build:
-      context: ../../..
+      context: ${ARTIFACTWEAVE_ROOT:?run through make, or set ARTIFACTWEAVE_ROOT to the repository root}
       args:
         VERSION: ${VERSION:-devel}
         COMMIT: ${COMMIT:-unknown}
