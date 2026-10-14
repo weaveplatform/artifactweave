@@ -59,11 +59,27 @@ func (s *Store) each(
 	op, sha string,
 	f func(m *member) error,
 ) error {
+	return s.try(ctx, ms, op, sha, true, f)
+}
+
+// try is each with the health observation optional. Signing turns it off:
+// a signature exercises the member's credentials, not its storage, so a
+// member that cannot sign (Azure on a SAS token, GCS without signBlob)
+// must not open its breaker and lose the reads it serves perfectly well.
+func (s *Store) try(
+	ctx context.Context,
+	ms []*member,
+	op, sha string,
+	observed bool,
+	f func(m *member) error,
+) error {
 	var failures []error
 	for _, m := range ms {
 		start := s.now()
 		err := f(m)
-		s.observe(m, start, err)
+		if observed {
+			s.observe(m, start, err)
+		}
 		switch {
 		case err == nil:
 			return nil
@@ -332,7 +348,8 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 }
 
 // PresignGet returns a time-limited URL from the first member, in read
-// order, that holds the blob and can presign.
+// order, that holds the blob and can presign. A member's signing failure
+// moves on to the next member but never counts against its health.
 func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (string, error) {
 	if err := s.check(ctx, "presign", sha); err != nil {
 		return "", err
@@ -343,7 +360,7 @@ func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (
 	}
 	capable := false
 	var url string
-	err = s.each(ctx, ms, "presign", sha, func(m *member) error {
+	err = s.try(ctx, ms, "presign", sha, false, func(m *member) error {
 		p, ok := m.Store.(blob.Presigner)
 		if !ok {
 			return fmt.Errorf("presigning: %w", blob.ErrNotFound)
@@ -351,8 +368,12 @@ func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (
 		capable = true
 		if probing {
 			// Without an index record, only a member that holds the blob
-			// may hand out a URL to it.
-			if ok, err := m.Store.Exists(ctx, sha); err != nil || !ok {
+			// may hand out a URL to it. The probe is a storage call, so
+			// unlike the signature its outcome counts toward health.
+			start := s.now()
+			ok, err := m.Store.Exists(ctx, sha)
+			s.observe(m, start, err)
+			if err != nil || !ok {
 				return errors.Join(err, blob.ErrNotFound)
 			}
 		}

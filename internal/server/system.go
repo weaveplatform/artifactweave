@@ -29,6 +29,9 @@ const versionMediaType = "application/vnd.org.jfrog.artifactory.system.Version+j
 type artifactoryService struct {
 	artgen.UnimplementedStrict
 	cfg Config
+	// signWarn throttles the log line for a failing download-redirect
+	// signer; nil, in services built only to reach the store, logs each.
+	signWarn *throttle
 }
 
 type accessService struct {

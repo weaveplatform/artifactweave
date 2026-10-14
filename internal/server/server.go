@@ -113,7 +113,7 @@ func New(cfg Config) http.Handler {
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
-	artSvc := artifactoryService{cfg: cfg}
+	artSvc := artifactoryService{cfg: cfg, signWarn: newThrottle(signWarnEvery)}
 	accSvc := accessService{cfg: cfg}
 
 	// Hand-written routes go first so they win over anything a generated mux
