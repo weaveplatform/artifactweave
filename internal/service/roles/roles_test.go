@@ -102,10 +102,12 @@ func TestEnvironments(t *testing.T) {
 		t.Fatalf("assigned through a project: %v", err)
 	}
 	must(t, db.Projects().DeleteAssignment(ctx, "r"))
-	must(t, s.DeleteEnvironment(ctx, "stage"))
-	if r, _ := s.Role(ctx, "ci"); len(r.Environments) != 0 {
-		t.Fatalf("the deleted environment stays in the role: %v", r.Environments)
+	// ci still names STAGE, and a role keeps it too.
+	if err := s.DeleteEnvironment(ctx, "STAGE"); !errors.Is(err, roles.ErrInUse) {
+		t.Fatalf("named by a role: %v", err)
 	}
+	must(t, s.UpdateRole(ctx, "ci", types.Role{Name: "ci", Type: types.RoleCustomGlobal}))
+	must(t, s.DeleteEnvironment(ctx, "stage"))
 	if envs, _ := s.Environments(ctx); len(envs) != 2 {
 		t.Fatalf("after delete %v", envs)
 	}
@@ -160,10 +162,13 @@ func TestRoles(t *testing.T) {
 		r    types.Role
 		want error
 	}{
-		"built in": {"Viewer", types.Role{Name: "Viewer", Type: types.RoleCustomGlobal}, roles.ErrBuiltin},
-		"mismatch": {"ci", types.Role{Name: "other", Type: types.RoleCustomGlobal}, roles.ErrInvalid},
-		"missing":  {"gone", types.Role{Name: "gone", Type: types.RoleCustomGlobal}, roles.ErrNotFound},
-		"invalid":  {"ci", types.Role{Name: "ci", Type: types.RolePredefined}, roles.ErrInvalid},
+		"admin":           {"Project Admin", types.Role{Name: "Project Admin", Type: types.RoleAdmin}, roles.ErrBuiltin},
+		"predefined type": {"Viewer", types.Role{Name: "Viewer", Type: types.RoleCustomGlobal}, roles.ErrInvalid},
+		"rename":          {"Viewer", types.Role{Name: "Watcher", Type: types.RolePredefined}, roles.ErrInvalid},
+		"predefined env":  {"Viewer", types.Role{Name: "Viewer", Type: types.RolePredefined, Environments: []string{"NOPE"}}, roles.ErrInvalid},
+		"mismatch":        {"ci", types.Role{Name: "other", Type: types.RoleCustomGlobal}, roles.ErrInvalid},
+		"missing":         {"gone", types.Role{Name: "gone", Type: types.RoleCustomGlobal}, roles.ErrNotFound},
+		"invalid":         {"ci", types.Role{Name: "ci", Type: types.RolePredefined}, roles.ErrInvalid},
 	} {
 		if err := s.UpdateRole(ctx, c.path, c.r); !errors.Is(err, c.want) {
 			t.Errorf("update %s: %v, want %v", name, err, c.want)
@@ -172,6 +177,31 @@ func TestRoles(t *testing.T) {
 	must(t, s.UpdateRole(ctx, "ci", update))
 	if got, _ := s.Role(ctx, "ci"); !slices.Equal(got.Actions, []string{"DEPLOY_BUILD"}) {
 		t.Fatalf("updated %+v", got)
+	}
+
+	// A predefined role's actions and environments change and read back,
+	// its description stays, and the change is not a custom role.
+	viewer, _ := types.BuiltinGlobalRole("Viewer")
+	must(t, s.UpdateRole(ctx, "Viewer", types.Role{
+		Name: "Viewer", Type: types.RolePredefined, Description: "ignored",
+		Actions: []string{"READ_BUILD"}, Environments: []string{"prod"},
+	}))
+	got, err = s.Role(ctx, "Viewer")
+	if err != nil || got.Type != types.RolePredefined || got.Description != viewer.Description ||
+		!slices.Equal(
+			got.Actions,
+			[]string{"READ_BUILD"},
+		) || !slices.Equal(got.Environments, []string{"PROD"}) {
+		t.Fatalf("changed Viewer %+v %v", got, err)
+	}
+	all, err = s.Roles(ctx)
+	if err != nil || len(all) != len(types.BuiltinGlobalRoles())+1 {
+		t.Fatalf("the change to Viewer is listed as a role of its own: %v %v", all, err)
+	}
+	for _, r := range all {
+		if r.Name == "Viewer" && !slices.Equal(r.Actions, []string{"READ_BUILD"}) {
+			t.Fatalf("the list shows Viewer's defaults: %+v", r)
+		}
 	}
 
 	// Deleting ci removes it from memberships; one left with no role goes.

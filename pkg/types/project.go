@@ -79,8 +79,10 @@ type Role struct {
 	Actions      []string
 }
 
-// Editable reports whether administrators may change the role; predefined
-// and admin roles are read-only.
+// Editable reports whether administrators may change every field of the
+// role, name and description included. A PREDEFINED global role's actions and
+// environments can still be changed (roles.Service.UpdateRole); an ADMIN
+// role's cannot.
 func (r Role) Editable() bool { return r.Type == RoleCustom || r.Type == RoleCustomGlobal }
 
 // Built-in environments.

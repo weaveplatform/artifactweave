@@ -51,8 +51,12 @@ func ValidEnvironmentName(name string) bool { return environmentName.MatchString
 // The built-in global roles. JFrog names them (Project Admin, Developer,
 // Contributor, Viewer, Release Manager and Security Manager; Application
 // Admin and the ML roles belong to products artifactweave does not serve)
-// but documents their default actions only in its UI. These sets follow
-// each role's documented purpose, widening from Viewer to Project Admin.
+// but documents their default actions only in its UI. Developer follows
+// JFrog's one published example (manage-project-roles: Read and Write in DEV
+// and PROD, the Basic actions' bundles in the global vocabulary); the others
+// follow each role's documented purpose, widening from Viewer to Project
+// Admin. Administrators may change a PREDEFINED role's actions and
+// environments (roles.Service.UpdateRole); these are only the defaults.
 var builtinGlobalRoles = []Role{
 	{
 		Name: "Project Admin", Type: RoleAdmin,
@@ -62,14 +66,15 @@ var builtinGlobalRoles = []Role{
 	},
 	{
 		Name: "Developer", Type: RolePredefined,
-		Description:  "Reads, deploys, annotates and deletes artifacts and builds.",
-		Environments: []string{EnvironmentDev},
+		Description:  "Reads and writes artifacts, builds and Release Bundles.",
+		Environments: []string{EnvironmentDev, EnvironmentProd},
+		// Read: read repository, Release Bundle, build and pipeline. Write:
+		// annotate and deploy/cache repository artifacts, annotate and create
+		// Release Bundles, annotate and deploy builds.
 		Actions: []string{
 			"READ_REPOSITORY", "ANNOTATE_REPOSITORY", "DEPLOY_CACHE_REPOSITORY",
-			"DELETE_OVERWRITE_REPOSITORY", "READ_RELEASE_BUNDLE",
-			"READ_BUILD", "ANNOTATE_BUILD", "DEPLOY_BUILD", "DELETE_BUILD",
-			"READ_SOURCES_PIPELINE", "TRIGGER_PIPELINE", "READ_INTEGRATIONS_PIPELINE",
-			"READ_POOLS_PIPELINE",
+			"READ_RELEASE_BUNDLE", "ANNOTATE_RELEASE_BUNDLE", "CREATE_RELEASE_BUNDLE",
+			"READ_BUILD", "ANNOTATE_BUILD", "DEPLOY_BUILD", "READ_SOURCES_PIPELINE",
 		},
 	},
 	{

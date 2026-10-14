@@ -30,24 +30,40 @@ environment's own spelling, so rename and delete find every repository that uses
 
 **Global roles and environments** (`/access/api/v1/roles`, `/access/api/v1/environments`,
 issue #77, `internal/service/roles`):
-- **Built-ins:** they're defined in code (`types.BuiltinGlobalRoles`,
-  `types.BuiltinEnvironments`), never stored, and can't be changed: PUT or DELETE of one
-  answers 400.
+- **Built-ins:** their defaults are defined in code (`types.BuiltinGlobalRoles`,
+  `types.BuiltinEnvironments`).
   - The roles are "Project Admin" (`ADMIN`, the whole global vocabulary on DEV and PROD)
     and Developer, Contributor, Viewer, Release Manager and Security Manager
     (`PREDEFINED`). Application Admin and the ML roles belong to products artifactweave
     does not serve.
-  - JFrog names the predefined roles but documents their default actions only in its
-    UI, so the action sets in `pkg/types/roles.go` are chosen to match each role's
-    documented purpose.
+  - **Editable predefined roles** (issue #100), as JFrog documents
+    (`manage-global-roles`, `assign-environments-to-global-and-project-roles`):
+    - PUT may change a `PREDEFINED` role's actions and environments. The change is
+      stored as a role row of the same name and laid over the defaults; the built-in
+      description stays.
+    - Renaming, deleting or changing the type of any built-in role answers 400, as does
+      any change to Project Admin.
+  - **Default action sets:**
+    - Developer's default is JFrog's one published example (`manage-project-roles`):
+      Read and Write in DEV and PROD, expanded through the Basic actions' documented
+      bundles.
+    - JFrog documents the other predefined roles' defaults only in its UI, so those are
+      chosen to match each role's documented purpose.
+  - DEV and PROD can't be renamed or deleted.
+- **Create-role response:** `POST /access/api/v1/roles` answers 201 with
+  `{"code":"OK","message":"Role '<name>' created"}`, as JFrog's spec documents
+  (`createglobalrole.json`). Our spec had drifted to "no body" and is corrected.
 - **Names:** environment names are compared without regard to case, across global and
   project environments.
 - **Rename** updates roles, project assignments and repository configurations in one
   transaction.
-- **Delete** refuses an environment a repository belongs to, and removes it from the
-  custom roles that name it.
+- **Delete** refuses, with 400, DEV, PROD, and any environment a repository or global role
+  still names.
+  - **To verify against a live Artifactory:** JFrog's spec lists only 204, 401, 403 and
+    404 for this operation, so both 400 cases are artifactweave's choices: refusing
+    built-ins, and refusing an environment still in use rather than detaching it.
 - **Custom global roles:**
-  - At most 30, as JFrog allows.
+  - At most 30, as JFrog allows. Stored changes to predefined roles don't count.
   - Actions are checked against the 25-value global vocabulary, and environments must
     exist.
   - Deleting a role removes it from every project membership; a membership left with no

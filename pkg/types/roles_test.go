@@ -78,3 +78,24 @@ func TestRoleActions(t *testing.T) {
 		t.Errorf("Release Bundle actions grant nothing here: %v", got)
 	}
 }
+
+// Developer follows JFrog's one published example: Read and Write in DEV and
+// PROD, so artifacts are read, annotated and deployed but not deleted.
+func TestDeveloperDefault(t *testing.T) {
+	dev, ok := BuiltinGlobalRole("Developer")
+	if !ok || !slices.Equal(dev.Environments, []string{EnvironmentDev, EnvironmentProd}) {
+		t.Fatalf("Developer %+v", dev)
+	}
+	if got := RoleActions(
+		dev.Actions,
+		ResourceArtifact,
+	); got != ActionRead|ActionAnnotate|ActionWrite {
+		t.Errorf("Developer on artifacts %v", got)
+	}
+	if got := RoleActions(
+		dev.Actions,
+		ResourceBuild,
+	); got != ActionRead|ActionAnnotate|ActionWrite {
+		t.Errorf("Developer on builds %v", got)
+	}
+}

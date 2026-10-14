@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -148,8 +149,9 @@ func (s accessService) GetGlobalRole(
 	return accessgen.GetGlobalRole200JSONResponse(globalRoleWire(r)), nil
 }
 
-// CreateGlobalRole answers 201 with no body: the platform provider reads the
-// status alone and then reads the role back.
+// CreateGlobalRole answers 201 with {"code":"OK","message":"Role '<name>'
+// created"}, as JFrog's spec documents; the platform provider then reads the
+// role back.
 func (s accessService) CreateGlobalRole(
 	ctx context.Context,
 	req accessgen.CreateGlobalRoleRequestObject,
@@ -170,7 +172,9 @@ func (s accessService) CreateGlobalRole(
 	if err := svc.CreateRole(ctx, r); err != nil {
 		return nil, s.roleError(ctx, "create role", err, http.StatusConflict)
 	}
-	return accessgen.CreateGlobalRole201Response{}, nil
+	return accessgen.CreateGlobalRole201JSONResponse{
+		Code: "OK", Message: fmt.Sprintf("Role '%s' created", r.Name),
+	}, nil
 }
 
 func (s accessService) UpdateGlobalRole(
