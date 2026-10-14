@@ -25,7 +25,7 @@ const (
 	// needs, and per-request deadlines belong in the handlers.
 	readHeaderTimeout = 10 * time.Second
 	// drainTimeout is how long in-flight requests get after a shutdown
-	// signal before connections are closed.
+	// signal before they are cancelled and their connections closed.
 	drainTimeout = 10 * time.Second
 )
 
@@ -75,6 +75,11 @@ func serve(
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Listen, err)
 	}
+	// Requests must not run on ctx: the shutdown signal cancels it, which
+	// would fail every in-flight request with a 500 before the drain below
+	// could let it finish. They are cancelled only once the drain has expired.
+	reqCtx, cancelRequests := context.WithCancel(context.WithoutCancel(ctx))
+	defer cancelRequests()
 	srv := &http.Server{
 		Handler: newHandler(server.Config{
 			BaseURL:       cfg.BaseURL,
@@ -92,7 +97,7 @@ func serve(
 			Tokens:        rt.tokens,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
-		BaseContext:       func(net.Listener) context.Context { return ctx },
+		BaseContext:       func(net.Listener) context.Context { return reqCtx },
 		ErrorLog:          stdlog.New(serverLog{log}, "", 0),
 	}
 	log.Info("artifactweave listening",
@@ -117,6 +122,10 @@ func serve(
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), drain)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
+		// Shutdown leaves active connections open when the drain expires;
+		// cancelling and closing them keeps shutdown bounded.
+		cancelRequests()
+		_ = srv.Close()
 		return fmt.Errorf("shutdown: %w", err)
 	}
 	// Serve returns ErrServerClosed after Shutdown; anything else is a bug.
