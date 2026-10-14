@@ -10,8 +10,10 @@
 // ResumeUpload accepts in a later request. One writer per session is assumed;
 // the HTTP layer serialises requests for the same upload.
 //
-// Backends: blob/fs (local disk) and blob/s3 (S3-compatible object storage).
-// Both are held to the same behaviour by blob/blobtest.
+// Backends: blob/fs (local disk), blob/s3 (S3-compatible object storage),
+// blob/gcs (Google Cloud Storage) and blob/azure (Azure Blob Storage), plus
+// blob/mirror, one store over several of them. All are held to the same
+// behaviour by blob/blobtest.
 package blob
 
 import (

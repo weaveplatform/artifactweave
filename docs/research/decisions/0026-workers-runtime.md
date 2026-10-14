@@ -93,9 +93,10 @@ on `context` *(the JFrog field name for secrets is unverified)*.
 ## Rationale
 
 goja is mature, pure Go and used at scale for user scripts; esbuild's Go API transpiles
-TypeScript without a Node toolchain. Together they keep the binary static and make
-workers part of the same process, so before-hooks add microseconds of dispatch rather than
-an IPC round trip. Evaluating filters before creating a runtime and creating a fresh
+TypeScript without a Node toolchain. Together they keep the binary static: the helper
+processes are the same binary, so no separate runtime is shipped or versioned. A
+before-hook pays one pipe round trip to a warm helper, the price of the enforceable memory
+cap and the crash isolation described under execution hosts. Evaluating filters before creating a runtime and creating a fresh
 runtime per execution keep isolation simple: no state leaks between runs except through
 `state`.
 

@@ -35,7 +35,7 @@ object replication) is asynchronous and never crosses clouds (section 3.2).
 |---|---|---|
 | `members` | the stores that hold copies | sub-providers |
 | `redundancy` R | copies kept of each blob; default every member, a full mirror; R < M places copies by write order | `redundancy` |
-| `write_quorum` W | copies that must be stored before an upload succeeds, 1 <= W <= R | `lenientLimit` |
+| `write_quorum` W | copies that must be stored before an upload succeeds, 1 <= W <= R; default R-1 (at least 1), so one member down does not stop uploads | `lenientLimit` |
 | `zone` | this instance's zone; reads and writes prefer members in it | `crossZoneOrder` |
 | `member_timeout` | how long a straggling member may finish after the quorum before its copy is left to repair | `concurrentStreamWaitTimeout` |
 | member `write_enabled` | false drains a member: no new copies, reads continue | `writeEnabled` |

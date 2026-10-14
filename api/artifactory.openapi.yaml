@@ -18305,7 +18305,7 @@ components:
       description: Request for a time-limited download URL for one artifact. Not supported by artifactweave v1 (Enterprise feature in Artifactory); declared for parity.
       properties:
         expiry:
-          description: Optional within this object. Absolute expiry as Unix epoch seconds. Mutually exclusive with `valid_for_secs`.
+          description: Optional within this object. Absolute expiry as Unix epoch milliseconds. Mutually exclusive with `valid_for_secs`.
           format: int64
           type: integer
         repo_path:
@@ -18550,7 +18550,7 @@ components:
           description: Optional within this object. Number of unique tags to keep per Docker image when maxUniqueTags is applied. Defaults to 1.
           type: integer
         downloadRedirect:
-          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
@@ -19315,7 +19315,7 @@ components:
           description: Optional within this object. Number of unique tags to keep per Docker image when maxUniqueTags is applied. Defaults to 1.
           type: integer
         downloadRedirect:
-          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
@@ -20488,7 +20488,7 @@ components:
           description: Optional within this object. Path of NuGet package downloads below the upstream URL. Defaults to api/v2/package.
           type: string
         downloadRedirect:
-          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. When true downloads answer with a redirect to a pre-signed object store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableCookieManagement:
           description: Optional within this object. When true upstream cookies are stored and replayed. Defaults to false.

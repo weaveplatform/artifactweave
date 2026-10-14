@@ -23,23 +23,31 @@ pkg/                           # PUBLIC LIBRARY: no imports from internal/ or cm
     wire/                      # the only hand-written structs with JFrog JSON names
   aql/                         # AQL parser, AST, SQL compiler per dialect
   blob/                        # blob store contract (upload sessions, ranged reads, presign)
-    fs/ s3/                    # backends
+    fs/ s3/ gcs/ azure/        # backends
+    session/                   # upload session shared by the object-store backends
+    mirror/                    # one store over several members, with a write quorum
     blobtest/                  # contract suite
   store/                       # store contracts, sentinel errors, cursors
     inmem/                     # reference in-memory backend
     storetest/                 # contract suite
+  containertest/               # gates the tests that start containers (Docker on Linux)
   client/
     artifactory/ access/ event/  # generated Go clients (oapi-codegen), used by tests
 internal/
   layout/                      # import-tier enforcement test
   app/                         # wiring: config → stores → services → router
   config/                      # strict app YAML, flag > env > file precedence
+  auth/                        # request authentication, tokens, built-in principals
+  authz/                       # the permission evaluator
+  keymaterial/                 # key pair and certificate checks for the security API
+  repos/                       # repository operations shared by the API and the descriptor
   descriptor/                  # Artifactory YAML descriptor import, XML descriptor export
   wire/
     artifactory/ access/ legacy/  # JSON wire models with JFrog's field names (tagliatelle ignored here only)
   server/                      # chi router, middleware, auth, baseurl resolver, errors table,
                                # and the hand-written item-path handlers beside the generated ones
     gen/                       # generated strict servers, one package per spec
+    apierror/ baseurl/         # error envelopes and the base-URL resolver
     docker/                    # /v2 routing for the repository-path access method
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator
@@ -48,17 +56,19 @@ internal/
   remote/                      # upstream fetcher, cache policy, negative cache, singleflight
   format/
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/
-  service/
-    repo/ item/ pkgindex/ search/ security/ token/ project/ webhook/ retention/ build/ system/
+  service/                     # one package per domain service; more arrive with their phases
+    gc/ identity/ item/ multipart/ permission/ pkgindex/ roles/ trash/ usage/
   scheduler/                   # Quartz-syntax cron runner for cleanup, replication, GC
   fakeupstream/                # chi fakes of upstream registries with fault modes
   testfault/                   # shared failing fakes for handler tests
   buildinfo/                   # version stamped by make build (from the template)
+  openapibundle/ stubgen/      # spec tooling: fragment bundler, 501 stub generator
+  specoracle/                  # cached JFrog definitions and the parity comparison
 test/
   acceptance/                  # godog features and steps, run on Linux
     features/
   conformance/                 # OCI distribution-spec conformance job wrapper
-  terraform/                   # jfrog provider fixtures and the pre-populated provider mirror
+  terraform/                   # jfrog provider fixture; run.sh builds the provider mirror at run time
 docs/
   research/ implementation/ security/ operations/ testing/
 ```

@@ -94,8 +94,9 @@ components:
           type: integer
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
-            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a
-            JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+            store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of
+            them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on federated
+            repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
@@ -367,8 +368,9 @@ components:
           type: integer
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
-            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a
-            JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+            store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of
+            them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on local
+            repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
@@ -824,9 +826,9 @@ components:
           type: string
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
-            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered
-            as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on
-            input.
+            store URL instead of streaming the bytes, on any blob store that can sign (s3, gcs, azure or a mirror of
+            them); a store that cannot sign streams. Defaults to false. Rendered as a JSON boolean on remote
+            repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableCookieManagement:
           description: Optional within this object. When true upstream cookies are stored and replayed. Defaults

@@ -173,8 +173,8 @@ components:
         feature in Artifactory); declared for parity.
       properties:
         expiry:
-          description: Optional within this object. Absolute expiry as Unix epoch seconds. Mutually exclusive with
-            `valid_for_secs`.
+          description: Optional within this object. Absolute expiry as Unix epoch milliseconds. Mutually exclusive
+            with `valid_for_secs`.
           format: int64
           type: integer
         repo_path:
