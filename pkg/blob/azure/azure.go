@@ -31,12 +31,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
 // Props are a committed blob's properties.
@@ -100,14 +103,24 @@ type API interface {
 	// SignRead returns a URL that reads name without credentials, as o
 	// describes.
 	SignRead(ctx context.Context, name string, o ReadSAS) (string, error)
+	// Container names the container every name lives in, the first segment
+	// of a blob's path on the service.
+	Container() string
 }
 
 // ReadSAS describes a read SAS: how long it lasts and the response
-// overrides (rscd, rsct) it carries, empty when not wanted.
+// overrides (rscd, rsct, rscc) it carries, empty when not wanted.
 type ReadSAS struct {
 	TTL                time.Duration
 	ContentDisposition string
 	ContentType        string
+	CacheControl       string
+	// Start and Expiry, when set, fix the SAS's validity instead of now and
+	// now plus TTL; the start is still backdated against clock skew. A CDN
+	// URL fixes both to its window, so every SAS for a blob in that window
+	// is the same string and the edge's cache, keyed on it, stays useful.
+	Start  time.Time
+	Expiry time.Time
 }
 
 const (
@@ -167,6 +180,12 @@ type Options struct {
 	// Presign makes the store sign storage URLs (blob.Signer). Set it from
 	// ClientConfig.CanSign: a store on a pre-issued SAS token cannot sign.
 	Presign bool
+	// FrontDoor, when set with Presign, makes the store sign CDN URLs: a
+	// window-aligned read SAS placed on the Front Door endpoint (decision
+	// 0029).
+	FrontDoor *cdn.FrontDoor
+	// Now is the clock CDN windows are cut from; nil means time.Now.
+	Now func() time.Time
 }
 
 // Store is a blob.Store on an Azure Blob Storage container.
@@ -178,6 +197,8 @@ type Store struct {
 	concurrency int
 	sessions    session.Store
 	presign     bool
+	frontDoor   *cdn.FrontDoor
+	now         func() time.Time
 }
 
 var (
@@ -218,9 +239,18 @@ func New(api API, o Options) (*Store, error) {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
+	if o.FrontDoor != nil {
+		if err := o.FrontDoor.Covers(api.Container() + "/" + prefix); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+		}
+	}
+	if o.Now == nil {
+		o.Now = time.Now
+	}
 	return &Store{
 		api: api, prefix: prefix, partSize: o.PartSize, copyRange: o.CopyRangeSize,
 		concurrency: o.Concurrency, sessions: o.Sessions, presign: o.Presign,
+		frontDoor: o.FrontDoor, now: o.Now,
 	}, nil
 }
 
@@ -610,8 +640,15 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 }
 
 // Signs reports whether the store signs URLs for via: storage URLs when
-// Options.Presign was set. It signs no CDN route yet.
-func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign }
+// Options.Presign was set, and CDN URLs when it also has a Front Door. A
+// store on a pre-issued SAS signs neither: Front Door passes the SAS through
+// to storage, so a CDN URL needs a SAS the store can mint.
+func (s *Store) Signs(via blob.Via) bool {
+	if via == blob.ViaCDN {
+		return s.presign && s.frontDoor != nil
+	}
+	return s.presign
+}
 
 // SignURL returns a time-limited read URL, carrying o's filename and media
 // type as response overrides.
@@ -629,11 +666,47 @@ func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (st
 	if o.Filename != "" {
 		rs.ContentDisposition = blob.Disposition(o.Filename)
 	}
-	url, err := s.api.SignRead(ctx, s.blobKey(sha), rs)
+	if o.Via == blob.ViaCDN {
+		return s.signFrontDoor(ctx, sha, rs)
+	}
+	signed, err := s.api.SignRead(ctx, s.blobKey(sha), rs)
 	if err != nil {
 		return "", fmt.Errorf("blob/azure: sign %s: %w", sha, err)
 	}
-	return url, nil
+	return signed, nil
+}
+
+// signFrontDoor signs a read SAS fixed to the current TTL-long window and
+// moves it onto the Front Door endpoint, so every client in one window gets
+// the same URL for a blob and the edge serves it from its cache (decision
+// 0029). The SAS lives until the window ends plus the TTL; an edge may keep
+// serving a copy it cached just before then for up to its max-age, or the
+// route's cap if that is shorter.
+func (s *Store) signFrontDoor(ctx context.Context, sha string, rs ReadSAS) (string, error) {
+	start, expiry, err := cdn.Window(s.now(), rs.TTL)
+	if err != nil {
+		return "", fmt.Errorf("blob/azure: sign %s via front_door: %w", sha, err)
+	}
+	rs.Start, rs.Expiry = start, expiry
+	// Without a Cache-Control of its own an object stays in Front Door's
+	// cache for one to three days; max-age bounds it at the TTL even where
+	// the route's cap is missing. A fixed value, not the time left in the
+	// window, so the window's SAS stays one string.
+	rs.CacheControl = "public, max-age=" + strconv.FormatInt(int64(rs.TTL/time.Second), 10)
+	key := s.blobKey(sha)
+	raw, err := s.api.SignRead(ctx, key, rs)
+	if err != nil {
+		return "", fmt.Errorf("blob/azure: sign %s via front_door: %w", sha, err)
+	}
+	signed, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("blob/azure: sign %s via front_door: %w", sha, err)
+	}
+	u, err := s.frontDoor.URL(s.api.Container()+"/"+key, signed.RawQuery)
+	if err != nil {
+		return "", fmt.Errorf("blob/azure: sign %s via front_door: %w", sha, err)
+	}
+	return u, nil
 }
 
 // reader serves a blob through ranged GETs. It opens the body lazily and

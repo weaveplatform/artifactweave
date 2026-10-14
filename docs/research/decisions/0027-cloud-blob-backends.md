@@ -108,10 +108,12 @@ SDK offer.
   - A service SAS signed with explicit container and blob names.
   - Or a user delegation SAS from a cached key under Entra ID.
   - The item's filename and media type travel as `rscd` and `rsct`.
-  - For a storage URL the start time is backdated 15 minutes.
-  - For a Front Door URL the start and expiry are fixed per window and `rscc` caps the
-    edge's cache at the window, so every client in a window gets the same URL and the
-    cached copy expires with it ([0029](0029-cdn-delivery-and-download-redirect.md)).
+  - The start time is backdated 15 minutes.
+  - For a Front Door URL the start and expiry are fixed per window and `rscc` is
+    `public, max-age=<TTL>`, so every client in a window gets the same URL and an edge
+    copy lasts at most the TTL ([0029](0029-cdn-delivery-and-download-redirect.md)). One
+    user delegation key is kept across a window, and a SAS that would outlive the longest
+    key the service issues (7 days, less the hour the key is renewed early) is refused.
 - **Credentials:** shared key, connection string, SAS token, `DefaultAzureCredential`,
   managed identity or workload identity.
 

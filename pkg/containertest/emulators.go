@@ -113,23 +113,36 @@ type AzuriteEndpoint struct {
 func Azurite(t *testing.T) AzuriteEndpoint {
 	t.Helper()
 	RequireLinux(t)
-	ctx := context.Background()
+	ep, stop, err := RunAzurite(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(stop)
+	return ep
+}
+
+// RunAzurite starts Azurite's blob service and returns its endpoint and a
+// function that removes it, for callers without a *testing.T such as
+// acceptance steps; check CheckLinux first.
+func RunAzurite(ctx context.Context) (AzuriteEndpoint, func(), error) {
 	ctr, err := azurite.Run(ctx, AzuriteImage,
 		azurite.WithEnabledServices(azurite.BlobService),
 		testcontainers.WithCmdArgs("--skipApiVersionCheck"),
 	)
-	testcontainers.CleanupContainer(t, ctr)
+	stop := func() { _ = testcontainers.TerminateContainer(ctr) }
 	if err != nil {
-		t.Fatalf("start azurite: %v", err)
+		stop()
+		return AzuriteEndpoint{}, nil, fmt.Errorf("start azurite: %w", err)
 	}
 	endpoint, err := ctr.BlobServiceURL(ctx)
 	if err != nil {
-		t.Fatalf("azurite endpoint: %v", err)
+		stop()
+		return AzuriteEndpoint{}, nil, fmt.Errorf("azurite endpoint: %w", err)
 	}
 	return AzuriteEndpoint{
 		ServiceURL: strings.Replace(endpoint, "localhost", "127.0.0.1", 1) +
 			"/" + azurite.AccountName + "/",
 		Account: azurite.AccountName,
 		Key:     azurite.AccountKey,
-	}
+	}, stop, nil
 }

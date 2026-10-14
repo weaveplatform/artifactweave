@@ -66,6 +66,8 @@ type Request struct {
 	// a client must not send to a CDN on another host.
 	Authorization bool
 	Status        int
+	// Cached reports a Front Door edge answering from its cache.
+	Cached bool
 }
 
 // Edge is a running fake edge.
@@ -75,10 +77,13 @@ type Edge struct {
 	URL string
 
 	opts Options
-	srv  *http.Server
-	done chan struct{}
-	mu   sync.Mutex
-	reqs []Request
+	// frontDoor, when set, makes the edge a Front Door that passes requests
+	// to a storage origin instead of checking a signature (StartFrontDoor).
+	frontDoor *frontDoorEdge
+	srv       *http.Server
+	done      chan struct{}
+	mu        sync.Mutex
+	reqs      []Request
 }
 
 // Start listens and serves until Close.
@@ -129,12 +134,17 @@ func (e *Edge) Requests() []Request {
 
 func (e *Edge) serve(w http.ResponseWriter, r *http.Request) {
 	sw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
-	e.answer(sw, r)
+	hit := false
+	if e.frontDoor != nil {
+		hit = e.frontDoor.answer(sw, r)
+	} else {
+		e.answer(sw, r)
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.reqs = append(e.reqs, Request{
 		Method: r.Method, Path: r.URL.Path, Range: r.Header.Get("Range"),
-		Authorization: r.Header.Get("Authorization") != "", Status: sw.status,
+		Authorization: r.Header.Get("Authorization") != "", Status: sw.status, Cached: hit,
 	})
 }
 

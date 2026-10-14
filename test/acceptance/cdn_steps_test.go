@@ -11,7 +11,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/container"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/cucumber/godog"
@@ -32,6 +35,8 @@ const (
 
 func (w *world) registerCDN(sc *godog.ScenarioContext) {
 	sc.Step(`^the registry is running on S3 behind a CloudFront edge$`, w.startBehindCloudFront)
+	sc.Step(`^the registry is running on Azure behind a Front Door edge$`, w.startBehindFrontDoor)
+	sc.Step(`^the CDN edge answered (\d+) requests? from its cache$`, w.edgeCacheHits)
 	sc.Step(`^the CDN edge served at least (\d+) ranged requests?$`, w.edgeServedRanges)
 	sc.Step(`^the CDN edge served (\d+) requests?$`, w.edgeServed)
 	sc.Step(`^the CDN edge never received an Authorization header$`, w.edgeNoAuthorization)
@@ -112,6 +117,83 @@ func (w *world) startBehindCloudFront() error {
 		"AWS_EC2_METADATA_DISABLED=true",
 	}
 	return w.start()
+}
+
+// frontDoorContainer holds the blobs in Azurite, where the registry writes
+// them and Front Door's origin reads them.
+const frontDoorContainer = "artifacts"
+
+// startBehindFrontDoor starts Azurite, a fake Front Door whose origin is
+// Azurite's account, and the registry on azure with that Front Door. The
+// edge checks nothing: it passes the SAS the registry signs through to
+// Azurite, which checks it, and caches whole-object responses under the full
+// URL, as a route with UseQueryString does.
+func (w *world) startBehindFrontDoor() error {
+	ctx := context.Background()
+	if err := containertest.CheckLinux(ctx); err != nil {
+		w.t.Logf("skipping: %v", err)
+		return godog.ErrSkip
+	}
+	az, stop, err := containertest.RunAzurite(ctx)
+	if err != nil {
+		return err
+	}
+	w.closers = append(w.closers, stop)
+	cred, err := container.NewSharedKeyCredential(az.Account, az.Key)
+	if err != nil {
+		return err
+	}
+	cc, err := container.NewClientWithSharedKeyCredential(
+		az.ServiceURL+frontDoorContainer,
+		cred,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	if _, err := cc.Create(ctx, nil); err != nil {
+		return fmt.Errorf("create container: %w", err)
+	}
+	edge, err := cdntest.StartFrontDoor(cdntest.FrontDoorOptions{
+		Origin: strings.TrimSuffix(az.ServiceURL, "/"), CacheTTL: time.Minute,
+	})
+	if err != nil {
+		return err
+	}
+	w.edge = edge
+	w.closers = append(w.closers, func() { _ = edge.Close() })
+	w.env = []string{
+		"ARTIFACTWEAVE_BLOB_BACKEND=azure",
+		"ARTIFACTWEAVE_BLOB_AZURE_ENDPOINT=" + az.ServiceURL,
+		"ARTIFACTWEAVE_BLOB_AZURE_ACCOUNT=" + az.Account,
+		"ARTIFACTWEAVE_BLOB_AZURE_CONTAINER=" + frontDoorContainer,
+		"ARTIFACTWEAVE_BLOB_AZURE_PREFIX=" + cdnPrefix,
+		"ARTIFACTWEAVE_BLOB_AZURE_ACCOUNT_KEY=" + az.Key,
+		"ARTIFACTWEAVE_BLOB_AZURE_CDN_FRONT_DOOR_ENDPOINT=" + edge.URL,
+	}
+	return w.start()
+}
+
+func (w *world) edgeCacheHits(n int) error {
+	reqs, err := w.edgeRequests()
+	if err != nil {
+		return err
+	}
+	got := 0
+	for _, r := range reqs {
+		if r.Cached {
+			got++
+		}
+	}
+	if got != n {
+		return fmt.Errorf(
+			"the edge answered %d requests from its cache, want %d: %+v",
+			got,
+			n,
+			reqs,
+		)
+	}
+	return nil
 }
 
 // edgeRequests is what the edge answered, or an error before the edge runs.

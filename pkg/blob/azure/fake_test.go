@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
@@ -329,15 +330,28 @@ func (f *fakeAzure) SignRead(_ context.Context, name string, o ReadSAS) (string,
 	if f.noSign {
 		return "", fmt.Errorf("%w: no signing credential", ErrConfig)
 	}
+	// A real SAS carries its start and expiry; the fake carries them when
+	// they are fixed, so a CDN window's URLs repeat as real ones do.
 	q := url.Values{"se": {strconv.Itoa(int(o.TTL.Seconds()))}, "sig": {"x"}}
+	if !o.Start.IsZero() {
+		q.Set("st", o.Start.UTC().Format(time.RFC3339))
+	}
+	if !o.Expiry.IsZero() {
+		q.Set("se", o.Expiry.UTC().Format(time.RFC3339))
+	}
 	if o.ContentDisposition != "" {
 		q.Set("rscd", o.ContentDisposition)
 	}
 	if o.ContentType != "" {
 		q.Set("rsct", o.ContentType)
 	}
+	if o.CacheControl != "" {
+		q.Set("rscc", o.CacheControl)
+	}
 	return "https://fake.blob.core.windows.net/c/" + name + "?" + q.Encode(), nil
 }
+
+func (*fakeAzure) Container() string { return "c" }
 
 // staged reports the uncommitted block count of name.
 func (f *fakeAzure) staged(name string) int {

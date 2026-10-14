@@ -100,7 +100,9 @@ type Signer interface {
   start. A signing failure at request time is logged at WARN at most once a minute and the
   download streams.
 - The CDN signers live in `pkg/cdn`, one per provider, and are injected through each
-  backend's `Options`, so `Signs` is known at construction. A store is never wrapped in a
+  backend's `Options`, so `Signs` is known at construction. Front Door is the exception
+  in kind: it checks no signature, so `pkg/cdn.FrontDoor` only places a SAS on the
+  endpoint, and the azure store signs the SAS with its own credentials. A store is never wrapped in a
   CDN decorator, because a wrapper hides the store's other interfaces, `blob.PartSizer` in
   particular, which silently changes mirror chunk sizing (#39).
 - s3, gcs and azure export `ObjectKey(sha256)`, the object name under the store's prefix,
@@ -145,8 +147,12 @@ type Signer interface {
   at the origin.
 - **Front Door:** SAS passthrough. artifactweave signs a user delegation SAS (or a service
   SAS under a shared key) with `st` and `se` fixed per window, `rscd` and `rsct`, and
-  `rscc: public, max-age=<seconds until the window ends>`. It then replaces the storage
-  host with the Front Door endpoint, keeping the path `/<container>/<object key>`.
+  `rscc: public, max-age=<TTL>`. It then replaces the storage host with the Front Door
+  endpoint, keeping the path `/<container>/<object key>`.
+  - `max-age` is the TTL, not the time left in the window: a value that changed between
+    requests would make every SAS in the window a different string and defeat the
+    cache. It bounds an edge copy even where the route's cap is missing, since without a
+    `Cache-Control` Front Door keeps an object for one to three days.
   - The route must cache with `UseQueryString` and cap cache expiry at the window with a
     rules-engine override.
   - A URL minted in a window is accepted by storage until the window ends plus the TTL.
@@ -221,6 +227,10 @@ keeps its meaning.
   against its AQL checksums.
 - **Presigned URLs bypass mirror health** once handed out, as [0028](0028-blob-mirroring.md)
   records.
+- **A user delegation SAS cannot outlive its key,** which the service issues for at most
+  7 days. A Front Door URL lasts up to twice the TTL, so with Entra ID the TTL must keep
+  that under 7 days less the hour a key is renewed early; a longer SAS is refused at
+  signing.
 
 ## Verification
 

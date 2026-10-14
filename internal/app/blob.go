@@ -202,10 +202,14 @@ func buildBackend(
 		if err != nil {
 			return nil, err //nolint:wrapcheck // wrapped with the key by openBackend
 		}
+		fd, err := frontDoor(b.Azure.CDN.FrontDoor)
+		if err != nil {
+			return nil, err
+		}
 		return azure.New(api, azure.Options{ //nolint:wrapcheck // as above
 			Prefix: b.Azure.Prefix, PartSize: int64(b.Azure.PartSize),
 			CopyRangeSize: int64(b.Azure.CopyRangeSize), Concurrency: b.Azure.Concurrency,
-			Sessions: sessions, Presign: cc.CanSign(),
+			Sessions: sessions, Presign: cc.CanSign(), FrontDoor: fd,
 		})
 	default:
 		return nil, fmt.Errorf("%w %q", config.ErrUnknownBlob, b.Backend)
@@ -231,6 +235,18 @@ func cloudFront(c config.CloudFrontConfig) (cdn.Signer, error) {
 		return nil, fmt.Errorf("cloudfront: %w", err)
 	}
 	return signer, nil
+}
+
+// frontDoor builds the Front Door c configures, or none.
+func frontDoor(c config.FrontDoorConfig) (*cdn.FrontDoor, error) {
+	if !c.Enabled() {
+		return nil, nil //nolint:nilnil // no CDN is a valid answer
+	}
+	fd, err := cdn.NewFrontDoor(cdn.FrontDoorConfig{Endpoint: c.Endpoint, PathPrefix: c.PathPrefix})
+	if err != nil {
+		return nil, fmt.Errorf("front_door: %w", err)
+	}
+	return fd, nil
 }
 
 // azureClient passes only the secret the chosen credential uses: the SDK
