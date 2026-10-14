@@ -34,6 +34,10 @@ var (
 	// ErrNotRevocable refuses to revoke a token shorter than the revocable
 	// threshold that was not forced revocable.
 	ErrNotRevocable = errors.New("token is not revocable")
+	// ErrRefreshOtherUser refuses a refresh token of another user than the
+	// one refreshing: "The authenticated user must match the user of the
+	// access token being refreshed" (createtoken.json, which answers 403).
+	ErrRefreshOtherUser = errors.New("the refresh token belongs to another user")
 
 	errMalformed = fmt.Errorf("%w: malformed", auth.ErrInvalidToken)
 	errBadKey    = errors.New("bad signing key")
@@ -128,6 +132,10 @@ type Request struct {
 	IncludeReference bool
 	// ByAdmin is whether the caller is an administrator.
 	ByAdmin bool
+	// Purpose marks a token its user holds at most one of
+	// (types.TokenPurposeEncryptedPassword). Such a token always has a
+	// reference token, and keeps it sealed so it can be shown again.
+	Purpose string
 }
 
 // Issued is a new token and its secrets, which are never stored and so
@@ -169,6 +177,7 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 		IssuedAt:    now,
 		Refreshable: r.Refreshable,
 		Revocable:   types.Revocable(expiresIn, types.DefaultRevocableThreshold, r.ForceRevocable),
+		Purpose:     r.Purpose,
 	}
 	if expiresIn > 0 {
 		rec.ExpiresAt = now.Add(expiresIn)
@@ -192,9 +201,12 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 		out.RefreshToken = newUUID()
 		rec.RefreshDigest = digest(out.RefreshToken)
 	}
-	if r.IncludeReference {
+	if r.IncludeReference || r.Purpose != "" {
 		out.ReferenceToken = newReference()
 		rec.ReferenceDigest = digest(out.ReferenceToken)
+	}
+	if r.Purpose != "" {
+		rec.Secret = out.ReferenceToken
 	}
 	if err := s.st.Tokens().Create(ctx, rec); err != nil {
 		return Issued{}, fmt.Errorf("token: store: %w", err)
@@ -236,7 +248,7 @@ func (s *Service) Verify(ctx context.Context, raw string) (types.Token, error) {
 	if types.IsReferenceToken(raw) {
 		rec, err = s.byDigest(ctx, store.DigestReference, raw)
 	} else {
-		rec, err = s.verifyJWT(ctx, raw)
+		rec, err = s.verifyJWT(ctx, raw, false)
 	}
 	if err != nil {
 		return types.Token{}, err
@@ -252,7 +264,25 @@ func (s *Service) Verify(ctx context.Context, raw string) (types.Token, error) {
 	return rec, nil
 }
 
-func (s *Service) verifyJWT(ctx context.Context, raw string) (types.Token, error) {
+// VerifyExpired resolves an access token (a JWT) as Verify does, but
+// accepts one whose only fault is its expiry. Signature, key, revocation and
+// subject are all still checked; a reference token always fails. It serves
+// only the refresh grant, which the JFrog CLI sends with the access token it
+// is replacing, by then often expired. The record outlives its expiry for
+// types.DefaultRefreshGrace (the gc keeps it), which bounds how long after
+// expiry this succeeds.
+func (s *Service) VerifyExpired(ctx context.Context, raw string) (types.Token, error) {
+	if types.IsReferenceToken(raw) {
+		return types.Token{}, fmt.Errorf("%w: not an access token", auth.ErrInvalidToken)
+	}
+	return s.verifyJWT(ctx, raw, true)
+}
+
+func (s *Service) verifyJWT(
+	ctx context.Context,
+	raw string,
+	allowExpired bool,
+) (types.Token, error) {
 	p, err := parse(raw)
 	if err != nil {
 		return types.Token{}, err
@@ -271,7 +301,7 @@ func (s *Service) verifyJWT(ctx context.Context, raw string) (types.Token, error
 	if err := json.Unmarshal(p.payload, &c); err != nil {
 		return types.Token{}, errMalformed
 	}
-	if c.Exp != 0 && !s.now().Before(time.Unix(c.Exp, 0)) {
+	if !allowExpired && c.Exp != 0 && !s.now().Before(time.Unix(c.Exp, 0)) {
 		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
 	}
 	rec, err := s.st.Tokens().Get(ctx, c.Jti)
@@ -323,6 +353,28 @@ func (s *Service) byDigest(
 // scope, lifetime and options, and revokes the old one. A refresh token
 // stays usable for types.DefaultRefreshGrace after its token expires.
 func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, error) {
+	return s.RefreshAs(ctx, refreshToken, RefreshCheck{})
+}
+
+// RefreshCheck is what a refresh must match beyond a valid refresh token.
+type RefreshCheck struct {
+	// Username, when set, must be the refreshed token's user, or the refresh
+	// fails with ErrRefreshOtherUser.
+	Username string
+	// TokenID, when set, must be the refreshed token's id, or the refresh
+	// fails as an invalid refresh token: the caller presented that token as
+	// its credential, and it must not vouch for refreshing another.
+	TokenID string
+}
+
+// RefreshAs is Refresh for a refresh token that must pass c. The user is
+// checked before the token, so another user's refresh token is
+// ErrRefreshOtherUser whichever token the caller presented.
+func (s *Service) RefreshAs(
+	ctx context.Context,
+	refreshToken string,
+	c RefreshCheck,
+) (Issued, error) {
 	var out Issued
 	err := s.st.Tx(ctx, func(ctx context.Context) error {
 		old, err := s.byDigest(ctx, store.DigestRefresh, refreshToken)
@@ -336,6 +388,12 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, err
 		sub, err := types.ParseSubject(old.Subject)
 		if err != nil {
 			return fmt.Errorf("%w: %w", auth.ErrInvalidToken, err)
+		}
+		if c.Username != "" && sub.Name != c.Username {
+			return ErrRefreshOtherUser
+		}
+		if c.TokenID != "" && old.ID != c.TokenID {
+			return fmt.Errorf("%w: refresh token of another token", auth.ErrInvalidToken)
 		}
 		var lifetime time.Duration
 		if !old.ExpiresAt.IsZero() {
@@ -357,6 +415,51 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (Issued, err
 		return Issued{}, fmt.Errorf("token: refresh: %w", err)
 	}
 	return out, nil
+}
+
+// EncryptedPassword returns the user's encrypted password: the reference
+// token of their types.TokenPurposeEncryptedPassword token, which never
+// expires. A user holds at most one, created on first use and shown again
+// after, so every client given it keeps working until the password changes
+// and the identity service revokes it.
+func (s *Service) EncryptedPassword(ctx context.Context, username string) (string, error) {
+	if secret, err := s.encryptedPassword(ctx, username); err != nil || secret != "" {
+		return secret, err
+	}
+	never := time.Duration(0)
+	issued, err := s.Issue(ctx, Request{
+		Username: username, ExpiresIn: &never, ForceRevocable: true,
+		Description: "encrypted password", Purpose: types.TokenPurposeEncryptedPassword,
+		// Never expiring is otherwise admin only; this token stands in for
+		// the user's own password, which does not expire either.
+		ByAdmin: true,
+	})
+	if errors.Is(err, store.ErrConflict) {
+		// A concurrent first use created it: answer with that one, so both
+		// callers hold the same value.
+		secret, rerr := s.encryptedPassword(ctx, username)
+		if rerr != nil || secret != "" {
+			return secret, rerr
+		}
+	}
+	if err != nil {
+		return "", fmt.Errorf("token: encrypted password: %w", err)
+	}
+	return issued.ReferenceToken, nil
+}
+
+// encryptedPassword returns the user's stored encrypted password, or "".
+func (s *Service) encryptedPassword(ctx context.Context, username string) (string, error) {
+	ts, _, err := s.st.Tokens().List(ctx, store.TokenFilter{
+		Subject: s.issuer + "/users/" + username, Purpose: types.TokenPurposeEncryptedPassword,
+	}, store.Page{})
+	if err != nil {
+		return "", fmt.Errorf("token: encrypted password: %w", err)
+	}
+	if len(ts) == 0 {
+		return "", nil
+	}
+	return ts[0].Secret, nil
 }
 
 // Revoke revokes the token with id.

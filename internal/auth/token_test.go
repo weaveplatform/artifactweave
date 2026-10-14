@@ -146,3 +146,99 @@ func TestLooksLikeToken(t *testing.T) {
 		t.Errorf("reference %q", ref)
 	}
 }
+
+// expiringVerifier is a fakeVerifier that also verifies expired tokens from
+// a map of its own.
+type expiringVerifier struct {
+	fakeVerifier
+	expired map[string]types.Token
+}
+
+func (e expiringVerifier) VerifyExpired(_ context.Context, raw string) (types.Token, error) {
+	t, ok := e.expired[raw]
+	if !ok {
+		return types.Token{}, ErrInvalidToken
+	}
+	return t, nil
+}
+
+func TestExpiredToken(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "")
+	addUser(t, db, types.User{Name: "gone", Status: types.UserDisabled}, "")
+	v := expiringVerifier{expired: map[string]types.Token{
+		"old":      {ID: "t1", Subject: "jfac@x/users/dev"},
+		"disabled": {ID: "t2", Subject: "jfac@x/users/gone"},
+	}}
+	a, _ := newAuth(t, db, Options{Tokens: v})
+	want := Refresher{User: "dev", TokenID: "t1"}
+	if r, ok := a.ExpiredToken(ctx, "old"); !ok || r != want {
+		t.Fatalf("an expired token = %+v, %v", r, ok)
+	}
+	for _, raw := range []string{"disabled", "forged"} {
+		if r, ok := a.ExpiredToken(ctx, raw); ok {
+			t.Errorf("%s = %+v", raw, r)
+		}
+	}
+	// A verifier without VerifyExpired accepts no expired token.
+	plain, _ := newAuth(t, db, Options{Tokens: fakeVerifier{}})
+	if _, ok := plain.ExpiredToken(ctx, "old"); ok {
+		t.Fatal("a plain verifier verified an expired token")
+	}
+
+	if _, ok := ExpiredTokenFrom(ctx); ok {
+		t.Fatal("an empty context carries an expired token")
+	}
+	if r, ok := ExpiredTokenFrom(WithExpiredToken(ctx, want)); !ok || r != want {
+		t.Fatalf("ExpiredTokenFrom = %+v, %v", r, ok)
+	}
+}
+
+// TestEncryptedPasswordToken: an encrypted password works exactly when the
+// password it stands for would.
+func TestEncryptedPasswordToken(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	a, clk := newAuth(t, db, Options{})
+	addUser(t, db, types.User{Name: "dev", PasswordChanged: clk.t.AddDate(0, 0, -10)}, "pw")
+	addUser(t, db, types.User{Name: "sso", InternalPasswordDisabled: true}, "pw")
+	addUser(t, db, types.User{Name: "nopass"}, "")
+	addUser(t, db, types.User{Name: "forced", PasswordExpired: true}, "pw")
+	v := fakeVerifier{}
+	for _, n := range []string{"dev", "sso", "nopass", "forced"} {
+		v[n] = types.Token{
+			ID: n, Subject: "jfac@x/users/" + n, Scope: types.UserScope(),
+			Purpose: types.TokenPurposeEncryptedPassword,
+		}
+	}
+	a.tokens = v
+	if p, err := a.Token(ctx, "dev", "dev"); err != nil || p.Name != "dev" || p.TokenID != "dev" {
+		t.Fatalf("dev = %+v, %v", p, err)
+	}
+	for raw, want := range map[string]error{
+		"sso": ErrBadCredentials, "nopass": ErrBadCredentials, "forced": ErrPasswordExpired,
+	} {
+		if _, err := a.Token(ctx, raw, ""); !errors.Is(err, want) {
+			t.Errorf("%s: %v, want %v", raw, err, want)
+		}
+	}
+	// The age policy expires the password with no write that could revoke
+	// its encrypted password.
+	if err := db.Settings().Put(ctx, types.SettingPasswordExpirationPolicy,
+		types.PasswordExpirationPolicy{Enabled: true, MaxAgeDays: 5}); err != nil {
+		t.Fatal(err)
+	}
+	a.ForgetPolicies()
+	if _, err := a.Token(ctx, "dev", ""); !errors.Is(err, ErrPasswordExpired) {
+		t.Fatalf("a password past the policy's age: %v", err)
+	}
+
+	broken, err := NewAuthenticator(db.Users(), failingSettings{db.Settings()}, Options{Tokens: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := broken.Token(ctx, "dev", ""); err == nil || errors.Is(err, ErrBadCredentials) {
+		t.Fatalf("a policy that cannot be read: %v", err)
+	}
+}

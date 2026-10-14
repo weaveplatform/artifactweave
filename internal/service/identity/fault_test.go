@@ -156,6 +156,29 @@ func TestStoreFailures(t *testing.T) {
 	if _, err := s.ExpirePasswords(ctx, []string{"eve"}); !errors.Is(err, errBoom) {
 		t.Errorf("expire with a failing read: %v", err)
 	}
+	// The encrypted password's revocation fails the password change.
+	if err := db.Tokens().Create(ctx, types.Token{
+		ID: "ep", Subject: "jfac@svc/users/eve", Purpose: types.TokenPurposeEncryptedPassword,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pw := "Eve-pass2"
+	for _, op := range []string{"tokens.list", "tokens.delete"} {
+		f.fail = op
+		if err := s.PatchUser(
+			ctx,
+			"eve",
+			identity.UserPatch{Password: &pw},
+		); !errors.Is(
+			err,
+			errBoom,
+		) {
+			t.Errorf("set a password with %s failing: %v", op, err)
+		}
+		if _, err := s.ExpirePasswords(ctx, []string{"eve"}); !errors.Is(err, errBoom) {
+			t.Errorf("expire a password with %s failing: %v", op, err)
+		}
+	}
 	f.fail = "users.list"
 	if _, err := s.Users(ctx); !errors.Is(err, errBoom) {
 		t.Errorf("list users: %v", err)

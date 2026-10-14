@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -125,6 +126,13 @@ func (w *world) register(sc *godog.ScenarioContext) {
 		`^I keep the JSON field "([^"]*)" of the (?:output|response) as "([^"]*)"$`,
 		w.keepOutputField,
 	)
+	sc.Step(`^the jf server "([^"]*)" has the refresh token kept as "([^"]*)"$`, w.jfRefreshToken)
+	sc.Step(`^the access token kept as "([^"]*)" has expired$`, w.awaitExpiry)
+	sc.Step(
+		`^I import the jf server "([^"]*)" with the access token kept as "([^"]*)" `+
+			`and the refresh token kept as "([^"]*)"$`,
+		w.jfImport,
+	)
 }
 
 // start launches the binary on a free port and waits for readiness.
@@ -234,7 +242,7 @@ func (w *world) getWithToken(path, name string) error {
 // post takes the body as a Gherkin docstring: JSON in an inline quoted
 // argument would need escaping that godog's step regex cannot match.
 func (w *world) post(path string, body *godog.DocString) error {
-	return w.request(http.MethodPost, path, body.Content)
+	return w.request(http.MethodPost, path, w.expand(body.Content))
 }
 
 func (w *world) sendAsAdmin(method, path string, body *godog.DocString) error {
@@ -272,7 +280,7 @@ func (w *world) nextHeader(name, value string) error {
 	if w.next == nil {
 		w.next = map[string]string{}
 	}
-	w.next[name] = value
+	w.next[name] = w.expand(value)
 	return nil
 }
 
@@ -576,11 +584,90 @@ func (w *world) jfAvailable() error {
 	return nil
 }
 
-// runJF runs the JFrog CLI with {url} replaced by the registry's Artifactory
-// base, {platform} by its platform base, {password} by the seeded admin's,
-// {dir} by the scenario's file directory and {name} by a value kept from
-// earlier output. JFROG_CLI_HOME_DIR isolates the CLI's config from the
-// developer's; it lasts for the scenario.
+// expand replaces {url} with the registry's Artifactory base, {platform}
+// with its platform base, {password} with the seeded admin's, {dir} with the
+// scenario's file directory and {name} with a value kept from earlier
+// output.
+func (w *world) expand(s string) string {
+	pairs := []string{
+		"{url}", w.url + "/artifactory",
+		"{platform}", w.url,
+		"{password}", testAdminPassword,
+		"{dir}", w.dir,
+	}
+	for k, v := range w.vars {
+		pairs = append(pairs, "{"+k+"}", v)
+	}
+	return strings.NewReplacer(pairs...).Replace(s)
+}
+
+// jfRefreshToken gives a configured jf server a refresh token. The CLI
+// keeps an Access refresh token only from a web login, which a test cannot
+// drive (jf c import files a refresh token as the legacy Artifactory one),
+// so it is written into the configuration file the CLI reads.
+func (w *world) jfRefreshToken(serverID, name string) error {
+	path := filepath.Join(w.jfHome, "jfrog-cli.conf.v6")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var conf map[string]any
+	if err := json.Unmarshal(raw, &conf); err != nil {
+		return err
+	}
+	servers, _ := conf["servers"].([]any)
+	for _, s := range servers {
+		if srv, ok := s.(map[string]any); ok && srv["serverId"] == serverID {
+			srv["refreshToken"] = w.vars[name]
+			out, err := json.MarshalIndent(conf, "", "  ")
+			if err != nil {
+				return err
+			}
+			return os.WriteFile(path, out, 0o600)
+		}
+	}
+	return fmt.Errorf("no jf server %q in %s", serverID, raw)
+}
+
+// jfImport runs jf c import with a server configuration token: base64 of
+// the JSON jf c export writes. The CLI keeps its refreshToken as the legacy
+// Artifactory refresh token, which it refreshes through
+// /artifactory/api/security/token.
+func (w *world) jfImport(serverID, access, refresh string) error {
+	conf, err := json.Marshal(map[string]any{
+		"version": 2, "url": w.url + "/", "serverId": serverID,
+		"accessToken": w.vars[access], "refreshToken": w.vars[refresh],
+	})
+	if err != nil {
+		return err
+	}
+	return w.runJF("c import " + base64.StdEncoding.EncodeToString(conf))
+}
+
+// awaitExpiry waits until a kept access token's exp has passed, so the next
+// use of it is of an expired token.
+func (w *world) awaitExpiry(name string) error {
+	parts := strings.Split(w.vars[name], ".")
+	if len(parts) != 3 {
+		return fmt.Errorf("%q is not a JWT", name)
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return err
+	}
+	var claims struct{ Exp int64 }
+	if err := json.Unmarshal(payload, &claims); err != nil || claims.Exp == 0 {
+		return fmt.Errorf("no exp in %s: %v", payload, err)
+	}
+	// The server refuses a token from its exp second on; the margin covers
+	// the CLI's start-up racing the boundary.
+	time.Sleep(time.Until(time.Unix(claims.Exp, 0)) + 500*time.Millisecond)
+	return nil
+}
+
+// runJF runs the JFrog CLI with its arguments expanded (expand).
+// JFROG_CLI_HOME_DIR isolates the CLI's config from the developer's; it
+// lasts for the scenario.
 func (w *world) runJF(args string) error {
 	if w.jfHome == "" {
 		home, err := os.MkdirTemp("", "jfrog-home-")
@@ -591,16 +678,7 @@ func (w *world) runJF(args string) error {
 		w.jfHome = home
 	}
 	home := w.jfHome
-	pairs := []string{
-		"{url}", w.url + "/artifactory",
-		"{platform}", w.url,
-		"{password}", testAdminPassword,
-		"{dir}", w.dir,
-	}
-	for k, v := range w.vars {
-		pairs = append(pairs, "{"+k+"}", v)
-	}
-	argv := strings.Fields(strings.NewReplacer(pairs...).Replace(args))
+	argv := strings.Fields(w.expand(args))
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
 	// Relative file specs resolve against the scenario's files, so an
 	// upload of "org/*" keeps the tree's layout under the target.

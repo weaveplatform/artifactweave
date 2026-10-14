@@ -229,13 +229,15 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 	})
 }
 
-// setPassword hashes password into u, unless it is empty, and restarts the
-// password's age. The password must satisfy the password policy. With
-// keepSame, the current password sent back is no change and passes
-// unchecked: Terraform's artifactory_user resends the password on every
-// update, and not_match_old, on by default, would refuse every one
-// (decision 0005). The password change endpoint passes false, so there it is
-// a reuse.
+// setPassword hashes password into u, unless it is empty, restarts the
+// password's age and revokes u's encrypted password, which stood for the
+// old one. Every way of setting a password comes through here, so none
+// leaves the old encrypted password working. The password must satisfy the
+// password policy. With keepSame, the current password sent back is no
+// change, passes unchecked and keeps its encrypted password: Terraform's
+// artifactory_user resends the password on every update, and
+// not_match_old, on by default, would refuse every one (decision 0005). The
+// password change endpoint passes false, so there it is a reuse.
 func (s *Service) setPassword(
 	ctx context.Context,
 	u *types.User,
@@ -259,7 +261,7 @@ func (s *Service) setPassword(
 		return fmt.Errorf("identity: hash password: %w", err)
 	}
 	u.PasswordHash, u.PasswordChanged, u.PasswordExpired = hash, now, false
-	return nil
+	return s.revokeEncryptedPasswords(ctx, u.Name)
 }
 
 // keepAnAdmin refuses demoting the last administrator: without one, nothing
@@ -334,6 +336,36 @@ func (s *Service) revokeTokens(ctx context.Context, name string) error {
 					!errors.Is(err, store.ErrNotFound) {
 					return err //nolint:wrapcheck // a store error
 				}
+			}
+		}
+		if next == "" {
+			return nil
+		}
+		page.After = next
+	}
+}
+
+// revokeEncryptedPasswords deletes the named users' encrypted passwords
+// (types.TokenPurposeEncryptedPassword tokens); the next request for one
+// issues a new value. Each user holds at most one, so the list is one entry
+// per user who ever asked, not every token.
+func (s *Service) revokeEncryptedPasswords(ctx context.Context, names ...string) error {
+	var page store.Page
+	for {
+		tokens, next, err := s.Store.Tokens().List(
+			ctx, store.TokenFilter{Purpose: types.TokenPurposeEncryptedPassword}, page,
+		)
+		if err != nil {
+			return err //nolint:wrapcheck // a store error
+		}
+		for _, t := range tokens {
+			sub, err := types.ParseSubject(t.Subject)
+			if err != nil || sub.Kind != "users" || !slices.Contains(names, sub.Name) {
+				continue
+			}
+			if err := s.Store.Tokens().Delete(ctx, t.ID); err != nil &&
+				!errors.Is(err, store.ErrNotFound) {
+				return err //nolint:wrapcheck // a store error
 			}
 		}
 		if next == "" {
@@ -483,11 +515,13 @@ func (s *Service) Groups(ctx context.Context) ([]types.Group, error) {
 // --- Locks and expiry --------------------------------------------------------
 
 // ExpirePasswords forces each named user to set a new password before the
-// next login and returns the names that matched no user.
+// next login, revokes their encrypted passwords, and returns the names that
+// matched no user.
 func (s *Service) ExpirePasswords(ctx context.Context, names []string) ([]string, error) {
 	var unknown []string
 	err := s.tx(ctx, func(ctx context.Context) error {
 		unknown = nil
+		var expired []string
 		for _, n := range sortedUnique(names) {
 			u, err := s.Store.Users().Get(ctx, n)
 			if errors.Is(err, store.ErrNotFound) {
@@ -501,8 +535,12 @@ func (s *Service) ExpirePasswords(ctx context.Context, names []string) ([]string
 			if err := s.Store.Users().Update(ctx, u); err != nil {
 				return err //nolint:wrapcheck // a store error
 			}
+			expired = append(expired, n)
 		}
-		return nil
+		if len(expired) == 0 {
+			return nil
+		}
+		return s.revokeEncryptedPasswords(ctx, expired...)
 	})
 	return unknown, err
 }

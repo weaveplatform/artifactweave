@@ -530,7 +530,7 @@ timestamps are UTC; identifiers are the wire identities above.
 | `permissions` | `name PK, description, created_at, updated_at` | `resources` in the Access v2 shape | one representation; v1/v2 projections computed |
 | `permission_grants` | `permission_name, resource_type, principal_type, principal_name, action` | | the authorizer queries by principal, not by scanning documents |
 | `permission_targets` | `permission_name, resource_type, target, include_patterns, exclude_patterns` | | `target` is a repo key, `ANY LOCAL`, `ANY REMOTE`, `ANY`, or `artifactory-build-info` |
-| `tokens` | `id PK, subject, token_hash, refresh_hash, reference_hash, scope, audience, description, issued_at, expires_at, refreshable, revocable, project_key, last_used_at` | | listing, revocation by id or by value (hash lookup) |
+| `tokens` | `id PK, subject, token_hash, refresh_hash, reference_hash, scope, audience, description, issued_at, expires_at, refreshable, revocable, project_key, last_used_at, purpose, secret (sealed)` | | listing, revocation by id or by value (hash lookup); `purpose` marks a token a subject holds at most one of (unique `(subject, purpose)` where set), and `secret` keeps that token's reference token to show again: the encrypted password, [0005](decisions/0005-authentication-and-tokens.md) (migration 0010) |
 | `api_keys` | shim only; no table in v1 | | |
 | `keypairs` | `name PK, type, alias, public_key, private_key (sealed), passphrase (sealed)` | vault refs | |
 | `repository_keypairs` | `repo_key, role (primary/secondary), keypair_name` | | |

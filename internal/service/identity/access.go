@@ -113,7 +113,9 @@ func (s *Service) SetPassword(ctx context.Context, name, password string) error 
 }
 
 // ExpireAllPasswords forces every internal user with a password to set a
-// new one; users whose internal password is disabled are unaffected.
+// new one, and revokes their encrypted passwords as ExpirePasswords does, so
+// UnexpireAllPasswords cannot bring an old one back; users whose internal
+// password is disabled are unaffected.
 func (s *Service) ExpireAllPasswords(ctx context.Context) error {
 	return s.forEachUser(ctx, func(u *types.User) bool {
 		if u.InternalPasswordDisabled || u.PasswordExpired {
@@ -121,6 +123,8 @@ func (s *Service) ExpireAllPasswords(ctx context.Context) error {
 		}
 		u.PasswordExpired = true
 		return true
+	}, func(ctx context.Context, expired []string) error {
+		return s.revokeEncryptedPasswords(ctx, expired...)
 	})
 }
 
@@ -135,17 +139,23 @@ func (s *Service) UnexpireAllPasswords(ctx context.Context) error {
 		}
 		u.PasswordExpired, u.PasswordChanged = false, now
 		return true
-	})
+	}, nil)
 }
 
 // forEachUser applies change to every user in one transaction and stores
-// those it reports changed.
-func (s *Service) forEachUser(ctx context.Context, change func(*types.User) bool) error {
+// those it reports changed; then, when set, runs in the same transaction
+// with their names.
+func (s *Service) forEachUser(
+	ctx context.Context,
+	change func(*types.User) bool,
+	then func(ctx context.Context, changed []string) error,
+) error {
 	return s.tx(ctx, func(ctx context.Context) error {
 		users, err := s.Users(ctx)
 		if err != nil {
 			return err
 		}
+		var changed []string
 		for i := range users {
 			if !change(&users[i]) {
 				continue
@@ -153,8 +163,12 @@ func (s *Service) forEachUser(ctx context.Context, change func(*types.User) bool
 			if err := s.Store.Users().Update(ctx, users[i]); err != nil {
 				return err //nolint:wrapcheck // a store error
 			}
+			changed = append(changed, users[i].Name)
 		}
-		return nil
+		if then == nil || len(changed) == 0 {
+			return nil
+		}
+		return then(ctx, changed)
 	})
 }
 

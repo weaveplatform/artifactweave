@@ -217,6 +217,53 @@ func TestBulkPasswordExpiry(t *testing.T) {
 	}
 }
 
+// TestBulkExpiryRevokesEncryptedPasswords: expiring every password revokes
+// the expired users' encrypted passwords, so unexpiring them all cannot
+// bring an old one back. A user whose internal password is disabled is not
+// expired and keeps its own, which authentication refuses anyway.
+func TestBulkExpiryRevokesEncryptedPasswords(t *testing.T) {
+	ctx := context.Background()
+	s, db := newService(t)
+	sso := newUser("sso")
+	sso.InternalPasswordDisabled = true
+	if err := s.CreateUser(ctx, sso, ""); err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range []string{"admin", "sso"} {
+		if err := db.Tokens().Create(ctx, types.Token{
+			ID:      "ep-" + n,
+			Subject: "jfac@svc/users/" + n,
+			Purpose: types.TokenPurposeEncryptedPassword,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := s.ExpireAllPasswords(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.UnexpireAllPasswords(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Tokens().Get(ctx, "ep-admin"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("admin's encrypted password after expiring every password: %v", err)
+	}
+	if _, err := db.Tokens().Get(ctx, "ep-sso"); err != nil {
+		t.Fatalf("sso's encrypted password: %v", err)
+	}
+
+	// A revocation that fails fails the expiry with it.
+	_, db2 := newService(t)
+	f := &faulty{Store: db2, fail: "tokens.list"}
+	if err := (&identity.Service{Store: f, Hash: cheap}).ExpireAllPasswords(
+		ctx,
+	); !errors.Is(
+		err,
+		errBoom,
+	) {
+		t.Fatalf("expire all with the revocation failing: %v", err)
+	}
+}
+
 func TestAccessStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	_, db := newService(t)

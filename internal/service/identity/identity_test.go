@@ -3,6 +3,7 @@ package identity_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 	"time"
@@ -353,4 +354,77 @@ func TestPolicies(t *testing.T) {
 	}
 	_, err = s.SetExpirationPolicy(ctx, types.PasswordExpirationPolicy{})
 	wantInvalid(t, "a zero age", err)
+}
+
+// TestEncryptedPasswordFollowsThePassword: setting or expiring a password
+// revokes that user's encrypted password and nothing else.
+func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
+	ctx := context.Background()
+	s, db := newService(t)
+	for _, n := range []string{"dan", "erin"} {
+		if _, err := s.PutUser(ctx, newUser(n), "Pass-"+n+"1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	encrypted := func(id, sub string) {
+		t.Helper()
+		if err := db.Tokens().Create(ctx, types.Token{
+			ID: id, Subject: sub, Purpose: types.TokenPurposeEncryptedPassword, Secret: id,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// More than a page of other users' encrypted passwords, so the
+	// revocation reads every page.
+	for i := range store.DefaultLimit {
+		encrypted(fmt.Sprintf("ep-other-%03d", i), fmt.Sprintf("jfac@svc/users/other%03d", i))
+	}
+	encrypted("ep-bad", "nonsense")
+	encrypted("ep-erin", "jfac@svc/users/erin")
+	if err := db.Tokens().
+		Create(ctx, types.Token{ID: "t-dan", Subject: "jfac@svc/users/dan"}); err != nil {
+		t.Fatal(err)
+	}
+	exists := func(id string) bool {
+		_, err := db.Tokens().Get(ctx, id)
+		return err == nil
+	}
+	email := "dan@example.org"
+	pw := "Pass-dan2"
+	for what, change := range map[string]func() error{
+		"patch": func() error { return s.PatchUser(ctx, "dan", identity.UserPatch{Password: &pw}) },
+		"put":   func() error { _, err := s.PutUser(ctx, newUser("dan"), "Pass-dan3"); return err },
+		"expire": func() error {
+			_, err := s.ExpirePasswords(ctx, []string{"dan"})
+			return err
+		},
+	} {
+		encrypted("ep-dan", "jfac@svc/users/dan")
+		// A change that leaves the password alone keeps it.
+		if err := s.PatchUser(
+			ctx,
+			"dan",
+			identity.UserPatch{Email: &email},
+		); err != nil ||
+			!exists("ep-dan") {
+			t.Fatalf("%s: an email change revoked the encrypted password (%v)", what, err)
+		}
+		if err := change(); err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		if exists("ep-dan") {
+			t.Errorf("%s: dan's encrypted password survived", what)
+		}
+		for _, id := range []string{"ep-erin", "ep-bad", "t-dan", "ep-other-000", "ep-other-099"} {
+			if !exists(id) {
+				t.Errorf("%s: %s was revoked", what, id)
+			}
+		}
+		if _, err := db.Tokens().Get(ctx, "ep-dan"); !errors.Is(err, store.ErrNotFound) {
+			t.Fatalf("%s: %v", what, err)
+		}
+	}
+	if _, err := s.ExpirePasswords(ctx, []string{"ghost"}); err != nil || !exists("ep-erin") {
+		t.Fatalf("expiring nobody: %v", err)
+	}
 }

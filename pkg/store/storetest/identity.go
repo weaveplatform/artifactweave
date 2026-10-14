@@ -479,6 +479,37 @@ func testTokens(t *testing.T, s store.Store) {
 		wantErr(t, err, store.ErrInvalidCursor)
 	}
 
+	// A subject holds at most one token of a purpose, and its sealed secret
+	// round-trips. Unpurposed tokens never collide on the purpose.
+	pw := types.Token{
+		ID:      "tp1",
+		Subject: "jfac@01abc/users/dave",
+		Purpose: types.TokenPurposeEncryptedPassword,
+		Secret:  "ref-tp1",
+	}
+	must(t, ts.Create(ctx, pw))
+	same(t, "Get purposed", pw, get[types.Token](t)(ts.Get(ctx, "tp1")))
+	again := pw
+	again.ID, again.Secret = "tp2", "ref-tp2"
+	wantErr(t, ts.Create(ctx, again), store.ErrConflict)
+	other := again
+	other.Subject = "jfac@01abc/users/erin"
+	must(t, ts.Create(ctx, other))
+	byPurpose := pages(t, 1, func(p store.Page) ([]types.Token, string, error) {
+		return ts.List(ctx, store.TokenFilter{Purpose: types.TokenPurposeEncryptedPassword}, p)
+	})
+	same(t, "List by purpose", []string{"tp1", "tp2"}, tokenIDs(byPurpose))
+	davePW, _, err := ts.List(
+		ctx,
+		store.TokenFilter{Subject: pw.Subject, Purpose: types.TokenPurposeEncryptedPassword},
+		store.Page{},
+	)
+	must(t, err)
+	same(t, "List by subject and purpose", []types.Token{pw}, davePW)
+	for _, id := range []string{"tp1", "tp2"} {
+		must(t, ts.Delete(ctx, id))
+	}
+
 	must(t, ts.Touch(ctx, "t1", at(30)))
 	t1.LastUsed = at(30)
 	same(t, "Touch", t1, get[types.Token](t)(ts.Get(ctx, "t1")))

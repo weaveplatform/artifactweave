@@ -153,6 +153,8 @@ func TestStoreFailures(t *testing.T) {
 	)
 	check("tokens.delete", func() error { return s.Revoke(ctx, out.Record.ID) })
 	check("tokens.delete", func() error { _, err := s.Refresh(ctx, out.RefreshToken); return err })
+	check("tokens.list", func() error { _, err := s.EncryptedPassword(ctx, "a"); return err })
+	check("tokens.create", func() error { _, err := s.EncryptedPassword(ctx, "a"); return err })
 	check("tokens.list", func() error { return s.Rotate(ctx) })
 	check("settings.get", func() error { return s.Rotate(ctx) })
 	check("keys.put", func() error { return s.Rotate(ctx) })

@@ -94,12 +94,15 @@ const (
 // TokenFilter narrows token listings.
 type TokenFilter struct {
 	Subject string
+	// Purpose, when set, lists only tokens of that purpose.
+	Purpose string
 }
 
-// TokenStore persists access token records; the tokens themselves are never
-// stored.
+// TokenStore persists access token records. The tokens themselves are never
+// stored, except a purposed token's Secret, which stores seal.
 type TokenStore interface {
-	// Create stores t; ErrConflict when the ID or a digest exists.
+	// Create stores t; ErrConflict when the ID or a digest exists, or when
+	// the subject already has a token of t's purpose.
 	Create(ctx context.Context, t types.Token) error
 	// Get returns the token with id.
 	Get(ctx context.Context, id string) (types.Token, error)

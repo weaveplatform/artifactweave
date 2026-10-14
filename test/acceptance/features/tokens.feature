@@ -46,3 +46,58 @@ Feature: Access tokens
     When I GET "/artifactory/tokens-local/hello.txt" as admin
     Then the response status is 200
     And the response body contains "hello from a token"
+
+  Scenario: jf refreshes an access token that has expired
+    Given the JFrog CLI is available
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"refreshable":true,"expires_in":3}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "short"
+    And I keep the JSON field "refresh_token" of the response as "refresh"
+    When I run jf "c add refresh-server --url {platform}/ --access-token {short} --interactive=false"
+    Then the command succeeds
+    Given the jf server "refresh-server" has the refresh token kept as "refresh"
+    And the access token kept as "short" has expired
+    # The CLI refreshes before the request, sending the expired token as its
+    # Bearer credential; the ping then answers with the new token, which an
+    # expired one would not.
+    When I run jf "rt ping --server-id refresh-server"
+    Then the command succeeds
+    And the output contains "OK"
+    And the server never answered 401 to POST "/access/api/v1/tokens"
+    # The refresh revoked the expired token, so it cannot refresh again.
+    Given the next request has header "Authorization" "Bearer {short}"
+    When I POST "/access/api/v1/tokens" with body:
+      """
+      {"grant_type":"refresh_token","refresh_token":"{refresh}"}
+      """
+    Then the response status is 401
+
+  Scenario: jf refreshes an expired access token through the legacy route
+    Given the JFrog CLI is available
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"refreshable":true,"expires_in":3}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "short"
+    And I keep the JSON field "refresh_token" of the response as "refresh"
+    When I import the jf server "legacy-server" with the access token kept as "short" and the refresh token kept as "refresh"
+    Then the command succeeds
+    Given the access token kept as "short" has expired
+    # The CLI refreshes through the legacy route with no credentials and the
+    # expired token as access_token, which must pair with the refresh token.
+    When I run jf "rt ping --server-id legacy-server"
+    Then the command succeeds
+    And the output contains "OK"
+    And the server answered 200 to POST "/artifactory/api/security/token"
+    And the server never answered 401 to POST "/artifactory/api/security/token"
+    # The refresh revoked the expired token, so it cannot refresh again.
+    Given the next request has header "Content-Type" "application/x-www-form-urlencoded"
+    When I POST "/artifactory/api/security/token" with body:
+      """
+      grant_type=refresh_token&access_token={short}&refresh_token={refresh}
+      """
+    Then the response status is 401
