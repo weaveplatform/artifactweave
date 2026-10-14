@@ -14,21 +14,11 @@ output "store_prefix" {
 }
 
 output "resource_group" {
-  description = "Resource group holding the account and the GitHub identity."
+  description = "Resource group holding the account."
   value       = azurerm_resource_group.this.name
 }
 
 output "subscription_id" {
-  description = "Subscription for azure/login (CONFORMANCE_AZURE_SUBSCRIPTION_ID)."
+  description = "Subscription holding the account, which credentials.sh checks the CLI against."
   value       = var.subscription_id
-}
-
-output "tenant_id" {
-  description = "Tenant for azure/login (CONFORMANCE_AZURE_TENANT_ID)."
-  value       = data.azurerm_client_config.current.tenant_id
-}
-
-output "client_id" {
-  description = "The GitHub identity's client ID, for azure/login (CONFORMANCE_AZURE_CLIENT_ID)."
-  value       = azurerm_user_assigned_identity.github.client_id
 }

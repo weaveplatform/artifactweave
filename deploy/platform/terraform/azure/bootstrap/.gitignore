@@ -1,0 +1,7 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+# Written by make while the state account does not exist (bootstrap.mk).
+local_override.tf

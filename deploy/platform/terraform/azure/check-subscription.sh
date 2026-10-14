@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Refuses to continue unless the Azure CLI's active subscription is the one
-# given and its tenant owns that subscription. Terraform pins the
-# subscription as well; this stops a login aimed at another subscription
-# from being used for anything, including the az commands the scripts run.
+# Shared by the azure/ roots. Refuses to continue unless the Azure CLI's
+# active subscription is the one given and its tenant owns that
+# subscription. Terraform pins the subscription as well; this stops a login
+# aimed at another subscription from being used for anything, including the
+# az commands the scripts run.
 set -euo pipefail
 want=${1:?usage: check-subscription.sh <subscription id>}
 active=$(az account show --query id -o tsv 2>/dev/null) || {

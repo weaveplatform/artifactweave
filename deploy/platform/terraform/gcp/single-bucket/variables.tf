@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "Project that holds the acceptance bucket and its service account."
+  description = "Project that holds the acceptance bucket (the bootstrap's lab project)."
   type        = string
   default     = "project-0c0b2d7a-9ad7-4221-9a8"
 }
@@ -11,7 +11,7 @@ variable "region" {
 }
 
 variable "name" {
-  description = "Prefix for the bucket and service account names."
+  description = "Prefix for the bucket name."
   type        = string
   default     = "artifactweave-acc"
 }
@@ -22,8 +22,8 @@ variable "store_prefix" {
   default     = "local/"
 }
 
-variable "github_repository" {
-  description = "Repository whose Actions may act as the service account (cloud-conformance.yml)."
+variable "conformance_service_account" {
+  description = "Account ID of the data-plane service account gcp/bootstrap created; it gets object rights on this bucket."
   type        = string
-  default     = "weaveplatform/artifactweave"
+  default     = "artifactweave-conformance"
 }

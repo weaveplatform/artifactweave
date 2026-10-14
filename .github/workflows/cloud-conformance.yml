@@ -29,6 +29,10 @@ jobs:
     if: inputs.target == 'both' || inputs.target == 'gcs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # The workload identity provider admits this repository's environment
+    # subjects only (deploy/platform/terraform/gcp/bootstrap), so the job must
+    # run in cloud-conformance to be trusted at all.
+    environment: cloud-conformance
     # id-token lets google-github-actions/auth exchange the job's OIDC token
     # for the service account (Workload Identity Federation): no stored key.
     permissions:
@@ -64,7 +68,7 @@ jobs:
         run: |
           if [ -z "$ARTIFACTWEAVE_TEST_GCS_BUCKET" ] || [ -z "$ARTIFACTWEAVE_TEST_GCS_ACCESS_ID" ] \
             || [ -z "$GCP_WIF_PROVIDER" ]; then
-            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (make gcp-github-vars, from deploy/platform/terraform/gcp/single-bucket)"
+            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (make platform-github-vars SCENARIO=gcp/bootstrap, then make gcp-github-vars)"
             exit 1
           fi
 
@@ -143,7 +147,7 @@ jobs:
           for v in ARTIFACTWEAVE_TEST_AZURE_ACCOUNT ARTIFACTWEAVE_TEST_AZURE_CONTAINER \
             CONFORMANCE_AZURE_CLIENT_ID CONFORMANCE_AZURE_TENANT_ID CONFORMANCE_AZURE_SUBSCRIPTION_ID; do
             if [ -z "${!v}" ]; then
-              echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT, CONFORMANCE_AZURE_CONTAINER, CONFORMANCE_AZURE_CLIENT_ID, CONFORMANCE_AZURE_TENANT_ID and CONFORMANCE_AZURE_SUBSCRIPTION_ID variables (make azure-github-vars)"
+              echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT, CONFORMANCE_AZURE_CONTAINER, CONFORMANCE_AZURE_CLIENT_ID, CONFORMANCE_AZURE_TENANT_ID and CONFORMANCE_AZURE_SUBSCRIPTION_ID variables (make platform-github-vars SCENARIO=azure/bootstrap, then make azure-github-vars)"
               exit 1
             fi
           done

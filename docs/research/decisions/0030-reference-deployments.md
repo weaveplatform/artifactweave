@@ -34,6 +34,8 @@ deploy/
     README.md                         scenario catalogue, costs, how CI runs them
     terraform/
       scenario.mk                     shared make targets for every scenario
+      bootstrap.mk                    shared make targets for the bootstraps
+      github-environments.sh          creates the cloud-conformance and cloud-platform environments
       modules/<cloud>/<capability>    child modules: storage, cdn, ci-access; no provider blocks
       aws/ gcp/ azure/
         bootstrap/                    long-lived: CI identities, remote state, DNS zone, APIs, budget
@@ -51,7 +53,9 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
 ```
 
 - `bootstrap` is not a scenario: an operator applies it once per cloud and it outlives every
-  scenario.
+  scenario. It holds the data-plane and deployer identities, so a scenario such as
+  `single-bucket` only looks its identity up and grants it the scenario's store.
+  `make destroy` refuses on a bootstrap.
 - Child modules are per cloud. There is no cross-cloud abstraction module: each cloud's
   storage, CDN and identity resources differ too much for one interface to help.
 - Compute hosting of artifactweave itself, when it is added, is a further `deploy/platform`
@@ -81,14 +85,23 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
 | `cloud-platform` | a deployer identity in each cloud | create and destroy scenario resources in the lab project, subscription and account | `platform-scenarios.yml` |
 
 - Every trust matches the immutable subject
-  `repo:weaveplatform@336817058/artifactweave@1415179278:environment:<env>` exactly. The GCP
-  provider's attribute condition checks it, not just the repository.
+  `repo:weaveplatform@336817058/artifactweave@1415179278:environment:<env>` exactly. On GCP,
+  one workload identity provider admits only the two environment subjects (its attribute
+  condition), and each service account grants `roles/iam.workloadIdentityUser` to one
+  subject (`principal://…/subject/<sub>`), not to the provider. On Azure, each identity has
+  one federated credential for one subject.
 - `cloud-platform` requires the maintainer's approval and has no branch restriction, so a
   pull request's branch can prove its own scenario before merge. "Prevent self-reviews"
   stays off, so the maintainer can approve a run they dispatched.
-- Deployers get least privilege within their lab: a role set limited to the services the
-  scenarios use on GCP, a role assignment on Azure limited by condition to the roles the
-  scenarios grant, and a permission boundary on AWS.
+- Deployers get least privilege within their lab:
+  - GCP: storage admin, load balancer admin (which covers Cloud CDN), Certificate Manager
+    editor and service usage consumer on the project, DNS admin on the scenarios' zone only;
+    no role that administers the project, its IAM or its APIs.
+  - Azure: Contributor and Storage Blob Data Contributor on one resource group,
+    `artifactweave-scenarios-rg`, where every scenario instance is created; Role Based Access
+    Control Administrator there, limited by condition to assigning Storage Blob Data
+    Contributor and Reader; DNS Zone Contributor on the scenarios' zone.
+  - AWS: a permission boundary.
 - Bootstrap enables the APIs and resource providers scenarios need, so a deployer never
   needs service-usage administration.
 
@@ -99,7 +112,10 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
   and a later `destroy` dispatch find the same state.
 - A bootstrap starts on local state, because its backend does not exist yet, and moves its
   state into the bucket it created with `terraform init -migrate-state`, so no single
-  machine holds it.
+  machine holds it. Its committed backend block names the store, so the store's name is
+  fixed rather than generated (`artifactweave-tfstate-<project number>` on GCP,
+  `awtfstate<subscription prefix>` on Azure); while the store does not exist, `make init`
+  writes a git-ignored `local_override.tf` that replaces the backend with local state.
 - State and plan files are never uploaded as workflow artifacts.
 
 **Keys.**
@@ -216,7 +232,11 @@ and least-privilege CI roles, because those are part of what a reference shows.
 - CloudFront distributions, Front Door profiles and managed certificates take minutes to
   tens of minutes to create and delete, which bounds how fast a `test` run can be.
 - The GCP acceptance pool `github-actions` was deleted on 2026-10-14; until about
-  2026-11-13 its ID can only be reused by undeleting it.
+  2026-11-13 its ID can only be reused by undeleting it. `gcp/bootstrap` undeletes it
+  (`make undelete-pool`) and imports it, with its provider, rather than choosing a new ID.
+- The DNS zones were created by CLI before the bootstraps, so their delegation at GoDaddy
+  could be set up; the bootstraps import them and refuse to destroy them, because a new zone
+  would get new name servers.
 
 ## Verification
 
