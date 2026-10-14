@@ -149,6 +149,8 @@ func keypairStatusRows() []statusCase {
 		{list, kp, "anonymous", "", 401},
 
 		{create, kp, "admin", good, 201},
+		// The Terraform provider posts to the collection with a trailing slash.
+		{create, kp + "/", "admin", keypairBody("kp-slash", "slash", k.public), 201},
 		{create, kp, "admin", keypairBody("kp-used", "x", k.public), 400},
 		{create, kp, "admin", keypairBody("kp-bad", "x", k.otherPublic), 400},
 		{create, kp, "admin", `{"pairName":"kp-empty"}`, 400},

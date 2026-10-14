@@ -105,7 +105,7 @@ func New(cfg Config) http.Handler {
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
 		normalizeContentType,
-		repositoriesSlash,
+		collectionSlash,
 	)
 	if cfg.Auth != nil {
 		r.Use(authenticate(cfg.Auth, cfg.Store))

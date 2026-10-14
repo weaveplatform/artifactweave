@@ -56,14 +56,23 @@ const (
 	msgSomeFailed = "Some repositories failed to be removed"
 )
 
-// repositoriesSlash routes /artifactory/api/repositories/ as
-// /artifactory/api/repositories: the Terraform provider lists repositories
-// with the trailing slash (research 08), which chi would otherwise read as a
-// repository with an empty key.
-func repositoriesSlash(next http.Handler) http.Handler {
+// slashCollections are the collection paths the Terraform provider calls
+// with a trailing slash, which chi would otherwise read as a member with an
+// empty key: it lists repositories at /api/repositories/ (research 08) and
+// creates key pairs with POST /api/security/keypair/ (its KeypairEndPoint).
+// Only these exact paths are rewritten, because a trailing slash elsewhere
+// under /artifactory names a folder.
+var slashCollections = map[string]string{
+	"/artifactory/api/repositories/":     "/artifactory/api/repositories",
+	"/artifactory/api/security/keypair/": "/artifactory/api/security/keypair",
+}
+
+// collectionSlash routes each of slashCollections as its path without the
+// trailing slash.
+func collectionSlash(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/artifactory/api/repositories/" {
-			r.URL.Path, r.URL.RawPath = "/artifactory/api/repositories", ""
+		if bare, ok := slashCollections[r.URL.Path]; ok {
+			r.URL.Path, r.URL.RawPath = bare, ""
 			if rctx := chi.RouteContext(r.Context()); rctx != nil {
 				rctx.RoutePath = r.URL.Path
 			}

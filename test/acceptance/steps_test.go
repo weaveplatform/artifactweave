@@ -122,6 +122,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the JFrog CLI is available$`, w.jfAvailable)
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
+	sc.Step(`^the command fails$`, w.commandFails)
 	sc.Step(
 		`^I keep the JSON field "([^"]*)" of the (?:output|response) as "([^"]*)"$`,
 		w.keepOutputField,
@@ -734,6 +735,13 @@ func (w *world) runJF(args string) error {
 func (w *world) commandSucceeds() error {
 	if w.lastRC != 0 {
 		return fmt.Errorf("exit code %d; output:\n%s", w.lastRC, w.body)
+	}
+	return nil
+}
+
+func (w *world) commandFails() error {
+	if w.lastRC == 0 {
+		return fmt.Errorf("the command succeeded; output:\n%s", w.body)
 	}
 	return nil
 }

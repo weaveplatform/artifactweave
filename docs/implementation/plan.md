@@ -22,7 +22,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P2 Stores | Done (2026-10-13) | Store contracts for every entity in research 15 (27 concerns), in-memory reference store, SQLite and PostgreSQL stores over one dialect layer with 71 tables in five migrations, the `storetest` contract suite (62 subtests) passing on all four backends, `migrate up/down/version`, `keys rotate` with versioned master keys, durable S3 upload sessions; merged coverage 97.7%. Stale-upload reaping moves to the P3 GC task; build-info tables to P5 |
 | P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) landed after P3's storage endpoints (#48) |
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
-| P4 Identity and authorization | Not started | **M1** |
+| P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
 | P4b Reference deployments and CDN delivery | Not started | Epics #113 (CDN delivery and download redirect) and #114 (reference deployments); decisions 0029 and 0030. The download-redirect fixes (#117) landed early |
 | P5 Full AQL, searches, build-info | Not started | |
 | P6 Docker/OCI | Not started | |
@@ -387,9 +387,9 @@ Decisions: [0005](../research/decisions/0005-authentication-and-tokens.md),
 5. Route × principal matrix tests including `anonymous`.
 
 **Exit criteria**
-- `artifactory_user`, `artifactory_managed_user`, `artifactory_group`, `platform_permission`, `artifactory_permission_target`, `artifactory_scoped_token`, `artifactory_keypair`, `platform_group` apply, plan clean, destroy.
-- `jf rt user-create`, `group-create`, `permission-target-create`, `access-token-create` and `jf c add` with the created token work.
-- A token scoped to one repository cannot read another. **M1.**
+- `artifactory_user`, `artifactory_managed_user`, `artifactory_group`, `platform_permission`, `artifactory_permission_target`, `artifactory_scoped_token`, `artifactory_keypair`, `platform_group` apply, plan clean, destroy. Met: `deploy/artifactweave/terraform/identity` in the `terraform` job (#85). `artifactory_permission_target` is a stub in provider 12.11.14 that fails every operation with "deprecated. Use platform_permission instead", so the scenario reads the permission back through its data source.
+- `jf rt user-create`, `group-create`, `permission-target-create`, `access-token-create` and `jf c add` with the created token work. Met: `identity_exit.feature` (#85), with `security.feature`, `permissions.feature` and `tokens.feature`.
+- A token scoped to one repository cannot read another. **M1.** Met: `identity_exit.feature` (#85), where the token's `jf rt dl` from the other repository fails and its GET answers 403.
 - Moved from P3 (#69): the `terraform` CI job mints an admin access token and runs `make terraform TERRAFORM_MODE=apply`. `artifactory_local_generic_repository` and `artifactory_item_properties` apply, `terraform plan` is empty, then destroy, and the job's coverage joins the gate. Met: the `terraform` job (#69), after the repository API started writing its flags as JSON booleans and listing no environments as `[]`.
 
 ## P4b: Reference deployments and CDN delivery
