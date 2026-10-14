@@ -181,9 +181,9 @@ type ContentSyncSource struct {
 	OriginAbsenceDetection bool `json:"originAbsenceDetection"`
 }
 
-// Member is one federated repository member. Artifactory types enabled as a
-// JSON string, which FlexBool renders when the member is marshalled; nil means
-// the caller did not say, and Defaults turns that into "true".
+// Member is one federated repository member. enabled is a FlexBool because
+// JFrog documents it as a string; nil means the caller did not say, and
+// Defaults turns that into true.
 type Member struct {
 	URL     string    `json:"url"`
 	Enabled *FlexBool `json:"enabled,omitempty"`
@@ -312,16 +312,6 @@ type Config struct {
 	DebianDefaultArchitectures                    string           `json:"debianDefaultArchitectures,omitempty"`
 }
 
-// flexBoolFields lists the fields whose JSON type depends on the class; see
-// FlexBool. Members' enabled flag is handled separately because it is always a
-// string.
-func (c *Config) flexBoolFields() []**FlexBool {
-	return []**FlexBool{
-		&c.PriorityResolution, &c.DownloadRedirect, &c.CDNRedirect,
-		&c.BlockPushingSchema1, &c.EnableFileListsIndexing,
-	}
-}
-
 // UnmarshalJSON decodes a repository document. FlexBool already accepts both
 // spellings, so this only exists because the generated API server wraps
 // Config in response types that delegate both directions to it; without the
@@ -334,41 +324,20 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON renders the class-dependent boolean fields in the spelling
-// Artifactory uses for that class. The receiver is copied so the caller's
-// values are not mutated; the copy is shallow, which is safe because only the
-// FlexBool pointers are replaced.
+// MarshalJSON writes environments as [] when the slice is empty but not nil,
+// which omitempty would drop: Masked relies on that for API responses, while
+// stored documents keep a nil slice and leave the key out. The outer field
+// shadows the embedded one because encoding/json prefers the shallower field.
 func (c Config) MarshalJSON() ([]byte, error) {
-	asString := c.Class == Local || c.Class == Federated
-	for _, f := range c.flexBoolFields() {
-		if *f != nil {
-			v := **f
-			v.asString = asString
-			*f = &v
-		}
-	}
-	// The federated schema is the one exception in the oracle: it types
-	// priorityResolution as a boolean while keeping the other four as strings
-	// (research 15, section 5).
-	if c.Class == Federated && c.PriorityResolution != nil {
-		v := *c.PriorityResolution
-		v.asString = false
-		c.PriorityResolution = &v
-	}
-	if len(c.Members) > 0 {
-		members := make([]Member, len(c.Members))
-		for i, m := range c.Members {
-			if m.Enabled != nil {
-				v := *m.Enabled
-				v.asString = true
-				m.Enabled = &v
-			}
-			members[i] = m
-		}
-		c.Members = members
-	}
 	type plain Config
-	b, err := json.Marshal(plain(c))
+	doc := struct {
+		plain
+		Environments *[]string `json:"environments,omitempty"`
+	}{plain: plain(c)}
+	if c.Environments != nil {
+		doc.Environments = &c.Environments
+	}
+	b, err := json.Marshal(doc)
 	if err != nil {
 		return nil, fmt.Errorf("marshal repository %q: %w", c.Key, err)
 	}

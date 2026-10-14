@@ -50,9 +50,16 @@ accept:
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -count=1 ./test/acceptance/...
 
-## terraform: validate test/terraform against the pinned provider from a filesystem mirror (TERRAFORM_MODE=apply for the full run, which needs P4 tokens)
+## terraform: validate test/terraform against the pinned provider from a filesystem mirror (TERRAFORM_MODE=apply also applies, plans and destroys against a -cover server)
+# Apply writes the server's coverage to cover/terraform for make cover; CI
+# uploads it as cover-terraform.
 terraform:
+ifeq ($(TERRAFORM_MODE),apply)
+	@rm -rf $(COVER_DIR)/terraform && mkdir -p $(COVER_DIR)/terraform
+	GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/terraform ./test/terraform/run.sh apply
+else
 	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate)
+endif
 
 ## capture-aql: refresh pkg/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)
 capture-aql:

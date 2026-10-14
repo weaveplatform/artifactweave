@@ -11,21 +11,19 @@ import (
 // the strings "true" or "false".
 var ErrNotBoolean = errors.New("value is not a boolean")
 
-// FlexBool is a boolean that Artifactory types inconsistently on the wire.
-// JFrog's JSON documentation and OpenAPI schema declare enableFileListsIndexing,
+// FlexBool is a boolean that JFrog documents inconsistently. JFrog's JSON
+// documentation and OpenAPI schema declare enableFileListsIndexing,
 // downloadRedirect, cdnRedirect, priorityResolution and blockPushingSchema1 as
-// strings ("false") on local and federated repositories but as booleans on
-// remote and virtual ones, with one exception the crawled schema shows:
-// priorityResolution is a boolean on federated. Federated members[].enabled is
-// always a string (docs/research/03-repository-configuration-model.md, "Typing
-// traps", and docs/research/15-data-model.md section 5). The
-// JFrog Terraform provider reads these back after a create and compares them,
-// so the server must accept both spellings on input and echo the one
-// Artifactory uses for the class on output. Config.MarshalJSON sets asString;
-// a FlexBool marshalled on its own is a plain boolean.
+// strings on local and federated repositories, and federated members[].enabled
+// as a string (docs/research/03-repository-configuration-model.md, "Typing
+// traps"). Artifactory itself
+// sends JSON booleans: the JFrog Terraform provider 12.11.14 decodes all six
+// into Go bools on every class and fails its refresh on a quoted value, and its
+// sample local repository shows "cdnRedirect": false. So the server writes
+// booleans and accepts both spellings on input, for clients that followed the
+// documentation.
 type FlexBool struct {
-	Value    bool
-	asString bool
+	Value bool
 }
 
 // Bool returns the value, or false when the pointer is nil.
@@ -61,11 +59,7 @@ func (f *FlexBool) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes the boolean, quoted when the owning Config decided the
-// class uses the string spelling.
+// MarshalJSON writes a JSON boolean, never the documented string spelling.
 func (f FlexBool) MarshalJSON() ([]byte, error) {
-	if f.asString {
-		return []byte(strconv.Quote(strconv.FormatBool(f.Value))), nil
-	}
 	return []byte(strconv.FormatBool(f.Value)), nil
 }

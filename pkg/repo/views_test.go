@@ -1,6 +1,8 @@
 package repo_test
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -85,5 +87,28 @@ func TestRelevant(t *testing.T) {
 	} {
 		c := repo.Config{Key: "x", Class: repo.Remote, PackageType: pt}
 		_ = repo.Relevant(*repo.Defaults(&c))
+	}
+}
+
+func TestEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
+	c := repo.Config{Key: "k", Class: repo.Local}
+	stored, err := json.Marshal(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(stored), "environments") {
+		t.Errorf("stored document gained environments: %s", stored)
+	}
+	shown, err := json.Marshal(repo.Masked(c))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(shown), `"environments":[]`) {
+		t.Errorf("want environments [] in %s", shown)
+	}
+	c.Environments = []string{"DEV"}
+	shown, _ = json.Marshal(repo.Masked(c))
+	if !strings.Contains(string(shown), `"environments":["DEV"]`) {
+		t.Errorf("want environments [DEV] in %s", shown)
 	}
 }

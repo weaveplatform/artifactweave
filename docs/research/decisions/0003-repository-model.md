@@ -19,8 +19,8 @@ port per repository), each needing reverse-proxy or DNS support.
 **One configuration struct.** `pkg/repo.Config` mirrors the Artifactory repository JSON
 in [03-repository-configuration-model](../03-repository-configuration-model.md): the
 common fields, the local, remote, virtual and federated fields, the per-package-type
-fields, the enumerations, the defaults, the string-typed booleans per class and the
-provider-only keys. Validation enforces the allowed package types per class, the layout
+fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
+in either spelling, written as booleans) and the provider-only keys. Validation enforces the allowed package types per class, the layout
 reference, the include and exclude patterns and the per-type constraints. The struct is
 importable because other weave repositories will declare repositories as code.
 

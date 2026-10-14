@@ -230,7 +230,7 @@ https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
 
 | Entity | Fields | Notes |
 |---|---|---|
-| Federated repository | the local repository fields plus `members[{url, enabled}]` (`enabled` string-typed), `proxy`, `disableProxy` ([03](03-repository-configuration-model.md)) | member `url` is `<base>/artifactory/<repoKey>` |
+| Federated repository | the local repository fields plus `members[{url, enabled}]` (`enabled` a boolean, documented as a string), `proxy`, `disableProxy` ([03](03-repository-configuration-model.md)) | member `url` is `<base>/artifactory/<repoKey>` |
 | Sync state | `[{key, status SYNCING|FULL_SYNC_RUNNING|DISABLED|OUT_OF_SYNC, members[{remoteKey, remoteUrl}]}]` | |
 | State details | `{federations[{localRepoKey, priority HIGH|STANDARD, memberInfoList[{url, repoKey, aggregatedStatus, isSupported, isDisabled, isInLag}]}]}` | |
 | Mirror lag | `[{localRepoKey, remoteUrl, remoteRepoKey, lagInMS, eventRegistrationTimeStamp}]` | |

@@ -17,8 +17,15 @@ func Public(c Config) Config {
 // password and the values of sensitive custom headers. An update that omits
 // the password, or sends a sensitive header back with an empty value, keeps
 // the stored secret (RestoreSecrets).
+//
+// It also lists no environments as [] rather than leaving the key out, as
+// Artifactory does: the Terraform provider defaults project_environments to an
+// empty set and reads an absent key as null, so every plan would show a change.
 func Masked(c Config) Config {
 	c.Password = ""
+	if c.Environments == nil {
+		c.Environments = []string{}
+	}
 	if len(c.CustomHTTPHeaders) > 0 {
 		hs := slices.Clone(c.CustomHTTPHeaders)
 		for i := range hs {

@@ -4,11 +4,12 @@
 # release zip and its pinned SHA-256, so no run depends on the registry.
 #
 #   run.sh validate   init from the mirror and validate the fixture
-#   run.sh apply      also start a -cover artifactweave, apply, require an
-#                     empty plan, and destroy
+#   run.sh apply      also start a -cover artifactweave, mint an admin access
+#                     token through its token API, apply, require an empty
+#                     plan, and destroy
 #
-# apply needs Bearer access tokens, which arrive in P4: until then the
-# provider's configure call is refused with 401 and apply stops there.
+# The provider authenticates only with a Bearer access token, so apply mints
+# one with the bootstrap admin's password; TERRAFORM_ACCESS_TOKEN overrides it.
 set -euo pipefail
 
 PROVIDER_VERSION=12.11.14
@@ -69,14 +70,22 @@ provider_installation {
 RC
 export TF_CLI_CONFIG_FILE="$work/terraformrc" TF_IN_AUTOMATION=1 TF_INPUT=0
 export TF_DATA_DIR="$work/tfdata"
-tf() { terraform -chdir="$here" "$@"; }
+# Terraform runs on a copy in $work so its local state, kept beside main.tf,
+# never lands in the source tree, where a failed run's state would point the
+# next run at resources on a server that no longer exists.
+mkdir -p "$work/fixture"
+cp "$here"/*.tf "$here/.terraform.lock.hcl" "$work/fixture/"
+tf() { terraform -chdir="$work/fixture" "$@"; }
 
 tf init -backend=false -lockfile=readonly
 tf validate
 [ "$mode" = apply ] || exit 0
 
-# A -cover binary so the run's coverage joins the merged report.
-go build -cover -o "$work/artifactweave" "$root/cmd/artifactweave"
+# A -cover binary so the run's coverage joins the merged report. The flags
+# match the acceptance build: unit tests run with -race, which forces atomic
+# counters, and covdata merge refuses to mix counter modes.
+module=$(cd "$root" && go list -m)
+(cd "$root" && go build -cover -covermode=atomic -coverpkg="$module/..." 	-o "$work/artifactweave" ./cmd/artifactweave)
 port=${TERRAFORM_PORT:-18081}
 url="http://127.0.0.1:$port"
 password=terraform-admin
@@ -92,9 +101,14 @@ for _ in $(seq 100); do
 	sleep 0.1
 done
 
-# Until P4 issues tokens there is none to pass; TERRAFORM_ACCESS_TOKEN lets
-# a later phase supply one.
-vars=(-var "url=$url" -var "access_token=${TERRAFORM_ACCESS_TOKEN:-none-before-p4}")
+token=${TERRAFORM_ACCESS_TOKEN:-}
+if [ -z "$token" ]; then
+	token=$(curl -fsS -u "admin:$password" -H 'Content-Type: application/json' \
+		-d '{"scope":"applied-permissions/admin","expires_in":3600}' \
+		"$url/access/api/v1/tokens" |
+		python3 -I -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+fi
+vars=(-var "url=$url" -var "access_token=$token")
 tf apply -auto-approve "${vars[@]}" -var with_properties=false
 curl -fsS -u "admin:$password" -X PUT --data-binary 'fixture' \
 	"$url/artifactory/tf-generic-local/fixture.txt" >/dev/null

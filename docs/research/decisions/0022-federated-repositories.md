@@ -24,8 +24,8 @@ the peer protocol ([0021](0021-peer-trust-and-sync-protocol.md)) on the stream
 **Members.** Each entry in `members` names a peer's repository as
 `<peer base URL>/artifactory/<repoKey>`. A member URL whose host is not a paired peer with
 the `federation` use case is rejected with 400 naming the URL. This instance's own entry
-may be present or omitted. `enabled` is string-typed on the wire and maps to whether
-events flow to that member. When a federated repository is created or its member list
+may be present or omitted. `enabled` is a boolean (JFrog documents a string; either is
+accepted) and maps to whether events flow to that member. When a federated repository is created or its member list
 changes, the instance sends the configuration to each member over the peer protocol and
 the member creates or updates its copy (`configSync`); a member that cannot be reached is
 reported as unavailable and retried.

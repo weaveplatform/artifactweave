@@ -30,8 +30,8 @@ writes it, and its fields are the union of the fields those operations carry.
   in `internal/wire/{artifactory,access,legacy}` and are produced and consumed by
   converters; no handler or store touches a wire struct directly. `pkg/repo` is the
   existing instance of this rule for repositories and stays the model for that entity.
-- **Wire quirks are preserved by the converters, never by the domain.** String-typed
-  booleans per repository class, `size` as a decimal string, `lastDownloaded` as epoch
+- **Wire quirks are preserved by the converters, never by the domain.** Booleans
+  accepted as strings, `size` as a decimal string, `lastDownloaded` as epoch
   milliseconds in one projection and ISO time in another, kebab-case keys in the legacy
   v2 permission target, the `<key>-cache` repository name on cached items, and
   human-formatted storage summaries are all rendered at the edge from one domain value.

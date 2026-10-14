@@ -66,30 +66,29 @@ func TestFixturesRoundTrip(t *testing.T) {
 	}
 }
 
-func TestFlexBoolSpellingPerClass(t *testing.T) {
-	tests := []struct {
-		class repo.Class
-		want  string
-	}{
-		{repo.Local, `"priorityResolution":"true"`},
-		{repo.Federated, `"priorityResolution":true`},
-		{repo.Remote, `"priorityResolution":true`},
-		{repo.Virtual, `"priorityResolution":true`},
-	}
-	for _, tt := range tests {
-		t.Run(string(tt.class), func(t *testing.T) {
-			cfg := repo.Config{Key: "k", Class: tt.class, PriorityResolution: repo.Flex(true)}
+// Every class gets JSON booleans, although JFrog documents strings for local
+// and federated: the Terraform provider decodes these into Go bools and fails
+// its refresh on a quoted value.
+func TestFlexBoolIsABooleanOnEveryClass(t *testing.T) {
+	for _, class := range []repo.Class{repo.Local, repo.Federated, repo.Remote, repo.Virtual} {
+		t.Run(string(class), func(t *testing.T) {
+			cfg := repo.Config{
+				Key: "k", Class: class,
+				PriorityResolution: repo.Flex(true), DownloadRedirect: repo.Flex(false),
+				CDNRedirect: repo.Flex(false), BlockPushingSchema1: repo.Flex(true),
+				EnableFileListsIndexing: repo.Flex(false),
+			}
 			out, err := json.Marshal(cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if !strings.Contains(string(out), tt.want) {
-				t.Errorf("want %s in %s", tt.want, out)
-			}
-			// The caller's value must not have been mutated into string mode.
-			standalone, _ := json.Marshal(cfg.PriorityResolution)
-			if string(standalone) != "true" {
-				t.Errorf("standalone FlexBool marshalled as %s", standalone)
+			for _, want := range []string{
+				`"priorityResolution":true`, `"downloadRedirect":false`, `"cdnRedirect":false`,
+				`"blockPushingSchema1":true`, `"enableFileListsIndexing":false`,
+			} {
+				if !strings.Contains(string(out), want) {
+					t.Errorf("want %s in %s", want, out)
+				}
 			}
 		})
 	}
@@ -137,7 +136,7 @@ func TestFlexBoolUnmarshal(t *testing.T) {
 	}
 }
 
-func TestMembersEnabledIsAString(t *testing.T) {
+func TestMembersEnabledIsABoolean(t *testing.T) {
 	cfg := repo.Config{Key: "f", Class: repo.Federated, Members: []repo.Member{
 		{URL: "https://a/x", Enabled: repo.Flex(false)},
 		{URL: "https://b/x"},
@@ -147,7 +146,7 @@ func TestMembersEnabledIsAString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"enabled":"false"`, `"enabled":"true"`} {
+	for _, want := range []string{`"enabled":false`, `"enabled":true`} {
 		if !strings.Contains(string(out), want) {
 			t.Errorf("want %s in %s", want, out)
 		}
@@ -224,7 +223,7 @@ func TestDefaults(t *testing.T) {
 				ForceMetadataNameVersion: ptr(false),
 				ForceNonDuplicateChart:   ptr(false),
 			}
-			if diff := cmp.Diff(want, *c, cmp.AllowUnexported(repo.FlexBool{})); diff != "" {
+			if diff := cmp.Diff(want, *c); diff != "" {
 				t.Errorf("(-want +got):\n%s", diff)
 			}
 		}},

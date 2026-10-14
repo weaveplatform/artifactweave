@@ -192,9 +192,10 @@ jobs:
 
   # The JFrog Artifactory Terraform provider against the fixture in
   # test/terraform, installed from a filesystem mirror of the pinned release
-  # zip so the run never depends on registry.terraform.io. P3 validates the
-  # fixture; apply, an empty plan and destroy against a -cover binary
-  # (run.sh apply) join once P4 issues the Bearer tokens the provider sends.
+  # zip so the run never depends on registry.terraform.io. run.sh starts a
+  # -cover artifactweave, mints the admin access token the provider sends as a
+  # Bearer token, applies, requires an empty plan and destroys; the server's
+  # coverage joins the merged gate.
   terraform:
     name: 'Terraform provider fixture'
     runs-on: ubuntu-latest
@@ -227,8 +228,16 @@ jobs:
           unzip -q -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip"
           echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
 
-      - name: Validate the fixture against the mirrored provider
-        run: make terraform
+      - name: Apply, plan and destroy the fixture against artifactweave
+        run: make terraform TERRAFORM_MODE=apply
+
+      - name: Upload Terraform coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-terraform
+          path: cover/terraform
+          include-hidden-files: true
+          retention-days: 7
 
   # Parity against JFrog's published OpenAPI definitions (decision 0001).
   # The definitions are proprietary, so they are cached per run under the
@@ -277,9 +286,10 @@ jobs:
 
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
-    # The download pattern cover-* picks up the unit directories from every OS
-    # and the acceptance directory, so one merge enforces the gate over all.
-    needs: [unit, acceptance]
+    # The download pattern cover-* picks up the unit directories from every OS,
+    # the acceptance directory and the Terraform run, so one merge enforces the
+    # gate over all.
+    needs: [unit, acceptance, terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
