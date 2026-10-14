@@ -144,6 +144,19 @@ var implemented = map[string]bool{
 	"PUT /access/api/v1/config/security/authentication/basic_authentication_enabled": true,
 	"PUT /access/api/v1/config/security/password_policy":                             true,
 	"PATCH /access/api/v1/config/security/password_policy":                           true,
+
+	// The OIDC integration (#83).
+	"GET /access/api/v1/oidc":                                                     true,
+	"POST /access/api/v1/oidc":                                                    true,
+	"POST /access/api/v1/oidc/token":                                              true,
+	"GET /access/api/v1/oidc/{name}":                                              true,
+	"PUT /access/api/v1/oidc/{name}":                                              true,
+	"DELETE /access/api/v1/oidc/{name}":                                           true,
+	"GET /access/api/v1/oidc/{provider_name}/identity_mappings":                   true,
+	"POST /access/api/v1/oidc/{provider_name}/identity_mappings":                  true,
+	"GET /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}":    true,
+	"PUT /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}":    true,
+	"DELETE /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}": true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

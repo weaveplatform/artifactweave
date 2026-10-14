@@ -36,7 +36,7 @@ type tokens struct{ s *Store }
 
 const tokenCols = "id, subject, access_digest, refresh_digest, reference_digest, scope, audience, " +
 	"description, project_key, issued_at, expires_at, refreshable, revocable, last_used_at, " +
-	"purpose, secret"
+	"purpose, secret, identity"
 
 // tokenKey is the keyset of the token list; issued_at is never NULL (0 for
 // an unset time) so both engines sort and compare it the same way.
@@ -87,6 +87,7 @@ func (ts tokens) scan(row interface{ Scan(...any) error }) (types.Token, error) 
 		&used,
 		&t.Purpose,
 		&secret,
+		&t.Identity,
 	); err != nil {
 		return t, err //nolint:wrapcheck // wrapped by the caller
 	}
@@ -142,6 +143,7 @@ func (ts tokens) Create(ctx context.Context, t types.Token) error {
 		micros(t.LastUsed),
 		t.Purpose,
 		secret,
+		string(t.Identity),
 	)
 	return err
 }

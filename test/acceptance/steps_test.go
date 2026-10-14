@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/cucumber/godog"
+
+	"github.com/weaveplatform/artifactweave/internal/auth/idtoken/idtokentest"
 )
 
 // testMasterKey is a fixed key so scenarios are reproducible; it protects
@@ -56,6 +58,9 @@ type world struct {
 	// vars holds values kept from command output, for {name} in jf
 	// arguments.
 	vars map[string]string
+	// issuer is the scenario's fake OIDC provider, nil until a step starts
+	// it; its URL is {issuer}.
+	issuer *idtokentest.Issuer
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -83,6 +88,10 @@ func newWorld(t *testing.T) *world { return &world{t: t} }
 func (w *world) register(sc *godog.ScenarioContext) {
 	sc.After(func(ctx context.Context, s *godog.Scenario, err error) (context.Context, error) {
 		w.stop()
+		if w.issuer != nil {
+			w.issuer.Close()
+			w.issuer = nil
+		}
 		if aqlCapture != "" {
 			err = errors.Join(err, w.captureAQL(s.Name))
 		}
@@ -129,6 +138,11 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	)
 	sc.Step(`^the jf server "([^"]*)" has the refresh token kept as "([^"]*)"$`, w.jfRefreshToken)
 	sc.Step(`^the access token kept as "([^"]*)" has expired$`, w.awaitExpiry)
+	sc.Step(`^an OIDC provider is running$`, w.startIssuer)
+	sc.Step(
+		`^the OIDC provider issues an ID token for audience "([^"]*)" kept as "([^"]*)" with claims:$`,
+		w.mintIDToken,
+	)
 	sc.Step(
 		`^I import the jf server "([^"]*)" with the access token kept as "([^"]*)" `+
 			`and the refresh token kept as "([^"]*)"$`,
@@ -247,7 +261,7 @@ func (w *world) post(path string, body *godog.DocString) error {
 }
 
 func (w *world) sendAsAdmin(method, path string, body *godog.DocString) error {
-	return w.send(method, path, body.Content, func(r *http.Request) {
+	return w.send(method, path, w.expand(body.Content), func(r *http.Request) {
 		r.SetBasicAuth("admin", testAdminPassword)
 	})
 }
@@ -783,4 +797,40 @@ func (w *world) keepOutputField(field, name string) error {
 		i += 1 + next
 	}
 	return fmt.Errorf("no JSON object with a string field %q in the output:\n%s", field, out)
+}
+
+// startIssuer starts a fake OIDC provider, a CI system's stand-in, whose
+// URL is {issuer}.
+func (w *world) startIssuer() error {
+	i, err := idtokentest.New()
+	if err != nil {
+		return err
+	}
+	w.issuer = i
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars["issuer"] = i.URL()
+	return nil
+}
+
+// mintIDToken has the provider issue an ID token for audience, valid for
+// an hour, with the document's claims, and keeps it as name.
+func (w *world) mintIDToken(audience, name string, body *godog.DocString) error {
+	if w.issuer == nil {
+		return errors.New("no OIDC provider is running")
+	}
+	var claims map[string]any
+	if err := json.Unmarshal([]byte(body.Content), &claims); err != nil {
+		return err
+	}
+	raw, err := w.issuer.Mint(audience, time.Hour, claims)
+	if err != nil {
+		return err
+	}
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars[name] = raw
+	return nil
 }

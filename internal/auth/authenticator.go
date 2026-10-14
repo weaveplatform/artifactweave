@@ -41,6 +41,10 @@ type Options struct {
 	Hash HashParams
 	// Tokens verifies access and reference tokens; nil refuses every token.
 	Tokens TokenVerifier
+	// Groups names the groups new users join automatically, which a
+	// transient user of an OIDC token joins (types.IdentityTransient); nil
+	// means none.
+	Groups store.GroupStore
 }
 
 // Authenticator verifies credentials against the user store.
@@ -54,6 +58,7 @@ type Authenticator struct {
 	// does not tell which user names exist.
 	dummy  []byte
 	tokens TokenVerifier
+	groups store.GroupStore
 	policy policyCache
 }
 
@@ -83,8 +88,9 @@ func NewAuthenticator(
 	}
 	return &Authenticator{
 		users: users, settings: settings, now: o.Now, dummy: dummy, tokens: o.Tokens,
-		cache: &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
-		slots: make(chan struct{}, o.Concurrency),
+		groups: o.Groups,
+		cache:  &verified{max: o.CacheSize, ttl: o.CacheTTL, m: map[[32]byte]time.Time{}},
+		slots:  make(chan struct{}, o.Concurrency),
 	}, nil
 }
 

@@ -425,9 +425,13 @@ func testTokens(t *testing.T, s store.Store) {
 	wantErr(t, ts.Create(ctx, dup), store.ErrConflict)
 	_, err = ts.Get(ctx, "t9")
 	wantErr(t, err, store.ErrNotFound)
+	// The identity of an OIDC exchange's token round-trips (research 21).
 	bare := []types.Token{
-		{ID: "t0", Subject: "jfac@01abc/users/bob", Scope: types.UserScope()},
-		{ID: "t00", Subject: "jfac@01abc/users/bob"},
+		{
+			ID: "t0", Subject: "jfac@01abc/users/bob", Scope: types.UserScope(),
+			Identity: types.IdentityTransient,
+		},
+		{ID: "t00", Subject: "jfac@01abc/users/bob", Identity: types.IdentitySynthetic},
 	}
 	for _, b := range bare {
 		must(t, ts.Create(ctx, b))

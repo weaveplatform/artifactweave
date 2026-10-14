@@ -26,6 +26,26 @@ const (
 //nolint:gosec // G101: a purpose name, not a credential
 const TokenPurposeEncryptedPassword = "encrypted_password"
 
+// TokenIdentity says how a token's subject resolves to a user. Access issues
+// tokens from an OIDC token exchange without checking that the mapped user
+// exists (research 21), so such a token may name a user who is not stored.
+type TokenIdentity string
+
+// Token identities.
+const (
+	// IdentityStored: the subject must be a stored, enabled user. Every token
+	// but an OIDC exchange's.
+	IdentityStored TokenIdentity = ""
+	// IdentityTransient: a stored user of that name if there is one;
+	// otherwise a transient user for the request, a member of the groups new
+	// users join automatically.
+	IdentityTransient TokenIdentity = "transient"
+	// IdentitySynthetic: never a stored user and in no group but those the
+	// scope names. An identity mapping without a user name issues it, so a
+	// group-scoped token acts through exactly its groups.
+	IdentitySynthetic TokenIdentity = "synthetic"
+)
+
 // Token is the stored record of an access token. The JWT itself is never
 // stored: AccessDigest, RefreshDigest and ReferenceDigest are hashes used to
 // revoke by value and to resolve refresh and reference tokens. A zero
@@ -51,6 +71,8 @@ type Token struct {
 	// Secret is the reference token of a purposed token, kept so it can be
 	// shown again; stores seal it. Empty for an ordinary token.
 	Secret string `json:"-"`
+	// Identity is how the subject resolves to a user.
+	Identity TokenIdentity
 }
 
 // Expired reports whether the token has expired at now.

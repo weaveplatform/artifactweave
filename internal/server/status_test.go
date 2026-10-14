@@ -61,6 +61,7 @@ func statusTable() []statusCase {
 		tokenStatusRows(),
 		permissionStatusRows(),
 		accessIdentityStatusRows(),
+		oidcStatusRows(),
 	)
 }
 

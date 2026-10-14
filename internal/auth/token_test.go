@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -240,5 +241,88 @@ func TestEncryptedPasswordToken(t *testing.T) {
 	}
 	if _, err := broken.Token(ctx, "dev", ""); err == nil || errors.Is(err, ErrBadCredentials) {
 		t.Fatalf("a policy that cannot be read: %v", err)
+	}
+}
+
+// failingAutoJoin is a group store whose auto-join list cannot be read.
+type failingAutoJoin struct{ store.GroupStore }
+
+func (failingAutoJoin) AutoJoin(context.Context) ([]string, error) {
+	return nil, errors.New("database down")
+}
+
+// TestOIDCTokenIdentities covers the tokens an OIDC exchange issues, whose
+// subject need not be a stored user (research 21).
+func TestOIDCTokenIdentities(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	for _, g := range []types.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
+		if err := db.Groups().Create(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, u := range []types.User{
+		{Name: "dev", Groups: []string{"ci"}},
+		{Name: "gone", Status: types.UserDisabled},
+	} {
+		if err := db.Users().Create(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const iss = "jfac@x/users/"
+	v := fakeVerifier{
+		"transient-new": {
+			Subject: iss + "robot", Scope: types.UserScope(), Identity: types.IdentityTransient,
+		},
+		"transient-stored": {
+			Subject: iss + "dev", Scope: types.UserScope(), Identity: types.IdentityTransient,
+		},
+		"transient-disabled": {
+			Subject: iss + "gone", Scope: types.UserScope(), Identity: types.IdentityTransient,
+		},
+		"synthetic": {
+			Subject:  iss + "dev",
+			Scope:    scope(t, "applied-permissions/groups:ci"),
+			Identity: types.IdentitySynthetic,
+		},
+	}
+	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v, Groups: db.Groups()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for raw, want := range map[string][]string{
+		// A missing user joins the auto-join groups for the request.
+		"transient-new": {"everyone"},
+		// A stored user is itself, groups and all.
+		"transient-stored": {"ci"},
+		// A synthetic subject is never the stored user of that name: it
+		// acts through its scope's groups alone.
+		"synthetic": nil,
+	} {
+		p, err := a.Token(ctx, raw, "")
+		if err != nil || !slices.Equal(p.Groups, want) {
+			t.Errorf("%s: %+v, %v; want groups %v", raw, p, err, want)
+		}
+	}
+	if _, err := a.Token(ctx, "transient-disabled", ""); !errors.Is(err, ErrBadCredentials) {
+		t.Errorf("a disabled stored user still wins over the transient one: %v", err)
+	}
+	// Without a group store a transient user joins nothing.
+	bare, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p, err := bare.Token(ctx, "transient-new", ""); err != nil || len(p.Groups) != 0 {
+		t.Errorf("no group store: %+v, %v", p, err)
+	}
+	broken, err := NewAuthenticator(db.Users(), db.Settings(), Options{
+		Tokens: v, Groups: failingAutoJoin{db.Groups()},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := broken.Token(ctx, "transient-new", ""); err == nil ||
+		errors.Is(err, ErrBadCredentials) {
+		t.Errorf("an unreadable auto-join list is not a credential failure: %v", err)
 	}
 }

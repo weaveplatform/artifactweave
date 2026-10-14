@@ -385,6 +385,10 @@ Decisions: [0005](../research/decisions/0005-authentication-and-tokens.md),
 3. JWT access tokens with the RawStdEncoding-safe payload, reference tokens, refresh tokens, Docker token endpoint.
 4. Native evaluator: admin, permission targets in the three wire formats over one internal shape, `ANY` targets, Ant patterns, groups, token scope narrowing, anonymous.
 5. Route × principal matrix tests including `anonymous`.
+6. OIDC token exchange for CI workload identity (#83, decision 0019, research 21):
+   providers, identity mappings and `POST /access/api/v1/oidc/token`. Outside the exit
+   criteria. Done: `oidc.feature` with the real `jf eot`, and
+   `deploy/artifactweave/terraform/oidc` in the `terraform` job.
 
 **Exit criteria**
 - `artifactory_user`, `artifactory_managed_user`, `artifactory_group`, `platform_permission`, `artifactory_permission_target`, `artifactory_scoped_token`, `artifactory_keypair`, `platform_group` apply, plan clean, destroy. Met: `deploy/artifactweave/terraform/identity` in the `terraform` job (#85). `artifactory_permission_target` is a stub in provider 12.11.14 that fails every operation with "deprecated. Use platform_permission instead", so the scenario reads the permission back through its data source.

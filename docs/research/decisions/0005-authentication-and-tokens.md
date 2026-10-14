@@ -134,6 +134,42 @@ issue tokens from the same service, under these rules:
     password itself would be refused: expired (`ErrPasswordExpired`), internal password
     disabled, or no password set.
 
+**OIDC token exchange** ([research 21](../21-oidc-token-exchange.md)).
+`POST /access/api/v1/oidc/token` needs no credentials: the subject token is the
+credential. Providers and identity mappings are configuration documents, admin only,
+stored in their wire form so the jfrog/platform provider reads back what it wrote.
+- **Verification.** The ID token is verified against the provider's keys, found
+  through `<issuer_url>/.well-known/openid-configuration` and its JWKS and cached for
+  15 minutes; a key the cache lacks forces one early fetch, at most every 30 seconds.
+  Asymmetric algorithms only (RS, PS, ES, EdDSA). `iss` must be `token_issuer` when a
+  generic or Azure provider sets it, otherwise `issuer_url`; `aud` must hold the
+  provider's audience when it has one; the token must carry `exp`, with a minute of
+  leeway on every time. A GitHub provider that is not permissive also requires
+  `repository_owner` to equal its organisation. Azure's `azure_app_id` asks the JWKS
+  for the application's keys. Keys are fetched directly, or through the environment's
+  proxy when `use_default_proxy` is set.
+- **Mapping.** A named `identity_mapping_name` is the only candidate. Otherwise the
+  request's project's mappings come first, then global ones, then lower priorities, a
+  mapping without one last, then creation order; another project's mappings never
+  apply. A claim matches with `*` (not across `/`) and `**` wildcards, a list matches
+  when any element does, an object matches its nested claims, and a dotted name reaches
+  into nested objects. `username_pattern` and `groups_pattern` take `{{claim}}`,
+  optionally followed by `| replacement` or `| regex | replacement`.
+- **The token.** Its lifetime is `token_spec.expires_in`, one hour when unset, at most
+  24 hours. A named or patterned user may not exist: the token is marked
+  `transient`, and authenticates as the stored user of that name when there is one,
+  otherwise as a transient user in the auto-join groups. A mapping without a user
+  issues for the synthetic subject `oidc-<provider>-<mapping>`, marked `synthetic`,
+  which is never a stored user and acts through its scope's groups alone; such a
+  mapping must therefore name groups only. Every other token still needs a stored,
+  enabled user. The description records the provider, the mapping and the request's
+  CI fields; `audience`, `application_key` and the `gh_*` fields are accepted and
+  ignored.
+- **Statuses.** 400 for a malformed request, an unknown provider or mapping, or no
+  matching mapping; 401 for a token that does not verify, including when the
+  provider's keys cannot be fetched, which is logged at WARN. Management answers 404
+  for an unknown provider or mapping, 400 for an invalid body or a name in use.
+
 **Docker token endpoint.** `GET /v2/` without credentials answers `401` with a
 `WWW-Authenticate: Bearer realm=...,service=...` challenge; the realm issues short-lived
 JWTs scoped `repository:<image>:pull,push`. The exact `service` value and `expires_in`
@@ -258,6 +294,9 @@ exist. Reporting the real artifactweave version elsewhere keeps the lie bounded.
 - A test that every issued JWT payload decodes with `base64.RawStdEncoding`.
 - `jf c add` and `jf rt access-token-create` in the acceptance suite.
 - `artifactory_scoped_token` and `platform_permission` Terraform acceptance.
+- OIDC: `internal/service/oidc` and `internal/auth/idtoken` tests against a fake issuer
+  (`idtokentest`); `oidc.feature`, where the real `jf eot` exchanges a token and
+  downloads with it; `deploy/artifactweave/terraform/oidc` in the `terraform` job.
 - Docker token flow in the OCI conformance job.
 - A test that the version endpoints report the configured compatibility version and that
   the usage and metrics stubs answer 2xx.
@@ -268,5 +307,6 @@ exist. Reporting the real artifactweave version elsewhere keeps the lie bounded.
   tokens, auth mechanisms and JSON shapes
 - [08-terraform-providers](../08-terraform-providers.md), configure-time probes
 - [09-jfrog-cli-compatibility](../09-jfrog-cli-compatibility.md), token and version rows
+- [21-oidc-token-exchange](../21-oidc-token-exchange.md), the exchange's wire behaviour
 - <https://docs.jfrog.com/administration/docs/access-tokens>
 - <https://docs.jfrog.com/user-management/docs/identity-tokens>
