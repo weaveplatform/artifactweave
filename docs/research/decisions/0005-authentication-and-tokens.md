@@ -67,7 +67,9 @@ issue tokens from the same service, under these rules:
 - A non-administrator may mint only identity tokens (`applied-permissions/user`) for
   themselves; an administrator may name any user and any scope.
 - A token whose scope is narrower than its user's identity (groups or resources only) may not
-  mint tokens at all, so a narrowed token cannot obtain a broader one.
+  mint tokens at all, so a narrowed token cannot obtain a broader one. For the same reason it
+  may not set its user's password (`PUT /access/api/v2/users/{username}/password`), which would
+  turn it into a credential with all of the user's rights (#84).
 - The refresh grant is authenticated by the refresh token itself, so both create routes let a
   request through without other credentials, and the handlers require a user for every other
   grant.

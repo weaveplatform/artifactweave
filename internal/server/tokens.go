@@ -89,10 +89,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	if err != nil {
 		return token.Issued{}, fmt.Errorf("tokens: %w", err)
 	}
-	// A token whose scope is narrower than its user's identity must not mint
-	// a broader one: a resource- or group-scoped token minting an identity
-	// token would escalate past its own scope.
-	if p.TokenID != "" && !identityScope(p.Scope) {
+	if narrowedToken(p) {
 		return token.Issued{}, apierror.New(http.StatusForbidden,
 			"A token with a narrowed scope cannot create tokens")
 	}
@@ -204,6 +201,12 @@ func (t tokenAPI) refresh(
 
 var errRefreshOtherUser = apierror.New(http.StatusForbidden,
 	"The authenticated user must match the user of the access token being refreshed")
+
+// narrowedToken reports whether p presented a token whose scope is narrower
+// than its user's identity. Such a token must not mint a broader credential,
+// a token or a password: a resource- or group-scoped token doing so would
+// escalate past its own scope.
+func narrowedToken(p auth.Principal) bool { return p.TokenID != "" && !identityScope(p.Scope) }
 
 // identityScope reports whether a scope acts as its user or as an
 // administrator, rather than narrowing to groups or resources.

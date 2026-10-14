@@ -53,6 +53,20 @@ func decode(t *testing.T, body string) any {
 	return v
 }
 
+// TestSystemLicense reads the license as an administrator, the only caller
+// it answers.
+func TestSystemLicense(t *testing.T) {
+	rec := do(t, statusFixture(t, false), http.MethodGet, "/artifactory/api/system/license",
+		basic("admin", "pw"), "")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body)
+	}
+	want := `{"type":"artifactweave","validThrough":"never","licensedTo":"artifactweave"}`
+	if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
+		t.Errorf("body (-want +got):\n%s", diff)
+	}
+}
+
 func TestSystemEndpoints(t *testing.T) {
 	h := testHandler()
 	cases := []struct {
@@ -104,16 +118,6 @@ func TestSystemEndpoints(t *testing.T) {
 			versionMediaType,
 			"",
 			`{"version":"7.155.0","revision":"v0.1.0-3-gabc","addons":[],"license":"artifactweave"}`,
-		},
-		{
-			"license",
-			"GET",
-			"/artifactory/api/system/license",
-			nil,
-			200,
-			"application/json",
-			"",
-			`{"type":"artifactweave","validThrough":"never","licensedTo":"artifactweave"}`,
 		},
 		{
 			"readiness",

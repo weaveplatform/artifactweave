@@ -77,10 +77,15 @@ func (s artifactoryService) GetSystemVersion(
 	return artgen.GetSystemVersion200JSONResponse(body), nil
 }
 
+// GetSystemLicense answers administrators only, as documented
+// (getlicenseinfo.json).
 func (artifactoryService) GetSystemLicense(
-	context.Context,
-	artgen.GetSystemLicenseRequestObject,
+	ctx context.Context,
+	_ artgen.GetSystemLicenseRequestObject,
 ) (artgen.GetSystemLicenseResponseObject, error) {
+	if err := adminOnly(ctx); err != nil {
+		return nil, err
+	}
 	return artgen.GetSystemLicense200JSONResponse{
 		Type:         "artifactweave",
 		ValidThrough: "never",
