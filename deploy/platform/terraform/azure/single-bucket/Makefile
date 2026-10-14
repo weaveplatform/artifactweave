@@ -1,7 +1,8 @@
-# azure/single-bucket: a storage account without Shared Key, a managed
-# identity federated with GitHub Actions (Terraform), artifactweave in a
-# local container against the account, and the real-cloud conformance tests.
-# Plan and apply need az login and az account set --subscription SUBSCRIPTION.
+# azure/single-bucket: a storage account without Shared Key granted to the
+# bootstrap's conformance identity (Terraform), artifactweave in a local
+# container against the account, and the real-cloud conformance tests. Apply
+# azure/bootstrap first. Plan and apply need az login and
+# az account set --subscription SUBSCRIPTION.
 
 # Every target that touches Azure checks that the CLI's active subscription
 # is this one first; Terraform is pinned to it too.
@@ -15,19 +16,17 @@ CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_AZURE_LARGE_RANGES=$(LARGE_RANGES)
 CONFORMANCE_RUN := TestContractOnRealAzure|TestRealAzureProbes
 CONFORMANCE_PKG := ./pkg/blob/azure/
-GITHUB_ENVIRONMENT := cloud-conformance
+# The identity, tenant and subscription variables, and the environment,
+# come from azure/bootstrap.
 GITHUB_VARS := \
   CONFORMANCE_AZURE_ACCOUNT=account \
-  CONFORMANCE_AZURE_CONTAINER=container \
-  CONFORMANCE_AZURE_CLIENT_ID=client_id \
-  CONFORMANCE_AZURE_TENANT_ID=tenant_id \
-  CONFORMANCE_AZURE_SUBSCRIPTION_ID=subscription_id
+  CONFORMANCE_AZURE_CONTAINER=container
 
 .PHONY: check-subscription
 
 ## check-subscription: refuse unless az's active subscription and tenant are SUBSCRIPTION's
 check-subscription:
-	@./check-subscription.sh $(SUBSCRIPTION)
+	@../check-subscription.sh $(SUBSCRIPTION)
 
 ## LARGE_RANGES=1: with conformance, adds Put Block From URL ranges up to 4000MiB (about a minute)
 

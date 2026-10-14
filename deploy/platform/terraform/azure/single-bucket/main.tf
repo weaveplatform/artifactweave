@@ -1,7 +1,9 @@
 # An acceptance storage account for artifactweave's azure blob backend: the
 # local container (compose.yaml) and the real-cloud conformance tests
 # (cloud-conformance.yml) both use it, under separate prefixes. Nothing uses
-# an account key: Shared Key is disabled on the account.
+# an account key: Shared Key is disabled on the account. The conformance
+# identity and GitHub's trust in it live in azure/bootstrap, which outlives
+# this scenario; apply the bootstrap first.
 
 data "azurerm_client_config" "current" {}
 
@@ -94,33 +96,21 @@ resource "azurerm_storage_management_policy" "cleanup" {
   }
 }
 
-# The identity GitHub Actions runs of one repository act as, through a
-# federated credential: cloud-conformance.yml stores no secret.
-resource "azurerm_user_assigned_identity" "github" {
-  name                = "${var.name}-github"
-  resource_group_name = azurerm_resource_group.this.name
-  location            = azurerm_resource_group.this.location
-}
-
-resource "azurerm_federated_identity_credential" "github" {
-  name                      = "github-${var.github_environment}"
-  user_assigned_identity_id = azurerm_user_assigned_identity.github.id
-  audience                  = ["api://AzureADTokenExchange"]
-  issuer                    = "https://token.actions.githubusercontent.com"
-  # Matched exactly. With GitHub's immutable subject the owner and
-  # repository carry their IDs, so the plain repo:<owner>/<repo> form never
-  # matches; the prefix comes from the repository's OIDC settings.
-  subject = "${var.github_subject_prefix}:environment:${var.github_environment}"
+# The data-plane identity azure/bootstrap created and GitHub's
+# cloud-conformance environment acts as.
+data "azurerm_user_assigned_identity" "conformance" {
+  name                = var.conformance_identity
+  resource_group_name = var.bootstrap_resource_group
 }
 
 # Storage Blob Data Contributor covers reading, writing and deleting blobs
 # and generating user delegation keys (for SAS and presigned URLs). The
 # operator holds it too: the local tests act as you, and the local container
 # runs on a user delegation SAS minted from your login.
-resource "azurerm_role_assignment" "github" {
+resource "azurerm_role_assignment" "conformance" {
   scope                = azurerm_storage_account.blobs.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.github.principal_id
+  principal_id         = data.azurerm_user_assigned_identity.conformance.principal_id
   principal_type       = "ServicePrincipal"
 }
 

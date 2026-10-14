@@ -1,7 +1,7 @@
-# gcp/single-bucket: a GCS bucket, a service account and GitHub federation
-# (Terraform), artifactweave in a local container against the bucket, and
-# the real-cloud conformance tests. Plan and apply need
-# `gcloud auth application-default login`.
+# gcp/single-bucket: a GCS bucket granted to the bootstrap's conformance
+# service account (Terraform), artifactweave in a local container against
+# the bucket, and the real-cloud conformance tests. Apply gcp/bootstrap
+# first. Plan and apply need `gcloud auth application-default login`.
 
 CONFORMANCE_DEPS := credentials
 CONFORMANCE_ENV = \
@@ -10,10 +10,9 @@ CONFORMANCE_ENV = \
   GOOGLE_APPLICATION_CREDENTIALS=$(CURDIR)/.secrets/container-credentials.json
 CONFORMANCE_RUN := TestContractOnRealGCS|TestRealGCSProbes
 CONFORMANCE_PKG := ./pkg/blob/gcs/
+# The service account and provider variables come from gcp/bootstrap.
 GITHUB_VARS := \
-  CONFORMANCE_GCS_BUCKET=bucket \
-  CONFORMANCE_GCP_SERVICE_ACCOUNT=service_account \
-  CONFORMANCE_GCP_WIF_PROVIDER=workload_identity_provider
+  CONFORMANCE_GCS_BUCKET=bucket
 CLEAN_FILES := .local .secrets
 
 include $(shell git rev-parse --show-toplevel)/deploy/platform/terraform/scenario.mk

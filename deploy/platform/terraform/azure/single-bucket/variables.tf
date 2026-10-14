@@ -28,14 +28,14 @@ variable "store_prefix" {
   default     = "local/"
 }
 
-variable "github_subject_prefix" {
-  description = "The OIDC subject prefix of the repository whose Actions may act as the identity. This repository uses GitHub's immutable subject, which names the owner and repository with their IDs; read it with `gh api repos/{owner}/{repo}/actions/oidc/customization/sub --jq .sub_claim_prefix`."
+variable "bootstrap_resource_group" {
+  description = "Resource group of azure/bootstrap, which holds the conformance identity."
   type        = string
-  default     = "repo:weaveplatform@336817058/artifactweave@1415179278"
+  default     = "artifactweave-bootstrap-rg"
 }
 
-variable "github_environment" {
-  description = "GitHub environment the workflow's azure job runs in. Azure matches the OIDC subject exactly, and an environment gives a subject independent of branch and event."
+variable "conformance_identity" {
+  description = "Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account."
   type        = string
-  default     = "cloud-conformance"
+  default     = "artifactweave-conformance"
 }

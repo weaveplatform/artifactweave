@@ -7,8 +7,10 @@ and by the manually dispatched `cloud-conformance.yml` workflow.
 Nothing uses an account key: the account has Shared Key disabled.
 - **Terraform** runs with your Azure CLI login.
 - **The local tests** run as you through `DefaultAzureCredential`, with the Azure CLI.
-- **The workflow** uses a user-assigned managed identity, through a federated credential for
-  this repository's `cloud-conformance` environment.
+- **The workflow** uses the `artifactweave-conformance` managed identity from
+  [`azure/bootstrap`](../bootstrap/README.md), through a federated credential for this
+  repository's `cloud-conformance` environment. Apply the bootstrap first: this root looks
+  the identity up and grants it the account.
 - **The local container** runs on a short-lived user delegation SAS minted from your login,
   because `DefaultAzureCredential` can't reach the host's Azure CLI from inside the image.
 
@@ -16,7 +18,7 @@ Nothing uses an account key: the account has Shared Key disabled.
 
 Terraform is pinned to `subscription_id`, by default `c33dbc35-f86d-4b7c-a81e-2a33eb3f7946`.
 Every `az` command the scripts run passes `--subscription`. `plan`, `apply`, `destroy`,
-`credentials` and `conformance` first run `check-subscription.sh`, which refuses unless:
+`credentials` and `conformance` first run `../check-subscription.sh` (shared with `azure/bootstrap`), which refuses unless:
 - the Azure CLI's active subscription is that one; and
 - the login's tenant owns it.
 
@@ -31,13 +33,9 @@ In `uksouth`, in resource group `artifactweave-acc-rg`:
 - **A lifecycle policy:** it deletes `local/_uploads/` blobs after 2 days and
   `conformance/` blobs after 1 day. Uncommitted blocks aren't blobs; Azure discards them
   after 7 days.
-- **A user-assigned managed identity** with a federated credential for subject
-  `repo:weaveplatform@336817058/artifactweave@1415179278:environment:cloud-conformance`.
-  This repository uses GitHub's immutable OIDC subject, which carries the owner and
-  repository IDs. Azure matches the subject exactly, so the plain `repo:<owner>/<repo>` form
-  never matches. `gh api repos/{owner}/{repo}/actions/oidc/customization/sub` shows the prefix.
-- **Storage Blob Data Contributor** on the account, for that identity and for you. The role
-  includes `generateUserDelegationKey`, for presigned URLs and the container's SAS.
+- **Storage Blob Data Contributor** on the account, for the bootstrap's conformance
+  identity and for you. The role includes `generateUserDelegationKey`, for presigned URLs
+  and the container's SAS.
 
 ## Use
 
@@ -49,7 +47,7 @@ make up           # mints the SAS, builds the image, starts artifactweave on por
 make smoke        # deploys and downloads 40 MiB, then reads the blob's committed block list
 make conformance  # the real-Azure blob contract and probes, as you
 make conformance LARGE_RANGES=1  # adds Put Block From URL ranges up to 4,000 MiB (about a minute)
-make github-vars  # creates the cloud-conformance environment, sets the workflow's variables
+make github-vars  # sets the account and container variables; the identity's come from azure/bootstrap
 make down         # stops the container; make clean also drops its data and .local/
 make destroy      # removes everything, the account's blobs included
 ```
@@ -106,24 +104,23 @@ fails when it is stale.
 
 | Name | Type |
 | ---- | ---- |
-| [azurerm_federated_identity_credential.github](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential) | resource |
 | [azurerm_resource_group.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
-| [azurerm_role_assignment.github](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
+| [azurerm_role_assignment.conformance](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_role_assignment.operator](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
 | [azurerm_storage_account.blobs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
 | [azurerm_storage_container.blobs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_container) | resource |
 | [azurerm_storage_management_policy.cleanup](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_management_policy) | resource |
-| [azurerm_user_assigned_identity.github](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/user_assigned_identity) | resource |
 | [random_string.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
+| [azurerm_user_assigned_identity.conformance](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/user_assigned_identity) | data source |
 
 ### Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| bootstrap\_resource\_group | Resource group of azure/bootstrap, which holds the conformance identity. | `string` | `"artifactweave-bootstrap-rg"` | no |
+| conformance\_identity | Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account. | `string` | `"artifactweave-conformance"` | no |
 | container | Blob container for blob.azure.container. | `string` | `"artifactweave"` | no |
-| github\_environment | GitHub environment the workflow's azure job runs in. Azure matches the OIDC subject exactly, and an environment gives a subject independent of branch and event. | `string` | `"cloud-conformance"` | no |
-| github\_subject\_prefix | The OIDC subject prefix of the repository whose Actions may act as the identity. This repository uses GitHub's immutable subject, which names the owner and repository with their IDs; read it with `gh api repos/{owner}/{repo}/actions/oidc/customization/sub --jq .sub_claim_prefix`. | `string` | `"repo:weaveplatform@336817058/artifactweave@1415179278"` | no |
 | location | Region of the resource group and storage account. | `string` | `"uksouth"` | no |
 | name | Prefix for the resource names. | `string` | `"artifactweave-acc"` | no |
 | store\_prefix | Blob prefix the local container writes under (blob.azure.prefix). | `string` | `"local/"` | no |
@@ -134,10 +131,8 @@ fails when it is stale.
 | Name | Description |
 | ---- | ----------- |
 | account | Storage account for blob.azure.account and ARTIFACTWEAVE\_TEST\_AZURE\_ACCOUNT. |
-| client\_id | The GitHub identity's client ID, for azure/login (CONFORMANCE\_AZURE\_CLIENT\_ID). |
 | container | Container for blob.azure.container and ARTIFACTWEAVE\_TEST\_AZURE\_CONTAINER. |
-| resource\_group | Resource group holding the account and the GitHub identity. |
+| resource\_group | Resource group holding the account. |
 | store\_prefix | Blob name prefix the local container writes under (blob.azure.prefix). |
-| subscription\_id | Subscription for azure/login (CONFORMANCE\_AZURE\_SUBSCRIPTION\_ID). |
-| tenant\_id | Tenant for azure/login (CONFORMANCE\_AZURE\_TENANT\_ID). |
+| subscription\_id | Subscription holding the account, which credentials.sh checks the CLI against. |
 <!-- END_TF_DOCS -->

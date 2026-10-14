@@ -8,9 +8,13 @@ A real Google Cloud Storage bucket for artifactweave's `gcs` blob backend. Three
 Nothing uses a service account key. The organisation enforces
 `iam.disableServiceAccountKeyCreation`:
 - **Terraform** runs with your own Application Default Credentials.
-- **The local container and tests** impersonate the acceptance service account.
+- **The local container and tests** impersonate the conformance service account.
 - **The workflow** reaches that account through Workload Identity Federation, limited to
-  this repository.
+  this repository's `cloud-conformance` environment.
+
+The service account, its federation and the APIs live in [`gcp/bootstrap`](../bootstrap/README.md),
+which outlives this scenario. Apply the bootstrap first: this root looks the account up and
+grants it the bucket.
 
 ## What Terraform creates
 
@@ -18,11 +22,9 @@ Nothing uses a service account key. The organisation enforces
   delete is off, so the temporary parts the backend composes and deletes aren't billed for a
   retention period. Lifecycle rules delete abandoned `local/_uploads/` parts after two days
   and `conformance/` prefixes after one.
-- A service account with `roles/storage.objectAdmin` on that bucket only.
-- Two Service Account Token Creator grants on that account: one for you, to impersonate it,
-  and one for the account itself, to sign URLs through IAM `signBlob`.
-- A Workload Identity pool and provider for GitHub Actions. The provider accepts only
-  `weaveplatform/artifactweave`, which may act as the service account.
+- `roles/storage.objectAdmin` on that bucket only, for the bootstrap's
+  `artifactweave-conformance` service account. The bootstrap already lets you impersonate
+  it and lets it sign URLs as itself through IAM `signBlob`.
 
 ## Use
 
@@ -33,7 +35,7 @@ make apply        # from the repository root: make gcp-apply, or make platform-a
 make up           # builds the image, starts artifactweave against the bucket on port 8081
 make smoke        # deploys and downloads 40 MiB through the container
 make conformance  # the real-GCS blob contract and probes
-make github-vars  # sets the workflow's repository variables from the outputs
+make github-vars  # sets CONFORMANCE_GCS_BUCKET; the identity variables come from gcp/bootstrap
 make down         # stops the container; make clean also drops its data
 make destroy      # removes everything, the bucket's objects included
 ```
@@ -88,25 +90,18 @@ fails when it is stale.
 
 | Name | Type |
 | ---- | ---- |
-| [google_iam_workload_identity_pool.github](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/iam_workload_identity_pool) | resource |
-| [google_iam_workload_identity_pool_provider.github](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/iam_workload_identity_pool_provider) | resource |
-| [google_project_service.this](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/project_service) | resource |
-| [google_service_account.app](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account) | resource |
-| [google_service_account_iam_member.github](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account_iam_member) | resource |
-| [google_service_account_iam_member.operator_impersonates](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account_iam_member) | resource |
-| [google_service_account_iam_member.signs_as_itself](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/service_account_iam_member) | resource |
 | [google_storage_bucket.blobs](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket) | resource |
 | [google_storage_bucket_iam_member.app](https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/storage_bucket_iam_member) | resource |
 | [random_id.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/id) | resource |
-| [google_client_openid_userinfo.me](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/client_openid_userinfo) | data source |
+| [google_service_account.conformance](https://registry.terraform.io/providers/hashicorp/google/latest/docs/data-sources/service_account) | data source |
 
 ### Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| github\_repository | Repository whose Actions may act as the service account (cloud-conformance.yml). | `string` | `"weaveplatform/artifactweave"` | no |
-| name | Prefix for the bucket and service account names. | `string` | `"artifactweave-acc"` | no |
-| project\_id | Project that holds the acceptance bucket and its service account. | `string` | `"project-0c0b2d7a-9ad7-4221-9a8"` | no |
+| conformance\_service\_account | Account ID of the data-plane service account gcp/bootstrap created; it gets object rights on this bucket. | `string` | `"artifactweave-conformance"` | no |
+| name | Prefix for the bucket name. | `string` | `"artifactweave-acc"` | no |
+| project\_id | Project that holds the acceptance bucket (the bootstrap's lab project). | `string` | `"project-0c0b2d7a-9ad7-4221-9a8"` | no |
 | region | Location of the bucket. | `string` | `"europe-west2"` | no |
 | store\_prefix | Object prefix the local container writes under (blob.gcs.prefix). | `string` | `"local/"` | no |
 
@@ -115,7 +110,6 @@ fails when it is stale.
 | Name | Description |
 | ---- | ----------- |
 | bucket | Bucket for blob.gcs.bucket and ARTIFACTWEAVE\_TEST\_GCS\_BUCKET. |
-| service\_account | Service account for blob.gcs.google\_access\_id and the conformance workflow. |
+| service\_account | The bootstrap's conformance service account, for blob.gcs.google\_access\_id and ARTIFACTWEAVE\_TEST\_GCS\_ACCESS\_ID. |
 | store\_prefix | Object prefix the local container writes under (blob.gcs.prefix). |
-| workload\_identity\_provider | Provider for google-github-actions/auth (repository variable CONFORMANCE\_GCP\_WIF\_PROVIDER). |
 <!-- END_TF_DOCS -->

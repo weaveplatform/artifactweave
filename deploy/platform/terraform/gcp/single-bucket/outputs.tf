@@ -4,13 +4,8 @@ output "bucket" {
 }
 
 output "service_account" {
-  description = "Service account for blob.gcs.google_access_id and the conformance workflow."
-  value       = google_service_account.app.email
-}
-
-output "workload_identity_provider" {
-  description = "Provider for google-github-actions/auth (repository variable CONFORMANCE_GCP_WIF_PROVIDER)."
-  value       = google_iam_workload_identity_pool_provider.github.name
+  description = "The bootstrap's conformance service account, for blob.gcs.google_access_id and ARTIFACTWEAVE_TEST_GCS_ACCESS_ID."
+  value       = data.google_service_account.conformance.email
 }
 
 output "store_prefix" {

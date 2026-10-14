@@ -14,7 +14,7 @@ applied through the JFrog Terraform providers.
 
 | Scenario | AWS | GCP | Azure |
 |---|---|---|---|
-| `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | planned (#128) | planned (#126) | planned (#126) |
+| `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | planned (#128) | [available](terraform/gcp/bootstrap/README.md) | [available](terraform/azure/bootstrap/README.md) |
 | `single-bucket`: one private bucket or container | planned (#128) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
 | `multi-region`: two regional stores as artifactweave mirror members | planned (#130) | planned (#130) | planned (#130) |
 | `geo-replicated`: one store with the cloud's own replication | planned (#131) | planned (#131) | planned (#131) |
@@ -25,8 +25,26 @@ applied through the JFrog Terraform providers.
 The two `single-bucket` scenarios are the acceptance environments the real-cloud blob
 conformance tests run against. They predate the scenario contract: their server
 configuration is rendered by `credentials.sh` rather than a Terraform output, and they carry
-no `expires-at` label yet. Both arrive with the bootstraps (#126) and the scenario workflow
-(#129).
+no `expires-at` label yet. Both arrive with the scenario workflow (#129).
+
+## Bootstraps
+
+Each cloud's `bootstrap` holds what every scenario on that cloud relies on and outlives
+them all: GitHub's trust in a data-plane identity (`cloud-conformance`) and a deployer
+(`cloud-platform`), the remote state store, the cloud's DNS zone under
+`artifact.weaveplatform.run`, the APIs or resource providers, and a budget. Apply it once,
+before any scenario:
+
+```bash
+make platform-undelete-pool SCENARIO=gcp/bootstrap   # GCP only, once: restores the pool deleted on 2026-10-14
+make platform-apply         SCENARIO=gcp/bootstrap   # first run uses local state
+make platform-migrate-state SCENARIO=gcp/bootstrap   # then moves it into the bucket it made
+make platform-github-vars   SCENARIO=gcp/bootstrap   # environments and repository variables
+```
+
+`make platform-destroy` refuses on a bootstrap. The trusts and environments are described in
+[`docs/testing/ci.md`](../../docs/testing/ci.md#cloud-trust-and-environments), and the
+`platform-auth-check.yml` workflow proves the deployer trust on demand.
 
 ## Running a scenario
 

@@ -1,20 +1,8 @@
 # An acceptance bucket for artifactweave's GCS backend: the local container
 # (compose.yaml) and the real-cloud conformance tests (cloud-conformance.yml)
-# both use it, under separate prefixes.
-
-resource "google_project_service" "this" {
-  # iamcredentials signs URLs and mints impersonated tokens; sts exchanges
-  # GitHub's OIDC token for one.
-  for_each = toset([
-    "storage.googleapis.com",
-    "iam.googleapis.com",
-    "iamcredentials.googleapis.com",
-    "sts.googleapis.com",
-    "cloudresourcemanager.googleapis.com",
-  ])
-  service            = each.value
-  disable_on_destroy = false
-}
+# both use it, under separate prefixes. The APIs, the conformance service
+# account and GitHub's trust in it live in gcp/bootstrap, which outlives this
+# scenario; apply the bootstrap first.
 
 resource "random_id" "suffix" {
   byte_length = 4
@@ -67,68 +55,17 @@ resource "google_storage_bucket" "blobs" {
       type = "Delete"
     }
   }
-
-  depends_on = [google_project_service.this]
 }
 
-resource "google_service_account" "app" {
-  account_id   = var.name
-  display_name = "artifactweave acceptance"
-  description  = "Used by the local artifactweave container and the real-cloud conformance tests."
-  depends_on   = [google_project_service.this]
+# The data-plane service account gcp/bootstrap created and GitHub's
+# cloud-conformance environment acts as.
+data "google_service_account" "conformance" {
+  account_id = var.conformance_service_account
 }
 
 # Object admin on this bucket only: create, read, compose and delete objects.
 resource "google_storage_bucket_iam_member" "app" {
   bucket = google_storage_bucket.blobs.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${google_service_account.app.email}"
-}
-
-data "google_client_openid_userinfo" "me" {}
-
-# No keys (the organisation forbids them). The local container acts as the
-# service account by impersonation from the operator's own login (up.sh
-# writes the impersonated credentials file), and signs download URLs through
-# IAM signBlob as itself.
-resource "google_service_account_iam_member" "operator_impersonates" {
-  service_account_id = google_service_account.app.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "user:${data.google_client_openid_userinfo.me.email}"
-}
-
-resource "google_service_account_iam_member" "signs_as_itself" {
-  service_account_id = google_service_account.app.name
-  role               = "roles/iam.serviceAccountTokenCreator"
-  member             = "serviceAccount:${google_service_account.app.email}"
-}
-
-# GitHub Actions runs of one repository exchange their OIDC token for the
-# service account (Workload Identity Federation): cloud-conformance.yml needs
-# no stored credential.
-resource "google_iam_workload_identity_pool" "github" {
-  workload_identity_pool_id = "github-actions"
-  display_name              = "GitHub Actions"
-  depends_on                = [google_project_service.this]
-}
-
-resource "google_iam_workload_identity_pool_provider" "github" {
-  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
-  workload_identity_pool_provider_id = "artifactweave"
-  display_name                       = "weaveplatform/artifactweave"
-  attribute_mapping = {
-    "google.subject"       = "assertion.sub"
-    "attribute.repository" = "assertion.repository"
-    "attribute.ref"        = "assertion.ref"
-  }
-  attribute_condition = "assertion.repository == '${var.github_repository}'"
-  oidc {
-    issuer_uri = "https://token.actions.githubusercontent.com"
-  }
-}
-
-resource "google_service_account_iam_member" "github" {
-  service_account_id = google_service_account.app.name
-  role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repository}"
+  member = "serviceAccount:${data.google_service_account.conformance.email}"
 }
