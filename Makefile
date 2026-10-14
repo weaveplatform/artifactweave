@@ -50,15 +50,19 @@ accept:
 	@rm -rf $(COVER_DIR)/accept && mkdir -p $(COVER_DIR)/accept
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -count=1 ./test/acceptance/...
 
-## terraform: validate test/terraform against the pinned provider from a filesystem mirror (TERRAFORM_MODE=apply also applies, plans and destroys against a -cover server)
+# The Terraform scenarios applied against artifactweave: the repositories
+# fixture and the identity reference.
+TERRAFORM_SCENARIOS ?= test/terraform deploy/artifactweave/terraform/identity
+
+## terraform: validate the Terraform scenarios against the pinned providers from a filesystem mirror (TERRAFORM_MODE=apply also applies, plans and destroys each against one -cover server)
 # Apply writes the server's coverage to cover/terraform for make cover; CI
 # uploads it as cover-terraform.
 terraform:
 ifeq ($(TERRAFORM_MODE),apply)
 	@rm -rf $(COVER_DIR)/terraform && mkdir -p $(COVER_DIR)/terraform
-	GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/terraform ./test/terraform/run.sh apply
+	GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/terraform ./test/terraform/run.sh apply $(TERRAFORM_SCENARIOS)
 else
-	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate)
+	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate) $(TERRAFORM_SCENARIOS)
 endif
 
 ## capture-aql: refresh pkg/aql/aqltest/testdata with the AQL the pinned jf sends (needs ARTIFACTWEAVE_JF_BIN)

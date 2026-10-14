@@ -21,7 +21,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries and container-backed Maven, .NET, Node and Python clients; uploads `cover-accept` |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
 | `conformance` | `ubuntu-latest` | P6 | Starts the `-cover` binary with a `docker-local` repo, clones `opencontainers/distribution-spec` at a pinned tag and runs its conformance module with `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials; uploads `cover-conformance` |
-| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` provider from a filesystem mirror of its release zip (checked against the release SHA-256 and the committed lock file) and validates `test/terraform/`. Then it starts a `-cover` binary, mints an admin access token, applies the fixture, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69); uploads `cover-terraform` |
+| `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario: the `test/terraform/` repositories fixture and `deploy/artifactweave/terraform/identity`. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69 and #85); uploads `cover-terraform` |
 | `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
 | `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
@@ -96,39 +96,52 @@ the contract and probes to that key instead. `make azure-conformance` refuses to
 the Azure CLI's active subscription is the acceptance one
 (`deploy/terraform/acceptance-azure`).
 
-## Terraform fixture
+## Terraform scenarios
 
-`make terraform` runs `test/terraform/run.sh`:
-- It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` once into a
-  filesystem mirror, checking it against the SHA-256 pinned in the script.
-- It points `TF_CLI_CONFIG_FILE` at a CLI configuration that installs the provider only from
-  that mirror.
-- It runs `terraform init -lockfile=readonly` and `terraform validate`.
+`make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories
+fixture in `test/terraform/` and the identity reference in
+`deploy/artifactweave/terraform/identity/`.
+- It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
+  `terraform-provider-platform_<version>_<os>_<arch>.zip` once into a filesystem mirror,
+  checking each against the SHA-256 pinned in the script.
+- It points `TF_CLI_CONFIG_FILE` at a CLI configuration that installs both providers only
+  from that mirror.
+- For each scenario it runs `terraform init -lockfile=readonly` and `terraform validate`.
 
-The committed `.terraform.lock.hcl` holds the provider's hashes for linux and darwin on
-amd64 and arm64. To move the provider to a new version:
-1. Update the version in `main.tf`.
-2. Update the checksums in `run.sh` from the release's `SHA256SUMS`.
-3. Regenerate the lock from a mirror holding the four zips:
+Each scenario's committed `.terraform.lock.hcl` holds its providers' hashes for linux and
+darwin on amd64 and arm64. To move a provider to a new version:
+1. Update the version in every scenario's `main.tf`.
+2. Update the version and checksums in `run.sh` from the release's `SHA256SUMS`.
+3. Regenerate each lock from a mirror holding the four zips of each provider:
    `terraform providers lock -fs-mirror=<mirror> -platform=...`.
 
 `make terraform TERRAFORM_MODE=apply` adds the full run, which the `terraform` CI job runs:
-1. Build and start a `-cover` binary, writing its coverage to `cover/terraform`.
+1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`.
 2. Mint an admin access token with the bootstrap admin's password
-   (`POST /access/api/v1/tokens`). The provider authenticates only with a Bearer token.
+   (`POST /access/api/v1/tokens`). The providers authenticate only with a Bearer token.
    Set `TERRAFORM_ACCESS_TOKEN` to supply one instead.
-3. Apply the repository.
-4. Deploy `fixture.txt`.
-5. Apply its properties.
-6. Require `terraform plan -detailed-exitcode` to exit 0.
-7. Destroy.
+3. Apply each scenario with its own steps:
+   - **repositories:** apply the repository, deploy `fixture.txt`, then apply its
+     properties;
+   - **identity:** generate an RSA key pair for `artifactory_keypair`, apply, then check
+     that the permission written through Access v2 reads back through the legacy v2
+     permission target API.
+4. Require `terraform plan -detailed-exitcode` to exit 0.
+5. Destroy.
 
-Terraform runs on a copy of the fixture in the work directory, so its state never lands
-in the source tree. The empty plan is the check that matters: the provider reads back
-every attribute it wrote. It found two gaps in the repository API, both fixed in #69. The
-server echoed the boolean flags JFrog documents as strings in that string form, which the
-provider cannot decode. It also left out `environments` when a repository has none, which
-the provider reads as null against its default of an empty set.
+Terraform runs on a copy of each scenario in the work directory, so its state never lands
+in the source tree. The empty plan is the check that matters: the providers read back
+every attribute they wrote. The repositories fixture found two gaps in the repository API,
+both fixed in #69. The server echoed the boolean flags JFrog documents as strings in that
+string form, which the provider cannot decode. It also left out `environments` when a
+repository has none, which the provider reads as null against its default of an empty
+set. The identity scenario found that the provider creates key pairs with
+`POST /artifactory/api/security/keypair/`, with a trailing slash, which #85 routes.
+
+`artifactory_permission_target` is a stub in provider 12.11.14: every operation returns
+"deprecated. Use platform_permission instead". The identity scenario uses
+`platform_permission` and reads the result back with the `artifactory_permission_target`
+data source, which still calls `/artifactory/api/v2/security/permissions/{name}`.
 
 ## AQL fixtures from the JFrog CLI
 
