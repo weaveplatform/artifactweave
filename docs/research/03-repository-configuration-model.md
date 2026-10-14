@@ -206,18 +206,25 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
 ## Federated fields
 
 Everything a local repository has, plus `members`, an array of `{"url","enabled"}` where
-`enabled` is a JSON string (default `"true"`) and `url` may be derived from the base URL
-and the key, and `proxy` and `disableProxy`.
+`enabled` is a boolean (default `true`; documented as a string, see below) and `url` may be
+derived from the base URL and the key, and `proxy` and `disableProxy`.
 
 ## Typing traps
 
 The JSON documentation and the OpenAPI schema type `enableFileListsIndexing`,
 `downloadRedirect`, `cdnRedirect`, `priorityResolution` and `blockPushingSchema1` as
 strings (`"false"`) on local and federated repositories, while `priorityResolution` is a
-boolean on remote repositories, and federated `members[].enabled` is a string. The
-Terraform provider round-trips these values, so the implementation must accept both the
-string and boolean spellings on input and echo the form Artifactory uses for that class
-on output. The `pkg/repo` round-trip tests cover every such field.
+boolean on remote repositories, and federated `members[].enabled` is a string.
+
+Artifactory sends JSON booleans for all of them, whatever the documentation says. Provider
+12.11.14 decodes every one into a Go `bool` (`local.RepositoryBaseParams`, which federated
+reuses, the Docker and RPM models, and the federated `Member`), and its sample local
+repository shows `"cdnRedirect": false` and `"blockPushingSchema1": true`. Echoing the
+string spelling broke the provider's refresh after a create ("cannot unmarshal string into
+Go struct field ... priorityResolution of type bool"), which the `terraform` CI job found
+(#69). artifactweave writes booleans for every class and accepts both spellings on input, for
+clients that followed the documentation. The `pkg/repo` round-trip tests cover every such
+field.
 
 ## Keys known only from the Terraform provider
 

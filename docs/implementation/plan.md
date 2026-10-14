@@ -109,7 +109,7 @@ Decisions: [0001](../research/decisions/0001-mirror-the-jfrog-api-surface.md),
 
 **Tasks**
 1. `make init NAME=artifactweave`; this documentation set; `CODEOWNERS`.
-2. `pkg/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that preserves JFrog's string-typed booleans per rclass, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
+2. `pkg/repo`: the `Config` model with every field in [research 03](../research/03-repository-configuration-model.md), JSON round-trip that accepts the string-typed booleans JFrog documents per rclass and writes booleans, validation (key syntax, rclass and packageType sets, virtual members exist, `defaultDeploymentRepo` is a member, `projectKey` implies `environments`).
 3. `pkg/layout`: pattern engine for `repoLayoutRef` tokens with the bundled layouts and the Maven-2 integration-revision regexes.
 4. `internal/config`: strict app YAML, flag > env > file precedence, unknown keys rejected, `config validate`.
 5. `internal/server`: chi router, request id, slog access log, recovery, body limits, the per-surface errors table, the base-URL resolver middleware, content-type normalisation for `+json` vendor types and `application/yaml`.
@@ -366,7 +366,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 
 **Exit criteria**
 - `jf rt u/dl/s/cp/mv/del/sp` round-trip a tree, including a checksum-deploy hit for a file over 10 KiB and a split download. Met: `round_trip.feature` (#51).
-- Moved to P4 (#69): `artifactory_local_generic_repository` and `artifactory_item_properties` apply, plan clean, destroy. The provider authenticates only with a Bearer access token, which P4 issues. Until then the `terraform` CI job validates the fixture against the mirrored provider (`make terraform`).
+- Moved to P4 (#69): `artifactory_local_generic_repository` and `artifactory_item_properties` apply, plan clean, destroy. The provider authenticates only with a Bearer access token, which P4 issues. Met in P4 (#69).
 - The status-code table test covers every route in this phase. Met: the guard in `internal/server/status_test.go` fails while an implemented route has no row.
 
 ## P4: Identity and authorization
@@ -386,7 +386,7 @@ Decisions: [0005](../research/decisions/0005-authentication-and-tokens.md),
 - `artifactory_user`, `artifactory_managed_user`, `artifactory_group`, `platform_permission`, `artifactory_permission_target`, `artifactory_scoped_token`, `artifactory_keypair`, `platform_group` apply, plan clean, destroy.
 - `jf rt user-create`, `group-create`, `permission-target-create`, `access-token-create` and `jf c add` with the created token work.
 - A token scoped to one repository cannot read another. **M1.**
-- Moved from P3 (#69): the `terraform` CI job mints an admin access token and runs `make terraform TERRAFORM_MODE=apply`. `artifactory_local_generic_repository` and `artifactory_item_properties` apply, `terraform plan` is empty, then destroy, and the job's coverage joins the gate.
+- Moved from P3 (#69): the `terraform` CI job mints an admin access token and runs `make terraform TERRAFORM_MODE=apply`. `artifactory_local_generic_repository` and `artifactory_item_properties` apply, `terraform plan` is empty, then destroy, and the job's coverage joins the gate. Met: the `terraform` job (#69), after the repository API started writing its flags as JSON booleans and listing no environments as `[]`.
 
 ## P5: Full AQL, searches, build-info
 

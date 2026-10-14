@@ -85,11 +85,11 @@ Local and federated:
 | `yumRootDepth` | integer | |
 | `dockerApiVersion` | string `V2` | |
 | `terraformType` | string `MODULE\|PROVIDER` | local only in the oracle; the provider sends lower case |
-| `enableFileListsIndexing`, `downloadRedirect`, `cdnRedirect`, `blockPushingSchema1` | **string** | string-typed booleans (`"true"`/`"false"`) |
-| `priorityResolution` | **string** on local, **boolean** on federated | the single place the oracle disagrees with itself |
+| `enableFileListsIndexing`, `downloadRedirect`, `cdnRedirect`, `blockPushingSchema1` | **string** | string-typed booleans (`"true"`/`"false"`) in the oracle; Artifactory sends booleans ([03](03-repository-configuration-model.md#typing-traps)) |
+| `priorityResolution` | **string** on local, **boolean** on federated | the single place the oracle disagrees with itself; Artifactory sends a boolean on both |
 | `optionalIndexCompressionFormats` | array of string | Debian |
 | `forceNugetAuthentication`, `forceP2Authentication`, `forceConanAuthentication`, `encryptStates` | boolean | local only in the oracle |
-| `members[]` | array of `{url: string, enabled: string}` | federated only; `enabled` is a string |
+| `members[]` | array of `{url: string, enabled: string}` | federated only; `enabled` is a string in the oracle, a boolean on the wire |
 | `proxy`, `disableProxy` | string, boolean | federated only in the oracle (and remote) |
 
 Remote:
@@ -359,7 +359,7 @@ distribution, Access Federation and topology. Added 2026-10-13 with
 
 | Entity | Fields | Notes |
 |---|---|---|
-| Federated repository | the local repository fields plus `members[{url, enabled ("true"/"false")}]`, `proxy`, `disableProxy` | members must be paired peers ([0022](decisions/0022-federated-repositories.md)) |
+| Federated repository | the local repository fields plus `members[{url, enabled}]`, `proxy`, `disableProxy` | members must be paired peers ([0022](decisions/0022-federated-repositories.md)) |
 | Federation settings per repository | `priority HIGH|STANDARD`, `propagate_created_time`, `disabled` | |
 | Sync state (derived) | `{key, status SYNCING|FULL_SYNC_RUNNING|DISABLED|OUT_OF_SYNC, members[{remoteKey, remoteUrl}]}`; details `{federations[{localRepoKey, priority, memberInfoList[{url, repoKey, aggregatedStatus, isSupported, isDisabled, isInLag}]}]}`; lag `[{localRepoKey, remoteUrl, remoteRepoKey, lagInMS, eventRegistrationTimeStamp}]` | computed from cursors |
 | Full sync run | `id, repo_key, peer_id, forced, started_at, finished_at, snapshot_seq, status, result_paths[]` | `fullSync` answers with `resultPaths` |

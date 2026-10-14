@@ -15,8 +15,9 @@ make terraform TERRAFORM_MODE=apply  # also apply, require an empty plan, destro
 pinned release zip, checks it against the SHA-256 in the script, and then checks it against
 the committed `.terraform.lock.hcl`. No run contacts registry.terraform.io.
 
-The provider authenticates only with a Bearer access token (`access_token`). artifactweave
-issues those from P4. Until then the provider's first call is refused with 401, so
-`TERRAFORM_MODE=apply` stops at configure. `TERRAFORM_ACCESS_TOKEN` supplies a token once
-there is one. See [docs/testing/ci.md](../../docs/testing/ci.md#terraform-fixture) for
+The provider authenticates only with a Bearer access token (`access_token`). The apply run
+mints an admin token from the server's token API with the bootstrap admin's password.
+`TERRAFORM_ACCESS_TOKEN` supplies a token instead. Terraform runs on a copy of this
+directory in the work directory, so no state file is left here. See
+[docs/testing/ci.md](../../docs/testing/ci.md#terraform-fixture) for the steps and for
 moving to a new provider version.

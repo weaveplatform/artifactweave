@@ -54,20 +54,18 @@ components:
           type: boolean
         blockPushingSchema1:
           description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
-            Defaults to false; artifactweave never accepts schema 1 regardless. Artifactory renders this boolean
-            as the strings "true" or "false" on federated repositories; the server accepts either form on input
-            and echoes the string form here.
-          type: string
+            Defaults to false; artifactweave never accepts schema 1 regardless. Rendered as a JSON boolean on federated
+            repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
         calculateYumMetadata:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy.
             Defaults to false. Not implemented for RPM in v1 but stored.
           type: boolean
         cdnRedirect:
-          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted
-            and stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Artifactory
-            renders this boolean as the strings "true" or "false" on federated repositories; the server accepts
-            either form on input and echoes the string form here.
-          type: string
+          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted and
+            stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Rendered as a JSON
+            boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
         checksumPolicyType:
           allOf:
           - $ref: '#/components/schemas/ChecksumPolicyType'
@@ -96,15 +94,14 @@ components:
           type: integer
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
-            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Artifactory
-            renders this boolean as the strings "true" or "false" on federated repositories; the server accepts
-            either form on input and echoes the string form here.
-          type: string
+            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a
+            JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
-            Artifactory renders this boolean as the strings "true" or "false" on federated repositories; the server
-            accepts either form on input and echoes the string form here.
-          type: string
+            Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and
+            "false" on input.
+          type: boolean
         encryptStates:
           description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
             Defaults to true. The terraformbackend package type is not supported in v1 and the field is stored only.
@@ -112,7 +109,7 @@ components:
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
             Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after.
+            after. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -178,10 +175,11 @@ components:
             description: One federation member.
             properties:
               enabled:
-                description: Optional within this object. Whether sync with this member is on. Always rendered as
-                  the strings "true" or "false"; defaults to "true". Turning it off queues no events for the member
-                  until it is turned on again, after which a full sync catches it up.
-                type: string
+                description: Optional within this object. Whether sync with this member is on. Rendered as a JSON
+                  boolean; the server also accepts the strings "true" and "false" on input. Defaults to true. Turning
+                  it off queues no events for the member until it is turned on again, after which a full sync catches
+                  it up.
+                type: boolean
               url:
                 description: Required within this object. Full URL of the member repository on its instance, `<base
                   URL>/artifactory/<repo key>`. The repository key may differ between members.
@@ -299,20 +297,18 @@ components:
           type: boolean
         blockPushingSchema1:
           description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
-            Defaults to false; artifactweave never accepts schema 1 regardless. Artifactory renders this boolean
-            as the strings "true" or "false" on local repositories; the server accepts either form on input and
-            echoes the string form here.
-          type: string
+            Defaults to false; artifactweave never accepts schema 1 regardless. Rendered as a JSON boolean on local
+            repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
         calculateYumMetadata:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy.
             Defaults to false. Not implemented for RPM in v1 but stored.
           type: boolean
         cdnRedirect:
-          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted
-            and stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Artifactory
-            renders this boolean as the strings "true" or "false" on local repositories; the server accepts either
-            form on input and echoes the string form here.
-          type: string
+          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted and
+            stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Rendered as a JSON
+            boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
         checksumPolicyType:
           allOf:
           - $ref: '#/components/schemas/ChecksumPolicyType'
@@ -371,15 +367,14 @@ components:
           type: integer
         downloadRedirect:
           description: Optional within this object. When true downloads answer with a redirect to a pre-signed object
-            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Artifactory
-            renders this boolean as the strings "true" or "false" on local repositories; the server accepts either
-            form on input and echoes the string form here.
-          type: string
+            store URL instead of streaming the bytes. Defaults to false and requires the s3 blob backend. Rendered as a
+            JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          type: boolean
         enableFileListsIndexing:
           description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
-            Artifactory renders this boolean as the strings "true" or "false" on local repositories; the server
-            accepts either form on input and echoes the string form here.
-          type: string
+            Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on
+            input.
+          type: boolean
         encryptStates:
           description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
             Defaults to true. The terraformbackend package type is not supported in v1 and the field is stored only.
@@ -387,7 +382,7 @@ components:
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
             Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after.
+            after. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -464,9 +459,9 @@ components:
           type: string
         priorityResolution:
           description: Optional within this object. When true a virtual repository resolves this member before members
-            without the flag. Defaults to false. Artifactory renders this boolean as the strings "true" or "false"
-            on local repositories; the server accepts either form on input and echoes the string form here.
-          type: string
+            without the flag. Defaults to false. Rendered as a JSON boolean on local repositories; the server also
+            accepts the strings "true" and "false" on input.
+          type: boolean
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. When set, environments
             must also be set, and the repository key must carry the project prefix. Changing it moves the repository
@@ -844,7 +839,7 @@ components:
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
             Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after.
+            after. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -1260,7 +1255,7 @@ components:
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
             Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after.
+            after. An administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
