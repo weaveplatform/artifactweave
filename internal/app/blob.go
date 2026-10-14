@@ -189,9 +189,13 @@ func buildBackend(
 		if err != nil {
 			return nil, err //nolint:wrapcheck // wrapped with the key by openBackend
 		}
+		cdnSigner, err := cloudCDN(b.GCS.CDN.CloudCDN)
+		if err != nil {
+			return nil, err
+		}
 		return gcs.New(api, gcs.Options{ //nolint:wrapcheck // as above
 			Prefix: b.GCS.Prefix, PartSize: int64(b.GCS.PartSize), Sessions: sessions,
-			Presign: cc.CanSign(), SignsOverNetwork: cc.SignsOverNetwork(),
+			Presign: cc.CanSign(), SignsOverNetwork: cc.SignsOverNetwork(), CDN: cdnSigner,
 		})
 	case "azure":
 		cc, err := azureClient(b.Azure)
@@ -247,6 +251,25 @@ func frontDoor(c config.FrontDoorConfig) (*cdn.FrontDoor, error) {
 		return nil, fmt.Errorf("front_door: %w", err)
 	}
 	return fd, nil
+}
+
+// cloudCDN builds the Cloud CDN signer c configures, or none, reading and
+// checking the key file at start as cloudFront does.
+func cloudCDN(c config.CloudCDNConfig) (cdn.Signer, error) {
+	if !c.Enabled() {
+		return nil, nil //nolint:nilnil // no CDN is a valid answer
+	}
+	key, err := os.ReadFile(c.KeyFile)
+	if err != nil {
+		return nil, fmt.Errorf("cloud_cdn key_file: %w", err)
+	}
+	signer, err := cdn.NewCloudCDN(cdn.CloudCDNConfig{
+		Domain: c.Domain, KeyName: c.KeyName, Key: key, PathPrefix: c.PathPrefix,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cloud_cdn: %w", err)
+	}
+	return signer, nil
 }
 
 // azureClient passes only the secret the chosen credential uses: the SDK

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -431,6 +432,66 @@ func TestOpenBackendWithFrontDoor(t *testing.T) {
 		"origin outside the prefix": {Endpoint: "fd.azurefd.net", PathPrefix: "other"},
 	} {
 		_, err := openBackend(context.Background(), "blob", azWith(fd), session.NewMemory(), "")
+		if !errors.Is(err, errBlobStore) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+// cloudCDNKeyFile writes a base64url Cloud CDN key file and returns its path.
+func cloudCDNKeyFile(t *testing.T) string {
+	t.Helper()
+	file := filepath.Join(t.TempDir(), "cloud-cdn.key")
+	key := base64.URLEncoding.EncodeToString([]byte("0123456789abcdef"))
+	if err := os.WriteFile(file, []byte(key+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return file
+}
+
+func TestOpenBackendWithCloudCDN(t *testing.T) {
+	gcsWith := func(cc config.CloudCDNConfig) config.BlobBackendConfig {
+		return config.BlobBackendConfig{Backend: "gcs", GCS: config.BlobGCSConfig{
+			Bucket: "b", Prefix: "art", CredentialsFile: gcsKeyFile(t),
+			CDN: config.BlobGCSCDNConfig{CloudCDN: cc},
+		}}
+	}
+	good := config.CloudCDNConfig{
+		Domain: "cdn.example.com", KeyName: "key-1", KeyFile: cloudCDNKeyFile(t),
+		PathPrefix: "art",
+	}
+	s, err := openBackend(context.Background(), "blob", gcsWith(good), session.NewMemory(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sg, ok := s.(blob.Signer)
+	if !ok || !sg.Signs(blob.ViaCDN) || !sg.Signs(blob.ViaStorage) {
+		t.Fatal("a gcs store with a key and Cloud CDN signs both routes")
+	}
+	sha := strings.Repeat("ab", 32)
+	u, err := sg.SignURL(
+		context.Background(),
+		sha,
+		blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute},
+	)
+	if err != nil ||
+		!strings.HasPrefix(u, "https://cdn.example.com/sha256/ab/"+sha+"?Expires=") ||
+		!strings.Contains(u, "&KeyName=key-1&Signature=") {
+		t.Fatalf("%q %v", u, err)
+	}
+	missing, badKey, badName, outside := good, good, good, good
+	missing.KeyFile = filepath.Join(t.TempDir(), "absent.key")
+	badKey.KeyFile = filepath.Join(t.TempDir(), "bad.key")
+	if err := os.WriteFile(badKey.KeyFile, []byte("not a key!"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	badName.KeyName = "Key 1"
+	outside.PathPrefix = "elsewhere"
+	for name, cc := range map[string]config.CloudCDNConfig{
+		"missing key file": missing, "not a key": badKey, "bad key name": badName,
+		"origin outside the prefix": outside,
+	} {
+		_, err := openBackend(context.Background(), "blob", gcsWith(cc), session.NewMemory(), "")
 		if !errors.Is(err, errBlobStore) {
 			t.Errorf("%s: %v", name, err)
 		}

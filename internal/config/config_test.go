@@ -94,6 +94,12 @@ blob:
     credentials_file: /srv/sa.json
     google_access_id: aw@p.iam.gserviceaccount.com
     part_size: 32MiB
+    cdn:
+      cloud_cdn:
+        domain: cdn.example.com
+        key_name: key-1
+        key_file: /srv/cloud-cdn.key
+        path_prefix: gp
   azure:
     account: acct
     endpoint: https://acct.blob.core.windows.net/
@@ -153,6 +159,10 @@ download:
 		}, GCS: BlobGCSConfig{
 			Bucket: "g", Prefix: "gp", Endpoint: "http://gcs:4443", CredentialsFile: "/srv/sa.json",
 			GoogleAccessID: "aw@p.iam.gserviceaccount.com", PartSize: 32 << 20,
+			CDN: BlobGCSCDNConfig{CloudCDN: CloudCDNConfig{
+				Domain: "cdn.example.com", KeyName: "key-1", KeyFile: "/srv/cloud-cdn.key",
+				PathPrefix: "gp",
+			}},
 		}, Azure: BlobAzureConfig{
 			Account: "acct", Endpoint: "https://acct.blob.core.windows.net/", Container: "c",
 			Prefix: "ap", Credential: "managed_identity", AccountKey: "ak", SASToken: "st",
@@ -213,7 +223,9 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
-		cfg.ColdBlob.Azure.CDN.FrontDoor.PathPrefix != "true" {
+		cfg.ColdBlob.Azure.CDN.FrontDoor.PathPrefix != "true" ||
+		cfg.Blob.GCS.CDN.CloudCDN.KeyName != "true" ||
+		cfg.ColdBlob.GCS.CDN.CloudCDN.KeyFile != "true" {
 		t.Fatalf("env keys not applied: %+v", cfg)
 	}
 }
@@ -866,6 +878,81 @@ func TestFrontDoorValidation(t *testing.T) {
 			"cold_blob.azure.container":               "archive",
 			"cold_blob.azure.account_key":             "k",
 			"cold_blob.azure.cdn.front_door.endpoint": "fd.azurefd.net",
+		}, ErrInvalidValue},
+	}
+	for name, c := range bad {
+		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+func TestCloudCDNValidation(t *testing.T) {
+	gcs := func(extra map[string]string) map[string]string {
+		flags := map[string]string{
+			"blob.backend":                    "gcs",
+			"blob.gcs.bucket":                 "b",
+			"blob.gcs.cdn.cloud_cdn.domain":   "cdn.example.com",
+			"blob.gcs.cdn.cloud_cdn.key_name": "key-1",
+			"blob.gcs.cdn.cloud_cdn.key_file": "/k.key",
+		}
+		maps.Copy(flags, extra)
+		return flags
+	}
+	good := []map[string]string{
+		gcs(nil),
+		// A sibling host: Go drops the credentials on the redirect.
+		gcs(map[string]string{"base_url": "https://registry.example.com"}),
+		gcs(map[string]string{
+			"base_url":                      "http://127.0.0.1:8081",
+			"blob.gcs.cdn.cloud_cdn.domain": "http://localhost:9000",
+		}),
+	}
+	for _, flags := range good {
+		if _, err := Load(LoadOptions{Flags: flags}); err != nil {
+			t.Errorf("%v: %v", flags, err)
+		}
+	}
+	bad := map[string]struct {
+		flags map[string]string
+		want  error
+	}{
+		"no key name": {
+			gcs(map[string]string{"blob.gcs.cdn.cloud_cdn.key_name": ""}),
+			ErrMissingValue,
+		},
+		"only a path prefix": {
+			map[string]string{
+				"blob.backend":                       "gcs",
+				"blob.gcs.bucket":                    "b",
+				"blob.gcs.cdn.cloud_cdn.path_prefix": "p",
+			},
+			ErrMissingValue,
+		},
+		"bad domain": {
+			gcs(map[string]string{"blob.gcs.cdn.cloud_cdn.domain": "ftp://x"}),
+			ErrInvalidValue,
+		},
+		"a subdomain of the registry": {gcs(map[string]string{
+			"base_url":                      "https://repo.example.com",
+			"blob.gcs.cdn.cloud_cdn.domain": "cdn.repo.example.com",
+		}), ErrInvalidValue},
+		"a mirror member on the registry's host": {map[string]string{
+			"base_url":                                 "https://repo.example.com",
+			"blob.backend":                             "mirror",
+			"blob.mirror.members":                      "a",
+			"blob.stores.a.backend":                    "gcs",
+			"blob.stores.a.gcs.bucket":                 "b",
+			"blob.stores.a.gcs.cdn.cloud_cdn.domain":   "repo.example.com",
+			"blob.stores.a.gcs.cdn.cloud_cdn.key_name": "key-1",
+			"blob.stores.a.gcs.cdn.cloud_cdn.key_file": "/k.key",
+		}, ErrInvalidValue},
+		"the archive tier": {map[string]string{
+			"cold_blob.backend":                    "gcs",
+			"cold_blob.gcs.bucket":                 "archive",
+			"cold_blob.gcs.cdn.cloud_cdn.domain":   "cdn.example.com",
+			"cold_blob.gcs.cdn.cloud_cdn.key_name": "key-1",
+			"cold_blob.gcs.cdn.cloud_cdn.key_file": "/k.key",
 		}, ErrInvalidValue},
 	}
 	for name, c := range bad {

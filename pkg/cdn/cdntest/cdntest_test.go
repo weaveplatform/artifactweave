@@ -249,3 +249,66 @@ func TestStartNeedsAValidatorAnOriginAndAHost(t *testing.T) {
 	}
 	_ = e.Close()
 }
+
+func TestCloudCDNEdgeRefusesBadSignatures(t *testing.T) {
+	s, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := blobtest.Content(4, 1024)
+	sha := blobtest.Put(context.Background(), t, s, body).Digests.SHA256
+	key := []byte("0123456789abcdef")
+	now := time.Unix(1_800_000_000, 0)
+	edge, err := cdntest.Start(cdntest.Options{
+		Validator: cdntest.CloudCDN{Keys: map[string][]byte{"key-1": key}},
+		Origin:    s,
+		Now:       func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = edge.Close() })
+	path := edge.URL + "/sha256/" + sha[:2] + "/" + sha
+	good := cdn.SignCloudCDN(path, "key-1", key, now.Add(time.Minute))
+	if code, got := do(t, http.MethodGet, good, nil); code != http.StatusOK || got != string(body) {
+		t.Fatalf("signed GET: %d", code)
+	}
+	if code, _ := do(t, http.MethodGet, strings.TrimSuffix(good, "="), nil); code != http.StatusOK {
+		t.Fatalf("an unpadded signature: %d", code)
+	}
+	sig := good[strings.LastIndex(good, "Signature=")+len("Signature="):]
+	tampered := []byte(sig)
+	tampered[0] ^= 1
+	cases := map[string]string{
+		"unsigned":           path,
+		"url prefix":         good + "&URLPrefix=aHR0cA==",
+		"signature not last": good + "&x=1",
+		"keyname not before": path + "?KeyName=key-1&Expires=1&Signature=" + sig,
+		"bad expires": cdn.SignCloudCDN(
+			path+"?Expires=soon&KeyName=key-1",
+			"key-1",
+			key,
+			now,
+		),
+		"unknown key": cdn.SignCloudCDN(path, "key-2", key, now.Add(time.Minute)),
+		"not base64":  strings.Replace(good, "Signature="+sig, "Signature=%25%25", 1),
+		"tampered":    strings.Replace(good, sig, string(tampered), 1),
+		"other path":  strings.Replace(good, sha, strings.Repeat("0", 64), 1),
+		"key from other edge": cdn.SignCloudCDN(
+			path,
+			"key-1",
+			[]byte("fedcba9876543210"),
+			now.Add(time.Minute),
+		),
+	}
+	for name, u := range cases {
+		if code, _ := do(t, http.MethodGet, u, nil); code != http.StatusForbidden {
+			t.Errorf("%s: %d, want 403", name, code)
+		}
+	}
+	now = now.Add(time.Hour)
+	if code, got := do(t, http.MethodGet, good, nil); code != http.StatusForbidden ||
+		!strings.Contains(got, "expired") {
+		t.Fatalf("expired: %d %s", code, got)
+	}
+}

@@ -14,8 +14,9 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/hmac"
 	"crypto/rsa"
-	"crypto/sha1" //nolint:gosec // CloudFront's default signature hash
+	"crypto/sha1" //nolint:gosec // CloudFront's default hash, Cloud CDN's only one
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -262,13 +263,17 @@ func (v CloudFront) Validate(r *http.Request, now time.Time) error {
 	return nil
 }
 
+// requestBase is r's scheme and host, as the client addressed the edge.
+func requestBase(r *http.Request) string {
+	if r.TLS != nil {
+		return "https://" + r.Host
+	}
+	return "http://" + r.Host
+}
+
 // resource is the URL r was signed for: as the client sent it, without the
 // signature parameters, which CloudFront appends after the rest.
 func resource(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
 	rawPath, rawQuery, _ := strings.Cut(r.RequestURI, "?")
 	var kept []string
 	for p := range strings.SplitSeq(rawQuery, "&") {
@@ -277,7 +282,7 @@ func resource(r *http.Request) string {
 			kept = append(kept, p)
 		}
 	}
-	u := scheme + "://" + r.Host + rawPath
+	u := requestBase(r) + rawPath
 	if len(kept) > 0 {
 		u += "?" + strings.Join(kept, "&")
 	}
@@ -294,4 +299,63 @@ func cannedPolicy(res string, expires time.Time) ([]byte, error) {
 		return nil, fmt.Errorf("cdntest: encode policy: %w", err)
 	}
 	return bytes.TrimSpace(buf.Bytes()), nil
+}
+
+// CloudCDN validates URL signatures as Cloud CDN does: Keys maps each key
+// name on the backend bucket to its raw 16-byte key. Cloud CDN itself passes
+// an unsigned request to the origin, which refuses it because the bucket is
+// private (decision 0029); the fake refuses it at the edge with the same
+// status. URLPrefix signatures and signed cookies are not modelled.
+type CloudCDN struct {
+	Keys map[string][]byte
+}
+
+// cloudCDNSignature separates what Cloud CDN signs from the signature, which
+// is always the last parameter.
+const cloudCDNSignature = "&Signature="
+
+// Validate checks r's URL signature at now.
+func (v CloudCDN) Validate(r *http.Request, now time.Time) error {
+	q := r.URL.Query()
+	if q.Has("URLPrefix") {
+		return fmt.Errorf("%w: URLPrefix signatures are not modelled", ErrSignature)
+	}
+	exp, name := q.Get("Expires"), q.Get("KeyName")
+	full := requestBase(r) + r.RequestURI
+	i := strings.LastIndex(full, cloudCDNSignature)
+	if exp == "" || name == "" || i < 0 {
+		return fmt.Errorf("%w: missing Expires, KeyName or Signature", ErrSignature)
+	}
+	signed, sig := full[:i], full[i+len(cloudCDNSignature):]
+	if strings.Contains(sig, "&") ||
+		!strings.HasSuffix(signed, "Expires="+exp+"&KeyName="+name) {
+		return fmt.Errorf(
+			"%w: Expires, KeyName and Signature must end the URL, in that order",
+			ErrSignature,
+		)
+	}
+	expires, err := strconv.ParseInt(exp, 10, 64)
+	if err != nil {
+		return fmt.Errorf("%w: Expires %q", ErrSignature, exp)
+	}
+	if now.Unix() >= expires {
+		return fmt.Errorf("%w: expired at %d", ErrSignature, expires)
+	}
+	key, ok := v.Keys[name]
+	if !ok {
+		return fmt.Errorf("%w: unknown key %q", ErrSignature, name)
+	}
+	got, err := base64.URLEncoding.DecodeString(sig)
+	if err != nil {
+		got, err = base64.RawURLEncoding.DecodeString(sig)
+	}
+	if err != nil {
+		return fmt.Errorf("%w: Signature is not base64url", ErrSignature)
+	}
+	mac := hmac.New(sha1.New, key)
+	_, _ = mac.Write([]byte(signed))
+	if !hmac.Equal(got, mac.Sum(nil)) {
+		return fmt.Errorf("%w: bad HMAC signature", ErrSignature)
+	}
+	return nil
 }

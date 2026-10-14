@@ -81,21 +81,34 @@ func RunMinIO(ctx context.Context) (MinIOEndpoint, func(), error) {
 func FakeGCS(t *testing.T) string {
 	t.Helper()
 	RequireLinux(t)
-	ctx := context.Background()
-	ctr, err := fakegcsserver.Run(ctx, FakeGCSImage)
-	testcontainers.CleanupContainer(t, ctr)
+	endpoint, stop, err := RunFakeGCS(context.Background())
 	if err != nil {
-		t.Fatalf("start fake-gcs-server: %v", err)
+		t.Fatal(err)
+	}
+	t.Cleanup(stop)
+	return endpoint
+}
+
+// RunFakeGCS starts fake-gcs-server and returns its JSON API endpoint, as
+// FakeGCS does, and a function that removes it, for callers without a
+// *testing.T such as acceptance steps; check CheckLinux first.
+func RunFakeGCS(ctx context.Context) (string, func(), error) {
+	ctr, err := fakegcsserver.Run(ctx, FakeGCSImage)
+	stop := func() { _ = testcontainers.TerminateContainer(ctr) }
+	if err != nil {
+		stop()
+		return "", nil, fmt.Errorf("start fake-gcs-server: %w", err)
 	}
 	endpoint, err := ctr.StorageURL(ctx)
 	if err != nil {
-		t.Fatalf("fake-gcs-server endpoint: %v", err)
+		stop()
+		return "", nil, fmt.Errorf("fake-gcs-server endpoint: %w", err)
 	}
 	endpoint = strings.TrimSuffix(endpoint, "/")
 	if !strings.HasSuffix(endpoint, "/storage/v1") {
 		endpoint += "/storage/v1"
 	}
-	return endpoint + "/"
+	return endpoint + "/", stop, nil
 }
 
 // AzuriteEndpoint addresses Azurite's blob service.
