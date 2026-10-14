@@ -51,8 +51,9 @@ accept:
 	ARTIFACTWEAVE_GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/accept $(GO) test -count=1 ./test/acceptance/...
 
 # The Terraform scenarios applied against artifactweave: the repositories
-# fixture and the identity reference.
-TERRAFORM_SCENARIOS ?= test/terraform deploy/artifactweave/terraform/identity
+# fixture and the identity and OIDC references.
+TERRAFORM_SCENARIOS ?= test/terraform deploy/artifactweave/terraform/identity \
+	deploy/artifactweave/terraform/oidc
 
 ## terraform: validate the Terraform scenarios against the pinned providers from a filesystem mirror (TERRAFORM_MODE=apply also applies, plans and destroys each against one -cover server)
 # Apply writes the server's coverage to cover/terraform for make cover; CI

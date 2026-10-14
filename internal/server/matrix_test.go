@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	"github.com/weaveplatform/artifactweave/internal/service/oidc"
 	"github.com/weaveplatform/artifactweave/internal/service/roles"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -319,7 +320,41 @@ func matrixTable() []matrixRow {
 		tokenMatrix(),
 		securityMatrix(),
 		accessIdentityMatrix(),
+		oidcMatrix(),
 	)
+}
+
+// oidcMatrix covers the OIDC integration (#83): providers and mappings are
+// administrators' alone; the exchange answers anyone, and a request without
+// a subject token is a bad request whoever makes it. The fixture seeded each
+// principal's provider pv-{p} with its mapping m-{p}.
+func oidcMatrix() []matrixRow {
+	const (
+		cfg  = "/access/api/v1/oidc"
+		maps = cfg + "/{provider_name}/identity_mappings"
+		one  = maps + "/{mapping_name}"
+		mine = cfg + "/pv-{p}/identity_mappings"
+		spec = `"token_spec":{"username":"ci","scope":"applied-permissions/user"}`
+	)
+	return []matrixRow{
+		at("GET "+cfg, "", administrators, 200),
+		at("POST "+cfg, `{"name":"np-{p}","issuer_url":"https://ci.example"}`, administrators, 200),
+		row("GET "+cfg+"/{name}", cfg+"/pv-{p}", "", administrators, 200),
+		row(
+			"PUT "+cfg+"/{name}",
+			cfg+"/pv-{p}",
+			`{"name":"pv-{p}","issuer_url":"https://ci2.example"}`,
+			administrators,
+			200,
+		),
+		row("DELETE "+cfg+"/{name}", cfg+"/pv-{p}", "", administrators, 204),
+		row("GET "+maps, mine, "", administrators, 200),
+		row("POST "+maps, mine, `{"name":"nm-{p}",`+spec+`}`, administrators, 200),
+		row("GET "+one, mine+"/m-{p}", "", administrators, 200),
+		row("PUT "+one, mine+"/m-{p}", `{"name":"m-{p}",`+spec+`}`, administrators, 200),
+		row("DELETE "+one, mine+"/m-{p}", "", administrators, 204),
+		at("POST "+cfg+"/token", `{}`, noCredentials, 400),
+	}
 }
 
 func systemMatrix() []matrixRow {
@@ -933,6 +968,17 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		db.Settings().
 			Put(ctx, types.SettingFolderDownload, types.FolderDownloadSettings{Enabled: true}),
 	)
+	idp := oidc.Service{Store: db}
+	for _, p := range names {
+		name, issuer, mapping, user, scope := "pv-"+p, "https://ci.example", "m-"+p, "ci",
+			"applied-permissions/user"
+		_, err := idp.CreateProvider(ctx, oidc.Provider{Name: &name, IssuerURL: &issuer})
+		must(err)
+		_, err = idp.CreateMapping(ctx, name, oidc.Mapping{
+			Name: &mapping, TokenSpec: &oidc.TokenSpec{Username: &user, Scope: &scope},
+		})
+		must(err)
+	}
 
 	tokens, secrets := seedMatrixTokens(t, db)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{

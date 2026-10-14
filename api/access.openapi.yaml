@@ -7486,6 +7486,9 @@ components:
         application_key:
           description: Optional within this object. AppTrust application key. Accepted and ignored, because AppTrust is out of scope.
           type: string
+        audience:
+          description: Optional within this object. The audience the caller requested the ID token for; the JFrog CLI sends its --oidc-audience here. Accepted and ignored, because the provider's configured audience decides which tokens verify.
+          type: string
         branch:
           description: Optional within this object. Source branch of the CI run, recorded with the issued token for auditing.
           type: string
@@ -7542,11 +7545,14 @@ components:
         reference_token:
           description: Optional within this object. Reference token for the issued token. Present only when include_reference_token was true.
           type: string
+        scope:
+          description: Optional within this object. Scope of the issued token, which the JFrog CLI prints.
+          type: string
         token_type:
           description: Optional within this object. Always Bearer.
           type: string
         username:
-          description: Optional within this object. Username the mapping produced for the token's subject.
+          description: Optional within this object. Username the mapping produced for the token's subject. A mapping without a username issues its token for a synthetic subject, oidc-<provider>-<mapping>, which acts through the groups of its scope alone.
           type: string
       type: object
     PasswordPolicy:

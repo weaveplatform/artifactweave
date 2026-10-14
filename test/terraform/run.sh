@@ -167,6 +167,7 @@ for scenario in "${scenarios[@]}"; do
 	case $scenario in
 	test/terraform) apply_repositories ;;
 	deploy/artifactweave/terraform/identity) apply_identity ;;
+	deploy/artifactweave/terraform/oidc) tf apply -auto-approve ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1

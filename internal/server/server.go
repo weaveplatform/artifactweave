@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
@@ -114,7 +115,9 @@ func New(cfg Config) http.Handler {
 	r.MethodNotAllowed(methodNotAllowed)
 
 	artSvc := artifactoryService{cfg: cfg, signWarn: newThrottle(signWarnEvery)}
-	accSvc := accessService{cfg: cfg}
+	// One verifier per handler, so providers' keys stay cached between
+	// exchanges.
+	accSvc := accessService{cfg: cfg, idTokens: idtoken.New(idtoken.Options{})}
 
 	// Hand-written routes go first so they win over anything a generated mux
 	// might later claim for the same prefix.

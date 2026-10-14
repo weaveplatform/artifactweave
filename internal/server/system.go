@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
@@ -37,6 +38,9 @@ type artifactoryService struct {
 type accessService struct {
 	accessgen.UnimplementedStrict
 	cfg Config
+	// idTokens verifies the subject tokens of the OIDC token exchange and
+	// caches each provider's signing keys for the life of the handler.
+	idTokens *idtoken.Verifier
 }
 
 // eventService serves /event (webhook subscriptions). Nothing is implemented

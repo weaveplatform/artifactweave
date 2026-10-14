@@ -136,6 +136,9 @@ type Request struct {
 	// (types.TokenPurposeEncryptedPassword). Such a token always has a
 	// reference token, and keeps it sealed so it can be shown again.
 	Purpose string
+	// Identity is how the token's subject resolves to a user; only an OIDC
+	// token exchange issues a token for a user who need not be stored.
+	Identity types.TokenIdentity
 }
 
 // Issued is a new token and its secrets, which are never stored and so
@@ -178,6 +181,7 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 		Refreshable: r.Refreshable,
 		Revocable:   types.Revocable(expiresIn, types.DefaultRevocableThreshold, r.ForceRevocable),
 		Purpose:     r.Purpose,
+		Identity:    r.Identity,
 	}
 	if expiresIn > 0 {
 		rec.ExpiresAt = now.Add(expiresIn)

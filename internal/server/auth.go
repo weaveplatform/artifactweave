@@ -30,6 +30,8 @@ var publicRoutes = map[string]bool{
 	// the refresh token; the handlers require a user for every other grant.
 	"POST /access/api/v1/tokens":           true,
 	"POST /artifactory/api/security/token": true,
+	// The OIDC token exchange, whose subject token is the credential.
+	oidcTokenRoute: true,
 }
 
 // selfAuthenticated routes verify their own credential, so the middleware

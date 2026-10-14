@@ -7,9 +7,12 @@ providers against a running artifactweave. It is the driver for:
   (`artifactory_item_properties`);
 - the identity reference in
   [deploy/artifactweave/terraform/identity](../../deploy/artifactweave/terraform/identity):
-  users, groups, a permission, a scoped token and a key pair.
+  users, groups, a permission, a scoped token and a key pair;
+- the OIDC reference in
+  [deploy/artifactweave/terraform/oidc](../../deploy/artifactweave/terraform/oidc):
+  two OIDC providers and their identity mappings.
 
-The `terraform` CI job runs both, and so does `make terraform` locally:
+The `terraform` CI job runs them all, and so does `make terraform` locally:
 
 ```sh
 make terraform                       # init from the mirror and validate each scenario

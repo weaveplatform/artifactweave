@@ -1226,6 +1226,9 @@ type OidcTokenExchangeRequest struct {
 	// ApplicationKey Optional within this object. AppTrust application key. Accepted and ignored, because AppTrust is out of scope.
 	ApplicationKey *string `json:"application_key,omitempty"`
 
+	// Audience Optional within this object. The audience the caller requested the ID token for; the JFrog CLI sends its --oidc-audience here. Accepted and ignored, because the provider's configured audience decides which tokens verify.
+	Audience *string `json:"audience,omitempty"`
+
 	// Branch Optional within this object. Source branch of the CI run, recorded with the issued token for auditing.
 	Branch *string `json:"branch,omitempty"`
 
@@ -1280,10 +1283,13 @@ type OidcTokenExchangeResult struct {
 	// ReferenceToken Optional within this object. Reference token for the issued token. Present only when include_reference_token was true.
 	ReferenceToken *string `json:"reference_token,omitempty"`
 
+	// Scope Optional within this object. Scope of the issued token, which the JFrog CLI prints.
+	Scope *string `json:"scope,omitempty"`
+
 	// TokenType Optional within this object. Always Bearer.
 	TokenType *string `json:"token_type,omitempty"`
 
-	// Username Optional within this object. Username the mapping produced for the token's subject.
+	// Username Optional within this object. Username the mapping produced for the token's subject. A mapping without a username issues its token for a synthetic subject, oidc-<provider>-<mapping>, which acts through the groups of its scope alone.
 	Username *string `json:"username,omitempty"`
 }
 

@@ -19,6 +19,7 @@ Status: skeleton (P0). Completed in P18 before the first release candidate.
 | Registry → webhook receivers | Outbound HTTP with HMAC signing; receivers are untrusted |
 | Registry → database and blob store | Trusted infrastructure; sealed columns protect secrets at rest |
 | Signed URLs → object stores and CDNs | A redirected download hands the client a time-limited URL to the object store or a CDN, signed after the permission check. Anyone holding the URL can fetch the blob until it expires; the registry cannot revoke it. Front Door validates nothing and serves its cached copy for the exact URL (decision 0029) |
+| CI providers → token exchange | `POST /access/api/v1/oidc/token` needs no credentials: a provider's signed ID token is exchanged for an access token when an identity mapping's claims match. Only administrators register providers, so the keys fetched from `issuer_url` are trusted as far as the administrator trusts that issuer; a mapping with loose claims (or none) hands a token to every workload that provider signs for (decision 0005, research 21) |
 | Operators → configuration | Strict YAML, descriptor PATCH, Terraform with admin tokens |
 
 ## Threats to analyse (P18)

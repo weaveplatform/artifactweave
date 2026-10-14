@@ -95,7 +95,9 @@ func (a *Authenticator) ExpiredToken(ctx context.Context, raw string) (Refresher
 }
 
 // tokenUser returns the enabled user t's subject names, which must be user
-// when user is set.
+// when user is set. A token from an OIDC exchange may name a user who is not
+// stored (types.TokenIdentity): a synthetic subject is never a stored user,
+// and a transient one stands in for a missing user.
 func (a *Authenticator) tokenUser(
 	ctx context.Context,
 	t types.Token,
@@ -105,7 +107,13 @@ func (a *Authenticator) tokenUser(
 	if err != nil || sub.Kind != "users" || (user != "" && user != sub.Name) {
 		return types.User{}, ErrBadCredentials
 	}
+	if t.Identity == types.IdentitySynthetic {
+		return types.User{Name: sub.Name}, nil
+	}
 	u, err := a.users.Get(ctx, sub.Name)
+	if errors.Is(err, store.ErrNotFound) && t.Identity == types.IdentityTransient {
+		return a.transientUser(ctx, sub.Name)
+	}
 	if errors.Is(err, store.ErrNotFound) {
 		return types.User{}, ErrBadCredentials
 	}
@@ -115,6 +123,22 @@ func (a *Authenticator) tokenUser(
 	if u.Status != "" && u.Status != types.UserEnabled {
 		return types.User{}, ErrBadCredentials
 	}
+	return u, nil
+}
+
+// transientUser is a user an OIDC token names who is not stored: for the
+// request it belongs to the groups new users join automatically, as Access
+// treats such a user (research 21).
+func (a *Authenticator) transientUser(ctx context.Context, name string) (types.User, error) {
+	u := types.User{Name: name}
+	if a.groups == nil {
+		return u, nil
+	}
+	groups, err := a.groups.AutoJoin(ctx)
+	if err != nil {
+		return types.User{}, fmt.Errorf("auth: auto-join groups: %w", err)
+	}
+	u.Groups = groups
 	return u, nil
 }
 

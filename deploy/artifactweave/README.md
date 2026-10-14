@@ -9,6 +9,7 @@ requires an empty plan and destroys it (see
 | Scenario | What it manages |
 |---|---|
 | [identity](terraform/identity) | Users (`artifactory_user`, `artifactory_managed_user`), groups (`platform_group`, `artifactory_group`), a permission over one repository (`platform_permission`, read back with the `artifactory_permission_target` data source), a repository-scoped token (`artifactory_scoped_token`) and a signing key pair (`artifactory_keypair`) |
+| [oidc](terraform/oidc) | OIDC token exchange for CI: a GitHub Actions provider and a generic one (`platform_oidc_configuration`), each with an identity mapping (`platform_oidc_identity_mapping`), one for a named user and one for a group through a synthetic subject |
 
 ## Providers and authentication
 
