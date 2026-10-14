@@ -55,6 +55,7 @@ func statusTable() []statusCase {
 		keypairStatusRows(),
 		securityStatusRows(),
 		tokenStatusRows(),
+		permissionStatusRows(),
 	)
 }
 
@@ -120,6 +121,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 		}
 	}
 	seedKeys(t, db)
+	seedPermissions(t, db)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

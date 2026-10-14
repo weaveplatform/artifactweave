@@ -86,7 +86,10 @@ func requestDetails(next http.Handler) http.Handler {
 				return
 			}
 		}
-		if r.Method == http.MethodPost && isRepositoryUpdate(r.URL.Path) {
+		// A permission create keeps its raw body too: the generated Access
+		// type drops the destination and pipeline_source sections.
+		if r.Method == http.MethodPost &&
+			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions") {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
 				bindingError(http.StatusBadRequest)(w, r, err)

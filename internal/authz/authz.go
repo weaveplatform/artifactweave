@@ -70,8 +70,10 @@ type Decider struct {
 	// artifact entries allow.
 	filter []types.ScopeEntry
 	scope  *types.Scope
-	// groups are the groups the subject acts through once the scope has
-	// narrowed them.
+	// user and groups are the identities the subject's grants are read
+	// for, after a token scope narrowed them: user is empty when the scope
+	// does not act as the user, and groups are those it acts through.
+	user   string
 	groups []string
 }
 
@@ -95,6 +97,7 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 	if err != nil {
 		return nil, err
 	}
+	d.user = user
 	d.every = (sc.user && s.Admin) || viaGroup
 	d.admin = sc.open && ((s.Admin && sc.adminAllowed) || viaGroup)
 	perms, err := src.Permissions.ForPrincipal(ctx, user, groups)
@@ -145,6 +148,13 @@ func (d *Decider) RepoVisible(repo Repo) bool {
 	}
 	return d.AllowsFolder(types.ResourceArtifact, repo, "", types.ActionRead) ||
 		d.System("info", types.ScopeRead)
+}
+
+// Holds reports whether g grants every action in want to the subject,
+// directly or through a group it acts as. It answers questions about a
+// permission document itself (who may manage it), not about content.
+func (d *Decider) Holds(g types.Grants, want types.Actions) bool {
+	return heldBy(g, d.user, d.groups).Has(want)
 }
 
 // Actions returns every action the subject holds on path in repo's

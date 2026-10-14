@@ -543,3 +543,33 @@ func TestTargetAllows(t *testing.T) {
 		t.Error("an empty include list admits everything")
 	}
 }
+
+func TestHolds(t *testing.T) {
+	ctx := context.Background()
+	db := world(t)
+	grants := types.Grants{
+		Users:  map[string]types.Actions{"bob": m},
+		Groups: map[string]types.Actions{"devs": r | m},
+	}
+	for _, c := range []struct {
+		name string
+		sub  Subject
+		want bool
+	}{
+		{"direct grant", Subject{Name: "bob"}, true},
+		{"through a group", Subject{Name: "carol", Groups: []string{"devs"}}, true},
+		{"no grant", Subject{Name: "carol", Groups: []string{"readers"}}, false},
+		{"a groups scope drops the user's own grant", Subject{
+			Name: "bob", Scope: scope(t, "applied-permissions/groups:readers"),
+		}, false},
+		{"anonymous while anonymous access is off", Subject{Name: "bob", Anonymous: true}, false},
+	} {
+		dec, err := New(ctx, Sources{Permissions: db.Permissions(), Groups: db.Groups()}, c.sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := dec.Holds(grants, m); got != c.want {
+			t.Errorf("%s: Holds = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
