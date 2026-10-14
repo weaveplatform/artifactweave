@@ -32,6 +32,7 @@ var sealedColumns = []sealedColumn{
 	{"signing_keys", "private_key", purposeSigningPrivate, []string{"alias"}, firstKey},
 	{"signing_keys", "passphrase", purposeSigningPassphrase, []string{"alias"}, firstKey},
 	{"certificates", "private_key", purposeCertificateKey, []string{"alias"}, firstKey},
+	{"tokens", "secret", purposeTokenSecret, []string{"id"}, firstKey},
 	{"replications", "password", purposeReplicationPassword, []string{"replication_key"}, firstKey},
 	{
 		"webhook_secrets", "value", purposeWebhookSecret,

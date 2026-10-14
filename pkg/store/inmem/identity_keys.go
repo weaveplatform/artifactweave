@@ -62,6 +62,9 @@ func (ts tokens) Create(ctx context.Context, t types.Token) error {
 			return conflict("token", t.ID)
 		}
 		for _, other := range ts.t().rows {
+			if t.Purpose != "" && other.Purpose == t.Purpose && other.Subject == t.Subject {
+				return conflict("token of purpose "+t.Purpose+" for", t.Subject)
+			}
 			for _, k := range digestKinds {
 				if d := digestOf(t, k); len(d) > 0 && bytes.Equal(d, digestOf(other, k)) {
 					return conflict("token digest of", t.ID)
@@ -111,7 +114,8 @@ func (ts tokens) List(ctx context.Context, f store.TokenFilter, p store.Page) ([
 	)
 	err := ts.s.do(ctx, func() error {
 		rows := ts.t().all(func(_ string, t types.Token) bool {
-			return f.Subject == "" || t.Subject == f.Subject
+			return (f.Subject == "" || t.Subject == f.Subject) &&
+				(f.Purpose == "" || t.Purpose == f.Purpose)
 		}, compareTokens)
 		var err error
 		out, next, err = paginate(rows, p, false, func(t types.Token) []any { return []any{issuedKey(t), t.ID} })

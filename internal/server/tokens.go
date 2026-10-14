@@ -64,7 +64,11 @@ type mintRequest struct {
 	description      string
 	projectKey       string
 	refreshToken     string
-	// legacy translates the legacy scope forms first.
+	// accessToken is the legacy refresh form's access_token, the token being
+	// refreshed.
+	accessToken string
+	// legacy translates the legacy scope forms first, and makes a refresh
+	// present the token it refreshes as accessToken.
 	legacy bool
 }
 
@@ -77,21 +81,7 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	switch m.grant {
 	case "", grantClient:
 	case grantRefresh:
-		// The refresh token is the credential: it is a random secret bound to
-		// one token, so the route lets a refresh through without others.
-		if m.refreshToken == "" {
-			return token.Issued{}, badRequest(
-				"refresh_token is required with grant_type refresh_token",
-			)
-		}
-		issued, err := svc.Refresh(ctx, m.refreshToken)
-		if errors.Is(err, auth.ErrInvalidToken) {
-			return token.Issued{}, badRequest("The refresh token is not valid")
-		}
-		if err != nil {
-			return token.Issued{}, t.internalError(ctx, "refresh token", err)
-		}
-		return issued, nil
+		return t.refresh(ctx, svc, m)
 	default:
 		return token.Issued{}, badRequest("unsupported grant_type %q", m.grant)
 	}
@@ -150,6 +140,70 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	}
 	return issued, nil
 }
+
+// refresh exchanges m's refresh token. The refresh token is the credential:
+// a random secret bound to one token, so the routes let a refresh through
+// without others. Who else the request names narrows it:
+//   - an authenticated caller must be the refreshed token's user, or 403
+//     (createtoken.json: "The authenticated user must match the user of the
+//     access token being refreshed");
+//   - the token the request presents as being refreshed (the expired Bearer
+//     token on the Access route, the form's access_token on the legacy one)
+//     must be the refresh token's: another user's is 403 as above, and
+//     another token of the same user answers as an invalid refresh token,
+//     so the pair is never confirmed.
+//
+// An unknown, expired, revoked or malformed refresh token answers 400, the
+// analogue of OAuth's invalid_grant; Access documents no status for it.
+func (t tokenAPI) refresh(
+	ctx context.Context,
+	svc *token.Service,
+	m mintRequest,
+) (token.Issued, error) {
+	if m.refreshToken == "" {
+		return token.Issued{}, badRequest("refresh_token is required with grant_type refresh_token")
+	}
+	var check token.RefreshCheck
+	if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
+		check.Username = p.Name
+	}
+	of, presented := auth.ExpiredTokenFrom(ctx)
+	if m.legacy {
+		// jfrog-client-go sends the legacy refresh with no credentials and the
+		// token being refreshed, possibly expired, as access_token
+		// (artifactory/services/security.go, buildRefreshTokenUrlValues).
+		if m.accessToken == "" {
+			return token.Issued{}, badRequest(
+				"access_token is required with grant_type refresh_token",
+			)
+		}
+		if t.cfg.Auth != nil {
+			of, presented = t.cfg.Auth.ExpiredToken(ctx, m.accessToken)
+		}
+		if !presented {
+			return token.Issued{}, auth.ErrBadCredentials
+		}
+	}
+	if presented {
+		if check.Username != "" && check.Username != of.User {
+			return token.Issued{}, errRefreshOtherUser
+		}
+		check = token.RefreshCheck{Username: of.User, TokenID: of.TokenID}
+	}
+	issued, err := svc.RefreshAs(ctx, m.refreshToken, check)
+	switch {
+	case errors.Is(err, token.ErrRefreshOtherUser):
+		return token.Issued{}, errRefreshOtherUser
+	case errors.Is(err, auth.ErrInvalidToken):
+		return token.Issued{}, badRequest("The refresh token is not valid")
+	case err != nil:
+		return token.Issued{}, t.internalError(ctx, "refresh token", err)
+	}
+	return issued, nil
+}
+
+var errRefreshOtherUser = apierror.New(http.StatusForbidden,
+	"The authenticated user must match the user of the access token being refreshed")
 
 // identityScope reports whether a scope acts as its user or as an
 // administrator, rather than narrowing to groups or resources.
@@ -483,8 +537,8 @@ func (s artifactoryService) GetLegacyTokens(
 }
 
 // createLegacyToken is POST /api/security/token: the form-encoded create or
-// refresh the JFrog CLI still implements. The refresh form also carries the
-// expired access_token; the refresh token alone identifies the token.
+// refresh the JFrog CLI still implements. A refresh carries the token being
+// refreshed as access_token, which must pair with refresh_token (refresh).
 func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		writeErr(w, r, badRequest("malformed form: %v", err))
@@ -493,7 +547,8 @@ func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Req
 	f := r.PostForm
 	m := mintRequest{
 		grant: f.Get("grant_type"), username: f.Get("username"), scope: f.Get("scope"),
-		audience: f.Get("audience"), refreshToken: f.Get("refresh_token"), legacy: true,
+		audience: f.Get("audience"), refreshToken: f.Get("refresh_token"),
+		accessToken: f.Get("access_token"), legacy: true,
 	}
 	var err error
 	if v := f.Get("refreshable"); v != "" {
@@ -589,10 +644,11 @@ func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Req
 
 // GetUserEncryptedPassword returns, in place of Artifactory's encrypted
 // password, a reference token bound to the caller: every client that took
-// the encrypted password accepts it as a password. It never expires, as the
-// encrypted password does not, and it is revocable through the token API. A
-// token-authenticated caller is refused: the encrypted password stands for
-// a password, which only a password login proves.
+// the encrypted password accepts it as a password. Like the encrypted
+// password it is the same on every call and lasts until the password is set
+// or expired, which revokes it; it is also revocable through the token API.
+// A token-authenticated caller is refused: the encrypted password stands
+// for a password, which only a password login proves.
 func (s artifactoryService) GetUserEncryptedPassword(
 	ctx context.Context,
 	_ artgen.GetUserEncryptedPasswordRequestObject,
@@ -609,18 +665,11 @@ func (s artifactoryService) GetUserEncryptedPassword(
 	if p.TokenID != "" {
 		return nil, badRequest("The encrypted password needs a password login, not an access token")
 	}
-	never := time.Duration(0)
-	issued, err := svc.Issue(ctx, token.Request{
-		Username: p.Name, ExpiresIn: &never, ForceRevocable: true, IncludeReference: true,
-		Description: "encrypted password",
-		// Never expiring is otherwise admin only; this token stands in for
-		// the caller's own password, which does not expire either.
-		ByAdmin: true,
-	})
+	secret, err := svc.EncryptedPassword(ctx, p.Name)
 	if err != nil {
 		return nil, t.internalError(ctx, "encrypted password", err)
 	}
-	return artgen.GetUserEncryptedPassword200TextResponse(issued.ReferenceToken), nil
+	return artgen.GetUserEncryptedPassword200TextResponse(secret), nil
 }
 
 // writeText answers 200 with a plain-text confirmation, as the legacy

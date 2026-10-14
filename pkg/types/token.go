@@ -18,6 +18,14 @@ const (
 	DefaultRefreshGrace       = 24 * time.Hour
 )
 
+// TokenPurposeEncryptedPassword marks the reference token that stands in for
+// a user's encrypted password (GET /api/security/encryptedPassword). A user
+// has at most one; it keeps its value, sealed, so it can be shown again, and
+// it is revoked whenever the password is set or expired.
+//
+//nolint:gosec // G101: a purpose name, not a credential
+const TokenPurposeEncryptedPassword = "encrypted_password"
+
 // Token is the stored record of an access token. The JWT itself is never
 // stored: AccessDigest, RefreshDigest and ReferenceDigest are hashes used to
 // revoke by value and to resolve refresh and reference tokens. A zero
@@ -37,6 +45,12 @@ type Token struct {
 	AccessDigest    []byte `json:"-"`
 	RefreshDigest   []byte `json:"-"`
 	ReferenceDigest []byte `json:"-"`
+	// Purpose marks a token with a special role; empty for an ordinary one.
+	// A subject has at most one token of each purpose.
+	Purpose string
+	// Secret is the reference token of a purposed token, kept so it can be
+	// shown again; stores seal it. Empty for an ordinary token.
+	Secret string `json:"-"`
 }
 
 // Expired reports whether the token has expired at now.

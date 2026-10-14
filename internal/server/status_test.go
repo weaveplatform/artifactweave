@@ -31,8 +31,12 @@ type statusCase struct {
 	// path is the request path, query included.
 	path string
 	// as is who calls: "" without credentials (anonymous access off),
-	// "anonymous" without credentials (anonymous access on), "admin", or
-	// "user" (a user in no group, so the seeded permissions grant nothing).
+	// "anonymous" without credentials (anonymous access on), "admin",
+	// "user" (a user in no group, so the seeded permissions grant nothing),
+	// "expired" (an expired, refreshable access token of admin's, as a
+	// Bearer token) or "forged" (that token with its signature altered).
+	// A body names the fixture's other token values as {name}
+	// (statusSecrets).
 	as   string
 	body string
 	want int
@@ -95,6 +99,18 @@ func systemStatusRows() []statusCase {
 // run in any order against one store.
 func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Handler {
 	t.Helper()
+	h, _ := newStatusFixture(t, anonymous, tune...)
+	return h
+}
+
+// newStatusFixture is statusFixture with the token secrets the rows refer
+// to, which exist only once the fixture's signing key does.
+func newStatusFixture(
+	t *testing.T,
+	anonymous bool,
+	tune ...func(*Config),
+) (http.Handler, statusSecrets) {
+	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
 	cheapSeed(t, db)
@@ -149,7 +165,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 		types.FolderDownloadSettings{Enabled: true}); err != nil {
 		t.Fatal(err)
 	}
-	tokens := seedTokens(t, db)
+	tokens, secrets := seedTokens(t, db)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
 		Hash: testHash, Tokens: tokens,
 	})
@@ -164,7 +180,7 @@ func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Han
 	for _, f := range tune {
 		f(&cfg)
 	}
-	return New(cfg)
+	return New(cfg), secrets
 }
 
 // multipartStatusRows covers the JFrog CLI multipart upload routes. Only
@@ -396,7 +412,13 @@ func repositoryStatusRows() []statusCase {
 }
 
 func TestStatusTable(t *testing.T) {
-	off, on := statusFixture(t, false), statusFixture(t, true)
+	off, secrets := newStatusFixture(t, false)
+	on := statusFixture(t, true)
+	var pairs []string
+	for name, v := range secrets {
+		pairs = append(pairs, "{"+name+"}", v)
+	}
+	fill := strings.NewReplacer(pairs...)
 	for _, c := range statusTable() {
 		h, headers := off, map[string]string(nil)
 		switch c.as {
@@ -404,8 +426,12 @@ func TestStatusTable(t *testing.T) {
 			h = on
 		case "admin", "user":
 			headers = basic(c.as, "pw")
+		case "expired":
+			headers = bearerAuth(secrets["expired-access"])
+		case "forged":
+			headers = bearerAuth(secrets["forged-access"])
 		}
-		body := c.body
+		body := fill.Replace(c.body)
 		if body != "" {
 			if headers == nil {
 				headers = map[string]string{}

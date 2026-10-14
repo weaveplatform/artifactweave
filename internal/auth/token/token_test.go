@@ -313,6 +313,176 @@ func TestRefresh(t *testing.T) {
 	}
 }
 
+// TestVerifyExpired: an expired JWT verifies for the refresh grant only, and
+// only while everything but its expiry still holds.
+func TestVerifyExpired(t *testing.T) {
+	s, _, c := world(t)
+	ctx := context.Background()
+	out := issue(t, s, Request{
+		Refreshable: true, ForceRevocable: true, IncludeReference: true, ExpiresIn: dur(time.Hour),
+	})
+	c.add(2 * time.Hour)
+	invalid(t, s, out.AccessToken, "expired JWT")
+	rec, err := s.VerifyExpired(ctx, out.AccessToken)
+	if err != nil || rec.ID != out.Record.ID {
+		t.Fatalf("VerifyExpired = %+v, %v", rec, err)
+	}
+	if _, err := s.VerifyExpired(ctx, out.ReferenceToken); !errors.Is(err, auth.ErrInvalidToken) {
+		t.Fatalf("a reference token: %v", err)
+	}
+	parts := strings.Split(out.AccessToken, ".")
+	forged := parts[0] + "." + b64.EncodeToString([]byte(strings.Replace(
+		string(decodePayload(t, out.AccessToken)), "/users/alice", "/users/admin", 1,
+	))) + "." + parts[2]
+	if _, err := s.VerifyExpired(ctx, forged); !errors.Is(err, auth.ErrInvalidToken) {
+		t.Fatalf("a forged expired token: %v", err)
+	}
+	if err := s.Revoke(ctx, out.Record.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.VerifyExpired(ctx, out.AccessToken); !errors.Is(err, auth.ErrInvalidToken) {
+		t.Fatalf("a revoked expired token: %v", err)
+	}
+}
+
+// TestRefreshAs: a refresh checked against a user and a token refreshes
+// only that user's token, and only the token named. Another user's refresh
+// token is ErrRefreshOtherUser even when a token is named too.
+func TestRefreshAs(t *testing.T) {
+	s, _, c := world(t)
+	ctx := context.Background()
+	mine := issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
+	other := issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
+	bobs := issue(t, s, Request{Username: "bob", Refreshable: true, ExpiresIn: dur(time.Hour)})
+	c.add(2 * time.Hour)
+	for what, r := range map[string]struct {
+		refresh string
+		check   RefreshCheck
+		want    error
+	}{
+		"another token's": {
+			other.RefreshToken,
+			RefreshCheck{Username: "alice", TokenID: mine.Record.ID},
+			auth.ErrInvalidToken,
+		},
+		"another user's": {bobs.RefreshToken, RefreshCheck{Username: "alice"}, ErrRefreshOtherUser},
+		"another user's, naming a token": {
+			bobs.RefreshToken,
+			RefreshCheck{Username: "alice", TokenID: mine.Record.ID},
+			ErrRefreshOtherUser,
+		},
+		"unknown": {"nope", RefreshCheck{Username: "alice"}, auth.ErrInvalidToken},
+	} {
+		if _, err := s.RefreshAs(ctx, r.refresh, r.check); !errors.Is(err, r.want) {
+			t.Errorf("%s: %v, want %v", what, err, r.want)
+		}
+	}
+	next, err := s.RefreshAs(
+		ctx,
+		mine.RefreshToken,
+		RefreshCheck{Username: "alice", TokenID: mine.Record.ID},
+	)
+	if err != nil || next.Record.Subject != mine.Record.Subject {
+		t.Fatalf("RefreshAs = %+v, %v", next, err)
+	}
+	// The refused attempts left the other tokens refreshable.
+	for _, rt := range []string{other.RefreshToken, bobs.RefreshToken} {
+		if _, err := s.Refresh(ctx, rt); err != nil {
+			t.Fatalf("a token after a refused refresh: %v", err)
+		}
+	}
+}
+
+// TestEncryptedPassword: one per user, the same value every time, a usable
+// reference token, and a new one once the old is revoked.
+func TestEncryptedPassword(t *testing.T) {
+	s, db, c := world(t)
+	ctx := context.Background()
+	first, err := s.EncryptedPassword(ctx, "alice")
+	if err != nil || !types.IsReferenceToken(first) {
+		t.Fatalf("EncryptedPassword = %q, %v", first, err)
+	}
+	c.add(400 * 24 * time.Hour)
+	again, err := s.EncryptedPassword(ctx, "alice")
+	if err != nil || again != first {
+		t.Fatalf("second EncryptedPassword = %q, %v; want %q", again, err, first)
+	}
+	rec, err := s.Verify(ctx, first)
+	if err != nil || rec.Purpose != types.TokenPurposeEncryptedPassword ||
+		!rec.ExpiresAt.IsZero() ||
+		!rec.Revocable {
+		t.Fatalf("Verify = %+v, %v", rec, err)
+	}
+	if bob, err := s.EncryptedPassword(ctx, "bob"); err != nil || bob == first {
+		t.Fatalf("bob's = %q, %v", bob, err)
+	}
+	if err := db.Tokens().Delete(ctx, rec.ID); err != nil {
+		t.Fatal(err)
+	}
+	next, err := s.EncryptedPassword(ctx, "alice")
+	if err != nil || next == first {
+		t.Fatalf("after revocation = %q, %v", next, err)
+	}
+}
+
+// racingTokens creates a competing encrypted password just before the
+// service's own, as a concurrent first use would, and with vanish revokes it
+// again before the service can read it.
+type racingTokens struct {
+	store.TokenStore
+	rival  types.Token
+	raced  bool
+	vanish bool
+}
+
+func (r *racingTokens) Create(ctx context.Context, t types.Token) error {
+	if t.Purpose == "" || r.raced {
+		return r.TokenStore.Create(ctx, t) //nolint:wrapcheck // test fake
+	}
+	r.raced = true
+	if err := r.TokenStore.Create(ctx, r.rival); err != nil {
+		return err //nolint:wrapcheck // test fake
+	}
+	err := r.TokenStore.Create(ctx, t)
+	if r.vanish {
+		_ = r.TokenStore.Delete(ctx, r.rival.ID)
+	}
+	return err //nolint:wrapcheck // test fake
+}
+
+type racingStore struct {
+	*inmem.Store
+	tokens *racingTokens
+}
+
+func (s racingStore) Tokens() store.TokenStore { return s.tokens }
+
+// TestEncryptedPasswordRace: the first use that loses the race answers with
+// the winner's value.
+func TestEncryptedPasswordRace(t *testing.T) {
+	ctx := context.Background()
+	c := &clock{t: time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)}
+	db := newStore(t)
+	rs := racingStore{Store: db, tokens: &racingTokens{TokenStore: db.Tokens()}}
+	s := newService(t, rs, c)
+	rs.tokens.rival = types.Token{
+		ID: "rival", Subject: s.Issuer() + "/users/alice",
+		Purpose: types.TokenPurposeEncryptedPassword, Secret: "rival-secret",
+	}
+	got, err := s.EncryptedPassword(ctx, "alice")
+	if err != nil || got != "rival-secret" {
+		t.Fatalf("EncryptedPassword = %q, %v", got, err)
+	}
+	// A rival revoked before it could be read leaves the conflict an error.
+	if err := db.Tokens().Delete(ctx, "rival"); err != nil {
+		t.Fatal(err)
+	}
+	rs.tokens.raced, rs.tokens.vanish = false, true
+	if _, err := s.EncryptedPassword(ctx, "alice"); !errors.Is(err, store.ErrConflict) {
+		t.Fatalf("a vanished rival: %v", err)
+	}
+}
+
 // TestRotation: tokens signed before a rotation keep verifying until the
 // latest expiry of the tokens stored then, and for ever when one of them
 // never expires; tokens signed after use the new key.

@@ -343,3 +343,149 @@ func TestTokenAPIWithoutService(t *testing.T) {
 		}
 	}
 }
+
+// TestRefreshWithExpiredAccessToken is the JFrog CLI's refresh: the expired
+// access token as the Bearer credential and its refresh token in the body.
+// The new token works; the expired one refreshes once and no other route
+// accepts it.
+func TestRefreshWithExpiredAccessToken(t *testing.T) {
+	h, secrets := newStatusFixture(t, false)
+	if rec := do(
+		t,
+		h,
+		http.MethodGet,
+		"/access/api/v1/tokens",
+		bearerAuth(secrets["expired-access"]),
+		"",
+	); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("an expired token on another route: %d", rec.Code)
+	}
+	refresh := `{"grant_type":"refresh_token","refresh_token":"` + secrets["expired-refresh"] + `"}`
+	rec := do(
+		t,
+		h,
+		http.MethodPost,
+		"/access/api/v1/tokens",
+		jsonAs(bearerAuth(secrets["expired-access"])),
+		refresh,
+	)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("refresh with the expired token: %d %s", rec.Code, rec.Body)
+	}
+	next := decodeObject(t, rec.Body.String())
+	access, _ := next["access_token"].(string)
+	if rec := do(
+		t,
+		h,
+		http.MethodGet,
+		"/access/api/v1/tokens/me",
+		bearerAuth(access),
+		"",
+	); rec.Code != http.StatusOK ||
+		next["expires_in"] != float64(3600) ||
+		next["refresh_token"] == "" {
+		t.Fatalf("the refreshed token: %d %v", rec.Code, next)
+	}
+	if rec := do(
+		t,
+		h,
+		http.MethodPost,
+		"/access/api/v1/tokens",
+		jsonAs(bearerAuth(secrets["expired-access"])),
+		refresh,
+	); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("a second refresh with the replaced token: %d", rec.Code)
+	}
+}
+
+// TestEncryptedPasswordFollowsThePassword: the encrypted password is the
+// same on every request, stands for the password until it is set or
+// expired, and is then replaced by a new value.
+func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
+	h := statusFixture(t, false)
+	const encPath = "/artifactory/api/security/encryptedPassword"
+	get := func(password string) string {
+		t.Helper()
+		rec := do(t, h, http.MethodGet, encPath, basic("user", password), "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("encrypted password: %d %s", rec.Code, rec.Body)
+		}
+		return rec.Body.String()
+	}
+	works := func(enc string) int {
+		t.Helper()
+		art := do(
+			t,
+			h,
+			http.MethodGet,
+			"/access/api/v1/tokens",
+			map[string]string{"X-JFrog-Art-Api": enc},
+			"",
+		)
+		if pw := do(
+			t,
+			h,
+			http.MethodGet,
+			"/access/api/v1/tokens",
+			basic("user", enc),
+			"",
+		); pw.Code != art.Code {
+			t.Fatalf("as X-JFrog-Art-Api %d, as a Basic password %d", art.Code, pw.Code)
+		}
+		return art.Code
+	}
+	admin := func(method, path, body string) {
+		t.Helper()
+		if rec := do(
+			t,
+			h,
+			method,
+			path,
+			jsonAs(basic("admin", "pw")),
+			body,
+		); rec.Code != http.StatusOK {
+			t.Fatalf("%s %s: %d %s", method, path, rec.Code, rec.Body)
+		}
+	}
+
+	first := get("pw")
+	if again := get("pw"); again != first || works(first) != http.StatusOK {
+		t.Fatalf("a repeat request: %q, want %q", again, first)
+	}
+	admin(http.MethodPost, secUsers+"/user", `{"password":"New-pass1"}`)
+	if code := works(first); code != http.StatusUnauthorized {
+		t.Fatalf("the encrypted password of the old password: %d", code)
+	}
+	second := get("New-pass1")
+	if second == first || works(second) != http.StatusOK {
+		t.Fatalf("after a password change: %q", second)
+	}
+	admin(http.MethodPost, secExpire, `["user"]`)
+	if code := works(second); code != http.StatusUnauthorized {
+		t.Fatalf("the encrypted password of an expired password: %d", code)
+	}
+	admin(http.MethodPost, secUnexpire+"user", "")
+	if third := get("New-pass1"); third == second || works(third) != http.StatusOK {
+		t.Fatalf("after the expiry was lifted: %q", third)
+	}
+}
+
+// TestLegacyRefreshWithoutAuthenticator: with no authenticator nothing can
+// verify the form's access_token, so a legacy refresh is refused.
+func TestLegacyRefreshWithoutAuthenticator(t *testing.T) {
+	h, secrets := newStatusFixture(t, false, func(c *Config) { c.Auth = nil })
+	body := strings.TrimPrefix(
+		lRefresh(secrets["legacy-access"], secrets["legacy-refresh"]),
+		"form:",
+	)
+	if rec := do(
+		t,
+		h,
+		http.MethodPost,
+		legacyTokenPath,
+		formAs(nil),
+		body,
+	); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("legacy refresh without an authenticator: %d %s", rec.Code, rec.Body)
+	}
+}

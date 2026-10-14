@@ -45,13 +45,18 @@ var selfAuthenticated = map[string]bool{
 	"POST " + uploadsAbort:    true,
 }
 
+// refreshRoute is the one route an expired access token reaches.
+const refreshRoute = "POST /access/api/v1/tokens"
+
 // authenticate puts the request's principal in its context. Credentials
 // that do not verify answer 401 at once, even on a public route, as
 // Artifactory does: a client with a wrong password learns it on its first
-// call. Without credentials the request acts as anonymous when anonymous
-// access is on; otherwise only public routes answer. Every principal is then
-// authorised once (auth.Authorize): its permissions are evaluated for the
-// request, and handlers ask that evaluator, through access, every question.
+// call. The exception is an expired Bearer access token on refreshRoute
+// (expiredRefresh). Without credentials the request acts as anonymous when
+// anonymous access is on; otherwise only public routes answer. Every
+// principal is then authorised once (auth.Authorize): its permissions are
+// evaluated for the request, and handlers ask that evaluator, through
+// access, every question.
 func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +71,9 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 				}
 				if err == nil {
 					p, err = authorize(ctx, st, p, false)
+				} else if who, ok := expiredRefresh(ctx, a, r, err); ok {
+					next.ServeHTTP(w, r.WithContext(auth.WithExpiredToken(ctx, who)))
+					return
 				}
 				if err != nil {
 					apierror.Write(w, surfaceFor(r.URL.Path), err)
@@ -141,6 +149,29 @@ func credentials(
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	return auth.Principal{}, false, nil
+}
+
+// expiredRefresh reports the Bearer access token a request to refreshRoute
+// presented when it failed only for having expired. The JFrog CLI refreshes
+// with the token it is replacing as its Bearer credential (jfrog-client-go's
+// handleUnauthenticated), and it refreshes because that token is expiring or
+// has expired. The request then reaches the handler with no principal, which
+// accepts only a refresh grant whose refresh token belongs to that token;
+// revoked and forged tokens still answer 401.
+func expiredRefresh(
+	ctx context.Context,
+	a *auth.Authenticator,
+	r *http.Request,
+	err error,
+) (auth.Refresher, bool) {
+	if !errors.Is(err, auth.ErrBadCredentials) || r.Method+" "+r.URL.Path != refreshRoute {
+		return auth.Refresher{}, false
+	}
+	scheme, raw, _ := strings.Cut(r.Header.Get("Authorization"), " ")
+	if !strings.EqualFold(scheme, "Bearer") {
+		return auth.Refresher{}, false
+	}
+	return a.ExpiredToken(ctx, strings.TrimSpace(raw))
 }
 
 // authorize evaluates p's permissions for the request. A handler built

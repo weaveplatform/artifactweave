@@ -21,6 +21,7 @@ const (
 	purposeSigningPrivate    = "signing_keys.private_key"
 	purposeSigningPassphrase = "signing_keys.passphrase"
 	purposeCertificateKey    = "certificates.private_key"
+	purposeTokenSecret       = "tokens.secret"
 )
 
 // Tokens implements store.Store.
@@ -34,7 +35,8 @@ func (s *Store) Keys() store.KeyStore { return keys{s} }
 type tokens struct{ s *Store }
 
 const tokenCols = "id, subject, access_digest, refresh_digest, reference_digest, scope, audience, " +
-	"description, project_key, issued_at, expires_at, refreshable, revocable, last_used_at"
+	"description, project_key, issued_at, expires_at, refreshable, revocable, last_used_at, " +
+	"purpose, secret"
 
 // tokenKey is the keyset of the token list; issued_at is never NULL (0 for
 // an unset time) so both engines sort and compare it the same way.
@@ -57,13 +59,16 @@ func digestArg(b []byte) any {
 	return b
 }
 
-func scanToken(row interface{ Scan(...any) error }) (types.Token, error) {
+// scan reads a token row; the secret of a purposed token is sealed with the
+// token id.
+func (ts tokens) scan(row interface{ Scan(...any) error }) (types.Token, error) {
 	var (
 		t                types.Token
 		scope            string
 		issued           int64
 		expires, used    sql.NullInt64
 		access, ref, rfr []byte
+		secret           []byte
 	)
 	if err := row.Scan(
 		&t.ID,
@@ -80,8 +85,14 @@ func scanToken(row interface{ Scan(...any) error }) (types.Token, error) {
 		&t.Refreshable,
 		&t.Revocable,
 		&used,
+		&t.Purpose,
+		&secret,
 	); err != nil {
 		return t, err //nolint:wrapcheck // wrapped by the caller
+	}
+	var err error
+	if t.Secret, err = ts.s.unseal(purposeTokenSecret, t.ID, secret); err != nil {
+		return t, err
 	}
 	if len(access) > 0 {
 		t.AccessDigest = access
@@ -107,7 +118,11 @@ func scanToken(row interface{ Scan(...any) error }) (types.Token, error) {
 }
 
 func (ts tokens) Create(ctx context.Context, t types.Token) error {
-	_, err := ts.s.exec(
+	secret, err := ts.s.seal(purposeTokenSecret, t.ID, t.Secret)
+	if err != nil {
+		return err
+	}
+	_, err = ts.s.exec(
 		ctx,
 		"create token "+t.ID,
 		Insert("tokens", strings.Split(tokenCols, ", ")),
@@ -125,12 +140,14 @@ func (ts tokens) Create(ctx context.Context, t types.Token) error {
 		t.Refreshable,
 		t.Revocable,
 		micros(t.LastUsed),
+		t.Purpose,
+		secret,
 	)
 	return err
 }
 
 func (ts tokens) Get(ctx context.Context, id string) (types.Token, error) {
-	t, err := scanToken(ts.s.q(ctx).QueryRowContext(ctx,
+	t, err := ts.scan(ts.s.q(ctx).QueryRowContext(ctx,
 		ts.s.d.Rebind("SELECT "+tokenCols+" FROM tokens WHERE id = ?"), id))
 	return t, ts.s.wrap(fmt.Sprintf("get token %q", id), err)
 }
@@ -154,7 +171,7 @@ func (ts tokens) ByDigest(
 	if len(d) == 0 {
 		return types.Token{}, fmt.Errorf("token by empty %s: %w", col, store.ErrNotFound)
 	}
-	t, err := scanToken(ts.s.q(ctx).QueryRowContext(ctx,
+	t, err := ts.scan(ts.s.q(ctx).QueryRowContext(ctx,
 		ts.s.d.Rebind("SELECT "+tokenCols+" FROM tokens WHERE "+col+" = ?"), d))
 	return t, ts.s.wrap("get token by "+col, err)
 }
@@ -176,12 +193,16 @@ func (ts tokens) List(
 		cond += " AND subject = ?"
 		args = append(args, f.Subject)
 	}
+	if f.Purpose != "" {
+		cond += " AND purpose = ?"
+		args = append(args, f.Purpose)
+	}
 	var out []types.Token
 	err = ts.s.rows(ctx, "list tokens",
 		"SELECT "+tokenCols+" FROM tokens WHERE "+cond+orderBy(tokenKey, false)+" LIMIT ?",
 		append(args, p.Limit+1),
 		func(r *sql.Rows) error {
-			t, err := scanToken(r)
+			t, err := ts.scan(r)
 			out = append(out, t)
 			return err
 		})

@@ -56,9 +56,11 @@ construction, with no search.
   `token.signing_keys` setting.
 - **Issuer and subject:** the issuer is `jfac@<uuid>`, taken from the instance id `jfrt@<uuid>`
   created at first start.
-- **Records:** every token's record is stored, as only digests of its secrets.
-  Verification needs the record, so revocation is deletion. GC removes records
-  `DefaultRefreshGrace` after expiry, the window in which their refresh token still works.
+- **Records:** every token's record is stored, as only digests of its secrets. The one
+  exception is the encrypted password's reference token, which is kept sealed so it can be
+  shown again (#106). Verification needs the record, so revocation is deletion. GC removes
+  records `DefaultRefreshGrace` after expiry, the window in which their refresh token still
+  works.
 
 **Token API.** `POST /access/api/v1/tokens` and the legacy form `POST /api/security/token`
 issue tokens from the same service, under these rules:
@@ -68,8 +70,45 @@ issue tokens from the same service, under these rules:
   mint tokens at all, so a narrowed token cannot obtain a broader one.
 - The refresh grant is authenticated by the refresh token itself, so both create routes let a
   request through without other credentials, and the handlers require a user for every other
-  grant. A refresh request that sends an expired token in `Authorization` is refused (401) by
-  the middleware before it reaches the handler.
+  grant.
+- *Refresh statuses (#106):* both create routes answer a refresh grant as follows:
+  - **400** for an unknown, expired, revoked or malformed refresh token. This is inferred, as
+    the analogue of OAuth's `invalid_grant`; Access documents no status for it.
+  - **403** when the refresh token belongs to another user than the caller. The documented
+    rule is "The authenticated user must match the user of the access token being refreshed
+    (identified by the refresh token)", and the operation lists 403 as forbidden
+    (`.specoracle/administration-jfrog-platform-rest-apis/createtoken.json`). There is no
+    administrator exception.
+  - **401** for missing or invalid credentials, including a revoked or forged token presented
+    as the token being refreshed.
+  - A refresh with no credentials at all still succeeds on the refresh token alone.
+- *Refresh with an expired token (#106):* the JFrog CLI refreshes with the access token it is
+  replacing as its `Authorization: Bearer` credential (jfrog-cli-core
+  `utils/config/tokenrefresh.go`; jfrog-client-go `access/services/accesstoken.go`,
+  `handleUnauthenticated`). It refreshes because that token is expiring or has already
+  expired. The exception applies only to `POST /access/api/v1/tokens`, and only to a Bearer
+  JWT whose signature, key, record and subject verify and whose user is enabled, but whose
+  `exp` has passed. Such a request reaches the handler with no principal and with the token.
+  The handler then accepts only a refresh grant whose refresh token belongs to that token:
+  - another user's refresh token answers 403;
+  - another token of the same user answers 400, as an unknown one does, so the answer never
+    confirms a pairing;
+  - any other grant answers 401.
+
+  Revoked tokens, forged tokens, reference tokens, and an expired token on any other route
+  still answer 401. The record outlives `exp` by `DefaultRefreshGrace`, which bounds the
+  window.
+- *Legacy refresh (#106):* the JFrog CLI refreshes a legacy Artifactory refresh token (the one
+  `jf c import` stores) through `POST /api/security/token`. It sends no `Authorization` header,
+  and the form carries the current, possibly expired, token as `access_token` (jfrog-client-go
+  `artifactory/services/security.go`, `RefreshToken` and `buildRefreshTokenUrlValues`;
+  jfrog-cli-core `utils/config/tokenrefresh.go`, `refreshArtifactoryExpiredToken` with
+  `noCredsDetails`). The handler applies the following rules:
+  - `access_token` is required (400 without it);
+  - its signature, key, record, subject and user are verified with expiry ignored (401 if
+    any fails);
+  - it must pair with `refresh_token` (same token id), with the statuses above;
+  - an authenticated caller must also be its user (403).
 - Every token has a record. Non-revocable tokens (shorter than the revocable threshold and not
   `force_revocable`) are left out of the token lists and refuse revocation, as in Artifactory,
   but still read back by id: the `artifactory_scoped_token` resource reads its token after
@@ -77,6 +116,21 @@ issue tokens from the same service, under these rules:
 - `GET /api/security/encryptedPassword` answers, in place of an encrypted password, a
   non-expiring, revocable reference token bound to the caller. Only a password login may ask
   for one.
+- *The encrypted password follows the password (#106):* as with Artifactory's encrypted
+  password, a user has one value at a time.
+  - **One per user:** the user holds at most one token of purpose `encrypted_password`
+    (enforced by a unique `(subject, purpose)` index).
+  - **Same value on repeat:** its reference token is stored sealed (`tokens.secret`, resealed
+    with the other sealed columns), so a repeat request answers the same value.
+  - **Revocation:** the identity service revokes it whenever the password is set or an
+    administrator expires it, for one user or for all at once. Every set goes through its
+    `setPassword`, whichever API makes it. Sending back the current password, as Terraform
+    does on every update, is no change and keeps the encrypted password. The next request
+    then issues a new value.
+  - **Refusal at authentication:** the age policy expires a password without any write to
+    revoke on. Authentication therefore refuses an encrypted-password token whenever the
+    password itself would be refused: expired (`ErrPasswordExpired`), internal password
+    disabled, or no password set.
 
 **Docker token endpoint.** `GET /v2/` without credentials answers `401` with a
 `WWW-Authenticate: Bearer realm=...,service=...` challenge; the realm issues short-lived
