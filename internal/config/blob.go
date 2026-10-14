@@ -137,7 +137,32 @@ type BlobGCSConfig struct {
 	// the credentials alone do not name one.
 	GoogleAccessID string   `yaml:"google_access_id"`
 	PartSize       ByteSize `yaml:"part_size"`
+	// CDN is a CDN in front of the bucket (decision 0029).
+	CDN BlobGCSCDNConfig `yaml:"cdn"`
 }
+
+// BlobGCSCDNConfig is the CDN in front of a gcs store.
+type BlobGCSCDNConfig struct {
+	CloudCDN CloudCDNConfig `yaml:"cloud_cdn"`
+}
+
+// CloudCDNConfig is a Cloud CDN backend bucket whose bucket is the store's.
+// The signing key stays in its file, which is read at start: the
+// configuration holds only the path.
+type CloudCDNConfig struct {
+	// Domain is the load balancer host, or an http(s) URL for a test edge.
+	Domain string `yaml:"domain"`
+	// KeyName names the signing key on the backend bucket.
+	KeyName string `yaml:"key_name"`
+	// KeyFile holds the 128-bit key, base64url, as gcloud reads it.
+	KeyFile string `yaml:"key_file"`
+	// PathPrefix is the path inside the bucket the load balancer serves at
+	// its root.
+	PathPrefix string `yaml:"path_prefix"`
+}
+
+// Enabled reports whether any field is set.
+func (c CloudCDNConfig) Enabled() bool { return c != CloudCDNConfig{} }
 
 // BlobAzureConfig is the Azure Blob Storage backend (decision 0027).
 // AccountKey, SASToken and ConnectionString are secrets: prefer their
@@ -248,6 +273,8 @@ func backendKeys() []string {
 		"s3.cdn.cloudfront.path_prefix",
 		"gcs.bucket", "gcs.prefix", "gcs.endpoint", "gcs.credentials_file",
 		"gcs.google_access_id", "gcs.part_size",
+		"gcs.cdn.cloud_cdn.domain", "gcs.cdn.cloud_cdn.key_name",
+		"gcs.cdn.cloud_cdn.key_file", "gcs.cdn.cloud_cdn.path_prefix",
 		"azure.account", "azure.endpoint", "azure.container", "azure.prefix",
 		"azure.credential", "azure.account_key", "azure.sas_token", "azure.connection_string",
 		"azure.managed_identity_client_id", "azure.part_size", "azure.copy_range_size",
@@ -346,6 +373,10 @@ func (b *BlobBackendConfig) set(sub, key, value string) error {
 		"gcs.endpoint":                       &b.GCS.Endpoint,
 		"gcs.credentials_file":               &b.GCS.CredentialsFile,
 		"gcs.google_access_id":               &b.GCS.GoogleAccessID,
+		"gcs.cdn.cloud_cdn.domain":           &b.GCS.CDN.CloudCDN.Domain,
+		"gcs.cdn.cloud_cdn.key_name":         &b.GCS.CDN.CloudCDN.KeyName,
+		"gcs.cdn.cloud_cdn.key_file":         &b.GCS.CDN.CloudCDN.KeyFile,
+		"gcs.cdn.cloud_cdn.path_prefix":      &b.GCS.CDN.CloudCDN.PathPrefix,
 		"azure.account":                      &b.Azure.Account,
 		"azure.endpoint":                     &b.Azure.Endpoint,
 		"azure.container":                    &b.Azure.Container,
@@ -495,6 +526,7 @@ func (b BlobBackendConfig) validate(prefix string) []error {
 		errs = append(errs, b.S3.CDN.CloudFront.validate(prefix+".s3.cdn.cloudfront")...)
 	case "gcs":
 		errs = append(errs, b.GCS.validate(prefix)...)
+		errs = append(errs, b.GCS.CDN.CloudCDN.validate(prefix+".gcs.cdn.cloud_cdn")...)
 	case "azure":
 		errs = append(errs, b.Azure.validate(prefix)...)
 	default:
@@ -531,6 +563,28 @@ func (c CloudFrontConfig) validate(prefix string) []error {
 	return errs
 }
 
+func (c CloudCDNConfig) validate(prefix string) []error {
+	if !c.Enabled() {
+		return nil
+	}
+	var errs []error
+	for _, f := range []struct{ name, value string }{
+		{"domain", c.Domain},
+		{"key_name", c.KeyName},
+		{"key_file", c.KeyFile},
+	} {
+		if f.value == "" {
+			errs = append(errs, fmt.Errorf("%w: %s.%s", ErrMissingValue, prefix, f.name))
+		}
+	}
+	if c.Domain != "" {
+		if _, err := cdn.ParseDomain(c.Domain); err != nil {
+			errs = append(errs, fmt.Errorf("%w: %s.domain: %w", ErrInvalidValue, prefix, err))
+		}
+	}
+	return errs
+}
+
 // cdnDomains maps the configuration key of every CDN domain in the section,
 // the named stores' included, to its value.
 func (b BlobConfig) cdnDomains(prefix string) map[string]string {
@@ -538,6 +592,9 @@ func (b BlobConfig) cdnDomains(prefix string) map[string]string {
 	add := func(p string, bc BlobBackendConfig) {
 		if cf := bc.S3.CDN.CloudFront; cf.Enabled() {
 			out[p+".s3.cdn.cloudfront.domain"] = cf.Domain
+		}
+		if cc := bc.GCS.CDN.CloudCDN; cc.Enabled() {
+			out[p+".gcs.cdn.cloud_cdn.domain"] = cc.Domain
 		}
 		if fd := bc.Azure.CDN.FrontDoor; fd.Enabled() {
 			out[p+".azure.cdn.front_door.endpoint"] = fd.Endpoint

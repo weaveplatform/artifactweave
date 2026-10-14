@@ -143,6 +143,13 @@ Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0):
 | Signed responses are cached for `signed-url-cache-max-age`, which "defaults to one hour" | doc | [gcdn-signed] |
 | "Private bucket access" makes a private bucket reachable through Cloud CDN without signed URLs, so it is not viewer authorisation | doc | [gcdn-private] |
 | There is no Go SDK helper for signing; Google's page gives a Go sample | doc | [gcdn-signed] |
+| The signed string is the whole URL, scheme to `KeyName`, query included: Google's Go sample appends `Expires` and `KeyName` with `?`, or `&` when the URL already has a query, and its comment asks only that the URL carry no `Expires`, `KeyName` or `Signature` | doc | [gcdn-signed] |
+| The signature is base64url with its padding; "Don't convert trailing `=` characters of the signature to their percent-encoded form" | doc | [gcdn-signed] |
+| `URLPrefix` signs `URLPrefix=…&Expires=…&KeyName=…`, and its prefix is matched "as a text substring, not strictly a directory path" | doc | [gcdn-signed] |
+| A key name is 1 to 63 characters, `[a-z]([-a-z0-9]*[a-z0-9])?` (RFC 1035); the key value is 128 bits, RFC 4648 base64url | doc | [gce-signedurlkey] |
+| A backend bucket's cache key leaves out protocol and host, and "By default, only query parameters that are known to Cloud Storage are included"; an include list can add parameters, and "Cloud CDN doesn't support excluding query parameters from a cache key to a backend bucket" | doc | [gcdn-caching], [gcdn-cache-keys] |
+| Cloud Storage's `response-content-disposition` and `response-content-type` override those headers "for authenticated GET requests" | doc | [gcs-xml-headers] |
+| Whether Cloud CDN forwards the override parameters to a backend bucket on a cache fill, and counts them among the parameters "known to Cloud Storage", is not stated. Both are likely, because the cache fill is an authenticated read by `cloud-cdn-fill` and the parameters are Cloud Storage's own | inf | [gcdn-signed], [gcdn-caching], [gcs-xml-headers] |
 | A Cloud CDN backend bucket sits behind a global external Application Load Balancer, which needs a certificate for HTTPS | doc | [gcdn-signed], [glb-pricing] |
 
 ### 3.3 Azure Front Door
@@ -184,7 +191,7 @@ Read on 2026-10-14; list prices in USD, first tier.
 ## 5. artifactweave today
 
 At first written for main at `00888fc`, after #139; updated for #146 (the redirect policy),
-#120 (CloudFront) and #122 (Front Door).
+#120 (CloudFront), #121 (Cloud CDN) and #122 (Front Door).
 
 | Behaviour | Source |
 |---|---|
@@ -194,12 +201,13 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 | A 302 carries no `Content-Type`, `Content-Disposition` or `ETag`; the signed URL carries the name and media type as response overrides | `internal/server/redirect.go`, each backend's `SignURL` |
 | A redirected download is counted when it is a whole file or a range starting at byte 0, and `skipUpdateStats=true` opts out | `internal/server/redirect.go` (`countsDownload`) |
 | A signing failure is logged at WARN at most once a minute and the download streams | `internal/server/redirect.go` (`signFailed`) |
-| `blob.Signer` is `Signs(via)`, fixed when the store is built, and `SignURL(ctx, sha256, SignOptions)`. Storage URLs: s3 with its presign client; gcs when its credentials can sign; azure unless it runs on a pre-issued SAS; fs never. CDN URLs: s3 with a CloudFront configuration; azure with a Front Door, unless it runs on a pre-issued SAS; gcs not yet | `pkg/blob/blob.go`, `pkg/blob/{s3,gcs,azure}` |
+| `blob.Signer` is `Signs(via)`, fixed when the store is built, and `SignURL(ctx, sha256, SignOptions)`. Storage URLs: s3 with its presign client; gcs when its credentials can sign; azure unless it runs on a pre-issued SAS; fs never. CDN URLs: s3 with a CloudFront configuration; gcs with a Cloud CDN configuration; azure with a Front Door, unless it runs on a pre-issued SAS | `pkg/blob/blob.go`, `pkg/blob/{s3,gcs,azure}` |
 | CloudFront URLs are canned-policy signed with `aws-sdk-go-v2/feature/cloudfront/sign`, SHA-1 or SHA-256, with an RSA or ECDSA key read from a file at start | `pkg/cdn/cloudfront.go`, `internal/app/blob.go` |
+| Cloud CDN URLs are signed whole, not by `URLPrefix`: `Expires` and `KeyName` appended, then an HMAC-SHA1 `Signature` with the 128-bit key read from a base64url file at start. A test checks the signer against vectors computed with Google's Python sample | `pkg/cdn/cloudcdn.go` (`SignCloudCDN`), `pkg/cdn/cloudcdn_test.go`, `internal/app/blob.go` |
 | Front Door URLs are the store's own read SAS, by shared key or user delegation, with start and expiry fixed to the TTL-long window, `rscd`/`rsct` overrides and `rscc: public, max-age=<TTL>`, moved onto the endpoint host. One delegation key is kept across a window, so the window's URLs are identical; a SAS that would outlive the longest key (7 days less an hour) is refused | `pkg/blob/azure` (`signFrontDoor`, `delegationSAS`), `pkg/cdn/frontdoor.go` |
 | A mirror signs with the first member in read order that holds the blob and signs the route, without counting signing against the member's health | `pkg/blob/mirror/read.go` (`SignURL`) |
 | The server refuses to start with a CDN on the archive tier, or on the `base_url` host or a subdomain of it | `internal/config/config.go` (`validateCDN`) |
-| A fake CloudFront edge checks signatures and serves blobs from a store; acceptance runs `jf rt dl` of a split download through it, with MinIO behind | `pkg/cdn/cdntest`, `test/acceptance/features/cdn.feature` |
+| A fake edge checks CloudFront or Cloud CDN signatures and serves blobs from a store; acceptance runs `jf rt dl` of a split download through each, with MinIO or fake-gcs-server behind | `pkg/cdn/cdntest`, `test/acceptance/features/cdn.feature` |
 | A fake Front Door checks nothing, passes the SAS through to its storage origin and caches whole-object responses under the full URL up to a cap; acceptance runs a split `jf rt dl` and a repeated download through it with Azurite behind, which checks the SAS and applies the overrides. Azurite refuses an anonymous read with 403 `AuthorizationFailure`. Not modelled: the route's real cache behaviour (8 MiB chunks, ranged responses) and Private Link | `pkg/cdn/cdntest/frontdoor.go`, `test/acceptance/features/cdn_front_door.feature` |
 
 ## Versions at the research baseline
@@ -246,6 +254,10 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 **Google Cloud**
 - [gcdn-signed]: https://docs.cloud.google.com/cdn/docs/using-signed-urls
 - [gcdn-private]: https://docs.cloud.google.com/cdn/docs/configure-private-bucket-access
+- [gcdn-caching]: https://docs.cloud.google.com/cdn/docs/caching
+- [gcdn-cache-keys]: https://docs.cloud.google.com/cdn/docs/using-cache-keys
+- [gce-signedurlkey]: https://docs.cloud.google.com/compute/docs/reference/rest/v1/backendBuckets/addSignedUrlKey
+- [gcs-xml-headers]: https://docs.cloud.google.com/storage/docs/xml-api/reference-headers
 - [gcdn-pricing]: https://cloud.google.com/cdn/pricing
 - [glb-pricing]: https://cloud.google.com/load-balancing/pricing
 

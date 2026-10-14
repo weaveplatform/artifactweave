@@ -133,6 +133,9 @@ type Options struct {
 	// the store caches the URLs it signs (decision 0029). Set it from
 	// ClientConfig.SignsOverNetwork.
 	SignsOverNetwork bool
+	// CDN signs CDN URLs when set, such as a cdn.CloudCDN in front of the
+	// bucket (decision 0029). It must reach every key under Prefix.
+	CDN cdn.Signer
 }
 
 // Store is a blob.Store on a GCS bucket.
@@ -145,6 +148,8 @@ type Store struct {
 	// signed caches signed URLs when signing is a network call; nil when
 	// it is local and costs nothing to repeat.
 	signed *urlCache
+	// cdn signs CDN URLs with a local HMAC, so they are never cached.
+	cdn cdn.Signer
 }
 
 var (
@@ -169,12 +174,18 @@ func New(api API, o Options) (*Store, error) {
 	if prefix != "" && !strings.HasSuffix(prefix, "/") {
 		prefix += "/"
 	}
+	if o.CDN != nil {
+		if err := o.CDN.Covers(prefix); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrConfig, err)
+		}
+	}
 	s := &Store{
 		api:      api,
 		prefix:   prefix,
 		partSize: o.PartSize,
 		sessions: o.Sessions,
 		presign:  o.Presign,
+		cdn:      o.CDN,
 	}
 	if o.Presign && o.SignsOverNetwork {
 		s.signed = newURLCache(signedURLCacheSize)
@@ -538,8 +549,13 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 }
 
 // Signs reports whether the store signs URLs for via: storage URLs when
-// Options.Presign was set. It signs no CDN route yet.
-func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign }
+// Options.Presign was set, CDN URLs when it has a CDN signer.
+func (s *Store) Signs(via blob.Via) bool {
+	if via == blob.ViaCDN {
+		return s.cdn != nil
+	}
+	return via == blob.ViaStorage && s.presign
+}
 
 // SignURL returns a time-limited GET URL, carrying o's filename and media
 // type as response overrides. A store that signs over the network issues
@@ -550,6 +566,15 @@ func (s *Store) SignURL(_ context.Context, sha string, o blob.SignOptions) (stri
 	}
 	if !s.Signs(o.Via) {
 		return "", fmt.Errorf("blob/gcs: sign %s via %s: %w", sha, o.Via, blob.ErrCannotSign)
+	}
+	if o.Via == blob.ViaCDN {
+		u, err := s.cdn.Sign(s.blobName(sha), cdn.Request{
+			TTL: o.TTL, Filename: o.Filename, ContentType: o.ContentType,
+		})
+		if err != nil {
+			return "", fmt.Errorf("blob/gcs: sign %s via %s: %w", sha, s.cdn.Provider(), err)
+		}
+		return u, nil
 	}
 	if o.TTL <= 0 || o.TTL > maxSignedTTL {
 		return "", fmt.Errorf(

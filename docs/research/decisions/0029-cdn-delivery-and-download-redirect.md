@@ -149,9 +149,12 @@ type Signer interface {
 - **CloudFront:** a canned policy signed with `aws-sdk-go-v2/feature/cloudfront/sign`.
   The distribution's cache policy keys on the path plus `response-content-disposition`
   and `response-content-type` only, so the signature never fragments the cache.
-- **Cloud CDN:** `Expires`, `KeyName` and `Signature` per Google's algorithm. The bucket
-  is private, readable only by the `cloud-cdn-fill` account, so an unsigned request fails
-  at the origin.
+- **Cloud CDN:** `Expires`, `KeyName` and `Signature` per Google's algorithm, over the
+  whole URL with its overrides, so an edited filename fails the signature. Each URL is
+  signed whole, never by `URLPrefix`: a prefix signature would open every blob under the
+  prefix to whoever holds one URL, and windows already make URLs repeat for the cache. The
+  bucket is private, readable only by the `cloud-cdn-fill` account, so an unsigned request
+  fails at the origin.
 - **Front Door:** SAS passthrough. artifactweave signs a user delegation SAS (or a service
   SAS under a shared key) with `st` and `se` fixed per window, `rscd` and `rsct`, and
   `rscc: public, max-age=<TTL>`. It then replaces the storage host with the Front Door
@@ -220,9 +223,12 @@ keeps its meaning.
   the override parameters, or downloads either miss the cache or get another item's
   filename. AWS does not document whether signature parameters enter a policy that keys on
   every query string.
-- **Cloud CDN overrides:** whether a backend bucket honours `response-content-disposition`
-  on the origin fetch is unverified. If it does not, the stored object's headers are
-  served. Package clients name files from the request, not the header.
+- **Cloud CDN overrides:** Cloud Storage honours `response-content-disposition` and
+  `response-content-type` on authenticated reads, and a backend bucket's default cache key
+  keeps Cloud Storage's own query parameters, but Google does not state that Cloud CDN
+  passes them on a cache fill (research 19 §3.2). The reference deployment checks it. If
+  they are dropped, the stored object's headers are served; package clients name files
+  from the request, not the header.
 - **Cloud CDN does not block unsigned requests.** A bucket that stays public, or "private
   bucket access", makes every blob public through the CDN.
 - **Temporary credentials** end a storage URL's validity when the session ends, so the TTL
