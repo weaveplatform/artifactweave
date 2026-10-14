@@ -191,7 +191,7 @@ func buildBackend(
 		}
 		return gcs.New(api, gcs.Options{ //nolint:wrapcheck // as above
 			Prefix: b.GCS.Prefix, PartSize: int64(b.GCS.PartSize), Sessions: sessions,
-			Presign: cc.CanSign(),
+			Presign: cc.CanSign(), SignsOverNetwork: cc.SignsOverNetwork(),
 		})
 	case "azure":
 		cc, err := azureClient(b.Azure)

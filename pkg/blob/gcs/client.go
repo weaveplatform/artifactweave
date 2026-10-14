@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"cloud.google.com/go/storage"
 	"google.golang.org/api/googleapi"
@@ -75,6 +74,19 @@ func NewAPI(ctx context.Context, bucket string, cfg ClientConfig) (API, error) {
 	}, nil
 }
 
+// signing is how a client built from a ClientConfig signs URLs.
+type signing int
+
+const (
+	cannotSign signing = iota
+	// signsLocally: with a configured key, or the private key in a
+	// service-account credentials file.
+	signsLocally
+	// signsOverNetwork: through IAM signBlob as a named service account,
+	// one request per URL (the SDK's BucketHandle.SignedURL fallback).
+	signsOverNetwork
+)
+
 // CanSign reports whether a client built from cfg can sign URLs, decided
 // from the configuration and credential files without a request, so a store
 // knows its routes when it is built (decision 0029). The SDK signs locally
@@ -83,15 +95,32 @@ func NewAPI(ctx context.Context, bucket string, cfg ClientConfig) (API, error) {
 // credentials that name one, or the metadata server on Google Cloud. User
 // credentials from "gcloud auth application-default login" name no account
 // and cannot sign without GoogleAccessID.
-func (cfg ClientConfig) CanSign() bool {
+func (cfg ClientConfig) CanSign() bool { return cfg.signing() != cannotSign }
+
+// SignsOverNetwork reports whether every URL a client built from cfg signs
+// costs an IAM signBlob request, so a store should cache what it signs
+// (decision 0029).
+func (cfg ClientConfig) SignsOverNetwork() bool { return cfg.signing() == signsOverNetwork }
+
+// signing mirrors BucketHandle.SignedURL: a configured key signs locally;
+// otherwise the private key in the credentials JSON does; otherwise IAM
+// signBlob does, as GoogleAccessID or the account the credentials name.
+func (cfg ClientConfig) signing() signing {
 	switch {
+	case cfg.GoogleAccessID != "" && len(cfg.PrivateKey) > 0:
+		return signsLocally
 	case cfg.WithoutAuthentication:
-		return cfg.GoogleAccessID != "" && len(cfg.PrivateKey) > 0
-	case cfg.GoogleAccessID != "":
-		return true
+		return cannotSign
 	case cfg.CredentialsFile != "":
-		// NewAPI accepts only a service-account key here.
-		return true
+		// NewAPI accepts only a service-account key here, and the SDK signs
+		// with its private key.
+		return signsLocally
+	}
+	// Signing as GoogleAccessID without a key goes through signBlob, unless
+	// the credentials JSON carries a private key the SDK uses instead.
+	named := cannotSign
+	if cfg.GoogleAccessID != "" {
+		named = signsOverNetwork
 	}
 	file, ok := lookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
 	if !ok || file == "" {
@@ -100,23 +129,28 @@ func (cfg ClientConfig) CanSign() bool {
 	data, err := os.ReadFile(file) //nolint:gosec // the operator's own credentials file
 	if err != nil {
 		// No credentials file: Application Default Credentials come from the
-		// metadata server, whose attached service account can sign.
-		return true
+		// metadata server, whose attached service account signs through
+		// signBlob.
+		return signsOverNetwork
 	}
 	var creds struct {
 		Type             string `json:"type"`
 		ImpersonationURL string `json:"service_account_impersonation_url"`
 	}
 	if json.Unmarshal(data, &creds) != nil {
-		return false
+		return named
 	}
 	switch creds.Type {
-	case "service_account", "impersonated_service_account":
-		return true
+	case "service_account":
+		return signsLocally
+	case "impersonated_service_account":
+		return signsOverNetwork
 	case "external_account":
-		return creds.ImpersonationURL != ""
+		if creds.ImpersonationURL != "" {
+			return signsOverNetwork
+		}
 	}
-	return false
+	return named
 }
 
 // lookupEnv and userHome are variables so tests control what CanSign sees.
@@ -262,7 +296,7 @@ func (a *sdkAPI) SignedURL(name string, o SignedURLOptions) (string, error) {
 		GoogleAccessID:  a.accessID,
 		PrivateKey:      a.key,
 		Method:          http.MethodGet,
-		Expires:         time.Now().Add(o.TTL),
+		Expires:         o.Expires,
 		Scheme:          storage.SigningSchemeV4,
 		QueryParameters: q,
 	})
