@@ -79,9 +79,9 @@ func Validate(c *Config) error {
 			)
 		}
 	}
-	if c.ProjectKey != "" && len(c.Environments) == 0 {
-		add("environments", "is required when projectKey is set")
-	}
+	// A project's repository without environments is valid: Artifactory
+	// assigns DEV, and repos.CheckEnvironments applies that default on every
+	// write path (decision 0013).
 	switch class {
 	case Remote:
 		if c.URL == "" {

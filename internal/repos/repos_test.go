@@ -237,54 +237,66 @@ func TestCheckEnvironments(t *testing.T) {
 	if err := db.Projects().Create(ctx, types.Project{Key: "proj"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, e := range []types.Environment{{Name: "QA"}, {ProjectKey: "proj", Name: "proj-stage"}} {
+	for _, e := range []types.Environment{
+		{Name: "QA"},
+		{ProjectKey: "proj", Name: "stage"},       // stored without the prefix
+		{ProjectKey: "proj", Name: "proj-canary"}, // stored with it
+	} {
 		if err := db.Projects().CreateEnvironment(ctx, e); err != nil {
 			t.Fatal(err)
 		}
 	}
-	c := repo.Config{Key: "r", Environments: []string{"dev", "qa", "DEV"}}
-	if err := CheckEnvironments(ctx, db.Projects(), &c); err != nil {
-		t.Fatal(err)
+	check := func(c repo.Config) (string, error) {
+		t.Helper()
+		err := CheckEnvironments(ctx, db.Projects(), &c)
+		return strings.Join(c.Environments, ","), err
 	}
-	if got := strings.Join(c.Environments, ","); got != "DEV,QA" {
-		t.Fatalf("environments %s: rewritten to the stored spelling, once each", got)
+	for name, tc := range map[string]struct {
+		c    repo.Config
+		want string
+	}{
+		"outside a project, ignored": {
+			repo.Config{Key: "r", Environments: []string{"nope", "DEV"}}, "",
+		},
+		"a project without a list gets DEV": {repo.Config{Key: "r", ProjectKey: "proj"}, "DEV"},
+		"built-in and global, any case, once each": {
+			repo.Config{Key: "r", ProjectKey: "proj", Environments: []string{"dev", "qa", "DEV"}},
+			"DEV,QA",
+		},
+		"the project's own, by <projectKey>-<name>": {
+			repo.Config{
+				Key: "r", ProjectKey: "proj",
+				Environments: []string{"PROJ-STAGE", "proj-Canary", "prod"},
+			},
+			"proj-stage,proj-canary,PROD",
+		},
+		"a project without environments still has the built-ins": {
+			repo.Config{Key: "r", ProjectKey: "ghost", Environments: []string{"PROD"}},
+			"PROD",
+		},
+	} {
+		if got, err := check(tc.c); err != nil || got != tc.want {
+			t.Errorf("%s: %q, %v; want %q", name, got, err, tc.want)
+		}
 	}
-	if err := CheckEnvironments(ctx, db.Projects(), &repo.Config{Key: "r"}); err != nil {
-		t.Fatalf("no environments: %v", err)
-	}
-	scoped := repo.Config{
-		Key:          "r",
-		ProjectKey:   "proj",
-		Environments: []string{"PROJ-STAGE", "prod"},
-	}
-	if err := CheckEnvironments(ctx, db.Projects(), &scoped); err != nil ||
-		strings.Join(scoped.Environments, ",") != "proj-stage,PROD" {
-		t.Fatalf("project environment: %v %v", scoped.Environments, err)
-	}
-	// Another project's environment is not this repository's.
-	err := CheckEnvironments(
-		ctx,
-		db.Projects(),
-		&repo.Config{Key: "r", Environments: []string{"proj-stage"}},
-	)
-	if err == nil || !strings.Contains(err.Error(), "Environment 'proj-stage' does not exist") {
-		t.Fatalf("outside its project: %v", err)
-	}
-	err = CheckEnvironments(
-		ctx,
-		db.Projects(),
-		&repo.Config{Key: "r", ProjectKey: "ghost", Environments: []string{"DEV"}},
-	)
-	if err != nil {
-		t.Fatalf("a project without environments: %v", err)
+	for name, c := range map[string]repo.Config{
+		"unknown": {Key: "r", ProjectKey: "proj", Environments: []string{"DEV", "nope"}},
+		"a project environment without its prefix": {
+			Key: "r", ProjectKey: "proj", Environments: []string{"stage"},
+		},
+		"another project's": {Key: "r", ProjectKey: "ghost", Environments: []string{"proj-stage"}},
+	} {
+		if _, err := check(c); err == nil || !strings.Contains(err.Error(), "does not exist") {
+			t.Errorf("%s: %v", name, err)
+		}
 	}
 	for scope, c := range map[string]repo.Config{
-		"":     {Key: "r", Environments: []string{"DEV"}},
-		"proj": {Key: "r", ProjectKey: "proj", Environments: []string{"DEV"}},
+		"":     {Key: "r", ProjectKey: "proj"},
+		"proj": {Key: "r", ProjectKey: "proj"},
 	} {
 		if err := CheckEnvironments(ctx, failingProjects{db.Projects(), scope}, &c); err == nil ||
 			!strings.Contains(err.Error(), "boom") {
-			t.Fatalf("store failure for %q: %v", scope, err)
+			t.Errorf("store failure for %q: %v", scope, err)
 		}
 	}
 }
