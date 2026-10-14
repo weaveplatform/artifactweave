@@ -672,7 +672,7 @@ type GlobalRole struct {
 	// Name Required within this object. The role name.
 	Name string `json:"name"`
 
-	// Type Optional within this object. The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles are created through this API.
+	// Type Optional within this object. The kind of a global role. ADMIN and PREDEFINED are built in and can be neither renamed nor deleted; a PREDEFINED role's actions and environments can be changed, the ADMIN role cannot. CUSTOM_GLOBAL roles are created through this API.
 	Type *GlobalRoleType `json:"type,omitempty"`
 }
 
@@ -697,10 +697,22 @@ type GlobalRoleCreate struct {
 // GlobalRoleCreateType Required within this object. Must be CUSTOM_GLOBAL; built-in types cannot be created.
 type GlobalRoleCreateType string
 
-// GlobalRoleType The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles are created through this API.
+// GlobalRoleCreated The answer to a role creation, as JFrog documents it.
+type GlobalRoleCreated struct {
+	// Code Required within this object. OK on success.
+	Code string `json:"code"`
+
+	// Detail Optional within this object. Further detail, when there is any.
+	Detail *string `json:"detail,omitempty"`
+
+	// Message Required within this object. For example "Role 'ci' created".
+	Message string `json:"message"`
+}
+
+// GlobalRoleType The kind of a global role. ADMIN and PREDEFINED are built in and can be neither renamed nor deleted; a PREDEFINED role's actions and environments can be changed, the ADMIN role cannot. CUSTOM_GLOBAL roles are created through this API.
 type GlobalRoleType string
 
-// GlobalRoleUpdate The replacement content of a custom global role.
+// GlobalRoleUpdate The replacement content of a global role.
 type GlobalRoleUpdate struct {
 	// Actions Optional within this object. The complete action list; omitted grants nothing.
 	Actions *[]string `json:"actions,omitempty"`
@@ -714,7 +726,7 @@ type GlobalRoleUpdate struct {
 	// Name Required within this object. Must equal the role name in the path.
 	Name string `json:"name"`
 
-	// Type Required within this object. The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles are created through this API.
+	// Type Required within this object. The kind of a global role. ADMIN and PREDEFINED are built in and can be neither renamed nor deleted; a PREDEFINED role's actions and environments can be changed, the ADMIN role cannot. CUSTOM_GLOBAL roles are created through this API.
 	Type GlobalRoleType `json:"type"`
 }
 
@@ -3099,7 +3111,7 @@ type ClientInterface interface {
 
 	// DeleteGlobalEnvironment Delete a global environment
 	//
-	// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that still has repositories assigned; both answer 400. Admin only. Answers 204 with no body.
+	// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.
 	//
 	// Corresponds with DELETE /api/v1/environments/{environmentName} (the `DeleteGlobalEnvironment` operationId).
 	DeleteGlobalEnvironment(ctx context.Context, environmentName EnvironmentName, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3779,7 +3791,7 @@ type ClientInterface interface {
 
 	// CreateGlobalRoleWithBody Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3788,7 +3800,7 @@ type ClientInterface interface {
 
 	// CreateGlobalRole Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3811,7 +3823,7 @@ type ClientInterface interface {
 
 	// UpdateGlobalRoleWithBody Replace a global role
 	//
-	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3820,7 +3832,7 @@ type ClientInterface interface {
 
 	// UpdateGlobalRole Replace a global role
 	//
-	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5019,7 +5031,7 @@ func (c *Client) CreateGlobalEnvironment(ctx context.Context, body CreateGlobalE
 
 // DeleteGlobalEnvironment Delete a global environment
 //
-// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that still has repositories assigned; both answer 400. Admin only. Answers 204 with no body.
+// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.
 //
 // Corresponds with DELETE /api/v1/environments/{environmentName} (the `DeleteGlobalEnvironment` operationId).
 func (c *Client) DeleteGlobalEnvironment(ctx context.Context, environmentName EnvironmentName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6539,7 +6551,7 @@ func (c *Client) GetAllGlobalRoles(ctx context.Context, reqEditors ...RequestEdi
 
 // CreateGlobalRoleWithBody Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6558,7 +6570,7 @@ func (c *Client) CreateGlobalRoleWithBody(ctx context.Context, contentType strin
 
 // CreateGlobalRole Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6611,7 +6623,7 @@ func (c *Client) GetGlobalRole(ctx context.Context, role RoleName, reqEditors ..
 
 // UpdateGlobalRoleWithBody Replace a global role
 //
-// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6630,7 +6642,7 @@ func (c *Client) UpdateGlobalRoleWithBody(ctx context.Context, role RoleName, co
 
 // UpdateGlobalRole Replace a global role
 //
-// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14962,7 +14974,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteGlobalEnvironmentWithResponse Delete a global environment
 	//
-	// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that still has repositories assigned; both answer 400. Admin only. Answers 204 with no body.
+	// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15718,7 +15730,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalRoleWithBodyWithResponse Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15727,7 +15739,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalRoleWithResponse Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15754,7 +15766,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGlobalRoleWithBodyWithResponse Replace a global role
 	//
-	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15763,7 +15775,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGlobalRoleWithResponse Replace a global role
 	//
-	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+	// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -21286,6 +21298,8 @@ func (r GetAllGlobalRolesResponse) ContentType() string {
 type CreateGlobalRoleResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *GlobalRoleCreated
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -21294,6 +21308,11 @@ type CreateGlobalRoleResponse struct {
 	JSON403 *ErrorResponse
 	// JSON409 the response for an HTTP 409 `application/json` response
 	JSON409 *ErrorResponse
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateGlobalRoleResponse) GetJSON201() *GlobalRoleCreated {
+	return r.JSON201
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -26203,7 +26222,7 @@ func (c *ClientWithResponses) CreateGlobalEnvironmentWithResponse(ctx context.Co
 
 // DeleteGlobalEnvironmentWithResponse Delete a global environment
 //
-// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that still has repositories assigned; both answer 400. Admin only. Answers 204 with no body.
+// Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27463,7 +27482,7 @@ func (c *ClientWithResponses) GetAllGlobalRolesWithResponse(ctx context.Context,
 
 // CreateGlobalRoleWithBodyWithResponse Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27478,7 +27497,7 @@ func (c *ClientWithResponses) CreateGlobalRoleWithBodyWithResponse(ctx context.C
 
 // CreateGlobalRoleWithResponse Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27523,7 +27542,7 @@ func (c *ClientWithResponses) GetGlobalRoleWithResponse(ctx context.Context, rol
 
 // UpdateGlobalRoleWithBodyWithResponse Replace a global role
 //
-// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27538,7 +27557,7 @@ func (c *ClientWithResponses) UpdateGlobalRoleWithBodyWithResponse(ctx context.C
 
 // UpdateGlobalRoleWithResponse Replace a global role
 //
-// Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+// Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -32564,8 +32583,12 @@ func ParseCreateGlobalRoleResponse(rsp *http.Response) (*CreateGlobalRoleRespons
 	}
 
 	switch {
-	case rsp.StatusCode == 201:
-		break // No content-type
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest GlobalRoleCreated
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest ErrorResponse

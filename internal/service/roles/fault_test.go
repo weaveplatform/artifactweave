@@ -179,7 +179,7 @@ func TestStoreFailures(t *testing.T) {
 			t,
 			s.CreateRole(
 				ctx,
-				types.Role{Name: "ci", Type: types.RoleCustomGlobal, Environments: []string{"QA"}},
+				types.Role{Name: "ci", Type: types.RoleCustomGlobal},
 			),
 		)
 		must(t, db.Projects().PutMember(ctx, types.ProjectMember{
@@ -241,6 +241,19 @@ func TestStoreFailures(t *testing.T) {
 		{"Role", func(s roles.Service) error {
 			return s.UpdateRole(ctx, "ci", types.Role{Name: "ci", Type: types.RoleCustomGlobal})
 		}},
+		{"Role", func(s roles.Service) error { _, err := s.Role(ctx, "Viewer"); return err }},
+		{"PutRole", func(s roles.Service) error {
+			return s.UpdateRole(
+				ctx,
+				"Viewer",
+				types.Role{Name: "Viewer", Type: types.RolePredefined},
+			)
+		}},
+		{"Environments", func(s roles.Service) error {
+			return s.UpdateRole(ctx, "Viewer", types.Role{
+				Name: "Viewer", Type: types.RolePredefined, Environments: []string{"DEV"},
+			})
+		}},
 		{"DeleteRole", func(s roles.Service) error { return s.DeleteRole(ctx, "ci") }},
 		{"List", func(s roles.Service) error { return s.DeleteRole(ctx, "ci") }},
 		{"Members", func(s roles.Service) error { return s.DeleteRole(ctx, "ci") }},
@@ -256,7 +269,7 @@ func TestStoreFailures(t *testing.T) {
 	}
 
 	// Deleting QA: free it first, then fail the steps after the in-use check.
-	for _, fail := range []string{"Assignments", "Roles", "PutRole", "DeleteEnvironment"} {
+	for _, fail := range []string{"Assignments", "Roles", "DeleteEnvironment"} {
 		f, s := setup(t)
 		c, _ := f.Store.Repos().Get(ctx, "r")
 		c.Environments = nil

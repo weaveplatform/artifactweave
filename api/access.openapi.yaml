@@ -583,7 +583,7 @@ paths:
         - environments
   /api/v1/environments/{environmentName}:
     delete:
-      description: Removes an environment. DEV and PROD cannot be deleted, nor can an environment that still has repositories assigned; both answer 400. Admin only. Answers 204 with no body.
+      description: Removes an environment. DEV and PROD cannot be deleted, nor can an environment that repositories or global roles still name; both answer 400. Admin only. Answers 204 with no body.
       operationId: deleteGlobalEnvironment
       parameters:
         - $ref: '#/components/parameters/environmentName'
@@ -3265,7 +3265,7 @@ paths:
       tags:
         - roles
     post:
-      description: Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with no body (the platform_global_role resource relies on the status alone and then reads the role back). Admin only. An existing name answers 409.
+      description: Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
       operationId: createGlobalRole
       requestBody:
         content:
@@ -3276,6 +3276,10 @@ paths:
         required: true
       responses:
         '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GlobalRoleCreated'
           description: The role was created.
         '400':
           content:
@@ -3374,7 +3378,7 @@ paths:
       tags:
         - roles
     put:
-      description: Replaces the description, environments and actions of a CUSTOM_GLOBAL role. The name in the body must equal the path name; ADMIN and PREDEFINED roles cannot be changed and answer 400. Admin only. Answers 200 with no body.
+      description: Replaces the description, environments and actions of a CUSTOM_GLOBAL role, or the environments and actions of a PREDEFINED one. The name in the body must equal the path name and the type must stay the same; the ADMIN role cannot be changed. Each of these answers 400. Admin only. Answers 200 with no body.
       operationId: updateGlobalRole
       parameters:
         - $ref: '#/components/parameters/roleName'
@@ -6828,7 +6832,7 @@ components:
         type:
           allOf:
             - $ref: '#/components/schemas/GlobalRoleType'
-          description: Optional within this object. The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles are created through this API.
+          description: Optional within this object. The kind of a global role. ADMIN and PREDEFINED are built in and can be neither renamed nor deleted; a PREDEFINED role's actions and environments can be changed, the ADMIN role cannot. CUSTOM_GLOBAL roles are created through this API.
       required:
         - actions
         - environments
@@ -6864,15 +6868,31 @@ components:
         - name
         - type
       type: object
+    GlobalRoleCreated:
+      description: The answer to a role creation, as JFrog documents it.
+      properties:
+        code:
+          description: Required within this object. OK on success.
+          type: string
+        detail:
+          description: Optional within this object. Further detail, when there is any.
+          type: string
+        message:
+          description: Required within this object. For example "Role 'ci' created".
+          type: string
+      required:
+        - code
+        - message
+      type: object
     GlobalRoleType:
-      description: The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles are created through this API.
+      description: The kind of a global role. ADMIN and PREDEFINED are built in and can be neither renamed nor deleted; a PREDEFINED role's actions and environments can be changed, the ADMIN role cannot. CUSTOM_GLOBAL roles are created through this API.
       enum:
         - ADMIN
         - PREDEFINED
         - CUSTOM_GLOBAL
       type: string
     GlobalRoleUpdate:
-      description: The replacement content of a custom global role.
+      description: The replacement content of a global role.
       properties:
         actions:
           description: Optional within this object. The complete action list; omitted grants nothing.
@@ -6895,7 +6915,7 @@ components:
         type:
           allOf:
             - $ref: '#/components/schemas/GlobalRoleType'
-          description: Required within this object. The kind of a global role. ADMIN and PREDEFINED are built in and immutable; CUSTOM_GLOBAL roles are created through this API.
+          description: Required within this object. The kind of a global role. ADMIN and PREDEFINED are built in and can be neither renamed nor deleted; a PREDEFINED role's actions and environments can be changed, the ADMIN role cannot. CUSTOM_GLOBAL roles are created through this API.
       required:
         - name
         - type

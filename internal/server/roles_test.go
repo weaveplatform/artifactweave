@@ -39,8 +39,33 @@ func TestGlobalRolesAndEnvironmentsBodies(t *testing.T) {
 	rec = do(t, h, http.MethodPost, "/access/api/v1/roles", jsonAdmin,
 		`{"name":"ci","type":"CUSTOM_GLOBAL","description":"CI","environments":["dev","qa","DEV"],`+
 			`"actions":["READ_BUILD","READ_REPOSITORY","READ_BUILD"]}`)
-	if rec.Code != http.StatusCreated || rec.Body.Len() != 0 {
-		t.Fatalf("create role answers 201 with no body: %d %q", rec.Code, rec.Body)
+	if rec.Code != http.StatusCreated ||
+		decodeObject(t, rec.Body.String())["code"] != "OK" ||
+		decodeObject(t, rec.Body.String())["message"] != "Role 'ci' created" {
+		t.Fatalf("create role answers JFrog's documented body: %d %q", rec.Code, rec.Body)
+	}
+
+	// A predefined role's actions and environments change and read back.
+	rec = do(
+		t,
+		h,
+		http.MethodPut,
+		"/access/api/v1/roles/Developer",
+		jsonAdmin,
+		`{"name":"Developer","type":"PREDEFINED","actions":["READ_REPOSITORY"],"environments":["prod"]}`,
+	)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("change Developer: %d %s", rec.Code, rec.Body)
+	}
+	var dev struct {
+		Type                  string
+		Actions, Environments []string
+	}
+	rec = do(t, h, http.MethodGet, "/access/api/v1/roles/Developer", admin, "")
+	if err := json.Unmarshal(rec.Body.Bytes(), &dev); err != nil || dev.Type != "PREDEFINED" ||
+		!slices.Equal(dev.Actions, []string{"READ_REPOSITORY"}) ||
+		!slices.Equal(dev.Environments, []string{"PROD"}) {
+		t.Fatalf("Developer after the change: %d %s", rec.Code, rec.Body)
 	}
 	var role struct {
 		Name, Type, Description string
