@@ -75,6 +75,14 @@ func systemStatusRows() []statusCase {
 			200,
 		},
 		{"GET /artifactory/api/system/license", "/artifactory/api/system/license", "", "", 401},
+		{"GET /artifactory/api/system/license", "/artifactory/api/system/license", "user", "", 403},
+		{
+			"GET /artifactory/api/system/license",
+			"/artifactory/api/system/license",
+			"anonymous",
+			"",
+			401,
+		},
 		{
 			"GET /artifactory/api/v1/system/readiness",
 			"/artifactory/api/v1/system/readiness",

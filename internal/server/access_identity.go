@@ -341,8 +341,9 @@ func (s accessService) ChangeUserPassword(
 	}
 	name := string(req.Username)
 	// An administrator sets anyone's password; any user sets their own, even
-	// with an expired password (the middleware lets that one request through).
-	if !p.Admin && p.Name != name {
+	// with an expired password (the middleware lets that one request through),
+	// but not through a narrowed token (narrowedToken).
+	if !p.Admin && (p.Name != name || narrowedToken(p)) {
 		return nil, auth.ErrForbidden
 	}
 	if req.Body == nil || req.Body.Password == nil || *req.Body.Password == "" {

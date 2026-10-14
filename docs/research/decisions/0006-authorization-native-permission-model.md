@@ -175,7 +175,10 @@ undocumented.
 ## Verification
 
 - A route × principal matrix test over every operation with admin, a scoped user, a group
-  member, a project member, a narrowed token and anonymous.
+  member, a project member, a narrowed token and anonymous. `internal/server/matrix_test.go`
+  (#84) covers every implemented route with all of these but project members, who arrive in
+  P11. Each row states who may make its request from this model, and a guard fails while an
+  implemented route has no row.
 - Converter round-trip tests across v1, v2 and Access v2.
 - `jf rt permission-target-*`, `artifactory_permission_target` and `platform_permission`
   in the acceptance suite.
