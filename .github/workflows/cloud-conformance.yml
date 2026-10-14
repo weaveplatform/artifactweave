@@ -54,6 +54,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
       # The tests skip without configuration; a dispatched run that skipped
       # would look like a pass, so missing configuration fails here instead.
       - name: Check configuration
@@ -130,6 +133,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       - name: Check configuration
         shell: bash

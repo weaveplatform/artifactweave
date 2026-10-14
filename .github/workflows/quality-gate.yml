@@ -23,6 +23,15 @@ concurrency:
 
 env:
   GOWORK: 'off'
+  # GitHub-hosted runners are discarded after every job, so testcontainers'
+  # reaper (Ryuk) has nothing to clean up here, and starting it sometimes
+  # times out ("wait for reaper ... context deadline exceeded", #148).
+  # testcontainers-go v0.44.0 reads this variable in internal/config/config.go
+  # and then skips connectReaper (docker.go). The emulators still terminate
+  # through testcontainers.CleanupContainer at the end of each test; the one
+  # PostgreSQL container per test binary (internal/sqlstore/sqltest) lives
+  # until the runner is discarded. Local runs keep the reaper.
+  TESTCONTAINERS_RYUK_DISABLED: 'true'
 
 jobs:
   unit:
@@ -47,6 +56,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       - name: Vet
         run: go vet ./...
@@ -81,6 +93,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       # The linter version lives in a plain file so the deps refresh job can
       # move it without the workflows permission a workflow edit would need.
@@ -118,6 +133,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
       - name: govulncheck
         run: make vuln
 
@@ -139,6 +157,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       - name: Build every cmd/* binary for every release platform (CGO disabled)
         run: make build
@@ -165,6 +186,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       # A pinned jf binary rather than jfrog/setup-jfrog-cli: Dependabot only
       # maintains pins for actions already in use, and the release metadata at
@@ -216,6 +240,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
       # A pinned download, like jf above, verified against HashiCorp's
       # published SHA256SUMS.
       - name: Terraform (pinned)
@@ -265,6 +292,9 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
       - name: Static checks and mocked tests
         env:
           # tflint --init fetches the pinned rulesets from GitHub releases;
@@ -299,6 +329,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       # The cache key changes with the index list in tools/specoracle, so a
       # new API family triggers a fresh crawl. Bump the trailing version to
@@ -339,6 +372,9 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
 
       - name: Download every coverage directory
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

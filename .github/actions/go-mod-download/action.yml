@@ -1,0 +1,31 @@
+name: Download Go modules
+description: >-
+  Fill the module cache before any Go step, retrying a failed download, so a
+  transient proxy.golang.org error does not fail lint or tests.
+
+# Every job that runs Go calls this straight after actions/setup-go. go mod
+# download with no arguments fetches every module the main module's go.mod
+# requires, the tool block included, so the go vet, go test, go tool and
+# golangci-lint steps that follow read the cache and never reach the proxy.
+# golangci-lint-action caches only its analysis directory and loads packages
+# through the same GOMODCACHE.
+#
+# Only this download is retried. A failing test or lint step stays a failure.
+runs:
+  using: composite
+  steps:
+    - name: go mod download (up to 3 attempts)
+      shell: bash
+      run: |
+        for attempt in 1 2 3; do
+          if go mod download; then
+            exit 0
+          fi
+          if [ "$attempt" -lt 3 ]; then
+            delay=$((attempt * 15))
+            echo "::warning::go mod download failed (attempt ${attempt} of 3); retrying in ${delay}s"
+            sleep "$delay"
+          fi
+        done
+        echo "::error::go mod download failed after 3 attempts"
+        exit 1
