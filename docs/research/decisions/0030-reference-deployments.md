@@ -154,9 +154,11 @@ caches.
 
 **Dependencies.** Dependabot's `terraform` ecosystem covers `deploy/platform` with major
 versions ignored, since a provider major merged on mocked tests alone could break a real
-apply. `deploy/artifactweave` and `test/terraform` are excluded: `run.sh` pins the
-`jfrog/artifactory` provider zip by SHA-256, which Dependabot cannot update, so
-`deps-refresh` moves the version and the pin together.
+apply. `deploy/artifactweave` is excluded: `test/terraform/run.sh` pins its `jfrog/artifactory`
+and `jfrog/platform` provider zips by SHA-256, which Dependabot cannot update. `deps-refresh`
+does not touch Terraform providers either, so the version, the checksums and the lock file
+move together by hand, following the steps in
+[docs/testing/ci.md](../../testing/ci.md#terraform-scenarios).
 
 **Lab accounts.** The accounts behind these environments are labs. The design asks for no
 operator-hardening steps, such as separate non-root administrators or MFA ceremonies. The
