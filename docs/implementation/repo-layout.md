@@ -95,3 +95,31 @@ and v2 permission targets, Access v2 permissions, legacy and Access users and gr
 it has no logic, depends on nothing in the project, and is exempt from the snake_case
 tag rule alongside `pkg/repo`. Types that the stores persist as JSON documents carry
 snake_case tags; secrets are tagged `json:"-"` and live in sealed columns.
+
+## Deployment tree
+
+Terraform lives under `deploy/` (decision
+[0030](../research/decisions/0030-reference-deployments.md)): infrastructure per cloud and
+scenario in `deploy/platform`, and artifactweave's own configuration through the JFrog
+providers in `deploy/artifactweave`. Each scenario is a documented reference deployment
+that CI checks on every pull request and applies on real clouds by manual dispatch.
+
+```text
+deploy/
+  platform/
+    README.md                         # scenario catalogue, costs, how CI runs them
+    terraform/
+      scenario.mk                     # shared make targets for every scenario
+      modules/<cloud>/<capability>/   # child modules (storage, cdn, ci-access), no provider blocks
+      aws/ gcp/ azure/
+        bootstrap/                    # long-lived CI identities, remote state, DNS zone, budget
+        single-bucket/ multi-region/ geo-replicated/ cdn/   # scenarios
+      multicloud/
+        mirror/                       # one mirror with a member on each cloud
+  artifactweave/
+    README.md                         # managing artifactweave with the JFrog Terraform providers
+    terraform/<scenario>/             # repositories, identity, cdn-repositories, ...
+test/
+  terraform/run.sh                    # driver: applies a deploy/artifactweave scenario to a -cover server
+  platform/                           # real-cloud scenario suite (_test.go only), run by platform-scenarios.yml
+```
