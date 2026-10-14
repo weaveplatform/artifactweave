@@ -10,9 +10,9 @@
 #                                  empty plan, and destroy it
 #
 # A scenario is a directory relative to the repository root; the default is
-# this directory's repositories fixture. The providers authenticate only with
-# a Bearer access token, so apply mints one with the bootstrap admin's
-# password; TERRAFORM_ACCESS_TOKEN overrides it.
+# the repositories reference in deploy/artifactweave/terraform. The providers
+# authenticate only with a Bearer access token, so apply mints one with the
+# bootstrap admin's password; TERRAFORM_ACCESS_TOKEN overrides it.
 set -euo pipefail
 
 ARTIFACTORY_VERSION=12.11.14
@@ -37,7 +37,7 @@ shift || true
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 scenarios=("$@")
-[ ${#scenarios[@]} -gt 0 ] || scenarios=(test/terraform)
+[ ${#scenarios[@]} -gt 0 ] || scenarios=(deploy/artifactweave/terraform/repositories)
 work=${TERRAFORM_WORK:-}
 if [ -z "$work" ]; then
 	work=$(mktemp -d)
@@ -131,7 +131,7 @@ if [ -z "$token" ]; then
 fi
 export TF_VAR_url=$url TF_VAR_access_token=$token
 
-# The repositories fixture: the provider cannot deploy content, so the file
+# The repositories scenario: the provider cannot deploy content, so the file
 # its properties go on is deployed between a first apply without them and
 # the full one.
 apply_repositories() {
@@ -165,7 +165,7 @@ apply_identity() {
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
-	test/terraform) apply_repositories ;;
+	deploy/artifactweave/terraform/repositories) apply_repositories ;;
 	deploy/artifactweave/terraform/identity) apply_identity ;;
 	deploy/artifactweave/terraform/oidc) tf apply -auto-approve ;;
 	*)

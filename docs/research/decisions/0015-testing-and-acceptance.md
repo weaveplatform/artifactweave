@@ -44,9 +44,12 @@ is merged into the gate. Budget: 15 minutes wall clock per pull request.
 `opencontainers/distribution-spec` at a pinned tag, run its conformance module with
 `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials, upload `GOCOVERDIR`.
 
-**Terraform fixture.** `test/terraform` applies every in-scope resource of the three JFrog
-providers against the binary, then plans (no changes allowed), then destroys. Providers
-come from a pre-populated mirror so the job does not depend on registry.terraform.io.
+**Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
+`deploy/artifactweave/terraform` (decision 0030), which together cover the in-scope
+resources of the JFrog providers, against the binary, then plans (no changes allowed), then
+destroys. Providers come from a filesystem mirror of the pinned release zips, built at run
+time and checked against their SHA-256s, so the job does not depend on
+registry.terraform.io.
 
 **Nightly** `-tags e2e` runs resolve each format through real upstream registries.
 
