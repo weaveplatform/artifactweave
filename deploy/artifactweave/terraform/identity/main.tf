@@ -4,6 +4,7 @@
 # destroys it.
 
 terraform {
+  required_version = ">= 1.6"
   required_providers {
     artifactory = {
       source = "jfrog/artifactory"
@@ -122,7 +123,9 @@ resource "platform_permission" "team" {
 # artifactory_permission_target is a stub in provider 12.x: every operation
 # returns "deprecated. Use platform_permission instead". Its data source
 # still reads the v2 permission target API, so the permission written
-# through Access v2 is read back through the legacy API here.
+# through Access v2 is read back through the legacy API here: run.sh reads
+# it from the state, so nothing in this configuration refers to it.
+# tflint-ignore: terraform_unused_declarations
 data "artifactory_permission_target" "team" {
   name = platform_permission.team.name
 }

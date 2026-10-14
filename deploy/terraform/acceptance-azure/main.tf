@@ -16,6 +16,25 @@ resource "azurerm_resource_group" "this" {
   location = var.location
 }
 
+# Accepted trivy findings (deploy/check.sh), each with its reason:
+# - AZU-0012: the account takes connections from any network, because the
+#   conformance runners and laptops have no fixed addresses. Shared Key is
+#   off, so every request still needs an Entra ID token or a user delegation
+#   SAS; the azure/cdn scenario is the one that closes the public endpoint.
+# - AZU-0057: no Storage Analytics logs; the Azure activity log records the
+#   management calls, and these are acceptance data only.
+# - AZU-0058: LRS on purpose. Acceptance data needs no second region, and the
+#   geo-replicated scenario is where GZRS is shown.
+# - AZU-0060: Microsoft-managed keys are enough for acceptance data; a
+#   customer-managed key would add a Key Vault the tests never exercise.
+# - AZU-0061: no infrastructure (double) encryption. Service-side encryption
+#   already applies, and the setting can only be chosen when the account is
+#   created.
+#trivy:ignore:AZU-0012
+#trivy:ignore:AZU-0057
+#trivy:ignore:AZU-0058
+#trivy:ignore:AZU-0060
+#trivy:ignore:AZU-0061
 resource "azurerm_storage_account" "blobs" {
   # 3 to 24 lowercase letters and digits, globally unique.
   name                     = "awacc${random_string.suffix.result}"

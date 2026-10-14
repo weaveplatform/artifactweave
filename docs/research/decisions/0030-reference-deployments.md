@@ -122,10 +122,18 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
 `deploy/` and `test/terraform`:
 - `terraform fmt -check -recursive`;
 - `terraform validate` per root with `init -backend=false`;
-- `tflint --recursive` with the aws, google and azurerm rulesets pinned in `.tflint.hcl`;
-- `trivy config`, the action pinned by commit SHA, with each ignore recorded with its reason;
+- tflint per root with the aws, google and azurerm rulesets pinned in `.tflint.hcl`;
+- `trivy config` per root, with each accepted finding a `#trivy:ignore` comment beside the
+  resource stating its reason;
 - `terraform test` for every root with `tests/`, using mocked providers only;
-- a terraform-docs drift check: regenerate the READMEs and fail on `git diff --exit-code`.
+- a terraform-docs drift check: regenerate each README in a copy and fail when it differs
+  from the committed file.
+
+`deploy/check.sh` runs them (`make deploy-check` locally). It installs terraform, tflint,
+trivy and terraform-docs by exact version, each archive checked against the SHA-256 from
+its release, rather than through third-party actions. It walks the roots it finds, not
+`--recursive` from the repository root, which would also descend into worktrees and tool
+caches.
 
 **Real-cloud runs.** `platform-scenarios.yml` runs only on `workflow_dispatch`, under the
 `cloud-platform` environment. Its inputs are `cloud`, `scenario`, `instance` and an
@@ -144,7 +152,7 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.
 
-**Dependencies.** Dependabot's `terraform` ecosystem covers `deploy/platform` with major
+**Dependencies.** Dependabot's `terraform` ecosystem covers `deploy/platform` (the `deploy/terraform` roots until they move there) with major
 versions ignored, since a provider major merged on mocked tests alone could break a real
 apply. `deploy/artifactweave` and `test/terraform` are excluded: `run.sh` pins the
 `jfrog/artifactory` provider zip by SHA-256, which Dependabot cannot update, so

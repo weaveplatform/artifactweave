@@ -1,0 +1,25 @@
+# terraform-docs for every README carrying BEGIN_TF_DOCS markers
+# (deploy/check.sh; make deploy-docs rewrites them, make deploy-check fails
+# when one is stale).
+version: ">= 0.24.0, < 1.0.0"
+
+formatter: "markdown table"
+
+output:
+  file: README.md
+  mode: inject
+
+sections:
+  # The README's own prose says what the root is for; main.tf's leading
+  # comment would repeat it.
+  hide: [header, footer, modules]
+
+sort:
+  enabled: true
+  by: name
+
+settings:
+  anchor: false
+  html: false
+  indent: 3
+  lockfile: true

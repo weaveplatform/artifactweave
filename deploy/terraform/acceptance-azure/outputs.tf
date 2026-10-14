@@ -4,23 +4,28 @@ output "account" {
 }
 
 output "container" {
-  value = azurerm_storage_container.blobs.name
+  description = "Container for blob.azure.container and ARTIFACTWEAVE_TEST_AZURE_CONTAINER."
+  value       = azurerm_storage_container.blobs.name
 }
 
 output "store_prefix" {
-  value = var.store_prefix
+  description = "Blob name prefix the local container writes under (blob.azure.prefix)."
+  value       = var.store_prefix
 }
 
 output "resource_group" {
-  value = azurerm_resource_group.this.name
+  description = "Resource group holding the account and the GitHub identity."
+  value       = azurerm_resource_group.this.name
 }
 
 output "subscription_id" {
-  value = var.subscription_id
+  description = "Subscription for azure/login (CONFORMANCE_AZURE_SUBSCRIPTION_ID)."
+  value       = var.subscription_id
 }
 
 output "tenant_id" {
-  value = data.azurerm_client_config.current.tenant_id
+  description = "Tenant for azure/login (CONFORMANCE_AZURE_TENANT_ID)."
+  value       = data.azurerm_client_config.current.tenant_id
 }
 
 output "client_id" {

@@ -1,7 +1,9 @@
 # Every dependency tracks its latest release. Updates arrive daily, grouped
 # into one PR per ecosystem, majors included; auto-merge.yml merges each PR
 # once the quality gate passes on it, so the gate is the only thing that can
-# hold an update back.
+# hold an update back. Terraform providers are the exception: they hold
+# majors, because a provider major merged on mocked tests alone could break a
+# real apply (decision 0030).
 # https://docs.github.com/en/code-security/dependabot/working-with-dependabot/dependabot-options-reference
 version: 2
 updates:
@@ -26,6 +28,26 @@ updates:
       go-modules:
         patterns: ["*"]
         update-types: ["major", "minor", "patch"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # The infrastructure roots. deploy/artifactweave and test/terraform are left
+  # out: test/terraform/run.sh pins their jfrog provider zips by SHA-256,
+  # which Dependabot cannot update, so deps-refresh moves version and pin
+  # together. The directories move to deploy/platform/terraform with #125.
+  - package-ecosystem: "terraform"
+    directories:
+      - "/deploy/terraform/*"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      terraform-providers:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
     commit-message:
       prefix: "chore"
       include: "scope"
