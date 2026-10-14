@@ -2,8 +2,11 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"slices"
 
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -26,6 +29,54 @@ type Principal struct {
 	// presented; empty for a password or anonymous request. The token API's
 	// "me" resolves to it, and encryptedPassword refuses token callers.
 	TokenID string
+	// token marks a principal authenticated by an access token, whose Scope
+	// applies even when it is empty.
+	token bool
+	// access is the request's permission evaluator, set by Authorize.
+	access *authz.Decider
+}
+
+// Subject is p as the permission evaluator starts from it: the user's own
+// admin flag and groups, and the token's scope when a token authenticated
+// the request.
+func (p Principal) Subject() authz.Subject {
+	s := authz.Subject{
+		Name: p.Name, Groups: slices.Clone(p.Groups), Admin: p.Admin, Anonymous: p.Anonymous,
+	}
+	if p.token {
+		sc := p.Scope
+		s.Scope = &sc
+		// A groups scope acts through the groups it names whether or not
+		// the user belongs to them (#79 decides who may mint such a token);
+		// the evaluator keeps only named groups that the subject has, so
+		// they are added here.
+		for _, e := range sc.Entries {
+			if e.Kind == types.ScopeGroups {
+				s.Groups = append(s.Groups, e.Names...)
+			}
+		}
+		slices.Sort(s.Groups)
+		s.Groups = slices.Compact(s.Groups)
+	}
+	return s
+}
+
+// Access returns the request's permission evaluator, or nil before
+// Authorize has run.
+func (p Principal) Access() *authz.Decider { return p.access }
+
+// Authorize evaluates p's permissions once for the request (decision 0006)
+// and returns p with Admin and Groups set to what the evaluator decides: a
+// token scope can remove the admin flag and narrow the groups, and an
+// admin-privilege group makes a member an administrator. Handlers then ask
+// Access() every permission question.
+func Authorize(ctx context.Context, src authz.Sources, p Principal) (Principal, error) {
+	d, err := authz.New(ctx, src, p.Subject())
+	if err != nil {
+		return Principal{}, fmt.Errorf("auth: permissions: %w", err)
+	}
+	p.Admin, p.Groups, p.access = d.Admin(), d.Groups(), d
+	return p, nil
 }
 
 // Anonymous is the principal of a request without credentials when

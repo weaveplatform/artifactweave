@@ -25,9 +25,9 @@ import (
 )
 
 // The repositories API (research 02, decision 0003). Every write is for
-// administrators; reads show a caller the repositories the seeded
-// permissions let them read (auth.RepoReader) until P4 evaluates permissions
-// fully.
+// administrators; reads show a caller the repositories the permission
+// evaluator lets them see (access.visible): those they may read anywhere in,
+// or those a token's repo or system:info scope names (decision 0006).
 
 const (
 	// repoBatchLimit bounds the v2 batch reads and writes. JFrog documents
@@ -177,11 +177,11 @@ func (s artifactoryService) readerFor(
 	if err != nil {
 		return p, nil, err
 	}
-	can, err := auth.RepoReader(ctx, st.Permissions(), p)
+	acc, err := accessFor(ctx, st, p)
 	if err != nil {
 		return p, nil, s.internalError(ctx, "repository read rights", err)
 	}
-	return p, can, nil
+	return p, acc.visible, nil
 }
 
 // view is the configuration a reader receives: everything but secrets for

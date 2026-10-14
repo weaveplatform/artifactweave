@@ -84,7 +84,7 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		writeErr(w, r, err)
 		return
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -108,7 +108,7 @@ func (s artifactoryService) createMultipart(w http.ResponseWriter, r *http.Reque
 		writeErr(w, r, s.itemError(ctx, "resolve deploy target", err))
 		return
 	}
-	if !can(c, types.ActionWrite) {
+	if !acc.file(c, repoPath, types.ActionWrite) {
 		writeErr(w, r, denied(p))
 		return
 	}

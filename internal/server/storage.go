@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -133,7 +134,7 @@ type storageView struct {
 	path   string
 	repo   repo.Config
 	cached bool
-	can    func(repo.Config, types.Actions) bool
+	acc    access
 }
 
 // uri is the storage API URL of p (a full path, "" for the root) under the
@@ -158,7 +159,7 @@ func (v storageView) target(ctx context.Context) (found, error) {
 			RepoKey: v.repo.Key, Cached: v.cached, Folder: true,
 		}}, nil
 	}
-	return lookup(ctx, v.st, v.repo, v.cached, v.path, v.can, map[string]bool{})
+	return lookup(ctx, v.st, v.repo, v.cached, v.path, v.acc, map[string]bool{})
 }
 
 // trees are the repository trees a folder view reads: the repository, or a
@@ -185,7 +186,7 @@ func (v storageView) trees(
 		if err != nil {
 			return nil, fmt.Errorf("member %s of %s: %w", key, c.Key, err)
 		}
-		if !v.can(m, types.ActionRead) {
+		if !v.acc.folder(m, v.path, types.ActionRead) {
 			continue
 		}
 		sub, err := v.trees(ctx, m, seen)
@@ -219,7 +220,10 @@ func (v storageView) below(ctx context.Context, folder string, deep bool) ([]typ
 				return nil, fmt.Errorf("list %s/%s: %w", t.repo.Key, folder, err)
 			}
 			for _, it := range batch {
-				if !seen[it.FullPath()] {
+				// What the caller may not see is left out; a folder shows
+				// when something below it is readable.
+				if !seen[it.FullPath()] &&
+					v.acc.item(t.repo, it.FullPath(), it.Folder, types.ActionRead) {
 					seen[it.FullPath()] = true
 					out = append(out, it)
 				}
@@ -247,13 +251,15 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, err)
 		return
 	}
-	if !v.can(v.repo, types.ActionRead) {
+	// A folder check first, as for a download; the exact right once the
+	// item is found.
+	if !v.acc.folder(v.repo, v.path, types.ActionRead) {
 		writeErr(w, r, denied(p))
 		return
 	}
 	switch {
 	case mode == "list" && p.Anonymous,
-		mode == "lastModified" && !v.can(v.repo, types.ActionWrite),
+		mode == "lastModified" && !v.acc.folder(v.repo, v.path, types.ActionWrite),
 		mode == "permissions" && !p.Admin:
 		writeErr(w, r, denied(p))
 		return
@@ -261,6 +267,10 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 	f, err := v.target(ctx)
 	if err != nil {
 		writeErr(w, r, s.itemError(ctx, "storage item", err))
+		return
+	}
+	if !v.acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
+		writeErr(w, r, denied(p))
 		return
 	}
 	var (
@@ -310,7 +320,7 @@ func (s artifactoryService) storageRequest(
 	if err != nil {
 		return v, auth.Principal{}, nil, err
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		return v, p, nil, err
 	}
@@ -319,7 +329,7 @@ func (s artifactoryService) storageRequest(
 		return v, p, nil, s.itemError(ctx, "resolve repository", err)
 	}
 	return storageView{
-		s: s, st: st, key: req.key, path: req.path, repo: c, cached: cached, can: can,
+		s: s, st: st, key: req.key, path: req.path, repo: c, cached: cached, acc: acc,
 	}, p, q, nil
 }
 
@@ -520,9 +530,9 @@ func (v storageView) lastModified(ctx context.Context, f found) (string, any, er
 	}, nil
 }
 
-// permissions renders who holds which actions on the item's repository, in
-// the legacy letters. Include and exclude patterns are not evaluated until
-// P4, matching auth.RepoChecker.
+// permissions renders who holds which actions on the item, in the legacy
+// letters: grants whose target names the item's repository and whose include
+// and exclude patterns admit its path.
 func (v storageView) permissions(ctx context.Context, f found) (string, any, error) {
 	targets := []string{f.repo.Key, types.TargetAny}
 	switch f.repo.Class {
@@ -543,7 +553,8 @@ func (v storageView) permissions(ctx context.Context, f found) (string, any, err
 			if seen[perm.Name] || !ok {
 				continue
 			}
-			if _, named := res.Targets[t]; !named {
+			tg, named := res.Targets[t]
+			if !named || !authz.TargetAllows(tg, f.item.FullPath(), f.item.Folder) {
 				continue
 			}
 			seen[perm.Name] = true
@@ -636,7 +647,7 @@ func (s artifactoryService) editProperties(
 		writeErr(w, r, err)
 		return
 	}
-	if !v.can(v.repo, types.ActionAnnotate) {
+	if !v.acc.file(v.repo, v.path, types.ActionAnnotate) {
 		writeErr(w, r, denied(p))
 		return
 	}

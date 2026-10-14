@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -36,8 +37,10 @@ func scope(t *testing.T, s string) types.Scope {
 func TestTokenPrincipal(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
-	for _, g := range []string{"ops", "devs", "readers"} {
-		if err := db.Groups().Create(ctx, types.Group{Name: g}); err != nil {
+	for _, g := range []types.Group{
+		{Name: "ops"}, {Name: "devs"}, {Name: "readers"}, {Name: "admins", AdminPrivileges: true},
+	} {
+		if err := db.Groups().Create(ctx, g); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -61,6 +64,11 @@ func TestTokenPrincipal(t *testing.T) {
 		"dev-user":  {Subject: iss + "dev", Scope: scope(t, "applied-permissions/user")},
 		"dev-admin": {Subject: iss + "dev", Scope: scope(t, "applied-permissions/admin")},
 		"dev-repo":  {Subject: iss + "dev", Scope: scope(t, "artifact:libs:r")},
+		"dev-ops":   {Subject: iss + "dev", Scope: scope(t, "applied-permissions/groups:ops")},
+		"dev-admins": {
+			Subject: iss + "dev",
+			Scope:   scope(t, "applied-permissions/groups:admins"),
+		},
 		"gone":      {Subject: iss + "gone", Scope: types.UserScope()},
 		"missing":   {Subject: iss + "nobody", Scope: types.UserScope()},
 		"node":      {Subject: "jfac@x/nodes/n1", Scope: types.UserScope()},
@@ -70,17 +78,28 @@ func TestTokenPrincipal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Authorize applies the scope: /admin is admin only for an admin, /groups
+	// acts through the named groups whether or not the user belongs to them,
+	// an admin-privilege group makes its members administrators, and a
+	// resource-only scope keeps the user's groups for the evaluator to narrow.
+	src := authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}
 	for raw, want := range map[string]Principal{
 		"root-user":   {Name: "root", Admin: true, Groups: []string{"ops"}},
-		"root-admin":  {Name: "root", Admin: true},
+		"root-admin":  {Name: "root", Admin: true, Groups: []string{"ops"}},
 		"root-groups": {Name: "root", Groups: []string{"readers"}},
 		"dev-user":    {Name: "dev", Groups: []string{"devs", "readers"}},
-		"dev-admin":   {Name: "dev"},
-		"dev-repo":    {Name: "dev"},
+		"dev-admin":   {Name: "dev", Groups: []string{"devs", "readers"}},
+		"dev-repo":    {Name: "dev", Groups: []string{"devs", "readers"}},
+		"dev-ops":     {Name: "dev", Groups: []string{"ops"}},
+		"dev-admins":  {Name: "dev", Admin: true, Groups: []string{"admins"}},
 	} {
 		p, err := a.Token(ctx, raw, "")
+		if err == nil {
+			p, err = Authorize(ctx, src, p)
+		}
 		if err != nil || p.Name != want.Name || p.Admin != want.Admin ||
-			!slices.Equal(p.Groups, want.Groups) || p.Scope.String() != v[raw].Scope.String() {
+			!slices.Equal(p.Groups, want.Groups) || p.Scope.String() != v[raw].Scope.String() ||
+			p.Access() == nil {
 			t.Errorf("%s: %+v, %v; want %+v", raw, p, err, want)
 		}
 	}

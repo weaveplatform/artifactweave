@@ -109,7 +109,7 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 	if key == "" {
 		return badRequest("a trash path starts with the original repository key")
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		return err
 	}
@@ -120,7 +120,7 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 			return trashRefusal(p, "Only an administrator can clean trash of a deleted repository")
 		case err != nil:
 			return s.internalError(ctx, "get repository", err)
-		case !can(c, types.ActionDelete) && !can(c, types.ActionManage):
+		case !acc.file(c, rest, types.ActionDelete) && !acc.file(c, rest, types.ActionManage):
 			return trashRefusal(p, "Delete or manage permission on '%s' is required", key)
 		}
 	}
@@ -187,7 +187,7 @@ func (s artifactoryService) restoreTrash(
 	if toKey == "" {
 		return badRequest("the 'to' parameter names the destination repository")
 	}
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (s artifactoryService) restoreTrash(
 	case dst.Class != repo.Local && dst.Class != repo.Federated:
 		return badRequest("Items can be restored only into a local repository; '%s' is %s",
 			toKey, dst.Class)
-	case !can(dst, types.ActionManage):
+	case !acc.file(dst, toPath, types.ActionManage):
 		return trashRefusal(p, "Manage permission on '%s' is required", toKey)
 	}
 	svc := s.trashService(st)
@@ -346,7 +346,7 @@ func (s artifactoryService) zapCache(w http.ResponseWriter, r *http.Request) {
 	}
 	rp := strings.Trim(strings.TrimPrefix(r.URL.Path, "/artifactory/api/zap/"), "/")
 	key, rest := cutRepoPath(rp)
-	p, can, err := s.itemCaller(ctx, st)
+	p, acc, err := s.itemCaller(ctx, st)
 	if err != nil {
 		writeErr(w, r, err)
 		return
@@ -360,7 +360,7 @@ func (s artifactoryService) zapCache(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, badRequest("Zap applies to a remote repository's cache: use '%s'",
 			key+types.CacheSuffix))
 		return
-	case !can(c, types.ActionDelete) && !can(c, types.ActionManage):
+	case !acc.file(c, rest, types.ActionDelete) && !acc.file(c, rest, types.ActionManage):
 		writeErr(w, r, denied(p))
 		return
 	}

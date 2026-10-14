@@ -456,3 +456,90 @@ func TestWireFormsEvaluateAlike(t *testing.T) {
 		}
 	}
 }
+
+func TestRepoVisibleAndGroups(t *testing.T) {
+	ctx := context.Background()
+	db := world(t)
+	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
+	mk := func(s string, admin bool, groups ...string) *Decider {
+		t.Helper()
+		sub := Subject{Name: "bob", Groups: groups, Admin: admin}
+		if s != "" {
+			sub.Scope = scope(t, s)
+		}
+		dec, err := New(ctx, src, sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return dec
+	}
+	for _, c := range []struct {
+		scope   string
+		admin   bool
+		repo    Repo
+		visible bool
+	}{
+		// devs read only org/acme/** in libs-local: the root leads there.
+		{"", false, libs, true},
+		{"", false, ext, false},
+		{"", true, ext, true},
+		// repo entries decide alone, whatever the content rights.
+		{"repo:libs-local:r", false, libs, true},
+		{"repo:libs-local:r", false, ext, false},
+		{"applied-permissions/user repo:*:r", false, ext, true},
+		// system:info:r lists every repository.
+		{"system:info:r", false, ext, true},
+		// an artifact scope sees what it may read.
+		{"artifact:libs-local:r", false, libs, true},
+		{"artifact:libs-local:r", false, ext, false},
+	} {
+		if got := mk(c.scope, c.admin, "devs").RepoVisible(c.repo); got != c.visible {
+			t.Errorf("scope %q admin %v: RepoVisible(%s) = %v, want %v",
+				c.scope, c.admin, c.repo.Key, got, c.visible)
+		}
+	}
+	if got := mk(
+		"",
+		false,
+		"devs",
+		"readers",
+	).Groups(); !slices.Equal(
+		got,
+		[]string{"devs", "readers"},
+	) {
+		t.Errorf("unscoped groups %v", got)
+	}
+	if got := mk(
+		"applied-permissions/groups:readers",
+		false,
+		"devs",
+		"readers",
+	).Groups(); !slices.Equal(
+		got,
+		[]string{"readers"},
+	) {
+		t.Errorf("a groups scope narrows to the named groups: %v", got)
+	}
+}
+
+func TestTargetAllows(t *testing.T) {
+	tg := target([]string{"com/**"}, []string{"**/*.tmp"})
+	for _, c := range []struct {
+		path   string
+		folder bool
+		want   bool
+	}{
+		{"com/a.jar", false, true},
+		{"com/a.tmp", false, false},
+		{"org/a.jar", false, false},
+		{"", true, true},
+		{"", false, false},
+	} {
+		if got := TargetAllows(tg, c.path, c.folder); got != c.want {
+			t.Errorf("TargetAllows(%q, folder=%v) = %v, want %v", c.path, c.folder, got, c.want)
+		}
+	}
+	if !TargetAllows(types.Target{}, "anything", false) {
+		t.Error("an empty include list admits everything")
+	}
+}

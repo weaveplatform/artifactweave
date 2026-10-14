@@ -108,7 +108,7 @@ func New(cfg Config) http.Handler {
 		repositoriesSlash,
 	)
 	if cfg.Auth != nil {
-		r.Use(authenticate(cfg.Auth))
+		r.Use(authenticate(cfg.Auth, cfg.Store))
 	}
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)

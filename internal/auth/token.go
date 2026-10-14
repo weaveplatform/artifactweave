@@ -65,27 +65,14 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (Principal,
 	return p, nil
 }
 
-// tokenPrincipal applies the parts of a scope that decide who the request
-// is: applied-permissions/user acts as the user (an administrator stays
-// one), /admin is administrator only for a user who still is one, and
-// /groups acts as members of the named groups only. Resource and system
-// entries narrow what that principal may do; the permission evaluator
-// applies them, from Principal.Scope.
+// tokenPrincipal is the token's user with the token's scope. Authorize
+// applies the scope (decision 0006): applied-permissions/user acts as the
+// user, /admin is administrator only for a user who still is one, /groups
+// acts through the named groups the user belongs to, and resource and
+// system entries only narrow. The user's own flag and groups are kept here
+// because a resource-only scope narrows them rather than replacing them.
 func tokenPrincipal(u types.User, scope types.Scope) Principal {
-	p := Principal{Name: u.Name, Scope: scope}
-	for _, e := range scope.Entries {
-		switch e.Kind {
-		case types.ScopeAdmin:
-			p.Admin = p.Admin || u.Admin
-		case types.ScopeUser:
-			p.Admin = p.Admin || u.Admin
-			p.Groups = append(p.Groups, u.Groups...)
-		case types.ScopeGroups:
-			p.Groups = append(p.Groups, e.Names...)
-		default:
-		}
+	return Principal{
+		Name: u.Name, Admin: u.Admin, Groups: slices.Clone(u.Groups), Scope: scope, token: true,
 	}
-	slices.Sort(p.Groups)
-	p.Groups = slices.Compact(p.Groups)
-	return p
 }

@@ -85,6 +85,22 @@ These are choices made where no source documents Artifactory's behaviour:
 - **`repo:<key>:r`** narrows configuration reads to the named repositories. **`system:<area>`**
   scopes are the only way a non-admin reaches system capabilities.
 
+## Applying it to requests (#80)
+
+- **Once per request.** The authentication middleware authorises every principal (`auth.Authorize`): it builds the `authz.Decider` from the user's own admin flag, groups and token scope, and sets the principal's `Admin` and `Groups` to the evaluator's answers. A token scope can remove the admin flag, an admin-privilege group adds it, and `/groups` acts through the named groups. Handlers ask that one decider every question, and nothing reads the permissions again.
+- **Paths.**
+  - Deploy, download, delete, properties, copy, move and multipart check the item's repository-relative path.
+  - A download or storage read first checks the requested path as a folder, so it allows anything at or below it. Once the item is found, which in a virtual repository means in a member, the exact right is checked.
+  - Listings, folder archives and AQL rows leave out what the caller may not read. A folder shows when something below it is readable.
+- **Repository visibility** (listings and configuration reads):
+  - an administrator sees every repository;
+  - a token scope with `repo:` entries sees exactly those repositories;
+  - anyone else sees the repositories they may read anywhere in, and every repository under `system:info:r`.
+- **The `?permissions` storage view** reports grants whose target patterns admit the item's path.
+- **Known approximations:**
+  - Explode-on-deploy checks the right to overwrite at the archive's path, not at each entry.
+  - A recursive property edit checks annotate at the folder, not at each item below it.
+
 ## Verification
 
 - A route × principal matrix test over every operation with admin, a scoped user, a group

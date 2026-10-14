@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -46,9 +48,10 @@ var selfAuthenticated = map[string]bool{
 // that do not verify answer 401 at once, even on a public route, as
 // Artifactory does: a client with a wrong password learns it on its first
 // call. Without credentials the request acts as anonymous when anonymous
-// access is on; otherwise only public routes answer, and handlers decide the
-// rest from the principal (auth.RequireAdmin and friends).
-func authenticate(a *auth.Authenticator) func(http.Handler) http.Handler {
+// access is on; otherwise only public routes answer. Every principal is then
+// authorised once (auth.Authorize): its permissions are evaluated for the
+// request, and handlers ask that evaluator, through access, every question.
+func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -57,6 +60,9 @@ func authenticate(a *auth.Authenticator) func(http.Handler) http.Handler {
 				return
 			}
 			if p, presented, err := credentials(ctx, a, r); presented {
+				if err == nil {
+					p, err = authorize(ctx, st, p, false)
+				}
 				if err != nil {
 					apierror.Write(w, surfaceFor(r.URL.Path), err)
 					return
@@ -71,7 +77,12 @@ func authenticate(a *auth.Authenticator) func(http.Handler) http.Handler {
 			}
 			switch {
 			case anonymous:
-				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, auth.Anonymous)))
+				p, err := authorize(ctx, st, auth.Anonymous, true)
+				if err != nil {
+					apierror.Write(w, surfaceFor(r.URL.Path), err)
+					return
+				}
+				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
 			case publicRoutes[r.Method+" "+r.URL.Path]:
 				next.ServeHTTP(w, r)
 			default:
@@ -117,4 +128,20 @@ func credentials(
 		return p, true, err //nolint:wrapcheck // apierror values, rendered by status
 	}
 	return auth.Principal{}, false, nil
+}
+
+// authorize evaluates p's permissions for the request. A handler built
+// without a store (tests of the system endpoints) has nothing to evaluate.
+func authorize(
+	ctx context.Context,
+	st store.Store,
+	p auth.Principal,
+	anonymous bool,
+) (auth.Principal, error) {
+	if st == nil {
+		return p, nil
+	}
+	return auth.Authorize(ctx, authz.Sources{ //nolint:wrapcheck // auth wraps its own errors
+		Permissions: st.Permissions(), Groups: st.Groups(), AnonymousEnabled: anonymous,
+	}, p)
 }
