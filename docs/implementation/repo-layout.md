@@ -68,7 +68,7 @@ test/
   acceptance/                  # godog features and steps, run on Linux
     features/
   conformance/                 # OCI distribution-spec conformance job wrapper
-  terraform/                   # jfrog provider fixture; run.sh builds the provider mirror at run time
+  terraform/                   # run.sh only: applies the deploy/artifactweave scenarios; builds the provider mirror at run time
 docs/
   research/ implementation/ security/ operations/ testing/
 ```
@@ -118,7 +118,7 @@ deploy/
         mirror/                       # one mirror with a member on each cloud
   artifactweave/
     README.md                         # managing artifactweave with the JFrog Terraform providers
-    terraform/<scenario>/             # repositories, identity, cdn-repositories, ...
+    terraform/<scenario>/             # repositories, identity, oidc, cdn-repositories, ...
 test/
   terraform/run.sh                    # driver: applies a deploy/artifactweave scenario to a -cover server
   platform/                           # real-cloud scenario suite (_test.go only), run by platform-scenarios.yml

@@ -191,12 +191,13 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
-  # The JFrog Artifactory Terraform provider against the fixture in
-  # test/terraform, installed from a filesystem mirror of the pinned release
-  # zip so the run never depends on registry.terraform.io. run.sh starts a
-  # -cover artifactweave, mints the admin access token the provider sends as a
-  # Bearer token, applies, requires an empty plan and destroys; the server's
-  # coverage joins the merged gate.
+  # The JFrog Terraform providers against the app-layer references in
+  # deploy/artifactweave/terraform, installed by test/terraform/run.sh from a
+  # filesystem mirror of the pinned release zips so the run never depends on
+  # registry.terraform.io. run.sh starts a -cover artifactweave, mints the
+  # admin access token the providers send as a Bearer token, applies each,
+  # requires an empty plan and destroys; the server's coverage joins the
+  # merged gate.
   terraform:
     name: 'Terraform provider fixture'
     runs-on: ubuntu-latest
@@ -229,7 +230,7 @@ jobs:
           unzip -q -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip"
           echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
 
-      - name: Apply, plan and destroy the fixture against artifactweave
+      - name: Apply, plan and destroy the scenarios against artifactweave
         run: make terraform TERRAFORM_MODE=apply
 
       - name: Upload Terraform coverage
