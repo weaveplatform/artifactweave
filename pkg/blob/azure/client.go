@@ -31,6 +31,11 @@ const storageScope = "https://storage.azure.com/.default"
 // sourceSASLifetime bounds the SAS that authorises one commit's copy source.
 const sourceSASLifetime = time.Hour
 
+// delegationKeyLifetime is how long a user delegation key is requested for:
+// the service's maximum. A key is renewed an hour before a SAS signed with
+// it would outlive it, so a SAS may last up to the lifetime less that hour.
+const delegationKeyLifetime = 7 * 24 * time.Hour
+
 // ClientConfig mirrors the blob.azure section of the application
 // configuration. Exactly one way to authenticate applies, in this order:
 // ConnectionString, AccountKey, SASToken, Credential, and otherwise Entra ID
@@ -386,6 +391,8 @@ func (a *sdkAPI) List(ctx context.Context, prefix, marker string) ([]Item, strin
 	return items, next, nil
 }
 
+func (a *sdkAPI) Container() string { return a.container }
+
 func (a *sdkAPI) SignRead(ctx context.Context, name string, o ReadSAS) (string, error) {
 	u := a.cc.NewBlobClient(name).URL()
 	switch {
@@ -413,17 +420,32 @@ func (a *sdkAPI) SignRead(ctx context.Context, name string, o ReadSAS) (string, 
 // wrong blob name on hosts that are not an IP address or *.blob.* (research
 // 18).
 func (a *sdkAPI) readValues(name string, o ReadSAS) sas.BlobSignatureValues {
-	now := a.now().UTC()
+	issued, expiry := sasTimes(a.now(), o)
 	return sas.BlobSignatureValues{
 		Protocol:           sas.ProtocolHTTPSandHTTP,
-		StartTime:          now.Add(-a.start),
-		ExpiryTime:         now.Add(o.TTL),
+		StartTime:          issued.Add(-a.start),
+		ExpiryTime:         expiry,
 		Permissions:        (&sas.BlobPermissions{Read: true}).String(),
 		ContainerName:      a.container,
 		BlobName:           name,
 		ContentDisposition: o.ContentDisposition,
 		ContentType:        o.ContentType,
+		CacheControl:       o.CacheControl,
 	}
+}
+
+// sasTimes is when a SAS is issued and when it expires: o's Start and
+// Expiry when set, otherwise now and now plus the TTL.
+func sasTimes(now time.Time, o ReadSAS) (issued, expiry time.Time) {
+	issued = now.UTC()
+	if !o.Start.IsZero() {
+		issued = o.Start.UTC()
+	}
+	expiry = issued.Add(o.TTL)
+	if !o.Expiry.IsZero() {
+		expiry = o.Expiry.UTC()
+	}
+	return issued, expiry
 }
 
 func (a *sdkAPI) serviceSAS(name string, o ReadSAS) (string, error) {
@@ -435,7 +457,9 @@ func (a *sdkAPI) serviceSAS(name string, o ReadSAS) (string, error) {
 }
 
 // delegationSAS signs with a user delegation key, fetched once and reused
-// until an hour before it expires. A key lives at most seven days.
+// until a SAS signed with it would expire within an hour of the key. A key
+// lives at most seven days, so a SAS cannot outlive that less the hour; the
+// same key across a CDN window keeps the window's URLs identical.
 func (a *sdkAPI) delegationSAS(
 	ctx context.Context,
 	name string,
@@ -444,8 +468,18 @@ func (a *sdkAPI) delegationSAS(
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now().UTC()
-	if a.udk == nil || !now.Add(o.TTL+time.Hour).Before(a.exp) {
-		exp := now.Add(7 * 24 * time.Hour)
+	_, expiry := sasTimes(now, o)
+	if latest := now.Add(delegationKeyLifetime - time.Hour); expiry.After(latest) {
+		return "", fmt.Errorf(
+			"%w: a user delegation SAS expiring at %s outlives the longest key the service issues "+
+				"(%s less an hour)",
+			ErrConfig,
+			expiry.Format(time.RFC3339),
+			delegationKeyLifetime,
+		)
+	}
+	if a.udk == nil || !expiry.Add(time.Hour).Before(a.exp) {
+		exp := now.Add(delegationKeyLifetime)
 		info := service.KeyInfo{
 			Start:  to.Ptr(now.Add(-a.start).Format(sas.TimeFormat)),
 			Expiry: to.Ptr(exp.Format(sas.TimeFormat)),

@@ -160,7 +160,29 @@ type BlobAzureConfig struct {
 	PartSize                ByteSize `yaml:"part_size"`
 	CopyRangeSize           ByteSize `yaml:"copy_range_size"`
 	Concurrency             int      `yaml:"concurrency"`
+	// CDN is a CDN in front of the container (decision 0029).
+	CDN BlobAzureCDNConfig `yaml:"cdn"`
 }
+
+// BlobAzureCDNConfig is the CDN in front of an azure store.
+type BlobAzureCDNConfig struct {
+	FrontDoor FrontDoorConfig `yaml:"front_door"`
+}
+
+// FrontDoorConfig is an Azure Front Door endpoint whose origin is the
+// storage account. Front Door checks no signature: the store signs a read
+// SAS and Front Door passes it to storage, so the store's credential must be
+// one that signs (not sas).
+type FrontDoorConfig struct {
+	// Endpoint is the endpoint host, or an http(s) URL for a test edge.
+	Endpoint string `yaml:"endpoint"`
+	// PathPrefix is the route's origin path inside the account, starting
+	// with the container.
+	PathPrefix string `yaml:"path_prefix"`
+}
+
+// Enabled reports whether any field is set.
+func (c FrontDoorConfig) Enabled() bool { return c != FrontDoorConfig{} }
 
 // Azure credential kinds.
 const (
@@ -230,6 +252,7 @@ func backendKeys() []string {
 		"azure.credential", "azure.account_key", "azure.sas_token", "azure.connection_string",
 		"azure.managed_identity_client_id", "azure.part_size", "azure.copy_range_size",
 		"azure.concurrency",
+		"azure.cdn.front_door.endpoint", "azure.cdn.front_door.path_prefix",
 	}
 }
 
@@ -332,6 +355,8 @@ func (b *BlobBackendConfig) set(sub, key, value string) error {
 		"azure.sas_token":                    &b.Azure.SASToken,
 		"azure.connection_string":            &b.Azure.ConnectionString,
 		"azure.managed_identity_client_id":   &b.Azure.ManagedIdentityClientID,
+		"azure.cdn.front_door.endpoint":      &b.Azure.CDN.FrontDoor.Endpoint,
+		"azure.cdn.front_door.path_prefix":   &b.Azure.CDN.FrontDoor.PathPrefix,
 	}
 	if dst, ok := str[sub]; ok {
 		*dst = value
@@ -514,6 +539,9 @@ func (b BlobConfig) cdnDomains(prefix string) map[string]string {
 		if cf := bc.S3.CDN.CloudFront; cf.Enabled() {
 			out[p+".s3.cdn.cloudfront.domain"] = cf.Domain
 		}
+		if fd := bc.Azure.CDN.FrontDoor; fd.Enabled() {
+			out[p+".azure.cdn.front_door.endpoint"] = fd.Endpoint
+		}
 	}
 	add(prefix, b.BlobBackendConfig)
 	for name, st := range b.Stores {
@@ -590,6 +618,32 @@ func (a BlobAzureConfig) validate(prefix string) []error {
 			errs,
 			fmt.Errorf("%w: %s.azure.concurrency %d", ErrInvalidValue, prefix, a.Concurrency),
 		)
+	}
+	return append(errs, a.CDN.FrontDoor.validate(prefix+".azure.cdn.front_door",
+		a.EffectiveCredential())...)
+}
+
+// validate checks a Front Door against the store's credential: a pre-issued
+// SAS token signs nothing, and Front Door has no signature of its own to
+// fall back on.
+func (c FrontDoorConfig) validate(prefix, credential string) []error {
+	if !c.Enabled() {
+		return nil
+	}
+	var errs []error
+	switch _, err := cdn.ParseDomain(c.Endpoint); {
+	case c.Endpoint == "":
+		errs = append(errs, fmt.Errorf("%w: %s.endpoint", ErrMissingValue, prefix))
+	case err != nil:
+		errs = append(errs, fmt.Errorf("%w: %s.endpoint: %w", ErrInvalidValue, prefix, err))
+	}
+	if credential == AzureSAS {
+		errs = append(errs, fmt.Errorf(
+			"%w: %s needs a credential that signs a SAS (shared_key, connection_string or "+
+				"Entra ID), not sas",
+			ErrInvalidValue,
+			prefix,
+		))
 	}
 	return errs
 }

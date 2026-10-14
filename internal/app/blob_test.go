@@ -399,3 +399,40 @@ func TestOpenBackendWithCloudFront(t *testing.T) {
 		}
 	}
 }
+
+func TestOpenBackendWithFrontDoor(t *testing.T) {
+	azWith := func(fd config.FrontDoorConfig) config.BlobBackendConfig {
+		return config.BlobBackendConfig{Backend: "azure", Azure: config.BlobAzureConfig{
+			Account: "acct", Container: "c", Prefix: "art", Credential: config.AzureSharedKey,
+			AccountKey: "AAAA", CDN: config.BlobAzureCDNConfig{FrontDoor: fd},
+		}}
+	}
+	good := config.FrontDoorConfig{Endpoint: "artifacts-x1.z01.azurefd.net"}
+	s, err := openBackend(context.Background(), "blob", azWith(good), session.NewMemory(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sg, ok := s.(blob.Signer)
+	if !ok || !sg.Signs(blob.ViaCDN) || !sg.Signs(blob.ViaStorage) {
+		t.Fatal("an azure store with a Front Door signs both routes")
+	}
+	sha := strings.Repeat("ab", 32)
+	u, err := sg.SignURL(
+		context.Background(),
+		sha,
+		blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute},
+	)
+	if err != nil ||
+		!strings.HasPrefix(u, "https://artifacts-x1.z01.azurefd.net/c/art/sha256/ab/"+sha+"?") {
+		t.Fatalf("%q %v", u, err)
+	}
+	for name, fd := range map[string]config.FrontDoorConfig{
+		"bad endpoint":              {Endpoint: "ftp://x"},
+		"origin outside the prefix": {Endpoint: "fd.azurefd.net", PathPrefix: "other"},
+	} {
+		_, err := openBackend(context.Background(), "blob", azWith(fd), session.NewMemory(), "")
+		if !errors.Is(err, errBlobStore) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}

@@ -183,8 +183,8 @@ Read on 2026-10-14; list prices in USD, first tier.
 
 ## 5. artifactweave today
 
-At first written for main at `00888fc`, after #139; updated for #146 (the redirect policy)
-and #120 (CloudFront).
+At first written for main at `00888fc`, after #139; updated for #146 (the redirect policy),
+#120 (CloudFront) and #122 (Front Door).
 
 | Behaviour | Source |
 |---|---|
@@ -194,11 +194,13 @@ and #120 (CloudFront).
 | A 302 carries no `Content-Type`, `Content-Disposition` or `ETag`; the signed URL carries the name and media type as response overrides | `internal/server/redirect.go`, each backend's `SignURL` |
 | A redirected download is counted when it is a whole file or a range starting at byte 0, and `skipUpdateStats=true` opts out | `internal/server/redirect.go` (`countsDownload`) |
 | A signing failure is logged at WARN at most once a minute and the download streams | `internal/server/redirect.go` (`signFailed`) |
-| `blob.Signer` is `Signs(via)`, fixed when the store is built, and `SignURL(ctx, sha256, SignOptions)`. Storage URLs: s3 with its presign client; gcs when its credentials can sign; azure unless it runs on a pre-issued SAS; fs never. CDN URLs: s3 with a CloudFront configuration; gcs and azure not yet | `pkg/blob/blob.go`, `pkg/blob/{s3,gcs,azure}` |
+| `blob.Signer` is `Signs(via)`, fixed when the store is built, and `SignURL(ctx, sha256, SignOptions)`. Storage URLs: s3 with its presign client; gcs when its credentials can sign; azure unless it runs on a pre-issued SAS; fs never. CDN URLs: s3 with a CloudFront configuration; azure with a Front Door, unless it runs on a pre-issued SAS; gcs not yet | `pkg/blob/blob.go`, `pkg/blob/{s3,gcs,azure}` |
 | CloudFront URLs are canned-policy signed with `aws-sdk-go-v2/feature/cloudfront/sign`, SHA-1 or SHA-256, with an RSA or ECDSA key read from a file at start | `pkg/cdn/cloudfront.go`, `internal/app/blob.go` |
+| Front Door URLs are the store's own read SAS, by shared key or user delegation, with start and expiry fixed to the TTL-long window, `rscd`/`rsct` overrides and `rscc: public, max-age=<TTL>`, moved onto the endpoint host. One delegation key is kept across a window, so the window's URLs are identical; a SAS that would outlive the longest key (7 days less an hour) is refused | `pkg/blob/azure` (`signFrontDoor`, `delegationSAS`), `pkg/cdn/frontdoor.go` |
 | A mirror signs with the first member in read order that holds the blob and signs the route, without counting signing against the member's health | `pkg/blob/mirror/read.go` (`SignURL`) |
 | The server refuses to start with a CDN on the archive tier, or on the `base_url` host or a subdomain of it | `internal/config/config.go` (`validateCDN`) |
 | A fake CloudFront edge checks signatures and serves blobs from a store; acceptance runs `jf rt dl` of a split download through it, with MinIO behind | `pkg/cdn/cdntest`, `test/acceptance/features/cdn.feature` |
+| A fake Front Door checks nothing, passes the SAS through to its storage origin and caches whole-object responses under the full URL up to a cap; acceptance runs a split `jf rt dl` and a repeated download through it with Azurite behind, which checks the SAS and applies the overrides. Azurite refuses an anonymous read with 403 `AuthorizationFailure`. Not modelled: the route's real cache behaviour (8 MiB chunks, ranged responses) and Private Link | `pkg/cdn/cdntest/frontdoor.go`, `test/acceptance/features/cdn_front_door.feature` |
 
 ## Versions at the research baseline
 

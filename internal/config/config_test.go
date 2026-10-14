@@ -107,6 +107,10 @@ blob:
     part_size: 16MiB
     copy_range_size: 64MiB
     concurrency: 4
+    cdn:
+      front_door:
+        endpoint: artifacts-x1.z01.azurefd.net
+        path_prefix: c
 cold_blob:
   backend: gcs
   gcs:
@@ -154,6 +158,9 @@ download:
 			Prefix: "ap", Credential: "managed_identity", AccountKey: "ak", SASToken: "st",
 			ConnectionString: "cs", ManagedIdentityClientID: "mi", PartSize: 16 << 20,
 			CopyRangeSize: 64 << 20, Concurrency: 4,
+			CDN: BlobAzureCDNConfig{FrontDoor: FrontDoorConfig{
+				Endpoint: "artifacts-x1.z01.azurefd.net", PathPrefix: "c",
+			}},
 		}},
 		ColdBlob:          BlobConfig{Backend: "gcs", GCS: BlobGCSConfig{Bucket: "archive"}},
 		MasterKey:         "k",
@@ -204,7 +211,9 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
 		cfg.Download.Redirect.TTL != 45*time.Second ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
-		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" {
+		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
+		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
+		cfg.ColdBlob.Azure.CDN.FrontDoor.PathPrefix != "true" {
 		t.Fatalf("env keys not applied: %+v", cfg)
 	}
 }
@@ -790,6 +799,73 @@ func TestCloudFrontValidation(t *testing.T) {
 			"cold_blob.s3.cdn.cloudfront.domain":           "d1.cloudfront.net",
 			"cold_blob.s3.cdn.cloudfront.key_pair_id":      "K1",
 			"cold_blob.s3.cdn.cloudfront.private_key_file": "/k.pem",
+		}, ErrInvalidValue},
+	}
+	for name, c := range bad {
+		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
+	}
+}
+
+func TestFrontDoorValidation(t *testing.T) {
+	azure := func(extra map[string]string) map[string]string {
+		flags := map[string]string{
+			"blob.backend":                       "azure",
+			"blob.azure.account":                 "acct",
+			"blob.azure.container":               "c",
+			"blob.azure.account_key":             "k",
+			"blob.azure.cdn.front_door.endpoint": "artifacts-x1.z01.azurefd.net",
+		}
+		maps.Copy(flags, extra)
+		for k, v := range flags {
+			if v == "" {
+				delete(flags, k)
+			}
+		}
+		return flags
+	}
+	good := []map[string]string{
+		azure(nil),
+		azure(map[string]string{"blob.azure.cdn.front_door.path_prefix": "c"}),
+		// Entra ID signs user delegation SAS.
+		azure(map[string]string{"blob.azure.account_key": "", "blob.azure.credential": "default"}),
+		azure(map[string]string{
+			"base_url":                           "http://127.0.0.1:8081",
+			"blob.azure.cdn.front_door.endpoint": "http://localhost:9000",
+		}),
+	}
+	for _, flags := range good {
+		if _, err := Load(LoadOptions{Flags: flags}); err != nil {
+			t.Errorf("%v: %v", flags, err)
+		}
+	}
+	bad := map[string]struct {
+		flags map[string]string
+		want  error
+	}{
+		"only a path prefix": {azure(map[string]string{
+			"blob.azure.cdn.front_door.endpoint":    "",
+			"blob.azure.cdn.front_door.path_prefix": "c",
+		}), ErrMissingValue},
+		"bad endpoint": {
+			azure(map[string]string{"blob.azure.cdn.front_door.endpoint": "ftp://x"}),
+			ErrInvalidValue,
+		},
+		// A pre-issued SAS signs nothing, and Front Door checks nothing.
+		"a SAS token credential": {azure(map[string]string{
+			"blob.azure.account_key": "", "blob.azure.sas_token": "sv=x&sig=y",
+		}), ErrInvalidValue},
+		"a subdomain of the registry": {azure(map[string]string{
+			"base_url":                           "https://repo.example.com",
+			"blob.azure.cdn.front_door.endpoint": "cdn.repo.example.com",
+		}), ErrInvalidValue},
+		"the archive tier": {map[string]string{
+			"cold_blob.backend":                       "azure",
+			"cold_blob.azure.account":                 "acct",
+			"cold_blob.azure.container":               "archive",
+			"cold_blob.azure.account_key":             "k",
+			"cold_blob.azure.cdn.front_door.endpoint": "fd.azurefd.net",
 		}, ErrInvalidValue},
 	}
 	for name, c := range bad {
