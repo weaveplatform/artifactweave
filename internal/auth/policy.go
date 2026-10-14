@@ -29,7 +29,23 @@ const policyTTL = 10 * time.Second
 // an administrator, has expired. It is reported only after the password
 // verifies, so it tells nothing to someone without it.
 var ErrPasswordExpired = apierror.New(http.StatusUnauthorized,
-	"The password has expired; an administrator must set a new one")
+	"The password has expired; set a new one with PUT /access/api/v2/users/{username}/password")
+
+// ErrBasicAuthDisabled answers a user name and password while the platform
+// accepts only tokens (basic_authentication_enabled is false).
+var ErrBasicAuthDisabled = apierror.New(http.StatusUnauthorized,
+	"Basic authentication with a password is disabled; use an access token")
+
+// BasicAuthEnabled reports whether user names and passwords are accepted
+// over HTTP Basic. Unset means on, as Artifactory ships.
+func BasicAuthEnabled(ctx context.Context, settings store.SettingsStore) (bool, error) {
+	on := true
+	if err := settings.Get(ctx, types.SettingBasicAuthEnabled, &on); err != nil &&
+		!errors.Is(err, store.ErrNotFound) {
+		return on, fmt.Errorf("auth: basic authentication switch: %w", err)
+	}
+	return on, nil
+}
 
 // LockPolicy returns the stored user lock policy, or the default.
 func LockPolicy(ctx context.Context, settings store.SettingsStore) (types.UserLockPolicy, error) {
@@ -75,6 +91,7 @@ type policyCache struct {
 	fetched time.Time
 	lock    types.UserLockPolicy
 	expiry  types.PasswordExpirationPolicy
+	basic   bool
 }
 
 // policies returns the lock and expiration policies, from the cache when
@@ -97,8 +114,22 @@ func (a *Authenticator) policies(
 	if err != nil {
 		return lock, expiry, err
 	}
-	c.lock, c.expiry, c.fetched = lock, expiry, now
+	basic, err := BasicAuthEnabled(ctx, a.settings)
+	if err != nil {
+		return lock, expiry, err
+	}
+	c.lock, c.expiry, c.basic, c.fetched = lock, expiry, basic, now
 	return lock, expiry, nil
+}
+
+// basicEnabled is the cached basic authentication switch.
+func (a *Authenticator) basicEnabled(ctx context.Context) (bool, error) {
+	if _, _, err := a.policies(ctx); err != nil {
+		return false, err
+	}
+	a.policy.mu.Lock()
+	defer a.policy.mu.Unlock()
+	return a.policy.basic, nil
 }
 
 // ForgetPolicies drops the cached policies, so a change made through this
@@ -133,7 +164,11 @@ func (a *Authenticator) accept(
 		return Principal{}, err
 	}
 	if PasswordExpired(u, expiry, now) {
-		return Principal{}, ErrPasswordExpired
+		// The principal comes back with the error: the one request it may
+		// make is changing its own password.
+		p := principalOf(u)
+		p.PasswordExpired = true
+		return p, ErrPasswordExpired
 	}
 	if filled || u.FailedLogins > 0 {
 		// Best effort: a failed write must not fail the login.

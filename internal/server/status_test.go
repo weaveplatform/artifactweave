@@ -56,6 +56,7 @@ func statusTable() []statusCase {
 		securityStatusRows(),
 		tokenStatusRows(),
 		permissionStatusRows(),
+		accessIdentityStatusRows(),
 	)
 }
 

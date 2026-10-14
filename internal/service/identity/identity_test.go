@@ -189,7 +189,7 @@ func TestLastAdminAndDeletion(t *testing.T) {
 
 func TestGroups(t *testing.T) {
 	ctx := context.Background()
-	s, _ := newService(t)
+	s, db := newService(t)
 	if _, err := s.PutUser(ctx, newUser("cat"), "Cat-pass1"); err != nil {
 		t.Fatal(err)
 	}
@@ -243,13 +243,23 @@ func TestGroups(t *testing.T) {
 	) {
 		t.Fatalf("unknown group: %v", err)
 	}
-	wantInvalid(t, "delete readers", s.DeleteGroup(ctx, auth.ReadersGroup))
 	if err := s.DeleteGroup(ctx, "devs"); err != nil {
 		t.Fatal(err)
 	}
+	// The seeded readers group goes like any other, and its grant with it.
+	if err := s.DeleteGroup(ctx, auth.ReadersGroup); err != nil {
+		t.Fatalf("delete readers: %v", err)
+	}
 	groups, err := s.Groups(ctx)
-	if err != nil || len(groups) != 1 {
+	if err != nil || len(groups) != 0 {
 		t.Fatalf("groups: %v %v", groups, err)
+	}
+	anything, err := db.Permissions().Get(ctx, auth.AnythingPermission)
+	if err != nil || len(anything.Resources[types.ResourceArtifact].Actions.Groups) != 0 {
+		t.Fatalf("Anything after deleting readers: %+v %v", anything, err)
+	}
+	if err := s.DeleteGroup(ctx, "devs"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("delete an unknown group: %v", err)
 	}
 }
 

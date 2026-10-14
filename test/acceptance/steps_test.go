@@ -91,6 +91,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
 	sc.Step(`^I GET "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.getAs)
+	sc.Step(`^I GET "([^"]*)" with the kept token "([^"]*)"$`, w.getWithToken)
 	sc.Step(`^the response status is not (\d+)$`, w.statusIsNot)
 	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, w.headerContains)
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
@@ -217,6 +218,17 @@ func (w *world) getAs(path, user, password string) error {
 		"",
 		func(r *http.Request) { r.SetBasicAuth(user, password) },
 	)
+}
+
+// getWithToken sends a token kept from an earlier response as Bearer.
+func (w *world) getWithToken(path, name string) error {
+	tok, ok := w.vars[name]
+	if !ok {
+		return fmt.Errorf("no token kept as %q", name)
+	}
+	return w.send(http.MethodGet, path, "", func(r *http.Request) {
+		r.Header.Set("Authorization", "Bearer "+tok)
+	})
 }
 
 // post takes the body as a Gherkin docstring: JSON in an inline quoted

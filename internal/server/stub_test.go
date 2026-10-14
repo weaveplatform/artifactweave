@@ -121,6 +121,29 @@ var implemented = map[string]bool{
 	"PUT /access/api/v1/config/token/default_expiry":                          true,
 	"GET /artifactory/api/security/token":                                     true,
 	"GET /artifactory/api/security/encryptedPassword":                         true,
+
+	// Access v2 users and groups and the identity configuration (#81).
+	"GET /access/api/v2/users":                                                       true,
+	"POST /access/api/v2/users":                                                      true,
+	"POST /access/api/v2/users/expire_password_for_all_users":                        true,
+	"POST /access/api/v2/users/unexpire_password_for_all_users":                      true,
+	"GET /access/api/v2/users/{username}":                                            true,
+	"PATCH /access/api/v2/users/{username}":                                          true,
+	"DELETE /access/api/v2/users/{username}":                                         true,
+	"PATCH /access/api/v2/users/{username}/groups":                                   true,
+	"PUT /access/api/v2/users/{username}/password":                                   true,
+	"POST /access/api/v2/users/{username}/password/expire":                           true,
+	"POST /access/api/v2/users/{username}/unlock":                                    true,
+	"GET /access/api/v2/groups":                                                      true,
+	"POST /access/api/v2/groups":                                                     true,
+	"GET /access/api/v2/groups/{name}":                                               true,
+	"PATCH /access/api/v2/groups/{name}":                                             true,
+	"DELETE /access/api/v2/groups/{name}":                                            true,
+	"PATCH /access/api/v2/groups/{name}/members":                                     true,
+	"GET /access/api/v1/config/security/authentication/basic_authentication_enabled": true,
+	"PUT /access/api/v1/config/security/authentication/basic_authentication_enabled": true,
+	"PUT /access/api/v1/config/security/password_policy":                             true,
+	"PATCH /access/api/v1/config/security/password_policy":                           true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

@@ -29,6 +29,9 @@ type Principal struct {
 	// presented; empty for a password or anonymous request. The token API's
 	// "me" resolves to it, and encryptedPassword refuses token callers.
 	TokenID string
+	// PasswordExpired marks a principal whose correct password has expired.
+	// The middleware lets it through only to change its own password.
+	PasswordExpired bool
 	// token marks a principal authenticated by an access token, whose Scope
 	// applies even when it is empty.
 	token bool
