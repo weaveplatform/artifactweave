@@ -9,13 +9,16 @@ Use the [template](TEMPLATE.md) for new decisions and leave out sections that wo
 empty. Integrate amendments into the relevant record, keeping its number and filename so
 existing links still resolve.
 
-Two rules keep the set readable:
+Three rules keep the set readable:
 
 - **Research files hold facts and citations; decision records hold the decision and the
   rationale.** A record links to the section of the numbered research report that holds the
   endpoint tables, field lists or protocol facts it relies on. It never restates them.
 - **Records never contain implementation milestones or sequencing.** Ordering belongs in
   the [implementation plan](../../implementation/plan.md).
+- **A deliberate departure from Artifactory is also listed in the
+  [deviations register](../../implementation/deviations.md)**, which links back to the
+  record. The record's Rationale says why.
 
 Status values: Proposed, Accepted, Superseded.
 

@@ -12,7 +12,9 @@ Status: Proposed | Accepted | Superseded
 
 ## Rationale
 
-<Why this design meets the requirement; include material alternatives and tradeoffs when useful.>
+<Why this design meets the requirement; include material alternatives and tradeoffs when useful.
+If the design deliberately departs from Artifactory's behaviour or design, say so here and
+record it in ../../implementation/deviations.md.>
 
 ## Constraints
 
