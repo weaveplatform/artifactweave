@@ -32,10 +32,10 @@ updates:
       prefix: "chore"
       include: "scope"
 
-  # The infrastructure roots. deploy/artifactweave and test/terraform are left
-  # out: test/terraform/run.sh pins their jfrog provider zips by SHA-256,
-  # which Dependabot cannot update, so deps-refresh moves version and pin
-  # together.
+  # The infrastructure roots. deploy/artifactweave is left out:
+  # test/terraform/run.sh pins its jfrog provider zips by SHA-256, which
+  # Dependabot cannot update, so those providers move by hand with their pins
+  # (docs/testing/ci.md, "Terraform scenarios").
   - package-ecosystem: "terraform"
     directories:
       - "/deploy/platform/terraform/**"
