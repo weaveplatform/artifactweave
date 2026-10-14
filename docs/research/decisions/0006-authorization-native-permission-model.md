@@ -101,6 +101,77 @@ These are choices made where no source documents Artifactory's behaviour:
   - Explode-on-deploy checks the right to overwrite at the archive's path, not at each entry.
   - A recursive property edit checks annotate at the folder, not at each item below it.
 
+## Implementation notes (permission APIs, #82)
+
+`internal/service/permission` validates and stores; the v1, v2 and Access v2 handlers in
+`internal/server/permissions.go` are views over it, so a permission written in one format
+reads back in the others. Sources are the JFrog OpenAPI pages the parity oracle caches,
+`.specoracle/<family>/<page>.json`. Each rule is marked documented, inferred or
+undocumented.
+
+- **Validation**, shared by every API, answers 400:
+  - Names are non-empty, without surrounding spaces or a slash, and at most 64 characters.
+  - Patterns are at most 1024 characters.
+  - Artifact targets are existing local or remote repositories, `<remote>-cache`, or `ANY`,
+    `ANY LOCAL`, `ANY REMOTE` and `ANY DISTRIBUTION`. A virtual repository is refused.
+  - The build section takes exactly one target, `artifactory-build-info`.
+  - Named users and groups exist.
+- **What a write replaces:**
+  - A v1 PUT replaces only the artifact section.
+  - A v2 PUT replaces artifact, build and release_bundle whole, and keeps the description,
+    destination and pipeline_source, which v2 cannot carry.
+  - Access stores and echoes destination and pipeline_source. The generated types drop
+    them, so create reads the raw body.
+  - An Access PATCH on a section merges users, groups and targets by key; a PUT replaces it.
+- **Who may** (documented, each page's Security note):
+  - v1, and every Access write: an administrator.
+  - Access reads and listing: an administrator or a `system:permissions:r` token
+    (`getpermissiondetails.json`, `getpermissions.json`).
+  - v2 reads, HEAD, listings and the by-user and by-group views: an administrator, or a
+    holder of MANAGE, who sees the permissions it manages.
+  - v2 PUT: an administrator, or a MANAGE holder who "can only edit the actions"
+    (`createorreplacepermissiontargetv2.json`). A replace that changes a section, target
+    or pattern answers that holder 403.
+  - v2 POST and DELETE: an administrator (`createpermissiontargetv2.json`,
+    `deletepermissiontargetv2.json`).
+  - The request's evaluator decides MANAGE (`Decider.Holds`) under the caller's token
+    scope, so a groups-scoped token loses a user's direct grant.
+- **A missing name answers a non-administrator 403**, as one it may not see. *Inferred:*
+  details need an administrator, MANAGE on the target or a `system:permissions:r` token, and
+  no one holds MANAGE on a target that does not exist. Answering 404 would let anyone probe
+  for names.
+- **Different patterns per target** (*undocumented*): v1 and v2 hold one pattern list per
+  section, so such a permission has no legacy view.
+  - The v1 and v2 listings still show it by name and URI, so it is not invisible.
+  - Details answer 400 naming `/access/api/v2/permissions`, because a merged view would
+    grant every pattern on every target.
+  - The v2 by-user and by-group views carry full documents and leave it out.
+- **Access listing** (documented, `getpermissions.json`):
+  - `expand` without a `user` or `group` filter answers 400.
+  - A filter naming a user or group that does not exist answers 404.
+  - `limit` runs from 1 to 99999.
+  - The cursor is the name of the page's last permission, passed back as the next call's
+    cursor; the next page starts after it. It is absent when no more remain.
+  - `expand` returns full documents narrowed to the requested principals' grants. With
+    `include_inherited_groups` (the default), the named users' groups count among them
+    (*inferred*: their grants are why the permission matched).
+  - Not done: the page matches user names case-insensitively; the user store is
+    case-sensitive.
+- **Statuses:**
+
+  | Request | Answer | Source |
+  | --- | --- | --- |
+  | v1 PUT | 200, `{"info": "Successfully created\|updated permission target 'x'"}` | documented, `createorreplacepermissiontarget.json` |
+  | v1 DELETE | 200, text | documented, `deletepermissiontarget.json` |
+  | v2 POST | 201, empty; 409 when the name exists | 201 documented, `createpermissiontargetv2.json`; 409 is what jfrog-client-go reads as "already exists" |
+  | v2 PUT | 200, create or replace | documented, `createorreplacepermissiontargetv2.json` |
+  | v2 HEAD | 200 or 404 | documented, `permissiontargetexistencecheckv2.json` |
+  | v2 DELETE | 200 | documented, `deletepermissiontargetv2.json` |
+  | Access POST | 201 with the stored document; 409 when the name exists | statuses documented, `createpermission.json`; the body is our choice |
+  | Access DELETE | 204 | documented, `deletepermission.json` |
+  | Access section DELETE | 204 | documented, `deletepermissionresource.json` |
+  | Access list | 400 and 404 as above | documented, `getpermissions.json` |
+
 ## Verification
 
 - A route × principal matrix test over every operation with admin, a scoped user, a group
