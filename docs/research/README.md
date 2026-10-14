@@ -53,6 +53,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [16-enterprise-products.md](16-enterprise-products.md) | Distribution and release bundles v1, cold-storage archive, platform federation and topology, federated repositories and Workers: endpoints, entities, clients, and what is not reproducible with artifactweave-only peers |
 | [17-undocumented-shapes.md](17-undocumented-shapes.md) | What SDKs, providers, samples, KB articles and community captures show for the shapes JFrog leaves untyped, with confidence per finding |
 | [18-cloud-blob-storage.md](18-cloud-blob-storage.md) | Google Cloud Storage and Azure Blob Storage: SDK capabilities and limits for resumable multipart uploads, finalising at a content address, presigning, authentication, emulators, JFrog's provider settings; mirroring across stores: Artifactory sharding, cloud-native replication |
+| [20-reference-deployments.md](20-reference-deployments.md) | Reference deployments: multi-region object storage on AWS, GCP and Azure and how it meets signed URLs and the mirror; Terraform layout, mocked tests, linting, scanning and generated docs; GitHub OIDC to each cloud; labels, secrets in state and costs |
 | [glossary.md](glossary.md) | Terms used across the set |
 | [decisions/](decisions/README.md) | Decision records 0001–0026 |
 

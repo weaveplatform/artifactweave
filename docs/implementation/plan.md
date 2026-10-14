@@ -23,6 +23,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) landed after P3's storage endpoints (#48) |
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
 | P4 Identity and authorization | Not started | **M1** |
+| P4b Reference deployments and CDN delivery | Not started | Epics #113 (CDN delivery and download redirect) and #114 (reference deployments); decisions 0029 and 0030. The download-redirect fixes (#117) landed early |
 | P5 Full AQL, searches, build-info | Not started | |
 | P6 Docker/OCI | Not started | |
 | P7 npm, Go, Maven locals | Not started | **M2** |
@@ -60,6 +61,7 @@ flowchart LR
   P4 --> P6[P6 Docker/OCI]
   P4 --> P7[P7 npm, Go, Maven]
   P4 --> P8[P8 PyPI, NuGet, Helm, Terraform]
+  P4 --> P4b[P4b Reference deployments + CDN]
   P6 --> P9[P9 Remote]
   P7 --> P9
   P8 --> P9
@@ -78,6 +80,7 @@ flowchart LR
   P15 --> P18
   P16 --> P18
   P17 --> P18
+  P4b --> P18
 ```
 
 **Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P10 → P11 → P13 → P15 → P18.
@@ -85,7 +88,8 @@ flowchart LR
 **Parallel lanes:** P16 and P17 run beside P13 to P15 once P11 has landed; P12 runs
 beside all of them. P5 runs beside P6–P8. P6, P7 and P8 are independent of each other
 once P4 has landed (publishing needs credentials). P9 can start as soon as one format
-exists.
+exists. P4b runs beside P5 to P8 once P4 has landed: its CDN work builds on the blob
+backends of P2b, and its scenarios on the Terraform job from P4.
 
 ## Cut from v1
 
@@ -387,6 +391,63 @@ Decisions: [0005](../research/decisions/0005-authentication-and-tokens.md),
 - `jf rt user-create`, `group-create`, `permission-target-create`, `access-token-create` and `jf c add` with the created token work.
 - A token scoped to one repository cannot read another. **M1.**
 - Moved from P3 (#69): the `terraform` CI job mints an admin access token and runs `make terraform TERRAFORM_MODE=apply`. `artifactory_local_generic_repository` and `artifactory_item_properties` apply, `terraform plan` is empty, then destroy, and the job's coverage joins the gate. Met: the `terraform` job (#69), after the repository API started writing its flags as JSON booleans and listing no environments as `[]`.
+
+## P4b: Reference deployments and CDN delivery
+
+Decisions: [0029](../research/decisions/0029-cdn-delivery-and-download-redirect.md),
+[0030](../research/decisions/0030-reference-deployments.md); research
+[19](../research/19-cdn-and-download-redirect.md) and
+[20](../research/20-reference-deployments.md).
+
+Requested on 2026-10-14, after the Terraform apply job (#109) showed that the
+`downloadRedirect` and `cdnRedirect` flags were stored but barely used:
+- CDN delivery on all three clouds, on self-hosted instances;
+- every Terraform root the Makefile uses moved under `deploy/`, as documented reference
+  deployments per cloud and scenario that artifactweave is tested against by manual
+  dispatch.
+
+The phase number places it after P4 because its scenarios use P4's access tokens and
+Terraform job. It runs beside P5 to P8.
+
+**Tracking.** One GitHub issue per PR:
+- Epic #113, CDN delivery and download redirect:
+  - the download-redirect fixes: HEAD, conditional requests, counts, mirror health (#117, done);
+  - research 19 and decision 0029 (#118);
+  - the redirect policy, signing capability and redirect settings (#119);
+  - `cdnRedirect` with CloudFront signed URLs and a fake edge (#120);
+  - Cloud CDN signed URLs (#121);
+  - Azure Front Door with SAS passthrough (#122).
+- Epic #114, reference deployments:
+  - research 20 and decision 0030 (#123);
+  - static checks and mocked tests for deployment Terraform (#124);
+  - the acceptance roots moved to `deploy/platform/terraform` (#125);
+  - per-cloud bootstrap roots for CI trust, remote state, DNS and budgets (#126);
+  - app-layer references in `deploy/artifactweave` (#127);
+  - AWS bootstrap, `aws/single-bucket` and real S3 conformance (#128);
+  - the scenario workflow and the `test/platform` suite (#129);
+  - multi-region mirror scenarios (#130);
+  - geo-replicated scenarios with native replication (#131);
+  - `aws/cdn` (#132), `gcp/cdn` (#133) and `azure/cdn` (#134);
+  - the multicloud mirror scenario (#135).
+- Alongside, outside both epics: the deviations register (#115, done) and the stale
+  references it found (#116).
+
+**Exit criteria**
+- `jf rt dl` downloads files above and below 5 MiB from a `downloadRedirect` repository on
+  every backend that signs; HEAD and conditional requests are answered locally; redirected
+  downloads are counted.
+- `cdnRedirect` redirects to CloudFront, Cloud CDN and Front Door URLs, verified against
+  the fake edge in acceptance and against the real edges in the CDN scenarios.
+- `X-JFrog-Download-Redirect-To` with `None`, `S3` and `CF` is honoured.
+- Every Terraform root the Makefile uses lives under `deploy/`; `test/terraform` keeps only
+  its driver.
+- `single-bucket`, `multi-region`, `geo-replicated` and `cdn` exist for AWS, GCP and
+  Azure, plus `multicloud/mirror`, each documented with inputs, outputs, costs and a
+  rendered `artifactweave.yaml`.
+- Every pull request runs fmt, validate, tflint, trivy, mocked `terraform test` and the
+  docs drift check over them.
+- Each scenario has a recorded `platform-scenarios` run that applied, passed
+  `test/platform` and destroyed.
 
 ## P5: Full AQL, searches, build-info
 
