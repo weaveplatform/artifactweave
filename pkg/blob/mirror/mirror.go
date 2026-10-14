@@ -243,8 +243,8 @@ func (s *Store) WaitIdle(ctx context.Context) error {
 }
 
 var (
-	_ blob.Store     = (*Store)(nil)
-	_ blob.Presigner = (*Store)(nil)
+	_ blob.Store  = (*Store)(nil)
+	_ blob.Signer = (*Store)(nil)
 )
 
 // member is a Member with its health.

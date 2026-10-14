@@ -95,11 +95,15 @@ func serve(
 			Mirrors:       rt.mirrorsAdmin(),
 			Multipart:     rt.multipart,
 			Tokens:        rt.tokens,
+			Redirect: server.Redirect{
+				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
+			},
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },
 		ErrorLog:          stdlog.New(serverLog{log}, "", 0),
 	}
+	logSigning(ctx, log, rt.store, rt.blobs)
 	log.Info("artifactweave listening",
 		"addr", ln.Addr().String(),
 		"version", buildinfo.Version(),

@@ -35,6 +35,14 @@ const (
 	DefaultBlobBackend   = "fs"
 	DefaultLogLevel      = "info"
 	DefaultLogFormat     = "json"
+	// DefaultRedirectMinSize matches Artifactory's self-hosted 1 MB: below
+	// it a redirect costs the client more than the bytes it saves.
+	DefaultRedirectMinSize ByteSize = 1 << 20
+	// DefaultRedirectTTL covers a client's retries and the later parts of a
+	// split download, which Artifactory's 30 seconds do not (decision 0029).
+	DefaultRedirectTTL = 5 * time.Minute
+	// maxRedirectTTL is the V4 signing limit on S3 and GCS.
+	maxRedirectTTL = 7 * 24 * time.Hour
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -58,6 +66,20 @@ type Config struct {
 	Docker            DockerConfig    `yaml:"docker"`
 	Log               LogConfig       `yaml:"log"`
 	GC                GCConfig        `yaml:"gc"`
+	Download          DownloadConfig  `yaml:"download"`
+}
+
+// DownloadConfig holds how downloads are served.
+type DownloadConfig struct {
+	Redirect RedirectConfig `yaml:"redirect"`
+}
+
+// RedirectConfig tunes downloadRedirect and cdnRedirect (decision 0029).
+type RedirectConfig struct {
+	// MinSize is the smallest file that redirects; smaller files stream.
+	MinSize ByteSize `yaml:"min_size"`
+	// TTL is the least time a signed URL stays valid once handed out.
+	TTL time.Duration `yaml:"ttl"`
 }
 
 // GCConfig schedules garbage collection (decision 0010). Zero values mean
@@ -137,6 +159,9 @@ func Default() Config {
 		Database: DatabaseConfig{Driver: DefaultDriver},
 		Blob:     BlobConfig{Backend: DefaultBlobBackend},
 		Log:      LogConfig{Level: DefaultLogLevel, Format: DefaultLogFormat},
+		Download: DownloadConfig{Redirect: RedirectConfig{
+			MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL,
+		}},
 	}
 }
 
@@ -201,6 +226,7 @@ var keys = append(append([]string{
 	"docker.subdomain_match",
 	"log.level", "log.format",
 	"gc.interval", "gc.grace_period",
+	"download.redirect.min_size", "download.redirect.ttl",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -247,6 +273,14 @@ func set(cfg *Config, key, value string) error {
 		return setDuration(&cfg.GC.Interval, key, value)
 	case "gc.grace_period":
 		return setDuration(&cfg.GC.GracePeriod, key, value)
+	case "download.redirect.min_size":
+		n, err := ParseByteSize(value)
+		if err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+		cfg.Download.Redirect.MinSize = n
+	case "download.redirect.ttl":
+		return setDuration(&cfg.Download.Redirect.TTL, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -307,6 +341,11 @@ func (c Config) Validate() error {
 	if c.GC.Interval < 0 || c.GC.GracePeriod < 0 {
 		errs = append(errs, fmt.Errorf("%w: gc.interval and gc.grace_period must not be negative",
 			ErrInvalidValue))
+	}
+	if ttl := c.Download.Redirect.TTL; ttl <= 0 || ttl > maxRedirectTTL {
+		errs = append(errs, fmt.Errorf(
+			"%w: download.redirect.ttl %s must be more than zero and at most 7 days",
+			ErrInvalidValue, ttl))
 	}
 	return errors.Join(errs...)
 }

@@ -123,7 +123,7 @@ func TestContractOnRealAzure(t *testing.T) {
 			// Small parts and copy ranges so the large blob takes several
 			// blocks and several server-side copy calls.
 			PartSize: 1 << 20, CopyRangeSize: 3 << 20, Concurrency: 4,
-			Sessions: session.NewMemory(),
+			Sessions: session.NewMemory(), Presign: true,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -285,7 +285,7 @@ func realSigner(ctx context.Context, t *testing.T, ra realAccount) func(string) 
 		t.Fatal(err)
 	}
 	return func(name string) string {
-		u, err := api.SignRead(ctx, name, time.Hour)
+		u, err := api.SignRead(ctx, name, ReadSAS{TTL: time.Hour})
 		if err != nil {
 			t.Fatal(err)
 		}

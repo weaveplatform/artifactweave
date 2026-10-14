@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -671,12 +672,11 @@ func (s artifactoryService) serveFile(
 	h.Set("X-Checksum-Md5", it.Actual.MD5)
 	h.Set("X-Artifactory-Filename", it.Name)
 	h.Set("Content-Type", it.MimeType)
-	h.Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s",
-		it.Name, url.PathEscape(it.Name)))
+	h.Set("Content-Disposition", blob.Disposition(it.Name))
 	if it.Actual.SHA1 != "" {
 		h.Set("ETag", `"`+it.Actual.SHA1+`"`)
 	}
-	if r.Method == http.MethodGet && f.repo.DownloadRedirect.Bool() && s.redirect(w, r, st, f, p) {
+	if s.redirect(w, r, st, f, p) {
 		return
 	}
 	content, _, err := s.cfg.Blobs.Open(ctx, it.Actual.SHA256)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -341,8 +342,15 @@ func (p fakePresign) PresignGetObject(
 	for _, fn := range opts {
 		fn(&o)
 	}
+	q := url.Values{"expires": {o.Expires.String()}}
+	if in.ResponseContentDisposition != nil {
+		q.Set("response-content-disposition", *in.ResponseContentDisposition)
+	}
+	if in.ResponseContentType != nil {
+		q.Set("response-content-type", *in.ResponseContentType)
+	}
 	return &v4.PresignedHTTPRequest{
-		URL:    "https://fake.invalid/" + aws.ToString(in.Key) + "?expires=" + o.Expires.String(),
+		URL:    "https://fake.invalid/" + aws.ToString(in.Key) + "?" + q.Encode(),
 		Method: "GET",
 	}, nil
 }

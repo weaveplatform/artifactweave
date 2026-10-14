@@ -46,7 +46,7 @@ func TestContractOnAzurite(t *testing.T) {
 		}
 		s, err := New(api, Options{
 			Prefix: "art", PartSize: 256 << 10, CopyRangeSize: 300 << 10, Concurrency: 4,
-			Sessions: session.NewMemory(),
+			Sessions: session.NewMemory(), Presign: true,
 		})
 		if err != nil {
 			t.Fatal(err)

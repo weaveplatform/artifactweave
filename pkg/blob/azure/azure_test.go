@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -35,6 +36,7 @@ func newFakeStore(t *testing.T, f *fakeAzure, sessions session.Store) *Store {
 		CopyRangeSize: testRange,
 		Concurrency:   3,
 		Sessions:      sessions,
+		Presign:       true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -549,12 +551,46 @@ func TestDeleteWalkPresignErrors(t *testing.T) {
 	if err := s.Walk(ctx, func(blob.Info) error { n++; return nil }); err != nil || n != 1 {
 		t.Fatalf("walk = %d, %v", n, err)
 	}
-	if url, err := s.PresignGet(ctx, sha, time.Minute); err != nil || !strings.Contains(url, sha) {
-		t.Fatalf("presign = %q, %v", url, err)
+	if !s.Signs(blob.ViaStorage) || s.Signs(blob.ViaCDN) {
+		t.Fatal("Presign signs storage URLs only")
+	}
+	signed, err := s.SignURL(ctx, sha, blob.SignOptions{
+		TTL: time.Minute, Filename: "x.bin", ContentType: "application/x-bin",
+	})
+	if err != nil || !strings.Contains(signed, sha) {
+		t.Fatalf("sign = %q, %v", signed, err)
+	}
+	u, err := url.Parse(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q := u.Query(); q.Get("rscd") != blob.Disposition("x.bin") ||
+		q.Get("rsct") != "application/x-bin" {
+		t.Fatalf("overrides %v", q)
+	}
+	if _, err := s.SignURL(ctx, sha, blob.SignOptions{}); !errors.Is(err, ErrConfig) {
+		t.Fatalf("zero ttl: %v", err)
+	}
+	_, err = s.SignURL(ctx, "bad", blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, blob.ErrInvalidDigest) {
+		t.Fatal(err)
+	}
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute})
+	if !errors.Is(err, blob.ErrCannotSign) {
+		t.Fatal(err)
 	}
 	f.noSign = true
-	if _, err := s.PresignGet(ctx, sha, time.Minute); !errors.Is(err, ErrConfig) {
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, ErrConfig) {
 		t.Fatal(err)
+	}
+	s.presign = false
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, blob.ErrCannotSign) {
+		t.Fatal(err)
+	}
+	if s.ObjectKey(sha) != s.prefix+"sha256/"+sha[:2]+"/"+sha {
+		t.Fatalf("object key %q", s.ObjectKey(sha))
 	}
 }
 

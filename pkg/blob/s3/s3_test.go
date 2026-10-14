@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -475,17 +476,55 @@ func TestDeleteWalkPresignErrors(t *testing.T) {
 		t.Fatalf("walk: %d %v", count, err)
 	}
 
-	url, err := s.PresignGet(ctx, sha, time.Minute)
-	if err != nil || !strings.Contains(url, sha) {
-		t.Fatalf("%q %v", url, err)
+	if !s.Signs(blob.ViaStorage) || s.Signs(blob.ViaCDN) {
+		t.Fatal("a store with a presign client signs storage URLs only")
+	}
+	signed, err := s.SignURL(ctx, sha, blob.SignOptions{
+		TTL: time.Minute, Filename: "a b.tgz", ContentType: "application/x-gzip",
+	})
+	if err != nil || !strings.Contains(signed, sha) {
+		t.Fatalf("%q %v", signed, err)
+	}
+	u, err := url.Parse(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q := u.Query(); q.Get("response-content-disposition") != blob.Disposition("a b.tgz") ||
+		q.Get("response-content-type") != "application/x-gzip" || q.Get("expires") != "1m0s" {
+		t.Fatalf("overrides and expiry: %v", q)
+	}
+	plain, err := s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if err != nil || strings.Contains(plain, "response-content") {
+		t.Fatalf("no overrides asked for: %q %v", plain, err)
+	}
+	for _, ttl := range []time.Duration{0, 7*24*time.Hour + time.Second} {
+		if _, err := s.SignURL(ctx, sha, blob.SignOptions{TTL: ttl}); !errors.Is(err, ErrConfig) {
+			t.Fatalf("ttl %s: %v", ttl, err)
+		}
+	}
+	_, err = s.SignURL(ctx, "bad", blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, blob.ErrInvalidDigest) {
+		t.Fatal(err)
+	}
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute})
+	if !errors.Is(err, blob.ErrCannotSign) {
+		t.Fatal(err)
 	}
 	s.presign = fakePresign{err: errInjected}
-	if _, err := s.PresignGet(ctx, sha, time.Minute); !errors.Is(err, errInjected) {
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, errInjected) {
 		t.Fatal(err)
 	}
 	s.presign = nil
-	if _, err := s.PresignGet(ctx, sha, time.Minute); !errors.Is(err, ErrConfig) {
+	if s.Signs(blob.ViaStorage) {
+		t.Fatal("no presign client, no storage URLs")
+	}
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, blob.ErrCannotSign) {
 		t.Fatal(err)
+	}
+	if s.ObjectKey(sha) != "art/sha256/"+sha[:2]+"/"+sha {
+		t.Fatalf("object key %q", s.ObjectKey(sha))
 	}
 }
 

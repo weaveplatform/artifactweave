@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"net/url"
 	"regexp"
 	"time"
 )
@@ -45,6 +46,9 @@ var (
 	// ErrInvalidDigest reports a digest that is not lowercase hex of the right
 	// length for its algorithm.
 	ErrInvalidDigest = errors.New("blob: invalid digest")
+	// ErrCannotSign reports a SignURL for a route the store does not sign:
+	// Signs(via) is false.
+	ErrCannotSign = errors.New("blob: store cannot sign this route")
 )
 
 // Digests are lowercase hex checksums. In Commit's want argument an empty
@@ -107,10 +111,54 @@ type Upload interface {
 	Abort(ctx context.Context) error
 }
 
-// Presigner is implemented by backends that can hand a client a time-limited
-// URL for a blob, used when a repository sets downloadRedirect.
-type Presigner interface {
-	PresignGet(ctx context.Context, sha256 string, ttl time.Duration) (string, error)
+// Via is the route a signed download URL takes (decision 0029).
+type Via int
+
+const (
+	// ViaStorage is a URL on the object store itself.
+	ViaStorage Via = iota
+	// ViaCDN is a URL on a CDN in front of the object store.
+	ViaCDN
+)
+
+// String names the route for logs.
+func (v Via) String() string {
+	if v == ViaCDN {
+		return "cdn"
+	}
+	return "storage"
+}
+
+// SignOptions describe one signed download URL.
+type SignOptions struct {
+	// Via is the route.
+	Via Via
+	// TTL is how long the URL stays valid once handed out.
+	TTL time.Duration
+	// Filename and ContentType, when set, travel as response overrides, so
+	// the object store answers with the item's name and media type rather
+	// than the blob's: the 302 that points at the URL describes no body.
+	Filename    string
+	ContentType string
+}
+
+// Signer is implemented by backends that can hand a client a time-limited
+// URL for a blob, used when a repository sets downloadRedirect or
+// cdnRedirect. Signs is fixed when the store is built, from its
+// configuration and credentials, so a caller knows the route is available
+// before it tries; SignURL returns ErrCannotSign for a route Signs refuses.
+type Signer interface {
+	Signs(via Via) bool
+	SignURL(ctx context.Context, sha256 string, o SignOptions) (string, error)
+}
+
+// Disposition is the Content-Disposition naming a downloaded file, in the
+// form Artifactory sends: a quoted name for old clients and an RFC 6266
+// UTF-8 name for the rest. A streamed download and a signed URL's override
+// use the same value.
+func Disposition(filename string) string {
+	return fmt.Sprintf("attachment; filename=%q; filename*=UTF-8''%s",
+		filename, url.PathEscape(filename))
 }
 
 // PartSizer is implemented by backends that write an upload in parts of a

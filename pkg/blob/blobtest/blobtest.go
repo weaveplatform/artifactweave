@@ -27,8 +27,9 @@ type Options struct {
 	// Backends that buffer into parts set it above their part size. Zero
 	// means 3 MiB.
 	LargeSize int
-	// FetchPresigned makes the suite GET a presigned URL over HTTP and compare
-	// the body. Only meaningful against a real object store.
+	// FetchPresigned makes the suite GET a signed URL over HTTP and compare
+	// the body and the response overrides. Only meaningful against a real
+	// object store.
 	FetchPresigned bool
 }
 
@@ -54,7 +55,7 @@ func Run(t *testing.T, newStore func(t *testing.T) blob.Store, o Options) {
 		"walk":                  func(t *testing.T, s blob.Store) { walk(ctx, t, s) },
 		"delete and not found":  func(t *testing.T, s blob.Store) { deleteNotFound(ctx, t, s) },
 		"cancelled context":     func(t *testing.T, s blob.Store) { cancelled(t, s) },
-		"presign":               func(t *testing.T, s blob.Store) { presign(ctx, t, s, o.FetchPresigned) },
+		"sign":                  func(t *testing.T, s blob.Store) { sign(ctx, t, s, o) },
 	}
 	names := make([]string, 0, len(tests))
 	for name := range tests {
@@ -568,21 +569,32 @@ func cancelled(t *testing.T, s blob.Store) {
 	}
 }
 
-func presign(ctx context.Context, t *testing.T, s blob.Store, fetch bool) {
-	p, ok := s.(blob.Presigner)
-	if !ok {
-		t.Skip("backend does not presign")
+func sign(ctx context.Context, t *testing.T, s blob.Store, o Options) {
+	sg, ok := s.(blob.Signer)
+	if !ok || !sg.Signs(blob.ViaStorage) {
+		t.Skip("backend does not sign storage URLs")
 	}
 	body := Content(50, 3000)
 	info := Put(ctx, t, s, body)
-	if _, err := p.PresignGet(ctx, "bad", time.Minute); !errors.Is(err, blob.ErrInvalidDigest) {
-		t.Fatalf("presign invalid digest: %v", err)
+	opts := blob.SignOptions{
+		TTL: time.Minute, Filename: "lib 1.0.tgz", ContentType: "application/x-test",
 	}
-	url, err := p.PresignGet(ctx, info.Digests.SHA256, time.Minute)
+	if _, err := sg.SignURL(ctx, "bad", opts); !errors.Is(err, blob.ErrInvalidDigest) {
+		t.Fatalf("sign invalid digest: %v", err)
+	}
+	if !sg.Signs(blob.ViaCDN) {
+		cdn := opts
+		cdn.Via = blob.ViaCDN
+		_, err := sg.SignURL(ctx, info.Digests.SHA256, cdn)
+		if !errors.Is(err, blob.ErrCannotSign) {
+			t.Fatalf("sign for a CDN the store lacks: %v", err)
+		}
+	}
+	url, err := sg.SignURL(ctx, info.Digests.SHA256, opts)
 	if err != nil || url == "" {
-		t.Fatalf("presign: %q %v", url, err)
+		t.Fatalf("sign: %q %v", url, err)
 	}
-	if !fetch {
+	if !o.FetchPresigned {
 		return
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -596,6 +608,14 @@ func presign(ctx context.Context, t *testing.T, s blob.Store, fetch bool) {
 	defer func() { _ = resp.Body.Close() }()
 	got, err := io.ReadAll(resp.Body)
 	if err != nil || resp.StatusCode != http.StatusOK || !bytes.Equal(got, body) {
-		t.Fatalf("presigned GET: %d %v (%d bytes)", resp.StatusCode, err, len(got))
+		t.Fatalf("signed GET: %d %v (%d bytes)", resp.StatusCode, err, len(got))
+	}
+	if cd, ct := resp.Header.Get(
+		"Content-Disposition",
+	), resp.Header.Get(
+		"Content-Type",
+	); cd != blob.Disposition(opts.Filename) ||
+		ct != opts.ContentType {
+		t.Fatalf("signed GET overrides: Content-Disposition %q, Content-Type %q", cd, ct)
 	}
 }

@@ -550,21 +550,43 @@ func TestDeleteWalkPresignErrors(t *testing.T) {
 	}
 	f.failOn("Delete", 100, nil)
 
-	if _, err := s.PresignGet(ctx, sha, 8*24*time.Hour); !errors.Is(err, ErrConfig) {
-		t.Fatalf("ttl above seven days: %v", err)
+	if !s.Signs(blob.ViaStorage) || s.Signs(blob.ViaCDN) {
+		t.Fatal("Presign signs storage URLs only")
 	}
-	if _, err := s.PresignGet(ctx, sha, 0); !errors.Is(err, ErrConfig) {
-		t.Fatalf("zero ttl: %v", err)
+	for _, ttl := range []time.Duration{8 * 24 * time.Hour, 0} {
+		if _, err := s.SignURL(ctx, sha, blob.SignOptions{TTL: ttl}); !errors.Is(err, ErrConfig) {
+			t.Fatalf("ttl %s: %v", ttl, err)
+		}
+	}
+	_, err := s.SignURL(ctx, "bad", blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, blob.ErrInvalidDigest) {
+		t.Fatalf("invalid digest: %v", err)
+	}
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute})
+	if !errors.Is(err, blob.ErrCannotSign) {
+		t.Fatalf("no CDN: %v", err)
+	}
+	plain, err := s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if err != nil || strings.Contains(plain, "response-content") {
+		t.Fatalf("no overrides asked for: %q %v", plain, err)
 	}
 	f.failOn("SignedURL", 0, errInjected)
-	if _, err := s.PresignGet(ctx, sha, time.Minute); !errors.Is(err, errInjected) {
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, errInjected) {
 		t.Fatalf("signing failure: %v", err)
 	}
 	off, err := New(f, Options{Sessions: session.NewMemory(), PartSize: testPart})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := off.PresignGet(ctx, sha, time.Minute); !errors.Is(err, ErrConfig) {
+	if off.Signs(blob.ViaStorage) {
+		t.Fatal("presigning off signs nothing")
+	}
+	_, err = off.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, blob.ErrCannotSign) {
 		t.Fatalf("presigning off: %v", err)
+	}
+	if s.ObjectKey(sha) != "art/sha256/"+sha[:2]+"/"+sha {
+		t.Fatalf("object key %q", s.ObjectKey(sha))
 	}
 }

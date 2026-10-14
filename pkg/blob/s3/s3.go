@@ -108,6 +108,8 @@ const (
 	DefaultPartSize = 8 << 20
 	// copyPartSize is the range each UploadPartCopy moves above copyLimit.
 	copyPartSize = 1 << 30
+	// maxSignedTTL is the longest validity SigV4 allows a presigned URL.
+	maxSignedTTL = 7 * 24 * time.Hour
 )
 
 // S3 limits, as variables so tests can exercise the paths without
@@ -136,7 +138,8 @@ type Options struct {
 	// Sessions holds upload sessions between requests; session.InUploads
 	// with a backend name such as "s3:<store name>" keeps them durable.
 	Sessions session.Store
-	// Presign enables PresignGet when set.
+	// Presign signs storage URLs when set (blob.Signer); NewClient always
+	// returns one.
 	Presign PresignAPI
 }
 
@@ -152,7 +155,7 @@ type Store struct {
 
 var (
 	_ blob.Store     = (*Store)(nil)
-	_ blob.Presigner = (*Store)(nil)
+	_ blob.Signer    = (*Store)(nil)
 	_ blob.PartSizer = (*Store)(nil)
 )
 
@@ -186,7 +189,12 @@ func New(api API, o Options) (*Store, error) {
 func (s *Store) PartSize() int64 { return s.partSize }
 
 func (s *Store) blobKey(sha string) string { return s.prefix + "sha256/" + sha[:2] + "/" + sha }
-func (s *Store) tempKey(id string) string  { return s.prefix + "_uploads/" + id }
+
+// ObjectKey is the key a blob is stored under, prefix included, for signers
+// that address the bucket directly, such as a CDN. sha must be a valid
+// digest (blob.ValidateSHA256).
+func (s *Store) ObjectKey(sha string) string { return s.blobKey(sha) }
+func (s *Store) tempKey(id string) string    { return s.prefix + "_uploads/" + id }
 
 // multipart is the s3 backend's part of a session: the multipart upload
 // once the first full part starts it. The json tags are the storage format.
@@ -524,19 +532,38 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 	}
 }
 
-// PresignGet returns a time-limited GET URL for downloadRedirect.
-func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (string, error) {
+// Signs reports whether the store signs URLs for via: storage URLs when it
+// has a presign client. It signs no CDN route yet.
+func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign != nil }
+
+// SignURL returns a time-limited GET URL, carrying o's filename and media
+// type as response overrides.
+func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (string, error) {
 	if err := blob.ValidateSHA256(sha); err != nil {
-		return "", err
+		return "", err //nolint:wrapcheck // already a blob sentinel
 	}
-	if s.presign == nil {
-		return "", fmt.Errorf("%w: presigning is not configured", ErrConfig)
+	if !s.Signs(o.Via) {
+		return "", fmt.Errorf("blob/s3: sign %s via %s: %w", sha, o.Via, blob.ErrCannotSign)
+	}
+	if o.TTL <= 0 || o.TTL > maxSignedTTL {
+		return "", fmt.Errorf(
+			"%w: a signed URL must last more than zero and at most 7 days, not %s",
+			ErrConfig,
+			o.TTL,
+		)
 	}
 	key := s.blobKey(sha)
-	req, err := s.presign.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: &s.bucket, Key: &key},
-		func(o *s3.PresignOptions) { o.Expires = ttl })
+	in := &s3.GetObjectInput{Bucket: &s.bucket, Key: &key}
+	if o.Filename != "" {
+		in.ResponseContentDisposition = aws.String(blob.Disposition(o.Filename))
+	}
+	if o.ContentType != "" {
+		in.ResponseContentType = aws.String(o.ContentType)
+	}
+	req, err := s.presign.PresignGetObject(ctx, in,
+		func(p *s3.PresignOptions) { p.Expires = o.TTL })
 	if err != nil {
-		return "", fmt.Errorf("blob/s3: presign %s: %w", sha, err)
+		return "", fmt.Errorf("blob/s3: sign %s: %w", sha, err)
 	}
 	return req.URL, nil
 }

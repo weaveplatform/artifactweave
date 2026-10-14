@@ -22,8 +22,8 @@ import (
 
 const testChunk = 16 << 10
 
-// fakes returns n fake members named m0, m1, ... ; every one can presign
-// when presign is set.
+// fakes returns n fake members named m0, m1, ... ; every one signs storage
+// URLs when presign is set.
 func fakes(n int, presign bool) ([]*fake, []Member) {
 	fs := make([]*fake, n)
 	ms := make([]Member, n)
@@ -515,7 +515,7 @@ func TestDeleteWithMemberDown(t *testing.T) {
 	}
 }
 
-func TestPresign(t *testing.T) {
+func TestSign(t *testing.T) {
 	ctx := context.Background()
 	f := newFake()
 	ms := []Member{
@@ -523,43 +523,85 @@ func TestPresign(t *testing.T) {
 		{Name: "signer", Store: presigner{f}, WriteEnabled: true},
 	}
 	s, r := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+	if !s.Signs(blob.ViaStorage) || s.Signs(blob.ViaCDN) {
+		t.Fatal("the mirror signs the routes its members sign")
+	}
+	storage := blob.SignOptions{TTL: time.Minute}
 	info := put(t, s, blobtest.Content(11, 10))
-	url, err := s.PresignGet(ctx, info.Digests.SHA256, time.Minute)
+	url, err := s.SignURL(ctx, info.Digests.SHA256, storage)
 	if err != nil || url != "fake://"+info.Digests.SHA256 {
-		t.Fatalf("presign %q %v", url, err)
+		t.Fatalf("sign %q %v", url, err)
+	}
+	_, err = s.SignURL(
+		ctx,
+		info.Digests.SHA256,
+		blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute},
+	)
+	if !errors.Is(err, blob.ErrCannotSign) {
+		t.Fatalf("no member has a CDN: %v", err)
 	}
 	// Without index records only a member holding the blob signs.
 	if _, err := r.DeleteBlob(ctx, info.Digests.SHA256); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.PresignGet(ctx, info.Digests.SHA256, time.Minute); err != nil {
-		t.Fatalf("probing presign: %v", err)
+	if _, err := s.SignURL(ctx, info.Digests.SHA256, storage); err != nil {
+		t.Fatalf("probing sign: %v", err)
 	}
 	missing := blobtest.Digest([]byte("missing")).SHA256
-	if _, err := s.PresignGet(ctx, missing, time.Minute); !errors.Is(err, blob.ErrNotFound) {
-		t.Fatalf("presign of a missing blob: %v", err)
+	if _, err := s.SignURL(ctx, missing, storage); !errors.Is(err, blob.ErrNotFound) {
+		t.Fatalf("sign of a missing blob: %v", err)
 	}
-	f.failOn("presign", 0, errInjected)
-	if _, err := s.PresignGet(ctx, info.Digests.SHA256, time.Minute); !errors.Is(err, errInjected) {
+	f.failOn("sign", 0, errInjected)
+	if _, err := s.SignURL(ctx, info.Digests.SHA256, storage); !errors.Is(err, errInjected) {
 		t.Fatal(err)
 	}
 
 	_, plain := fakes(2, false)
 	s, _ = newMirror(t, plain, nil)
 	info = put(t, s, blobtest.Content(12, 10))
-	if _, err := s.PresignGet(ctx, info.Digests.SHA256, time.Minute); !errors.Is(err, ErrConfig) {
-		t.Fatalf("no member can presign: %v", err)
+	if s.Signs(blob.ViaStorage) {
+		t.Fatal("no member signs")
 	}
-	if _, err := s.PresignGet(ctx, "bad", time.Minute); !errors.Is(err, blob.ErrInvalidDigest) {
+	if _, err := s.SignURL(ctx, info.Digests.SHA256, storage); !errors.Is(err, blob.ErrCannotSign) {
+		t.Fatalf("no member can sign: %v", err)
+	}
+	if _, err := s.SignURL(ctx, "bad", storage); !errors.Is(err, blob.ErrInvalidDigest) {
 		t.Fatal(err)
 	}
 }
 
+// The CDN route skips members without a CDN, even ahead in read order, and
+// passes the options through.
+func TestSignPicksAMemberForTheRoute(t *testing.T) {
+	// The bubble's frozen clock gives both members the same latency, so
+	// read order is configuration order.
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		ms := []Member{
+			{Name: "storage", Store: presigner{newFake()}, WriteEnabled: true},
+			{Name: "edge", Store: cdnSigner{newFake()}, WriteEnabled: true},
+		}
+		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+		if !s.Signs(blob.ViaCDN) {
+			t.Fatal("a member with a CDN gives the mirror one")
+		}
+		sha := put(t, s, blobtest.Content(14, 10)).Digests.SHA256
+		cdn := blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute, Filename: "a.tgz"}
+		if url, err := s.SignURL(ctx, sha, cdn); err != nil || url != "cdn://"+sha+"/a.tgz" {
+			t.Fatalf("CDN sign %q %v", url, err)
+		}
+		storage := blob.SignOptions{TTL: time.Minute}
+		if url, err := s.SignURL(ctx, sha, storage); err != nil || url != "fake://"+sha {
+			t.Fatalf("storage sign comes from the first member in read order: %q %v", url, err)
+		}
+	})
+}
+
 // A member that cannot sign (Azure on a SAS token, GCS without signBlob)
-// fails every PresignGet with its configuration error. Counting that as a
+// fails every signature with its configuration error. Counting that as a
 // health failure opened its breaker and pushed its reads behind the other
 // members, although its storage was fine.
-func TestPresignFailureKeepsHealth(t *testing.T) {
+func TestSignFailureKeepsHealth(t *testing.T) {
 	// The bubble's frozen clock gives both members the same latency, so
 	// read order is configuration order and the unsigned member comes first.
 	synctest.Test(t, func(t *testing.T) {
@@ -571,17 +613,22 @@ func TestPresignFailureKeepsHealth(t *testing.T) {
 		}
 		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum, o.BreakerThreshold = 2, 2 })
 		sha := put(t, s, blobtest.Content(13, 10)).Digests.SHA256
-		unsigned.failOn("presign", 0, fmt.Errorf("%w: cannot sign", ErrConfig))
+		unsigned.failOn("sign", 0, fmt.Errorf("%w: cannot sign", ErrConfig))
 		for range 10 {
-			if url, err := s.PresignGet(ctx, sha, time.Minute); err != nil || url != "fake://"+sha {
-				t.Fatalf("presign %q %v", url, err)
+			if url, err := s.SignURL(
+				ctx,
+				sha,
+				blob.SignOptions{TTL: time.Minute},
+			); err != nil ||
+				url != "fake://"+sha {
+				t.Fatalf("sign %q %v", url, err)
 			}
 		}
 		if s.byName["unsigned"].health.open(s.now()) {
 			t.Fatal("signing failures opened the breaker")
 		}
 		// Still first in read order, so it was asked every time.
-		if n := unsigned.calls["presign"]; n != 10 {
+		if n := unsigned.calls["sign"]; n != 10 {
 			t.Fatalf("unsigned member asked %d times, want 10", n)
 		}
 	})
@@ -863,7 +910,7 @@ func (f failingReplicas) DeleteBlob(ctx context.Context, sha string) (int64, err
 
 func TestReplicaIndexFailures(t *testing.T) {
 	ctx := context.Background()
-	_, ms := fakes(3, false)
+	_, ms := fakes(3, true)
 	base := inmem.New().Replicas()
 	s, _ := newMirror(
 		t,
@@ -893,7 +940,8 @@ func TestReplicaIndexFailures(t *testing.T) {
 	if _, _, err := s.Open(ctx, sha); !errors.Is(err, errInjected) {
 		t.Fatal(err)
 	}
-	if _, err := s.PresignGet(ctx, sha, time.Minute); !errors.Is(err, errInjected) {
+	_, err = s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
+	if !errors.Is(err, errInjected) {
 		t.Fatal(err)
 	}
 	s, _ = newMirror(

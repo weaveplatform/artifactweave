@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
+	"slices"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -347,25 +347,37 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 	return nil
 }
 
-// PresignGet returns a time-limited URL from the first member, in read
-// order, that holds the blob and can presign. A member's signing failure
-// moves on to the next member but never counts against its health.
-func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (string, error) {
-	if err := s.check(ctx, "presign", sha); err != nil {
+// Signs reports whether any member signs URLs for via. Members are fixed
+// when the mirror is built, so the answer is too.
+func (s *Store) Signs(via blob.Via) bool {
+	return slices.ContainsFunc(s.members, func(m *member) bool { return signs(m, via) })
+}
+
+// signs reports whether member m signs URLs for via.
+func signs(m *member, via blob.Via) bool {
+	sg, ok := m.Store.(blob.Signer)
+	return ok && sg.Signs(via)
+}
+
+// SignURL returns a URL from the first member, in read order, that holds
+// the blob and signs o's route. A member's signing failure moves on to the
+// next member but never counts against its health.
+func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (string, error) {
+	if err := s.check(ctx, "sign", sha); err != nil {
 		return "", err
+	}
+	if !s.Signs(o.Via) {
+		return "", fmt.Errorf("blob/mirror: sign %s via %s: %w", sha, o.Via, blob.ErrCannotSign)
 	}
 	ms, probing, err := s.candidates(ctx, sha)
 	if err != nil {
 		return "", err
 	}
-	capable := false
 	var url string
-	err = s.try(ctx, ms, "presign", sha, false, func(m *member) error {
-		p, ok := m.Store.(blob.Presigner)
-		if !ok {
-			return fmt.Errorf("presigning: %w", blob.ErrNotFound)
+	err = s.try(ctx, ms, "sign", sha, false, func(m *member) error {
+		if !signs(m, o.Via) {
+			return fmt.Errorf("signing via %s: %w", o.Via, blob.ErrNotFound)
 		}
-		capable = true
 		if probing {
 			// Without an index record, only a member that holds the blob
 			// may hand out a URL to it. The probe is a storage call, so
@@ -378,12 +390,13 @@ func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (
 			}
 		}
 		var err error
-		url, err = p.PresignGet(ctx, sha, ttl)
-		return err //nolint:wrapcheck // tagged by each
+		url, err = m.Store.(blob.Signer).SignURL(
+			ctx,
+			sha,
+			o,
+		) //nolint:forcetypeassert // signs checked it
+		return err //nolint:wrapcheck // tagged by try
 	})
-	if !capable {
-		return "", fmt.Errorf("%w: no member can presign", ErrConfig)
-	}
 	return url, err
 }
 

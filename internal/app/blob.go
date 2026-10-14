@@ -174,18 +174,17 @@ func buildBackend(
 			Bucket: b.S3.Bucket, Prefix: b.S3.Prefix, Sessions: sessions, Presign: presign,
 		})
 	case "gcs":
-		api, err := gcs.NewAPI(ctx, b.GCS.Bucket, gcs.ClientConfig{
+		cc := gcs.ClientConfig{
 			Endpoint: b.GCS.Endpoint, CredentialsFile: b.GCS.CredentialsFile,
 			GoogleAccessID: b.GCS.GoogleAccessID,
-		})
+		}
+		api, err := gcs.NewAPI(ctx, b.GCS.Bucket, cc)
 		if err != nil {
 			return nil, err //nolint:wrapcheck // wrapped with the key by openBackend
 		}
 		return gcs.New(api, gcs.Options{ //nolint:wrapcheck // as above
 			Prefix: b.GCS.Prefix, PartSize: int64(b.GCS.PartSize), Sessions: sessions,
-			// Signing is only tried when a repository redirects downloads;
-			// credentials that cannot sign fail that request, not startup.
-			Presign: true,
+			Presign: cc.CanSign(),
 		})
 	case "azure":
 		cc, err := azureClient(b.Azure)
@@ -199,7 +198,7 @@ func buildBackend(
 		return azure.New(api, azure.Options{ //nolint:wrapcheck // as above
 			Prefix: b.Azure.Prefix, PartSize: int64(b.Azure.PartSize),
 			CopyRangeSize: int64(b.Azure.CopyRangeSize), Concurrency: b.Azure.Concurrency,
-			Sessions: sessions,
+			Sessions: sessions, Presign: cc.CanSign(),
 		})
 	default:
 		return nil, fmt.Errorf("%w %q", config.ErrUnknownBlob, b.Backend)
@@ -249,6 +248,33 @@ func logRepair(log *slog.Logger, section string) func(mirror.RepairReport, error
 				"copied", r.Copied, "found", r.Found, "failed", r.Failed,
 				"deleted", r.Deleted, "deletes_skipped", r.DeletesSkipped,
 				"backfilled", r.Backfilled, "drained", r.Drained)
+		}
+	}
+}
+
+// logSigning says at start which download routes the hot blob store signs,
+// and warns once for every repository whose redirect flags ask for a route
+// it cannot sign, so a misconfigured store shows before downloads quietly
+// stream (decision 0029). Repositories created later are not checked.
+func logSigning(ctx context.Context, log *slog.Logger, st store.Store, blobs blob.Store) {
+	signer, _ := blobs.(blob.Signer)
+	signs := func(via blob.Via) bool { return signer != nil && signer.Signs(via) }
+	log.InfoContext(ctx, "download redirect routes",
+		"storage", signs(blob.ViaStorage), "cdn", signs(blob.ViaCDN))
+	repos, err := st.Repos().List(ctx, store.RepoFilter{})
+	if err != nil {
+		log.WarnContext(ctx, "download redirect: listing repositories", "error", err)
+		return
+	}
+	for _, r := range repos {
+		download, cdn := r.DownloadRedirect.Bool(), r.CDNRedirect.Bool()
+		switch {
+		case download && !signs(blob.ViaStorage) && !signs(blob.ViaCDN):
+			log.WarnContext(ctx, "download redirect: the blob store cannot sign URLs, so "+
+				"downloads stream", "repo", r.Key)
+		case cdn && !download && !signs(blob.ViaCDN):
+			log.WarnContext(ctx, "download redirect: cdnRedirect is set but the blob store "+
+				"has no CDN, so downloads stream", "repo", r.Key)
 		}
 	}
 }

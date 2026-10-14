@@ -2,10 +2,15 @@ package gcs
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -68,6 +73,73 @@ func NewAPI(ctx context.Context, bucket string, cfg ClientConfig) (API, error) {
 		accessID: cfg.GoogleAccessID,
 		key:      cfg.PrivateKey,
 	}, nil
+}
+
+// CanSign reports whether a client built from cfg can sign URLs, decided
+// from the configuration and credential files without a request, so a store
+// knows its routes when it is built (decision 0029). The SDK signs locally
+// with a key, or through IAM signBlob as a service account it can name:
+// from GoogleAccessID, a service-account key, impersonated or federated
+// credentials that name one, or the metadata server on Google Cloud. User
+// credentials from "gcloud auth application-default login" name no account
+// and cannot sign without GoogleAccessID.
+func (cfg ClientConfig) CanSign() bool {
+	switch {
+	case cfg.WithoutAuthentication:
+		return cfg.GoogleAccessID != "" && len(cfg.PrivateKey) > 0
+	case cfg.GoogleAccessID != "":
+		return true
+	case cfg.CredentialsFile != "":
+		// NewAPI accepts only a service-account key here.
+		return true
+	}
+	file, ok := lookupEnv("GOOGLE_APPLICATION_CREDENTIALS")
+	if !ok || file == "" {
+		file = wellKnownADC()
+	}
+	data, err := os.ReadFile(file) //nolint:gosec // the operator's own credentials file
+	if err != nil {
+		// No credentials file: Application Default Credentials come from the
+		// metadata server, whose attached service account can sign.
+		return true
+	}
+	var creds struct {
+		Type             string `json:"type"`
+		ImpersonationURL string `json:"service_account_impersonation_url"`
+	}
+	if json.Unmarshal(data, &creds) != nil {
+		return false
+	}
+	switch creds.Type {
+	case "service_account", "impersonated_service_account":
+		return true
+	case "external_account":
+		return creds.ImpersonationURL != ""
+	}
+	return false
+}
+
+// lookupEnv and userHome are variables so tests control what CanSign sees.
+var (
+	lookupEnv = os.LookupEnv
+	userHome  = os.UserHomeDir
+)
+
+// wellKnownADC is where "gcloud auth application-default login" writes its
+// credentials.
+func wellKnownADC() string {
+	if dir, ok := lookupEnv("CLOUDSDK_CONFIG"); ok && dir != "" {
+		return filepath.Join(dir, "application_default_credentials.json")
+	}
+	if runtime.GOOS == "windows" {
+		appData, _ := lookupEnv("APPDATA")
+		return filepath.Join(appData, "gcloud", "application_default_credentials.json")
+	}
+	home, err := userHome()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "gcloud", "application_default_credentials.json")
 }
 
 // normaliseEndpoint ends an endpoint in "/storage/v1/"; without the trailing
@@ -178,18 +250,26 @@ func (a *sdkAPI) List(ctx context.Context, prefix string, fn func(Attrs) error) 
 	}
 }
 
-func (a *sdkAPI) SignedURL(name string, ttl time.Duration) (string, error) {
-	url, err := a.bucket.SignedURL(name, &storage.SignedURLOptions{
-		GoogleAccessID: a.accessID,
-		PrivateKey:     a.key,
-		Method:         http.MethodGet,
-		Expires:        time.Now().Add(ttl),
-		Scheme:         storage.SigningSchemeV4,
+func (a *sdkAPI) SignedURL(name string, o SignedURLOptions) (string, error) {
+	q := url.Values{}
+	if o.ContentDisposition != "" {
+		q.Set("response-content-disposition", o.ContentDisposition)
+	}
+	if o.ContentType != "" {
+		q.Set("response-content-type", o.ContentType)
+	}
+	signed, err := a.bucket.SignedURL(name, &storage.SignedURLOptions{
+		GoogleAccessID:  a.accessID,
+		PrivateKey:      a.key,
+		Method:          http.MethodGet,
+		Expires:         time.Now().Add(o.TTL),
+		Scheme:          storage.SigningSchemeV4,
+		QueryParameters: q,
 	})
 	if err != nil {
 		return "", fmt.Errorf("blob/gcs: sign: %w", err)
 	}
-	return url, nil
+	return signed, nil
 }
 
 // translate maps the SDK's errors onto the store's sentinels: a missing

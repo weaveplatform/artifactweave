@@ -152,6 +152,24 @@ func NewAPI(cfg ClientConfig) (API, error) {
 	return a, nil
 }
 
+// CanSign reports whether a client built from cfg can sign read URLs,
+// decided from the configuration alone so a store knows its routes when it
+// is built (decision 0029): a shared key (given, or inside the connection
+// string) signs service SAS, an Entra ID credential signs user delegation
+// SAS, and a pre-issued SAS token cannot sign anything.
+func (cfg ClientConfig) CanSign() bool {
+	switch {
+	case cfg.ConnectionString != "":
+		name, key := connectionKey(cfg.ConnectionString)
+		return name != "" && key != ""
+	case cfg.AccountKey != "":
+		return true
+	case cfg.SASToken != "":
+		return false
+	}
+	return true
+}
+
 // entraCredential returns the managed identity named by clientID, or the
 // default credential chain (environment, workload identity, managed
 // identity, developer tools).
@@ -255,7 +273,7 @@ func (a *sdkAPI) sourceURL(
 	u := a.cc.NewBlobClient(src).URL()
 	switch {
 	case a.key != nil:
-		qp, err := a.serviceSAS(src, sourceSASLifetime)
+		qp, err := a.serviceSAS(src, ReadSAS{TTL: sourceSASLifetime})
 		if err != nil {
 			return "", err
 		}
@@ -368,17 +386,17 @@ func (a *sdkAPI) List(ctx context.Context, prefix, marker string) ([]Item, strin
 	return items, next, nil
 }
 
-func (a *sdkAPI) SignRead(ctx context.Context, name string, ttl time.Duration) (string, error) {
+func (a *sdkAPI) SignRead(ctx context.Context, name string, o ReadSAS) (string, error) {
 	u := a.cc.NewBlobClient(name).URL()
 	switch {
 	case a.key != nil:
-		qp, err := a.serviceSAS(name, ttl)
+		qp, err := a.serviceSAS(name, o)
 		if err != nil {
 			return "", err
 		}
 		return u + "?" + qp, nil
 	case a.svc != nil:
-		qp, err := a.delegationSAS(ctx, name, ttl)
+		qp, err := a.delegationSAS(ctx, name, o)
 		if err != nil {
 			return "", err
 		}
@@ -394,20 +412,22 @@ func (a *sdkAPI) SignRead(ctx context.Context, name string, ttl time.Duration) (
 // are given explicitly: the SDK's GetSASURL re-parses the URL and signs the
 // wrong blob name on hosts that are not an IP address or *.blob.* (research
 // 18).
-func (a *sdkAPI) readValues(name string, ttl time.Duration) sas.BlobSignatureValues {
+func (a *sdkAPI) readValues(name string, o ReadSAS) sas.BlobSignatureValues {
 	now := a.now().UTC()
 	return sas.BlobSignatureValues{
-		Protocol:      sas.ProtocolHTTPSandHTTP,
-		StartTime:     now.Add(-a.start),
-		ExpiryTime:    now.Add(ttl),
-		Permissions:   (&sas.BlobPermissions{Read: true}).String(),
-		ContainerName: a.container,
-		BlobName:      name,
+		Protocol:           sas.ProtocolHTTPSandHTTP,
+		StartTime:          now.Add(-a.start),
+		ExpiryTime:         now.Add(o.TTL),
+		Permissions:        (&sas.BlobPermissions{Read: true}).String(),
+		ContainerName:      a.container,
+		BlobName:           name,
+		ContentDisposition: o.ContentDisposition,
+		ContentType:        o.ContentType,
 	}
 }
 
-func (a *sdkAPI) serviceSAS(name string, ttl time.Duration) (string, error) {
-	qp, err := a.readValues(name, ttl).SignWithSharedKey(a.key)
+func (a *sdkAPI) serviceSAS(name string, o ReadSAS) (string, error) {
+	qp, err := a.readValues(name, o).SignWithSharedKey(a.key)
 	if err != nil {
 		return "", fmt.Errorf("blob/azure: sign %s: %w", name, err)
 	}
@@ -419,12 +439,12 @@ func (a *sdkAPI) serviceSAS(name string, ttl time.Duration) (string, error) {
 func (a *sdkAPI) delegationSAS(
 	ctx context.Context,
 	name string,
-	ttl time.Duration,
+	o ReadSAS,
 ) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now().UTC()
-	if a.udk == nil || !now.Add(ttl+time.Hour).Before(a.exp) {
+	if a.udk == nil || !now.Add(o.TTL+time.Hour).Before(a.exp) {
 		exp := now.Add(7 * 24 * time.Hour)
 		info := service.KeyInfo{
 			Start:  to.Ptr(now.Add(-a.start).Format(sas.TimeFormat)),
@@ -436,7 +456,7 @@ func (a *sdkAPI) delegationSAS(
 		}
 		a.udk, a.exp = udk, exp
 	}
-	qp, err := a.readValues(name, ttl).SignWithUserDelegation(a.udk)
+	qp, err := a.readValues(name, o).SignWithUserDelegation(a.udk)
 	if err != nil {
 		return "", fmt.Errorf("blob/azure: sign %s: %w", name, err)
 	}

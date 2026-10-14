@@ -189,8 +189,20 @@ func (f *fake) Walk(ctx context.Context, fn func(blob.Info) error) error {
 	return nil
 }
 
-// presigner is a fake that can presign.
+// presigner is a fake that signs storage URLs.
 type presigner struct{ *fake }
+
+// cdnSigner is a fake that signs storage and CDN URLs.
+type cdnSigner struct{ *fake }
+
+func (c cdnSigner) Signs(blob.Via) bool { return true }
+
+func (c cdnSigner) SignURL(ctx context.Context, sha string, o blob.SignOptions) (string, error) {
+	if err := c.enter(ctx, "sign"); err != nil {
+		return "", err
+	}
+	return o.Via.String() + "://" + sha + "/" + o.Filename, nil
+}
 
 // parted is a fake that writes in parts of a fixed size.
 type parted struct {
@@ -200,9 +212,14 @@ type parted struct {
 
 func (p parted) PartSize() int64 { return p.part }
 
-func (p presigner) PresignGet(ctx context.Context, sha string, _ time.Duration) (string, error) {
-	if err := p.enter(ctx, "presign"); err != nil {
+func (p presigner) Signs(via blob.Via) bool { return via == blob.ViaStorage }
+
+func (p presigner) SignURL(ctx context.Context, sha string, o blob.SignOptions) (string, error) {
+	if err := p.enter(ctx, "sign"); err != nil {
 		return "", err
+	}
+	if o.Via != blob.ViaStorage {
+		return "", blob.ErrCannotSign
 	}
 	return "fake://" + sha, nil
 }
