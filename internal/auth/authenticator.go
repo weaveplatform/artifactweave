@@ -90,8 +90,17 @@ func NewAuthenticator(
 
 // Basic verifies a user name and password. Wrong credentials, an unknown or
 // disabled user, and a user without an internal password all answer
-// ErrBadCredentials alike.
+// ErrBadCredentials alike; while basic authentication is switched off,
+// every password answers ErrBasicAuthDisabled. A correct but expired
+// password answers ErrPasswordExpired with the principal, marked
+// PasswordExpired.
 func (a *Authenticator) Basic(ctx context.Context, name, password string) (Principal, error) {
+	// A switch that cannot be read does not stop the check here: a correct
+	// password then fails in accept, which needs the same settings, and a
+	// wrong one still answers as a wrong password.
+	if enabled, err := a.basicEnabled(ctx); err == nil && !enabled {
+		return Principal{}, ErrBasicAuthDisabled
+	}
 	u, err := a.users.Get(ctx, name)
 	if errors.Is(err, store.ErrNotFound) {
 		_, _ = a.check(ctx, a.dummy, password)

@@ -23,6 +23,14 @@ import (
 // principal. Handlers answer it 400.
 var ErrInvalid = errors.New("invalid")
 
+// ErrProtected marks the ErrInvalid errors that refuse a change to a
+// built-in principal. The legacy API answers them 400 like any ErrInvalid;
+// Access v2 documents 403 for deleting a built-in user.
+var ErrProtected = errors.New("protected")
+
+// ErrExists answers a create-only call for a name already taken (409).
+var ErrExists = errors.New("already exists")
+
 // Service manages users, groups and the account policies.
 type Service struct {
 	Store store.Store
@@ -75,6 +83,10 @@ type UserPatch struct {
 	PolicyManager            *bool
 	WatchManager             *bool
 	ReportsManager           *bool
+	// The flags only Access v2 sets; the legacy API leaves them nil.
+	ResourcesManager *bool
+	ManageWebhook    *bool
+	PlatformAuditor  *bool
 }
 
 // PutUser creates u, or replaces every field an existing user's document
@@ -104,12 +116,9 @@ func (s *Service) PutUser(ctx context.Context, u types.User, password string) (b
 		next := u
 		next.Realm, next.MFA = types.RealmInternal, types.MFANone
 		if created {
-			next.Status, next.Created = types.UserEnabled, now
-			auto, err := s.Store.Groups().AutoJoin(ctx)
-			if err != nil {
-				return err //nolint:wrapcheck // a store error
+			if next, err = s.newUser(ctx, u, now); err != nil {
+				return err
 			}
-			next.Groups = sortedUnique(append(slices.Clone(u.Groups), auto...))
 		} else {
 			// Server-owned state survives a replacement.
 			next.Status, next.Created, next.LastLoggedIn = old.Status, old.Created, old.LastLoggedIn
@@ -122,7 +131,7 @@ func (s *Service) PutUser(ctx context.Context, u types.User, password string) (b
 				return err
 			}
 		}
-		if err := s.setPassword(&next, password, now); err != nil {
+		if err := s.setPassword(ctx, &next, password, now, true); err != nil {
 			return err
 		}
 		if created {
@@ -131,6 +140,49 @@ func (s *Service) PutUser(ctx context.Context, u types.User, password string) (b
 		return groupsError(s.Store.Users().Update(ctx, next))
 	})
 	return created, err
+}
+
+// CreateUser creates u with password, as PutUser does for a new name, and
+// answers ErrExists when the name is taken instead of replacing the user.
+func (s *Service) CreateUser(ctx context.Context, u types.User, password string) error {
+	if err := validName("user", u.Name); err != nil {
+		return err
+	}
+	if u.Email == "" {
+		return invalid("email is required")
+	}
+	if password == "" && !u.InternalPasswordDisabled {
+		return invalid("password is required unless internal_password_disabled is true")
+	}
+	return s.tx(ctx, func(ctx context.Context) error {
+		now := s.now()
+		next, err := s.newUser(ctx, u, now)
+		if err != nil {
+			return err
+		}
+		if err := s.setPassword(ctx, &next, password, now, false); err != nil {
+			return err
+		}
+		err = s.Store.Users().Create(ctx, next)
+		if errors.Is(err, store.ErrConflict) {
+			return fmt.Errorf("%w: user %q", ErrExists, u.Name)
+		}
+		return groupsError(err)
+	})
+}
+
+// newUser is u as first stored: an enabled internal user that also joins
+// every auto-join group.
+func (s *Service) newUser(ctx context.Context, u types.User, now time.Time) (types.User, error) {
+	next := u
+	next.Realm, next.MFA = types.RealmInternal, types.MFANone
+	next.Status, next.Created = types.UserEnabled, now
+	auto, err := s.Store.Groups().AutoJoin(ctx)
+	if err != nil {
+		return next, err //nolint:wrapcheck // a store error
+	}
+	next.Groups = sortedUnique(append(slices.Clone(u.Groups), auto...))
+	return next, nil
 }
 
 // PatchUser changes the fields p carries; Groups, when present, replaces
@@ -151,6 +203,9 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 		set(&next.Roles.PolicyManager, p.PolicyManager)
 		set(&next.Roles.WatchManager, p.WatchManager)
 		set(&next.Roles.ReportsManager, p.ReportsManager)
+		set(&next.Roles.ResourcesManager, p.ResourcesManager)
+		set(&next.Roles.ManageWebhook, p.ManageWebhook)
+		set(&next.Roles.PlatformAuditor, p.PlatformAuditor)
 		if p.Groups != nil {
 			next.Groups = slices.Clone(*p.Groups)
 		}
@@ -166,7 +221,7 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 			if *p.Password == "" {
 				return invalid("password cannot be empty")
 			}
-			if err := s.setPassword(&next, *p.Password, s.now()); err != nil {
+			if err := s.setPassword(ctx, &next, *p.Password, s.now(), true); err != nil {
 				return err
 			}
 		}
@@ -175,10 +230,29 @@ func (s *Service) PatchUser(ctx context.Context, name string, p UserPatch) error
 }
 
 // setPassword hashes password into u, unless it is empty, and restarts the
-// password's age.
-func (s *Service) setPassword(u *types.User, password string, now time.Time) error {
+// password's age. The password must satisfy the password policy. With
+// keepSame, the current password sent back is no change and passes
+// unchecked: Terraform's artifactory_user resends the password on every
+// update, and not_match_old, on by default, would refuse every one
+// (decision 0005). The password change endpoint passes false, so there it is
+// a reuse.
+func (s *Service) setPassword(
+	ctx context.Context,
+	u *types.User,
+	password string,
+	now time.Time,
+	keepSame bool,
+) error {
 	if password == "" {
 		return nil
+	}
+	if keepSame && len(u.PasswordHash) > 0 {
+		if same, err := auth.CheckPassword(u.PasswordHash, password); err == nil && same {
+			return nil
+		}
+	}
+	if err := s.checkPolicy(ctx, *u, password); err != nil {
+		return err
 	}
 	hash, err := auth.HashPasswordWith(s.Hash, password)
 	if err != nil {
@@ -222,7 +296,12 @@ func (s *Service) admins(ctx context.Context) ([]string, error) {
 // seeded admin and anonymous users and the last administrator stay.
 func (s *Service) DeleteUser(ctx context.Context, name string) error {
 	if name == auth.AdminUser || name == auth.AnonymousUser {
-		return invalid("the built-in user %q cannot be deleted", name)
+		return fmt.Errorf(
+			"%w: %w: the built-in user %q cannot be deleted",
+			ErrInvalid,
+			ErrProtected,
+			name,
+		)
 	}
 	return s.tx(ctx, func(ctx context.Context) error {
 		u, err := s.Store.Users().Get(ctx, name)
@@ -285,6 +364,11 @@ type GroupPatch struct {
 	WatchManager    *bool
 	PolicyManager   *bool
 	ReportsManager  *bool
+	// The fields only Access v2 sets; the legacy API leaves them nil.
+	ExternalID       *string
+	PolicyViewer     *bool
+	ResourcesManager *bool
+	ManageWebhook    *bool
 }
 
 // PutGroup creates g, or replaces every field of an existing group, and
@@ -336,6 +420,10 @@ func (s *Service) PatchGroup(ctx context.Context, name string, p GroupPatch) err
 		set(&g.Roles.WatchManager, p.WatchManager)
 		set(&g.Roles.PolicyManager, p.PolicyManager)
 		set(&g.Roles.ReportsManager, p.ReportsManager)
+		set(&g.ExternalID, p.ExternalID)
+		set(&g.Roles.PolicyViewer, p.PolicyViewer)
+		set(&g.Roles.ResourcesManager, p.ResourcesManager)
+		set(&g.Roles.ManageWebhook, p.ManageWebhook)
 		if p.Members != nil {
 			g.Members = sortedUnique(*p.Members)
 		}
@@ -343,13 +431,43 @@ func (s *Service) PatchGroup(ctx context.Context, name string, p GroupPatch) err
 	})
 }
 
-// DeleteGroup removes a group and its memberships. The seeded readers group
-// stays: the Anything permission grants through it.
+// DeleteGroup removes a group, its memberships and, in the same
+// transaction, its grants in every permission: a grant left behind would
+// pass to a later group of the same name. The seeded readers group is no
+// exception (no JFrog source protects it, and jf rt group-delete makes
+// none); seeding runs once, so it does not come back.
 func (s *Service) DeleteGroup(ctx context.Context, name string) error {
-	if name == auth.ReadersGroup {
-		return invalid("the built-in group %q cannot be deleted", name)
+	return s.tx(ctx, func(ctx context.Context) error {
+		if err := s.Store.Groups().Delete(ctx, name); err != nil {
+			return err //nolint:wrapcheck // ErrNotFound is the handler's 404
+		}
+		perms, err := all(ctx, s.Store.Permissions().List)
+		if err != nil {
+			return err
+		}
+		for _, p := range perms {
+			if !dropGroupGrants(p, name) {
+				continue
+			}
+			if err := s.Store.Permissions().Update(ctx, p); err != nil {
+				return err //nolint:wrapcheck // a store error
+			}
+		}
+		return nil
+	})
+}
+
+// dropGroupGrants removes group's grants from p and reports whether it had
+// any.
+func dropGroupGrants(p types.Permission, group string) bool {
+	dropped := false
+	for _, r := range p.Resources {
+		if _, ok := r.Actions.Groups[group]; ok {
+			delete(r.Actions.Groups, group)
+			dropped = true
+		}
 	}
-	return s.Store.Groups().Delete(ctx, name) //nolint:wrapcheck // ErrNotFound is the handler's 404
+	return dropped
 }
 
 // Group returns one group with its members.

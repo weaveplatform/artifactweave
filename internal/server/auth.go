@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -60,6 +61,9 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 				return
 			}
 			if p, presented, err := credentials(ctx, a, r); presented {
+				if errors.Is(err, auth.ErrPasswordExpired) && ownPasswordChange(r, p.Name) {
+					err = nil
+				}
 				if err == nil {
 					p, err = authorize(ctx, st, p, false)
 				}
@@ -90,6 +94,15 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 			}
 		})
 	}
+}
+
+// ownPasswordChange reports whether r sets user's own password through
+// Access v2, the one request an expired password may still make: without
+// it, a user whose password expired could not choose a new one.
+func ownPasswordChange(r *http.Request, user string) bool {
+	rest, ok := strings.CutPrefix(r.URL.Path, "/access/api/v2/users/")
+	name, ok2 := strings.CutSuffix(rest, "/password")
+	return r.Method == http.MethodPut && ok && ok2 && user != "" && name == user
 }
 
 // credentials verifies whatever credential the request presents, reporting

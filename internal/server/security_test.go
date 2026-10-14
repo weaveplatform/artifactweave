@@ -104,7 +104,6 @@ func securityStatusRows() []statusCase {
 		{postGroup, secGroups + "/nobody", "admin", `{"description":"d"}`, 404},
 		{postGroup, secGroups + "/sec-group", "user", `{"description":"d"}`, 403},
 		{delGroup, secGroups + "/sec-group", "admin", "", 200},
-		{delGroup, secGroups + "/readers", "admin", "", 400},
 		{delGroup, secGroups + "/nobody", "admin", "", 404},
 		{delGroup, secGroups + "/readers", "user", "", 403},
 

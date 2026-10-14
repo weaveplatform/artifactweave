@@ -103,6 +103,61 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
 - **The policies are cached** for 10 seconds per instance. A change made through an
   instance applies there at once, and elsewhere within the 10 seconds.
 
+*Access v2 and the identity configuration (#81):*
+- **One record, two APIs.** `/access/api/v2/users` and `/groups` manage the same records
+  as the legacy security API. Creation is create-only: a taken name answers `409`, not a
+  replacement. Deleting a built-in user answers `403` in v2, but `400` in the legacy API
+  as before.
+- **The basic authentication switch** refuses a password in `Basic` with `401` when it is
+  off. An access or reference token sent as the Basic password still works, as does
+  `Bearer`. When the switch cannot be read, the password is checked as usual; the policy
+  read then fails the request, so a broken settings store never lets a password in that
+  the switch would refuse. The switch is cached with the account policies.
+- **An expired password may set its own replacement.** The middleware lets a correct but
+  expired password through for exactly one request:
+  `PUT /access/api/v2/users/{own name}/password`. Without that request, a user whose
+  password expired could not choose a new one.
+- **The password policy** (`uppercase`, `lowercase`, `digit`, `special_char`, `length`,
+  `not_match_old`) is enforced by the identity service whenever either API sets a password.
+  Passwords already stored are not checked.
+  - *Defaults (documented: docs.jfrog.com, supported Access configurations,
+    `security.password-policy`).* While no policy is stored, the policy requires no
+    character classes, a length of at least 4, and a new password that differs from the old
+    one. A password may never match the username, compared without case. The API has no
+    field for that last rule, so it always applies.
+  - *PUT and PATCH (documented: `createPasswordPolicy`, `updatePasswordPolicy`).* `PUT`
+    replaces the policy, and a field it leaves out returns to its default. `PATCH` merges
+    into the stored policy.
+  - *A resent password is no change (observed: terraform-provider-artifactory).* A user
+    record update (legacy `PUT`/`POST`, v2 `PATCH`) that sends the current password back
+    leaves it as it is: no policy check, no `not_match_old`, and no reset of the password's
+    age or expiry. Only `PUT …/{username}/password` treats the same password as a reuse.
+    - *Evidence:* `artifactory_user`'s Update always sends `Password: plan.Password`
+      (`pkg/artifactory/resource/user/user.go`, lines 810–820), as PATCH
+      `access/api/v2/users/{name}`, or as POST `api/security/users/{name}` on older
+      versions (lines 468–486). `TestAccUser_full_groups`
+      (`resource_artifactory_user_test.go`, lines 138–209) updates a user with the same
+      password against a real Artifactory, where `not-match-old` defaults to true.
+    - *Inferred:* no expiry reset, because resetting it would extend the expiry on every
+      `terraform apply`.
+- **Deleting groups** *(inferred: no JFrog source protects `readers`, and
+  `jf rt group-delete` makes no exception).* Any group may be deleted through either API,
+  the seeded `readers` included. Its grants are removed from every permission (such as the
+  seeded `Anything`) in the same transaction, so a later group of the same name inherits
+  nothing. Seeding runs once, so `readers` does not come back.
+- **Group create and update** *(documented: `createGroup`, `updateGroup`; observed:
+  `platform_group` PATCHes its whole model).*
+  - A create naming an unknown member answers `404` "One or more users in members were not
+    found".
+  - The update request carries neither name, realm, realm attributes nor members, and
+    Access does not change a realm. A PATCH may still send `name`, `realm` and
+    `realm_attributes` with their stored values, but answers `400` when one differs.
+    `members` is ignored, since it has its own endpoint.
+- **Readers of users and groups.** Administrators, and tokens whose scope covers
+  `system:identities:r`, may list and read users and groups, as the permission evaluator
+  decides ([0006](0006-authorization-native-permission-model.md)). A user may also read their own record. All
+  writes are admin-only, except a user changing their own password.
+
 **API keys** are shims: creation answers `400` with a message that API keys are retired,
 lookup answers `404`, and `X-JFrog-Art-Api` accepts reference tokens.
 

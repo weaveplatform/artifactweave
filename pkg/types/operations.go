@@ -217,6 +217,9 @@ type PasswordExpirationPolicy struct {
 }
 
 // PasswordPolicy constrains new internal passwords.
+//
+// DefaultPasswordPolicy is in force while none is stored, and a replacing
+// PUT resets every field it leaves out to it.
 type PasswordPolicy struct {
 	Uppercase   int  `json:"uppercase"`
 	Lowercase   int  `json:"lowercase"`
@@ -225,6 +228,13 @@ type PasswordPolicy struct {
 	Length      int  `json:"length"`
 	NotMatchOld bool `json:"not_match_old"`
 }
+
+// DefaultPasswordPolicy is Access's documented default: no character
+// classes required, at least 4 characters, and not the old password
+// (docs.jfrog.com, supported Access configurations, security.password-policy).
+// The documented rule that a password cannot match the username has no
+// field and always applies.
+func DefaultPasswordPolicy() PasswordPolicy { return PasswordPolicy{Length: 4, NotMatchOld: true} }
 
 // TrashcanSettings control the trash can.
 type TrashcanSettings struct {

@@ -74,9 +74,10 @@ func repositoriesSlash(next http.Handler) http.Handler {
 
 // requestDetails keeps what the strict handlers need beyond their decoded
 // request: the Accept header for media-type negotiation, and the raw body of
-// a repository update. repo.Config cannot tell a field left out (keep the
-// stored value) from one sent as null (reset it to its default), and an
-// update needs both. It runs after bodyLimit, so the copy is bounded.
+// a repository or Access v2 group update. repo.Config cannot tell a field
+// left out (keep the stored value) from one sent as null (reset it to its
+// default), and an update needs both. It runs after bodyLimit, so the copy
+// is bounded.
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
@@ -88,8 +89,9 @@ func requestDetails(next http.Handler) http.Handler {
 		}
 		// A permission create keeps its raw body too: the generated Access
 		// type drops the destination and pipeline_source sections.
-		if r.Method == http.MethodPost &&
-			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions") {
+		if (r.Method == http.MethodPost &&
+			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions")) ||
+			(r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)) {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
 				bindingError(http.StatusBadRequest)(w, r, err)
@@ -100,6 +102,13 @@ func requestDetails(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// isGroupUpdate matches PATCH /access/api/v2/groups/{name}, whose raw body
+// tells a field left out from one sent with its stored value.
+func isGroupUpdate(path string) bool {
+	name, ok := strings.CutPrefix(path, accessGroups)
+	return ok && name != "" && !strings.Contains(name, "/")
 }
 
 func isRepositoryUpdate(path string) bool {
