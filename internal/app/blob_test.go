@@ -12,14 +12,18 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/blobtest"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/blob/session"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -110,8 +114,83 @@ func TestOpenBackend(t *testing.T) {
 		s, err := openBackend(context.Background(), "blob", b, session.NewMemory(), t.TempDir())
 		if err != nil || s == nil {
 			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		// Every object store signs storage URLs except Azure on a SAS token;
+		// local disk signs nothing.
+		sg, ok := s.(blob.Signer)
+		want := name != "fs" && name != "azure sas"
+		if got := ok && sg.Signs(blob.ViaStorage); got != want {
+			t.Errorf("%s: signs storage URLs %v, want %v", name, got, want)
 		}
 	}
+}
+
+// signer signs the routes it lists.
+type signer struct {
+	blob.Store
+	routes []blob.Via
+}
+
+func (s signer) Signs(via blob.Via) bool { return slices.Contains(s.routes, via) }
+
+func (signer) SignURL(context.Context, string, blob.SignOptions) (string, error) { return "", nil }
+
+func TestLogSigning(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	for _, c := range []repo.Config{
+		{Key: "plain", Class: repo.Local},
+		{Key: "download", Class: repo.Local, DownloadRedirect: repo.Flex(true)},
+		{Key: "cdn", Class: repo.Local, CDNRedirect: repo.Flex(true)},
+	} {
+		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fsStore, err := fs.New(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		name  string
+		blobs blob.Store
+		warn  []string // repositories warned about
+	}{
+		{"local disk", fsStore, []string{"download", "cdn"}},
+		{"storage only", signer{fsStore, []blob.Via{blob.ViaStorage}}, []string{"cdn"}},
+		{"storage and CDN", signer{fsStore, []blob.Via{blob.ViaStorage, blob.ViaCDN}}, nil},
+	} {
+		var logs bytes.Buffer
+		logSigning(ctx, slog.New(slog.NewTextHandler(&logs, nil)), db, c.blobs)
+		if n := strings.Count(logs.String(), "level=WARN"); n != len(c.warn) {
+			t.Errorf("%s: %d warnings, want %d:\n%s", c.name, n, len(c.warn), logs.String())
+		}
+		for _, key := range c.warn {
+			if !strings.Contains(logs.String(), "repo="+key) {
+				t.Errorf("%s: no warning for %s:\n%s", c.name, key, logs.String())
+			}
+		}
+		if !strings.Contains(logs.String(), "download redirect routes") {
+			t.Errorf("%s: no summary:\n%s", c.name, logs.String())
+		}
+	}
+	var logs bytes.Buffer
+	logSigning(ctx, slog.New(slog.NewTextHandler(&logs, nil)), failingRepos{db}, fsStore)
+	if !strings.Contains(logs.String(), "listing repositories") {
+		t.Fatalf("a listing failure is logged:\n%s", logs.String())
+	}
+}
+
+// failingRepos is a store whose repository listing fails.
+type failingRepos struct{ store.Store }
+
+func (f failingRepos) Repos() store.RepoStore { return failingRepoList{f.Store.Repos()} }
+
+type failingRepoList struct{ store.RepoStore }
+
+func (failingRepoList) List(context.Context, store.RepoFilter) ([]repo.Config, error) {
+	return nil, errors.New("listing failed")
 }
 
 func TestOpenBackendErrors(t *testing.T) {

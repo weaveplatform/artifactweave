@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
@@ -231,17 +232,20 @@ func (f *fakeGCS) List(_ context.Context, prefix string, fn func(Attrs) error) e
 	return nil
 }
 
-func (f *fakeGCS) SignedURL(name string, ttl time.Duration) (string, error) {
+func (f *fakeGCS) SignedURL(name string, o SignedURLOptions) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("SignedURL"); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(
-		"https://storage.googleapis.com/b/%s?X-Goog-Expires=%d",
-		name,
-		int(ttl.Seconds()),
-	), nil
+	q := url.Values{"X-Goog-Expires": {strconv.Itoa(int(o.TTL.Seconds()))}}
+	if o.ContentDisposition != "" {
+		q.Set("response-content-disposition", o.ContentDisposition)
+	}
+	if o.ContentType != "" {
+		q.Set("response-content-type", o.ContentType)
+	}
+	return "https://storage.googleapis.com/b/" + name + "?" + q.Encode(), nil
 }
 
 var errInjected = errors.New("injected")

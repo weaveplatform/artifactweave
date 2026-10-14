@@ -260,7 +260,7 @@ func (c *clouds) mirror(t *testing.T) *rig {
 	}
 	azst, err := azure.New(aapi, azure.Options{
 		Prefix: "art", PartSize: azurePart, CopyRangeSize: 300 << 10, Concurrency: 4,
-		Sessions: session.InUploads(r.db.Uploads(), "azure:az"),
+		Sessions: session.InUploads(r.db.Uploads(), "azure:az"), Presign: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -345,7 +345,7 @@ func readAll(t *testing.T, s blob.Store, sha string) []byte {
 }
 
 // signingKey is a throwaway service-account key: fake-gcs-server does not
-// check signatures, but the GCS store needs a key to presign at all.
+// check signatures, but the GCS store needs a key to sign at all.
 func signingKey(t *testing.T) []byte {
 	t.Helper()
 	k, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -446,13 +446,15 @@ func (o *outage) Walk(ctx context.Context, fn func(blob.Info) error) error {
 // PartSize passes through, so New checks the chunk against the real stores.
 func (o *outage) PartSize() int64 { return o.inner.(blob.PartSizer).PartSize() }
 
-// PresignGet passes through: every backend here presigns, and without it
-// the mirror would report that no member can.
-func (o *outage) PresignGet(ctx context.Context, sha string, ttl time.Duration) (string, error) {
+// Signs and SignURL pass through: every backend here signs, and without
+// them the mirror would report that no member can.
+func (o *outage) Signs(via blob.Via) bool { return o.inner.(blob.Signer).Signs(via) }
+
+func (o *outage) SignURL(ctx context.Context, sha string, so blob.SignOptions) (string, error) {
 	if err := o.check(); err != nil {
 		return "", err
 	}
-	return o.inner.(blob.Presigner).PresignGet(ctx, sha, ttl)
+	return o.inner.(blob.Signer).SignURL(ctx, sha, so) //nolint:wrapcheck // a pass-through fake
 }
 
 type outageUpload struct {

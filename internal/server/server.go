@@ -71,6 +71,8 @@ type Config struct {
 	// value is production's. Only Go code can choose another: tests use a
 	// tiny cost.
 	PasswordHash auth.HashParams
+	// Redirect tunes downloadRedirect and cdnRedirect (decision 0029).
+	Redirect Redirect
 }
 
 // Mirrors is what the storage endpoints need from the runtime's blob

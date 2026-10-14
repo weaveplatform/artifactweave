@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -70,7 +71,7 @@ func TestNewClientBuildsWithoutNetwork(t *testing.T) {
 		t.Fatal(err)
 	}
 	sha := blobtest.Digest([]byte("x")).SHA256
-	url, err := s.PresignGet(ctx, sha, 60e9)
+	url, err := s.SignURL(ctx, sha, blob.SignOptions{TTL: time.Minute})
 	if err != nil || url == "" {
 		t.Fatalf("presign needs no network: %q %v", url, err)
 	}

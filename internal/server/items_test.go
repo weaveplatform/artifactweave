@@ -8,9 +8,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -31,11 +32,27 @@ type itemWorld struct {
 	blobs blob.Store
 }
 
-// signingBlobs makes the fs store a presigner for the downloadRedirect test.
-type signingBlobs struct{ blob.Store }
+// signingBlobs makes a blob store a signer of the routes it lists, with
+// the signing options readable back from the URL. err fails every signature.
+type signingBlobs struct {
+	blob.Store
+	routes []blob.Via
+	err    error
+}
 
-func (signingBlobs) PresignGet(_ context.Context, sha string, _ time.Duration) (string, error) {
-	return "https://signed.example/" + sha, nil
+// storageSigner signs storage URLs only, as an object store without a CDN.
+func storageSigner(st blob.Store) signingBlobs {
+	return signingBlobs{Store: st, routes: []blob.Via{blob.ViaStorage}}
+}
+
+func (b signingBlobs) Signs(via blob.Via) bool { return slices.Contains(b.routes, via) }
+
+func (b signingBlobs) SignURL(_ context.Context, sha string, o blob.SignOptions) (string, error) {
+	if b.err != nil {
+		return "", b.err
+	}
+	q := url.Values{"ttl": {o.TTL.String()}, "name": {o.Filename}, "type": {o.ContentType}}
+	return "https://" + o.Via.String() + ".example/" + sha + "?" + q.Encode(), nil
 }
 
 // newItemWorld builds the world; tune adjusts the router's configuration,
@@ -98,7 +115,7 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	}
 	cfg := Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
-		Store: db, Blobs: signingBlobs{fsBlobs}, Auth: a,
+		Store: db, Blobs: storageSigner(fsBlobs), Auth: a,
 	}
 	for _, f := range tune {
 		f(&cfg)
@@ -503,7 +520,10 @@ func TestDownloadRedirect(t *testing.T) {
 	)
 	rec := w.do("GET", "/artifactory/redirect-local/r.bin", "admin", "")
 	if rec.Code != http.StatusFound ||
-		rec.Header().Get("Location") != "https://signed.example/"+sha256Hex("redirected") {
+		!strings.HasPrefix(
+			rec.Header().Get("Location"),
+			"https://storage.example/"+sha256Hex("redirected")+"?",
+		) {
 		t.Fatalf("redirect %d %v", rec.Code, rec.Header())
 	}
 }

@@ -97,8 +97,17 @@ type API interface {
 	// List returns one page of committed blobs under prefix after marker,
 	// and the marker of the next page ("" on the last).
 	List(ctx context.Context, prefix, marker string) ([]Item, string, error)
-	// SignRead returns a URL that reads name for ttl without credentials.
-	SignRead(ctx context.Context, name string, ttl time.Duration) (string, error)
+	// SignRead returns a URL that reads name without credentials, as o
+	// describes.
+	SignRead(ctx context.Context, name string, o ReadSAS) (string, error)
+}
+
+// ReadSAS describes a read SAS: how long it lasts and the response
+// overrides (rscd, rsct) it carries, empty when not wanted.
+type ReadSAS struct {
+	TTL                time.Duration
+	ContentDisposition string
+	ContentType        string
 }
 
 const (
@@ -155,6 +164,9 @@ type Options struct {
 	// Sessions holds upload sessions between requests; session.InUploads
 	// with a backend name such as "azure:<store name>" keeps them durable.
 	Sessions session.Store
+	// Presign makes the store sign storage URLs (blob.Signer). Set it from
+	// ClientConfig.CanSign: a store on a pre-issued SAS token cannot sign.
+	Presign bool
 }
 
 // Store is a blob.Store on an Azure Blob Storage container.
@@ -165,11 +177,12 @@ type Store struct {
 	copyRange   int64
 	concurrency int
 	sessions    session.Store
+	presign     bool
 }
 
 var (
 	_ blob.Store     = (*Store)(nil)
-	_ blob.Presigner = (*Store)(nil)
+	_ blob.Signer    = (*Store)(nil)
 	_ blob.PartSizer = (*Store)(nil)
 )
 
@@ -207,7 +220,7 @@ func New(api API, o Options) (*Store, error) {
 	}
 	return &Store{
 		api: api, prefix: prefix, partSize: o.PartSize, copyRange: o.CopyRangeSize,
-		concurrency: o.Concurrency, sessions: o.Sessions,
+		concurrency: o.Concurrency, sessions: o.Sessions, presign: o.Presign,
 	}, nil
 }
 
@@ -215,7 +228,12 @@ func New(api API, o Options) (*Store, error) {
 func (s *Store) PartSize() int64 { return s.partSize }
 
 func (s *Store) blobKey(sha string) string { return s.prefix + "sha256/" + sha[:2] + "/" + sha }
-func (s *Store) tempKey(id string) string  { return s.prefix + "_uploads/" + id }
+
+// ObjectKey is the blob name a blob is stored under in the container,
+// prefix included, for signers that address it directly, such as a CDN.
+// sha must be a valid digest (blob.ValidateSHA256).
+func (s *Store) ObjectKey(sha string) string { return s.blobKey(sha) }
+func (s *Store) tempKey(id string) string    { return s.prefix + "_uploads/" + id }
 
 // blockID derives a block ID from the upload ID, a separator and the block
 // number. The format is frozen: Azure requires every block ID of one blob to
@@ -591,14 +609,29 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 	}
 }
 
-// PresignGet returns a time-limited GET URL for downloadRedirect.
-func (s *Store) PresignGet(ctx context.Context, sha string, ttl time.Duration) (string, error) {
+// Signs reports whether the store signs URLs for via: storage URLs when
+// Options.Presign was set. It signs no CDN route yet.
+func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign }
+
+// SignURL returns a time-limited read URL, carrying o's filename and media
+// type as response overrides.
+func (s *Store) SignURL(ctx context.Context, sha string, o blob.SignOptions) (string, error) {
 	if err := blob.ValidateSHA256(sha); err != nil {
 		return "", err //nolint:wrapcheck // already a blob sentinel
 	}
-	url, err := s.api.SignRead(ctx, s.blobKey(sha), ttl)
+	if !s.Signs(o.Via) {
+		return "", fmt.Errorf("blob/azure: sign %s via %s: %w", sha, o.Via, blob.ErrCannotSign)
+	}
+	if o.TTL <= 0 {
+		return "", fmt.Errorf("%w: a signed URL must last more than zero, not %s", ErrConfig, o.TTL)
+	}
+	rs := ReadSAS{TTL: o.TTL, ContentType: o.ContentType}
+	if o.Filename != "" {
+		rs.ContentDisposition = blob.Disposition(o.Filename)
+	}
+	url, err := s.api.SignRead(ctx, s.blobKey(sha), rs)
 	if err != nil {
-		return "", fmt.Errorf("blob/azure: presign %s: %w", sha, err)
+		return "", fmt.Errorf("blob/azure: sign %s: %w", sha, err)
 	}
 	return url, nil
 }

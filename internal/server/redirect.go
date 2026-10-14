@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"maps"
 	"net/http"
@@ -13,21 +14,61 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
-// presignTTL is how long a downloadRedirect URL stays valid: long enough for
-// the client to follow the redirect, short enough that a leaked link expires.
-const presignTTL = 5 * time.Minute
+// DefaultRedirectTTL is how long a signed download URL stays valid when
+// Config.Redirect sets no TTL.
+const DefaultRedirectTTL = 5 * time.Minute
 
 // signWarnEvery bounds how often a failing signer is logged. A store that
 // cannot sign fails every redirect, and one line a minute says so without
 // a line per download.
 const signWarnEvery = time.Minute
 
-// redirect answers a downloadRedirect GET with a 302 to a presigned blob URL
-// and reports whether it wrote a response; false means stream the file.
-// The caller redirects GET only: the JFrog CLI sends a HEAD, following
-// redirects and requiring 200, before it downloads any file over 5 MiB, and
-// a URL presigned for GET answers that HEAD with 403 on S3 and GCS, which
-// failed the download. ServeContent answers HEAD locally instead.
+// redirectChoice is the header a client steers a download with (decision
+// 0029): None streams, S3 means the object store rather than a CDN on every
+// cloud, and CF changes nothing because a CDN is already preferred.
+const redirectChoice = "X-JFrog-Download-Redirect-To"
+
+// Redirect tunes the download redirect policy.
+type Redirect struct {
+	// MinSize is the smallest file that redirects; zero redirects every file.
+	MinSize int64
+	// TTL is how long a signed URL stays valid once handed out; zero means
+	// DefaultRedirectTTL.
+	TTL time.Duration
+}
+
+// route applies the policy of decision 0029 to a GET of f and returns the
+// signer and the route a redirect takes; ok false means stream. The numbers
+// in the comments are the decision's rules. Rule 1, a conditional request
+// answered locally, is the caller's: it only matters when there is a
+// redirect to avoid, because a streamed file goes through ServeContent,
+// which applies the same rules.
+func (s artifactoryService) route(r *http.Request, f found) (blob.Signer, blob.Via, bool) {
+	download, cdn := f.repo.DownloadRedirect.Bool(), f.repo.CDNRedirect.Bool()
+	choice := r.Header.Get(redirectChoice)
+	signer, signs := s.cfg.Blobs.(blob.Signer)
+	switch {
+	case !download && !cdn, // 2: the repository does not redirect
+		f.item.Size < s.cfg.Redirect.MinSize, // 3: too small to be worth a round trip
+		strings.EqualFold(choice, "None"),    // 4: the client asks to stream
+		!signs:                               // local disk signs nothing
+		return nil, 0, false
+	case !strings.EqualFold(choice, "S3") && signer.Signs(blob.ViaCDN):
+		// 5: either flag is enough for the CDN, as on self-hosted
+		// Artifactory, where CloudFront is part of direct download.
+		return signer, blob.ViaCDN, true
+	case download && signer.Signs(blob.ViaStorage):
+		return signer, blob.ViaStorage, true // 6
+	}
+	return nil, 0, false // 7
+}
+
+// redirect answers a GET of f with a 302 to a signed URL when the policy
+// says so, and reports whether it wrote a response; false means stream the
+// file. HEAD never redirects: the JFrog CLI sends a HEAD, following
+// redirects and requiring 200, before it downloads any file over 5,120,000
+// bytes, and a URL signed for GET answers that HEAD with 403 on S3 and GCS,
+// which failed the download. ServeContent answers HEAD locally instead.
 func (s artifactoryService) redirect(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -35,7 +76,10 @@ func (s artifactoryService) redirect(
 	f found,
 	p auth.Principal,
 ) bool {
-	signer, ok := s.cfg.Blobs.(blob.Presigner)
+	if r.Method != http.MethodGet {
+		return false
+	}
+	signer, via, ok := s.route(r, f)
 	if !ok {
 		return false
 	}
@@ -47,12 +91,24 @@ func (s artifactoryService) redirect(
 		return true
 	}
 	ctx := r.Context()
-	u, err := signer.PresignGet(ctx, it.Actual.SHA256, presignTTL)
+	u, err := signer.SignURL(ctx, it.Actual.SHA256, blob.SignOptions{
+		Via: via, TTL: cmp.Or(s.cfg.Redirect.TTL, DefaultRedirectTTL),
+		Filename: it.Name, ContentType: it.MimeType,
+	})
 	if err != nil {
-		s.signFailed(ctx, f.repo.Key, err)
+		s.signFailed(ctx, f.repo.Key, via, err)
 		return false
 	}
-	http.Redirect(w, r, u, http.StatusFound)
+	// The 302 has no body, so the headers describing the artifact's body go;
+	// the signed URL carries the name and media type as overrides instead.
+	// The checksums stay for clients that read them before following.
+	h := w.Header()
+	h.Del("Content-Type")
+	h.Del("Content-Disposition")
+	h.Del("ETag")
+	h.Set("Cache-Control", "private, no-store")
+	h.Set("Location", u)
+	w.WriteHeader(http.StatusFound)
 	// The object store answers the GET, so count it as ServeContent's
 	// answer would have been: whole, or a range from the first byte.
 	status := http.StatusOK
@@ -68,13 +124,19 @@ func (s artifactoryService) redirect(
 // signFailed logs a signing failure, at most once per signWarnEvery with a
 // count of the failures held back, so a misconfigured store is visible
 // without a line per download.
-func (s artifactoryService) signFailed(ctx context.Context, repoKey string, err error) {
+func (s artifactoryService) signFailed(
+	ctx context.Context,
+	repoKey string,
+	via blob.Via,
+	err error,
+) {
 	ok, held := s.signWarn.allow(time.Now())
 	if !ok {
 		return
 	}
 	s.log().WarnContext(ctx, "download redirect: signing failed, streaming instead",
-		"repo", repoKey, "request_id", requestIDFrom(ctx), "error", err, "held_back", held)
+		"repo", repoKey, "via", via.String(), "request_id", requestIDFrom(ctx), "error", err,
+		"held_back", held)
 }
 
 // answerPreconditions answers the request when its conditional headers

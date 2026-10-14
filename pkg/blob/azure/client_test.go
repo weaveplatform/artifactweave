@@ -108,6 +108,25 @@ func TestNewAPIConfigurations(t *testing.T) {
 	}
 }
 
+func TestCanSign(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		cfg  ClientConfig
+		want bool
+	}{
+		{"shared key", ClientConfig{AccountKey: testKey}, true},
+		{"connection string with a key", ClientConfig{ConnectionString: "AccountName=a;AccountKey=" + testKey}, true},
+		{"connection string with a SAS", ClientConfig{ConnectionString: "BlobEndpoint=https://a/;SharedAccessSignature=sv=x"}, false},
+		{"pre-issued SAS token", ClientConfig{SASToken: "sv=x&sig=y"}, false},
+		{"Entra ID", ClientConfig{Credential: &staticCred{}}, true},
+		{"managed identity", ClientConfig{ManagedIdentityClientID: "id"}, true},
+	} {
+		if got := c.cfg.CanSign(); got != c.want {
+			t.Errorf("%s: CanSign = %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 func TestServiceSAS(t *testing.T) {
 	api, err := NewAPI(ClientConfig{Account: "acct", Container: "blobs", AccountKey: testKey})
 	if err != nil {
@@ -116,7 +135,9 @@ func TestServiceSAS(t *testing.T) {
 	a := api.(*sdkAPI) //nolint:forcetypeassert // the concrete adapter under test
 	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 	a.now = func() time.Time { return now }
-	raw, err := a.SignRead(context.Background(), "art/sha256/ab/abc", time.Hour)
+	raw, err := a.SignRead(context.Background(), "art/sha256/ab/abc", ReadSAS{
+		TTL: time.Hour, ContentDisposition: "attachment", ContentType: "text/plain",
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +150,8 @@ func TestServiceSAS(t *testing.T) {
 		t.Fatalf("url %s", raw)
 	}
 	if q.Get("sr") != "b" || q.Get("sp") != "r" || q.Get("sig") == "" || q.Get("sv") == "" ||
-		q.Get("se") != "2026-10-13T13:00:00Z" || q.Get("st") != "2026-10-13T11:45:00Z" {
+		q.Get("se") != "2026-10-13T13:00:00Z" || q.Get("st") != "2026-10-13T11:45:00Z" ||
+		q.Get("rscd") != "attachment" || q.Get("rsct") != "text/plain" {
 		t.Fatalf("query %v", q)
 	}
 }
@@ -158,7 +180,7 @@ func TestSourceAuthorisation(t *testing.T) {
 		// (CannotVerifyCopySource on real Azure).
 		t.Fatalf("sas source = %q, %v", u, err)
 	}
-	if _, err := sasd.SignRead(ctx, "x", time.Minute); !errors.Is(err, ErrConfig) {
+	if _, err := sasd.SignRead(ctx, "x", ReadSAS{TTL: time.Minute}); !errors.Is(err, ErrConfig) {
 		t.Fatalf("a SAS token must not be handed out: %v", err)
 	}
 	tokened, _ := NewAPI(ClientConfig{Account: "acct", Container: "c", Credential: &staticCred{}})
@@ -239,7 +261,7 @@ func TestDelegationSAS(t *testing.T) {
 	}
 	ctx := context.Background()
 	for range 2 {
-		raw, err := api.SignRead(ctx, "x", time.Hour)
+		raw, err := api.SignRead(ctx, "x", ReadSAS{TTL: time.Hour})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -254,7 +276,7 @@ func TestDelegationSAS(t *testing.T) {
 	a := api.(*sdkAPI) //nolint:forcetypeassert // the concrete adapter under test
 	a.udk = nil
 	fail.Store(true)
-	if _, err := api.SignRead(ctx, "x", time.Hour); err == nil {
+	if _, err := api.SignRead(ctx, "x", ReadSAS{TTL: time.Hour}); err == nil {
 		t.Fatal("a refused key request must fail the signing")
 	}
 }

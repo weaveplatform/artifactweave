@@ -8,10 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 )
@@ -319,7 +320,7 @@ func (f *fakeAzure) List(_ context.Context, prefix, marker string) ([]Item, stri
 	return items, next, nil
 }
 
-func (f *fakeAzure) SignRead(_ context.Context, name string, ttl time.Duration) (string, error) {
+func (f *fakeAzure) SignRead(_ context.Context, name string, o ReadSAS) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if err := f.enter("SignRead"); err != nil {
@@ -328,11 +329,14 @@ func (f *fakeAzure) SignRead(_ context.Context, name string, ttl time.Duration) 
 	if f.noSign {
 		return "", fmt.Errorf("%w: no signing credential", ErrConfig)
 	}
-	return fmt.Sprintf(
-		"https://fake.blob.core.windows.net/c/%s?se=%d&sig=x",
-		name,
-		int(ttl.Seconds()),
-	), nil
+	q := url.Values{"se": {strconv.Itoa(int(o.TTL.Seconds()))}, "sig": {"x"}}
+	if o.ContentDisposition != "" {
+		q.Set("rscd", o.ContentDisposition)
+	}
+	if o.ContentType != "" {
+		q.Set("rsct", o.ContentType)
+	}
+	return "https://fake.blob.core.windows.net/c/" + name + "?" + q.Encode(), nil
 }
 
 // staged reports the uncommitted block count of name.

@@ -113,13 +113,19 @@ docker:
 log:
   level: warn
   format: text
+download:
+  redirect:
+    min_size: 4MiB
+    ttl: 90s
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Config{
-		Listen: ":9000", BaseURL: "https://repo.example.com", DataDir: "/srv/aw",
+		Listen:   ":9000",
+		BaseURL:  "https://repo.example.com",
+		DataDir:  "/srv/aw",
 		Compat:   CompatConfig{ArtifactoryVersion: "7.160.1"},
 		Database: DatabaseConfig{Driver: "postgres", DSN: "postgres://u:p@db/aw"},
 		Blob: BlobConfig{Backend: "s3", FS: BlobFSConfig{Root: "/ignored"}, S3: BlobS3Config{
@@ -137,11 +143,15 @@ log:
 			ConnectionString: "cs", ManagedIdentityClientID: "mi", PartSize: 16 << 20,
 			CopyRangeSize: 64 << 20, Concurrency: 4,
 		}},
-		ColdBlob:  BlobConfig{Backend: "gcs", GCS: BlobGCSConfig{Bucket: "archive"}},
-		MasterKey: "k", MasterKeyPrevious: "kp",
-		Bootstrap: BootstrapConfig{AdminPassword: "pw", Descriptor: "/srv/desc.yaml"},
-		Docker:    DockerConfig{SubdomainMatch: true},
-		Log:       LogConfig{Level: "warn", Format: "text"},
+		ColdBlob:          BlobConfig{Backend: "gcs", GCS: BlobGCSConfig{Bucket: "archive"}},
+		MasterKey:         "k",
+		MasterKeyPrevious: "kp",
+		Bootstrap:         BootstrapConfig{AdminPassword: "pw", Descriptor: "/srv/desc.yaml"},
+		Docker:            DockerConfig{SubdomainMatch: true},
+		Log:               LogConfig{Level: "warn", Format: "text"},
+		Download: DownloadConfig{
+			Redirect: RedirectConfig{MinSize: 4 << 20, TTL: 90 * time.Second},
+		},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -162,7 +172,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"):
 			env[envName(k)] = "3"
-		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."):
+		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
+			strings.HasSuffix(k, ".ttl"):
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
@@ -178,7 +189,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 	if !cfg.Docker.SubdomainMatch || !cfg.Blob.S3.PathStyle || cfg.Blob.S3.Bucket != "true" ||
 		cfg.Blob.GCS.PartSize != 8<<20 || cfg.ColdBlob.Azure.Concurrency != 3 ||
 		cfg.ColdBlob.Azure.AccountKey != "true" || cfg.GC.Interval != 45*time.Second ||
-		cfg.GC.GracePeriod != 45*time.Second {
+		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
+		cfg.Download.Redirect.TTL != 45*time.Second {
 		t.Fatalf("env keys not applied: %+v", cfg)
 	}
 }
@@ -650,5 +662,36 @@ func TestGCConfig(t *testing.T) {
 	got, err := Load(LoadOptions{File: file})
 	if err != nil || got.GC.Interval != 30*time.Minute || got.GC.GracePeriod != 5*time.Minute {
 		t.Fatalf("gc from file: %+v, %v", got.GC, err)
+	}
+}
+
+func TestDownloadRedirectConfig(t *testing.T) {
+	if d := Default().Download.Redirect; d.MinSize != 1<<20 || d.TTL != 5*time.Minute {
+		t.Fatalf("defaults: %+v", d)
+	}
+	cfg := Default()
+	if err := set(&cfg, "download.redirect.ttl", "soon"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("bad duration: %v", err)
+	}
+	if err := set(&cfg, "download.redirect.min_size", "big"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("bad size: %v", err)
+	}
+	for _, ttl := range []string{"0s", "-1m", "169h"} {
+		_, err := Load(LoadOptions{Flags: map[string]string{"download.redirect.ttl": ttl}})
+		if !errors.Is(err, ErrInvalidValue) {
+			t.Fatalf("ttl %s: %v", ttl, err)
+		}
+	}
+	// Zero redirects every file; the flag beats the environment.
+	got, err := Load(LoadOptions{
+		Env: envOf(map[string]string{"ARTIFACTWEAVE_DOWNLOAD_REDIRECT_MIN_SIZE": "2MiB"}),
+		Flags: map[string]string{
+			"download.redirect.min_size": "0",
+			"download.redirect.ttl":      "168h",
+		},
+	})
+	if err != nil || got.Download.Redirect.MinSize != 0 ||
+		got.Download.Redirect.TTL != 7*24*time.Hour {
+		t.Fatalf("flags: %+v, %v", got.Download.Redirect, err)
 	}
 }

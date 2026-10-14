@@ -73,8 +73,16 @@ type API interface {
 	Delete(ctx context.Context, name string, generation int64) error
 	// List calls fn for every object whose name starts with prefix.
 	List(ctx context.Context, prefix string, fn func(Attrs) error) error
-	// SignedURL returns a V4 signed GET URL valid for ttl.
-	SignedURL(name string, ttl time.Duration) (string, error)
+	// SignedURL returns a V4 signed GET URL for name.
+	SignedURL(name string, o SignedURLOptions) (string, error)
+}
+
+// SignedURLOptions describe a signed GET URL: how long it lasts and the
+// response overrides it carries, empty when not wanted.
+type SignedURLOptions struct {
+	TTL                time.Duration
+	ContentDisposition string
+	ContentType        string
 }
 
 // ErrPrecondition reports a write or compose onto a name that exists.
@@ -116,8 +124,9 @@ type Options struct {
 	// Sessions holds upload sessions between requests; session.InUploads
 	// with a backend name such as "gcs:<store name>" keeps them durable.
 	Sessions session.Store
-	// Presign enables PresignGet. Signing needs a key in ClientConfig or
-	// credentials that may call IAM signBlob.
+	// Presign makes the store sign storage URLs (blob.Signer). Set it from
+	// ClientConfig.CanSign: signing needs a key, or credentials that name a
+	// service account and may call IAM signBlob.
 	Presign bool
 }
 
@@ -132,7 +141,7 @@ type Store struct {
 
 var (
 	_ blob.Store     = (*Store)(nil)
-	_ blob.Presigner = (*Store)(nil)
+	_ blob.Signer    = (*Store)(nil)
 	_ blob.PartSizer = (*Store)(nil)
 )
 
@@ -165,7 +174,12 @@ func New(api API, o Options) (*Store, error) {
 func (s *Store) PartSize() int64 { return s.partSize }
 
 func (s *Store) blobName(sha string) string { return s.prefix + "sha256/" + sha[:2] + "/" + sha }
-func (s *Store) uploadDir(id string) string { return s.prefix + "_uploads/" + id + "/" }
+
+// ObjectKey is the object name a blob is stored under, prefix included, for
+// signers that address the bucket directly, such as a CDN. sha must be a
+// valid digest (blob.ValidateSHA256).
+func (s *Store) ObjectKey(sha string) string { return s.blobName(sha) }
+func (s *Store) uploadDir(id string) string  { return s.prefix + "_uploads/" + id + "/" }
 
 // object is one part or fold object recorded in a session.
 type object struct {
@@ -511,24 +525,33 @@ func (s *Store) Walk(ctx context.Context, fn func(blob.Info) error) error {
 	return nil
 }
 
-// PresignGet returns a time-limited GET URL for downloadRedirect.
-func (s *Store) PresignGet(_ context.Context, sha string, ttl time.Duration) (string, error) {
+// Signs reports whether the store signs URLs for via: storage URLs when
+// Options.Presign was set. It signs no CDN route yet.
+func (s *Store) Signs(via blob.Via) bool { return via == blob.ViaStorage && s.presign }
+
+// SignURL returns a time-limited GET URL, carrying o's filename and media
+// type as response overrides.
+func (s *Store) SignURL(_ context.Context, sha string, o blob.SignOptions) (string, error) {
 	if err := blob.ValidateSHA256(sha); err != nil {
 		return "", err //nolint:wrapcheck // already a blob sentinel
 	}
-	if !s.presign {
-		return "", fmt.Errorf("%w: presigning is not configured", ErrConfig)
+	if !s.Signs(o.Via) {
+		return "", fmt.Errorf("blob/gcs: sign %s via %s: %w", sha, o.Via, blob.ErrCannotSign)
 	}
-	if ttl <= 0 || ttl > maxSignedTTL {
+	if o.TTL <= 0 || o.TTL > maxSignedTTL {
 		return "", fmt.Errorf(
 			"%w: a signed URL must last more than zero and at most 7 days, not %s",
 			ErrConfig,
-			ttl,
+			o.TTL,
 		)
 	}
-	url, err := s.api.SignedURL(s.blobName(sha), ttl)
+	so := SignedURLOptions{TTL: o.TTL, ContentType: o.ContentType}
+	if o.Filename != "" {
+		so.ContentDisposition = blob.Disposition(o.Filename)
+	}
+	url, err := s.api.SignedURL(s.blobName(sha), so)
 	if err != nil {
-		return "", fmt.Errorf("blob/gcs: presign %s: %w", sha, err)
+		return "", fmt.Errorf("blob/gcs: sign %s: %w", sha, err)
 	}
 	return url, nil
 }

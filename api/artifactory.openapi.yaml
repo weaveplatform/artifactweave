@@ -16041,7 +16041,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitem.md
     get:
-      description: 'Streams the content of a file. Resolution follows the repository class: local serves stored content, remote serves the cache or fetches from upstream, virtual walks its members in order. Matrix parameters `;key=value` on the path restrict resolution to items carrying those properties. The version tokens `[RELEASE]`, `[INTEGRATION]` and `SNAPSHOT` in layout-aware repositories resolve to the latest matching version. Supports `Range` requests with 206 and exposes `X-Checksum-Md5`, `X-Checksum-Sha1` and `X-Checksum-Sha256` headers. Each completed download updates the statistics unless `skipUpdateStats=true`.'
+      description: 'Streams the content of a file. Resolution follows the repository class: local serves stored content, remote serves the cache or fetches from upstream, virtual walks its members in order. Matrix parameters `;key=value` on the path restrict resolution to items carrying those properties. The version tokens `[RELEASE]`, `[INTEGRATION]` and `SNAPSHOT` in layout-aware repositories resolve to the latest matching version. Supports `Range` requests with 206 and exposes `X-Checksum-Md5`, `X-Checksum-Sha1` and `X-Checksum-Sha256` headers. Each completed download updates the statistics unless `skipUpdateStats=true`. In a repository with `downloadRedirect` or `cdnRedirect`, a GET of a file at least `download.redirect.min_size` long answers 302 to a signed URL on the CDN in front of the blob store, if it has one, or on the object store itself (`downloadRedirect` only), carrying the file name and media type as response overrides. HEAD and conditional requests are always answered here.'
       operationId: retrieveArtifact
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -16075,6 +16075,17 @@ paths:
           schema:
             description: When present, returns a plain-text explanation of how the request was resolved (repository, virtual member, cache hit, permission checks) instead of the content.
             type: boolean
+        - description: Optional header parameter. Steers a redirect. `None` streams the file from the server, `S3` redirects to the object store rather than a CDN (on every cloud), and `CF` changes nothing because a CDN is already preferred.
+          in: header
+          name: X-JFrog-Download-Redirect-To
+          required: false
+          schema:
+            description: '`None`, `S3` or `CF`.'
+            enum:
+              - None
+              - S3
+              - CF
+            type: string
       responses:
         '200':
           content:
@@ -16088,6 +16099,13 @@ paths:
                 description: The resolution trace returned when `trace` is given.
                 type: string
           description: The content, or the resolution trace when `trace` was given.
+        '302':
+          description: The file is served from a signed URL, given in `Location`, on a CDN or the object store. The response carries the `X-Checksum-*` headers and `X-Artifactory-Filename` but no body.
+          headers:
+            Location:
+              description: The signed URL.
+              schema:
+                type: string
         '401':
           content:
             application/json:
