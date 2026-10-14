@@ -20,15 +20,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
-	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-// presignTTL is how long a downloadRedirect URL stays valid: long enough for
-// the client to follow the redirect, short enough that a leaked link expires.
-const presignTTL = 5 * time.Minute
 
 // registerItemRoutes serves the item paths (decision 0002). They are
 // registered under exactly the patterns registerHandwrittenStubs derives from
@@ -681,13 +676,8 @@ func (s artifactoryService) serveFile(
 	if it.Actual.SHA1 != "" {
 		h.Set("ETag", `"`+it.Actual.SHA1+`"`)
 	}
-	if f.repo.DownloadRedirect.Bool() {
-		if signer, ok := s.cfg.Blobs.(blob.Presigner); ok {
-			if u, err := signer.PresignGet(ctx, it.Actual.SHA256, presignTTL); err == nil {
-				http.Redirect(w, r, u, http.StatusFound)
-				return
-			}
-		}
+	if r.Method == http.MethodGet && f.repo.DownloadRedirect.Bool() && s.redirect(w, r, st, f, p) {
+		return
 	}
 	content, _, err := s.cfg.Blobs.Open(ctx, it.Actual.SHA256)
 	if err != nil {
@@ -699,11 +689,8 @@ func (s artifactoryService) serveFile(
 	defer func() { _ = content.Close() }()
 	sw := &statusWriter{ResponseWriter: w}
 	http.ServeContent(sw, r, it.Name, it.Modified, content)
-	if r.Method == http.MethodGet && r.URL.Query().Get("skipUpdateStats") != "true" &&
-		(sw.status == http.StatusOK ||
-			(sw.status == http.StatusPartialContent && startsAtZero(r.Header.Get("Range")))) {
-		// Best effort: a failed count must not fail the download.
-		_ = st.Items().RecordDownload(ctx, it.ID, store.Download{By: p.Name, At: time.Now().UTC()})
+	if countsDownload(r, sw.status) {
+		recordDownload(ctx, st, f, p)
 	}
 }
 

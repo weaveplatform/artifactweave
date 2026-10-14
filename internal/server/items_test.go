@@ -38,7 +38,9 @@ func (signingBlobs) PresignGet(_ context.Context, sha string, _ time.Duration) (
 	return "https://signed.example/" + sha, nil
 }
 
-func newItemWorld(t *testing.T, anonymous bool) *itemWorld {
+// newItemWorld builds the world; tune adjusts the router's configuration,
+// for tests that need another blob store or a logger they can read.
+func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
 	t.Helper()
 	ctx := context.Background()
 	db := inmem.New()
@@ -94,11 +96,15 @@ func newItemWorld(t *testing.T, anonymous bool) *itemWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
-	w := &itemWorld{t: t, db: db, blobs: signingBlobs{fsBlobs}}
-	w.h = New(Config{
+	cfg := Config{
 		BaseURL: "https://reg.example", CompatVersion: "7.155.0",
-		Store: db, Blobs: w.blobs, Auth: a,
-	})
+		Store: db, Blobs: signingBlobs{fsBlobs}, Auth: a,
+	}
+	for _, f := range tune {
+		f(&cfg)
+	}
+	w := &itemWorld{t: t, db: db, blobs: cfg.Blobs}
+	w.h = New(cfg)
 	return w
 }
 

@@ -555,6 +555,38 @@ func TestPresign(t *testing.T) {
 	}
 }
 
+// A member that cannot sign (Azure on a SAS token, GCS without signBlob)
+// fails every PresignGet with its configuration error. Counting that as a
+// health failure opened its breaker and pushed its reads behind the other
+// members, although its storage was fine.
+func TestPresignFailureKeepsHealth(t *testing.T) {
+	// The bubble's frozen clock gives both members the same latency, so
+	// read order is configuration order and the unsigned member comes first.
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		unsigned := newFake()
+		ms := []Member{
+			{Name: "unsigned", Store: presigner{unsigned}, WriteEnabled: true},
+			{Name: "signer", Store: presigner{newFake()}, WriteEnabled: true},
+		}
+		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum, o.BreakerThreshold = 2, 2 })
+		sha := put(t, s, blobtest.Content(13, 10)).Digests.SHA256
+		unsigned.failOn("presign", 0, fmt.Errorf("%w: cannot sign", ErrConfig))
+		for range 10 {
+			if url, err := s.PresignGet(ctx, sha, time.Minute); err != nil || url != "fake://"+sha {
+				t.Fatalf("presign %q %v", url, err)
+			}
+		}
+		if s.byName["unsigned"].health.open(s.now()) {
+			t.Fatal("signing failures opened the breaker")
+		}
+		// Still first in read order, so it was asked every time.
+		if n := unsigned.calls["presign"]; n != 10 {
+			t.Fatalf("unsigned member asked %d times, want 10", n)
+		}
+	})
+}
+
 func TestNewValidates(t *testing.T) {
 	st := newFake()
 	m := func(name string) Member { return Member{Name: name, Store: st, WriteEnabled: true} }
