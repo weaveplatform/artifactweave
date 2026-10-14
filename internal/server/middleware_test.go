@@ -59,6 +59,66 @@ func TestAccessLogFields(t *testing.T) {
 	}
 }
 
+func TestAccessLogLogsTheCauseOfAnUntypedError(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		handler http.HandlerFunc
+		level   string
+		cause   bool
+	}{{
+		name: "untyped error",
+		handler: func(w http.ResponseWriter, r *http.Request) {
+			writeErr(w, r, errors.New("sqlite: disk I/O error"))
+		},
+		level: "ERROR",
+		cause: true,
+	}, {
+		name: "untyped error the binder renders as a 500",
+		handler: func(w http.ResponseWriter, r *http.Request) {
+			bindingError(http.StatusInternalServerError)(w, r, errors.New("sqlite: disk I/O error"))
+		},
+		level: "ERROR",
+		cause: true,
+	}, {
+		name:    "typed error",
+		handler: func(w http.ResponseWriter, r *http.Request) { writeErr(w, r, itemNotFound()) },
+		level:   "INFO",
+	}, {
+		name: "untyped binding error",
+		handler: func(w http.ResponseWriter, r *http.Request) {
+			bindingError(http.StatusBadRequest)(w, r, errors.New("bad header"))
+		},
+		level: "INFO",
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			h := requestID(accessLog(slog.New(slog.NewJSONHandler(&buf, nil)))(tc.handler))
+			h.ServeHTTP(
+				httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodGet, "/artifactory/api/x", nil),
+			)
+			line := buf.String()
+			if !strings.Contains(line, `"level":"`+tc.level+`","msg":"request"`) {
+				t.Fatalf("log line %s is not at %s", line, tc.level)
+			}
+			if got := strings.Contains(line, `"error":"sqlite: disk I/O error"`); got != tc.cause {
+				t.Fatalf("log line %s: cause logged %t, want %t", line, got, tc.cause)
+			}
+		})
+	}
+	// Without accessLog above it, a handler's error has nowhere to go and
+	// must not panic.
+	rec := httptest.NewRecorder()
+	writeErr(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/artifactory/api/x", nil),
+		errors.New("lost"),
+	)
+	if rec.Code != http.StatusInternalServerError || strings.Contains(rec.Body.String(), "lost") {
+		t.Fatalf("untyped error: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestRecoverPanicUsesEnvelope(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewJSONHandler(&buf, nil))

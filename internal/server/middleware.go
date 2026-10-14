@@ -44,21 +44,29 @@ func newRequestID() string {
 }
 
 // accessLog writes one slog line per request. It wraps the writer so the
-// status and byte count are known after the handler returns.
+// status and byte count are known after the handler returns. A request whose
+// handler noted a cause (noteCause) logs at ERROR with it.
 func accessLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-			next.ServeHTTP(ww, r)
-			logger.LogAttrs(r.Context(), slog.LevelInfo, "request",
+			var cause error
+			next.ServeHTTP(ww, r.WithContext(withCause(r.Context(), &cause)))
+			attrs := []slog.Attr{
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", ww.Status()),
 				slog.Int("bytes", ww.BytesWritten()),
 				slog.Duration("duration", time.Since(start)),
 				slog.String("request_id", requestIDFrom(r.Context())),
-			)
+			}
+			level := slog.LevelInfo
+			if cause != nil {
+				level = slog.LevelError
+				attrs = append(attrs, slog.String("error", cause.Error()))
+			}
+			logger.LogAttrs(r.Context(), level, "request", attrs...)
 		})
 	}
 }
@@ -160,6 +168,9 @@ func bindingError(status int) func(w http.ResponseWriter, r *http.Request, err e
 		if errors.As(err, &typed) {
 			apierror.Write(w, surfaceFor(r.URL.Path), typed)
 			return
+		}
+		if status >= http.StatusInternalServerError {
+			noteCause(r.Context(), err)
 		}
 		apierror.Write(w, surfaceFor(r.URL.Path), apierror.New(status, err.Error()))
 	}

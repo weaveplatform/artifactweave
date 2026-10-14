@@ -221,7 +221,14 @@ func (s artifactoryService) items(st store.Store) *item.Service {
 	return &item.Service{Store: st, Blobs: s.cfg.Blobs}
 }
 
+// writeErr renders err in r's surface. An error that is not an
+// *apierror.Error reaches the client as a bare 500, so its cause goes to the
+// access log.
 func writeErr(w http.ResponseWriter, r *http.Request, err error) {
+	var typed *apierror.Error
+	if !errors.As(err, &typed) {
+		noteCause(r.Context(), err)
+	}
 	apierror.Write(w, surfaceFor(r.URL.Path), err)
 }
 

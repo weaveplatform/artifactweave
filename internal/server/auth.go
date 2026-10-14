@@ -76,7 +76,7 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 					return
 				}
 				if err != nil {
-					apierror.Write(w, surfaceFor(r.URL.Path), err)
+					writeErr(w, r, err)
 					return
 				}
 				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
@@ -84,14 +84,14 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
 			if err != nil {
-				apierror.Write(w, surfaceFor(r.URL.Path), err)
+				writeErr(w, r, err)
 				return
 			}
 			switch {
 			case anonymous:
 				p, err := authorize(ctx, st, auth.Anonymous, true)
 				if err != nil {
-					apierror.Write(w, surfaceFor(r.URL.Path), err)
+					writeErr(w, r, err)
 					return
 				}
 				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
