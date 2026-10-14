@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -331,6 +332,70 @@ func TestLogRepair(t *testing.T) {
 	} {
 		if !strings.Contains(buf.String(), want) {
 			t.Errorf("missing %q in:\n%s", want, buf.String())
+		}
+	}
+}
+
+// cloudFrontKey writes a PKCS#1 RSA key file and returns its path.
+func cloudFrontKey(t *testing.T) string {
+	t.Helper()
+	k, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(t.TempDir(), "cloudfront.pem")
+	pemKey := pem.EncodeToMemory(
+		&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k)},
+	)
+	if err := os.WriteFile(file, pemKey, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return file
+}
+
+func TestOpenBackendWithCloudFront(t *testing.T) {
+	isolateAWS(t)
+	s3With := func(cf config.CloudFrontConfig) config.BlobBackendConfig {
+		return config.BlobBackendConfig{Backend: "s3", S3: config.BlobS3Config{
+			Bucket: "b", Prefix: "art", Region: "us-east-1", Endpoint: "http://127.0.0.1:9",
+			PathStyle: true, CDN: config.BlobS3CDNConfig{CloudFront: cf},
+		}}
+	}
+	good := config.CloudFrontConfig{
+		Domain: "d111.cloudfront.net", KeyPairID: "K1", PrivateKeyFile: cloudFrontKey(t),
+		PathPrefix: "art",
+	}
+	s, err := openBackend(context.Background(), "blob", s3With(good), session.NewMemory(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sg, ok := s.(blob.Signer)
+	if !ok || !sg.Signs(blob.ViaCDN) || !sg.Signs(blob.ViaStorage) {
+		t.Fatal("an s3 store with CloudFront signs both routes")
+	}
+	sha := strings.Repeat("ab", 32)
+	u, err := sg.SignURL(
+		context.Background(),
+		sha,
+		blob.SignOptions{Via: blob.ViaCDN, TTL: time.Minute},
+	)
+	if err != nil ||
+		!strings.HasPrefix(u, "https://d111.cloudfront.net/sha256/ab/"+sha+"?Expires=") {
+		t.Fatalf("%q %v", u, err)
+	}
+	missing, badKey, outside := good, good, good
+	missing.PrivateKeyFile = filepath.Join(t.TempDir(), "absent.pem")
+	badKey.PrivateKeyFile = filepath.Join(t.TempDir(), "bad.pem")
+	if err := os.WriteFile(badKey.PrivateKeyFile, []byte("not a key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	outside.PathPrefix = "elsewhere"
+	for name, cf := range map[string]config.CloudFrontConfig{
+		"missing key file": missing, "not a key": badKey, "origin outside the prefix": outside,
+	} {
+		_, err := openBackend(context.Background(), "blob", s3With(cf), session.NewMemory(), "")
+		if !errors.Is(err, errBlobStore) {
+			t.Errorf("%s: %v", name, err)
 		}
 	}
 }

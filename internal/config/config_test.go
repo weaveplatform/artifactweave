@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,6 +80,13 @@ blob:
     endpoint: http://minio:9000
     region: eu-west-1
     path_style: true
+    cdn:
+      cloudfront:
+        domain: d111.cloudfront.net
+        key_pair_id: K2JCJMDEHXQW5F
+        private_key_file: /srv/cloudfront.pem
+        hash: sha256
+        path_prefix: p
   gcs:
     bucket: g
     prefix: gp
@@ -134,6 +142,10 @@ download:
 			Endpoint:  "http://minio:9000",
 			Region:    "eu-west-1",
 			PathStyle: true,
+			CDN: BlobS3CDNConfig{CloudFront: CloudFrontConfig{
+				Domain: "d111.cloudfront.net", KeyPairID: "K2JCJMDEHXQW5F",
+				PrivateKeyFile: "/srv/cloudfront.pem", Hash: "sha256", PathPrefix: "p",
+			}},
 		}, GCS: BlobGCSConfig{
 			Bucket: "g", Prefix: "gp", Endpoint: "http://gcs:4443", CredentialsFile: "/srv/sa.json",
 			GoogleAccessID: "aw@p.iam.gserviceaccount.com", PartSize: 32 << 20,
@@ -190,7 +202,9 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Blob.GCS.PartSize != 8<<20 || cfg.ColdBlob.Azure.Concurrency != 3 ||
 		cfg.ColdBlob.Azure.AccountKey != "true" || cfg.GC.Interval != 45*time.Second ||
 		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
-		cfg.Download.Redirect.TTL != 45*time.Second {
+		cfg.Download.Redirect.TTL != 45*time.Second ||
+		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
+		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" {
 		t.Fatalf("env keys not applied: %+v", cfg)
 	}
 }
@@ -693,5 +707,94 @@ func TestDownloadRedirectConfig(t *testing.T) {
 	if err != nil || got.Download.Redirect.MinSize != 0 ||
 		got.Download.Redirect.TTL != 7*24*time.Hour {
 		t.Fatalf("flags: %+v, %v", got.Download.Redirect, err)
+	}
+}
+
+func TestCloudFrontValidation(t *testing.T) {
+	s3 := func(extra map[string]string) map[string]string {
+		flags := map[string]string{
+			"blob.backend":                            "s3",
+			"blob.s3.bucket":                          "b",
+			"blob.s3.cdn.cloudfront.domain":           "d111.cloudfront.net",
+			"blob.s3.cdn.cloudfront.key_pair_id":      "K1",
+			"blob.s3.cdn.cloudfront.private_key_file": "/k.pem",
+		}
+		maps.Copy(flags, extra)
+		return flags
+	}
+	good := []map[string]string{
+		s3(nil),
+		s3(
+			map[string]string{
+				"base_url":                    "https://repo.example.com",
+				"blob.s3.cdn.cloudfront.hash": "SHA256",
+			},
+		),
+		// A sibling host: Go drops the credentials on the redirect.
+		s3(map[string]string{
+			"base_url":                      "https://registry.example.com",
+			"blob.s3.cdn.cloudfront.domain": "cdn.example.com",
+		}),
+		s3(
+			map[string]string{
+				"base_url":                      "http://127.0.0.1:8081",
+				"blob.s3.cdn.cloudfront.domain": "http://localhost:9000",
+			},
+		),
+	}
+	for _, flags := range good {
+		if _, err := Load(LoadOptions{Flags: flags}); err != nil {
+			t.Errorf("%v: %v", flags, err)
+		}
+	}
+	bad := map[string]struct {
+		flags map[string]string
+		want  error
+	}{
+		"no key pair id": {
+			s3(map[string]string{"blob.s3.cdn.cloudfront.key_pair_id": ""}),
+			ErrMissingValue,
+		},
+		"only a hash": {map[string]string{
+			"blob.backend": "s3", "blob.s3.bucket": "b", "blob.s3.cdn.cloudfront.hash": "sha1",
+		}, ErrMissingValue},
+		"bad domain": {
+			s3(map[string]string{"blob.s3.cdn.cloudfront.domain": "ftp://x"}),
+			ErrInvalidValue,
+		},
+		"bad hash": {
+			s3(map[string]string{"blob.s3.cdn.cloudfront.hash": "md5"}),
+			ErrInvalidValue,
+		},
+		"the registry's host": {s3(map[string]string{
+			"base_url":                      "https://repo.example.com",
+			"blob.s3.cdn.cloudfront.domain": "https://REPO.example.com:8443",
+		}), ErrInvalidValue},
+		"a subdomain of the registry": {s3(map[string]string{
+			"base_url":                      "https://repo.example.com",
+			"blob.s3.cdn.cloudfront.domain": "cdn.repo.example.com",
+		}), ErrInvalidValue},
+		"a mirror member on the registry's host": {map[string]string{
+			"base_url":                                         "https://repo.example.com",
+			"blob.backend":                                     "mirror",
+			"blob.mirror.members":                              "a",
+			"blob.stores.a.backend":                            "s3",
+			"blob.stores.a.s3.bucket":                          "b",
+			"blob.stores.a.s3.cdn.cloudfront.domain":           "repo.example.com",
+			"blob.stores.a.s3.cdn.cloudfront.key_pair_id":      "K1",
+			"blob.stores.a.s3.cdn.cloudfront.private_key_file": "/k.pem",
+		}, ErrInvalidValue},
+		"the archive tier": {map[string]string{
+			"cold_blob.backend":                            "s3",
+			"cold_blob.s3.bucket":                          "archive",
+			"cold_blob.s3.cdn.cloudfront.domain":           "d1.cloudfront.net",
+			"cold_blob.s3.cdn.cloudfront.key_pair_id":      "K1",
+			"cold_blob.s3.cdn.cloudfront.private_key_file": "/k.pem",
+		}, ErrInvalidValue},
+	}
+	for name, c := range bad {
+		if _, err := Load(LoadOptions{Flags: c.flags}); !errors.Is(err, c.want) {
+			t.Errorf("%s: %v, want %v", name, err, c.want)
+		}
 	}
 }

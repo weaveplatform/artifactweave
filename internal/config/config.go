@@ -10,6 +10,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/url"
 	"os"
@@ -20,6 +21,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
 // EnvPrefix is prepended to every environment key. Nested keys join their
@@ -328,6 +331,7 @@ func (c Config) Validate() error {
 	}
 	errs = append(errs, c.Blob.validate("blob", true)...)
 	errs = append(errs, c.ColdBlob.validate("cold_blob", false)...)
+	errs = append(errs, c.validateCDN()...)
 	switch c.Log.Level {
 	case "debug", "info", "warn", "error":
 	default:
@@ -348,6 +352,38 @@ func (c Config) Validate() error {
 			ErrInvalidValue, ttl))
 	}
 	return errors.Join(errs...)
+}
+
+// validateCDN refuses a CDN on the archive tier, whose content is not
+// served from an edge, and a CDN on the registry's own host or a subdomain
+// of it: Go clients, the JFrog CLI among them, keep sending their
+// Authorization header across a redirect to those hosts, so the
+// credentials would reach the CDN (decision 0029).
+func (c Config) validateCDN() []error {
+	var errs []error
+	cold := c.ColdBlob.cdnDomains("cold_blob")
+	for _, key := range slices.Sorted(maps.Keys(cold)) {
+		errs = append(errs, fmt.Errorf("%w: %s: the archive tier has no CDN", ErrInvalidValue, key))
+	}
+	base, err := url.Parse(c.BaseURL)
+	if c.BaseURL == "" || err != nil {
+		return errs
+	}
+	registry := strings.ToLower(base.Hostname())
+	hot := c.Blob.cdnDomains("blob")
+	for _, key := range slices.Sorted(maps.Keys(hot)) {
+		u, err := cdn.ParseDomain(hot[key])
+		if err != nil {
+			continue // reported by the backend's own validation
+		}
+		host := strings.ToLower(u.Hostname())
+		if host == registry || strings.HasSuffix(host, "."+registry) {
+			errs = append(errs, fmt.Errorf(
+				"%w: %s %q is base_url's host or a subdomain of it, so clients would send it "+
+					"their credentials; use a sibling host", ErrInvalidValue, key, hot[key]))
+		}
+	}
+	return errs
 }
 
 // RequireMasterKey is the extra check `serve` makes; `config validate` and

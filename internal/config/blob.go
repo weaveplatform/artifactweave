@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/weaveplatform/artifactweave/pkg/cdn"
 )
 
 // BlobConfig selects one blob store: the hot store (blob) or the archive
@@ -95,7 +97,33 @@ type BlobS3Config struct {
 	Region    string `yaml:"region"`
 	PathStyle bool   `yaml:"path_style"`
 	Profile   string `yaml:"profile"`
+	// CDN is a CDN in front of the bucket (decision 0029).
+	CDN BlobS3CDNConfig `yaml:"cdn"`
 }
+
+// BlobS3CDNConfig is the CDN in front of an s3 store.
+type BlobS3CDNConfig struct {
+	CloudFront CloudFrontConfig `yaml:"cloudfront"`
+}
+
+// CloudFrontConfig is a CloudFront distribution whose origin is the bucket.
+// The private key stays in its file, which is read at start: the
+// configuration holds only the path.
+type CloudFrontConfig struct {
+	// Domain is the distribution host, or an http(s) URL for a test edge.
+	Domain string `yaml:"domain"`
+	// KeyPairID is the public key's ID in a trusted key group.
+	KeyPairID string `yaml:"key_pair_id"`
+	// PrivateKeyFile is the PEM key that signs URLs.
+	PrivateKeyFile string `yaml:"private_key_file"`
+	// Hash is sha1 (the default) or sha256.
+	Hash string `yaml:"hash"`
+	// PathPrefix is the distribution origin's path inside the bucket.
+	PathPrefix string `yaml:"path_prefix"`
+}
+
+// Enabled reports whether any field is set.
+func (c CloudFrontConfig) Enabled() bool { return c != CloudFrontConfig{} }
 
 // BlobGCSConfig is the Google Cloud Storage backend (decision 0027).
 // Credentials are Application Default Credentials unless CredentialsFile
@@ -193,6 +221,9 @@ func backendKeys() []string {
 	return []string{
 		"backend", "fs.root",
 		"s3.bucket", "s3.prefix", "s3.endpoint", "s3.region", "s3.path_style", "s3.profile",
+		"s3.cdn.cloudfront.domain", "s3.cdn.cloudfront.key_pair_id",
+		"s3.cdn.cloudfront.private_key_file", "s3.cdn.cloudfront.hash",
+		"s3.cdn.cloudfront.path_prefix",
 		"gcs.bucket", "gcs.prefix", "gcs.endpoint", "gcs.credentials_file",
 		"gcs.google_access_id", "gcs.part_size",
 		"azure.account", "azure.endpoint", "azure.container", "azure.prefix",
@@ -275,27 +306,32 @@ func (st *BlobStoreConfig) set(field, key, value string) error {
 // set assigns one key of a backend definition.
 func (b *BlobBackendConfig) set(sub, key, value string) error {
 	str := map[string]*string{
-		"backend":                          &b.Backend,
-		"fs.root":                          &b.FS.Root,
-		"s3.bucket":                        &b.S3.Bucket,
-		"s3.prefix":                        &b.S3.Prefix,
-		"s3.endpoint":                      &b.S3.Endpoint,
-		"s3.region":                        &b.S3.Region,
-		"s3.profile":                       &b.S3.Profile,
-		"gcs.bucket":                       &b.GCS.Bucket,
-		"gcs.prefix":                       &b.GCS.Prefix,
-		"gcs.endpoint":                     &b.GCS.Endpoint,
-		"gcs.credentials_file":             &b.GCS.CredentialsFile,
-		"gcs.google_access_id":             &b.GCS.GoogleAccessID,
-		"azure.account":                    &b.Azure.Account,
-		"azure.endpoint":                   &b.Azure.Endpoint,
-		"azure.container":                  &b.Azure.Container,
-		"azure.prefix":                     &b.Azure.Prefix,
-		"azure.credential":                 &b.Azure.Credential,
-		"azure.account_key":                &b.Azure.AccountKey,
-		"azure.sas_token":                  &b.Azure.SASToken,
-		"azure.connection_string":          &b.Azure.ConnectionString,
-		"azure.managed_identity_client_id": &b.Azure.ManagedIdentityClientID,
+		"backend":                            &b.Backend,
+		"fs.root":                            &b.FS.Root,
+		"s3.bucket":                          &b.S3.Bucket,
+		"s3.prefix":                          &b.S3.Prefix,
+		"s3.endpoint":                        &b.S3.Endpoint,
+		"s3.region":                          &b.S3.Region,
+		"s3.profile":                         &b.S3.Profile,
+		"s3.cdn.cloudfront.domain":           &b.S3.CDN.CloudFront.Domain,
+		"s3.cdn.cloudfront.key_pair_id":      &b.S3.CDN.CloudFront.KeyPairID,
+		"s3.cdn.cloudfront.private_key_file": &b.S3.CDN.CloudFront.PrivateKeyFile,
+		"s3.cdn.cloudfront.hash":             &b.S3.CDN.CloudFront.Hash,
+		"s3.cdn.cloudfront.path_prefix":      &b.S3.CDN.CloudFront.PathPrefix,
+		"gcs.bucket":                         &b.GCS.Bucket,
+		"gcs.prefix":                         &b.GCS.Prefix,
+		"gcs.endpoint":                       &b.GCS.Endpoint,
+		"gcs.credentials_file":               &b.GCS.CredentialsFile,
+		"gcs.google_access_id":               &b.GCS.GoogleAccessID,
+		"azure.account":                      &b.Azure.Account,
+		"azure.endpoint":                     &b.Azure.Endpoint,
+		"azure.container":                    &b.Azure.Container,
+		"azure.prefix":                       &b.Azure.Prefix,
+		"azure.credential":                   &b.Azure.Credential,
+		"azure.account_key":                  &b.Azure.AccountKey,
+		"azure.sas_token":                    &b.Azure.SASToken,
+		"azure.connection_string":            &b.Azure.ConnectionString,
+		"azure.managed_identity_client_id":   &b.Azure.ManagedIdentityClientID,
 	}
 	if dst, ok := str[sub]; ok {
 		*dst = value
@@ -431,6 +467,7 @@ func (b BlobBackendConfig) validate(prefix string) []error {
 		if b.S3.Bucket == "" {
 			errs = append(errs, fmt.Errorf("%w: %s.s3.bucket", ErrMissingBucket, prefix))
 		}
+		errs = append(errs, b.S3.CDN.CloudFront.validate(prefix+".s3.cdn.cloudfront")...)
 	case "gcs":
 		errs = append(errs, b.GCS.validate(prefix)...)
 	case "azure":
@@ -439,6 +476,50 @@ func (b BlobBackendConfig) validate(prefix string) []error {
 		errs = append(errs, fmt.Errorf("%w: %s.backend %q", ErrUnknownBlob, prefix, b.Backend))
 	}
 	return errs
+}
+
+func (c CloudFrontConfig) validate(prefix string) []error {
+	if !c.Enabled() {
+		return nil
+	}
+	var errs []error
+	for _, f := range []struct{ name, value string }{
+		{"domain", c.Domain},
+		{"key_pair_id", c.KeyPairID},
+		{"private_key_file", c.PrivateKeyFile},
+	} {
+		if f.value == "" {
+			errs = append(errs, fmt.Errorf("%w: %s.%s", ErrMissingValue, prefix, f.name))
+		}
+	}
+	if c.Domain != "" {
+		if _, err := cdn.ParseDomain(c.Domain); err != nil {
+			errs = append(errs, fmt.Errorf("%w: %s.domain: %w", ErrInvalidValue, prefix, err))
+		}
+	}
+	switch strings.ToLower(c.Hash) {
+	case "", cdn.HashSHA1, cdn.HashSHA256:
+	default:
+		errs = append(errs, fmt.Errorf("%w: %s.hash %q is not sha1 or sha256",
+			ErrInvalidValue, prefix, c.Hash))
+	}
+	return errs
+}
+
+// cdnDomains maps the configuration key of every CDN domain in the section,
+// the named stores' included, to its value.
+func (b BlobConfig) cdnDomains(prefix string) map[string]string {
+	out := map[string]string{}
+	add := func(p string, bc BlobBackendConfig) {
+		if cf := bc.S3.CDN.CloudFront; cf.Enabled() {
+			out[p+".s3.cdn.cloudfront.domain"] = cf.Domain
+		}
+	}
+	add(prefix, b.BlobBackendConfig)
+	for name, st := range b.Stores {
+		add(prefix+".stores."+name, st.BlobBackendConfig)
+	}
+	return out
 }
 
 func (g BlobGCSConfig) validate(prefix string) []error {
