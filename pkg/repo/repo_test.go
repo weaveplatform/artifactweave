@@ -266,7 +266,9 @@ func TestDefaults(t *testing.T) {
 			"remote maven",
 			repo.Config{Key: "k", Class: repo.Remote, PackageType: repo.Maven, URL: "https://x"},
 			func(t *testing.T, c *repo.Config) {
-				if *c.RetrievalCachePeriodSecs != 7200 || *c.MissedRetrievalCachePeriodSecs != 1800 || *c.SocketTimeoutMillis != 15000 ||
+				if *c.RetrievalCachePeriodSecs != 7200 ||
+					*c.MissedRetrievalCachePeriodSecs != 1800 ||
+					*c.SocketTimeoutMillis != 15000 ||
 					*c.AssumedOfflinePeriodSecs != 300 ||
 					*c.MetadataRetrievalTimeoutSecs != 60 ||
 					!*c.StoreArtifactsLocally ||
@@ -459,9 +461,9 @@ func TestValidate(t *testing.T) {
 			"packageType",
 		},
 		{
-			"project without environments",
+			"project without environments defaults later, so it is valid here",
 			func(c *repo.Config) { c.ProjectKey = "proj" },
-			"environments",
+			"",
 		},
 		{
 			"project with environments",
@@ -530,13 +532,12 @@ func TestValidateCollectsEveryError(t *testing.T) {
 		Key:           "",
 		Class:         repo.Virtual,
 		PackageType:   repo.Cargo,
-		ProjectKey:    "p",
 		MaxUniqueTags: ptr(-1),
 	}
 	err := repo.Validate(&c)
 	var errs repo.Errors
-	if !errors.As(err, &errs) || len(errs) != 5 {
-		t.Fatalf("want 5 errors, got %v", err)
+	if !errors.As(err, &errs) || len(errs) != 4 {
+		t.Fatalf("want 4 errors, got %v", err)
 	}
 	if fe := errs[0]; fe.Error() != "key: is required" {
 		t.Errorf("first error %q", fe.Error())

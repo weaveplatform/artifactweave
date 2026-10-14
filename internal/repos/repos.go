@@ -91,29 +91,35 @@ func CheckKeypairs(ctx context.Context, keys store.KeyStore, c repo.Config) erro
 	return nil
 }
 
-// CheckEnvironments rejects an environment c names that does not exist:
-// DEV, PROD or a stored global environment, or one of the repository's
-// project's environments (decision 0013). Names compare without regard to
-// case, and each is rewritten to the environment's stored spelling, because
-// renaming or deleting an environment finds its repositories by that
-// spelling: a repository keeping "dev" would be missed when DEV is renamed.
+// CheckEnvironments applies Artifactory's rule for a repository's
+// environments (decision 0013). Outside a project they are ignored, so none
+// are stored. In a project an empty list becomes DEV, and every entry must be
+// DEV, PROD, a global environment or one of the project's own environments,
+// which are named "<projectKey>-<name>". Names compare without regard to case
+// and are stored in the environment's own spelling, because renaming or
+// deleting an environment finds its repositories by that spelling.
 func CheckEnvironments(ctx context.Context, projects store.ProjectStore, c *repo.Config) error {
-	if len(c.Environments) == 0 {
+	if c.ProjectKey == "" {
+		c.Environments = nil
 		return nil
 	}
-	known := slices.Clone(types.BuiltinEnvironments)
-	scopes := []string{""}
-	if c.ProjectKey != "" {
-		scopes = append(scopes, c.ProjectKey)
+	if len(c.Environments) == 0 {
+		c.Environments = []string{types.EnvironmentDev}
 	}
-	for _, scope := range scopes {
-		envs, err := projects.Environments(ctx, scope)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return fmt.Errorf("repos: environments %q: %w", scope, err)
-		}
-		for _, e := range envs {
-			known = append(known, e.Name)
-		}
+	known := slices.Clone(types.BuiltinEnvironments)
+	global, err := projects.Environments(ctx, "")
+	if err != nil {
+		return fmt.Errorf("repos: global environments: %w", err)
+	}
+	for _, e := range global {
+		known = append(known, e.Name)
+	}
+	scoped, err := projects.Environments(ctx, c.ProjectKey)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return fmt.Errorf("repos: environments of project %s: %w", c.ProjectKey, err)
+	}
+	for _, e := range scoped {
+		known = append(known, projectEnvironment(c.ProjectKey, e.Name))
 	}
 	out := make([]string, 0, len(c.Environments))
 	for _, name := range c.Environments {
@@ -127,6 +133,17 @@ func CheckEnvironments(ctx context.Context, projects store.ProjectStore, c *repo
 	}
 	c.Environments = out
 	return nil
+}
+
+// projectEnvironment is the name a repository uses for a project
+// environment: "<projectKey>-<name>", as JFrog names them (the platform
+// provider's resource_project_environment). A stored name that already
+// carries the prefix is used as it is.
+func projectEnvironment(projectKey, name string) string {
+	if strings.HasPrefix(strings.ToLower(name), strings.ToLower(projectKey)+"-") {
+		return name
+	}
+	return projectKey + "-" + name
 }
 
 // Merge merges an update body into the stored configuration with

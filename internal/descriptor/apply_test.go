@@ -307,9 +307,11 @@ func TestStoredDocumentThatIsNotJSON(t *testing.T) {
 	}
 }
 
-// TestApplyEnvironments checks that the descriptor refuses an environment
-// that does not exist, and that a name spelled in another case is stored in
-// the environment's own spelling and unchanged on the next apply.
+// TestApplyEnvironments checks Artifactory's rule for a repository's
+// environments through the descriptor: ignored outside a project, DEV by
+// default in one, a name in another case stored in the environment's own
+// spelling and unchanged on the next apply, and an unknown name refusing the
+// whole descriptor.
 func TestApplyEnvironments(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
@@ -317,19 +319,30 @@ func TestApplyEnvironments(t *testing.T) {
 localRepositories:
   env-local:
     type: generic
-    environments: [dev]
+    projectKey: proj
+    environments: [prod]
+  default-local:
+    type: generic
+    projectKey: proj
+  loose-local:
+    type: generic
+    environments: [nope]
 `
-	if res := mustApply(t, db, doc); len(res.Created) != 1 {
+	if res := mustApply(t, db, doc); len(res.Created) != 3 {
 		t.Fatalf("first apply %+v", res)
 	}
-	c, err := db.Repos().Get(ctx, "env-local")
-	if err != nil || strings.Join(c.Environments, ",") != "DEV" {
-		t.Fatalf("stored %+v %v", c.Environments, err)
+	for key, want := range map[string]string{
+		"env-local": "PROD", "default-local": "DEV", "loose-local": "",
+	} {
+		c, err := db.Repos().Get(ctx, key)
+		if err != nil || strings.Join(c.Environments, ",") != want {
+			t.Fatalf("%s: %v %v, want %q", key, c.Environments, err, want)
+		}
 	}
-	if res := mustApply(t, db, doc); len(res.Unchanged) != 1 || len(res.Updated) != 0 {
-		t.Fatalf("second apply %+v: the stored spelling must compare equal", res)
+	if res := mustApply(t, db, doc); len(res.Unchanged) != 3 || len(res.Updated) != 0 {
+		t.Fatalf("second apply %+v: the stored spelling and defaults must compare equal", res)
 	}
-	_, err = apply(t, db, `
+	_, err := apply(t, db, `
 localRepositories:
   other-local:
     type: generic
@@ -343,7 +356,7 @@ localRepositories:
 	if _, err := db.Repos().Get(ctx, "other-local"); err == nil {
 		t.Fatal("a refused descriptor created a repository")
 	}
-	if c, _ := db.Repos().Get(ctx, "env-local"); strings.Join(c.Environments, ",") != "DEV" {
+	if c, _ := db.Repos().Get(ctx, "env-local"); strings.Join(c.Environments, ",") != "PROD" {
 		t.Fatalf("a refused descriptor changed a repository: %v", c.Environments)
 	}
 }

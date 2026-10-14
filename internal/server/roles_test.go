@@ -72,9 +72,9 @@ func TestGlobalRolesAndEnvironmentsBodies(t *testing.T) {
 		t.Fatalf("the rename did not reach the role: %s", rec.Body)
 	}
 
-	// A repository in STAGE keeps it from being deleted.
+	// A project's repository in STAGE keeps it from being deleted.
 	rec = do(t, h, http.MethodPut, "/artifactory/api/repositories/staged", jsonAdmin,
-		`{"rclass":"local","packageType":"generic","environments":["STAGE"]}`)
+		`{"rclass":"local","packageType":"generic","projectKey":"proj","environments":["STAGE"]}`)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("create repository: %d %s", rec.Code, rec.Body)
 	}

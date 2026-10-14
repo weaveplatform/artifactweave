@@ -23,10 +23,27 @@ synchronously so a following read shows `projectKey`. Each project gets its
 quota warns and blocks at the documented thresholds.
 
 Global and project environments live in the Access API with the documented endpoints;
-a repository's `environments` field is validated against them. Every write path checks
-it: create, update, the batch endpoints and the descriptor. An unknown name answers 400
-"Environment 'X' does not exist" and writes nothing. Accepted names are stored in the
-environment's own spelling, so rename and delete find every repository that uses it.
+a repository's `environments` field follows Artifactory's project rule.
+
+- **Outside a project** (no `projectKey`), `environments` is ignored, and none are stored.
+  Sources:
+  - JFrog's repository configuration spec marks the field "Mandatory when assigning
+    repository to a project".
+  - terraform-provider-artifactory's guide says it "is ignored by Artifactory, if the
+    repository is not assigned to an existing project".
+- **In a project:**
+  - An empty list becomes `["DEV"]`, Artifactory's default on assignment. `repo.Validate`
+    therefore no longer requires the list when `projectKey` is set.
+  - Every entry must be DEV, PROD, a global environment, or one of the project's own
+    environments. Project environments are named `<projectKey>-<name>`: the key, not the
+    project's name, with the whole name at most 32 characters
+    (terraform-provider-project, `resource_project_environment.go`).
+- **Case and spelling:** names compare without regard to case and are stored in the
+  environment's own spelling, so rename and delete find every repository that uses one.
+- **Where it applies:** create, update, the batch endpoints and the descriptor, all through
+  `repos.CheckEnvironments`.
+- **Unknown names:** an unknown entry answers 400 and writes nothing. The message,
+  "Environment 'X' does not exist", is our choice; no source documents Artifactory's.
 
 **Global roles and environments** (`/access/api/v1/roles`, `/access/api/v1/environments`,
 issue #77, `internal/service/roles`):
