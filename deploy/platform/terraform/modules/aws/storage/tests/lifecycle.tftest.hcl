@@ -69,8 +69,8 @@ run "versioning_turns_on_when_asked" {
   }
 
   assert {
-    condition     = one(aws_s3_bucket_versioning.blobs[0].versioning_configuration).status == "Enabled"
-    error_message = "versioning = true must enable versioning on the bucket"
+    condition     = one(aws_s3_bucket_versioning.blobs[0].versioning_configuration).status == "Enabled" && output.versioned
+    error_message = "versioning = true must enable versioning on the bucket, and the versioned output must say so"
   }
 }
 

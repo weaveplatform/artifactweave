@@ -15,7 +15,10 @@ output "region" {
 
 output "versioned" {
   description = "Whether versioning is on, which S3 replication requires of both buckets."
-  value       = var.versioning
+  # Read from the versioning resource, not var.versioning, so a replication
+  # rule that takes this output waits for versioning to be enabled: S3
+  # refuses the rule on a bucket that is not versioned yet.
+  value = length(aws_s3_bucket_versioning.blobs) == 1
 }
 
 output "host" {

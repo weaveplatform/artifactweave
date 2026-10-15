@@ -1,43 +1,12 @@
-output "bucket" {
-  description = "Primary bucket for blob.s3.bucket."
-  value       = aws_s3_bucket.blobs.bucket
-}
-
-output "region" {
-  description = "Region of the primary bucket (blob.s3.region)."
-  value       = var.region
-}
-
-output "replica_bucket" {
-  description = "Replica bucket S3 replicates committed blobs into."
-  value       = aws_s3_bucket.replica.bucket
-}
-
-output "replica_region" {
-  description = "Region of the replica bucket."
-  value       = var.replica_region
-}
-
-output "store_prefix" {
-  description = "Key prefix artifactweave writes under (blob.s3.prefix)."
-  value       = var.store_prefix
-}
-
-output "replicated_prefix" {
-  description = "Keys under this prefix (the committed blobs) replicate."
-  value       = local.replicated_prefix
-}
-
 output "artifactweave_config" {
-  description = "The blob section of artifactweave.yaml: one store, the primary bucket. Credentials come from the AWS default chain."
+  description = "The blob section of artifactweave.yaml: one store, the primary bucket. It authenticates through the AWS SDK chain, as the app role."
   value = yamlencode({
     blob = {
       backend = "s3"
-      s3 = {
-        bucket = aws_s3_bucket.blobs.bucket
-        region = var.region
-        prefix = var.store_prefix
-      }
+      s3 = merge(
+        { bucket = module.primary.bucket, region = var.region },
+        var.store_prefix == "" ? {} : { prefix = var.store_prefix },
+      )
     }
   })
 }
@@ -47,21 +16,40 @@ output "failover_artifactweave_config" {
   value = yamlencode({
     blob = {
       backend = "s3"
-      s3 = {
-        bucket = aws_s3_bucket.replica.bucket
-        region = var.replica_region
-        prefix = var.store_prefix
-      }
+      s3 = merge(
+        { bucket = module.replica.bucket, region = var.replica_region },
+        var.store_prefix == "" ? {} : { prefix = var.store_prefix },
+      )
     }
   })
 }
 
 output "storage_host" {
-  description = "Host a downloadRedirect repository's signed URLs point at: the primary bucket's virtual-hosted endpoint."
-  value       = "${aws_s3_bucket.blobs.bucket}.s3.${var.region}.amazonaws.com"
+  description = "Where a downloadRedirect repository's presigned URLs point: the primary bucket's virtual-hosted endpoint."
+  value       = module.primary.host
 }
 
-output "expires_at" {
-  description = "The expires-at tag (epoch seconds) a scenario run set, read by reap; empty outside scenario runs."
-  value       = lookup(var.scenario_labels, "expires-at", "")
+output "bucket" {
+  description = "The primary bucket, for blob.s3.bucket."
+  value       = module.primary.bucket
+}
+
+output "region" {
+  description = "The primary bucket's region, for blob.s3.region."
+  value       = var.region
+}
+
+output "replica_bucket" {
+  description = "The replica bucket S3 copies the committed blobs into."
+  value       = module.replica.bucket
+}
+
+output "replica_region" {
+  description = "The replica bucket's region."
+  value       = var.replica_region
+}
+
+output "replicated_prefix" {
+  description = "Keys under this prefix, the committed blobs, replicate."
+  value       = module.replication.prefix
 }

@@ -104,7 +104,7 @@ test/terraform/run.sh             the app-layer driver: builds a -cover server, 
 | Module | Creates | Inputs (default) |
 |---|---|---|
 | `aws/storage` | one private S3 bucket and its policy | `name`, `region`, `principals` (map of role ARNs, at least one), `store_prefix` (`""`), `versioning` (false), `expiring_prefixes` ({}), `force_destroy` (false), `tags` ({}) |
-| `aws/replication` | S3 cross-region replication from one bucket to another, and its IAM role | `name`, `source` and `destination` bucket objects, `prefix`, `replicate_deletes` (false), `replication_time_control` (false), `storage_class` ("STANDARD"), `permissions_boundary_arn` (null), `iam_role_path` (null), `tags` ({}) |
+| `aws/replication` | S3 cross-region replication from one bucket to another, and its IAM role | `name`, `source_bucket` and `destination_bucket` (`aws/storage` outputs; `source` is reserved in a `module` block), `prefix`, `replicate_deletes` (false), `replication_time_control` (false), `storage_class` ("STANDARD"), `permissions_boundary_arn` (null), `iam_role_path` (null), `tags` ({}) |
 | `gcp/storage` | one private GCS bucket and its grants | `name`, `location`, `data_locations` ([], zero or two), `rpo` (null), `principals` (map of service-account emails), `store_prefix` (`""`), `expiring_prefixes` ({}), `force_destroy` (false), `labels` ({}) |
 | `azure/storage` | one storage account, its container, lifecycle policy and grants | `account_name`, `resource_group_name`, `location`, `replication_type` ("LRS"), `container` ("artifactweave"), `store_prefix` (`""`), `principals` (map of `{principal_id, principal_type}`, type optional), `expiring_prefixes` ({}), `tags` ({}) |
 

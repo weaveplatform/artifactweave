@@ -5,5 +5,3 @@
 # then on (docs/testing/ci.md, The reference-deployment contract).
 
 # Scenarios.
-deploy/platform/terraform/aws/geo-replicated
-deploy/platform/terraform/aws/single-bucket
