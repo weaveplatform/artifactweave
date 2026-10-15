@@ -27,3 +27,15 @@ variable "conformance_service_account" {
   type        = string
   default     = "artifactweave-conformance"
 }
+
+variable "app_service_account" {
+  description = "Email of the service account artifactweave runs as and that gets object rights on the bucket. Empty uses conformance_service_account; scenario runs pass the deployer."
+  type        = string
+  default     = ""
+}
+
+variable "scenario_labels" {
+  description = "Labels for the bucket. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches."
+  type        = map(string)
+  default     = {}
+}

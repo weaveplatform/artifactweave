@@ -25,5 +25,5 @@ provider "azurerm" {
   # Only the providers this configuration uses, not every provider the
   # azurerm default registers in an empty subscription.
   resource_provider_registrations = "none"
-  resource_providers_to_register  = ["Microsoft.Storage", "Microsoft.ManagedIdentity"]
+  resource_providers_to_register  = var.register_resource_providers ? ["Microsoft.Storage", "Microsoft.ManagedIdentity"] : []
 }

@@ -14,7 +14,9 @@ COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X $(MODULE)/internal/buildinfo.version=$(VERSION) -X $(MODULE)/internal/buildinfo.commit=$(COMMIT) -X $(MODULE)/internal/buildinfo.buildDate=$(BUILD_DATE)
 PLATFORMS ?= linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
-UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v /test/acceptance)
+# test/acceptance runs in its own job; test/platform runs only in
+# platform-scenarios.yml, against a deployment, and is evidence rather than coverage.
+UNIT_PKGS = $(shell GOWORK=off $(GO) list ./... | grep -v -e /test/acceptance -e /test/platform)
 
 ## help: list targets
 help:

@@ -35,7 +35,25 @@ variable "bootstrap_resource_group" {
 }
 
 variable "conformance_identity" {
-  description = "Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account."
+  description = "Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account. Empty grants nothing beyond whoever applies (scenario runs, where the deployer applies and runs artifactweave)."
   type        = string
   default     = "artifactweave-conformance"
+}
+
+variable "resource_group_name" {
+  description = "An existing resource group to create the account in. Empty creates <name>-rg; scenario runs pass azure/bootstrap's scenarios group, where the deployer's rights end."
+  type        = string
+  default     = ""
+}
+
+variable "scenario_labels" {
+  description = "Tags for the account (and the resource group when this root creates it). Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches."
+  type        = map(string)
+  default     = {}
+}
+
+variable "register_resource_providers" {
+  description = "Register Microsoft.Storage and Microsoft.ManagedIdentity. Scenario runs pass false: the deployer has no subscription-level rights, and the bootstrap's subscription has them registered already."
+  type        = bool
+  default     = true
 }

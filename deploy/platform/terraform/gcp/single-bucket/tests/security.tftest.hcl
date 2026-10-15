@@ -46,3 +46,38 @@ run "app_reaches_this_bucket_only" {
     error_message = "the service account gets object rights on this bucket, not bucket or project administration"
   }
 }
+
+# A scenario run applies as the deployer: it names the app service account,
+# so nothing looks up the conformance account, and it labels the bucket for
+# reap.
+run "scenario_run_grants_the_named_account" {
+  command = plan
+
+  variables {
+    app_service_account = "artifactweave-deployer@lab.iam.gserviceaccount.com"
+    scenario_labels = {
+      artifactweave-scenario = "single-bucket"
+      expires-at             = "1767225600"
+    }
+  }
+
+  assert {
+    condition     = length(data.google_service_account.conformance) == 0
+    error_message = "a named app service account must skip the conformance lookup, which the deployer cannot read"
+  }
+
+  assert {
+    condition     = google_storage_bucket_iam_member.app.member == "serviceAccount:artifactweave-deployer@lab.iam.gserviceaccount.com"
+    error_message = "the bucket grant must go to the named app service account"
+  }
+
+  assert {
+    condition     = google_storage_bucket.blobs.labels["expires-at"] == "1767225600"
+    error_message = "the bucket must carry the scenario labels reap matches"
+  }
+
+  assert {
+    condition     = output.expires_at == "1767225600"
+    error_message = "the expires_at output must carry the label reap reads from state"
+  }
+}

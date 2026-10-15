@@ -13,6 +13,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS and Azure; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
+| `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform` or a `single-bucket` scenario) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
 
 `GOWORK=off` isolates builds from parent workspaces. Actions are pinned by commit SHA.
 
@@ -126,7 +127,7 @@ holds GitHub's trust, in two GitHub environments:
 | Environment | Identity on each cloud | Rights | Used by |
 |---|---|---|---|
 | `cloud-conformance` | data plane: `artifactweave-conformance` | objects in the `single-bucket` bucket or account only | `cloud-conformance.yml` |
-| `cloud-platform` | deployer: `artifactweave-deployer` | create and destroy scenario resources: the GCP lab project's storage, load balancing, Certificate Manager and the scenarios' DNS zone; Azure's `artifactweave-scenarios-rg` and DNS zone; each cloud's state store | `platform-auth-check.yml`, and the scenario workflow (#129) |
+| `cloud-platform` | deployer: `artifactweave-deployer` | create and destroy scenario resources: the GCP lab project's storage, load balancing, Certificate Manager and the scenarios' DNS zone; Azure's `artifactweave-scenarios-rg` and DNS zone; each cloud's state store | `platform-auth-check.yml`, `platform-scenarios.yml` |
 
 Every trust matches this repository's immutable OIDC subject,
 `repo:weaveplatform@336817058/artifactweave@1415179278:environment:<env>`, exactly: GCP's
@@ -149,6 +150,35 @@ that change a bootstrap, after the maintainer approves) logs in to both clouds a
 deployer and makes read-only calls that need its rights: the GCS state bucket and the DNS
 zone's records, the scenarios resource group and the Azure state container. It creates
 nothing.
+
+## Platform scenarios (manual)
+
+`platform-scenarios.yml` runs the reference deployments in `deploy/platform/terraform` on
+real clouds, from the `cloud-platform` environment, so the maintainer approves every run.
+Its inputs are `cloud`, `scenario`, `action` (`test`, `apply`, `destroy` or `reap`),
+`instance` and `ttl_minutes`; [`deploy/platform/README.md`](../../deploy/platform/README.md#running-a-scenario-in-ci)
+shows how to dispatch each. Every action goes through `deploy/platform/terraform/scenario-ci.sh`:
+
+- Terraform 1.16.4, pinned by SHA-256 as in the `terraform` job, works on a fresh copy of
+  the scenario with a backend generated for the instance's state, at
+  `scenarios/<cloud>/<scenario>/<instance>` in the bootstrap's state store. On Azure the
+  provider and backend exchange the job's OIDC token themselves (`ARM_USE_OIDC`).
+- `test` builds artifactweave, starts it with the scenario's `artifactweave_config` output,
+  and runs `test/platform`: a 40 MiB deploy and round trip, a ranged GET, the storage
+  API's checksums, a `HEAD` answered by the registry, a `downloadRedirect` 302 to the
+  scenario's `storage_host` whose signed URL serves the file and a range of it, and the
+  same URL refused without its signature. Scenarios add their own checks in
+  `test/platform`. The instance is destroyed in a step that always runs.
+- `reap` destroys expired instances and deletes resources that outlived their state.
+- State and plans are never uploaded, and nothing uploads coverage: scenario runs are
+  evidence, not coverage, so `make test` leaves `test/platform` out.
+
+On a pull request that changes the workflow, the driver, `test/platform` or a
+`single-bucket` scenario, the same job runs a proof for GCP and Azure (`single-bucket`):
+`test`; an `apply`, then a `destroy` that has only the remote state; an instance applied
+already expired, then a `reap` that removes it; then `check-clean`, which fails if any
+state, bucket or resource of the run remains. A failed step triggers a clean-up step that
+destroys the run's instances.
 
 ## Terraform scenarios
 

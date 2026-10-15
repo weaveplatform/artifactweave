@@ -13,9 +13,29 @@ resource "random_string" "suffix" {
   special = false
 }
 
+# Locally this root creates its own resource group. A scenario run applies as
+# the deployer, whose rights end at azure/bootstrap's scenarios resource
+# group, so it names that group instead and every resource lands inside it.
 resource "azurerm_resource_group" "this" {
+  count    = var.resource_group_name == "" ? 1 : 0
   name     = "${var.name}-rg"
   location = var.location
+  tags     = var.scenario_labels
+}
+
+data "azurerm_resource_group" "existing" {
+  count = var.resource_group_name == "" ? 0 : 1
+  name  = var.resource_group_name
+}
+
+locals {
+  resource_group_name = var.resource_group_name == "" ? azurerm_resource_group.this[0].name : data.azurerm_resource_group.existing[0].name
+  location            = var.resource_group_name == "" ? azurerm_resource_group.this[0].location : data.azurerm_resource_group.existing[0].location
+}
+
+moved {
+  from = azurerm_resource_group.this
+  to   = azurerm_resource_group.this[0]
 }
 
 # Accepted trivy findings (deploy/check.sh), each with its reason:
@@ -40,8 +60,8 @@ resource "azurerm_resource_group" "this" {
 resource "azurerm_storage_account" "blobs" {
   # 3 to 24 lowercase letters and digits, globally unique.
   name                     = "awacc${random_string.suffix.result}"
-  resource_group_name      = azurerm_resource_group.this.name
-  location                 = azurerm_resource_group.this.location
+  resource_group_name      = local.resource_group_name
+  location                 = local.location
   account_kind             = "StorageV2"
   account_tier             = "Standard"
   account_replication_type = "LRS"
@@ -53,6 +73,10 @@ resource "azurerm_storage_account" "blobs" {
   # with Entra ID or a user delegation SAS.
   shared_access_key_enabled       = false
   default_to_oauth_authentication = true
+
+  # Scenario runs (platform-scenarios.yml) tag the account with the
+  # scenario, the instance and expires-at, which reap matches.
+  tags = var.scenario_labels
 }
 
 resource "azurerm_storage_container" "blobs" {
@@ -97,8 +121,12 @@ resource "azurerm_storage_management_policy" "cleanup" {
 }
 
 # The data-plane identity azure/bootstrap created and GitHub's
-# cloud-conformance environment acts as.
+# cloud-conformance environment acts as. A scenario run sets
+# conformance_identity to empty: the deployer cannot read the bootstrap's
+# resource group, and the job runs artifactweave as the deployer, which the
+# operator assignment below covers.
 data "azurerm_user_assigned_identity" "conformance" {
+  count               = var.conformance_identity == "" ? 0 : 1
   name                = var.conformance_identity
   resource_group_name = var.bootstrap_resource_group
 }
@@ -108,10 +136,16 @@ data "azurerm_user_assigned_identity" "conformance" {
 # operator holds it too: the local tests act as you, and the local container
 # runs on a user delegation SAS minted from your login.
 resource "azurerm_role_assignment" "conformance" {
+  count                = var.conformance_identity == "" ? 0 : 1
   scope                = azurerm_storage_account.blobs.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = data.azurerm_user_assigned_identity.conformance.principal_id
+  principal_id         = data.azurerm_user_assigned_identity.conformance[0].principal_id
   principal_type       = "ServicePrincipal"
+}
+
+moved {
+  from = azurerm_role_assignment.conformance
+  to   = azurerm_role_assignment.conformance[0]
 }
 
 resource "azurerm_role_assignment" "operator" {

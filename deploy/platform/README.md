@@ -22,10 +22,9 @@ applied through the JFrog Terraform providers.
 
 `multicloud/mirror`, one mirror with a member on each cloud, is planned in #135.
 
-The two `single-bucket` scenarios are the acceptance environments the real-cloud blob
-conformance tests run against. They predate the scenario contract: their server
-configuration is rendered by `credentials.sh` rather than a Terraform output, and they carry
-no `expires-at` label yet. Both arrive with the scenario workflow (#129).
+The two `single-bucket` scenarios are also the acceptance environments the real-cloud blob
+conformance tests run against. An operator's `make platform-apply` grants the bootstrap's
+conformance identity; a CI run applies them as the deployer instead (their `ci-vars.sh`).
 
 ## Bootstraps
 
@@ -66,6 +65,36 @@ make platform-destroy SCENARIO=gcp/single-bucket
 
 Applying a scenario creates real, billed resources in the account your CLI is signed in to.
 Destroy it when you're done.
+
+## Running a scenario in CI
+
+`platform-scenarios.yml` applies, tests and destroys scenarios on real clouds as each
+cloud's deployer, from the `cloud-platform` environment. Dispatch it from the Actions tab or
+the CLI, then approve the run when GitHub asks (Review deployments, `cloud-platform`):
+
+```bash
+gh workflow run platform-scenarios.yml -f cloud=gcp -f scenario=single-bucket -f action=test
+gh workflow run platform-scenarios.yml -f cloud=azure -f action=apply -f instance=explore1 -f ttl_minutes=120
+gh workflow run platform-scenarios.yml -f cloud=azure -f action=destroy -f instance=explore1
+gh workflow run platform-scenarios.yml -f cloud=gcp -f action=reap
+```
+
+| Action | Does |
+|---|---|
+| `test` | applies a fresh instance, starts artifactweave against it, runs [`test/platform`](../../test/platform), and destroys the instance in a step that always runs |
+| `apply` | creates an instance and leaves it, labelled to expire after `ttl_minutes` (default 240); the run's summary names it |
+| `destroy` | destroys a named instance from its remote state |
+| `reap` | destroys every instance of the cloud whose `expires-at` has passed, and anything labelled or `awscn-`-prefixed that outlived its state |
+
+An instance is billed while it exists. `test` cleans up after itself; after an `apply`,
+dispatch `destroy`, or let a `reap` remove it once it expires. Instance state lives in the
+bootstrap's state store under `scenarios/<cloud>/<scenario>/<instance>`. The driver is
+[`terraform/scenario-ci.sh`](terraform/scenario-ci.sh), and each scenario's `ci-vars.sh`
+holds the variables a CI run passes.
+
+A pull request that changes the workflow, the driver, `test/platform` or a `single-bucket`
+scenario runs the whole cycle for GCP and Azure behind the same approval, and checks that
+nothing of the run is left.
 
 ## Checks
 
