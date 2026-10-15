@@ -29,6 +29,7 @@ func Run(t *testing.T, newStore Factory) {
 	runOperations(t, newStore)
 	runPeers(t, newStore)
 	runEnterprise(t, newStore)
+	runBuilds(t, newStore)
 }
 
 // opts compares stored values: empty and nil collections are equivalent,

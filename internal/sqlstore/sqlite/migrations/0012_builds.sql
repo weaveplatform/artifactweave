@@ -1,0 +1,115 @@
+-- Build-info (decision 0014, research 22 §3). One row per run, keyed by
+-- (project_key, name, number, started_at), because one build number may be
+-- published several times and each publish is a new run (research 22 §3.3).
+-- The document is kept as published for the read API; modules, properties,
+-- artifacts and dependencies are kept as rows for the AQL build domains,
+-- which join to items by checksum.
+-- +up
+CREATE TABLE builds (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_key TEXT NOT NULL DEFAULT '',
+    name        TEXT NOT NULL,
+    number      TEXT NOT NULL,
+    started_at  BIGINT NOT NULL,
+    url         TEXT NOT NULL DEFAULT '',
+    created_at  BIGINT,
+    created_by  TEXT NOT NULL DEFAULT '',
+    modified_at BIGINT,
+    modified_by TEXT NOT NULL DEFAULT '',
+    document    TEXT,
+    UNIQUE (project_key, name, number, started_at)
+);
+-- A name's runs newest first, and its latest run.
+CREATE INDEX builds_latest ON builds (project_key, name, started_at, id);
+
+-- Modules in document order.
+CREATE TABLE build_modules (
+    build_id  BIGINT NOT NULL,
+    position  INTEGER NOT NULL,
+    module_id TEXT NOT NULL DEFAULT '',
+    type      TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (build_id, position),
+    FOREIGN KEY (build_id) REFERENCES builds (id) ON DELETE CASCADE
+);
+
+-- Build-level properties (module_position -1) and module properties, one
+-- row per value, for the AQL build.property and module.property domains.
+CREATE TABLE build_properties (
+    build_id        BIGINT NOT NULL,
+    module_position INTEGER NOT NULL,
+    key             TEXT NOT NULL,
+    value           TEXT NOT NULL,
+    PRIMARY KEY (build_id, module_position, key, value),
+    FOREIGN KEY (build_id) REFERENCES builds (id) ON DELETE CASCADE
+);
+CREATE INDEX build_properties_value ON build_properties (key, value);
+
+-- What each module produced, in document order.
+CREATE TABLE build_artifacts (
+    build_id        BIGINT NOT NULL,
+    module_position INTEGER NOT NULL,
+    position        INTEGER NOT NULL,
+    name            TEXT NOT NULL DEFAULT '',
+    type            TEXT NOT NULL DEFAULT '',
+    path            TEXT NOT NULL DEFAULT '',
+    sha1            TEXT NOT NULL DEFAULT '',
+    sha256          TEXT NOT NULL DEFAULT '',
+    md5             TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (build_id, module_position, position),
+    FOREIGN KEY (build_id, module_position) REFERENCES build_modules (build_id, position) ON DELETE CASCADE
+);
+CREATE INDEX build_artifacts_sha1 ON build_artifacts (sha1);
+CREATE INDEX build_artifacts_sha256 ON build_artifacts (sha256);
+
+-- What each module consumed, in document order.
+CREATE TABLE build_dependencies (
+    build_id        BIGINT NOT NULL,
+    module_position INTEGER NOT NULL,
+    position        INTEGER NOT NULL,
+    dependency_id   TEXT NOT NULL DEFAULT '',
+    name            TEXT NOT NULL DEFAULT '',
+    type            TEXT NOT NULL DEFAULT '',
+    path            TEXT NOT NULL DEFAULT '',
+    scopes          TEXT,
+    sha1            TEXT NOT NULL DEFAULT '',
+    sha256          TEXT NOT NULL DEFAULT '',
+    md5             TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (build_id, module_position, position),
+    FOREIGN KEY (build_id, module_position) REFERENCES build_modules (build_id, position) ON DELETE CASCADE
+);
+CREATE INDEX build_dependencies_sha1 ON build_dependencies (sha1);
+CREATE INDEX build_dependencies_sha256 ON build_dependencies (sha256);
+
+-- Promotions of a run, oldest first.
+CREATE TABLE build_promotions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    build_id    BIGINT NOT NULL,
+    created_at  BIGINT,
+    created_by  TEXT NOT NULL DEFAULT '',
+    status      TEXT NOT NULL DEFAULT '',
+    comment     TEXT NOT NULL DEFAULT '',
+    ci_user     TEXT NOT NULL DEFAULT '',
+    source_repo TEXT NOT NULL DEFAULT '',
+    repo        TEXT NOT NULL DEFAULT '',
+    FOREIGN KEY (build_id) REFERENCES builds (id) ON DELETE CASCADE
+);
+CREATE INDEX build_promotions_build ON build_promotions (build_id, created_at, id);
+
+-- The retention a document asked for, kept per build name.
+CREATE TABLE build_retention (
+    project_key        TEXT NOT NULL DEFAULT '',
+    name               TEXT NOT NULL,
+    count              INTEGER NOT NULL DEFAULT 0,
+    minimum_build_date BIGINT,
+    delete_artifacts   BOOLEAN NOT NULL DEFAULT FALSE,
+    keep_numbers       TEXT,
+    PRIMARY KEY (project_key, name)
+);
+-- +down
+DROP TABLE build_retention;
+DROP TABLE build_promotions;
+DROP TABLE build_dependencies;
+DROP TABLE build_artifacts;
+DROP TABLE build_properties;
+DROP TABLE build_modules;
+DROP TABLE builds;

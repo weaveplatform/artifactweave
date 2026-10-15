@@ -626,7 +626,11 @@ decided:
 | `webhooks`, `project_repositories` | add `description`, `debug`, `created_at`, `updated_at`; `environments` document and `updated_at` | fields of `WebhookSubscription` and `RepositoryAssignment` |
 | `worker_executions (payload, result, logs)` | binary columns; `trigger_kind`, `filter_doc` renamed | non-UTF-8 bytes must round-trip; `trigger` and `filter` are SQL keywords |
 | (none) | `blob_replicas` and `cold_blob_replicas` (migration 0006) | which mirror members hold which blobs, with state, size, attempts and last error ([0028](decisions/0028-blob-mirroring.md)); `updated_at` is 0 when unset so the repair queue pages identically on every engine |
-| `builds`, `build_artifacts`, `build_dependencies`, `build_promotions` | not created | build-info has no oracle block and no domain type yet; its tables arrive with P5 in a new migration, with the shapes in [research 22](22-aql-searches-build-info.md#3-build-info) |
+| `builds` | migration 0012 (2026-10-15); adds `id`, `url`, `created_by`, `modified_at`, `modified_by` and the `document` column | the identity is four columns, so child rows and promotions reference a surrogate key; an append (`BuildStore.Replace`) stamps a modification |
+| `build_artifacts (module_id)`, `build_dependencies (module_id)` | keyed by `(build_id, module_position, position)` under a new `build_modules (build_id, position, module_id, type)`; artifacts add `path`, dependencies `dependency_id`, `name`, `path` | module IDs are not guaranteed unique within a document, and module and file order must round-trip |
+| (none) | `build_properties (build_id, module_position, key, value)`, `module_position` -1 for the build | one row per value for the AQL `build.property` and `module.property` domains |
+| `build_promotions` | `id, created_at, created_by, status, comment, ci_user, source_repo, repo`; no `dry_run` | the fields of a promotion status in the document (`repository`, `ciUser`, `user`, `timestamp`); a dry run records nothing |
+| (none) | `build_retention (project_key, name, count, minimum_build_date, delete_artifacts, keep_numbers)` | the `buildRetention` a publish carries, kept per build name; deleting or renaming the name takes it along |
 
 Conventions every table follows: times are BIGINT Unix microseconds (NULL for unset), durations BIGINT
 milliseconds, documents TEXT, sealed values a BLOB or BYTEA column of their own, and every text column a list

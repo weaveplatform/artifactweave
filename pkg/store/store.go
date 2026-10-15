@@ -171,6 +171,8 @@ type Store interface {
 	Archive() ArchiveStore
 	Workers() WorkerStore
 
+	Builds() BuildStore
+
 	// Tx runs fn in one transaction. Store calls made with the context fn
 	// receives take part; an error from fn rolls all of them back. A nested
 	// Tx joins the outer transaction.
