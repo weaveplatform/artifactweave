@@ -1,48 +1,32 @@
-output "bucket" {
-  description = "Bucket for blob.gcs.bucket."
-  value       = google_storage_bucket.blobs.name
-}
-
-output "location" {
-  description = "The bucket's dual-region (or multi-region, with data_locations)."
-  value       = google_storage_bucket.blobs.location
-}
-
-output "rpo" {
-  description = "DEFAULT (99.9% of new objects replicated within an hour) or ASYNC_TURBO (15 minutes)."
-  value       = google_storage_bucket.blobs.rpo
-}
-
-output "service_account" {
-  description = "The service account artifactweave runs as (the bootstrap's conformance account unless app_service_account names another), for blob.gcs.google_access_id."
-  value       = local.app_service_account
-}
-
-output "store_prefix" {
-  description = "Object prefix artifactweave writes under (blob.gcs.prefix)."
-  value       = var.store_prefix
-}
-
 output "artifactweave_config" {
-  description = "The blob section of artifactweave.yaml for this bucket. It is one store: the second region is Google's copy, not a mirror member."
+  description = "The blob section of artifactweave.yaml for the bucket. It is one store: the second region is Cloud Storage's copy, not a mirror member. artifactweave authenticates with Application Default Credentials, as the app service account, which also signs download URLs."
   value = yamlencode({
     blob = {
       backend = "gcs"
-      gcs = {
-        bucket           = google_storage_bucket.blobs.name
-        prefix           = var.store_prefix
-        google_access_id = local.app_service_account
-      }
+      gcs = merge(
+        { bucket = module.bucket.bucket, google_access_id = var.app_service_account },
+        var.store_prefix == "" ? {} : { prefix = var.store_prefix },
+      )
     }
   })
 }
 
 output "storage_host" {
-  description = "Host a downloadRedirect repository's signed URLs point at. One signed URL serves every location of the bucket."
+  description = "Where a downloadRedirect repository's signed URLs point: Cloud Storage's path-style endpoint. One signed URL serves the bucket in either region."
   value       = "storage.googleapis.com"
 }
 
-output "expires_at" {
-  description = "The expires-at label (epoch seconds) a scenario run set, read by reap; empty outside scenario runs."
-  value       = lookup(var.scenario_labels, "expires-at", "")
+output "bucket" {
+  description = "The bucket's name (blob.gcs.bucket)."
+  value       = module.bucket.bucket
+}
+
+output "location" {
+  description = "The bucket's dual-region, or the multi-region its data_locations lie in."
+  value       = upper(var.location)
+}
+
+output "rpo" {
+  description = "The bucket's replication: DEFAULT (99.9% of new objects in the second region within an hour) or ASYNC_TURBO (15 minutes)."
+  value       = local.rpo
 }

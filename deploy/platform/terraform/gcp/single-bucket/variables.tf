@@ -1,41 +1,53 @@
 variable "project_id" {
-  description = "Project that holds the acceptance bucket (the bootstrap's lab project)."
+  description = "Project that holds the bucket. Nothing is created anywhere else."
   type        = string
-  default     = "project-0c0b2d7a-9ad7-4221-9a8"
-}
-
-variable "region" {
-  description = "Location of the bucket."
-  type        = string
-  default     = "europe-west2"
 }
 
 variable "name" {
-  description = "Prefix for the bucket name."
+  description = "Start of the bucket's name. The bucket is <name>-<8 hex>, which must fit Cloud Storage's 63 characters."
   type        = string
-  default     = "artifactweave-acc"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]*$", var.name))
+    error_message = "name must be lowercase letters, digits and hyphens, starting with a letter or digit."
+  }
 }
 
-variable "store_prefix" {
-  description = "Object prefix the local run writes under (blob.gcs.prefix)."
+variable "location" {
+  description = "Region of the bucket, for example europe-west2."
   type        = string
-  default     = "local/"
-}
-
-variable "conformance_service_account" {
-  description = "Account ID of the data-plane service account gcp/bootstrap created; it gets object rights on this bucket."
-  type        = string
-  default     = "artifactweave-conformance"
 }
 
 variable "app_service_account" {
-  description = "Email of the service account artifactweave runs as and that gets object rights on the bucket. Empty uses conformance_service_account; scenario runs pass the deployer."
+  description = "Email of the service account artifactweave runs as. It gets object rights on the bucket, and signs download URLs (blob.gcs.google_access_id)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@]+@[^@]+\\.gserviceaccount\\.com$", var.app_service_account))
+    error_message = "app_service_account must be a service account email."
+  }
+}
+
+variable "store_prefix" {
+  description = "Object prefix artifactweave writes under (blob.gcs.prefix). Empty writes at the bucket's root."
   type        = string
   default     = ""
 }
 
-variable "scenario_labels" {
-  description = "Labels for the bucket. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches."
+variable "expiring_prefixes" {
+  description = "Object prefixes, from the bucket's root, whose objects expire after the given number of days, for example { \"scratch/\" = 1 }."
+  type        = map(number)
+  default     = {}
+}
+
+variable "force_destroy" {
+  description = "Let terraform destroy delete the bucket with every object still in it. Off, a destroy fails while the bucket holds anything."
+  type        = bool
+  default     = false
+}
+
+variable "labels" {
+  description = "Labels for the bucket."
   type        = map(string)
   default     = {}
 }

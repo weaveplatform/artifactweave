@@ -39,6 +39,14 @@
         {
           "type": "generic",
           "path": "deploy/platform/terraform/gcp/multi-region/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/platform/terraform/gcp/geo-replicated/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/platform/terraform/gcp/single-bucket/README.md"
         }
       ]
     }
