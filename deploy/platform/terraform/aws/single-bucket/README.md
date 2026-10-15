@@ -46,8 +46,7 @@ delegated zone.
 named `artifactweave-awscn-<instance>-<suffix>` (inside the `artifactweave-` prefix the
 deployer may manage), the bucket policy grants the deployer, which runs artifactweave in the
 same job, and the bucket is tagged with the scenario, instance and `expires-at` that reap
-matches. This path is wired and checked by the mocked tests, but no dispatched run has
-proven it yet, so the pull request proof covers GCP and Azure only.
+matches. The pull request proof runs it alongside GCP and Azure.
 
 ## Cost
 

@@ -49,16 +49,23 @@ apply: $(GUARD)
 	$(TERRAFORM) init -input=false
 	$(TERRAFORM) apply -input=false $(TF_VARS)
 
+# Only some scenarios (the single-bucket ones) ship a local container; the
+# others say so instead of failing on a missing script.
+NO_CONTAINER = { echo "this scenario has no local container; use its artifactweave_config output" >&2; exit 1; }
+
 ## credentials: render the container's configuration and credentials into .local/
 credentials:
+	@[ -x ./credentials.sh ] || $(NO_CONTAINER)
 	./credentials.sh
 
 ## up: build the image and start artifactweave in a local container against the scenario
 up:
+	@[ -x ./up.sh ] || $(NO_CONTAINER)
 	./up.sh
 
 ## smoke: deploy and download 40 MiB through the running container
 smoke:
+	@[ -x ./smoke.sh ] || $(NO_CONTAINER)
 	./smoke.sh
 
 ## conformance: run the real-cloud blob contract and probes locally
@@ -77,10 +84,12 @@ github-vars:
 
 ## logs: follow the container's logs
 logs:
+	@[ -f compose.yaml ] || $(NO_CONTAINER)
 	docker compose logs --follow
 
 ## down: stop the container, keeping its data volume
 down:
+	@[ -f compose.yaml ] || $(NO_CONTAINER)
 	docker compose down
 
 ## clean: stop the container and remove its data volume and the generated files

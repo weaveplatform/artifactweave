@@ -213,7 +213,9 @@ and `ttl_minutes` (how long until an applied instance's `expires-at`):
   names its bucket `artifactweave-awscn-<instance>-…`, and reap finds AWS buckets by their
   tags rather than by the `awscn-` prefix: it lists the `artifactweave-` buckets with their
   regions and reads each one's tags there, because a scenario may span regions and the
-  tagging API answers for one region at a time.
+  tagging API answers for one region at a time. An orphaned versioned bucket (the
+  geo-replicated scenario's, which replication needs versioned) is emptied of its versions
+  and delete markers before reap deletes it.
 - `test/platform` is a Go suite of `_test.go` files only, gated on `ARTIFACTWEAVE_SCENARIO`
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.
