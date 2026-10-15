@@ -16,7 +16,7 @@ applied through the JFrog Terraform providers.
 |---|---|---|---|
 | `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | [available](terraform/aws/bootstrap/README.md) | [available](terraform/gcp/bootstrap/README.md) | [available](terraform/azure/bootstrap/README.md) |
 | `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
-| `multi-region`: two regional stores as artifactweave mirror members | planned (#130) | planned (#130) | planned (#130) |
+| `multi-region`: two regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
 | `geo-replicated`: one store with the cloud's own replication | planned (#131) | planned (#131) | planned (#131) |
 | `cdn`: a store behind CloudFront, Cloud CDN or Front Door | planned (#132) | planned (#133) | planned (#134) |
 
@@ -25,7 +25,10 @@ applied through the JFrog Terraform providers.
 The three `single-bucket` scenarios are also the acceptance environments the real-cloud blob
 conformance tests run against. An operator's `make platform-apply` grants the bootstrap's
 conformance identity; a CI run applies them as the deployer instead (their `ci-vars.sh`).
-`aws/single-bucket` is wired for CI runs but no dispatched run has proven it yet.
+
+Scenarios build their stores from the child modules in [`terraform/modules`](terraform/modules):
+one private bucket or storage account per call, with its security invariants tested once in
+the module's own `tests/`.
 
 ## Bootstraps
 
@@ -98,11 +101,14 @@ bootstrap's state store under `scenarios/<cloud>/<scenario>/<instance>`. The dri
 [`terraform/scenario-ci.sh`](terraform/scenario-ci.sh), and each scenario's `ci-vars.sh`
 holds the variables a CI run passes.
 
-A pull request that changes the workflow, the driver, `test/platform` or a `single-bucket`
-scenario runs the whole cycle for GCP and Azure behind the same approval, and checks that
-nothing of the run is left. AWS (`-f cloud=aws`) is wired the same way, with its state in
-the S3 state bucket and its buckets found by tag, and joins that proof once a dispatched
-run has proven it.
+A pull request that changes the workflow, the driver, `test/platform`, a scenario or a
+module runs the whole cycle behind the same approval, for the scenarios
+[`terraform/prove-matrix.sh`](terraform/prove-matrix.sh) chooses from its changed paths:
+every cloud's `single-bucket` when the driver changes, each scenario it touches, and every
+scenario of a cloud whose module it touches. Each proof has its own run tag, so proofs run in
+parallel and each one's `reap` and final check see only its own instances. On AWS, state
+lives in the S3 state bucket and buckets are found by their tags in whichever region they
+are.
 
 ## Checks
 

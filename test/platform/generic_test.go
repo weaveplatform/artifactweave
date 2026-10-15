@@ -192,10 +192,18 @@ func headLocal(t *testing.T, h *harness) {
 }
 
 // redirectLocation asks the registry for the file and returns the signed
-// URL it redirects to, checking it points at the scenario's storage host.
+// URL it redirects to, checking it points at one of the scenario's storage
+// hosts (a mirror may sign on any member that holds the blob).
 func redirectLocation(t *testing.T, h *harness, header http.Header) *url.URL {
 	t.Helper()
-	resp, err := h.do(t, http.MethodGet, "/artifactory/"+redirectRepo+"/"+artifactPath, nil, header)
+	return redirectFor(t, h, artifactPath, file.sha256, header)
+}
+
+// redirectFor is redirectLocation for any file of the redirect repository,
+// whose content has the sha256 digest want.
+func redirectFor(t *testing.T, h *harness, path, want string, header http.Header) *url.URL {
+	t.Helper()
+	resp, err := h.do(t, http.MethodGet, "/artifactory/"+redirectRepo+"/"+path, nil, header)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,11 +215,15 @@ func redirectLocation(t *testing.T, h *harness, header http.Header) *url.URL {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loc.Hostname() != h.storageHost {
-		t.Fatalf("redirected to %s, want %s", loc.Hostname(), h.storageHost)
+	if !h.storageHosts[loc.Hostname()] {
+		t.Fatalf(
+			"redirected to %s, want one of the scenario's storage hosts %v",
+			loc.Hostname(),
+			h.storageHosts,
+		)
 	}
-	if got := resp.Header.Get("X-Checksum-Sha256"); got != file.sha256 {
-		t.Errorf("302 X-Checksum-Sha256 = %q, want %q", got, file.sha256)
+	if got := resp.Header.Get("X-Checksum-Sha256"); got != want {
+		t.Errorf("302 X-Checksum-Sha256 = %q, want %q", got, want)
 	}
 	return loc
 }

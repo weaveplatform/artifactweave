@@ -13,16 +13,16 @@ name: deploy | Platform scenarios
 #   reap     destroy every instance of the cloud whose expires-at has passed,
 #            and resources that outlived their state
 #
-# Pull requests that change this workflow, the scenario driver, test/platform
-# or a single-bucket scenario run the same driver as a proof, behind the same
-# approval: for gcp and azure single-bucket, test, then an apply and a destroy
-# that finds only the remote state (as two separate dispatches would), then an
+# Pull requests that change this workflow, the scenario driver, test/platform,
+# a scenario or a module run the same driver as a proof, behind the same
+# approval, for the scenarios prove-matrix.sh chooses from the changed paths:
+# every cloud's single-bucket when the driver changes, and each scenario the
+# pull request touches. Each proof runs test, then an apply and a destroy that
+# finds only the remote state (as two separate dispatches would), then an
 # instance that has already expired and a reap that removes it, then a check
 # that nothing of the run remains. A dispatch only finds workflows on the
 # default branch, so this is how a change is proven before it merges. Pull
-# requests from forks get no OIDC token and do not run. AWS is wired for
-# dispatch (aws/bootstrap, #128) but joins the pull request proof only once
-# a dispatched run has proven it.
+# requests from forks get no OIDC token and do not run.
 on:
   workflow_dispatch:
     inputs:
@@ -52,7 +52,10 @@ on:
     paths:
       - '.github/workflows/platform-scenarios.yml'
       - 'deploy/platform/terraform/scenario-ci.sh'
-      - 'deploy/platform/terraform/*/single-bucket/**'
+      - 'deploy/platform/terraform/prove-matrix.sh'
+      # <cloud>/<scenario>/ and modules/<cloud>/; a bootstrap change matches
+      # too, and prove-matrix.sh chooses nothing for it.
+      - 'deploy/platform/terraform/*/*/**'
       - 'test/platform/**'
 
 permissions:
@@ -67,6 +70,10 @@ jobs:
     name: 'Plan the runs'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      # The changed paths of the pull request, which prove-matrix.sh reads.
+      pull-requests: read
     outputs:
       include: ${{ steps.matrix.outputs.include }}
     steps:
@@ -75,12 +82,22 @@ jobs:
         with:
           egress-policy: audit
 
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       # Inputs reach the shell through the environment, never interpolated
       # into the script; scenario-ci.sh validates every name it is given.
+      # A pull request proves what prove-matrix.sh chooses; each proof gets
+      # its own run tag (the scenario's initials appended), so its reap and
+      # check-clean see only its own instances and proofs run in parallel.
       - name: Build the matrix
         id: matrix
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           PR: ${{ github.event.pull_request.number }}
@@ -95,11 +112,13 @@ jobs:
             if [ "$SAME_REPO" != true ]; then
               include='[]'
             else
-              include=$(jq -cn --arg tag "pr$PR-$RUN_ID" '[
-                {cloud: "gcp", scenario: "single-bucket", action: "prove", instance: "", ttl: "", run_tag: $tag,
-                 lock: "prove", title: "prove gcp/single-bucket"},
-                {cloud: "azure", scenario: "single-bucket", action: "prove", instance: "", ttl: "", run_tag: $tag,
-                 lock: "prove", title: "prove azure/single-bucket"}]')
+              pairs=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' |
+                deploy/platform/terraform/prove-matrix.sh)
+              include=$(jq -Rcn --arg pr "$PR" --arg run "$RUN_ID" '[inputs | select(length > 0) |
+                split(" ") as [$c, $s] | ([$s | splits("-") | .[0:1]] | join("")) as $code |
+                {cloud: $c, scenario: $s, action: "prove", instance: "", ttl: "",
+                 run_tag: ("pr" + $pr + "-" + $run + "-" + $code), lock: ("prove-" + $s),
+                 title: ("prove " + $c + "/" + $s)}]' <<<"$pairs")
             fi
           else
             instance=$IN_INSTANCE
@@ -265,8 +284,12 @@ jobs:
           TTL_MINUTES: '-5'
         run: deploy/platform/terraform/scenario-ci.sh apply
 
+      # Only this proof's instances: proofs of other scenarios on the same
+      # cloud run alongside and keep theirs.
       - name: 'Prove: reap removes it'
         if: matrix.action == 'prove'
+        env:
+          REAP_PREFIX: ${{ matrix.run_tag }}
         run: deploy/platform/terraform/scenario-ci.sh reap
 
       - name: 'Prove: nothing of this run remains'

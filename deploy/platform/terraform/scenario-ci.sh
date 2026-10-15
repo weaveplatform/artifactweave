@@ -11,12 +11,13 @@
 #                               delete the emptied state
 #   scenario-ci.sh reap         destroy every CLOUD instance whose expires-at
 #                               has passed, then delete labelled or prefixed
-#                               resources that outlived their state
+#                               resources that outlived their state; with
+#                               REAP_PREFIX, only instances starting with it
 #   scenario-ci.sh check-clean  fail if any state or labelled resource of an
 #                               instance starting with RUN_TAG remains
 #
 # Environment: CLOUD (gcp, azure or aws), SCENARIO,
-# INSTANCE, TTL_MINUTES and RUN_TAG as the action needs them, and the
+# INSTANCE, TTL_MINUTES, RUN_TAG and REAP_PREFIX as the action needs them, and the
 # PLATFORM_* repository variables the bootstraps set.
 #
 # Each instance's state lives at scenarios/<cloud>/<scenario>/<instance> in
@@ -72,7 +73,9 @@ check_names() { # scenario instance
 state_key() { echo "scenarios/$CLOUD/$1/$2"; }
 
 # use_instance exports the scenario's CI variables for one instance and
-# prepares a fresh, initialised copy of it in $dir.
+# prepares a fresh, initialised copy of it in $dir. The copy keeps the
+# scenario's place beside modules/, which its module sources reach as
+# ../../modules.
 use_instance() { # scenario instance expires-at
   local scenario=$1 instance=$2
   SCENARIO_LABELS=$(printf '{"artifactweave-scenario":"%s","instance":"%s","expires-at":"%s"}' "$scenario" "$instance" "$3")
@@ -80,9 +83,11 @@ use_instance() { # scenario instance expires-at
   export SCENARIO_LABELS INSTANCE
   # shellcheck source=/dev/null
   . "$here/$CLOUD/$scenario/ci-vars.sh"
-  dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/scenario-$CLOUD-$scenario-$instance"
-  rm -rf "$dir"
+  local work="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/scenario-$CLOUD-$scenario-$instance"
+  dir="$work/$CLOUD/$scenario"
+  rm -rf "$work"
   mkdir -p "$dir"
+  cp -R "$here/modules" "$work/modules"
   cp -R "$here/$CLOUD/$scenario/." "$dir/"
   rm -rf "$dir/.terraform" "$dir"/terraform.tfstate* "$dir/.local" "$dir/.secrets"
   local key
@@ -145,29 +150,48 @@ test_scenario() {
   local out=${RUNNER_TEMP:-${TMPDIR:-/tmp}}/scenario-run-$INSTANCE
   mkdir -p "$out"
   terraform -chdir="$dir" output -raw artifactweave_config >"$out/blob.yaml"
+  # Every output, for the checks a scenario adds (the mirror's members, for
+  # one); the runner's temporary directory is never uploaded.
+  terraform -chdir="$dir" output -json >"$out/outputs.json"
   local host
   host=$(terraform -chdir="$dir" output -raw storage_host)
   (cd "$root" && go build -trimpath -o "$out/artifactweave" ./cmd/artifactweave)
   (cd "$root" && ARTIFACTWEAVE_SCENARIO="$CLOUD/$SCENARIO" ARTIFACTWEAVE_BIN="$out/artifactweave" \
     ARTIFACTWEAVE_SCENARIO_CONFIG="$out/blob.yaml" ARTIFACTWEAVE_SCENARIO_STORAGE_HOST="$host" \
-    go test -count=1 -v -timeout 30m ./test/platform/...)
+    ARTIFACTWEAVE_SCENARIO_OUTPUTS="$out/outputs.json" \
+    go test -count=1 -v -timeout 40m ./test/platform/...)
   summary "test/platform passed against \`$CLOUD/$SCENARIO\` instance \`$INSTANCE\` (downloads redirected to \`$host\`)."
 }
 
+# state_resources prints how many managed resources an instance's state
+# holds: 0 when the state is empty or there is none. It reads the state store
+# directly, so it answers even when the scenario's configuration cannot
+# initialise, and fails when a state exists but cannot be read.
+state_resources() { # scenario instance
+  local json
+  if json=$(state_json "$1" "$2" 2>/dev/null) && [ -n "$json" ]; then
+    jq '[.resources[]? | select(.mode == "managed")] | length' <<<"$json"
+  elif states | grep -qx "$1 $2"; then
+    echo "the state of $CLOUD/$1 instance $2 exists but cannot be read" >&2
+    return 1
+  else
+    echo 0
+  fi
+}
+
 # destroy_one runs in its own process (reap calls it as "$0" destroy-one), so
-# set -e holds: a failed destroy must never go on to delete the state.
+# set -e holds: a failed destroy must never go on to delete the state. An
+# instance that never applied (its state empty or absent) needs no
+# configuration: it succeeds and removes the empty state, so a run whose
+# apply failed early still cleans up after itself.
 destroy_one() { # scenario instance
   check_names "$1" "$2"
-  use_instance "$1" "$2" "$now"
-  # state pull prints nothing when the instance has no state yet, and fails
-  # (stopping here) when the backend cannot be read; state list would fail
-  # in both cases.
-  local state managed
-  state=$(terraform -chdir="$dir" state pull)
-  managed=$(jq -n --argjson s "${state:-null}" '[$s.resources[]? | select(.mode == "managed")] | length')
+  local managed
+  managed=$(state_resources "$1" "$2")
   if [ "$managed" = 0 ]; then
     summary "No resources in the state of \`$CLOUD/$1\` instance \`$2\`; nothing to destroy."
   else
+    use_instance "$1" "$2" "$now"
     terraform -chdir="$dir" destroy -input=false -no-color -auto-approve
     summary "Destroyed \`$CLOUD/$1\` instance \`$2\`."
   fi
@@ -213,19 +237,35 @@ state_json() { # scenario instance
 }
 
 # aws_tagged_buckets prints "<bucket>\t<expires-at>\t<instance>" for every
-# bucket a scenario run tagged, through the tagging API, which the deployer
-# may read (bucket tags are indexed in the bucket's region).
+# bucket a scenario run tagged, in any region: a scenario may span several
+# (multi-region), and the tagging API only sees the region it is asked in.
+# It lists the deployer's artifactweave- buckets with their regions and reads
+# each one's tags there.
 aws_tagged_buckets() {
-  aws resourcegroupstaggingapi get-resources --region "$PLATFORM_AWS_REGION" \
-    --resource-type-filters s3 --tag-filters Key=artifactweave-scenario --output json |
-    jq -r '.ResourceTagMappingList[] | (.Tags | from_entries) as $t |
-      [(.ResourceARN | sub("^arn:aws:s3:::"; "")), ($t["expires-at"] // ""), ($t.instance // "")] | @tsv'
+  local name region tags
+  while IFS=$'\t' read -r name region; do
+    [ -n "$name" ] || continue
+    if [ -z "$region" ] || [ "$region" = None ]; then
+      region=$(aws s3api get-bucket-location --bucket "$name" --query LocationConstraint --output text)
+      [ "$region" != None ] || region=us-east-1
+    fi
+    # A bucket with no tags answers NoSuchTagSet; it is not a scenario's.
+    tags=$(aws s3api get-bucket-tagging --bucket "$name" --region "$region" --output json 2>/dev/null) || continue
+    jq -r --arg n "$name" '(.TagSet | from_entries) as $t | select($t["artifactweave-scenario"] != null) |
+      [$n, ($t["expires-at"] // ""), ($t.instance // "")] | @tsv' <<<"$tags"
+  done < <(aws s3api list-buckets --prefix artifactweave- --query 'Buckets[].[Name, BucketRegion]' --output text)
 }
+
+# in_scope is true when an instance belongs to this reap: every instance,
+# unless REAP_PREFIX narrows it to one run's (a pull request proof reaps only
+# its own, so parallel proofs never race to destroy the same state).
+in_scope() { [ -z "${REAP_PREFIX:-}" ] || [[ $1 == "$REAP_PREFIX"* ]]; }
 
 reap() {
   local failed=0 reaped=0 live=" " scenario instance json expires resources
   while read -r scenario instance; do
     [ -n "$scenario" ] || continue
+    in_scope "$instance" || continue
     json=$(state_json "$scenario" "$instance")
     expires=$(jq -r '.outputs.expires_at.value // ""' <<<"$json")
     resources=$(jq '[.resources[]? | select(.mode == "managed")] | length' <<<"$json")
@@ -255,6 +295,7 @@ reap() {
   gcp)
     while IFS=$'\t' read -r name exp inst; do
       [ -n "$name" ] || continue
+      in_scope "$inst" || continue
       if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
         if gcloud storage rm -r --quiet "gs://$name"; then
           summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
@@ -272,6 +313,7 @@ reap() {
       while IFS=$'\t' read -r name created; do
         [ -n "$name" ] || continue
         inst=${name#"$prefix"}
+        in_scope "$inst" || continue
         local owned=
         for l in $live; do [[ $inst == "$l"* ]] && owned=1; done
         [ -z "$owned" ] || continue
@@ -293,6 +335,7 @@ reap() {
     local id
     while IFS=$'\t' read -r id exp inst; do
       [ -n "$id" ] || continue
+      in_scope "$inst" || continue
       if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
         if az resource delete --ids "$id" --only-show-errors; then
           summary "Deleted orphaned resource \`${id##*/}\` (instance \`$inst\`, expired $(utc "$exp"))."
@@ -306,6 +349,7 @@ reap() {
   aws)
     while IFS=$'\t' read -r name exp inst; do
       [ -n "$name" ] || continue
+      in_scope "$inst" || continue
       if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
         if aws s3 rb --force "s3://$name" >/dev/null; then
           summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
@@ -317,7 +361,7 @@ reap() {
     ;;
   esac
 
-  summary "Reap of \`$CLOUD\`: $reaped expired instance(s) destroyed, $failed failure(s); live:${live% }."
+  summary "Reap of \`$CLOUD\`${REAP_PREFIX:+ (instances starting \`$REAP_PREFIX\`)}: $reaped expired instance(s) destroyed, $failed failure(s); live:${live% }."
   [ "$failed" = 0 ]
 }
 
