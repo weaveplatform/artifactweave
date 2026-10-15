@@ -64,7 +64,7 @@ func TestParseErrors(t *testing.T) {
 		`"items"`:                                         ErrSyntax,
 		`builds.find()`:                                   ErrUnsupported,
 		`widgets.find()`:                                  ErrSyntax,
-		`items.delete({})`:                                ErrUnsupported,
+		`items.update({})`:                                ErrUnsupported,
 		`items.search()`:                                  ErrSyntax,
 		`items find()`:                                    ErrSyntax,
 		`items.find(`:                                     ErrSyntax,
@@ -552,6 +552,123 @@ func TestParseOutputRules(t *testing.T) {
 		`items.find().include("name").sort({"$asc":["size"]})`: ErrInvalid,
 		`items.find().include("virtual_repos")`:                ErrInvalid,
 		`items.find().include("repo","name","virtual_repos")`:  ErrInvalid,
+	} {
+		if _, err := Parse(src); !errors.Is(err, want) {
+			t.Errorf("Parse(%s) = %v, want %v", src, err, want)
+		}
+	}
+}
+
+func TestParseActions(t *testing.T) {
+	// JFrog's documented examples (aql-syntax, aql-examples).
+	q := mustParse(t, `items.delete({"name" : {"$match" : "*.tmp"}}).dryRun("true")`)
+	if q.Action != DeleteItems || !q.DryRun || q.Action.String() != "items.delete" {
+		t.Fatalf("query %+v", q)
+	}
+	// delete selects files unless the criteria name a type, as find does.
+	and, _ := q.Criteria.(And)
+	if len(and) != 2 || and[1].(*FieldCriterion).Text != "file" {
+		t.Fatalf("criteria %#v", q.Criteria)
+	}
+	q = mustParse(
+		t,
+		`items.delete({"name":{"$match":"*.tmp"},"repo":"temp-local"}).dryRun("false")`,
+	)
+	if q.DryRun || !slices.Equal(q.Fields(), defaultFields) || q.Properties() {
+		t.Fatalf("query %+v", q)
+	}
+	q = mustParse(
+		t,
+		`properties.update({"item.repo":"libs-release-local","item.name":{"$match":"*.jar"}})`+
+			`.keys("status").newValue("approved").dryRun("false")`,
+	)
+	if q.Action != UpdateProperties || q.DryRun || !slices.Equal(q.Keys, []string{"status"}) ||
+		q.NewValue != "approved" || q.Action.String() != "properties.update" {
+		t.Fatalf("query %+v", q)
+	}
+	// item.<field> criteria become item fields; there is no implicit
+	// type=file, and an item must have one of the keys.
+	and, _ = q.Criteria.(And)
+	if len(and) != 3 || and[0].(*FieldCriterion).Field != FieldRepo ||
+		and[1].(*FieldCriterion).Field != FieldName {
+		t.Fatalf("criteria %#v", q.Criteria)
+	}
+	if has, _ := and[2].(Or); len(has) != 1 || has[0].(*PropertyCriterion).Key != "status" {
+		t.Fatalf("criteria %#v", q.Criteria)
+	}
+	// Rows carry the keys being changed and nothing else.
+	if !q.Properties() || !slices.Equal(q.PropertyKeys(), []string{"status"}) {
+		t.Fatalf("properties %v %v", q.Properties(), q.PropertyKeys())
+	}
+	// No .dryRun() is a dry run; booleans and any case are accepted, keys
+	// are deduplicated, and $and and $or reach item fields inside them.
+	for src, dry := range map[string]bool{
+		`items.delete()`:                             true,
+		`items.delete().dryRun(false)`:               false,
+		`items.delete().dryRun(true)`:                true,
+		`items.delete().dryRun("FALSE")`:             false,
+		`items.delete({"type":"folder"})`:            true,
+		`properties.update().keys("a").newValue("")`: true,
+	} {
+		if q := mustParse(t, src); q.DryRun != dry {
+			t.Errorf("%s: dry run %v", src, q.DryRun)
+		}
+	}
+	q = mustParse(
+		t,
+		`properties.update({"$or":[{"item.name":"a"},{"$and":[{"item.type":"folder"}]}]})`+
+			`.newValue("v").keys("b","a","b")`,
+	)
+	if !slices.Equal(q.Keys, []string{"b", "a"}) {
+		t.Fatalf("keys %v", q.Keys)
+	}
+	and, _ = q.Criteria.(And)
+	or, _ := and[0].(Or)
+	if len(or) != 2 || or[0].(*FieldCriterion).Field != FieldName ||
+		or[1].(And)[0].(*FieldCriterion).Field != FieldType {
+		t.Fatalf("criteria %#v", q.Criteria)
+	}
+	// find is no action and runs for real.
+	q = mustParse(t, `items.find()`)
+	if q.Action != Find || q.DryRun || q.Action.String() != "items.find" {
+		t.Fatalf("find %+v", q)
+	}
+}
+
+func TestParseActionErrors(t *testing.T) {
+	for src, want := range map[string]error{
+		`properties.find()`:                                                    ErrUnsupported,
+		`properties.search()`:                                                  ErrSyntax,
+		`items.delete([])`:                                                     ErrSyntax,
+		`items.delete().limit(1)`:                                              ErrInvalid,
+		`items.delete().sort({"$asc":["name"]})`:                               ErrInvalid,
+		`items.delete().include("name")`:                                       ErrInvalid,
+		`items.delete().keys("a")`:                                             ErrInvalid,
+		`items.find().dryRun("true")`:                                          ErrInvalid,
+		`items.delete().dryRun()`:                                              ErrSyntax,
+		`items.delete().dryRun("yes")`:                                         ErrSyntax,
+		`items.delete().dryRun(1)`:                                             ErrSyntax,
+		`items.delete().dryRun("true").dryRun("false")`:                        ErrSyntax,
+		`items.delete().explode()`:                                             ErrSyntax,
+		`properties.update().keys("a")`:                                        ErrInvalid,
+		`properties.update().newValue("v")`:                                    ErrInvalid,
+		`properties.update().keys().newValue("v")`:                             ErrSyntax,
+		`properties.update().keys("").newValue("v")`:                           ErrSyntax,
+		`properties.update().keys(1).newValue("v")`:                            ErrSyntax,
+		`properties.update().keys("a").newValue(1)`:                            ErrSyntax,
+		`properties.update().keys("a").newValue("v","w")`:                      ErrSyntax,
+		`properties.update().keys("a").newValue("v").limit(1)`:                 ErrInvalid,
+		`properties.update({"key":"a"}).keys("a").newValue("v")`:               ErrUnsupported,
+		`properties.update({"value":"a"}).keys("a").newValue("v")`:             ErrUnsupported,
+		`properties.update({"@a":"b"}).keys("a").newValue("v")`:                ErrUnsupported,
+		`properties.update({"$msp":[]}).keys("a").newValue("v")`:               ErrUnsupported,
+		`properties.update({"item.nosuch":"a"}).keys("a").newValue("v")`:       ErrUnsupported,
+		`properties.update({"item.stat.downloads":1}).keys("a").newValue("v")`: ErrUnsupported,
+		`properties.update({"name":"a"}).keys("a").newValue("v")`:              ErrSyntax,
+		`properties.update({"$or":[{"key":"a"}]}).keys("a").newValue("v")`:     ErrUnsupported,
+		`properties.update({"$or":["a"]}).keys("a").newValue("v")`:             ErrSyntax,
+		`properties.update({"$not":[]}).keys("a").newValue("v")`:               ErrSyntax,
+		`properties.update({"item.size":"big"}).keys("a").newValue("v")`:       ErrSyntax,
 	} {
 		if _, err := Parse(src); !errors.Is(err, want) {
 			t.Errorf("Parse(%s) = %v, want %v", src, err, want)

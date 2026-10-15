@@ -94,12 +94,29 @@ resolve against the configured repositories before the query runs, on every engi
 - **`items.delete(<criteria>).dryRun(...)`** and
   **`properties.update(<criteria>).keys(...).newValue(...).dryRun(...)`** answer in the
   `find` shape: the affected rows and a `range`. A dry run therefore lists what a real run
-  would change.
-- **Delete** needs delete permission on each item and goes through the trash can, as
-  `DELETE` does ([0010](0010-retention-trash-and-gc.md)).
-- **Update** needs annotate permission on each item and goes through the item service, so
-  webhooks and indexes see the change.
-- **Unpermitted items** are skipped and left out of the response.
+  would change. Rows carry the default item fields; `properties.update` rows add the keys
+  it changes, with their new values.
+- **A dry run by default.** An action without `.dryRun()` is a dry run. `.dryRun()` takes
+  `"true"` or `"false"` in any case, or a JSON boolean; anything else answers 400.
+- **Criteria.** `items.delete` takes `find`'s criteria, with the same implicit
+  `type: file`. `properties.update` takes `item.<field>` criteria, through `$and` and
+  `$or`, and adds no implicit type, because folders carry properties too. The properties
+  domain's own `key` and `value` fields answer 400 as unsupported.
+- **Suffixes.** `items.delete` takes only `.dryRun()`, and `properties.update` takes
+  `.keys()`, `.newValue()` and `.dryRun()`, the first two required. `include`, `sort`,
+  `offset` and `limit` answer 400, as JFrog documents for delete.
+- **Limits.** The result cap and the scan factor apply as for `find`. A capped action
+  changes only the rows it returns, with the cap's notification, and running it again
+  reaches the rest.
+- **Delete** needs read and delete permission on each item and goes through the trash can,
+  as `DELETE` does ([0010](0010-retention-trash-and-gc.md)). A folder takes everything
+  below it, as `DELETE` does, and an item it took is still listed.
+- **Update** affects an item that has at least one of the keys. Each key it has gets the
+  single new value, and keys it lacks are not added. It needs read and annotate permission
+  on each item, and writes as set-properties does, in one transaction.
+- **Unpermitted items** are skipped and left out of the response, as are items an action
+  cannot reach: a virtual repository's own, and a remote repository's outside its cache.
+  For a non-admin, the repository's include and exclude patterns apply as for `find`.
 
 **Dialect traps** are handled explicitly:
 - **Pattern operators.** `$match` and `$nmatch` are case-sensitive.
@@ -139,6 +156,10 @@ with the operations it batches. A dry run shows exactly what would be touched, a
 delete or update can do nothing that `DELETE` or set-properties would refuse. JFrog
 documents neither choice (research 22 §4).
 
+**A dry run by default** follows from JFrog documenting no default: of the two, only a dry
+run leaves a mistyped or forgotten suffix harmless. Read permission is required beside
+delete or annotate because every row the response lists is one the caller then sees.
+
 **The default result cap** protects the server's memory from an unbounded query, and is the
 value JFrog SaaS uses. Self-managed Artifactory has no default cap, so this is a deviation
 ([DV-030](../../implementation/deviations.md#api-behaviour)). Operators who want
@@ -150,6 +171,10 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - *Actions answering a count only:* a dry run could not show which items it would touch.
 - *Actions for administrators only:* stricter than the per-item operations they batch, for
   no gain.
+- *A real run when `.dryRun()` is left out:* one forgotten suffix would delete or rewrite
+  everything the criteria match.
+- *`properties.update` adding keys an item lacks:* the update would then reach every item
+  the criteria match, which no JFrog example asks for.
 - *No default result cap:* matches self-managed Artifactory, but leaves memory unbounded.
 
 ## Constraints
@@ -170,7 +195,8 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
   under every operator.
 - An acceptance round trip: `jf rt dl remote/*.jar` downloads a file seeded into the
   remote's cache.
-- Dry-run and real-run tests for both actions, including skipped items.
+- Dry-run and real-run tests for both actions, including skipped items, and shared
+  fixtures for their criteria run in memory and on SQLite and PostgreSQL.
 - GET search endpoint response-shape tests.
 
 ## References

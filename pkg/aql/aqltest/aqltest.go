@@ -346,6 +346,30 @@ func Cases() []Case {
 	q("stat time", `items.find({"stat.downloaded":{"$gte":"2026-01-01T00:30"}})`, jar, cached)
 	q("stat last", `items.find({"stat.downloaded":{"$last":"20minutes"}})`, cached)
 	q("stat before", `items.find({"stat.remote_downloaded":{"$before":"10minutes"}})`, readme)
+	// The actions select items as find does (research 22 §1.5); the server
+	// then deletes or updates the rows the store returns.
+	q("delete selects files", `items.delete({"repo":"libs-local"}).dryRun("false")`,
+		jar, pom, util, readme)
+	q("delete of folders", `items.delete({"repo":"libs-local","type":"folder"})`,
+		"libs-local/org", "libs-local/org/acme", "libs-local/org/acme/lib")
+	q("delete through a remote key", `items.delete({"repo":"remote"}).dryRun(true)`, cached)
+	q("update needs one of the keys",
+		`properties.update({"item.repo":"libs-local"}).keys("release","owner").newValue("x")`,
+		jar, util)
+	q("update with item criteria under or",
+		`properties.update({"$or":[{"item.name":"app-1.0.pom"},{"item.path":"org/acme/lib"}]})`+
+			`.keys("build.name","owner").newValue("v").dryRun("false")`,
+		pom, util)
+	q("update through a virtual key",
+		`properties.update({"item.repo":"all-virtual","item.name":{"$match":"*.txt"}})`+
+			`.keys("license").newValue("MIT")`,
+		aUnder, axb)
+	q("update without criteria", `properties.update().keys("owner").newValue("v")`, util)
+	out = append(out, Case{
+		Name:    "cap applies to an action",
+		Query:   `items.delete({"repo":"generic-local"})`,
+		Options: aql.Options{Max: 2}, Want: []string{guide, aUnder},
+	})
 	out = append(out, Case{
 		Name: "cap applies without a limit", Query: `items.find({"repo":"generic-local"})`,
 		Options: aql.Options{Max: 2}, Want: []string{guide, aUnder},

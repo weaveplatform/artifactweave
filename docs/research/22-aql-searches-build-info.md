@@ -153,9 +153,9 @@ Confidence:
   and does not support `sort`, `limit` or `offset` (`aql-syntax`, `aql-examples`).
 - **[D] `properties.update(<criteria>).keys(...).newValue("v").dryRun(...)`** updates item
   properties only, with `item.*` paths in the criteria (same pages).
-- **Undocumented:** no page gives the response body, the permission each action needs, the
-  version that introduced them, or a licence tier. Section 4 and decision 0012 cover what
-  artifactweave does.
+- **Undocumented:** no page gives the response body, the permission each action needs, what
+  an action without `.dryRun()` does, the version that introduced them, or a licence tier.
+  Section 4 and decision 0012 cover what artifactweave does.
 
 ## 2. Searches
 
@@ -294,6 +294,8 @@ does for each.
   `.delete()` and `.update()` answer in the `find` shape: the affected rows and a `range`.
 - **[I] What actions need.** `.delete()` would follow `DELETE` and need delete permission on
   each item; `.update()` would follow set-properties and need annotate permission.
+- **[I] An action without `.dryRun()`.** Every documented example names it, so no source
+  shows the default. Only a dry run makes leaving it out harmless.
 - **[I] Out of P5.** The `releases` and `release_artifacts` domains depend on release
   bundles v1 (P15). `item.infos` needs a record of property modifications that the item store
   does not keep.

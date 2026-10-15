@@ -261,12 +261,31 @@ func (p *parser) object(depth int) (value, error) {
 // otherDomains are AQL's other primary domains, refused as unsupported
 // rather than as a syntax error.
 var otherDomains = []string{
-	"builds", "build", "entries", "archive", "properties", "property", "releases",
+	"builds", "build", "entries", "archive", "property", "releases",
 	"release_artifacts", "promotions", "modules", "dependencies", "artifacts",
 }
 
-// Parse parses an items query. Errors wrap ErrEmpty, ErrSyntax,
-// ErrUnsupported, ErrInvalid or ErrTooLong.
+// methods maps each served domain's methods to what they do. The
+// properties domain is served for its update action only: it selects items
+// by their "item.<field>" criteria.
+var methods = map[string]map[string]Action{
+	"items":      {"find": Find, "delete": DeleteItems},
+	"properties": {"update": UpdateProperties},
+}
+
+// String is the action as a query spells it.
+func (a Action) String() string {
+	switch a {
+	case DeleteItems:
+		return "items.delete"
+	case UpdateProperties:
+		return "properties.update"
+	}
+	return "items.find"
+}
+
+// Parse parses an items query, items.delete or properties.update. Errors
+// wrap ErrEmpty, ErrSyntax, ErrUnsupported, ErrInvalid or ErrTooLong.
 func Parse(src string) (*Query, error) {
 	if strings.TrimSpace(src) == "" {
 		return nil, ErrEmpty
@@ -282,10 +301,11 @@ func Parse(src string) (*Query, error) {
 		return nil, syntaxErr(p.tok.pos, "expected a domain, found %s", p.describe())
 	}
 	domain := p.tok.text
-	if domain != "items" {
+	served, ok := methods[domain]
+	if !ok {
 		if slices.Contains(otherDomains, domain) {
 			return nil, fmt.Errorf(
-				"%w: the %s domain (only items is served)",
+				"%w: the %s domain (only items and properties.update are served)",
 				ErrUnsupported,
 				domain,
 			)
@@ -298,11 +318,13 @@ func Parse(src string) (*Query, error) {
 	if err := p.expect("."); err != nil {
 		return nil, err
 	}
-	if p.tok.kind != tokIdent || p.tok.text != "find" {
-		if p.tok.kind == tokIdent && (p.tok.text == "delete" || p.tok.text == "update") {
-			return nil, fmt.Errorf("%w: items.%s", ErrUnsupported, p.tok.text)
+	method := p.tok.text
+	action, ok := served[method]
+	if p.tok.kind != tokIdent || !ok {
+		if p.tok.kind == tokIdent && slices.Contains([]string{"find", "delete", "update"}, method) {
+			return nil, fmt.Errorf("%w: %s.%s", ErrUnsupported, domain, method)
 		}
-		return nil, syntaxErr(p.tok.pos, "expected find, found %s", p.describe())
+		return nil, syntaxErr(p.tok.pos, "expected find, delete or update, found %s", p.describe())
 	}
 	if err := p.advance(); err != nil {
 		return nil, err
@@ -310,7 +332,9 @@ func Parse(src string) (*Query, error) {
 	if err := p.expect("("); err != nil {
 		return nil, err
 	}
-	q := &Query{Distinct: true}
+	// An action without .dryRun() is a dry run: Artifactory documents no
+	// default, and the one that cannot destroy anything by omission is safe.
+	q := &Query{Distinct: true, Action: action, DryRun: action != Find}
 	var root Node
 	if !p.punct(")") {
 		v, err := p.value(0)
@@ -318,7 +342,12 @@ func Parse(src string) (*Query, error) {
 			return nil, err
 		}
 		if v.kind != vObject {
-			return nil, syntaxErr(v.pos, "find takes an object")
+			return nil, syntaxErr(v.pos, "%s takes an object", method)
+		}
+		if action == UpdateProperties {
+			if v, err = itemCriteria(v); err != nil {
+				return nil, err
+			}
 		}
 		if len(v.members) > 0 {
 			if root, err = criteria(v, 0); err != nil {
@@ -337,7 +366,9 @@ func Parse(src string) (*Query, error) {
 	default:
 		root = And{r}
 	}
-	if !mentionsType(root) {
+	// The implicit type=file is the items domain's; properties.update
+	// reaches folders too, since they carry properties.
+	if action != UpdateProperties && !mentionsType(root) {
 		root = append(root.(And), &FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"})
 	}
 	q.Criteria = root
@@ -370,6 +401,9 @@ func Parse(src string) (*Query, error) {
 	if p.tok.kind != tokEOF {
 		return nil, syntaxErr(p.tok.pos, "unexpected %s after the query", p.describe())
 	}
+	if action == UpdateProperties && (!seen["keys"] || !seen["newValue"]) {
+		return nil, fmt.Errorf("%w: properties.update needs .keys() and .newValue()", ErrInvalid)
+	}
 	if err := q.validate(); err != nil {
 		return nil, err
 	}
@@ -378,7 +412,56 @@ func Parse(src string) (*Query, error) {
 	for _, k := range q.keyIncludes() {
 		q.Criteria = append(q.Criteria.(And), &PropertyCriterion{Key: k, Op: OpEq, Value: "*"})
 	}
+	// properties.update changes the keys an item has and adds none, so an
+	// item without any of them is not affected and is no row.
+	if action == UpdateProperties {
+		has := make(Or, len(q.Keys))
+		for n, k := range q.Keys {
+			has[n] = &PropertyCriterion{Key: k, Op: OpEq, Value: "*"}
+		}
+		q.Criteria = append(q.Criteria.(And), has)
+	}
 	return q, nil
+}
+
+// itemCriteria rewrites properties.update criteria, whose item fields are
+// "item.<field>", into the items domain's spelling, through $and and $or.
+// The properties domain's own fields, key and value, are not served: the
+// keys an update changes are its .keys().
+func itemCriteria(v value) (value, error) {
+	out := v
+	out.members = make([]member, len(v.members))
+	for n, m := range v.members {
+		f, isItem := strings.CutPrefix(m.key, "item.")
+		_, known := fieldKinds[Field(f)]
+		switch {
+		case m.key == "$and" || m.key == "$or":
+			// A malformed operand is left for criterion to report.
+			items := make([]value, len(m.val.items))
+			for i, item := range m.val.items {
+				if item.kind == vObject {
+					var err error
+					if item, err = itemCriteria(item); err != nil {
+						return value{}, err
+					}
+				}
+				items[i] = item
+			}
+			m.val.items = items
+		case isItem && known:
+			m.key = f
+		case m.key == "$msp", m.key == "key", m.key == "value",
+			strings.Contains(m.key, "."), strings.HasPrefix(m.key, "@"):
+			return value{}, fmt.Errorf(
+				"%w: %q in properties.update (it selects items by item.<field>)",
+				ErrUnsupported, m.key,
+			)
+		case !strings.HasPrefix(m.key, "$"):
+			return value{}, syntaxErr(m.pos, "unknown field %q", m.key)
+		}
+		out.members[n] = m
+	}
+	return out, nil
 }
 
 // validate applies Artifactory's output rules (research 22 §1.2): sort,
@@ -413,6 +496,13 @@ func (q *Query) validate() error {
 	return nil
 }
 
+// modifiers lists the suffixes each kind of query takes.
+var modifiers = map[Action][]string{
+	Find:             {"include", "sort", "offset", "limit", "transitive", "distinct"},
+	DeleteItems:      {"dryRun"},
+	UpdateProperties: {"keys", "newValue", "dryRun"},
+}
+
 // modifier parses the arguments of one suffix.
 func (p *parser) modifier(q *Query, name string, pos int) error {
 	var args []value
@@ -428,7 +518,43 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 		}
 		args = append(args, v)
 	}
+	if !slices.Contains(modifiers[q.Action], name) {
+		for _, names := range modifiers {
+			if slices.Contains(names, name) {
+				// JFrog documents limit, offset and sort as not supported
+				// with delete; the actions return the default fields.
+				return fmt.Errorf("%w: %s does not take .%s()", ErrInvalid, q.Action, name)
+			}
+		}
+		return syntaxErr(pos, "unknown modifier %q", name)
+	}
 	switch name {
+	case "dryRun":
+		dry, ok := boolArg(args)
+		if !ok {
+			return syntaxErr(pos, `dryRun takes "true" or "false"`)
+		}
+		q.DryRun = dry
+		return nil
+	case "keys":
+		if len(args) == 0 {
+			return syntaxErr(pos, "keys takes one or more property keys")
+		}
+		for _, a := range args {
+			if a.kind != vString || a.text == "" {
+				return syntaxErr(a.pos, "keys takes property keys")
+			}
+			if !slices.Contains(q.Keys, a.text) {
+				q.Keys = append(q.Keys, a.text)
+			}
+		}
+		return nil
+	case "newValue":
+		if len(args) != 1 || args[0].kind != vString {
+			return syntaxErr(pos, "newValue takes one string")
+		}
+		q.NewValue = args[0].text
+		return nil
 	case "include":
 		for _, a := range args {
 			if a.kind != vString {
@@ -464,14 +590,31 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 		}
 		q.Transitive = true
 		return nil
-	case "distinct":
+	default: // distinct, the only name the check above leaves
 		if len(args) != 1 || args[0].kind != vBool {
 			return syntaxErr(pos, "distinct takes true or false")
 		}
 		q.Distinct = args[0].b
 		return nil
 	}
-	return syntaxErr(pos, "unknown modifier %q", name)
+}
+
+// boolArg reads dryRun's argument: "true" or "false" as JFrog documents it,
+// in any case, or a JSON boolean. Anything else is refused rather than read
+// as false, which would turn a typo into a real run.
+func boolArg(args []value) (b, ok bool) {
+	if len(args) != 1 {
+		return false, false
+	}
+	switch a := args[0]; {
+	case a.kind == vBool:
+		return a.b, true
+	case a.kind == vString && strings.EqualFold(a.text, "true"):
+		return true, true
+	case a.kind == vString && strings.EqualFold(a.text, "false"):
+		return false, true
+	}
+	return false, false
 }
 
 // includable reports whether name may appear in an include: an item field,
