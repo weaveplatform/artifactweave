@@ -2,8 +2,8 @@
 # Static checks and mocked tests over every Terraform root under deploy/ and
 # test/terraform, with pinned tools (decision 0030):
 #
-#   check.sh        fmt, validate, tflint, trivy, terraform test and the
-#                   terraform-docs drift check
+#   check.sh        the prove-matrix table test, then fmt, validate, tflint,
+#                   trivy, terraform test and the terraform-docs drift check
 #   check.sh docs   rewrite the terraform-docs sections of the READMEs
 #
 # Each tool is fetched once into .tools/ and checked against the SHA-256 in
@@ -45,6 +45,19 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 tools=$root/.tools
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
+
+failed=
+fail() {
+	echo "FAIL: $*" >&2
+	failed=1
+}
+
+# The table test needs no tools, so it runs before any is fetched and a wrong
+# proof rule fails fast.
+if [ "$mode" = check ]; then
+	echo "== prove-matrix"
+	"$root/deploy/platform/terraform/prove-matrix_test.sh" || fail "prove-matrix.sh chooses the wrong scenarios (deploy/platform/terraform/prove-matrix_test.sh)"
+fi
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
 case $(uname -m) in
@@ -132,11 +145,6 @@ fi
 	exit 2
 }
 
-failed=
-fail() {
-	echo "FAIL: $*" >&2
-	failed=1
-}
 # State and provider plugins live in $work, never beside the sources.
 tfin() {
 	local r=$1
