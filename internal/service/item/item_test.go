@@ -445,6 +445,26 @@ func TestDeleteWithoutTrash(t *testing.T) {
 	}
 }
 
+// TestPurge deletes for good with the trash can on.
+func TestPurge(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	tgt := Target{Repo: w.loc, Path: "f"}
+	if _, err := w.svc.Deploy(
+		ctx,
+		Deploy{Target: tgt, Body: strings.NewReader("gone")},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.svc.Purge(ctx, tgt); err != nil {
+		t.Fatal(err)
+	}
+	entries, _, _ := w.db.Trash().List(ctx, "", "", store.Page{})
+	if len(entries) != 0 || w.refs(sums("gone").SHA256) != 0 {
+		t.Fatalf("trash %v, refs %d", entries, w.refs(sums("gone").SHA256))
+	}
+}
+
 func TestDeleteRoot(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()

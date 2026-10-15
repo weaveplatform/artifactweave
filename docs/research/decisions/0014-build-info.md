@@ -45,7 +45,13 @@ the status codes and headers the CLI checks:
 - **Encoding.** The name and number use the CLI's encoding (research 22 §3.3), so the CLI's
   `LATEST` and build-append AQL queries find the item.
 - **One path for both.** Publishing writes the run record and the item together. Deleting a
-  run removes both, so the storage API, AQL and retention see one consistent set.
+  run removes both, so the storage API, AQL and retention see one consistent set. The
+  document item is purged rather than trashed, because a restore would bring it back without
+  its run.
+- **Deleting artifacts.** A delete with `artifacts=1` or `deleteArtifacts` also deletes the
+  items that hold an artifact's checksum and carry the run's `build.name` and `build.number`
+  properties. These are ordinary item deletes: they go to the trash can, and each needs
+  delete permission on the item. A copy without the properties is kept.
 
 **Raw-path routing.** The `{name}` and `{number}` path parameters are matched on the raw,
 still-escaped path. A `%2F` in a build name therefore stays inside its segment, as the
@@ -60,7 +66,10 @@ which is what the AQL build domains join through.
 
 **Permissions** come from the build resource, matched against the build-info repository as
 `<name>/**` through the native evaluator
-([0006](0006-authorization-native-permission-model.md)):
+([0006](0006-authorization-native-permission-model.md)). The path matched is the run's
+document item path, so a name containing `/` is matched in its encoded form
+(`team%2Fapp/**`), and a listing of names shows a name when a permitted path lies below
+its folder:
 
 | Operation | Needs |
 |---|---|

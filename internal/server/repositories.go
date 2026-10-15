@@ -85,8 +85,9 @@ func collectionSlash(next http.Handler) http.Handler {
 // request: the Accept header for media-type negotiation, and the raw body of
 // a repository or Access v2 group update. repo.Config cannot tell a field
 // left out (keep the stored value) from one sent as null (reset it to its
-// default), and an update needs both. It runs after bodyLimit, so the copy
-// is bounded.
+// default), and an update needs both. A build-info publish or append keeps
+// its raw body too, because the document is stored as published (decision
+// 0014). It runs after bodyLimit, so the copy is bounded.
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
@@ -99,7 +100,9 @@ func requestDetails(next http.Handler) http.Handler {
 		// A permission create keeps its raw body too: the generated Access
 		// type drops the destination and pipeline_source sections.
 		if (r.Method == http.MethodPost &&
-			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions")) ||
+			(isRepositoryUpdate(r.URL.Path) || r.URL.Path == "/access/api/v2/permissions" ||
+				strings.HasPrefix(r.URL.Path, buildsPath+"/append/"))) ||
+			(r.Method == http.MethodPut && r.URL.Path == buildsPath) ||
 			(r.Method == http.MethodPatch && isGroupUpdate(r.URL.Path)) {
 			b, err := io.ReadAll(r.Body)
 			if err != nil {
