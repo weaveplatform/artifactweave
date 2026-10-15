@@ -116,6 +116,9 @@ Each claim is labelled:
 | terraform-docs | `--output-mode inject` replaces the content between `<!-- BEGIN_TF_DOCS -->` and `<!-- END_TF_DOCS -->` | [D] [terraform-docs-output] |
 | terraform-docs check | A `--output-check` flag is listed in the CLI help; its exit status on a stale file is not documented on the configuration page | [I] [terraform-docs-output], secondary sources |
 | S3 backend | Locking with `use_lockfile = true` writes a `.tflock` object beside the state; DynamoDB locking is deprecated | [D] [tf-s3-backend] |
+| Variable validation | From Terraform 1.9, "Input variable validation rules can refer to other objects", so one variable's rule can check another (read 2026-10-15) | [D] [tf-changelog-1.9] |
+| Module sources | "Add `//` to the source path to indicate that the rest of the path after that point is a sub-directory within the package"; query parameters such as `ref` follow the sub-directory, as in `git::https://example.com/network.git//modules/vpc?ref=v1.2.0` (read 2026-10-15) | [D] [tf-module-block] |
+| Release-please extra files | The generic updater replaces the version on any line of a file listed in `extra-files` that carries the annotation `x-release-please-version`; a file can be forced to the generic updater with `{"type": "generic", "path": …}` (read 2026-10-15) | [D] [release-please-customizing] |
 
 ## 4. GitHub Actions identity
 
@@ -177,7 +180,7 @@ Each claim is labelled:
 | GCP load balancing labels | Compute's labelling page lists label support for forwarding rules only on internal Application Load Balancers. In the Terraform provider, `google_compute_backend_bucket`, `google_compute_url_map` and `google_compute_target_https_proxy` have no `labels` argument | [D] [gcp-labels]; [S] [tfgoogle-docs] |
 | Cloud CDN key in state | `google_compute_backend_bucket_signed_url_key.key_value` "will be stored in the raw state as plain text"; the resource has no write-only variant | [S] [tfgoogle-signed-url-key] |
 | Generated keys in state | The managed `tls_private_key` resource stores the private key "*unencrypted* in your Terraform state file"; an ephemeral `tls_private_key` (Terraform 1.11) avoids state, but only feeds write-only arguments | [D] [tf-tls-private-key] |
-| Front Door base fee | Standard $35 and Premium $330 per month, "Billed hourly and only for number of hours used" | [D] [afd-pricing] |
+| Front Door base fee | Standard $35 and Premium $330 per month, "Billed hourly and only for number of hours used"; "You're billed for each hour, or partial hour, that your profile is deployed" (read 2026-10-15); Private Link origins and managed WAF rule sets cost nothing extra on Premium | [D] [afd-pricing], [afd-billing] |
 | Cloud load balancer | About $0.025 per hour for each of the first five forwarding rules | [I] planning research; the pricing page did not render for verification [gcp-lb-pricing] |
 | Provisioning time | CloudFront distributions, Front Door profiles and Google-managed certificates take minutes to tens of minutes to create or delete | [I] |
 
@@ -222,6 +225,7 @@ Each claim is labelled:
 - [azure-object-replication]: https://learn.microsoft.com/en-us/azure/storage/blobs/object-replication-overview
 - [azure-fic]: https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-considerations
 - [afd-pricing]: https://azure.microsoft.com/en-us/pricing/details/frontdoor/
+- [afd-billing]: https://learn.microsoft.com/en-us/azure/frontdoor/billing
 
 **Terraform and tools**
 - [tf-module-providers]: https://developer.hashicorp.com/terraform/language/modules/develop/providers
@@ -235,6 +239,9 @@ Each claim is labelled:
 - [tfsec]: https://github.com/aquasecurity/tfsec
 - [cve-2026-33634]: https://cve.circl.lu/cve/CVE-2026-33634
 - [terraform-docs-output]: https://terraform-docs.io/user-guide/configuration/output/
+- [tf-changelog-1.9]: https://github.com/hashicorp/terraform/blob/v1.9/CHANGELOG.md
+- [tf-module-block]: https://developer.hashicorp.com/terraform/language/block/module
+- [release-please-customizing]: https://github.com/googleapis/release-please/blob/main/docs/customizing.md
 
 **GitHub**
 - [gh-oidc]: https://docs.github.com/en/actions/reference/security/oidc
