@@ -24,7 +24,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
 | P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
 | P4b Reference deployments and CDN delivery | Not started | Epics #113 (CDN delivery and download redirect) and #114 (reference deployments); decisions 0029 and 0030. The download-redirect fixes (#117) landed early |
-| P5 Full AQL, searches, build-info | Not started | |
+| P5 Full AQL, searches, build-info | Not started | Epic #160; decisions 0012 and 0014, research 22 |
 | P6 Docker/OCI | Not started | |
 | P7 npm, Go, Maven locals | Not started | **M2** |
 | P8 PyPI, NuGet, Helm, Terraform locals | Not started | |
@@ -456,12 +456,27 @@ Terraform job. It runs beside P5 to P8.
 ## P5: Full AQL, searches, build-info
 
 Decisions: [0012](../research/decisions/0012-search-and-aql.md),
-[0014](../research/decisions/0014-build-info.md).
+[0014](../research/decisions/0014-build-info.md); research
+[22](../research/22-aql-searches-build-info.md).
 
 **Tasks**
 1. Full AQL grammar for `items`, `properties`, `builds` and the secondary domains, `.delete()`, `properties.update()`, dialect-specific compilation with the traps named in 0012.
 2. GET searches: quick, GAVC, property, checksum, bad checksum, usage, dates, creation, pattern, versions, latest version (text), latest by properties.
 3. Build-info: the `builds`, `build_artifacts`, `build_dependencies` and `build_promotions` tables (a new migration and a `BuildStore` contract, deferred from P2), `PUT/GET /api/build`, build runs, build artifacts, delete, retention (204), rename, promotion with the vendor content type, `build.name`/`build.number` properties on upload.
+
+**Tracking.** Epic #160 holds one GitHub issue per PR:
+1. Research 22 and amendments to decisions 0012 and 0014 (#161).
+2. The Builds API in the spec oracle and the OpenAPI sources (#162).
+3. The AQL items domain: properties, statistics, `$msp`, output rules and limits (#163).
+4. The build-info store: migration, `BuildStore` contract and storetest (#164).
+5. The build-info API: publish, read, append, rename, delete and build artifacts (#165).
+6. Build promotion and retention (#166).
+7. AQL builds and the build secondary domains (#167).
+8. AQL actions: `items.delete` and `properties.update` (#168).
+9. GET searches: quick, property, checksum, bad checksum, usage, dates, creation and pattern (#169).
+10. GET searches: GAVC, versions, latest version, latest by properties, dependency and build artifacts (#170).
+11. A remote repository's key matching its cached items in AQL (#68).
+12. The exit checks: AQL fixtures on both dialects and the JFrog CLI build commands (#171).
 
 **Exit criteria**
 - AQL fixtures (CLI-captured plus hand-written per operator) produce identical ordered output on SQLite and PostgreSQL.

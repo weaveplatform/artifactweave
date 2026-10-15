@@ -57,6 +57,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [19-cdn-and-download-redirect.md](19-cdn-and-download-redirect.md) | Artifactory's direct cloud storage download and CDN distribution, how the JFrog CLI and other clients follow a redirect, CloudFront, Cloud CDN and Front Door for signed delivery from private buckets, costs, and artifactweave's redirect today |
 | [20-reference-deployments.md](20-reference-deployments.md) | Reference deployments: multi-region object storage on AWS, GCP and Azure and how it meets signed URLs and the mirror; Terraform layout, mocked tests, linting, scanning and generated docs; GitHub OIDC to each cloud; labels, secrets in state and costs |
 | [21-oidc-token-exchange.md](21-oidc-token-exchange.md) | OIDC token exchange for CI workload identity: the Access operations, what the JFrog CLI, setup-jfrog-cli and the platform provider send and read, claim matching, transient and synthetic users |
+| [22-aql-searches-build-info.md](22-aql-searches-build-info.md) | AQL domains, fields, output rules, limits, errors and permissions; remote caches and virtual repositories in queries (#68); the actions; the GET searches; the Builds API, the build-info document, run identity and its storage as an item, and what the JFrog CLI checks |
 | [glossary.md](glossary.md) | Terms used across the set |
 | [decisions/](decisions/README.md) | Decision records 0001–0030 |
 
