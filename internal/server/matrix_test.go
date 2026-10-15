@@ -355,6 +355,7 @@ func matrixTable() []matrixRow {
 		accessIdentityMatrix(),
 		oidcMatrix(),
 		buildMatrix(),
+		searchMatrix(),
 	)
 }
 

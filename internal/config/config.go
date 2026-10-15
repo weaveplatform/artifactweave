@@ -52,6 +52,8 @@ const (
 	// DefaultAQLScanFactor reads no extra rows for non-admin filtering, the
 	// default of artifactory.aql.query.non.admin.scan.factor.
 	DefaultAQLScanFactor = 1
+	// DefaultUserQueryLimit is artifactory.search.userQueryLimit's default.
+	DefaultUserQueryLimit = 1000
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -82,6 +84,14 @@ type Config struct {
 // SearchConfig holds the search limits.
 type SearchConfig struct {
 	AQL AQLConfig `yaml:"aql"`
+	// UserQueryLimit caps the results of a GET search for anonymous
+	// callers, and for every non-admin unless LimitAnonymousUsersOnly; zero
+	// means no cap. search.aql.max_results caps every caller's.
+	UserQueryLimit int `yaml:"user_query_limit"`
+	// LimitAnonymousUsersOnly spares signed-in users UserQueryLimit, as
+	// Artifactory's artifactory.search.limitAnonymousUsersOnly does by
+	// default.
+	LimitAnonymousUsersOnly bool `yaml:"limit_anonymous_users_only"`
 }
 
 // AQLConfig limits POST /api/search/aql (decision 0012).
@@ -188,9 +198,12 @@ func Default() Config {
 		Download: DownloadConfig{Redirect: RedirectConfig{
 			MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL,
 		}},
-		Search: SearchConfig{AQL: AQLConfig{
-			MaxResults: DefaultAQLMaxResults, NonAdminScanFactor: DefaultAQLScanFactor,
-		}},
+		Search: SearchConfig{
+			AQL: AQLConfig{
+				MaxResults: DefaultAQLMaxResults, NonAdminScanFactor: DefaultAQLScanFactor,
+			},
+			UserQueryLimit: DefaultUserQueryLimit, LimitAnonymousUsersOnly: true,
+		},
 	}
 }
 
@@ -257,6 +270,7 @@ var keys = append(append([]string{
 	"gc.interval", "gc.grace_period",
 	"download.redirect.min_size", "download.redirect.ttl",
 	"search.aql.max_results", "search.aql.non_admin_scan_factor",
+	"search.user_query_limit", "search.limit_anonymous_users_only",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -315,6 +329,10 @@ func set(cfg *Config, key, value string) error {
 		return setInt(&cfg.Search.AQL.MaxResults, key, value)
 	case "search.aql.non_admin_scan_factor":
 		return setInt(&cfg.Search.AQL.NonAdminScanFactor, key, value)
+	case "search.user_query_limit":
+		return setInt(&cfg.Search.UserQueryLimit, key, value)
+	case "search.limit_anonymous_users_only":
+		return setBool(&cfg.Search.LimitAnonymousUsersOnly, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -398,6 +416,10 @@ func (c Config) Validate() error {
 	if c.Search.AQL.NonAdminScanFactor < 1 {
 		errs = append(errs, fmt.Errorf("%w: search.aql.non_admin_scan_factor %d must be at least 1",
 			ErrInvalidValue, c.Search.AQL.NonAdminScanFactor))
+	}
+	if c.Search.UserQueryLimit < 0 {
+		errs = append(errs, fmt.Errorf("%w: search.user_query_limit %d must not be negative",
+			ErrInvalidValue, c.Search.UserQueryLimit))
 	}
 	return errors.Join(errs...)
 }

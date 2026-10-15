@@ -102,6 +102,10 @@ func serve(
 				MaxResults: cfg.Search.AQL.MaxResults,
 				ScanFactor: cfg.Search.AQL.NonAdminScanFactor,
 			},
+			Search: server.SearchLimits{
+				UserQueryLimit:     cfg.Search.UserQueryLimit,
+				LimitInternalUsers: !cfg.Search.LimitAnonymousUsersOnly,
+			},
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

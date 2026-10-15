@@ -63,6 +63,7 @@ func statusTable() []statusCase {
 		accessIdentityStatusRows(),
 		oidcStatusRows(),
 		buildStatusRows(),
+		searchStatusRows(),
 	)
 }
 

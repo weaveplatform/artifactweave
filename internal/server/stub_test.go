@@ -39,6 +39,16 @@ var implemented = map[string]bool{
 
 	"GET /artifactory/api/v1/uploads/config": true,
 
+	// The GET searches (#169).
+	"GET /artifactory/api/search/artifact":    true,
+	"GET /artifactory/api/search/badChecksum": true,
+	"GET /artifactory/api/search/checksum":    true,
+	"GET /artifactory/api/search/creation":    true,
+	"GET /artifactory/api/search/dates":       true,
+	"GET /artifactory/api/search/pattern":     true,
+	"GET /artifactory/api/search/prop":        true,
+	"GET /artifactory/api/search/usage":       true,
+
 	"GET /artifactory/api/security/users":                                            true,
 	"GET /artifactory/api/security/users/{userName}":                                 true,
 	"PUT /artifactory/api/security/users/{userName}":                                 true,

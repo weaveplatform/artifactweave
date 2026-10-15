@@ -139,6 +139,8 @@ search:
   aql:
     max_results: 1000
     non_admin_scan_factor: 3
+  user_query_limit: 50
+  limit_anonymous_users_only: false
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -185,7 +187,10 @@ search:
 		Download: DownloadConfig{
 			Redirect: RedirectConfig{MinSize: 4 << 20, TTL: 90 * time.Second},
 		},
-		Search: SearchConfig{AQL: AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3}},
+		Search: SearchConfig{
+			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
+			UserQueryLimit: 50,
+		},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -204,7 +209,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, "_size"):
 			env[envName(k)] = "8MiB"
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
-			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."):
+			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."),
+			k == "search.user_query_limit":
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"):
@@ -226,6 +232,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
 		cfg.Download.Redirect.TTL != 45*time.Second ||
 		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
+		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -763,6 +770,33 @@ func TestSearchAQLConfig(t *testing.T) {
 	})
 	if err != nil || got.Search.AQL != (AQLConfig{MaxResults: 0, NonAdminScanFactor: 4}) {
 		t.Fatalf("load: %+v, %v", got.Search.AQL, err)
+	}
+}
+
+func TestSearchLimitConfig(t *testing.T) {
+	if d := Default().Search; d.UserQueryLimit != 1000 || !d.LimitAnonymousUsersOnly {
+		t.Fatalf("defaults: %+v", d)
+	}
+	_, err := Load(LoadOptions{Flags: map[string]string{"search.user_query_limit": "-1"}})
+	if !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("negative limit: %v", err)
+	}
+	cfg := Default()
+	if err := set(&cfg, "search.limit_anonymous_users_only", "maybe"); !errors.Is(err,
+		ErrInvalidValue) {
+		t.Fatalf("bad boolean: %v", err)
+	}
+	// The flag beats the environment, which beats the file.
+	got, err := Load(LoadOptions{
+		File: writeFile(t, "search:\n  user_query_limit: 7\n  limit_anonymous_users_only: false\n"),
+		Env: envOf(map[string]string{
+			"ARTIFACTWEAVE_SEARCH_USER_QUERY_LIMIT":           "8",
+			"ARTIFACTWEAVE_SEARCH_LIMIT_ANONYMOUS_USERS_ONLY": "true",
+		}),
+		Flags: map[string]string{"search.user_query_limit": "0"},
+	})
+	if err != nil || got.Search.UserQueryLimit != 0 || !got.Search.LimitAnonymousUsersOnly {
+		t.Fatalf("load: %+v, %v", got.Search, err)
 	}
 }
 
