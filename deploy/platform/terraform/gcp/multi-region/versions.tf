@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.9"
   required_providers {
     google = {
       source  = "hashicorp/google"
@@ -12,11 +12,9 @@ terraform {
   }
 }
 
-# Credentials are your own Application Default Credentials
-# (`gcloud auth application-default login`), or the deployer's in a scenario
-# run. Each bucket names its own location, so the provider's region is only a
-# default.
+# Credentials are Application Default Credentials (`gcloud auth
+# application-default login`, a CI service account). Every bucket names its
+# own location, so the provider needs only the project.
 provider "google" {
   project = var.project_id
-  region  = var.primary_region
 }

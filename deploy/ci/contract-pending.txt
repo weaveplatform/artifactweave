@@ -6,16 +6,8 @@
 
 # Scenarios.
 deploy/platform/terraform/aws/geo-replicated
-deploy/platform/terraform/aws/multi-region
 deploy/platform/terraform/aws/single-bucket
 deploy/platform/terraform/azure/geo-replicated
-deploy/platform/terraform/azure/multi-region
 deploy/platform/terraform/azure/single-bucket
 deploy/platform/terraform/gcp/geo-replicated
-deploy/platform/terraform/gcp/multi-region
 deploy/platform/terraform/gcp/single-bucket
-
-# Modules.
-deploy/platform/terraform/modules/aws/storage
-deploy/platform/terraform/modules/azure/storage
-deploy/platform/terraform/modules/gcp/storage

@@ -1,20 +1,27 @@
-# One storage account and private container a scenario stores blobs in,
-# without Shared Key, with Storage Blob Data Contributor for the principals
-# artifactweave runs as. Scenarios call it once per store (multi-region calls
-# it per region); it holds no provider block, so the caller's azurerm
-# provider and subscription apply (decision 0030).
+# One storage account and private container, without Shared Key, with
+# Storage Blob Data Contributor for the principals in var.principals.
+# Scenarios call it once per store; it holds no provider block, so the
+# caller's azurerm provider and subscription apply (decision 0030).
+
+locals {
+  # As the azure backend normalises blob.azure.prefix, so the management
+  # policy matches the blobs it writes.
+  trimmed      = trimprefix(var.store_prefix, "/")
+  store_prefix = local.trimmed == "" || endswith(local.trimmed, "/") ? local.trimmed : "${local.trimmed}/"
+}
 
 # Accepted trivy findings (deploy/check.sh), each with its reason:
-# - AZU-0012: the account takes connections from any network, because CI
-#   runners and laptops have no fixed addresses. Shared Key is off, so every
-#   request still needs an Entra ID token or a user delegation SAS; the
-#   azure/cdn scenario is the one that closes the public endpoint.
+# - AZU-0012: the account takes connections from any network, because
+#   artifactweave and the clients its signed URLs serve have no fixed
+#   addresses. Shared Key is off, so every request still needs an Entra ID
+#   token or a user delegation SAS; the cdn scenarios close the endpoint.
 # - AZU-0057: no Storage Analytics logs; the Azure activity log records the
-#   management calls, and these are scenario data only.
-# - AZU-0058: LRS on purpose. A scenario that needs a second region gets it
-#   from artifactweave's mirror or shows the cloud's own (geo-replicated).
-# - AZU-0060: Microsoft-managed keys are enough for scenario data; a
-#   customer-managed key would add a Key Vault the tests never exercise.
+#   management calls.
+# - AZU-0058: replication_type defaults to LRS. A mirror member keeps one
+#   region's copy, and the mirror the other; a caller that wants Azure's own
+#   geo-replication asks for it (geo-replicated).
+# - AZU-0060: Microsoft-managed keys; a customer-managed key would add a Key
+#   Vault and its access policies to manage.
 # - AZU-0061: no infrastructure (double) encryption. Service-side encryption
 #   already applies, and the setting can only be chosen when the account is
 #   created.
@@ -29,7 +36,7 @@ resource "azurerm_storage_account" "blobs" {
   location                 = var.location
   account_kind             = "StorageV2"
   account_tier             = "Standard"
-  account_replication_type = "LRS"
+  account_replication_type = var.replication_type
   min_tls_version          = "TLS1_2"
 
   https_traffic_only_enabled      = true
@@ -48,9 +55,10 @@ resource "azurerm_storage_container" "blobs" {
   container_access_type = "private"
 }
 
-# A backstop for runs that stop before cleaning up: abandoned temporary
-# blobs. Uncommitted blocks are not blobs; Azure discards them after seven
-# days on its own.
+# Backstops for runs that stop before cleaning up: abandoned temporary blobs,
+# and the caller's expiring prefixes. Uncommitted blocks are not blobs; Azure
+# discards them after seven days on its own. The rules keep this order; the
+# tests address them by position.
 resource "azurerm_storage_management_policy" "cleanup" {
   storage_account_id = azurerm_storage_account.blobs.id
 
@@ -59,7 +67,7 @@ resource "azurerm_storage_management_policy" "cleanup" {
     enabled = true
     filters {
       blob_types   = ["blockBlob"]
-      prefix_match = ["${var.container}/${var.store_prefix}_uploads/"]
+      prefix_match = ["${var.container}/${local.store_prefix}_uploads/"]
     }
     actions {
       base_blob {
@@ -67,15 +75,34 @@ resource "azurerm_storage_management_policy" "cleanup" {
       }
     }
   }
+
+  dynamic "rule" {
+    for_each = var.expiring_prefixes
+    content {
+      # Rule names take letters, digits and hyphens only.
+      name    = "expire-${trim(replace(rule.key, "/[^A-Za-z0-9]+/", "-"), "-")}"
+      enabled = true
+      filters {
+        blob_types   = ["blockBlob"]
+        prefix_match = ["${var.container}/${rule.key}"]
+      }
+      actions {
+        base_blob {
+          delete_after_days_since_modification_greater_than = rule.value
+        }
+      }
+    }
+  }
 }
 
-# Storage Blob Data Contributor covers reading, writing and deleting blobs
-# and generating user delegation keys (for SAS and presigned URLs). The keys
-# of var.principals are static names, so for_each plans before the principal
-# IDs are known.
+# Storage Blob Data Contributor covers reading, listing, writing and deleting
+# blobs and generating user delegation keys (for SAS and presigned URLs),
+# and nothing on the account itself. The keys of var.principals are static
+# names, so for_each plans before the principal IDs are known.
 resource "azurerm_role_assignment" "app" {
   for_each             = var.principals
   scope                = azurerm_storage_account.blobs.id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = each.value
+  principal_id         = each.value.principal_id
+  principal_type       = each.value.principal_type
 }

@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.9"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -12,15 +12,10 @@ terraform {
   }
 }
 
-# Credentials are your own AWS CLI login (`aws login`), or the deployer's in a
-# scenario run. The Makefile refuses to plan or apply unless that login's
-# account holds the delegated zone. The provider's region is the primary;
-# each bucket in modules/aws/storage names its own.
+# Credentials come from the AWS SDK chain (an `aws login` session, a CI
+# role), and the account is theirs. Every bucket names its own region (the
+# per-resource region of the AWS provider 6), so this one provider serves
+# all the members; its own region is the first member's.
 provider "aws" {
-  region = var.primary_region
-  default_tags {
-    tags = {
-      managed-by = "artifactweave"
-    }
-  }
+  region = var.regions[0]
 }

@@ -33,9 +33,6 @@ here="$root/deploy/platform/terraform"
 action=${1:?usage: scenario-ci.sh apply|test|destroy|reap|check-clean}
 : "${CLOUD:?CLOUD is required}"
 now=$(date +%s)
-# Unlabelled resources (load balancers on GCP) are matched by this name
-# prefix; scenarios name everything awscn-<instance>-…
-prefix=awscn-
 # A prefixed resource with no live state is only reaped once it is this old,
 # so a run that is still applying, and has not written its state yet, keeps
 # its resources.
@@ -48,10 +45,24 @@ summary() {
 
 utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-%m-%dT%H:%M:%SZ; }
 
+# NAME_PREFIX starts every name a scenario run gives its resources: each
+# scenario's ci-vars.sh sets TF_VAR_name="${NAME_PREFIX}${INSTANCE}". On AWS
+# it is artifactweave-awscn-, because the deployer may manage only
+# artifactweave-* buckets; elsewhere awscn-, by which reap finds the
+# unlabelled GCP load-balancer pieces.
 case $CLOUD in
-gcp) : "${PLATFORM_GCP_STATE_BUCKET:?}" "${PLATFORM_GCP_PROJECT:?}" ;;
-azure) : "${PLATFORM_AZURE_STATE_ACCOUNT:?}" "${PLATFORM_AZURE_RESOURCE_GROUP:?}" ;;
-aws) : "${PLATFORM_AWS_STATE_BUCKET:?}" "${PLATFORM_AWS_REGION:?}" ;;
+gcp)
+  : "${PLATFORM_GCP_STATE_BUCKET:?}" "${PLATFORM_GCP_PROJECT:?}"
+  NAME_PREFIX=awscn-
+  ;;
+azure)
+  : "${PLATFORM_AZURE_STATE_ACCOUNT:?}" "${PLATFORM_AZURE_RESOURCE_GROUP:?}"
+  NAME_PREFIX=awscn-
+  ;;
+aws)
+  : "${PLATFORM_AWS_STATE_BUCKET:?}" "${PLATFORM_AWS_REGION:?}"
+  NAME_PREFIX=artifactweave-awscn-
+  ;;
 *)
   echo "unknown cloud: $CLOUD" >&2
   exit 1
@@ -321,7 +332,7 @@ reap() {
       [ "$kind" = backend-buckets ] && scope=
       while IFS=$'\t' read -r name created; do
         [ -n "$name" ] || continue
-        inst=${name#"$prefix"}
+        inst=${name#"$NAME_PREFIX"}
         in_scope "$inst" || continue
         local owned=
         for l in $live; do [[ $inst == "$l"* ]] && owned=1; done
@@ -336,7 +347,7 @@ reap() {
       done < <(
         # shellcheck disable=SC2086
         gcloud compute "$kind" list $scope --project "$PLATFORM_GCP_PROJECT" \
-          --filter="name~^$prefix" --format='value(name,creationTimestamp)' 2>/dev/null || true
+          --filter="name~^$NAME_PREFIX" --format='value(name,creationTimestamp)' 2>/dev/null || true
       )
     done
     ;;

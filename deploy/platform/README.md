@@ -19,7 +19,7 @@ applied through the JFrog Terraform providers.
 | Scenario | AWS | GCP | Azure |
 |---|---|---|---|
 | `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
-| `multi-region`: two regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
+| `multi-region`: regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
 | `geo-replicated`: one store with the cloud's own replication | [available](terraform/aws/geo-replicated/README.md) | [available](terraform/gcp/geo-replicated/README.md) | [available](terraform/azure/geo-replicated/README.md) |
 | `cdn`: a store behind CloudFront, Cloud CDN or Front Door | planned (#132) | planned (#133) | planned (#134) |
 
@@ -30,10 +30,15 @@ conformance tests run against. An operator's `make platform-apply` grants the bo
 conformance identity; a CI run applies them as the deployer instead (their `ci-vars.sh`).
 Every scenario needs its cloud's bootstrap applied first ([`deploy/ci`](../ci/README.md)).
 
-The `multi-region` scenarios build their stores from the child modules in
-[`terraform/modules`](terraform/modules): one private bucket or storage account per call,
-with its security invariants tested once in the module's own `tests/`. The other scenarios
-move onto the same modules with the scenario contract v2 (epic #189).
+The `multi-region` scenarios follow the scenario contract v2 (decision 0030): they compose
+the storage modules in [`terraform/modules`](terraform/modules), one private bucket or storage
+account per call with its security invariants tested once in the module's own `tests/`; every
+lab value is an input; and each README, written from
+[`SCENARIO-TEMPLATE.md`](SCENARIO-TEMPLATE.md), shows the configuration its example inputs
+render, which a test keeps true. To use one, copy its directory with `terraform/modules/<cloud>/`
+and its lock file, or source the modules from this repository at a release; the README's
+"Getting the code" has the line. The `single-bucket` and `geo-replicated` scenarios move onto
+the same contract with epic #189 (#184, #185, #186).
 
 Every scenario runs locally the same way, from its own `artifactweave_config` output (below).
 The `geo-replicated` READMEs cover how the cloud's replica relates to artifactweave and how to
@@ -45,7 +50,10 @@ Every scenario is a Terraform root with a Makefile built on
 [`deploy/ci/scenario.mk`](../ci/scenario.mk), which takes the lab's values from
 [`deploy/ci/lab.mk`](../ci/lab.mk) and runs the cloud's guard first: on AWS, that the CLI is
 signed in to the account holding the lab's zone; on Azure, that the CLI is on the lab's
-subscription. From the scenario's directory, `make help` lists its targets; from the
+subscription. `plan`, `apply` and `destroy` pass the scenario's own inputs from its Makefile
+and the lab's from [`deploy/ci/lab-vars.sh`](../ci/lab-vars.sh), resolved with your CLI: the
+account scope, the bootstrap's conformance identity as the app principal, on Azure you as an
+additional principal, and `force_destroy`. From the scenario's directory, `make help` lists its targets; from the
 repository root, `make platform-<target> SCENARIO=<cloud>/<scenario>` runs the same target:
 
 ```bash
