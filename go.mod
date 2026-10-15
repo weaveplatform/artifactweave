@@ -10,19 +10,19 @@ tool (
 require (
 	cloud.google.com/go/storage v1.69.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.14.1
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.8.2
 	github.com/ProtonMail/go-crypto v1.5.2
 	github.com/aws/aws-sdk-go-v2 v1.47.3
 	github.com/aws/aws-sdk-go-v2/config v1.33.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.9
-	github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign v1.12.5
+	github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign v1.12.6
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.114.3
 	github.com/aws/smithy-go v1.28.5
 	github.com/cucumber/godog v0.16.0
 	github.com/getkin/kin-openapi v0.150.0
-	github.com/go-chi/chi/v5 v5.4.0
-	github.com/go-jose/go-jose/v4 v4.1.5
+	github.com/go-chi/chi/v5 v5.5.0
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/google/go-cmp v0.7.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/client v0.6.2
@@ -36,7 +36,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sys v0.49.0
-	google.golang.org/api v0.303.0
+	google.golang.org/api v0.304.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.60.1
 )
@@ -90,7 +90,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/ebitengine/purego v0.11.1 // indirect
-	github.com/envoyproxy/go-control-plane/envoy v1.39.0 // indirect
+	github.com/envoyproxy/go-control-plane/envoy v1.40.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -162,7 +162,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.47.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.47.0 // indirect
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
-	golang.org/x/exp v0.0.0-20261013213113-2ab7f3cbc5fb // indirect
+	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/image v0.47.0 // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.61.0 // indirect
