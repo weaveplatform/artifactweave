@@ -25,6 +25,9 @@ resource "google_storage_bucket" "blobs" {
   storage_class               = "STANDARD"
   uniform_bucket_level_access = true
   public_access_prevention    = "enforced"
+  # Scenario runs (platform-scenarios.yml) label the bucket with the
+  # scenario, the instance and expires-at, which reap matches.
+  labels = var.scenario_labels
   # Acceptance data only: destroy removes the objects with the bucket.
   force_destroy = true
 
@@ -57,15 +60,23 @@ resource "google_storage_bucket" "blobs" {
   }
 }
 
-# The data-plane service account gcp/bootstrap created and GitHub's
-# cloud-conformance environment acts as.
+# The service account artifactweave runs as. Locally that is the data-plane
+# account gcp/bootstrap created, which GitHub's cloud-conformance environment
+# also acts as. A scenario run names the deployer instead: it applies this
+# root and runs artifactweave in the same job, and it cannot read service
+# accounts, so the lookup is skipped when the email is given.
 data "google_service_account" "conformance" {
+  count      = var.app_service_account == "" ? 1 : 0
   account_id = var.conformance_service_account
+}
+
+locals {
+  app_service_account = var.app_service_account != "" ? var.app_service_account : data.google_service_account.conformance[0].email
 }
 
 # Object admin on this bucket only: create, read, compose and delete objects.
 resource "google_storage_bucket_iam_member" "app" {
   bucket = google_storage_bucket.blobs.name
   role   = "roles/storage.objectAdmin"
-  member = "serviceAccount:${data.google_service_account.conformance.email}"
+  member = "serviceAccount:${local.app_service_account}"
 }

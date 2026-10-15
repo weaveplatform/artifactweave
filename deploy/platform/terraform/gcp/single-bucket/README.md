@@ -99,17 +99,22 @@ fails when it is stale.
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
+| app\_service\_account | Email of the service account artifactweave runs as and that gets object rights on the bucket. Empty uses conformance\_service\_account; scenario runs pass the deployer. | `string` | `""` | no |
 | conformance\_service\_account | Account ID of the data-plane service account gcp/bootstrap created; it gets object rights on this bucket. | `string` | `"artifactweave-conformance"` | no |
 | name | Prefix for the bucket name. | `string` | `"artifactweave-acc"` | no |
 | project\_id | Project that holds the acceptance bucket (the bootstrap's lab project). | `string` | `"project-0c0b2d7a-9ad7-4221-9a8"` | no |
 | region | Location of the bucket. | `string` | `"europe-west2"` | no |
+| scenario\_labels | Labels for the bucket. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches. | `map(string)` | `{}` | no |
 | store\_prefix | Object prefix the local container writes under (blob.gcs.prefix). | `string` | `"local/"` | no |
 
 ### Outputs
 
 | Name | Description |
 | ---- | ----------- |
+| artifactweave\_config | The blob section of artifactweave.yaml for this bucket, signing download URLs as the app service account. |
 | bucket | Bucket for blob.gcs.bucket and ARTIFACTWEAVE\_TEST\_GCS\_BUCKET. |
-| service\_account | The bootstrap's conformance service account, for blob.gcs.google\_access\_id and ARTIFACTWEAVE\_TEST\_GCS\_ACCESS\_ID. |
+| expires\_at | The expires-at label (epoch seconds) a scenario run set, read by reap; empty outside scenario runs. |
+| service\_account | The service account artifactweave runs as (the bootstrap's conformance account unless app\_service\_account names another), for blob.gcs.google\_access\_id and ARTIFACTWEAVE\_TEST\_GCS\_ACCESS\_ID. |
+| storage\_host | Host a downloadRedirect repository's signed URLs point at. |
 | store\_prefix | Object prefix the local container writes under (blob.gcs.prefix). |
 <!-- END_TF_DOCS -->

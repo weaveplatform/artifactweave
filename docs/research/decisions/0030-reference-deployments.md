@@ -66,8 +66,14 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
 **The scenario contract.** Every scenario root has:
 - a README whose inputs and outputs terraform-docs injects between `BEGIN_TF_DOCS` markers,
   with a cost note and security notes;
-- an output rendering the `artifactweave.yaml` the scenario needs, so the reference shows
-  the exact server configuration;
+- an `artifactweave_config` output rendering the `blob` section of the `artifactweave.yaml`
+  the scenario needs, so the reference shows the exact server configuration, plus a
+  `storage_host` output (where a `downloadRedirect` repository's signed URLs point) and an
+  `expires_at` output (the instance's `expires-at` label, which `reap` reads from state);
+- a `ci-vars.sh` that sets the Terraform variables a CI run passes, because the deployer
+  applies in CI where an operator applies on a workstation (for `single-bucket`: the
+  deployer as the identity artifactweave runs as, Azure's scenarios resource group, no
+  provider registration, the instance's labels);
 - `tests/*.tftest.hcl` with `mock_provider`, asserting the scenario's security invariants
   (examples: public access blocked; CloudFront origin access control; `cloud-cdn-fill`
   limited to read; Front Door `UseQueryString` and a cache-expiry cap; empty origin paths);
@@ -151,9 +157,9 @@ its release, rather than through third-party actions. It walks the roots it find
 `--recursive` from the repository root, which would also descend into worktrees and tool
 caches.
 
-**Real-cloud runs.** `platform-scenarios.yml` runs only on `workflow_dispatch`, under the
-`cloud-platform` environment. Its inputs are `cloud`, `scenario`, `instance` and an
-`action`:
+**Real-cloud runs.** `platform-scenarios.yml` runs on `workflow_dispatch`, under the
+`cloud-platform` environment. Its inputs are `cloud`, `scenario`, `instance`, an `action`
+and `ttl_minutes` (how long until an applied instance's `expires-at`):
 
 | Action | Does |
 |---|---|
@@ -164,6 +170,21 @@ caches.
 
 - `concurrency` is keyed on cloud, scenario and instance, with `cancel-in-progress: false`,
   so an apply is never cut off halfway.
+- One driver, `deploy/platform/terraform/scenario-ci.sh`, runs every action. Each action
+  works on a fresh copy of the scenario with a generated backend for the instance's state,
+  so nothing carries over between invocations except that state, and a destroy finds what a
+  separate apply left exactly as a later dispatch does. A destroy deletes the emptied state.
+- `reap` reads each state's `expires_at` output and destroys the expired instances, each in
+  its own process so a failed destroy never goes on to delete its state. It then deletes
+  resources that outlived their state: those labelled with a passed `expires-at`, and
+  unlabelled ones carrying the `awscn-` name prefix once they are two hours old and belong
+  to no live instance, so a run still applying keeps its resources.
+- A dispatch only finds workflows on the default branch, so a pull request that changes the
+  workflow, the driver, `test/platform` or a `single-bucket` scenario runs a proof instead,
+  behind the same approval: for each cloud, `test`, an `apply` followed by a `destroy` from
+  the remote state alone, an instance applied already expired and a `reap` that removes it,
+  then a check that nothing of the run remains. Pull requests from forks get no OIDC token
+  and do not run.
 - `test/platform` is a Go suite of `_test.go` files only, gated on `ARTIFACTWEAVE_SCENARIO`
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.

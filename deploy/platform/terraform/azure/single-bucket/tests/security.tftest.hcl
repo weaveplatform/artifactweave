@@ -53,3 +53,41 @@ run "abandoned_uploads_expire" {
     error_message = "a management policy rule must delete what an interrupted conformance run leaves under conformance/"
   }
 }
+
+# A scenario run applies as the deployer: it uses the bootstrap's scenarios
+# resource group, grants no conformance identity (the deployer cannot read
+# the bootstrap's group), registers no providers and tags the account for
+# reap.
+run "scenario_run_stays_in_the_scenarios_group" {
+  command = plan
+
+  variables {
+    resource_group_name         = "artifactweave-scenarios-rg"
+    conformance_identity        = ""
+    register_resource_providers = false
+    scenario_labels = {
+      artifactweave-scenario = "single-bucket"
+      expires-at             = "1767225600"
+    }
+  }
+
+  assert {
+    condition     = length(azurerm_resource_group.this) == 0
+    error_message = "a scenario run must not create a resource group; the deployer's rights end at the scenarios group"
+  }
+
+  assert {
+    condition     = length(azurerm_role_assignment.conformance) == 0
+    error_message = "a scenario run must not look up or grant the conformance identity"
+  }
+
+  assert {
+    condition     = azurerm_storage_account.blobs.tags["expires-at"] == "1767225600"
+    error_message = "the account must carry the scenario tags reap matches"
+  }
+
+  assert {
+    condition     = output.expires_at == "1767225600"
+    error_message = "the expires_at output must carry the tag reap reads from state"
+  }
+}

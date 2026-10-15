@@ -112,6 +112,7 @@ fails when it is stale.
 | [azurerm_storage_management_policy.cleanup](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_management_policy) | resource |
 | [random_string.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
 | [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
+| [azurerm_resource_group.existing](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
 | [azurerm_user_assigned_identity.conformance](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/user_assigned_identity) | data source |
 
 ### Inputs
@@ -119,10 +120,13 @@ fails when it is stale.
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | bootstrap\_resource\_group | Resource group of azure/bootstrap, which holds the conformance identity. | `string` | `"artifactweave-bootstrap-rg"` | no |
-| conformance\_identity | Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account. | `string` | `"artifactweave-conformance"` | no |
+| conformance\_identity | Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account. Empty grants nothing beyond whoever applies (scenario runs, where the deployer applies and runs artifactweave). | `string` | `"artifactweave-conformance"` | no |
 | container | Blob container for blob.azure.container. | `string` | `"artifactweave"` | no |
 | location | Region of the resource group and storage account. | `string` | `"uksouth"` | no |
 | name | Prefix for the resource names. | `string` | `"artifactweave-acc"` | no |
+| register\_resource\_providers | Register Microsoft.Storage and Microsoft.ManagedIdentity. Scenario runs pass false: the deployer has no subscription-level rights, and the bootstrap's subscription has them registered already. | `bool` | `true` | no |
+| resource\_group\_name | An existing resource group to create the account in. Empty creates <name>-rg; scenario runs pass azure/bootstrap's scenarios group, where the deployer's rights end. | `string` | `""` | no |
+| scenario\_labels | Tags for the account (and the resource group when this root creates it). Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches. | `map(string)` | `{}` | no |
 | store\_prefix | Blob prefix the local container writes under (blob.azure.prefix). | `string` | `"local/"` | no |
 | subscription\_id | Subscription that holds the acceptance storage account. Nothing is created anywhere else. | `string` | `"c33dbc35-f86d-4b7c-a81e-2a33eb3f7946"` | no |
 
@@ -131,8 +135,11 @@ fails when it is stale.
 | Name | Description |
 | ---- | ----------- |
 | account | Storage account for blob.azure.account and ARTIFACTWEAVE\_TEST\_AZURE\_ACCOUNT. |
+| artifactweave\_config | The blob section of artifactweave.yaml for this account. It authenticates through the Azure SDK chain, so artifactweave acts as whoever runs it (an Entra ID login, a managed identity or a workload identity) and signs download URLs with a user delegation SAS. |
 | container | Container for blob.azure.container and ARTIFACTWEAVE\_TEST\_AZURE\_CONTAINER. |
+| expires\_at | The expires-at tag (epoch seconds) a scenario run set, read by reap; empty outside scenario runs. |
 | resource\_group | Resource group holding the account. |
+| storage\_host | Host a downloadRedirect repository's signed URLs point at. |
 | store\_prefix | Blob name prefix the local container writes under (blob.azure.prefix). |
 | subscription\_id | Subscription holding the account, which credentials.sh checks the CLI against. |
 <!-- END_TF_DOCS -->

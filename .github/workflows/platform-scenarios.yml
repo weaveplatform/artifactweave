@@ -1,0 +1,267 @@
+name: deploy | Platform scenarios
+
+# Applies, tests, destroys and reaps the reference deployments under
+# deploy/platform/terraform (decision 0030) on real clouds. Every cloud call
+# is made as the deployer identity the bootstraps trust, from the
+# cloud-platform environment, so the maintainer approves each run. Manual
+# dispatch only: a scenario costs money while it exists, and test destroys
+# what it applied in a step that always runs.
+#
+#   test     apply a fresh instance, run test/platform against it, destroy it
+#   apply    create an instance and leave it (for exploration); destroy it later
+#   destroy  destroy an instance from its remote state
+#   reap     destroy every instance of the cloud whose expires-at has passed,
+#            and resources that outlived their state
+#
+# Pull requests that change this workflow, the scenario driver, test/platform
+# or a single-bucket scenario run the same driver as a proof, behind the same
+# approval: for gcp and azure single-bucket, test, then an apply and a destroy
+# that finds only the remote state (as two separate dispatches would), then an
+# instance that has already expired and a reap that removes it, then a check
+# that nothing of the run remains. A dispatch only finds workflows on the
+# default branch, so this is how a change is proven before it merges. Pull
+# requests from forks get no OIDC token and do not run.
+on:
+  workflow_dispatch:
+    inputs:
+      cloud:
+        description: 'Cloud whose bootstrap trust and state store to use'
+        type: choice
+        options: [gcp, azure, aws]
+        required: true
+      scenario:
+        description: 'Scenario directory under deploy/platform/terraform/<cloud>'
+        type: string
+        default: single-bucket
+      action:
+        description: 'test, apply, destroy or reap'
+        type: choice
+        options: [test, apply, destroy, reap]
+        default: test
+      instance:
+        description: 'Instance name (a-z, 0-9, -). Defaults to r<run id> for test and apply; required for destroy'
+        type: string
+        required: false
+      ttl_minutes:
+        description: 'apply and test: minutes until expires-at, after which reap removes the instance'
+        type: string
+        default: '240'
+  pull_request:
+    paths:
+      - '.github/workflows/platform-scenarios.yml'
+      - 'deploy/platform/terraform/scenario-ci.sh'
+      - 'deploy/platform/terraform/*/single-bucket/**'
+      - 'test/platform/**'
+
+permissions:
+  contents: read
+
+env:
+  GOWORK: 'off'
+  TF_IN_AUTOMATION: '1'
+
+jobs:
+  plan:
+    name: 'Plan the runs'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      include: ${{ steps.matrix.outputs.include }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      # Inputs reach the shell through the environment, never interpolated
+      # into the script; scenario-ci.sh validates every name it is given.
+      - name: Build the matrix
+        id: matrix
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_ID: ${{ github.run_id }}
+          IN_CLOUD: ${{ inputs.cloud }}
+          IN_SCENARIO: ${{ inputs.scenario }}
+          IN_ACTION: ${{ inputs.action }}
+          IN_INSTANCE: ${{ inputs.instance }}
+          IN_TTL: ${{ inputs.ttl_minutes }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            if [ "$SAME_REPO" != true ]; then
+              include='[]'
+            else
+              include=$(jq -cn --arg tag "pr$PR-$RUN_ID" '[
+                {cloud: "gcp", scenario: "single-bucket", action: "prove", instance: "", ttl: "", run_tag: $tag,
+                 lock: "prove", title: "prove gcp/single-bucket"},
+                {cloud: "azure", scenario: "single-bucket", action: "prove", instance: "", ttl: "", run_tag: $tag,
+                 lock: "prove", title: "prove azure/single-bucket"}]')
+            fi
+          else
+            instance=$IN_INSTANCE
+            if [ -z "$instance" ] && { [ "$IN_ACTION" = test ] || [ "$IN_ACTION" = apply ]; }; then
+              instance="r$RUN_ID"
+            fi
+            if [ "$IN_ACTION" = destroy ] && [ -z "$instance" ]; then
+              echo "::error::destroy needs the instance to destroy"
+              exit 1
+            fi
+            lock="$IN_SCENARIO-$instance"
+            [ "$IN_ACTION" = reap ] && lock=reap
+            include=$(jq -cn --arg c "$IN_CLOUD" --arg s "$IN_SCENARIO" --arg a "$IN_ACTION" \
+              --arg i "$instance" --arg t "$IN_TTL" --arg l "$lock" \
+              '[{cloud: $c, scenario: $s, action: $a, instance: $i, ttl: $t, run_tag: "", lock: $l,
+                 title: ($a + " " + $c + "/" + $s + (if $i == "" then "" else " " + $i end))}]')
+          fi
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+          echo "$include" | jq .
+
+  run:
+    needs: plan
+    if: needs.plan.outputs.include != '[]'
+    name: ${{ matrix.title }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
+    # The clouds trust this environment's subject exactly, and the
+    # environment asks the maintainer to approve every run.
+    environment: cloud-platform
+    concurrency:
+      group: platform-${{ matrix.cloud }}-${{ matrix.lock }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      CLOUD: ${{ matrix.cloud }}
+      SCENARIO: ${{ matrix.scenario }}
+      INSTANCE: ${{ matrix.instance }}
+      TTL_MINUTES: ${{ matrix.ttl }}
+      ACTION: ${{ matrix.action }}
+      RUN_TAG: ${{ matrix.run_tag }}
+      PLATFORM_GCP_PROJECT: ${{ vars.PLATFORM_GCP_PROJECT }}
+      PLATFORM_GCP_STATE_BUCKET: ${{ vars.PLATFORM_GCP_STATE_BUCKET }}
+      PLATFORM_GCP_SERVICE_ACCOUNT: ${{ vars.PLATFORM_GCP_SERVICE_ACCOUNT }}
+      PLATFORM_AZURE_SUBSCRIPTION_ID: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+      PLATFORM_AZURE_RESOURCE_GROUP: ${{ vars.PLATFORM_AZURE_RESOURCE_GROUP }}
+      PLATFORM_AZURE_STATE_ACCOUNT: ${{ vars.PLATFORM_AZURE_STATE_ACCOUNT }}
+      CLOUDSDK_CORE_PROJECT: ${{ vars.PLATFORM_GCP_PROJECT }}
+      # Terraform's azurerm provider and backend exchange the job's OIDC
+      # token for the deployer themselves; az login below serves the CLI
+      # and artifactweave's Azure SDK chain.
+      ARM_USE_OIDC: 'true'
+      ARM_CLIENT_ID: ${{ vars.PLATFORM_AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      # The same pinned download as the quality gate's terraform job.
+      - name: Terraform (pinned)
+        env:
+          TF_VERSION: '1.16.4'
+          TF_SHA256: 'dc94af0eef1147718ad7c8daea792ed199e3e0492eec180d0adafa2a65a879df'
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/terraform.zip" \
+            "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+          echo "${TF_SHA256}  $RUNNER_TEMP/terraform.zip" | sha256sum -c -
+          unzip -q -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip"
+          echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
+
+      - name: Authenticate to Google Cloud as the deployer
+        if: matrix.cloud == 'gcp'
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.PLATFORM_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.PLATFORM_GCP_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Azure as the deployer
+        if: matrix.cloud == 'azure'
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.PLATFORM_AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+
+      # Dispatch: the one action asked for.
+      - name: ${{ matrix.action }}
+        if: matrix.action != 'prove'
+        run: deploy/platform/terraform/scenario-ci.sh "$ACTION"
+
+      - name: Destroy the test instance
+        if: always() && matrix.action == 'test'
+        run: deploy/platform/terraform/scenario-ci.sh destroy
+
+      # Pull request proof.
+      - name: 'Prove: test (apply, test/platform)'
+        if: matrix.action == 'prove'
+        env:
+          INSTANCE: ${{ matrix.run_tag }}-t
+          TTL_MINUTES: '120'
+        run: deploy/platform/terraform/scenario-ci.sh test
+
+      - name: 'Prove: destroy the test instance'
+        if: always() && matrix.action == 'prove'
+        env:
+          INSTANCE: ${{ matrix.run_tag }}-t
+        run: deploy/platform/terraform/scenario-ci.sh destroy
+
+      - name: 'Prove: apply, as one dispatch would'
+        if: matrix.action == 'prove'
+        env:
+          INSTANCE: ${{ matrix.run_tag }}-l
+          TTL_MINUTES: '120'
+        run: deploy/platform/terraform/scenario-ci.sh apply
+
+      - name: 'Prove: destroy from the remote state alone, as a later dispatch would'
+        if: matrix.action == 'prove'
+        env:
+          INSTANCE: ${{ matrix.run_tag }}-l
+        run: deploy/platform/terraform/scenario-ci.sh destroy
+
+      - name: 'Prove: apply an instance that has already expired'
+        if: matrix.action == 'prove'
+        env:
+          INSTANCE: ${{ matrix.run_tag }}-o
+          TTL_MINUTES: '-5'
+        run: deploy/platform/terraform/scenario-ci.sh apply
+
+      - name: 'Prove: reap removes it'
+        if: matrix.action == 'prove'
+        run: deploy/platform/terraform/scenario-ci.sh reap
+
+      - name: 'Prove: nothing of this run remains'
+        if: matrix.action == 'prove'
+        run: deploy/platform/terraform/scenario-ci.sh check-clean
+
+      # A failed proof step must not leave anything billable behind.
+      - name: 'Prove: clean up after a failure'
+        if: failure() && matrix.action == 'prove'
+        run: |
+          status=0
+          for suffix in t l o; do
+            INSTANCE="$RUN_TAG-$suffix" deploy/platform/terraform/scenario-ci.sh destroy || status=1
+          done
+          deploy/platform/terraform/scenario-ci.sh check-clean || status=1
+          exit "$status"
