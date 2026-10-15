@@ -17,10 +17,11 @@ const (
 	PostgreSQL
 )
 
-// Compiled is a query as SQL over the store's items, item_properties and
-// item_stats tables (internal/sqlstore migrations): the caller selects its item
-// columns FROM items, then appends " WHERE " + Where and Tail, binding
-// Args in order. Placeholders are "?"; a PostgreSQL caller rebinds them.
+// Compiled is a query as SQL over the store's tables (internal/sqlstore
+// migrations): the caller selects its columns FROM the domain's table,
+// items, builds or build_promotions, unaliased, then appends " WHERE " +
+// Where and Tail, binding Args in order. Placeholders are "?"; a
+// PostgreSQL caller rebinds them.
 type Compiled struct {
 	Where string
 	Tail  string
@@ -60,11 +61,21 @@ type compiler struct {
 	now  time.Time
 	args []any
 	b    strings.Builder
+	// primary is the domain of the found rows. alias maps each relation
+	// path a Joined reaches to its table alias, "" to the found row's
+	// table; nullable marks the aliases an outer join may leave null.
+	primary  rel
+	alias    map[string]string
+	nullable map[string]bool
+	seq      int
 }
 
 // Compile writes q as SQL for d. Every value is bound, never interpolated.
 func (q *Query) Compile(d Dialect, o Options) (Compiled, error) {
-	c := &compiler{d: d, now: o.now()}
+	c := &compiler{
+		d: d, now: o.now(), primary: q.Domain.rel(),
+		alias: map[string]string{"": q.Domain.table()}, nullable: map[string]bool{},
+	}
 	if q.Criteria == nil {
 		c.b.WriteString("1=1")
 	} else if err := c.node(q.Criteria); err != nil {
@@ -80,9 +91,14 @@ func (q *Query) Compile(d Dialect, o Options) (Compiled, error) {
 			dir = " DESC"
 		}
 		for _, f := range q.Sort.Fields {
-			c.b.WriteString(c.ordered(f))
+			k, _ := c.primary.fieldKind(string(f))
+			if c.primary == relItem {
+				c.b.WriteString(c.ordered(f))
+			} else {
+				c.b.WriteString(c.orderedRel(c.alias[""], c.primary, string(f), k))
+			}
 			c.b.WriteString(dir)
-			if fieldKinds[f] == kindTime {
+			if k == kindTime {
 				// NULL times sort as the smallest value, which SQLite does
 				// natively and PostgreSQL only when told.
 				if q.Sort.Desc {
@@ -94,7 +110,7 @@ func (q *Query) Compile(d Dialect, o Options) (Compiled, error) {
 			c.b.WriteString(", ")
 		}
 	}
-	c.b.WriteString("items.id ASC")
+	c.b.WriteString(c.alias[""] + ".id ASC")
 	offset, limit := q.Window(o)
 	switch {
 	case limit >= 0:
@@ -126,16 +142,27 @@ func (c *compiler) node(n Node) error {
 		c.field(n)
 		return nil
 	case *PropertyCriterion:
-		c.property(n)
+		c.property(relItem, "items", n)
 		return nil
 	case MSP:
-		c.msp(n)
+		c.msp(relItem, "items", n)
 		return nil
 	case *StatCriterion:
 		c.stat(n)
 		return nil
 	case RepoSet:
 		c.repoSet(n)
+		return nil
+	case *Joined:
+		return c.joined(n)
+	case *PathCriterion:
+		c.guarded(n.Path, n.rel, func() { c.pathField(n) })
+		return nil
+	case *PathProperty:
+		c.guarded(n.Path, n.rel, func() { c.pathProperty(n) })
+		return nil
+	case *PathMSP:
+		c.guarded(n.Path, n.rel, func() { c.msp(n.rel, c.alias[n.Path], n.MSP) })
 		return nil
 	}
 	return fmt.Errorf("%w: criteria node %T", ErrUnsupported, n)
@@ -164,7 +191,12 @@ var sqlOps = map[Op]string{
 	OpEq: " = ", OpNe: " <> ", OpGt: " > ", OpGte: " >= ", OpLt: " < ", OpLte: " <= ",
 }
 
-func (c *compiler) field(f *FieldCriterion) {
+func (c *compiler) field(f *FieldCriterion) { c.fieldOf("items", f) }
+
+// fieldOf writes a comparison of a field of the item at alias: the found
+// item, or one a relation path reaches.
+func (c *compiler) fieldOf(alias string, f *FieldCriterion) {
+	col := func(f Field) string { return onAlias(alias, columns[f]) }
 	k := fieldKinds[f.Field]
 	switch {
 	case k == kindType && f.Text == "any":
@@ -174,16 +206,12 @@ func (c *compiler) field(f *FieldCriterion) {
 			c.b.WriteString("1=0")
 		}
 	case k == kindType:
-		c.b.WriteString(columns[FieldType] + sqlOps[f.Op] + c.bind(f.Text))
+		c.b.WriteString(col(FieldType) + sqlOps[f.Op] + c.bind(f.Text))
 	case k == kindNumber:
-		c.b.WriteString(columns[f.Field] + sqlOps[f.Op] + c.bind(f.Number))
-	case k == kindTime && f.Op == OpBefore:
-		c.b.WriteString(columns[f.Field] + " < " + c.bind(f.Span.back(c.now).UnixMicro()))
-	case k == kindTime && f.Op == OpLast:
-		c.b.WriteString(columns[f.Field] + " > " + c.bind(f.Span.back(c.now).UnixMicro()))
+		c.b.WriteString(col(f.Field) + sqlOps[f.Op] + c.bind(f.Number))
 	case k == kindTime:
-		c.b.WriteString(columns[f.Field] + sqlOps[f.Op] + c.bind(f.Time.UnixMicro()))
-	case f.Field == FieldRepo && (f.Op == OpEq || f.Op == OpNe):
+		c.time(col(f.Field), f.Op, f.Time, f.Span)
+	case f.Field == FieldRepo && (f.Op == OpEq || f.Op == OpNe) && alias == "items":
 		// Spelled out on the stored key and cached flag so the natural-key
 		// index serves the CLI's most common criterion.
 		stored, cached := types.ResolveRepoKey(f.Text)
@@ -194,9 +222,22 @@ func (c *compiler) field(f *FieldCriterion) {
 			" AND items.cached = " + c.bind(cached) + ")")
 	case f.Op == OpEq || f.Op == OpNe:
 		// Equality ignores collation, and the plain column keeps its index.
-		c.text(columns[f.Field], f.Op, f.Text)
+		c.text(c.itemExpr(alias, f.Field), f.Op, f.Text)
 	default:
-		c.text(c.ordered(f.Field), f.Op, f.Text)
+		c.text(c.orderedOf(alias, f.Field), f.Op, f.Text)
+	}
+}
+
+// time writes a comparison of a time column, which holds Unix
+// microseconds, with a criterion's time or relative span.
+func (c *compiler) time(col string, op Op, t time.Time, s Span) {
+	switch op {
+	case OpBefore:
+		c.b.WriteString(col + " < " + c.bind(s.back(c.now).UnixMicro()))
+	case OpLast:
+		c.b.WriteString(col + " > " + c.bind(s.back(c.now).UnixMicro()))
+	default:
+		c.b.WriteString(col + sqlOps[op] + c.bind(t.UnixMicro()))
 	}
 }
 
@@ -263,20 +304,37 @@ func (c *compiler) text(expr string, op Op, v string) {
 // ordered is the expression a field compares and sorts by. PostgreSQL text
 // is compared byte by byte (COLLATE "C"), as SQLite and Go compare it;
 // otherwise the database's locale would reorder results between backends.
-func (c *compiler) ordered(f Field) string {
-	expr := columns[f]
-	if f == FieldRepo {
-		expr = repoExpr
-	}
+func (c *compiler) ordered(f Field) string { return c.orderedOf("items", f) }
+
+func (c *compiler) orderedOf(alias string, f Field) string {
+	expr := c.itemExpr(alias, f)
 	if c.d == PostgreSQL && (fieldKinds[f] == kindText || fieldKinds[f] == kindType) {
 		return expr + ` COLLATE "C"`
 	}
 	return expr
 }
 
-// property writes an EXISTS over the item's properties, NOT EXISTS for $ne
-// and $nmatch, so each property criterion is independent of the others.
-func (c *compiler) property(p *PropertyCriterion) {
+// itemExpr is the expression of an item field at alias; repo is the
+// reported key.
+func (c *compiler) itemExpr(alias string, f Field) string {
+	if f == FieldRepo {
+		return onAlias(alias, repoExpr)
+	}
+	return onAlias(alias, columns[f])
+}
+
+// onAlias moves an expression over the items table onto alias.
+func onAlias(alias, expr string) string {
+	if alias == "items" {
+		return expr
+	}
+	return strings.ReplaceAll(expr, "items.", alias+".")
+}
+
+// property writes an EXISTS over the properties of the row at alias, of
+// domain r, NOT EXISTS for $ne and $nmatch, so each property criterion is
+// independent of the others.
+func (c *compiler) property(r rel, alias string, p *PropertyCriterion) {
 	op, exists := p.Op, "EXISTS"
 	switch p.Op {
 	case OpNe:
@@ -284,16 +342,30 @@ func (c *compiler) property(p *PropertyCriterion) {
 	case OpNMatch:
 		op, exists = OpMatch, "NOT EXISTS"
 	}
-	c.b.WriteString(exists + " (SELECT 1 FROM item_properties p WHERE p.item_id = items.id")
+	c.b.WriteString(exists + " (SELECT 1 FROM " + propertyRows(r, alias))
 	c.propertyRow(p, op)
 	c.b.WriteByte(')')
+}
+
+// propertyRows selects, as p, the property rows of the row at alias.
+// Builds and modules share build_properties, the build's own at
+// module_position -1 (migration 0012).
+func propertyRows(r rel, alias string) string {
+	switch r {
+	case relBuild:
+		return "build_properties p WHERE p.build_id = " + alias + ".id AND p.module_position = -1"
+	case relModule:
+		return "build_properties p WHERE p.build_id = " + alias + ".build_id" +
+			" AND p.module_position = " + alias + ".position"
+	}
+	return "item_properties p WHERE p.item_id = " + alias + ".id"
 }
 
 // msp writes one EXISTS whose property row satisfies every criterion. A
 // negative operator is a condition on that row, and "*" there (any key or
 // value) leaves no row to satisfy it.
-func (c *compiler) msp(m MSP) {
-	c.b.WriteString("EXISTS (SELECT 1 FROM item_properties p WHERE p.item_id = items.id")
+func (c *compiler) msp(r rel, alias string, m MSP) {
+	c.b.WriteString("EXISTS (SELECT 1 FROM " + propertyRows(r, alias))
 	for _, p := range m {
 		if p.Op != OpNe && p.Op != OpNMatch {
 			c.propertyRow(p, p.Op)

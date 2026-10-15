@@ -27,6 +27,7 @@ const (
 	ScopeRepo                          // repo:<key>:<actions>
 	ScopeProject                       // project:<key>/<area>:<actions>
 	ScopeSystem                        // system:<area>[@<qualifier>]:<actions>
+	ScopeBuild                         // build:<build-info repo|*>[/<ant path>]:<actions>
 )
 
 // ScopeActions are the resource-scope action letters r w d a x s m, or all.
@@ -84,8 +85,10 @@ func parseScopeActions(s string) (ScopeActions, error) {
 
 // ScopeEntry is one space-separated element of a scope string. Which fields
 // are set depends on Kind: Names for groups and roles, Project for roles and
-// project scopes, Target for the repository (artifact, repo), the project
-// area or the system area, Path for an artifact ant path, Qualifier for the
+// project scopes, Target for the repository (artifact, build, repo), the
+// project area or the system area, Path for an artifact or build ant path
+// (a build's path is its document's, <name>/<number>-<started>.json),
+// Qualifier for the
 // part of a system scope after '@'.
 type ScopeEntry struct {
 	Kind      ScopeKind
@@ -187,6 +190,11 @@ func parseScopeEntry(t string) (ScopeEntry, error) {
 	switch kind {
 	case "artifact":
 		e.Kind = ScopeArtifact
+		e.Target, e.Path, _ = strings.Cut(middle, "/")
+	case "build":
+		// build:artifactory-build-info/<pattern>:r lets a non-admin run
+		// AQL builds queries (research 22 §1.3).
+		e.Kind = ScopeBuild
 		e.Target, e.Path, _ = strings.Cut(middle, "/")
 	case "repo":
 		e.Kind = ScopeRepo
@@ -303,12 +311,16 @@ func (e ScopeEntry) String() string {
 		return appliedPrefix + "groups:" + renderNames(e.Names)
 	case ScopeRoles:
 		return appliedPrefix + "roles:" + e.Project + ":" + renderNames(e.Names)
-	case ScopeArtifact:
+	case ScopeArtifact, ScopeBuild:
 		target := e.Target
 		if e.Path != "" {
 			target += "/" + e.Path
 		}
-		return "artifact:" + target + ":" + e.Actions.String()
+		kind := "artifact:"
+		if e.Kind == ScopeBuild {
+			kind = "build:"
+		}
+		return kind + target + ":" + e.Actions.String()
 	case ScopeRepo:
 		return "repo:" + e.Target + ":" + e.Actions.String()
 	case ScopeProject:
@@ -338,8 +350,8 @@ func (s Scope) IsAdmin() bool {
 
 // Narrows reports whether s grants nothing beyond parent, which is the rule
 // for issuing a token from another token or for a non-admin creating one:
-// scopes only narrow (decision 0005). Resource scopes (artifact, repo,
-// project) intersect the subject's applied permissions, so any applied entry
+// scopes only narrow (decision 0005). Resource scopes (artifact, build,
+// repo, project) intersect the subject's applied permissions, so any applied entry
 // covers them; system scopes grant capabilities the subject's permissions do
 // not, so only admin or a matching system scope covers them.
 func (s Scope) Narrows(parent Scope) bool {
@@ -378,7 +390,7 @@ func scopeCovers(p, e ScopeEntry) bool {
 		return false
 	}
 	switch e.Kind {
-	case ScopeArtifact:
+	case ScopeArtifact, ScopeBuild:
 		return (p.Target == "*" || p.Target == e.Target) && pathCovers(p.Path, e.Path)
 	case ScopeRepo:
 		return p.Target == "*" || p.Target == e.Target

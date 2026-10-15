@@ -26,6 +26,20 @@ compiler to SQL per dialect.
   reaches), `stat`, `module`, `artifact`, `dependency` and `item`. For example,
   `artifact.module.build.name` from items, and `module.artifact.item.name` from builds.
 - **`$msp`** works on item, module and build properties.
+- **How paths join**, as Artifactory's SQL joins its tables (research 22 §1.1):
+  - an item relates to the build artifacts and dependencies whose SHA-1 is its actual
+    SHA-1; files relate to their module, modules to their run, promotions to their run;
+  - each relation path is joined once per query, so every criterion on one path meets the
+    same row: `artifact.module.build.name` and `artifact.module.build.number` must hold for
+    one run, which is what the JFrog CLI's `--build` searches rely on;
+  - a path that reaches no row reaches a null row, as an outer join does. No criterion holds
+    on it, `$ne` and a negative property criterion included, but an `$or` alternative on
+    the found row can still match;
+  - a dependency's `name` is its id and its `scope` its scopes joined with `,`, as
+    Artifactory stores them.
+- **Builds and promotions rows** render `build.<field>` and `build.promotion.<field>` in
+  alphabetical order, leaving out empty values; every field is a default. A build's `repo`
+  is its project's build-info repository.
 - **`releases` and `release_artifacts`** depend on release bundles v1
   ([0023](0023-release-bundles-and-distribution.md)). Until that product serves them, they
   answer 400 naming the domain as unsupported.
@@ -77,8 +91,11 @@ resolve against the configured repositories before the query runs, on every engi
 - **Restrictions on non-admins.**
   - Without a scoped token, a non-admin may query only `items`, and must include `repo`,
     `path` and `name`.
-  - A token scoped `build:<pattern>:r` may query `builds`, and must include `name`,
-    `number` and `repo`.
+  - A token scoped `build:<pattern>:r` may query `builds` and `build.promotions`, and a
+    `builds` query must include `name`, `number` and `repo`. The rows are the runs, or the
+    promotions of runs, the caller may read under the build permission on the run's
+    document path ([0014](0014-build-info.md)), narrowed by the token's pattern on that
+    path. A build scope reaches no artifact.
   - Results honour each repository's include and exclude patterns.
 
 **Errors.**
@@ -202,6 +219,9 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 
 - The `builds` domain depends on build-info ([0014](0014-build-info.md)).
 - Sorting on secondary-domain fields is not supported, as in Artifactory.
+- Including fields of another domain in a `builds` or `build.promotions` result, which
+  Artifactory nests (`modules[].artifacts[].items[]`), is not served yet: such an include
+  answers 400 as unsupported. Criteria on those domains are served.
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
   locations, which is to verify against a live Artifactory.
@@ -214,6 +234,12 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - CLI-generated queries captured as fixtures and replayed, including `download_remote` for
   a remote's cache, and shared cases for remote, cache, nested and cyclic virtual keys
   under every operator.
+- Shared build fixtures (`pkg/aql/aqltest`) for every relation path in both directions,
+  the CLI's `--build` query shapes, and the `builds` and `build.promotions` domains, with
+  identical ordered rows from the reference evaluator, the in-memory store, SQLite and
+  PostgreSQL.
+- An acceptance round trip: `jf rt s --build` and `jf rt dl --build` find the files a
+  published build produced, and nothing else.
 - An acceptance round trip: `jf rt dl remote/*.jar` downloads a file seeded into the
   remote's cache.
 - Dry-run and real-run tests for both actions, including skipped items, and shared

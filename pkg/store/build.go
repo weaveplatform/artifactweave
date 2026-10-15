@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -78,6 +79,13 @@ type BuildStore interface {
 	FindArtifacts(ctx context.Context, c types.Checksums) ([]types.BuildFileRef, error)
 	// FindDependencies is FindArtifacts for dependencies.
 	FindDependencies(ctx context.Context, c types.Checksums) ([]types.BuildFileRef, error)
+
+	// Search runs an AQL builds or build.promotions query (decision
+	// 0012): the matching runs, or promotions with their runs, in the
+	// order aql.SelectBuilds returns them. A hit's run carries its own
+	// columns only, not its properties, modules or document. Relation
+	// paths reach items by checksum. ErrInvalid for an items query.
+	Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.BuildHit, error)
 
 	// PutRetention creates or replaces a build name's retention.
 	PutRetention(ctx context.Context, r types.BuildRetention) error

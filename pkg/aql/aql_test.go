@@ -62,7 +62,7 @@ func TestParseErrors(t *testing.T) {
 		"":                                                ErrEmpty,
 		" \n\t":                                           ErrEmpty,
 		`"items"`:                                         ErrSyntax,
-		`builds.find()`:                                   ErrUnsupported,
+		`releases.find()`:                                 ErrUnsupported,
 		`widgets.find()`:                                  ErrSyntax,
 		`items.update({})`:                                ErrUnsupported,
 		`items.search()`:                                  ErrSyntax,

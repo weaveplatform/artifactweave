@@ -2,7 +2,6 @@ package aql
 
 import (
 	"cmp"
-	"slices"
 	"strings"
 	"time"
 
@@ -25,33 +24,19 @@ type Hit struct {
 // sort keys), then offset and limit. Properties and statistics are dropped
 // unless the query includes them. It is the reference the SQL backends are
 // tested against; candidates must carry their properties and statistics.
+// Relation paths reach no builds here; SelectItems joins them.
 func Select(q *Query, o Options, candidates []Hit) []Hit {
-	now := o.now()
-	var out []Hit
-	for _, h := range candidates {
-		if q.Match(h, now) {
-			if !q.Properties() {
-				h.Properties = nil
-			}
-			if len(q.Stats()) == 0 {
-				h.Stats = nil
-			}
-			out = append(out, h)
-		}
-	}
-	slices.SortFunc(out, func(a, b Hit) int { return q.Compare(a.Item, b.Item) })
-	offset, limit := q.Window(o)
-	out = out[min(offset, len(out)):]
-	if limit >= 0 && limit < len(out) {
-		out = out[:limit]
-	}
-	return out
+	return SelectItems(q, o, &Corpus{Items: candidates})
 }
 
 // Match reports whether the hit's item, with its properties and statistics,
-// satisfies the criteria.
+// satisfies the criteria. Relation paths reach no rows here.
 func (q *Query) Match(h Hit, now time.Time) bool {
-	return q.Criteria == nil || match(q.Criteria, h, now)
+	if q.Criteria == nil {
+		return true
+	}
+	e := env{c: &Corpus{}, now: now, self: &row{rel: relItem, hit: &h}}
+	return e.eval(q.Criteria)
 }
 
 func match(n Node, h Hit, now time.Time) bool {

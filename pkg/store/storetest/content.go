@@ -20,7 +20,7 @@ func runContent(t *testing.T, newStore Factory) {
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
 	t.Run("ItemProperties", func(t *testing.T) { testItemProperties(t, newStore(t).Items()) })
 	t.Run("ItemStats", func(t *testing.T) { testItemStats(t, newStore(t).Items()) })
-	t.Run("ItemSearch", func(t *testing.T) { testItemSearch(t, newStore(t).Items()) })
+	t.Run("ItemSearch", func(t *testing.T) { testItemSearch(t, newStore(t)) })
 	t.Run("Uploads", func(t *testing.T) { testUploads(t, newStore(t).Uploads()) })
 	t.Run("Trash", func(t *testing.T) { testTrash(t, newStore(t).Trash()) })
 	t.Run("Packages", func(t *testing.T) { testPackages(t, newStore(t)) })

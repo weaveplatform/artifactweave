@@ -89,6 +89,9 @@ func (q *Query) resolve(n Node, repos Repositories) Node {
 			out[i] = q.resolve(c, repos)
 		}
 		return out
+	case *Joined:
+		criteria, _ := q.resolve(n.Criteria, repos).(And)
+		return &Joined{Criteria: criteria}
 	case *FieldCriterion:
 		if n.Field == FieldRepo {
 			return q.resolveRepo(n, repos)

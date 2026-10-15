@@ -67,6 +67,20 @@ Sources:
   (jfrog-client-go `artifactory/services/utils/aqlquerybuilder.go`, `buildClauseItems`).
 - **[D] `$msp`** (match on a single property) works on every domain that has properties:
   item, module and build (`aql-search-criteria`).
+- **[S] How Artifactory joins the domains.** Artifactory's open source edition, last
+  published in 2022 (mirrored at `github.com/knottnhupfer/artifactory-oss`, `master`), shows
+  the model behind the paths:
+  - **By SHA-1.** Items join build artifacts and dependencies on the item's actual SHA-1
+    (`AqlTableGraph`: `nodes.sha1_actual` to `build_artifacts.sha1` and
+    `build_dependencies.sha1`). The `sha256` fields of both are commented out of
+    `AqlPhysicalFieldEnum`.
+  - **One table per domain.** The SQL generator joins each table once, with outer joins, so
+    criteria on `artifact.module.build.name` and `artifact.module.build.number` meet on one
+    build. Each property criterion, by contrast, is its own subquery, which is why `$msp`
+    exists.
+  - **A dependency's name is its id.** `BuildStoreServiceImpl` stores
+    `dependency.getId()` as the dependency name and its scope set joined with `,` as the
+    scope; build-info dependencies carry an id, not a name.
 
 ### 1.2 Output, sorting and limits
 
@@ -92,6 +106,12 @@ Sources:
 - **[D] `?compact=true`** minifies the JSON. A `stream: true` request header switches the
   server to cursor reads in batches of 50,000 rows; the response shape is unchanged
   (`aql-query-execution`).
+- **[D, S] Builds rows** carry `build.<field>` keys, and promotions rows
+  `build.promotion.<field>`, as the `builds.find` example in `aql-query-output` shows. In the
+  open source edition every build and promotion field is a default result field
+  (`AqlPhysicalFieldEnum`), and result rows serialise their keys alphabetically and leave
+  out nulls (`AqlRestResult.Row`: Jackson `alphabetic = true`, `NON_NULL`). Fields of other
+  domains in an include nest under `modules`, `artifacts`, `items` and so on.
 - **[D] `virtual_repos`** needs `repo`, `path` and `name` in the result set. It must usually
   be requested, and it is added implicitly when the query targets a virtual repository
   (`aql-repository-queries`).
@@ -110,6 +130,11 @@ Sources:
   and must include `repo`, `path` and `name`. A scoped token with `build:<pattern>:r` may run
   `builds.find()`, and must include `name`, `number` and `repo`. A missing field logs "AQL
   minimal field expectation error".
+  - The pattern is a path in the build-info repository: `build:artifactory-build-info/**:r`
+    reaches every build and `build:artifactory-build-info/my-build/**:r` one build name
+    (`aql-query-execution`, quick reference).
+  - **[S]** The 2022 open source edition predates build scopes: it drops every row of a
+    domain other than items for a non-admin (`AqlRestResult.canRead`).
 - **[D] Repository patterns.** AQL results honour each repository's include and exclude
   patterns.
 

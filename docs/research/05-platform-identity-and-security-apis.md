@@ -243,6 +243,7 @@ at most 500 characters, `username` at most 255, `description` at most 1024.
 | `applied-permissions/groups:"g1","g 2"` | the union of the named groups' permissions |
 | `applied-permissions/roles:<project>:developer,"Project Admin"` | project roles |
 | `artifact:<repo or *>[/<ant path>]:<actions>` | actions `r,w,d,a,x,s,m` or `*` |
+| `build:<build-info repo or *>[/<ant path>]:<actions>` | the build resource, matched on a run's document path; `build:artifactory-build-info/**:r` lets a non-admin run AQL `builds.find()` (https://docs.jfrog.com/artifactory/docs/aql-query-execution, research 22 §1.3) |
 | `repo:<key>:r` | read a repository's configuration |
 | `project:<key>/members/users:r`, `project:<key>/members/groups:r`, `project:<key>/roles:r` | project reads |
 | `system:metrics:r`, `system:livelogs:r`, `system:identities:r|w`, `system:permissions:r`, `system:info:r`, `system:info/licenses:r`, `system:info/storage:r` | system scopes |
