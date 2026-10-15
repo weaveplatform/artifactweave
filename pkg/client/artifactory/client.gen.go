@@ -209,6 +209,33 @@ func (e BuildCleanupPolicyResponseItemType) Valid() bool {
 	}
 }
 
+// Defines values for BuildInfoType.
+const (
+	ANT     BuildInfoType = "ANT"
+	GENERIC BuildInfoType = "GENERIC"
+	GRADLE  BuildInfoType = "GRADLE"
+	IVY     BuildInfoType = "IVY"
+	MAVEN   BuildInfoType = "MAVEN"
+)
+
+// Valid indicates whether the value is a known member of the BuildInfoType enum.
+func (e BuildInfoType) Valid() bool {
+	switch e {
+	case ANT:
+		return true
+	case GENERIC:
+		return true
+	case GRADLE:
+		return true
+	case IVY:
+		return true
+	case MAVEN:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ChecksumPolicyType.
 const (
 	ClientChecksums          ChecksumPolicyType = "client-checksums"
@@ -1037,6 +1064,27 @@ func (e PomRepositoryReferencesCleanupPolicy) Valid() bool {
 	}
 }
 
+// Defines values for PromotionMessageLevel.
+const (
+	PromotionMessageLevelError   PromotionMessageLevel = "error"
+	PromotionMessageLevelInfo    PromotionMessageLevel = "info"
+	PromotionMessageLevelWarning PromotionMessageLevel = "warning"
+)
+
+// Valid indicates whether the value is a known member of the PromotionMessageLevel enum.
+func (e PromotionMessageLevel) Valid() bool {
+	switch e {
+	case PromotionMessageLevelError:
+		return true
+	case PromotionMessageLevelInfo:
+		return true
+	case PromotionMessageLevelWarning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PudDirectoryInfoStatus.
 const (
 	PudDirectoryInfoStatusError    PudDirectoryInfoStatus = "error"
@@ -1391,6 +1439,42 @@ const (
 func (e ExportRepositoryWithMetadataJSONBodyAction) Valid() bool {
 	switch e {
 	case Repository:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteBuildsParamsArtifacts.
+const (
+	DeleteBuildsParamsArtifactsN0 DeleteBuildsParamsArtifacts = 0
+	DeleteBuildsParamsArtifactsN1 DeleteBuildsParamsArtifacts = 1
+)
+
+// Valid indicates whether the value is a known member of the DeleteBuildsParamsArtifacts enum.
+func (e DeleteBuildsParamsArtifacts) Valid() bool {
+	switch e {
+	case DeleteBuildsParamsArtifactsN0:
+		return true
+	case DeleteBuildsParamsArtifactsN1:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DeleteBuildsParamsDeleteAll.
+const (
+	DeleteBuildsParamsDeleteAllN0 DeleteBuildsParamsDeleteAll = 0
+	DeleteBuildsParamsDeleteAllN1 DeleteBuildsParamsDeleteAll = 1
+)
+
+// Valid indicates whether the value is a known member of the DeleteBuildsParamsDeleteAll enum.
+func (e DeleteBuildsParamsDeleteAll) Valid() bool {
+	switch e {
+	case DeleteBuildsParamsDeleteAllN0:
+		return true
+	case DeleteBuildsParamsDeleteAllN1:
 		return true
 	default:
 		return false
@@ -2435,6 +2519,39 @@ type AdminLegacyErrorResponse struct {
 	} `json:"errors,omitempty"`
 }
 
+// AffectedIssue An issue in the tracker that the build relates to.
+type AffectedIssue struct {
+	// Aggregated Optional within this object. Whether the issue was collected from an earlier build rather than this one.
+	Aggregated *bool `json:"aggregated,omitempty"`
+
+	// Key Optional within this object. Issue key in the tracker, for example PROJ-123.
+	Key *string `json:"key,omitempty"`
+
+	// Summary Optional within this object. Issue title.
+	Summary *string `json:"summary,omitempty"`
+
+	// Url Optional within this object. Link to the issue.
+	Url *string `json:"url,omitempty"`
+}
+
+// Agent The CI server or tool that ran the build.
+type Agent struct {
+	// Name Optional within this object. Name of the CI server or tool, for example GitHub Actions or Jenkins.
+	Name *string `json:"name,omitempty"`
+
+	// Version Optional within this object. Version of that CI server or tool.
+	Version *string `json:"version,omitempty"`
+}
+
+// AllBuildsResponse Every build name the caller may read.
+type AllBuildsResponse struct {
+	// Builds Optional within this object. One entry per build name.
+	Builds *[]BuildSummary `json:"builds,omitempty"`
+
+	// Uri Optional within this object. Absolute URL of /api/build.
+	Uri *string `json:"uri,omitempty"`
+}
+
 // ApiKeyResponse The API key of the calling user. API keys reached end of life in Artifactory at the end of 2024; artifactweave never issues one.
 type ApiKeyResponse struct {
 	// ApiKey Optional within this object. The key value. Keys that clients recognise start with AKCp8 and are at least 73 characters long. artifactweave returns this field only from the shim responses that report no key exists, so it is never populated.
@@ -3015,6 +3132,30 @@ type ArchiveSearchResults struct {
 	Results *[]map[string]interface{} `json:"results,omitempty"`
 }
 
+// Artifact One artifact a module produced. It must already exist in Artifactory before the build is uploaded.
+type Artifact struct {
+	// Md5 Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Upload requires it to match the stored file.
+	Md5 *string `json:"md5,omitempty"`
+
+	// Name Optional within this object. File name, without the path.
+	Name *string `json:"name,omitempty"`
+
+	// OriginalDeploymentRepo Optional within this object. Key of the repository the file was first deployed to.
+	OriginalDeploymentRepo *string `json:"originalDeploymentRepo,omitempty"`
+
+	// Path Optional within this object. Repository-relative path of the file, including its name, without the repository key.
+	Path *string `json:"path,omitempty"`
+
+	// Sha1 Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Upload requires it to match the stored file.
+	Sha1 *string `json:"sha1,omitempty"`
+
+	// Sha256 Optional within this object. SHA-256 of the file, 64 lowercase hexadecimal characters.
+	Sha256 *string `json:"sha256,omitempty"`
+
+	// Type Optional within this object. File type, usually the extension, for example jar or tgz.
+	Type *string `json:"type,omitempty"`
+}
+
 // ArtifactDeleteFailure One artifact that could not be deleted while removing a repository.
 type ArtifactDeleteFailure struct {
 	// Message Required within this object. Why the artifact could not be deleted.
@@ -3138,6 +3279,27 @@ type BinariesSummary struct {
 	Optimization *string `json:"optimization,omitempty"`
 }
 
+// BuildAgent The build tool that produced the build's modules.
+type BuildAgent struct {
+	// Name Optional within this object. Name of the build tool, for example Maven, Gradle or Generic.
+	Name *string `json:"name,omitempty"`
+
+	// Version Optional within this object. Version of that build tool.
+	Version *string `json:"version,omitempty"`
+}
+
+// BuildArtifact One artifact of a build run, located in the repository that holds it.
+type BuildArtifact struct {
+	// Name Optional within this object. File name.
+	Name *string `json:"name,omitempty"`
+
+	// Path Optional within this object. Folder of the file inside the repository, without the name; . for the repository root.
+	Path *string `json:"path,omitempty"`
+
+	// Repo Optional within this object. Key of the repository holding the file.
+	Repo *string `json:"repo,omitempty"`
+}
+
 // BuildArtifactsSearchResult Download URIs of the artifacts a build produced.
 type BuildArtifactsSearchResult struct {
 	// Results Optional within this object. One entry per artifact.
@@ -3247,6 +3409,195 @@ type BuildDependencySearchResult struct {
 		// Uri Optional within this object. URI of the build run under /api/build.
 		Uri *string `json:"uri,omitempty"`
 	} `json:"results,omitempty"`
+}
+
+// BuildInfo A build-info document: one run of a build, with its modules, artifacts and dependencies. artifactweave stores the document as a JSON item in the build-info repository, at <name>/<number>-<started epoch milliseconds>.json (decision 0014).
+type BuildInfo struct {
+	// Agent Optional within this object. The CI server or tool that ran the build.
+	Agent *Agent `json:"agent,omitempty"`
+
+	// ArtifactoryPluginVersion Optional within this object. Version of the client or plugin that sent the document.
+	ArtifactoryPluginVersion *string `json:"artifactoryPluginVersion,omitempty"`
+
+	// ArtifactoryPrincipal Optional within this object. User that deployed the build's artifacts.
+	ArtifactoryPrincipal *string `json:"artifactoryPrincipal,omitempty"`
+
+	// BuildAgent Optional within this object. The build tool that produced the modules.
+	BuildAgent *BuildAgent `json:"buildAgent,omitempty"`
+
+	// BuildRetention Optional within this object. Retention settings to apply to the build name after upload.
+	BuildRetention *BuildRetention `json:"buildRetention,omitempty"`
+
+	// DurationMillis Optional within this object. Duration of the run in milliseconds.
+	DurationMillis *int64 `json:"durationMillis,omitempty"`
+
+	// Issues Optional within this object. Issue-tracker information collected for the run.
+	Issues *Issues `json:"issues,omitempty"`
+
+	// LicenseControl Optional within this object. License-check settings, stored and not acted on.
+	LicenseControl *LicenseControl `json:"licenseControl,omitempty"`
+
+	// Modules Optional within this object. Modules of the build.
+	Modules *[]BuildModule `json:"modules,omitempty"`
+
+	// Name Optional within this object. Build name. Together with number and started it identifies the run.
+	Name *string `json:"name,omitempty"`
+
+	// Number Optional within this object. Build number. Several runs may share it.
+	Number *string `json:"number,omitempty"`
+
+	// Properties Optional within this object. Free-form string properties of the run, for example environment variables the client chose to record.
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+
+	// Started Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+	Started *string `json:"started,omitempty"`
+
+	// Type Optional within this object. Legacy build type.
+	Type *BuildInfoType `json:"type,omitempty"`
+
+	// Url Optional within this object. Link to the run on the CI server.
+	Url *string `json:"url,omitempty"`
+
+	// Vcs Optional within this object. Version-control state the build was made from, one entry per repository.
+	Vcs *[]VcsInfo `json:"vcs,omitempty"`
+
+	// Version Optional within this object. Schema version of the document. The JFrog CLI does not send it.
+	Version *string `json:"version,omitempty"`
+}
+
+// BuildInfoType Optional within this object. Legacy build type.
+type BuildInfoType string
+
+// BuildInfoResponse One run's build-info document.
+type BuildInfoResponse struct {
+	// BuildInfo Optional within this object. The stored build-info document.
+	BuildInfo *BuildInfo `json:"buildInfo,omitempty"`
+
+	// Uri Optional within this object. Absolute URL of the run.
+	Uri *string `json:"uri,omitempty"`
+}
+
+// BuildModule One module of a build: a unit the build tool produced, with its artifacts and dependencies.
+type BuildModule struct {
+	// Artifacts Optional within this object. Artifacts the module produced.
+	Artifacts *[]Artifact `json:"artifacts,omitempty"`
+
+	// Dependencies Optional within this object. Dependencies the module consumed.
+	Dependencies *[]Dependency `json:"dependencies,omitempty"`
+
+	// Id Optional within this object. Module id in the build tool's notation. A module of type build names another build as <name>/<number>; clients follow such modules when searching a build's artifacts.
+	Id *string `json:"id,omitempty"`
+
+	// Properties Optional within this object. Free-form string properties of the module.
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+
+	// Type Optional within this object. Module type, for example generic, maven, gradle, docker, npm, go, python or build.
+	Type *string `json:"type,omitempty"`
+}
+
+// BuildNumber One run of a build.
+type BuildNumber struct {
+	// Started Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+	Started *string `json:"started,omitempty"`
+
+	// Uri Optional within this object. Path of the run relative to the build, a slash followed by the build number.
+	Uri *string `json:"uri,omitempty"`
+}
+
+// BuildPromotionRequest Changes a build run's status and optionally moves or copies its files. JFrog's definition marks ciUser, timestamp, copy, artifacts, dependencies and failFast required, but the JFrog CLI omits all but failFast and Artifactory applies defaults, so artifactweave requires none of them.
+type BuildPromotionRequest struct {
+	// Artifacts Optional within this object. Whether the run's artifacts are moved or copied. Defaults to true.
+	Artifacts *bool `json:"artifacts,omitempty"`
+
+	// CiUser Optional within this object. User of the CI server that requested the promotion, recorded with the status change. Omitted records the authenticated user.
+	CiUser *string `json:"ciUser,omitempty"`
+
+	// Comment Optional within this object. Free-text comment recorded with the status change.
+	Comment *string `json:"comment,omitempty"`
+
+	// Copy Optional within this object. When true, files are copied to targetRepo; when false they are moved. Defaults to false.
+	Copy *bool `json:"copy,omitempty"`
+
+	// Dependencies Optional within this object. Whether the run's dependencies are moved or copied. Defaults to false.
+	Dependencies *bool `json:"dependencies,omitempty"`
+
+	// DryRun Optional within this object. When true, reports what would happen without changing anything. Defaults to false.
+	DryRun *bool `json:"dryRun,omitempty"`
+
+	// FailFast Optional within this object. When true, the promotion stops at the first error; when false it continues and reports every error. Defaults to true; the JFrog CLI always sends it.
+	FailFast *bool `json:"failFast,omitempty"`
+
+	// Properties Optional within this object. Properties set on every promoted file, as a map from key to an array of values. They are set whether or not a targetRepo is given.
+	Properties *map[string]interface{} `json:"properties,omitempty"`
+
+	// Scopes Optional within this object. Dependency scopes to include; omitted means every scope. Scopes add to each other.
+	Scopes *[]string `json:"scopes,omitempty"`
+
+	// SourceRepo Optional within this object. Only files found in this repository are moved or copied. Omitted means any repository.
+	SourceRepo *string `json:"sourceRepo,omitempty"`
+
+	// Status Optional within this object. New status recorded for the run, for example staged or released.
+	Status *string `json:"status,omitempty"`
+
+	// TargetRepo Optional within this object. Repository the files are moved or copied to. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
+	TargetRepo *string `json:"targetRepo,omitempty"`
+
+	// Timestamp Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted records the time the request arrived.
+	Timestamp *string `json:"timestamp,omitempty"`
+}
+
+// BuildPromotionResponse The promotion report.
+type BuildPromotionResponse struct {
+	// Messages Optional within this object. One message per notable event. A promotion with no messages succeeded completely.
+	Messages *[]PromotionMessage `json:"messages,omitempty"`
+}
+
+// BuildRetention Retention settings recorded with the build at upload. They take effect like a retention request for the build name.
+type BuildRetention struct {
+	// BuildNumbersNotToBeDiscarded Optional within this object. Build numbers kept whatever the other settings say.
+	BuildNumbersNotToBeDiscarded *[]string `json:"buildNumbersNotToBeDiscarded,omitempty"`
+
+	// Count Optional within this object. Number of most recent runs to keep. Omitted or 0 keeps every run.
+	Count *int `json:"count,omitempty"`
+
+	// DeleteBuildArtifacts Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
+	DeleteBuildArtifacts *bool `json:"deleteBuildArtifacts,omitempty"`
+
+	// MinimumBuildDate Optional within this object. Runs started before this time, in Unix epoch milliseconds, are discarded. Omitted keeps runs of any age.
+	MinimumBuildDate *int64 `json:"minimumBuildDate,omitempty"`
+}
+
+// BuildRetentionRequest Retention settings for a build name. Setting them does not delete anything at once; discarding happens as runs are added or as the request is processed.
+type BuildRetentionRequest struct {
+	// BuildNumbersNotToBeDiscarded Optional within this object. Build numbers kept whatever the other settings say.
+	BuildNumbersNotToBeDiscarded *[]string `json:"buildNumbersNotToBeDiscarded,omitempty"`
+
+	// Count Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. Omitted keeps every run.
+	Count *json.Number `json:"count,omitempty"`
+
+	// DeleteBuildArtifacts Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
+	DeleteBuildArtifacts *bool `json:"deleteBuildArtifacts,omitempty"`
+
+	// MinimumBuildDate Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted keeps runs of any age.
+	MinimumBuildDate *string `json:"minimumBuildDate,omitempty"`
+}
+
+// BuildRunsResponse The runs of one build.
+type BuildRunsResponse struct {
+	// BuildsNumbers Optional within this object. One entry per run. A build number appears once per run, so it may repeat.
+	BuildsNumbers *[]BuildNumber `json:"buildsNumbers,omitempty"`
+
+	// Uri Optional within this object. Absolute URL of the build.
+	Uri *string `json:"uri,omitempty"`
+}
+
+// BuildSummary One build name in the list of all builds.
+type BuildSummary struct {
+	// LastStarted Optional within this object. Started timestamp of the build's most recent run, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+	LastStarted *string `json:"lastStarted,omitempty"`
+
+	// Uri Optional within this object. Path of the build relative to /api/build, a slash followed by the build name.
+	Uri *string `json:"uri,omitempty"`
 }
 
 // CertificateInfo A client certificate that remote repositories may present to upstreams through clientTlsCertificate.
@@ -3750,6 +4101,24 @@ type DatesSearchResult struct {
 	} `json:"results,omitempty"`
 }
 
+// DeleteBuildsRequest Selects runs of one build to delete.
+type DeleteBuildsRequest struct {
+	// BuildName Required within this object. Name of the build.
+	BuildName string `json:"buildName"`
+
+	// BuildNumbers Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, newest first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
+	BuildNumbers *[]string `json:"buildNumbers,omitempty"`
+
+	// DeleteAll Optional within this object. When true, every run of the build is deleted. Defaults to false.
+	DeleteAll *bool `json:"deleteAll,omitempty"`
+
+	// DeleteArtifacts Optional within this object. Whether the deleted runs' artifacts are deleted too. Defaults to false.
+	DeleteArtifacts *bool `json:"deleteArtifacts,omitempty"`
+
+	// Project Optional within this object. Key of the project that owns the build. Omitted means builds outside any project.
+	Project *string `json:"project,omitempty"`
+}
+
 // DeleteDirectoryTrashPropertyRequest Tuning for the trash can compaction task. Every field is optional and defaults as shown.
 type DeleteDirectoryTrashPropertyRequest struct {
 	// BatchSize Optional within this object. Records examined per database query. Defaults to 1000; must be positive.
@@ -3766,6 +4135,30 @@ type DeleteDirectoryTrashPropertyRequest struct {
 type DeleteDirectoryTrashPropertyResponse struct {
 	// Info Optional within this object. Human readable confirmation.
 	Info *string `json:"info,omitempty"`
+}
+
+// Dependency One dependency a module consumed.
+type Dependency struct {
+	// Id Optional within this object. Identifier of the dependency in its package type's notation, for example group:artifact:version.
+	Id *string `json:"id,omitempty"`
+
+	// Md5 Optional within this object. MD5 of the dependency, 32 lowercase hexadecimal characters.
+	Md5 *string `json:"md5,omitempty"`
+
+	// RequestedBy Optional within this object. Chains of module or dependency ids that pulled this dependency in, outermost last.
+	RequestedBy *[][]string `json:"requestedBy,omitempty"`
+
+	// Scopes Optional within this object. Scopes the dependency was used in, for example compile or test. Promotion can filter on them.
+	Scopes *[]string `json:"scopes,omitempty"`
+
+	// Sha1 Optional within this object. SHA-1 of the dependency, 40 lowercase hexadecimal characters.
+	Sha1 *string `json:"sha1,omitempty"`
+
+	// Sha256 Optional within this object. SHA-256 of the dependency, 64 lowercase hexadecimal characters.
+	Sha256 *string `json:"sha256,omitempty"`
+
+	// Type Optional within this object. File type, usually the extension.
+	Type *string `json:"type,omitempty"`
 }
 
 // DistributeArtifactRequest Legacy Bintray distribution request. Bintray was retired in 2021; artifactweave answers 501.
@@ -4098,6 +4491,21 @@ type ImportSettings struct {
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
+// Issues Issue-tracker information collected for the build.
+type Issues struct {
+	// AffectedIssues Optional within this object. Issues the build relates to.
+	AffectedIssues *[]AffectedIssue `json:"affectedIssues,omitempty"`
+
+	// AggregateBuildIssues Optional within this object. Whether issues from earlier builds were aggregated into this one.
+	AggregateBuildIssues *bool `json:"aggregateBuildIssues,omitempty"`
+
+	// AggregationBuildStatus Optional within this object. Status of the earlier build that aggregation stops at, for example Released.
+	AggregationBuildStatus *string `json:"aggregationBuildStatus,omitempty"`
+
+	// Tracker Optional within this object. The tracker the issues come from.
+	Tracker *Tracker `json:"tracker,omitempty"`
+}
+
 // ItemCreated Body returned with 201 after a deploy. It is `FileInfo` without the modification fields because the item was just created.
 type ItemCreated struct {
 	// Checksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
@@ -4291,6 +4699,24 @@ type LicenseBatchResult struct {
 
 	// Status Optional within this object. The overall HTTP-style status, 200 when every entry succeeded.
 	Status *int `json:"status,omitempty"`
+}
+
+// LicenseControl License-check settings recorded with the build. artifactweave stores them and does not act on them.
+type LicenseControl struct {
+	// AutoDiscover Optional within this object. Whether licenses were discovered automatically.
+	AutoDiscover *bool `json:"autoDiscover,omitempty"`
+
+	// IncludePublishedArtifacts Optional within this object. Whether the build's own artifacts were included in license checks.
+	IncludePublishedArtifacts *bool `json:"includePublishedArtifacts,omitempty"`
+
+	// LicenseViolationsRecipientsList Optional within this object. Space-separated addresses notified about violations.
+	LicenseViolationsRecipientsList *string `json:"licenseViolationsRecipientsList,omitempty"`
+
+	// RunChecks Optional within this object. Whether license checks were requested.
+	RunChecks *bool `json:"runChecks,omitempty"`
+
+	// ScopesList Optional within this object. Space-separated dependency scopes the checks covered.
+	ScopesList *string `json:"scopesList,omitempty"`
 }
 
 // LicenseSearchResult Items tagged with licence information. artifactweave stores licence tags as ordinary properties and this search reads them; automatic discovery is not supported.
@@ -4718,6 +5144,18 @@ type Probe struct {
 	// Code Required within this object. OK when the probe passes.
 	Code string `json:"code"`
 }
+
+// PromotionMessage One line of a promotion report.
+type PromotionMessage struct {
+	// Level Optional within this object. Severity of the message.
+	Level *PromotionMessageLevel `json:"level,omitempty"`
+
+	// Message Optional within this object. What happened to one file or to the run.
+	Message *string `json:"message,omitempty"`
+}
+
+// PromotionMessageLevel Optional within this object. Severity of the message.
+type PromotionMessageLevel string
 
 // PudDirectoryInfo Progress of the prune process within one blob store directory.
 type PudDirectoryInfo struct {
@@ -5460,6 +5898,15 @@ type SystemVersion struct {
 	Version string `json:"version"`
 }
 
+// Tracker The issue tracker the build's issues come from.
+type Tracker struct {
+	// Name Optional within this object. Name of the issue tracker, for example JIRA.
+	Name *string `json:"name,omitempty"`
+
+	// Version Optional within this object. Version of the issue tracker.
+	Version *string `json:"version,omitempty"`
+}
+
 // TrustedKey A stored trusted public key.
 type TrustedKey struct {
 	// Alias Optional within this object. The alias given on upload.
@@ -5621,6 +6068,21 @@ type UserLockPolicy struct {
 	LoginAttempts *int `json:"loginAttempts,omitempty"`
 }
 
+// VcsInfo Version-control state the build was made from.
+type VcsInfo struct {
+	// Branch Optional within this object. Branch name.
+	Branch *string `json:"branch,omitempty"`
+
+	// Message Optional within this object. Commit message of the revision.
+	Message *string `json:"message,omitempty"`
+
+	// Revision Optional within this object. Revision or commit id.
+	Revision *string `json:"revision,omitempty"`
+
+	// Url Optional within this object. Repository URL.
+	Url *string `json:"url,omitempty"`
+}
+
 // VersionSearchResult Versions found for the given Maven group and artifact, ordered newest first.
 type VersionSearchResult struct {
 	// Results Optional within this object. One entry per distinct version.
@@ -5704,6 +6166,18 @@ type ArchiveNotFound = ErrorResponse
 
 // ArchiveUnauthorized The Artifactory error envelope used by every /artifactory response.
 type ArchiveUnauthorized = ErrorResponse
+
+// ArtifactoryBuildsApiBadRequest The Artifactory error envelope used by every /artifactory response.
+type ArtifactoryBuildsApiBadRequest = ErrorResponse
+
+// ArtifactoryBuildsApiForbidden The Artifactory error envelope used by every /artifactory response.
+type ArtifactoryBuildsApiForbidden = ErrorResponse
+
+// ArtifactoryBuildsApiNotFound The Artifactory error envelope used by every /artifactory response.
+type ArtifactoryBuildsApiNotFound = ErrorResponse
+
+// ArtifactoryBuildsApiUnauthorized The Artifactory error envelope used by every /artifactory response.
+type ArtifactoryBuildsApiUnauthorized = ErrorResponse
 
 // ArtifactorySearchesApiBadRequest The Artifactory error envelope used by every /artifactory response.
 type ArtifactorySearchesApiBadRequest = ErrorResponse
@@ -5824,6 +6298,90 @@ type ExportRepositoryWithMetadataJSONBody struct {
 
 // ExportRepositoryWithMetadataJSONBodyAction defines parameters for ExportRepositoryWithMetadata.
 type ExportRepositoryWithMetadataJSONBodyAction string
+
+// GetAllBuildsParams defines parameters for GetAllBuilds.
+type GetAllBuildsParams struct {
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
+
+// UploadBuildParams defines parameters for UploadBuild.
+type UploadBuildParams struct {
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
+
+// AppendBuildJSONBody defines parameters for AppendBuild.
+type AppendBuildJSONBody = []BuildModule
+
+// AppendBuildParams defines parameters for AppendBuild.
+type AppendBuildParams struct {
+	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+	Started *string `form:"started,omitempty" json:"started,omitempty"`
+
+	// BuildRepo Optional query parameter. Key of the build-info repository holding the run. Omitted derives it from project.
+	BuildRepo *string `form:"buildRepo,omitempty" json:"buildRepo,omitempty"`
+
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
+
+// PromoteBuildParams defines parameters for PromoteBuild.
+type PromoteBuildParams struct {
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
+
+// RenameBuildParams defines parameters for RenameBuild.
+type RenameBuildParams struct {
+	// To Required query parameter. New name of the build. It must not name an existing build.
+	To string `form:"to" json:"to"`
+
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
+
+// ControlBuildRetentionParams defines parameters for ControlBuildRetention.
+type ControlBuildRetentionParams struct {
+	// Async Optional query parameter. When true, discarding runs in the background and the request returns at once. Defaults to true.
+	Async *bool `form:"async,omitempty" json:"async,omitempty"`
+}
+
+// DeleteBuildsParams defines parameters for DeleteBuilds.
+type DeleteBuildsParams struct {
+	// BuildNumbers Optional query parameter. Comma-separated build numbers to delete. Ignored when deleteAll is 1.
+	BuildNumbers *string `form:"buildNumbers,omitempty" json:"buildNumbers,omitempty"`
+
+	// Artifacts Optional query parameter. 1 also deletes the runs' artifacts; 0, the default, keeps them.
+	Artifacts *DeleteBuildsParamsArtifacts `form:"artifacts,omitempty" json:"artifacts,omitempty"`
+
+	// DeleteAll Optional query parameter. 1 deletes every run of the build; 0, the default, deletes only buildNumbers.
+	DeleteAll *DeleteBuildsParamsDeleteAll `form:"deleteAll,omitempty" json:"deleteAll,omitempty"`
+}
+
+// DeleteBuildsParamsArtifacts defines parameters for DeleteBuilds.
+type DeleteBuildsParamsArtifacts int
+
+// DeleteBuildsParamsDeleteAll defines parameters for DeleteBuilds.
+type DeleteBuildsParamsDeleteAll int
+
+// GetBuildRunsParams defines parameters for GetBuildRuns.
+type GetBuildRunsParams struct {
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
+
+// GetBuildInfoParams defines parameters for GetBuildInfo.
+type GetBuildInfoParams struct {
+	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+	Started *string `form:"started,omitempty" json:"started,omitempty"`
+
+	// Diff Optional query parameter. Another build number of the same build to compare with. artifactweave accepts it and returns the run without a comparison.
+	Diff *string `form:"diff,omitempty" json:"diff,omitempty"`
+
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
+}
 
 // CalculateCargoRepositoryMetadataParams defines parameters for CalculateCargoRepositoryMetadata.
 type CalculateCargoRepositoryMetadataParams struct {
@@ -7010,6 +7568,27 @@ type RestoreArchivedPackagesJSONRequestBody = ArchiveRestorePackagesRequest
 
 // ExportRepositoryWithMetadataJSONRequestBody defines body for ExportRepositoryWithMetadata for application/json ContentType.
 type ExportRepositoryWithMetadataJSONRequestBody ExportRepositoryWithMetadataJSONBody
+
+// UploadBuildJSONRequestBody defines body for UploadBuild for application/json ContentType.
+type UploadBuildJSONRequestBody = BuildInfo
+
+// UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody defines body for UploadBuild for application/vnd.org.jfrog.artifactory+json ContentType.
+type UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody = BuildInfo
+
+// AppendBuildJSONRequestBody defines body for AppendBuild for application/json ContentType.
+type AppendBuildJSONRequestBody = AppendBuildJSONBody
+
+// DeleteBuildsMultipleJSONRequestBody defines body for DeleteBuildsMultiple for application/json ContentType.
+type DeleteBuildsMultipleJSONRequestBody = DeleteBuildsRequest
+
+// PromoteBuildJSONRequestBody defines body for PromoteBuild for application/json ContentType.
+type PromoteBuildJSONRequestBody = BuildPromotionRequest
+
+// PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody defines body for PromoteBuild for application/vnd.org.jfrog.artifactory.build.PromotionRequest+json ContentType.
+type PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody = BuildPromotionRequest
+
+// ControlBuildRetentionJSONRequestBody defines body for ControlBuildRetention for application/json ContentType.
+type ControlBuildRetentionJSONRequestBody = BuildRetentionRequest
 
 // SetItemSha256ChecksumJSONRequestBody defines body for SetItemSha256Checksum for application/json ContentType.
 type SetItemSha256ChecksumJSONRequestBody = Sha256ChecksumRequest
@@ -8327,6 +8906,108 @@ type ClientInterface interface {
 	//
 	// Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
 	CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAllBuilds performs a GET /api/build (the `GetAllBuilds` operationId) request.
+	//
+	// Lists every build name the caller may read, with the start time of each build's most recent run.
+	GetAllBuilds(ctx context.Context, params *GetAllBuildsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadBuildWithBody performs a PUT /api/build (the `UploadBuild` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	UploadBuildWithBody(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadBuild performs a PUT /api/build (the `UploadBuild` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	UploadBuild(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody performs a PUT /api/build (the `UploadBuild` operationId) request.
+	// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type.
+	//
+	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AppendBuildWithBody performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+	AppendBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AppendBuild performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+	AppendBuild(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, body AppendBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBuildsMultipleWithBody performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+	DeleteBuildsMultipleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBuildsMultiple performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+	DeleteBuildsMultiple(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	PromoteBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PromoteBuild performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	PromoteBuild(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type.
+	//
+	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RenameBuild performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
+	//
+	// Renames every run of a build. Needs deploy and delete permission on the build.
+	RenameBuild(ctx context.Context, buildName string, params *RenameBuildParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ControlBuildRetentionWithBody performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	ControlBuildRetentionWithBody(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ControlBuildRetention performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	ControlBuildRetention(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteBuilds performs a DELETE /api/build/{buildName} (the `DeleteBuilds` operationId) request.
+	//
+	// Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.
+	DeleteBuilds(ctx context.Context, buildName string, params *DeleteBuildsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBuildRuns performs a GET /api/build/{buildName} (the `GetBuildRuns` operationId) request.
+	//
+	// Lists the runs of one build. Needs read permission on the build.
+	GetBuildRuns(ctx context.Context, buildName string, params *GetBuildRunsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBuildInfo performs a GET /api/build/{buildName}/{buildNumber} (the `GetBuildInfo` operationId) request.
+	//
+	// Returns one run's build-info document. Needs read permission on the build.
+	GetBuildInfo(ctx context.Context, buildName string, buildNumber string, params *GetBuildInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetBuildArtifacts performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
+	//
+	// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+	GetBuildArtifacts(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
@@ -11741,6 +12422,288 @@ func (c *Client) ExportRepositoryWithMetadata(ctx context.Context, body ExportRe
 // Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
 func (c *Client) CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateBowerIndexRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAllBuilds performs a GET /api/build (the `GetAllBuilds` operationId) request.
+//
+// Lists every build name the caller may read, with the start time of each build's most recent run.
+func (c *Client) GetAllBuilds(ctx context.Context, params *GetAllBuildsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAllBuildsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UploadBuildWithBody performs a PUT /api/build (the `UploadBuild` operationId) request,
+// with any type of body and a specified content type.
+//
+// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+func (c *Client) UploadBuildWithBody(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadBuildRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UploadBuild performs a PUT /api/build (the `UploadBuild` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+func (c *Client) UploadBuild(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadBuildRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody performs a PUT /api/build (the `UploadBuild` operationId) request.
+// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type.
+//
+// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+func (c *Client) UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadBuildRequestWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AppendBuildWithBody performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
+// with any type of body and a specified content type.
+//
+// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+func (c *Client) AppendBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAppendBuildRequestWithBody(c.Server, buildName, buildNumber, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AppendBuild performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+func (c *Client) AppendBuild(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, body AppendBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAppendBuildRequest(c.Server, buildName, buildNumber, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBuildsMultipleWithBody performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request,
+// with any type of body and a specified content type.
+//
+// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+func (c *Client) DeleteBuildsMultipleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBuildsMultipleRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBuildsMultiple performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+func (c *Client) DeleteBuildsMultiple(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBuildsMultipleRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
+// with any type of body and a specified content type.
+//
+// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+func (c *Client) PromoteBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteBuildRequestWithBody(c.Server, buildName, buildNumber, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PromoteBuild performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+func (c *Client) PromoteBuild(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteBuildRequest(c.Server, buildName, buildNumber, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type.
+//
+// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+func (c *Client) PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteBuildRequestWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(c.Server, buildName, buildNumber, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RenameBuild performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
+//
+// Renames every run of a build. Needs deploy and delete permission on the build.
+func (c *Client) RenameBuild(ctx context.Context, buildName string, params *RenameBuildParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRenameBuildRequest(c.Server, buildName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ControlBuildRetentionWithBody performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
+// with any type of body and a specified content type.
+//
+// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+func (c *Client) ControlBuildRetentionWithBody(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewControlBuildRetentionRequestWithBody(c.Server, buildName, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ControlBuildRetention performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+func (c *Client) ControlBuildRetention(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewControlBuildRetentionRequest(c.Server, buildName, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteBuilds performs a DELETE /api/build/{buildName} (the `DeleteBuilds` operationId) request.
+//
+// Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.
+func (c *Client) DeleteBuilds(ctx context.Context, buildName string, params *DeleteBuildsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteBuildsRequest(c.Server, buildName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBuildRuns performs a GET /api/build/{buildName} (the `GetBuildRuns` operationId) request.
+//
+// Lists the runs of one build. Needs read permission on the build.
+func (c *Client) GetBuildRuns(ctx context.Context, buildName string, params *GetBuildRunsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBuildRunsRequest(c.Server, buildName, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBuildInfo performs a GET /api/build/{buildName}/{buildNumber} (the `GetBuildInfo` operationId) request.
+//
+// Returns one run's build-info document. Needs read permission on the build.
+func (c *Client) GetBuildInfo(ctx context.Context, buildName string, buildNumber string, params *GetBuildInfoParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBuildInfoRequest(c.Server, buildName, buildNumber, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetBuildArtifacts performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
+//
+// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+func (c *Client) GetBuildArtifacts(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetBuildArtifactsRequest(c.Server, buildName, buildNumber, buildRepo)
 	if err != nil {
 		return nil, err
 	}
@@ -19379,6 +20342,804 @@ func NewCalculateBowerIndexRequest(server string, repoKey string) (*http.Request
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAllBuildsRequest constructs an http.Request for the GetAllBuilds method
+func NewGetAllBuildsRequest(server string, params *GetAllBuildsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUploadBuildRequest calls the generic UploadBuild builder with application/json body
+func NewUploadBuildRequest(server string, params *UploadBuildParams, body UploadBuildJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUploadBuildRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewUploadBuildRequestWithApplicationVndOrgJfrogArtifactoryPlusJSONBody calls the generic UploadBuild builder with application/vnd.org.jfrog.artifactory+json body
+func NewUploadBuildRequestWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(server string, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUploadBuildRequestWithBody(server, params, "application/vnd.org.jfrog.artifactory+json", bodyReader)
+}
+
+// NewUploadBuildRequestWithBody constructs an http.Request for the UploadBuild method, with any body, and a specified content type
+func NewUploadBuildRequestWithBody(server string, params *UploadBuildParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewAppendBuildRequest calls the generic AppendBuild builder with application/json body
+func NewAppendBuildRequest(server string, buildName string, buildNumber string, params *AppendBuildParams, body AppendBuildJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewAppendBuildRequestWithBody(server, buildName, buildNumber, params, "application/json", bodyReader)
+}
+
+// NewAppendBuildRequestWithBody constructs an http.Request for the AppendBuild method, with any body, and a specified content type
+func NewAppendBuildRequestWithBody(server string, buildName string, buildNumber string, params *AppendBuildParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "buildNumber", buildNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/append/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Started != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "started", *params.Started, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.BuildRepo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "buildRepo", *params.BuildRepo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBuildsMultipleRequest calls the generic DeleteBuildsMultiple builder with application/json body
+func NewDeleteBuildsMultipleRequest(server string, body DeleteBuildsMultipleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewDeleteBuildsMultipleRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewDeleteBuildsMultipleRequestWithBody constructs an http.Request for the DeleteBuildsMultiple method, with any body, and a specified content type
+func NewDeleteBuildsMultipleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/delete")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPromoteBuildRequest calls the generic PromoteBuild builder with application/json body
+func NewPromoteBuildRequest(server string, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPromoteBuildRequestWithBody(server, buildName, buildNumber, params, "application/json", bodyReader)
+}
+
+// NewPromoteBuildRequestWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody calls the generic PromoteBuild builder with application/vnd.org.jfrog.artifactory.build.PromotionRequest+json body
+func NewPromoteBuildRequestWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(server string, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPromoteBuildRequestWithBody(server, buildName, buildNumber, params, "application/vnd.org.jfrog.artifactory.build.PromotionRequest+json", bodyReader)
+}
+
+// NewPromoteBuildRequestWithBody constructs an http.Request for the PromoteBuild method, with any body, and a specified content type
+func NewPromoteBuildRequestWithBody(server string, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "buildNumber", buildNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/promote/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRenameBuildRequest constructs an http.Request for the RenameBuild method
+func NewRenameBuildRequest(server string, buildName string, params *RenameBuildParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/rename/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewControlBuildRetentionRequest calls the generic ControlBuildRetention builder with application/json body
+func NewControlBuildRetentionRequest(server string, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewControlBuildRetentionRequestWithBody(server, buildName, params, "application/json", bodyReader)
+}
+
+// NewControlBuildRetentionRequestWithBody constructs an http.Request for the ControlBuildRetention method, with any body, and a specified content type
+func NewControlBuildRetentionRequestWithBody(server string, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/retention/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Async != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteBuildsRequest constructs an http.Request for the DeleteBuilds method
+func NewDeleteBuildsRequest(server string, buildName string, params *DeleteBuildsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.BuildNumbers != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "buildNumbers", *params.BuildNumbers, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Artifacts != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "artifacts", *params.Artifacts, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.DeleteAll != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "deleteAll", *params.DeleteAll, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBuildRunsRequest constructs an http.Request for the GetBuildRuns method
+func NewGetBuildRunsRequest(server string, buildName string, params *GetBuildRunsParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBuildInfoRequest constructs an http.Request for the GetBuildInfo method
+func NewGetBuildInfoRequest(server string, buildName string, buildNumber string, params *GetBuildInfoParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "buildNumber", buildNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/build/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Started != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "started", *params.Started, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Diff != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "diff", *params.Diff, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetBuildArtifactsRequest constructs an http.Request for the GetBuildArtifacts method
+func NewGetBuildArtifactsRequest(server string, buildName string, buildNumber string, buildRepo string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "buildName", buildName, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "buildNumber", buildNumber, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam2 string
+
+	pathParam2, err = runtime.StyleParamWithOptions("simple", false, "buildRepo", buildRepo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/builds/buildArtifacts/%s/%s/%s", pathParam0, pathParam1, pathParam2)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -33379,6 +35140,130 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error)
 
+	// GetAllBuildsWithResponse performs a GET /api/build (the `GetAllBuilds` operationId) request.
+	//
+	// Lists every build name the caller may read, with the start time of each build's most recent run.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetAllBuildsWithResponse(ctx context.Context, params *GetAllBuildsParams, reqEditors ...RequestEditorFn) (*GetAllBuildsResponse, error)
+
+	// UploadBuildWithBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	UploadBuildWithBodyWithResponse(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
+
+	// UploadBuildWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	UploadBuildWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
+
+	// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
+	// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
+
+	// AppendBuildWithBodyWithResponse performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	AppendBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AppendBuildResponse, error)
+
+	// AppendBuildWithResponse performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+	AppendBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, body AppendBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*AppendBuildResponse, error)
+
+	// DeleteBuildsMultipleWithBodyWithResponse performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	DeleteBuildsMultipleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error)
+
+	// DeleteBuildsMultipleWithResponse performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+	DeleteBuildsMultipleWithResponse(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error)
+
+	// PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	PromoteBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
+
+	// PromoteBuildWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	PromoteBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
+
+	// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
+
+	// RenameBuildWithResponse performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
+	//
+	// Renames every run of a build. Needs deploy and delete permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	RenameBuildWithResponse(ctx context.Context, buildName string, params *RenameBuildParams, reqEditors ...RequestEditorFn) (*RenameBuildResponse, error)
+
+	// ControlBuildRetentionWithBodyWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	ControlBuildRetentionWithBodyWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error)
+
+	// ControlBuildRetentionWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	ControlBuildRetentionWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error)
+
+	// DeleteBuildsWithResponse performs a DELETE /api/build/{buildName} (the `DeleteBuilds` operationId) request.
+	//
+	// Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	DeleteBuildsWithResponse(ctx context.Context, buildName string, params *DeleteBuildsParams, reqEditors ...RequestEditorFn) (*DeleteBuildsResponse, error)
+
+	// GetBuildRunsWithResponse performs a GET /api/build/{buildName} (the `GetBuildRuns` operationId) request.
+	//
+	// Lists the runs of one build. Needs read permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetBuildRunsWithResponse(ctx context.Context, buildName string, params *GetBuildRunsParams, reqEditors ...RequestEditorFn) (*GetBuildRunsResponse, error)
+
+	// GetBuildInfoWithResponse performs a GET /api/build/{buildName}/{buildNumber} (the `GetBuildInfo` operationId) request.
+	//
+	// Returns one run's build-info document. Needs read permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetBuildInfoWithResponse(ctx context.Context, buildName string, buildNumber string, params *GetBuildInfoParams, reqEditors ...RequestEditorFn) (*GetBuildInfoResponse, error)
+
+	// GetBuildArtifactsWithResponse performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
+	//
+	// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetBuildArtifactsWithResponse(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*GetBuildArtifactsResponse, error)
+
 	// CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
 	// Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
@@ -37962,6 +39847,674 @@ func (r CalculateBowerIndexResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CalculateBowerIndexResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAllBuildsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AllBuildsResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAllBuildsResponse) GetJSON200() *AllBuildsResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAllBuildsResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetAllBuildsResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAllBuildsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAllBuildsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAllBuildsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAllBuildsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// UploadBuildResponse200Headers the declared response headers of an HTTP 200 response for UploadBuild
+type UploadBuildResponse200Headers struct {
+	XChecksumSha256 *string
+}
+
+type UploadBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *UploadBuildResponse200Headers
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r UploadBuildResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r UploadBuildResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r UploadBuildResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r UploadBuildResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadBuildResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UploadBuildResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type AppendBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r AppendBuildResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r AppendBuildResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r AppendBuildResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r AppendBuildResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r AppendBuildResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AppendBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AppendBuildResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AppendBuildResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteBuildsMultipleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteBuildsMultipleResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteBuildsMultipleResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteBuildsMultipleResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteBuildsMultipleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBuildsMultipleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBuildsMultipleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteBuildsMultipleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PromoteBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BuildPromotionResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PromoteBuildResponse) GetJSON200() *BuildPromotionResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PromoteBuildResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PromoteBuildResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PromoteBuildResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r PromoteBuildResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PromoteBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PromoteBuildResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PromoteBuildResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RenameBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r RenameBuildResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r RenameBuildResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r RenameBuildResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r RenameBuildResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r RenameBuildResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RenameBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RenameBuildResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RenameBuildResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ControlBuildRetentionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ControlBuildRetentionResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ControlBuildRetentionResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ControlBuildRetentionResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ControlBuildRetentionResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ControlBuildRetentionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ControlBuildRetentionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ControlBuildRetentionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ControlBuildRetentionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteBuildsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteBuildsResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteBuildsResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteBuildsResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteBuildsResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteBuildsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteBuildsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteBuildsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteBuildsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBuildRunsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BuildRunsResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBuildRunsResponse) GetJSON200() *BuildRunsResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetBuildRunsResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetBuildRunsResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetBuildRunsResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBuildRunsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBuildRunsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBuildRunsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBuildRunsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBuildInfoResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *BuildInfoResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBuildInfoResponse) GetJSON200() *BuildInfoResponse {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetBuildInfoResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetBuildInfoResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetBuildInfoResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBuildInfoResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBuildInfoResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBuildInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBuildInfoResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetBuildArtifactsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *[]BuildArtifact
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ArtifactoryBuildsApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactoryBuildsApiNotFound
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetBuildArtifactsResponse) GetJSON200() *[]BuildArtifact {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetBuildArtifactsResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetBuildArtifactsResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetBuildArtifactsResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetBuildArtifactsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetBuildArtifactsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetBuildArtifactsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetBuildArtifactsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -58015,6 +60568,238 @@ func (c *ClientWithResponses) CalculateBowerIndexWithResponse(ctx context.Contex
 	return ParseCalculateBowerIndexResponse(rsp)
 }
 
+// GetAllBuildsWithResponse performs a GET /api/build (the `GetAllBuilds` operationId) request.
+//
+// Lists every build name the caller may read, with the start time of each build's most recent run.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetAllBuildsWithResponse(ctx context.Context, params *GetAllBuildsParams, reqEditors ...RequestEditorFn) (*GetAllBuildsResponse, error) {
+	rsp, err := c.GetAllBuilds(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAllBuildsResponse(rsp)
+}
+
+// UploadBuildWithBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request,
+// with any type of body and a specified content type.
+//
+// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) UploadBuildWithBodyWithResponse(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
+	rsp, err := c.UploadBuildWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadBuildResponse(rsp)
+}
+
+// UploadBuildWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+func (c *ClientWithResponses) UploadBuildWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
+	rsp, err := c.UploadBuild(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadBuildResponse(rsp)
+}
+
+// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
+// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+func (c *ClientWithResponses) UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
+	rsp, err := c.UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadBuildResponse(rsp)
+}
+
+// AppendBuildWithBodyWithResponse performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
+// with any type of body and a specified content type.
+//
+// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) AppendBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*AppendBuildResponse, error) {
+	rsp, err := c.AppendBuildWithBody(ctx, buildName, buildNumber, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAppendBuildResponse(rsp)
+}
+
+// AppendBuildWithResponse performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+func (c *ClientWithResponses) AppendBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *AppendBuildParams, body AppendBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*AppendBuildResponse, error) {
+	rsp, err := c.AppendBuild(ctx, buildName, buildNumber, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAppendBuildResponse(rsp)
+}
+
+// DeleteBuildsMultipleWithBodyWithResponse performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request,
+// with any type of body and a specified content type.
+//
+// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) DeleteBuildsMultipleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error) {
+	rsp, err := c.DeleteBuildsMultipleWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBuildsMultipleResponse(rsp)
+}
+
+// DeleteBuildsMultipleWithResponse performs a POST /api/build/delete (the `DeleteBuildsMultiple` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+func (c *ClientWithResponses) DeleteBuildsMultipleWithResponse(ctx context.Context, body DeleteBuildsMultipleJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteBuildsMultipleResponse, error) {
+	rsp, err := c.DeleteBuildsMultiple(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBuildsMultipleResponse(rsp)
+}
+
+// PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
+// with any type of body and a specified content type.
+//
+// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) PromoteBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
+	rsp, err := c.PromoteBuildWithBody(ctx, buildName, buildNumber, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteBuildResponse(rsp)
+}
+
+// PromoteBuildWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+func (c *ClientWithResponses) PromoteBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
+	rsp, err := c.PromoteBuild(ctx, buildName, buildNumber, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteBuildResponse(rsp)
+}
+
+// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
+// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+func (c *ClientWithResponses) PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
+	rsp, err := c.PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx, buildName, buildNumber, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteBuildResponse(rsp)
+}
+
+// RenameBuildWithResponse performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
+//
+// Renames every run of a build. Needs deploy and delete permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) RenameBuildWithResponse(ctx context.Context, buildName string, params *RenameBuildParams, reqEditors ...RequestEditorFn) (*RenameBuildResponse, error) {
+	rsp, err := c.RenameBuild(ctx, buildName, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRenameBuildResponse(rsp)
+}
+
+// ControlBuildRetentionWithBodyWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
+// with any type of body and a specified content type.
+//
+// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) ControlBuildRetentionWithBodyWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error) {
+	rsp, err := c.ControlBuildRetentionWithBody(ctx, buildName, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseControlBuildRetentionResponse(rsp)
+}
+
+// ControlBuildRetentionWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+func (c *ClientWithResponses) ControlBuildRetentionWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error) {
+	rsp, err := c.ControlBuildRetention(ctx, buildName, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseControlBuildRetentionResponse(rsp)
+}
+
+// DeleteBuildsWithResponse performs a DELETE /api/build/{buildName} (the `DeleteBuilds` operationId) request.
+//
+// Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) DeleteBuildsWithResponse(ctx context.Context, buildName string, params *DeleteBuildsParams, reqEditors ...RequestEditorFn) (*DeleteBuildsResponse, error) {
+	rsp, err := c.DeleteBuilds(ctx, buildName, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteBuildsResponse(rsp)
+}
+
+// GetBuildRunsWithResponse performs a GET /api/build/{buildName} (the `GetBuildRuns` operationId) request.
+//
+// Lists the runs of one build. Needs read permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetBuildRunsWithResponse(ctx context.Context, buildName string, params *GetBuildRunsParams, reqEditors ...RequestEditorFn) (*GetBuildRunsResponse, error) {
+	rsp, err := c.GetBuildRuns(ctx, buildName, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBuildRunsResponse(rsp)
+}
+
+// GetBuildInfoWithResponse performs a GET /api/build/{buildName}/{buildNumber} (the `GetBuildInfo` operationId) request.
+//
+// Returns one run's build-info document. Needs read permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetBuildInfoWithResponse(ctx context.Context, buildName string, buildNumber string, params *GetBuildInfoParams, reqEditors ...RequestEditorFn) (*GetBuildInfoResponse, error) {
+	rsp, err := c.GetBuildInfo(ctx, buildName, buildNumber, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBuildInfoResponse(rsp)
+}
+
+// GetBuildArtifactsWithResponse performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
+//
+// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetBuildArtifactsWithResponse(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*GetBuildArtifactsResponse, error) {
+	rsp, err := c.GetBuildArtifacts(ctx, buildName, buildNumber, buildRepo, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetBuildArtifactsResponse(rsp)
+}
+
 // CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
 // Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
@@ -64667,6 +67452,527 @@ func ParseCalculateBowerIndexResponse(rsp *http.Response) (*CalculateBowerIndexR
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAllBuildsResponse parses an HTTP response from a GetAllBuildsWithResponse call
+func ParseGetAllBuildsResponse(rsp *http.Response) (*GetAllBuildsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAllBuildsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AllBuildsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadBuildResponse parses an HTTP response from a UploadBuildWithResponse call
+func ParseUploadBuildResponse(rsp *http.Response) (*UploadBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers UploadBuildResponse200Headers
+		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XChecksumSha256 = &value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseAppendBuildResponse parses an HTTP response from a AppendBuildWithResponse call
+func ParseAppendBuildResponse(rsp *http.Response) (*AppendBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AppendBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBuildsMultipleResponse parses an HTTP response from a DeleteBuildsMultipleWithResponse call
+func ParseDeleteBuildsMultipleResponse(rsp *http.Response) (*DeleteBuildsMultipleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBuildsMultipleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePromoteBuildResponse parses an HTTP response from a PromoteBuildWithResponse call
+func ParsePromoteBuildResponse(rsp *http.Response) (*PromoteBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PromoteBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BuildPromotionResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRenameBuildResponse parses an HTTP response from a RenameBuildWithResponse call
+func ParseRenameBuildResponse(rsp *http.Response) (*RenameBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RenameBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseControlBuildRetentionResponse parses an HTTP response from a ControlBuildRetentionWithResponse call
+func ParseControlBuildRetentionResponse(rsp *http.Response) (*ControlBuildRetentionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ControlBuildRetentionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		break // No content-type
+
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteBuildsResponse parses an HTTP response from a DeleteBuildsWithResponse call
+func ParseDeleteBuildsResponse(rsp *http.Response) (*DeleteBuildsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteBuildsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBuildRunsResponse parses an HTTP response from a GetBuildRunsWithResponse call
+func ParseGetBuildRunsResponse(rsp *http.Response) (*GetBuildRunsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBuildRunsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BuildRunsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBuildInfoResponse parses an HTTP response from a GetBuildInfoWithResponse call
+func ParseGetBuildInfoResponse(rsp *http.Response) (*GetBuildInfoResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBuildInfoResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest BuildInfoResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetBuildArtifactsResponse parses an HTTP response from a GetBuildArtifactsWithResponse call
+func ParseGetBuildArtifactsResponse(rsp *http.Response) (*GetBuildArtifactsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetBuildArtifactsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest []BuildArtifact
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ArtifactoryBuildsApiForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactoryBuildsApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	}
 

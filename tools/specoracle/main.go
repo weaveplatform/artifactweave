@@ -53,6 +53,10 @@ var Indexes = []string{
 	"https://docs.jfrog.com/projects/reference/jfrog-platform-projects-api/llms.txt",
 	"https://docs.jfrog.com/integrations/reference/jfrog-platform-webhooks-api/llms.txt",
 	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-live-logs-api/llms.txt",
+	// The Builds API (build-info publish, promotion, retention, deletion).
+	// docs.jfrog.com also lists the same pages under jfrog-artifactory-build-api
+	// with "-1" slugs; fetching both would only duplicate every operation.
+	"https://docs.jfrog.com/integrations/reference/jfrog-artifactory-builds-api/llms.txt",
 }
 
 // BaselineFile is the committed list of accepted gaps, relative to -api.

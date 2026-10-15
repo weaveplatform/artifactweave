@@ -181,7 +181,9 @@ generated 501 stub.
 
 ### 3.1 The API
 
-The Builds API family is not in the spec oracle; its pages carry OpenAPI 3.1 blocks.
+The Builds API pages carry OpenAPI 3.1 blocks. The spec oracle fetches them from the
+`jfrog-artifactory-builds-api` index (#162). docs.jfrog.com lists the same pages again under
+`jfrog-artifactory-build-api` with `-1` slugs, so only one index is fetched.
 
 | Operation | Request | Documented response | What the CLI checks [S] |
 |---|---|---|---|

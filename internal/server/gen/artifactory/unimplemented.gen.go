@@ -86,6 +86,50 @@ func (UnimplementedStrict) CalculateBowerIndex(context.Context, CalculateBowerIn
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetAllBuilds(context.Context, GetAllBuildsRequestObject) (GetAllBuildsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) UploadBuild(context.Context, UploadBuildRequestObject) (UploadBuildResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) AppendBuild(context.Context, AppendBuildRequestObject) (AppendBuildResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) DeleteBuildsMultiple(context.Context, DeleteBuildsMultipleRequestObject) (DeleteBuildsMultipleResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) PromoteBuild(context.Context, PromoteBuildRequestObject) (PromoteBuildResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) RenameBuild(context.Context, RenameBuildRequestObject) (RenameBuildResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ControlBuildRetention(context.Context, ControlBuildRetentionRequestObject) (ControlBuildRetentionResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) DeleteBuilds(context.Context, DeleteBuildsRequestObject) (DeleteBuildsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetBuildRuns(context.Context, GetBuildRunsRequestObject) (GetBuildRunsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetBuildInfo(context.Context, GetBuildInfoRequestObject) (GetBuildInfoResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetBuildArtifacts(context.Context, GetBuildArtifactsRequestObject) (GetBuildArtifactsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) CalculateCargoRepositoryMetadata(context.Context, CalculateCargoRepositoryMetadataRequestObject) (CalculateCargoRepositoryMetadataResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
