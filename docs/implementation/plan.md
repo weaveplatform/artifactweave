@@ -23,7 +23,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) landed after P3's storage endpoints (#48) |
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
 | P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
-| P4b Reference deployments and CDN delivery | Not started | Epics #113 (CDN delivery and download redirect) and #114 (reference deployments); decisions 0029 and 0030. The download-redirect fixes (#117) landed early |
+| P4b Reference deployments and CDN delivery | In progress | Epic #113 (CDN delivery and download redirect) done; epics #114 (reference deployments) and #189 (consistent reference deployments, contract v2) open; decisions 0029 and 0030 |
 | P5 Full AQL, searches, build-info | Not started | Epic #160; decisions 0012 and 0014, research 22 |
 | P6 Docker/OCI | Not started | |
 | P7 npm, Go, Maven locals | Not started | **M2** |
@@ -431,8 +431,21 @@ Terraform job. It runs beside P5 to P8.
   - the scenario workflow and the `test/platform` suite (#129);
   - multi-region mirror scenarios (#130);
   - geo-replicated scenarios with native replication (#131);
-  - `aws/cdn` (#132), `gcp/cdn` (#133) and `azure/cdn` (#134);
-  - the multicloud mirror scenario (#135).
+  - then epic #189, consistent reference deployments (below);
+  - then `aws/cdn` (#132), `gcp/cdn` (#133) and `azure/cdn` (#134), on contract v2;
+  - last, the multicloud mirror scenario (#135), on contract v2.
+- Epic #189, consistent reference deployments: every scenario written once as both the
+  acceptance test and the consumer documentation of its deployment path, composing per-cloud
+  modules under a linted contract (decision 0030, contract v2):
+  - decision 0030 amended into the scenario contract v2, with the README templates (#178);
+  - prove only the scenarios a pull request changes (#179);
+  - the bootstraps and the lab harness moved to `deploy/ci` (#180), after #179;
+  - the contract linter (#181) and the local runner for any scenario (#182), after #180;
+  - storage modules v2 with the multi-region scenarios on them (#183), and the app-layer
+    references aligned (#187), after #181;
+  - AWS (#184), GCP (#185) and Azure (#186) single-bucket and geo-replicated as module
+    compositions, in parallel, after #182 and #183;
+  - closing the work (#188), last.
 - Alongside, outside both epics: the deviations register (#115, done) and the stale
   references it found (#116).
 
@@ -452,6 +465,10 @@ Terraform job. It runs beside P5 to P8.
   docs drift check over them.
 - Each scenario has a recorded `platform-scenarios` run that applied, passed
   `test/platform` and destroyed.
+- Every scenario composes per-cloud modules, keeps lab values and harness-only outputs out of
+  its consumer Terraform, and has a README that follows the scenario template with a tested
+  `artifactweave.yaml` example; `deploy/platform` holds only consumer references, and the
+  contract linter in `make deploy-check` is strict.
 
 ## P5: Full AQL, searches, build-info
 
