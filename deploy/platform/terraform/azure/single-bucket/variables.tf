@@ -1,59 +1,78 @@
 variable "subscription_id" {
-  description = "Subscription that holds the acceptance storage account. Nothing is created anywhere else."
+  description = "Subscription that holds the storage account. Nothing is created anywhere else."
   type        = string
-  default     = "c33dbc35-f86d-4b7c-a81e-2a33eb3f7946"
-}
 
-variable "location" {
-  description = "Region of the resource group and storage account."
-  type        = string
-  default     = "uksouth"
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$", var.subscription_id))
+    error_message = "subscription_id must be a subscription ID (a GUID)."
+  }
 }
 
 variable "name" {
-  description = "Prefix for the resource names."
+  description = "Start of every resource name. The storage account takes its letters and digits, lowercased and cut to fit 24 characters with a random suffix and the location's first three letters; the resource group this root creates is <name>-rg."
   type        = string
-  default     = "artifactweave-acc"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9][A-Za-z0-9-]{0,62}$", var.name))
+    error_message = "name must be 1 to 63 letters, digits and hyphens, starting with a letter or digit."
+  }
+}
+
+variable "location" {
+  description = "Region of the storage account, and of the resource group this root creates."
+  type        = string
+}
+
+variable "app_principal_id" {
+  description = "Object ID of the identity artifactweave runs as (a managed identity, or a service principal). It gets Storage Blob Data Contributor on the account."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$", var.app_principal_id))
+    error_message = "app_principal_id must be an object ID (a GUID)."
+  }
+}
+
+variable "additional_principals" {
+  description = "Further principals that get Storage Blob Data Contributor on the account, by a static name: an operator who runs artifactweave or mints user delegation SAS from a workstation, for one. principal_type (User, Group or ServicePrincipal) is optional."
+  type = map(object({
+    principal_id   = string
+    principal_type = optional(string)
+  }))
+  default = {}
+
+  validation {
+    condition     = !contains(keys(var.additional_principals), "app")
+    error_message = "additional_principals cannot use the name app, which is app_principal_id's."
+  }
+}
+
+variable "resource_group_name" {
+  description = "An existing resource group to create the account in. Null creates <name>-rg in location."
+  type        = string
+  default     = null
 }
 
 variable "container" {
-  description = "Blob container for blob.azure.container."
+  description = "Blob container in the account (blob.azure.container)."
   type        = string
   default     = "artifactweave"
 }
 
 variable "store_prefix" {
-  description = "Blob prefix the local run writes under (blob.azure.prefix)."
-  type        = string
-  default     = "local/"
-}
-
-variable "bootstrap_resource_group" {
-  description = "Resource group of azure/bootstrap, which holds the conformance identity."
-  type        = string
-  default     = "artifactweave-bootstrap-rg"
-}
-
-variable "conformance_identity" {
-  description = "Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account. Empty grants nothing beyond whoever applies (scenario runs, where the deployer applies and runs artifactweave)."
-  type        = string
-  default     = "artifactweave-conformance"
-}
-
-variable "resource_group_name" {
-  description = "An existing resource group to create the account in. Empty creates <name>-rg; scenario runs pass azure/bootstrap's scenarios group, where the deployer's rights end."
+  description = "Blob prefix artifactweave writes under in the container (blob.azure.prefix). Empty writes at the container's root."
   type        = string
   default     = ""
 }
 
-variable "scenario_labels" {
-  description = "Tags for the account (and the resource group when this root creates it). Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches."
-  type        = map(string)
+variable "expiring_prefixes" {
+  description = "Blob prefixes, from the container's root, whose blobs expire after the given number of days, for example { \"scratch/\" = 1 }."
+  type        = map(number)
   default     = {}
 }
 
-variable "register_resource_providers" {
-  description = "Register Microsoft.Storage and Microsoft.ManagedIdentity. Scenario runs pass false: the deployer has no subscription-level rights, and the bootstrap's subscription has them registered already."
-  type        = bool
-  default     = true
+variable "tags" {
+  description = "Tags for the storage account, and for the resource group when this root creates it."
+  type        = map(string)
+  default     = {}
 }

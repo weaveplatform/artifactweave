@@ -124,8 +124,8 @@ No modules.
 
 | Name | Description |
 | ---- | ----------- |
-| conformance\_client\_id | The data-plane identity's client ID (CONFORMANCE\_AZURE\_CLIENT\_ID); azure/single-bucket grants it its account. |
-| conformance\_identity | The data-plane identity's name, which azure/single-bucket looks up. |
+| conformance\_client\_id | The data-plane identity's client ID (CONFORMANCE\_AZURE\_CLIENT\_ID); the lab's azure/single-bucket grants it its account as the app identity. |
+| conformance\_identity | The data-plane identity's name, which deploy/ci/lab-vars.sh looks up to pass as the lab scenarios' app identity. |
 | deployer\_client\_id | The deployer identity's client ID (PLATFORM\_AZURE\_CLIENT\_ID). |
 | dns\_name\_servers | Name servers for the NS records at GoDaddy (azure.artifact under weaveplatform.run). |
 | resource\_group | The bootstrap's resource group, holding the identities, state account and DNS zone. |

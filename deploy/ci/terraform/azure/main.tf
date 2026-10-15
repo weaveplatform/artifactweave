@@ -44,7 +44,8 @@ resource "azurerm_resource_provider_registration" "cdn" {
 }
 
 # The data-plane identity: blob rights on the conformance account only,
-# granted by azure/single-bucket on its account.
+# granted by azure/single-bucket, which the lab applies with this identity
+# as its app identity (deploy/ci/lab-vars.sh).
 resource "azurerm_user_assigned_identity" "conformance" {
   name                = "artifactweave-conformance"
   resource_group_name = azurerm_resource_group.bootstrap.name

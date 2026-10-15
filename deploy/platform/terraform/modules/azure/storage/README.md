@@ -1,9 +1,10 @@
 # modules/azure/storage
 
 One storage account and private container, without Shared Key, with Storage Blob Data
-Contributor for the principals in `principals`. [`azure/multi-region`](../../../azure/multi-region/README.md)
-calls it once per location; with `replication_type` it also keeps Azure's own copies in the
-paired region. The module holds no provider block, so the caller's `azurerm` provider and
+Contributor for the principals in `principals`. [`azure/single-bucket`](../../../azure/single-bucket/README.md)
+calls it once, [`azure/multi-region`](../../../azure/multi-region/README.md) once per location,
+and [`azure/geo-replicated`](../../../azure/geo-replicated/README.md) once with a
+`replication_type` that keeps Azure's own copies in the paired region. The module holds no provider block, so the caller's `azurerm` provider and
 subscription apply (decision
 [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
 
@@ -37,6 +38,10 @@ subscription apply (decision
 - The account keeps one region's copies unless `replication_type` says otherwise
   (`tests/inputs.tftest.hcl`, runs `the_account_keeps_one_region_by_default` and
   `replication_type_reaches_the_account`).
+- `secondary_host` is the paired region's read endpoint, `<account>-secondary`, when
+  `replication_type` keeps a readable copy (RAGRS, RAGZRS), and null otherwise
+  (`tests/inputs.tftest.hcl`, runs `a_readable_copy_has_a_secondary_host` and
+  `an_unreadable_copy_has_no_secondary_host`).
 - `store_prefix` is normalised as the backend does: no leading slash, one trailing slash
   (`tests/inputs.tftest.hcl`, runs `store_prefix_gains_a_trailing_slash` and
   `store_prefix_loses_a_leading_slash`).
@@ -119,5 +124,6 @@ No modules.
 | account | The storage account's name, for blob.azure.account. |
 | container | The container's name, for blob.azure.container. |
 | host | The account's blob endpoint host, where its signed URLs point. |
+| secondary\_host | The blob endpoint host of Azure's read-only copy in the paired region (<account>-secondary), which a user delegation SAS minted for the account also reads, when replication\_type is RAGRS or RAGZRS; null otherwise, since a GRS or GZRS copy can be read only after a failover. |
 | signed\_url\_prefix | What a signed URL for a blob in this container starts with after the scheme. |
 <!-- END_TF_DOCS -->

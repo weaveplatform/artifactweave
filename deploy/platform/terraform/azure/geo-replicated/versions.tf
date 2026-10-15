@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6"
+  required_version = ">= 1.9"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -12,18 +12,17 @@ terraform {
   }
 }
 
-# Credentials are your Azure CLI login (`az login`). The subscription is
-# pinned here, not taken from the CLI's active one, so a login that points at
-# another subscription cannot create anything there; the Makefile refuses to
-# plan or apply unless the active subscription and tenant match as well.
+# Credentials are the Azure CLI login (`az login`) or a CI identity. The
+# subscription is an input rather than the CLI's active one, so a login that
+# points elsewhere cannot create anything there.
 provider "azurerm" {
   features {}
   subscription_id = var.subscription_id
-  # The storage account allows no Shared Key, so the provider reaches the
-  # data plane with Entra ID too.
+  # The account allows no Shared Key, so the provider reaches its data plane
+  # with Entra ID too.
   storage_use_azuread = true
-  # Only the providers this configuration uses, not every provider the
-  # azurerm default registers in an empty subscription.
+  # Registering resource providers needs subscription-wide rights a
+  # deployer scoped to one resource group lacks; Microsoft.Storage is
+  # registered once, ahead of this root.
   resource_provider_registrations = "none"
-  resource_providers_to_register  = var.register_resource_providers ? ["Microsoft.Storage", "Microsoft.ManagedIdentity"] : []
 }

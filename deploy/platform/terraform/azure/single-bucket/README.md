@@ -1,91 +1,197 @@
-# azure/single-bucket: the Azure acceptance environment
+# azure/single-bucket: one storage account
 
-A real Azure storage account for artifactweave's `azure` blob backend. It's used by
-artifactweave run locally against it, by the real-cloud conformance tests run locally,
-and by the manually dispatched `cloud-conformance.yml` workflow.
+One storage account and private container in one region, without Shared Key, for
+artifactweave's `azure` blob backend. It is the simplest deployment on Azure and the baseline
+the other Azure scenarios build on. Choose it when one region's copies are enough; choose
+`geo-replicated` to have Azure copy the account to its paired region, or `multi-region` for a
+mirror across regions under artifactweave's control.
 
-Nothing uses an account key: the account has Shared Key disabled.
-- **Terraform** runs with your Azure CLI login.
-- **The local run and tests** act as you through `DefaultAzureCredential`, with the Azure CLI.
-- **The workflow** uses the `artifactweave-conformance` managed identity from
-  [`deploy/ci/terraform/azure`](../../../../ci/terraform/azure/README.md), through a federated credential for this
-  repository's `cloud-conformance` environment. Apply the bootstrap first: this root looks
-  the identity up and grants it the account.
+## What it deploys
 
-## Subscription guard
+- One storage account with its container, lifecycle policy and role assignments, through
+  [`modules/azure/storage`](../../modules/azure/storage/README.md). It is named after `name`
+  (its letters and digits, lowercased, at most 15), a random suffix and the location's first
+  three letters, within Azure's 24 characters.
+- `random_string.suffix`: six characters, so the account name is globally unique.
+- `azurerm_resource_group.this`: `<name>-rg` in `location`, unless `resource_group_name` names
+  an existing group.
 
-Terraform is pinned to `subscription_id`: `make` passes the lab's, `LAB_AZURE_SUBSCRIPTION`
-in [`deploy/ci/lab.mk`](../../../../ci/lab.mk). Every `az` command the scripts run passes
-`--subscription`. `plan`, `apply`, `destroy`, `credentials`, `up`, `verify` and `conformance` first run
-[`deploy/ci/check-subscription.sh`](../../../../ci/check-subscription.sh) (shared with every
-Azure root and the bootstrap), which refuses unless:
-- the Azure CLI's active subscription is that one; and
-- the login's tenant owns it.
+## How it behaves
 
-A login aimed at another subscription can't be used for anything here.
+- **Uploads** go to the container, under `store_prefix`, each blob named by its SHA-256. An
+  upload whose digest is not declared up front is staged under `<store_prefix>_uploads/` and
+  copied to its name once complete; the lifecycle policy removes what an interrupted one
+  leaves there after two days.
+- **Reads** stream through artifactweave from the account.
+- **Redirects:** a `downloadRedirect` repository answers a download with a 302 to a user
+  delegation SAS URL on the account's blob endpoint (`storage_host`), so the client fetches
+  the blob from Azure directly.
+- **Copies:** the account is LRS, three copies within one datacentre. Losing the region stops
+  uploads and reads until it is back.
 
-## What Terraform creates
+## Prerequisites
 
-In `uksouth`, in resource group `artifactweave-acc-rg`:
-- **A StorageV2 LRS account:** HTTPS only, TLS 1.2, no public blob access, Shared Key
-  disabled, Entra ID the default.
-- **A private container `artifactweave`.**
-- **A lifecycle policy:** it deletes `local/_uploads/` blobs after 2 days and
-  `conformance/` blobs after 1 day. Uncommitted blocks aren't blobs; Azure discards them
-  after 7 days.
-- **Storage Blob Data Contributor** on the account, for the bootstrap's conformance
-  identity and for you. The role includes `generateUserDelegationKey`, for presigned URLs.
+- Terraform 1.9 or later, and an Azure CLI login (`az login`) that can create a storage
+  account and role assignments in the resource group: Contributor and Role Based Access
+  Control Administrator on it, or Owner. Creating the group needs Contributor on the
+  subscription.
+- `Microsoft.Storage` registered in the subscription. The provider registers nothing
+  (`resource_provider_registrations = "none"`); `az provider register --namespace
+  Microsoft.Storage` does it once.
+- The identity artifactweave runs as, created elsewhere (a managed identity, or a service
+  principal), whose object ID is `app_principal_id`. This scenario grants it blob data rights;
+  it does not create it.
 
-## Use
+### Getting the code
 
-```bash
-az login
-az account set --subscription c33dbc35-f86d-4b7c-a81e-2a33eb3f7946
-make apply        # from the repository root: make azure-apply, or make platform-apply SCENARIO=azure/single-bucket
-make up           # builds artifactweave and starts it on port 8082, acting as your az login
-make smoke        # 40 MiB through it, and a downloadRedirect 302 to the account
-make verify       # test/platform against the account, as CI runs it
-make conformance  # the real-Azure blob contract and probes, as you
-make conformance LARGE_RANGES=1  # adds Put Block From URL ranges up to 4,000 MiB (about a minute)
-make github-vars  # sets the account and container variables; the identity's come from deploy/ci/terraform/azure
-make down         # stops it; make clean also drops .local/
-make destroy      # removes everything, the account's blobs included
+Copy this directory together with `modules/azure/` and `.terraform.lock.hcl`, keeping the
+`../../modules` layout, or point the module at the repository:
+
+```hcl
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/azure/storage?ref=v0.0.0" # x-release-please-version
 ```
 
-## Local files
+## Inputs to set
 
-`make up` ([`deploy/ci/local.sh`](../../../../ci/local.sh)) keeps the configuration, a
-generated master key and admin password, and the database in `.local/`, which is git-ignored
-with the Terraform state. None of it is a storage credential: artifactweave reaches the
-account through your `az login` and signs downloads with a user delegation SAS.
+```hcl
+# terraform.tfvars
+subscription_id  = "00000000-0000-0000-0000-000000000000"
+name             = "artifactweave-example"
+location         = "uksouth"
+app_principal_id = "00000000-0000-0000-0000-00000000000a"
 
-
-## Moved from `deploy/terraform/acceptance-azure`
-
-This scenario lived at `deploy/terraform/acceptance-azure` until #125. Terraform state, `.secrets/` and
-`.local/` are git-ignored, so the move left them behind. If an environment is up from the old
-path, move them here before running any target, or Terraform will plan to create everything
-again:
-
-```bash
-old=deploy/terraform/acceptance-azure new=deploy/platform/terraform/azure/single-bucket
-mv "$old"/terraform.tfstate* "$new"/ && mv "$old"/.local "$new"/ 2>/dev/null; rm -rf "$old"/.terraform
+# Optional
+# resource_group_name   = "an-existing-group"
+# additional_principals = { operator = { principal_id = "00000000-0000-0000-0000-00000000000b", principal_type = "User" } }
+# store_prefix          = "artifacts/"
+# expiring_prefixes     = { "scratch/" = 1 }
+# tags                  = { team = "platform" }
 ```
 
-Then run `make plan` here; it should show no changes. Both acceptance environments were
-destroyed on 2026-10-14, so there was nothing to move at the time.
+```bash
+terraform init
+terraform apply
+```
 
-## Inputs, outputs and resources
+## The artifactweave configuration
 
-Generated by terraform-docs: `make deploy-docs` rewrites this section, and `make deploy-check`
-fails when it is stale.
+`artifactweave_config` renders the `blob` section of `artifactweave.yaml`: one `azure` store
+for the account and container, with `prefix` when `store_prefix` is set. It uses the `default`
+credential, the Azure SDK's chain, so no key or SAS is in the file, and signs download URLs
+with a user delegation SAS. The example below is the rendered output for the example inputs
+above, with the random suffix `0a1b2c`; the `readme_example` test fails if they differ.
+
+<!-- BEGIN_CONFIG_EXAMPLE -->
+```yaml
+blob:
+  backend: azure
+  azure:
+    account: artifactweaveex0a1b2cuks
+    container: artifactweave
+    credential: default
+```
+<!-- END_CONFIG_EXAMPLE -->
+
+### Running artifactweave with it
+
+```bash
+terraform output -raw artifactweave_config > artifactweave.yaml
+export ARTIFACTWEAVE_MASTER_KEY="$(openssl rand -base64 32)"   # keep it: it seals stored secrets
+export ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD='choose one'      # read on first start only
+artifactweave serve --config artifactweave.yaml
+```
+
+Run it as `app_principal_id`, a managed identity on its VM or container, or a workload
+identity, so the Azure SDK's default chain finds it. A `downloadRedirect` repository answers
+downloads with a 302 to a user delegation SAS URL at `storage_host`, the account's blob
+endpoint. The [configuration reference](../../../../../docs/operations/configuration-reference.md)
+lists every key.
+
+## Security
+
+The account carries the [`modules/azure/storage` invariants](../../modules/azure/storage/README.md#invariants):
+no public containers, HTTPS and TLS 1.2 only, Shared Key disabled so every request carries an
+Entra ID identity, encryption at rest, and abandoned uploads expired. The app identity, and
+each of `additional_principals`, holds Storage Blob Data Contributor on the account: it can
+read, write, list and delete blobs and mint user delegation keys, and cannot change the
+account's settings, keys or role assignments.
+
+### Accepted findings
+
+| ID | Resource (module) | Why |
+|---|---|---|
+| AZU-0012 | `azurerm_storage_account.blobs` (`azure/storage`) | The account takes connections from any network, because artifactweave and the clients its signed URLs serve have no fixed addresses; with Shared Key off, every request still needs an Entra ID token or a user delegation SAS. |
+| AZU-0057 | `azurerm_storage_account.blobs` (`azure/storage`) | No Storage Analytics logs: the activity log records the management calls. |
+| AZU-0058 | `azurerm_storage_account.blobs` (`azure/storage`) | LRS on purpose: one region's copies is what this scenario offers; `geo-replicated` and `multi-region` keep a second region. |
+| AZU-0060 | `azurerm_storage_account.blobs` (`azure/storage`) | Microsoft-managed keys; a customer-managed key would add a Key Vault and its access policies to manage. |
+| AZU-0061 | `azurerm_storage_account.blobs` (`azure/storage`) | No infrastructure (double) encryption: service-side encryption already applies. |
+
+## Cost
+
+### Steady state
+
+Hot LRS block blobs, roughly $0.02 per GB-month in the UK regions, plus operations per
+10,000 and downloads leaving Azure as internet egress. A redirected download leaves from the
+account, so its egress is the account's. There is no fixed or hourly charge.
+
+### Per test run
+
+Well under one cent: a proof stores well under 100 MiB for minutes, and its cost is mostly
+the test's downloads leaving Azure and its operations.
+
+## Teardown
+
+`terraform destroy` removes the account, with every blob in it, its role assignments and,
+when this root created it, the resource group. A resource group passed in through
+`resource_group_name` stays, and so does the app identity, which is not this scenario's.
+
+## How this scenario is tested
+
+- **Mocked tests** (`tests/scenario.tftest.hcl`, in `make deploy-check`) check the
+  composition: `readme_example` renders the example above from the example inputs; `ci_run`
+  uses the longest instance a proof produces, checking that the account name fits 24
+  characters, that a given resource group is used, and the outputs reap and `test/platform`
+  read; `lab_run` checks the lab's inputs; others check the resource group this root creates
+  and the inputs' validation.
+- **The real-cloud proof** (`platform-scenarios.yml`, on a pull request that changes this
+  scenario, its module or the harness) applies an instance as the CI deployer, which also
+  runs artifactweave, and runs `test/platform`: a 40 MiB upload, round trip, ranged GET and
+  checksums through artifactweave, a `downloadRedirect` 302 that lands on `storage_host` and
+  serves ranges, and the account refusing the URL without its signature. It then destroys the
+  instance, applies and destroys another from its remote state alone, and checks that reap
+  removes an expired one.
+- **Harness outputs** (`harness.tf`): `expires_at`, the tag reap reads from the state.
+- **The lab's conformance account** is this scenario applied with the Makefile's inputs:
+  `make conformance` runs the real-Azure blob contract and probes against it as you, and
+  `make github-vars` sets `CONFORMANCE_AZURE_ACCOUNT` and `CONFORMANCE_AZURE_CONTAINER` from
+  the `account` and `container` outputs for `cloud-conformance.yml`, which runs them as the
+  bootstrap's conformance identity. The tests write under `conformance/`, which expires
+  after a day in case a run skips its cleanup.
+- **Locally**, `make apply`, `up`, `smoke`, `verify` and `destroy` run the same checks
+  against an instance in the lab ([running a scenario locally](../../../../ci/README.md#running-a-scenario-locally)).
+
+| Variable | Scenario run (`ci-vars.sh`) | Operator run (`Makefile`, `deploy/ci/lab-vars.sh`) |
+|---|---|---|
+| `subscription_id` | `PLATFORM_AZURE_SUBSCRIPTION_ID` | `LAB_AZURE_SUBSCRIPTION` |
+| `name` | `${NAME_PREFIX}${INSTANCE}`: `awscn-<instance>`, the start reap knows scenario names by | `artifactweave-acc` |
+| `location` | `uksouth` | `uksouth` |
+| `resource_group_name` | `PLATFORM_AZURE_RESOURCE_GROUP`, the bootstrap's scenarios group, where the deployer's rights end | none: the root creates `artifactweave-acc-rg` |
+| `app_principal_id` | the deployer, from the `oid` claim of its access token | the bootstrap's conformance identity |
+| `additional_principals` | none | `operator`: you, from `az ad signed-in-user show`, as a `User` |
+| `store_prefix` | none | `local/`, where the local run writes |
+| `expiring_prefixes` | none | `conformance/` after 1 day |
+| `tags` | `$SCENARIO_LABELS`: `artifactweave-scenario`, `instance`, `expires-at` | none |
+
+## Reference
+
+Generated by terraform-docs (`make deploy-docs`).
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements
 
 | Name | Version |
 | ---- | ------- |
-| terraform | >= 1.6 |
+| terraform | >= 1.9 |
 | azurerm | ~> 5.9 |
 | random | ~> 3.9 |
 
@@ -98,48 +204,40 @@ fails when it is stale.
 
 ### Modules
 
-No modules.
+| Name | Source | Version |
+| ---- | ------ | ------- |
+| storage | ../../modules/azure/storage | n/a |
 
 ### Resources
 
 | Name | Type |
 | ---- | ---- |
 | [azurerm_resource_group.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/resource_group) | resource |
-| [azurerm_role_assignment.conformance](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
-| [azurerm_role_assignment.operator](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/role_assignment) | resource |
-| [azurerm_storage_account.blobs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
-| [azurerm_storage_container.blobs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_container) | resource |
-| [azurerm_storage_management_policy.cleanup](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_management_policy) | resource |
 | [random_string.suffix](https://registry.terraform.io/providers/hashicorp/random/latest/docs/resources/string) | resource |
-| [azurerm_client_config.current](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/client_config) | data source |
-| [azurerm_resource_group.existing](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/resource_group) | data source |
-| [azurerm_user_assigned_identity.conformance](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/data-sources/user_assigned_identity) | data source |
 
 ### Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
-| bootstrap\_resource\_group | Resource group of azure/bootstrap, which holds the conformance identity. | `string` | `"artifactweave-bootstrap-rg"` | no |
-| conformance\_identity | Name of the data-plane identity azure/bootstrap created; it gets blob rights on this account. Empty grants nothing beyond whoever applies (scenario runs, where the deployer applies and runs artifactweave). | `string` | `"artifactweave-conformance"` | no |
-| container | Blob container for blob.azure.container. | `string` | `"artifactweave"` | no |
-| location | Region of the resource group and storage account. | `string` | `"uksouth"` | no |
-| name | Prefix for the resource names. | `string` | `"artifactweave-acc"` | no |
-| register\_resource\_providers | Register Microsoft.Storage and Microsoft.ManagedIdentity. Scenario runs pass false: the deployer has no subscription-level rights, and the bootstrap's subscription has them registered already. | `bool` | `true` | no |
-| resource\_group\_name | An existing resource group to create the account in. Empty creates <name>-rg; scenario runs pass azure/bootstrap's scenarios group, where the deployer's rights end. | `string` | `""` | no |
-| scenario\_labels | Tags for the account (and the resource group when this root creates it). Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches. | `map(string)` | `{}` | no |
-| store\_prefix | Blob prefix the local run writes under (blob.azure.prefix). | `string` | `"local/"` | no |
-| subscription\_id | Subscription that holds the acceptance storage account. Nothing is created anywhere else. | `string` | `"c33dbc35-f86d-4b7c-a81e-2a33eb3f7946"` | no |
+| additional\_principals | Further principals that get Storage Blob Data Contributor on the account, by a static name: an operator who runs artifactweave or mints user delegation SAS from a workstation, for one. principal\_type (User, Group or ServicePrincipal) is optional. | ```map(object({ principal_id = string principal_type = optional(string) }))``` | `{}` | no |
+| app\_principal\_id | Object ID of the identity artifactweave runs as (a managed identity, or a service principal). It gets Storage Blob Data Contributor on the account. | `string` | n/a | yes |
+| container | Blob container in the account (blob.azure.container). | `string` | `"artifactweave"` | no |
+| expiring\_prefixes | Blob prefixes, from the container's root, whose blobs expire after the given number of days, for example { "scratch/" = 1 }. | `map(number)` | `{}` | no |
+| location | Region of the storage account, and of the resource group this root creates. | `string` | n/a | yes |
+| name | Start of every resource name. The storage account takes its letters and digits, lowercased and cut to fit 24 characters with a random suffix and the location's first three letters; the resource group this root creates is <name>-rg. | `string` | n/a | yes |
+| resource\_group\_name | An existing resource group to create the account in. Null creates <name>-rg in location. | `string` | `null` | no |
+| store\_prefix | Blob prefix artifactweave writes under in the container (blob.azure.prefix). Empty writes at the container's root. | `string` | `""` | no |
+| subscription\_id | Subscription that holds the storage account. Nothing is created anywhere else. | `string` | n/a | yes |
+| tags | Tags for the storage account, and for the resource group when this root creates it. | `map(string)` | `{}` | no |
 
 ### Outputs
 
 | Name | Description |
 | ---- | ----------- |
-| account | Storage account for blob.azure.account and ARTIFACTWEAVE\_TEST\_AZURE\_ACCOUNT. |
-| artifactweave\_config | The blob section of artifactweave.yaml for this account. It authenticates through the Azure SDK chain, so artifactweave acts as whoever runs it (an Entra ID login, a managed identity or a workload identity) and signs download URLs with a user delegation SAS. |
-| container | Container for blob.azure.container and ARTIFACTWEAVE\_TEST\_AZURE\_CONTAINER. |
-| expires\_at | The expires-at tag (epoch seconds) a scenario run set, read by reap; empty outside scenario runs. |
-| resource\_group | Resource group holding the account. |
-| storage\_host | Host a downloadRedirect repository's signed URLs point at. |
-| store\_prefix | Blob name prefix the local run writes under (blob.azure.prefix). |
-| subscription\_id | Subscription holding the account. |
+| account | The storage account (blob.azure.account). |
+| artifactweave\_config | The blob section of artifactweave.yaml for the account. It authenticates through the Azure SDK's default chain, as the app identity, and signs download URLs with a user delegation SAS. |
+| container | The container in the account (blob.azure.container). |
+| expires\_at | For the test harness: the expires-at tag (epoch seconds) a scenario run sets, which reap reads from the state; empty otherwise. |
+| resource\_group | The resource group holding the account. |
+| storage\_host | Where a downloadRedirect repository's signed URLs point: the account's blob endpoint. |
 <!-- END_TF_DOCS -->
