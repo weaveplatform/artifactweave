@@ -46,6 +46,12 @@ const (
 	DefaultRedirectTTL = 5 * time.Minute
 	// maxRedirectTTL is the V4 signing limit on S3 and GCS.
 	maxRedirectTTL = 7 * 24 * time.Hour
+	// DefaultAQLMaxResults is the cap JFrog SaaS sets with
+	// aql.search.query.max.limit; self-managed Artifactory has none (DV-030).
+	DefaultAQLMaxResults = 500000
+	// DefaultAQLScanFactor reads no extra rows for non-admin filtering, the
+	// default of artifactory.aql.query.non.admin.scan.factor.
+	DefaultAQLScanFactor = 1
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -70,6 +76,23 @@ type Config struct {
 	Log               LogConfig       `yaml:"log"`
 	GC                GCConfig        `yaml:"gc"`
 	Download          DownloadConfig  `yaml:"download"`
+	Search            SearchConfig    `yaml:"search"`
+}
+
+// SearchConfig holds the search limits.
+type SearchConfig struct {
+	AQL AQLConfig `yaml:"aql"`
+}
+
+// AQLConfig limits POST /api/search/aql (decision 0012).
+type AQLConfig struct {
+	// MaxResults caps the rows of every query, its own limit included; zero
+	// means no cap.
+	MaxResults int `yaml:"max_results"`
+	// NonAdminScanFactor multiplies a non-admin query's limit to read
+	// enough rows that the limit is still met once unreadable rows are
+	// filtered out. A request's scan-factor header overrides it.
+	NonAdminScanFactor int `yaml:"non_admin_scan_factor"`
 }
 
 // DownloadConfig holds how downloads are served.
@@ -165,6 +188,9 @@ func Default() Config {
 		Download: DownloadConfig{Redirect: RedirectConfig{
 			MinSize: DefaultRedirectMinSize, TTL: DefaultRedirectTTL,
 		}},
+		Search: SearchConfig{AQL: AQLConfig{
+			MaxResults: DefaultAQLMaxResults, NonAdminScanFactor: DefaultAQLScanFactor,
+		}},
 	}
 }
 
@@ -230,6 +256,7 @@ var keys = append(append([]string{
 	"log.level", "log.format",
 	"gc.interval", "gc.grace_period",
 	"download.redirect.min_size", "download.redirect.ttl",
+	"search.aql.max_results", "search.aql.non_admin_scan_factor",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -284,6 +311,10 @@ func set(cfg *Config, key, value string) error {
 		cfg.Download.Redirect.MinSize = n
 	case "download.redirect.ttl":
 		return setDuration(&cfg.Download.Redirect.TTL, key, value)
+	case "search.aql.max_results":
+		return setInt(&cfg.Search.AQL.MaxResults, key, value)
+	case "search.aql.non_admin_scan_factor":
+		return setInt(&cfg.Search.AQL.NonAdminScanFactor, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -296,6 +327,15 @@ func setDuration(dst *time.Duration, key, value string) error {
 		return fmt.Errorf("%w: %s=%q is not a duration", ErrInvalidValue, key, value)
 	}
 	*dst = d
+	return nil
+}
+
+func setInt(dst *int, key, value string) error {
+	n, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("%w: %s=%q is not an integer", ErrInvalidValue, key, value)
+	}
+	*dst = n
 	return nil
 }
 
@@ -350,6 +390,14 @@ func (c Config) Validate() error {
 		errs = append(errs, fmt.Errorf(
 			"%w: download.redirect.ttl %s must be more than zero and at most 7 days",
 			ErrInvalidValue, ttl))
+	}
+	if c.Search.AQL.MaxResults < 0 {
+		errs = append(errs, fmt.Errorf("%w: search.aql.max_results %d must not be negative",
+			ErrInvalidValue, c.Search.AQL.MaxResults))
+	}
+	if c.Search.AQL.NonAdminScanFactor < 1 {
+		errs = append(errs, fmt.Errorf("%w: search.aql.non_admin_scan_factor %d must be at least 1",
+			ErrInvalidValue, c.Search.AQL.NonAdminScanFactor))
 	}
 	return errors.Join(errs...)
 }

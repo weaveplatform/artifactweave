@@ -73,6 +73,8 @@ type Config struct {
 	PasswordHash auth.HashParams
 	// Redirect tunes downloadRedirect and cdnRedirect (decision 0029).
 	Redirect Redirect
+	// AQL bounds AQL searches; the zero value has no cap.
+	AQL AQLLimits
 }
 
 // Mirrors is what the storage endpoints need from the runtime's blob

@@ -265,9 +265,12 @@ var otherDomains = []string{
 	"release_artifacts", "promotions", "modules", "dependencies", "artifacts",
 }
 
-// Parse parses an items query. Errors wrap ErrSyntax, ErrUnsupported or
-// ErrTooLong.
+// Parse parses an items query. Errors wrap ErrEmpty, ErrSyntax,
+// ErrUnsupported, ErrInvalid or ErrTooLong.
 func Parse(src string) (*Query, error) {
+	if strings.TrimSpace(src) == "" {
+		return nil, ErrEmpty
+	}
 	if utf8.RuneCountInString(src) > MaxLength {
 		return nil, ErrTooLong
 	}
@@ -326,16 +329,16 @@ func Parse(src string) (*Query, error) {
 	if err := p.expect(")"); err != nil {
 		return nil, err
 	}
+	// The root is always an And, so the implicit criteria below can join it.
+	switch r := root.(type) {
+	case nil:
+		root = And{}
+	case And:
+	default:
+		root = And{r}
+	}
 	if !mentionsType(root) {
-		typeFile := &FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"}
-		switch r := root.(type) {
-		case nil:
-			root = And{typeFile}
-		case And:
-			root = append(r, typeFile)
-		default:
-			root = And{root, typeFile}
-		}
+		root = append(root.(And), &FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"})
 	}
 	q.Criteria = root
 	seen := map[string]bool{}
@@ -367,7 +370,47 @@ func Parse(src string) (*Query, error) {
 	if p.tok.kind != tokEOF {
 		return nil, syntaxErr(p.tok.pos, "unexpected %s after the query", p.describe())
 	}
+	if err := q.validate(); err != nil {
+		return nil, err
+	}
+	// An "@<key>" include also filters out items without that key
+	// (research 22 §1.2), as an any-value criterion would.
+	for _, k := range q.keyIncludes() {
+		q.Criteria = append(q.Criteria.(And), &PropertyCriterion{Key: k, Op: OpEq, Value: "*"})
+	}
 	return q, nil
+}
+
+// validate applies Artifactory's output rules (research 22 §1.2): sort,
+// offset and limit only with an include of item fields alone, sorting only
+// on fields in the output, and virtual_repos only beside repo, path and
+// name.
+func (q *Query) validate() error {
+	if (q.Sort != nil || q.HasOffset || q.HasLimit) && !q.primaryOnly() {
+		return fmt.Errorf(
+			"%w: sort, offset and limit need an include of item fields only",
+			ErrInvalid,
+		)
+	}
+	fields := q.Fields()
+	if q.Sort != nil {
+		for _, f := range q.Sort.Fields {
+			if !slices.Contains(fields, f) {
+				return fmt.Errorf("%w: sort on %q, which the output leaves out", ErrInvalid, f)
+			}
+		}
+	}
+	if q.VirtualRepos() {
+		for _, f := range []Field{FieldRepo, FieldPath, FieldName} {
+			if !slices.Contains(fields, f) {
+				return fmt.Errorf(
+					"%w: virtual_repos needs repo, path and name in the output",
+					ErrInvalid,
+				)
+			}
+		}
+	}
+	return nil
 }
 
 // modifier parses the arguments of one suffix.
@@ -410,7 +453,7 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 			return syntaxErr(args[0].pos, "%s must be a non-negative integer", name)
 		}
 		if name == "offset" {
-			q.Offset = n
+			q.Offset, q.HasOffset = n, true
 		} else {
 			q.Limit, q.HasLimit = n, true
 		}
@@ -432,16 +475,24 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 }
 
 // includable reports whether name may appear in an include: an item field,
-// "*", or the property secondary domain.
+// "*", virtual_repos, the property secondary domain ("property",
+// "property.*", "property.key", "property.value" or "@<key>"), or the stat
+// domain ("stat", "stat.*" or "stat.<field>").
 func includable(name string) bool {
 	if _, ok := fieldKinds[Field(name)]; ok {
 		return true
 	}
 	switch name {
-	case "*", "property", "property.*", "property.key", "property.value":
+	case "*", FieldVirtualRepos, "property", "property.*", "property.key", "property.value",
+		"stat", "stat.*":
 		return true
 	}
-	return false
+	if f, ok := strings.CutPrefix(name, "stat."); ok {
+		_, known := statKinds[StatField(f)]
+		return known
+	}
+	k, ok := strings.CutPrefix(name, "@")
+	return ok && k != "" && k != "*"
 }
 
 func sortOf(args []value, pos int) (*Sort, error) {

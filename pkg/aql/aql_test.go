@@ -21,11 +21,11 @@ func mustParse(t *testing.T, src string) *Query {
 }
 
 func TestParseModifiers(t *testing.T) {
-	q := mustParse(t, "  items . find ( { } )\n.include(\"name\", \"property\")\n"+
+	q := mustParse(t, "  items . find ( { } )\n.include(\"name\", \"size\")\n"+
 		`.sort({"$desc":["size","name"]}).offset(3).transitive().limit(7).distinct(false)`)
-	if !slices.Equal(q.Include, []string{"name", "property"}) || q.Sort == nil || !q.Sort.Desc ||
+	if !slices.Equal(q.Include, []string{"name", "size"}) || q.Sort == nil || !q.Sort.Desc ||
 		!slices.Equal(q.Sort.Fields, []Field{FieldSize, FieldName}) || q.Offset != 3 ||
-		q.Limit != 7 || !q.HasLimit || !q.Transitive || q.Distinct {
+		!q.HasOffset || q.Limit != 7 || !q.HasLimit || !q.Transitive || q.Distinct {
 		t.Fatalf("query %+v", q)
 	}
 	// An empty find still searches files only.
@@ -59,7 +59,8 @@ func TestParseErrors(t *testing.T) {
 		strings.Repeat(`]}`, maxDepth+2) + `)`
 	deeper := `items.find(` + strings.Repeat(`[`, maxValueDepth+2) + `)`
 	for src, want := range map[string]error{
-		"":                                                ErrSyntax,
+		"":                                                ErrEmpty,
+		" \n\t":                                           ErrEmpty,
 		`"items"`:                                         ErrSyntax,
 		`builds.find()`:                                   ErrUnsupported,
 		`widgets.find()`:                                  ErrSyntax,
@@ -94,8 +95,21 @@ func TestParseErrors(t *testing.T) {
 		`items.find({"created":{"$last":"3fortnights"}})`: ErrSyntax,
 		`items.find({"created":{"$last":"d"}})`:           ErrSyntax,
 		`items.find({"nosuch":"a"})`:                      ErrSyntax,
-		`items.find({"stat.downloads":1})`:                ErrUnsupported,
-		`items.find({"$msp":[]})`:                         ErrUnsupported,
+		`items.find({"stat.nosuch":1})`:                   ErrSyntax,
+		`items.find({"stat.downloads":{"$gt":null}})`:     ErrSyntax,
+		`items.find({"stat.downloads":{"$match":"1"}})`:   ErrSyntax,
+		`items.find({"stat.downloaded_by":1})`:            ErrSyntax,
+		`items.find({"stat":1})`:                          ErrSyntax,
+		`items.find({"archive.entry.name":"a"})`:          ErrUnsupported,
+		`items.find({"virtual_repos":"a"})`:               ErrUnsupported,
+		`items.find({"property.key":1})`:                  ErrSyntax,
+		`items.find({"property.value":{"$last":"1d"}})`:   ErrSyntax,
+		`items.find({"$msp":[]})`:                         ErrSyntax,
+		`items.find({"$msp":{}})`:                         ErrSyntax,
+		`items.find({"$msp":["a"]})`:                      ErrSyntax,
+		`items.find({"$msp":[{"name":"a"}]})`:             ErrSyntax,
+		`items.find({"$msp":[{"@k":1}]})`:                 ErrSyntax,
+		`items.find({"$msp":[{"@":"a"}]})`:                ErrSyntax,
 		`items.find({"$rf":[]})`:                          ErrUnsupported,
 		`items.find({"$not":[]})`:                         ErrSyntax,
 		`items.find({"$and":{}})`:                         ErrSyntax,
@@ -108,7 +122,9 @@ func TestParseErrors(t *testing.T) {
 		deep:                                              ErrSyntax,
 		deeper:                                            ErrSyntax,
 		`items.find().include(1)`:                         ErrSyntax,
-		`items.find().include("stat")`:                    ErrUnsupported,
+		`items.find().include("stat.nosuch")`:             ErrUnsupported,
+		`items.find().include("@")`:                       ErrUnsupported,
+		`items.find().include("@*")`:                      ErrUnsupported,
 		`items.find().sort("name")`:                       ErrSyntax,
 		`items.find().sort({"$up":["name"]})`:             ErrSyntax,
 		`items.find().sort({"$asc":[]})`:                  ErrSyntax,
@@ -251,7 +267,7 @@ func TestCompile(t *testing.T) {
 	}
 	// Without criteria the compiler still writes a valid WHERE; a nil
 	// criteria tree only comes from hand-built queries.
-	if c, _ := (&Query{}).Compile(SQLite, Options{Limit: 5}); c.Where != "1=1" ||
+	if c, _ := (&Query{}).Compile(SQLite, Options{Max: 5}); c.Where != "1=1" ||
 		c.Tail != " ORDER BY items.id ASC LIMIT ? OFFSET ?" {
 		t.Fatalf("empty query %+v", c)
 	}
@@ -271,22 +287,22 @@ type badNode struct{}
 func (badNode) node() {}
 
 func TestMatchEdges(t *testing.T) {
-	it := types.Item{Name: "a", Size: 3}
-	if (&Query{Criteria: badNode{}}).Match(it, nil, time.Now()) {
+	it := Hit{Item: types.Item{Name: "a", Size: 3}}
+	if (&Query{Criteria: badNode{}}).Match(it, time.Now()) {
 		t.Fatal("an unknown node matched")
 	}
-	if !(&Query{}).Match(it, nil, time.Now()) {
+	if !(&Query{}).Match(it, time.Now()) {
 		t.Fatal("no criteria must match everything")
 	}
 	if compareOp(OpMatch, 0) {
 		t.Fatal("compareOp with a non-ordering operator")
 	}
 	q := mustParse(t, `items.find({"type":{"$ne":"any"}})`)
-	if q.Match(it, nil, time.Now()) {
+	if q.Match(it, time.Now()) {
 		t.Fatal(`type $ne "any" matched`)
 	}
 	c, _ := q.Compile(SQLite, Options{})
-	if c.Where != "1=0" {
+	if c.Where != "(1=0)" {
 		t.Fatalf("where %s", c.Where)
 	}
 }
@@ -295,8 +311,10 @@ func TestFieldsAndRestrictions(t *testing.T) {
 	for include, want := range map[string][]Field{
 		``:                          defaultFields,
 		`.include("property")`:      defaultFields,
+		`.include("stat","@k")`:     defaultFields,
 		`.include("sha256","repo")`: {FieldRepo, FieldSHA256},
 		`.include("*")`:             fieldOrder,
+		`.include("virtual_repos","name","path","repo")`: {FieldRepo, FieldPath, FieldName},
 	} {
 		q := mustParse(t, `items.find()`+include)
 		if !slices.Equal(q.Fields(), want) {
@@ -312,7 +330,7 @@ func TestFieldsAndRestrictions(t *testing.T) {
 			t.Errorf("%s: %v", include, err)
 		}
 	}
-	for _, inc := range []string{"property", "property.*", "property.key", "property.value"} {
+	for _, inc := range []string{"property", "property.*", "property.key", "property.value", "@k"} {
 		if !mustParse(t, `items.find().include("`+inc+`")`).Properties() {
 			t.Errorf("include(%s) does not return properties", inc)
 		}
@@ -331,7 +349,10 @@ func TestResponse(t *testing.T) {
 		{Item: file, Properties: types.Properties{"b": {"2", "1"}, "a": {"x"}}},
 		{Item: folder},
 	}
-	q := mustParse(t, `items.find().include("*","property").offset(4).limit(2)`)
+	// Offset and limit beside a property include are refused by Parse, so
+	// they are set by hand to cover rendering the window.
+	q := mustParse(t, `items.find().include("*","property")`)
+	q.Offset, q.Limit, q.HasLimit = 4, 2, true
 	b, err := json.Marshal(q.Response(hits))
 	if err != nil {
 		t.Fatal(err)
@@ -364,14 +385,176 @@ func TestWindow(t *testing.T) {
 	if o, l := q.Window(Options{}); o != 1 || l != -1 {
 		t.Fatal(o, l)
 	}
-	if _, l := q.Window(Options{Limit: 9}); l != 9 {
+	if _, l := q.Window(Options{Max: 9}); l != 9 {
 		t.Fatal(l)
 	}
 	q.Limit, q.HasLimit = 0, true
-	if _, l := q.Window(Options{Limit: 9}); l != 0 {
+	if _, l := q.Window(Options{Max: 9}); l != 0 {
+		t.Fatal(l)
+	}
+	// The cap trims a query's own limit above it.
+	q.Limit = 20
+	if _, l := q.Window(Options{Max: 9}); l != 9 {
 		t.Fatal(l)
 	}
 	if (Options{}).now().IsZero() {
 		t.Fatal("zero clock")
+	}
+}
+
+func TestIncludes(t *testing.T) {
+	q := mustParse(t, `items.find().include("@b","@a","@b","stat.remote_path","stat.downloads")`)
+	if !slices.Equal(q.PropertyKeys(), []string{"b", "a"}) ||
+		!slices.Equal(q.Stats(), []StatField{StatDownloads, StatRemotePath}) || q.VirtualRepos() {
+		t.Fatalf("keys %v stats %v", q.PropertyKeys(), q.Stats())
+	}
+	// Each key include filters out items without the key.
+	and := q.Criteria.(And)
+	if len(and) != 3 ||
+		*and[1].(*PropertyCriterion) != (PropertyCriterion{Key: "b", Op: OpEq, Value: "*"}) ||
+		and[2].(*PropertyCriterion).Key != "a" {
+		t.Fatalf("criteria %#v", q.Criteria)
+	}
+	// The whole property domain renders every key, but the key still filters.
+	q = mustParse(t, `items.find().include("@a","property.*")`)
+	if q.PropertyKeys() != nil || len(q.Criteria.(And)) != 2 {
+		t.Fatalf("keys %v criteria %#v", q.PropertyKeys(), q.Criteria)
+	}
+	for _, inc := range []string{"stat", "stat.*"} {
+		if !slices.Equal(mustParse(t, `items.find().include("`+inc+`")`).Stats(), statOrder) {
+			t.Errorf("include(%s) does not return every statistic", inc)
+		}
+	}
+	q = mustParse(t, `items.find().include("name").sort({"$asc":["name"]}).limit(1)`)
+	if q.Properties() || q.Stats() != nil {
+		t.Fatal("an item-field include returns another domain")
+	}
+	if !mustParse(t, `items.find().include("repo","path","name","virtual_repos")`).VirtualRepos() {
+		t.Fatal("virtual_repos include")
+	}
+}
+
+func TestPropertyAndStatCriteria(t *testing.T) {
+	q := mustParse(t, `items.find({"$msp":[{"@license":{"$match":"*GPL*","$ne":"x"}},`+
+		`{"property.value":"v"}],"property.key":"k","stat.downloads":{"$ne":null}})`)
+	and := q.Criteria.(And)
+	m := and[0].(MSP)
+	if len(m) != 3 || m[0].Part != PartPair || m[1].Op != OpNe || m[2].Part != PartValue ||
+		m[2].Value != "v" {
+		t.Fatalf("msp %#v", m)
+	}
+	if p := and[1].(*PropertyCriterion); p.Part != PartKey || p.Key != "" || p.Value != "k" {
+		t.Fatalf("property.key %#v", p)
+	}
+	if s := and[2].(*StatCriterion); s.Field != StatDownloads || !s.Null || s.Op != OpNe {
+		t.Fatalf("stat %#v", s)
+	}
+	q = mustParse(
+		t,
+		`items.find({"stat.downloaded":{"$last":"1d"},"stat.remote_origin":{"$match":"h*"}})`,
+	)
+	and = q.Criteria.(And)
+	if s := and[0].(*StatCriterion); s.Span != (Span{N: 1, Unit: "d"}) {
+		t.Fatalf("stat span %#v", s)
+	}
+	if s := and[1].(*StatCriterion); s.Text != "h*" {
+		t.Fatalf("stat text %#v", s)
+	}
+}
+
+func TestCompileSecondaryDomains(t *testing.T) {
+	q := mustParse(t, `items.find({"$msp":[{"@l":{"$nmatch":"a*"}},{"@*":{"$ne":"*"}},`+
+		`{"property.key":{"$gt":"b"}}],"stat.downloaded_by":{"$match":"a*"},`+
+		`"stat.downloads":{"$eq":null},"stat.remote_path":{"$lt":"z"}})`)
+	pg, err := q.Compile(PostgreSQL, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`EXISTS (SELECT 1 FROM item_properties p WHERE p.item_id = items.id AND p.key = ? AND ` +
+			`NOT (p.value COLLATE "C" LIKE ? ESCAPE '\') AND 1=0 AND p.key COLLATE "C" > ?)`,
+		`((SELECT s.last_downloaded_by FROM item_stats s WHERE s.item_id = items.id) COLLATE "C" LIKE ? ESCAPE '\')`,
+		`(SELECT s.download_count FROM item_stats s WHERE s.item_id = items.id) IS NULL`,
+		`(SELECT s.remote_path FROM item_stats s WHERE s.item_id = items.id) COLLATE "C" < ?`,
+	} {
+		if !strings.Contains(pg.Where, want) {
+			t.Errorf("postgres where lacks\n%s\nin\n%s", want, pg.Where)
+		}
+	}
+	lite, _ := q.Compile(SQLite, Options{})
+	if !strings.Contains(
+		lite.Where,
+		`(SELECT s.remote_path FROM item_stats s WHERE s.item_id = items.id) < ?`,
+	) ||
+		!strings.Contains(lite.Where, `NOT (p.value GLOB ?)`) {
+		t.Fatalf("sqlite where %s", lite.Where)
+	}
+}
+
+func TestMatchStatEdges(t *testing.T) {
+	st := &types.ItemStats{DownloadCount: 1}
+	for src, want := range map[string]bool{
+		`{"stat.downloaded":{"$eq":null}}`:          true,
+		`{"stat.downloaded":{"$ne":null}}`:          false,
+		`{"stat.downloaded":{"$lt":"2030"}}`:        false,
+		`{"stat.downloaded_by":{"$ne":null}}`:       true,
+		`{"stat.downloaded_by":""}`:                 true,
+		`{"stat.remote_downloads":0}`:               true,
+		`{"stat.remote_origin":{"$nmatch":"x"}}`:    true,
+		`{"stat.remote_downloaded_by":{"$lt":"a"}}`: true,
+	} {
+		q := mustParse(t, `items.find(`+src+`)`)
+		if got := match(q.Criteria.(And)[0], Hit{Stats: st}, time.Now()); got != want {
+			t.Errorf("%s: %v", src, got)
+		}
+	}
+}
+
+func TestResponseSecondaryDomains(t *testing.T) {
+	at := time.Date(2026, 1, 2, 3, 4, 5, 678e6, time.UTC)
+	hit := Hit{
+		Item:         types.Item{RepoKey: "r", Path: "a", Name: "f"},
+		Properties:   types.Properties{"b": {"1"}, "a": {"x"}, "c": {"y"}},
+		Stats:        &types.ItemStats{DownloadCount: 2, LastDownloaded: at, RemoteOrigin: "o"},
+		VirtualRepos: []string{"v1", "v2"},
+	}
+	for query, want := range map[string]string{
+		`items.find().include("repo","path","name","virtual_repos","@c","@a","stat")`: `{"repo":"r",` +
+			`"path":"a","name":"f","virtual_repos":["v1","v2"],"properties":[{"key":"a","value":"x"},` +
+			`{"key":"c","value":"y"}],"stats":[{"downloaded":"2026-01-02T03:04:05.678Z","downloads":2,` +
+			`"remote_downloads":0,"remote_origin":"o"}]}`,
+		`items.find().include("name","stat.downloads","@z")`: `{"name":"f","stats":[{"downloads":2}]}`,
+	} {
+		b, _ := json.Marshal(mustParse(t, query).Response([]Hit{hit}).Rows[0])
+		if string(b) != want {
+			t.Errorf("%s:\ngot  %s\nwant %s", query, b, want)
+		}
+	}
+	// No virtual repositories render as an empty list; no statistics record
+	// renders no stats.
+	bare := Hit{Item: hit.Item}
+	q := mustParse(t, `items.find().include("repo","path","name","virtual_repos","stat")`)
+	b, _ := json.Marshal(q.Response([]Hit{bare}).Rows[0])
+	if string(b) != `{"repo":"r","path":"a","name":"f","virtual_repos":[]}` {
+		t.Fatalf("bare row %s", b)
+	}
+}
+
+// TestParseOutputRules covers the refusals of research 22 §1.2's output
+// rules and the longer secondary-domain errors.
+func TestParseOutputRules(t *testing.T) {
+	for src, want := range map[string]error{
+		`items.find().include("property").limit(1)`:            ErrInvalid,
+		`items.find().include("property.key").offset(0)`:       ErrInvalid,
+		`items.find().include("@k").offset(1)`:                 ErrInvalid,
+		`items.find().include("stat").sort({"$asc":["name"]})`: ErrInvalid,
+		`items.find().include("stat.downloads").limit(1)`:      ErrInvalid,
+		`items.find().include("name").sort({"$asc":["size"]})`: ErrInvalid,
+		`items.find().include("virtual_repos")`:                ErrInvalid,
+		`items.find().include("repo","name","virtual_repos")`:  ErrInvalid,
+	} {
+		if _, err := Parse(src); !errors.Is(err, want) {
+			t.Errorf("Parse(%s) = %v, want %v", src, err, want)
+		}
 	}
 }

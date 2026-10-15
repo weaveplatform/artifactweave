@@ -73,34 +73,55 @@ func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.H
 			}); err != nil {
 			return err
 		}
-		if !q.Properties() {
+		if q.Properties() {
+			if err := i.hitProperties(ctx, hits); err != nil {
+				return err
+			}
+		}
+		if len(q.Stats()) == 0 {
 			return nil
 		}
-		return i.hitProperties(ctx, hits)
+		return i.hitStats(ctx, hits)
 	})
 	return hits, err
 }
 
-// searchPropertyBatch bounds the IN list of one property query, well under
-// SQLite's and PostgreSQL's parameter limits.
-const searchPropertyBatch = 500
+// searchBatch bounds the IN list of one property or statistics query, well
+// under SQLite's and PostgreSQL's parameter limits.
+const searchBatch = 500
 
-// hitProperties fills each hit's properties.
-func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
-	byID := make(map[int64]int, len(hits))
-	for n, h := range hits {
-		byID[h.Item.ID] = n
-	}
-	for start := 0; start < len(hits); start += searchPropertyBatch {
-		batch := hits[start:min(start+searchPropertyBatch, len(hits))]
+// eachBatch calls load with an "IN (?,...)" list and its arguments for the
+// IDs of hits, searchBatch at a time.
+func eachBatch(hits []aql.Hit, load func(in string, args []any) error) error {
+	for start := 0; start < len(hits); start += searchBatch {
+		batch := hits[start:min(start+searchBatch, len(hits))]
 		args := make([]any, len(batch))
 		for n, h := range batch {
 			args[n] = h.Item.ID
 		}
-		err := i.s.rows(ctx, "search item properties",
-			"SELECT item_id, key, value FROM item_properties WHERE item_id IN ("+
-				strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")+
-				") ORDER BY item_id, key, value",
+		in := "IN (" + strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",") + ")"
+		if err := load(in, args); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func hitIndex(hits []aql.Hit) map[int64]int {
+	byID := make(map[int64]int, len(hits))
+	for n, h := range hits {
+		byID[h.Item.ID] = n
+	}
+	return byID
+}
+
+// hitProperties fills each hit's properties.
+func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
+	byID := hitIndex(hits)
+	return eachBatch(hits, func(in string, args []any) error {
+		return i.s.rows(ctx, "search item properties",
+			"SELECT item_id, key, value FROM item_properties WHERE item_id "+in+
+				" ORDER BY item_id, key, value",
 			args,
 			func(rs *sql.Rows) error {
 				var (
@@ -117,11 +138,33 @@ func (i items) hitProperties(ctx context.Context, hits []aql.Hit) error {
 				h.Properties[k] = append(h.Properties[k], v)
 				return nil
 			})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	})
+}
+
+// hitStats fills the statistics of each hit that has a record.
+func (i items) hitStats(ctx context.Context, hits []aql.Hit) error {
+	byID := hitIndex(hits)
+	return eachBatch(hits, func(in string, args []any) error {
+		return i.s.rows(ctx, "search item statistics",
+			"SELECT "+strings.Join(statsCols, ", ")+" FROM item_stats WHERE item_id "+in,
+			args,
+			func(rs *sql.Rows) error {
+				var (
+					id               int64
+					st               types.ItemStats
+					last, remoteLast sql.NullInt64
+				)
+				if err := rs.Scan(&id, &st.DownloadCount, &last, &st.LastDownloadedBy,
+					&st.RemoteDownloadCount, &remoteLast, &st.RemoteLastDownloadedBy,
+					&st.RemoteOrigin, &st.RemotePath); err != nil {
+					return err //nolint:wrapcheck // wrapped by rows
+				}
+				st.LastDownloaded = fromMicros(last)
+				st.RemoteLastDownloaded = fromMicros(remoteLast)
+				hits[byID[id]].Stats = &st
+				return nil
+			})
+	})
 }
 
 // canonical derives Path, Name and Depth from the item's full path.

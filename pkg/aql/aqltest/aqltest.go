@@ -1,8 +1,9 @@
 // Package aqltest holds the AQL fixtures every search backend must agree
 // on (decision 0012): seed items chosen to trip the dialect traps (a GLOB
 // character class, LIKE wildcards in names, a multi-byte character, a
-// missing time, a remote cache), the query shapes the JFrog CLI generates,
-// and the rows each query returns, in order.
+// missing time, a remote cache, an item without statistics beside one whose
+// statistics are zero), the query shapes the JFrog CLI generates, and the
+// rows each query returns, in order.
 //
 // The pkg/aql tests run the cases through aql.Select; the store contract
 // suite runs them through every ItemStore.Search.
@@ -36,10 +37,12 @@ var Base = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 // Now is the clock the cases run at, for $before and $last.
 var Now = Base.Add(time.Hour)
 
-// Seed is one item to store, with its properties.
+// Seed is one item to store, with its properties and its statistics; nil
+// Stats stores no statistics record.
 type Seed struct {
 	Item       types.Item
 	Properties types.Properties
+	Stats      *types.ItemStats
 }
 
 // Seeds returns the items in insertion order; stores give them ascending
@@ -82,14 +85,32 @@ func Seeds() []Seed {
 	add("libs-local", "readme.md", false, 5, "carol", nil)
 	add("generic-local", "docs", true, 0, "", nil)
 	add("generic-local", "docs/guide [1].txt", false, 7, "", nil)
-	add("generic-local", "docs/a_b.txt", false, 8, "", nil)
-	add("generic-local", "docs/axb.txt", false, 8, "", nil)
+	// The two license items are $msp's documented example (research 22
+	// §1.1): a_b.txt is item B, axb.txt item A.
+	add("generic-local", "docs/a_b.txt", false, 8, "",
+		types.Properties{"license": {"LGPL-2.1", "LGPL-2.2"}})
+	add("generic-local", "docs/axb.txt", false, 8, "",
+		types.Properties{"license": {"AGPL-V3"}})
 	add("generic-local", "docs/50%.txt", false, 9, "", nil)
 	add("generic-local", "docs/50abc.txt", false, 9, "", nil)
 	add("generic-local", "docs/naïve.txt", false, 11, "", nil)
 	add("remote-cache", "org/acme/app-1.0.jar", false, 100, "", nil)
 	// readme.md has no modification time, which SQL stores as NULL.
 	out[6].Item.Modified = time.Time{}
+	// util-2.0.jar has no statistics record and app-1.0.pom an empty one:
+	// a never-downloaded item compares as NULL in the first case and as 0
+	// or "" in the second.
+	out[3].Stats = &types.ItemStats{
+		DownloadCount: 5, LastDownloaded: Base.Add(30 * time.Minute), LastDownloadedBy: "alice",
+	}
+	out[4].Stats = &types.ItemStats{}
+	out[6].Stats = &types.ItemStats{
+		RemoteDownloadCount: 2, RemoteLastDownloaded: Base.Add(40 * time.Minute),
+		RemoteLastDownloadedBy: "bob", RemoteOrigin: "https://up", RemotePath: "readme.md",
+	}
+	out[14].Stats = &types.ItemStats{
+		DownloadCount: 1, LastDownloaded: Base.Add(50 * time.Minute), LastDownloadedBy: "carol",
+	}
 	return out
 }
 
@@ -102,7 +123,7 @@ func Hits() []aql.Hit {
 		it := s.Item
 		it.ID = int64(n + 1)
 		_, _, it.Depth, _ = types.SplitItemPath(it.FullPath())
-		out[n] = aql.Hit{Item: it, Properties: s.Properties}
+		out[n] = aql.Hit{Item: it, Properties: s.Properties, Stats: s.Stats}
 	}
 	return out
 }
@@ -220,13 +241,71 @@ func Cases() []Case {
 		`items.find({"repo":"libs-local","$or":[{"name":"readme.md","size":300}]})`, util, readme)
 	q("or of nothing", `items.find({"$or":[]})`)
 	q("and of nothing", `items.find({"$and":[],"repo":"remote-cache"})`, cached)
+	q("property include keeps the defaults",
+		`items.find({"repo":"libs-local"}).include("property")`, jar, pom, util, readme)
+	q("key include filters items", `items.find().include("repo","path","name","@release")`,
+		jar, util)
+	q("two key includes need both keys", `items.find().include("@release","@owner")`, util)
+	// $msp, research 22 §1.1: without it each criterion may be met by a
+	// different value of the key, with it by one value.
+	q("criteria without msp are independent",
+		`items.find({"repo":"generic-local","@license":{"$match":"*GPL*","$nmatch":"LGPL-2.1*"}})`,
+		axb)
+	q("msp needs one property to meet every criterion",
+		`items.find({"repo":"generic-local","$msp":[{"@license":{"$match":"*GPL*"}},`+
+			`{"@license":{"$nmatch":"LGPL-2.1*"}}]})`,
+		aUnder, axb)
+	q("property key and value are independent",
+		`items.find({"property.key":"release","property.value":"team-a"})`, util)
+	q("msp ties a key to its value",
+		`items.find({"$msp":[{"property.key":"release","property.value":"team-a"}]})`)
+	q("msp with an ordering operator",
+		`items.find({"$msp":[{"property.key":"release","property.value":{"$gt":"1.5"}}]})`, util)
+	q("msp negatives test the one property",
+		`items.find({"$msp":[{"@*":{"$nmatch":"*GPL*"}},{"property.key":{"$ne":"build.name"}}]})`,
+		jar, util)
+	q("msp value nmatch", `items.find({"$msp":[{"property.value":{"$nmatch":"*.*"}}]})`,
+		jar, pom, util, axb)
+	q("msp negative of any is nothing", `items.find({"$msp":[{"@license":{"$ne":"*"}}]})`)
+	q("property key ne holds without the key",
+		`items.find({"repo":"libs-local","property.key":{"$ne":"release"}})`, pom, readme)
+	q("property key any", `items.find({"repo":"libs-local","property.key":"*"})`,
+		jar, pom, util)
+	q("property value match", `items.find({"property.value":{"$match":"LGPL*"}})`, aUnder)
+	q("property key ordering", `items.find({"property.key":{"$lt":"c"}})`, jar, pom)
+	q("stat include", `items.find({"repo":"libs-local"}).include("repo","path","name","stat")`,
+		jar, pom, util, readme)
+	q("stat field include", `items.find({"name":"app-1.0.jar"}).include("stat.downloads")`,
+		jar, cached)
+	q("stat number as a string", `items.find({"stat.downloads":{"$gt":"0"}})`, jar, cached)
+	q("stat null is no statistics", `items.find({"repo":"libs-local","stat.downloads":null})`,
+		util)
+	q("stat null time", `items.find({"repo":"libs-local","stat.downloaded":{"$eq":null}})`,
+		pom, util, readme)
+	q("stat ne null", `items.find({"stat.downloads":{"$ne":null}})`, jar, pom, readme, cached)
+	q("stat zero is not null", `items.find({"stat.downloads":0})`, pom, readme)
+	q("stat text ne skips items without statistics",
+		`items.find({"stat.downloaded_by":{"$ne":"alice"}})`, pom, readme, cached)
+	q("stat text nmatch skips items without statistics",
+		`items.find({"repo":"libs-local","stat.remote_path":{"$nmatch":"*.md"}})`, jar, pom)
+	q("stat text match", `items.find({"stat.remote_origin":{"$match":"https://*"}})`, readme)
+	q("stat text ordering", `items.find({"stat.downloaded_by":{"$gt":"b"}})`, cached)
+	q("stat remote count", `items.find({"stat.remote_downloads":{"$lte":1}})`, jar, pom, cached)
+	q("stat time", `items.find({"stat.downloaded":{"$gte":"2026-01-01T00:30"}})`, jar, cached)
+	q("stat last", `items.find({"stat.downloaded":{"$last":"20minutes"}})`, cached)
+	q("stat before", `items.find({"stat.remote_downloaded":{"$before":"10minutes"}})`, readme)
 	out = append(out, Case{
 		Name: "cap applies without a limit", Query: `items.find({"repo":"generic-local"})`,
-		Options: aql.Options{Limit: 2}, Want: []string{guide, aUnder},
+		Options: aql.Options{Max: 2}, Want: []string{guide, aUnder},
 	})
 	out = append(out, Case{
-		Name: "own limit beats the cap", Query: `items.find({"repo":"generic-local"}).limit(3)`,
-		Options: aql.Options{Limit: 2}, Want: []string{guide, aUnder, axb},
+		Name:    "cap trims an own limit above it",
+		Query:   `items.find({"repo":"generic-local"}).limit(3)`,
+		Options: aql.Options{Max: 2}, Want: []string{guide, aUnder},
+	})
+	out = append(out, Case{
+		Name: "own limit below the cap", Query: `items.find({"repo":"generic-local"}).limit(1)`,
+		Options: aql.Options{Max: 2}, Want: []string{guide},
 	})
 	for n := range out {
 		out[n].Options.Now = Now

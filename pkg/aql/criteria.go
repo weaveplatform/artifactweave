@@ -57,23 +57,73 @@ func criterion(m member, depth int) (Node, error) {
 			return And(children), nil
 		}
 		return Or(children), nil
-	case m.key == "$msp" || m.key == "$rf":
+	case m.key == "$msp":
+		return msp(m)
+	case m.key == "$rf":
 		return nil, fmt.Errorf("%w: %s", ErrUnsupported, m.key)
 	case strings.HasPrefix(m.key, "$"):
 		return nil, syntaxErr(m.pos, "unknown operator %q", m.key)
-	case strings.HasPrefix(m.key, "@"):
+	case strings.HasPrefix(m.key, "@"), m.key == "property.key", m.key == "property.value":
 		return property(m)
+	case strings.HasPrefix(m.key, "stat."):
+		return stat(m)
+	case m.key == FieldVirtualRepos:
+		return nil, fmt.Errorf("%w: criteria on %s (it can only be included)",
+			ErrUnsupported, FieldVirtualRepos)
 	}
 	f := Field(m.key)
 	k, ok := fieldKinds[f]
 	if !ok {
 		if strings.Contains(m.key, ".") {
-			return nil, fmt.Errorf("%w: field %q (secondary domains other than @property)",
-				ErrUnsupported, m.key)
+			return nil, fmt.Errorf(
+				"%w: field %q (secondary domains other than property and stat)",
+				ErrUnsupported, m.key,
+			)
 		}
 		return nil, syntaxErr(m.pos, "unknown field %q", m.key)
 	}
 	return comparisons(m, func(op Op, v value) (Node, error) { return field(f, k, op, v) })
+}
+
+// msp reads $msp: an array of objects whose members are property criteria,
+// all of which one property of the item must satisfy (research 22 §1.1).
+func msp(m member) (Node, error) {
+	if m.val.kind != vArray {
+		return nil, syntaxErr(m.val.pos, "$msp takes an array of objects")
+	}
+	var out MSP
+	for _, item := range m.val.items {
+		if item.kind != vObject {
+			return nil, syntaxErr(item.pos, "$msp takes an array of objects")
+		}
+		for _, im := range item.members {
+			if !strings.HasPrefix(im.key, "@") && im.key != "property.key" &&
+				im.key != "property.value" {
+				return nil, syntaxErr(im.pos, "$msp takes property criteria, not %q", im.key)
+			}
+			n, err := property(im)
+			if err != nil {
+				return nil, err
+			}
+			out = appendProperty(out, n)
+		}
+	}
+	if len(out) == 0 {
+		return nil, syntaxErr(m.val.pos, "$msp has no criteria")
+	}
+	return out, nil
+}
+
+// appendProperty adds the property criteria of n, which property built: one
+// criterion, or the And of several operators on one key.
+func appendProperty(out MSP, n Node) MSP {
+	if a, ok := n.(And); ok {
+		for _, c := range a {
+			out = append(out, c.(*PropertyCriterion))
+		}
+		return out
+	}
+	return append(out, n.(*PropertyCriterion))
 }
 
 // comparisons applies build to the member's value: a scalar is $eq, and an
@@ -158,10 +208,18 @@ func field(f Field, k kind, op Op, v value) (Node, error) {
 	return c, nil
 }
 
+// property reads "@<key>", "property.key" or "property.value".
 func property(m member) (Node, error) {
-	key := strings.TrimPrefix(m.key, "@")
-	if key == "" {
-		return nil, syntaxErr(m.pos, "property criterion without a key")
+	part, key := PartPair, strings.TrimPrefix(m.key, "@")
+	switch m.key {
+	case "property.key":
+		part, key = PartKey, ""
+	case "property.value":
+		part, key = PartValue, ""
+	default:
+		if key == "" {
+			return nil, syntaxErr(m.pos, "property criterion without a key")
+		}
 	}
 	return comparisons(m, func(op Op, v value) (Node, error) {
 		switch op {
@@ -172,7 +230,36 @@ func property(m member) (Node, error) {
 		if v.kind != vString {
 			return nil, syntaxErr(v.pos, "property values are strings")
 		}
-		return &PropertyCriterion{Key: key, Op: op, Value: v.text}, nil
+		return &PropertyCriterion{Part: part, Key: key, Op: op, Value: v.text}, nil
+	})
+}
+
+// stat reads a "stat.<field>" criterion. A JSON null compares with $eq or $ne
+// against "no value": research 22 §1.1 and JFrog's own advice to write null,
+// not 0, for an item never downloaded.
+func stat(m member) (Node, error) {
+	f := StatField(strings.TrimPrefix(m.key, "stat."))
+	k, ok := statKinds[f]
+	if !ok {
+		return nil, syntaxErr(m.pos, "unknown field %q", m.key)
+	}
+	return comparisons(m, func(op Op, v value) (Node, error) {
+		if v.kind == vNull {
+			if op != OpEq && op != OpNe {
+				return nil, syntaxErr(v.pos, "null takes $eq or $ne, not %s", op)
+			}
+			return &StatCriterion{Field: f, Op: op, Null: true}, nil
+		}
+		// The item-field parser checks the operator and reads the value by
+		// kind; its field name only appears in errors.
+		n, err := field(Field(m.key), k, op, v)
+		if err != nil {
+			return nil, err
+		}
+		fc := n.(*FieldCriterion)
+		return &StatCriterion{
+			Field: f, Op: op, Text: fc.Text, Number: fc.Number, Time: fc.Time, Span: fc.Span,
+		}, nil
 	})
 }
 

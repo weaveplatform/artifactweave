@@ -1,8 +1,10 @@
 // Package aql parses Artifactory Query Language and runs it (decision 0012).
-// It covers the items domain in the shape the JFrog CLI generates for every
-// file specification (research 09): $and and $or, field comparisons, $match
-// and $nmatch globs, @property criteria, and the include, sort, offset,
-// limit, transitive and distinct suffixes.
+// It covers the items domain: the shape the JFrog CLI generates for every
+// file specification (research 09) and what users write by hand. That is
+// $and and $or, field comparisons, $match and $nmatch globs, @property and
+// property.key/property.value criteria, $msp, the stat domain, and the
+// include, sort, offset, limit, transitive and distinct suffixes with
+// Artifactory's output rules (research 22 §1).
 //
 // A parsed Query is run two ways that must agree row for row: Match and
 // Compare are the reference semantics (the in-memory store uses them), and
@@ -15,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -38,6 +41,13 @@ var (
 	ErrTooLong = errors.New("AQL query is too long")
 	// ErrRestricted reports a query a non-admin caller may not run.
 	ErrRestricted = errors.New("aql: restricted")
+	// ErrEmpty reports a request with no query at all.
+	ErrEmpty = errors.New("aql: empty query")
+	// ErrInvalid reports a query that parses but breaks an output rule:
+	// sort, offset or limit beside an include of another domain, a sort on
+	// a field the output leaves out, or virtual_repos without repo, path
+	// and name.
+	ErrInvalid = errors.New("aql: invalid query")
 )
 
 // Field is an item field name as AQL spells it.
@@ -72,6 +82,42 @@ const (
 	kindTime
 	kindType
 )
+
+// FieldVirtualRepos lists the virtual repositories that contain an item's
+// repository. It can be included but not searched on, and it needs repo,
+// path and name in the output (research 22 §1.2).
+const FieldVirtualRepos = "virtual_repos"
+
+// StatField is a field of the stat domain, which criteria name
+// "stat.<field>". Its values come from the item's download statistics; an
+// item that was never downloaded has none, which compares as SQL NULL.
+type StatField string
+
+// Statistic fields (research 22 §1.1).
+const (
+	StatDownloaded         StatField = "downloaded"
+	StatDownloads          StatField = "downloads"
+	StatDownloadedBy       StatField = "downloaded_by"
+	StatRemoteDownloads    StatField = "remote_downloads"
+	StatRemoteDownloaded   StatField = "remote_downloaded"
+	StatRemoteDownloadedBy StatField = "remote_downloaded_by"
+	StatRemoteOrigin       StatField = "remote_origin"
+	StatRemotePath         StatField = "remote_path"
+)
+
+// statOrder lists the statistic fields in the order results render them,
+// which is jfrog-client-go's Stat struct order for the fields it reads.
+var statOrder = []StatField{
+	StatDownloaded, StatDownloads, StatDownloadedBy, StatRemoteDownloads,
+	StatRemoteDownloaded, StatRemoteDownloadedBy, StatRemoteOrigin, StatRemotePath,
+}
+
+// statKinds maps each statistic field to its kind.
+var statKinds = map[StatField]kind{
+	StatDownloaded: kindTime, StatDownloads: kindNumber, StatDownloadedBy: kindText,
+	StatRemoteDownloads: kindNumber, StatRemoteDownloaded: kindTime,
+	StatRemoteDownloadedBy: kindText, StatRemoteOrigin: kindText, StatRemotePath: kindText,
+}
 
 // fieldOrder lists the item fields in the order results render them.
 var fieldOrder = []Field{
@@ -115,8 +161,8 @@ const (
 	OpLast   Op = "$last"
 )
 
-// Node is a criteria tree node: And, Or, *FieldCriterion or
-// *PropertyCriterion.
+// Node is a criteria tree node: And, Or, *FieldCriterion,
+// *PropertyCriterion, *StatCriterion or MSP.
 type Node interface{ node() }
 
 // And holds when every child holds; an empty And always holds.
@@ -137,20 +183,57 @@ type FieldCriterion struct {
 	Span   Span
 }
 
-// PropertyCriterion matches items by property. Key "*" is any key; Value
-// "*" with $eq (or $match) is any value. A negative operator ($ne,
-// $nmatch) holds when the item has no property of Key whose value matches
-// the positive form, so items without the key match it too.
+// PropertyPart says which part of a property a PropertyCriterion tests.
+type PropertyPart int
+
+// Property parts: "@key" tests a key's values, "property.key" the keys
+// alone and "property.value" the values alone.
+const (
+	PartPair PropertyPart = iota
+	PartKey
+	PartValue
+)
+
+// PropertyCriterion matches items by property. For PartPair, Key "*" is any
+// key and Value "*" with $eq (or $match) is any value. For PartKey and
+// PartValue, Value is what the key or the value is compared with, and "*"
+// with $eq is any. A negative operator ($ne, $nmatch) holds when the item has
+// no property that matches the positive form, so items without the key match
+// it too. Each criterion is tested on its own: two of them may be satisfied
+// by different properties of the item, unless they sit in an MSP.
 type PropertyCriterion struct {
+	Part  PropertyPart
 	Key   string
 	Op    Op
 	Value string
 }
 
+// MSP is $msp, match on a single property: it holds when one property of the
+// item satisfies every criterion at once. Inside it, a negative operator
+// tests that one property ($ne is a different value, $nmatch a value that
+// does not match), not the absence of every property that would match.
+type MSP []*PropertyCriterion
+
+// StatCriterion compares a statistic field. Null with $eq holds for an item
+// that has no value for the field (never downloaded), and with $ne for one
+// that has; otherwise a missing value compares as SQL NULL and no comparison
+// holds.
+type StatCriterion struct {
+	Field  StatField
+	Op     Op
+	Null   bool
+	Text   string
+	Number int64
+	Time   time.Time
+	Span   Span
+}
+
 func (And) node()                {}
 func (Or) node()                 {}
+func (MSP) node()                {}
 func (*FieldCriterion) node()    {}
 func (*PropertyCriterion) node() {}
+func (*StatCriterion) node()     {}
 
 // Span is a relative time for $before and $last: N units back from now.
 type Span struct {
@@ -191,14 +274,16 @@ type Query struct {
 	Include []string
 	// Sort is nil when the query does not sort.
 	Sort *Sort
-	// Offset and Limit are the suffixes; HasLimit tells .limit(0) from no
-	// limit.
-	Offset   int
-	Limit    int
-	HasLimit bool
+	// Offset and Limit are the suffixes; HasOffset and HasLimit tell
+	// .offset(0) and .limit(0) from none.
+	Offset    int
+	HasOffset bool
+	Limit     int
+	HasLimit  bool
 	// Transitive and Distinct are accepted for compatibility and have no
-	// effect: items rows are always distinct, and artifactweave has no
-	// virtual-repository search to make transitive.
+	// effect: items rows are always distinct (properties and statistics
+	// render inside their item), and artifactweave has no Smart Remote
+	// search to make transitive.
 	Transitive bool
 	Distinct   bool
 }
@@ -207,8 +292,9 @@ type Query struct {
 type Options struct {
 	// Now resolves $before and $last; zero means time.Now.
 	Now time.Time
-	// Limit caps a query that has no limit of its own; zero means no cap.
-	Limit int
+	// Max is the most rows any query returns, its own limit included: the
+	// search hard limit (decision 0012). Zero means no cap.
+	Max int
 }
 
 func (o Options) now() time.Time {
@@ -219,21 +305,22 @@ func (o Options) now() time.Time {
 }
 
 // Window returns the offset and the row limit to apply; a negative limit
-// means none.
+// means none. The cap trims a query's own limit too.
 func (q *Query) Window(o Options) (offset, limit int) {
-	switch {
-	case q.HasLimit:
-		return q.Offset, q.Limit
-	case o.Limit > 0:
-		return q.Offset, o.Limit
-	default:
-		return q.Offset, -1
+	limit = -1
+	if q.HasLimit {
+		limit = q.Limit
 	}
+	if o.Max > 0 && (limit < 0 || limit > o.Max) {
+		limit = o.Max
+	}
+	return q.Offset, limit
 }
 
 // Fields returns the item fields each result row carries, in render order:
 // the included item fields, or the default fields when the include names
-// none (an include of only "property" still returns the defaults).
+// none. Including only properties or statistics keeps the defaults, as
+// Artifactory does.
 func (q *Query) Fields() []Field {
 	var out []Field
 	for _, f := range fieldOrder {
@@ -241,16 +328,68 @@ func (q *Query) Fields() []Field {
 			out = append(out, f)
 		}
 	}
-	if len(out) == 0 {
+	if len(out) == 0 && !q.VirtualRepos() {
 		return slices.Clone(defaultFields)
 	}
 	return out
 }
 
-// Properties reports whether result rows carry the item's properties.
+// VirtualRepos reports whether result rows carry virtual_repos.
+func (q *Query) VirtualRepos() bool { return slices.Contains(q.Include, FieldVirtualRepos) }
+
+// Properties reports whether result rows carry the item's properties: an
+// include of "property", "property.*", "property.key", "property.value" or
+// "@<key>".
 func (q *Query) Properties() bool {
-	return slices.Contains(q.Include, "property") || slices.Contains(q.Include, "property.*") ||
-		slices.Contains(q.Include, "property.key") || slices.Contains(q.Include, "property.value")
+	return slices.ContainsFunc(q.Include, func(s string) bool {
+		return s == "property" || strings.HasPrefix(s, "property.") || strings.HasPrefix(s, "@")
+	})
+}
+
+// PropertyKeys returns the keys an "@<key>" include limits the rendered
+// properties to, in include order; nil means every key, which an include of
+// the whole property domain also asks for.
+func (q *Query) PropertyKeys() []string {
+	for _, s := range q.Include {
+		if s == "property" || s == "property.*" || s == "property.key" || s == "property.value" {
+			return nil
+		}
+	}
+	return q.keyIncludes()
+}
+
+// keyIncludes returns the keys of the "@<key>" includes, in include order.
+// Each also filters out items without that key, which Parse adds to the
+// criteria whatever else the include names.
+func (q *Query) keyIncludes() []string {
+	var out []string
+	for _, s := range q.Include {
+		if k, ok := strings.CutPrefix(s, "@"); ok && !slices.Contains(out, k) {
+			out = append(out, k)
+		}
+	}
+	return out
+}
+
+// Stats returns the statistic fields result rows carry, in render order:
+// all of them for "stat" or "stat.*", or those named "stat.<field>".
+func (q *Query) Stats() []StatField {
+	var out []StatField
+	for _, f := range statOrder {
+		for _, s := range q.Include {
+			if s == "stat" || s == "stat.*" || s == "stat."+string(f) {
+				out = append(out, f)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// primaryOnly reports whether the include names only item fields, the rule
+// sort, offset and limit need.
+func (q *Query) primaryOnly() bool {
+	return !q.Properties() && len(q.Stats()) == 0
 }
 
 // CheckRestricted applies decision 0012's rule for non-admin callers: they
