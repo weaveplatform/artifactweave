@@ -26,7 +26,15 @@
         },
         {
           "type": "generic",
+          "path": "deploy/platform/terraform/azure/geo-replicated/README.md"
+        },
+        {
+          "type": "generic",
           "path": "deploy/platform/terraform/azure/multi-region/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/platform/terraform/azure/single-bucket/README.md"
         },
         {
           "type": "generic",

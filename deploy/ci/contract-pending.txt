@@ -7,7 +7,5 @@
 # Scenarios.
 deploy/platform/terraform/aws/geo-replicated
 deploy/platform/terraform/aws/single-bucket
-deploy/platform/terraform/azure/geo-replicated
-deploy/platform/terraform/azure/single-bucket
 deploy/platform/terraform/gcp/geo-replicated
 deploy/platform/terraform/gcp/single-bucket

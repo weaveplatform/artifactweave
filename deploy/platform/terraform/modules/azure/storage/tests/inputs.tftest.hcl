@@ -93,6 +93,32 @@ run "outputs_name_the_account_and_its_signed_urls" {
   }
 }
 
+run "a_readable_copy_has_a_secondary_host" {
+  command = plan
+
+  variables {
+    replication_type = "RAGZRS"
+  }
+
+  assert {
+    condition     = output.secondary_host == "example0a1b2cuks-secondary.blob.core.windows.net"
+    error_message = "with a readable geo copy, secondary_host must be the paired region's endpoint, <account>-secondary"
+  }
+}
+
+run "an_unreadable_copy_has_no_secondary_host" {
+  command = plan
+
+  variables {
+    replication_type = "GZRS"
+  }
+
+  assert {
+    condition     = output.secondary_host == null
+    error_message = "a GZRS or GRS copy is readable only after a failover, so secondary_host must be null"
+  }
+}
+
 run "account_name_is_checked" {
   command = plan
 

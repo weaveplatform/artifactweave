@@ -1,9 +1,13 @@
-# azure/single-bucket: a storage account without Shared Key granted to the
-# bootstrap's conformance identity (Terraform), artifactweave run natively
-# against it (make up, deploy/ci/local.sh), and the real-cloud conformance
-# tests. Apply deploy/ci/terraform/azure first. Plan and apply need az login
-# and az account set --subscription to the lab's (LAB_AZURE_SUBSCRIPTION in
-# deploy/ci/lab.mk).
+# azure/single-bucket in the lab, and the Azure conformance account
+# (cloud-conformance.yml): make plan, apply and destroy pass these and
+# deploy/ci/lab-vars.sh's inputs (the lab's subscription, the bootstrap's
+# conformance identity as the app identity, and you as an additional
+# principal). The README's "How this scenario is tested" lists them. The
+# local run writes under local/, and the conformance tests under
+# conformance/, which expires after a day in case a run skips its cleanup.
+
+TF_VARS = -var name=artifactweave-acc -var location=uksouth -var store_prefix=local/ \
+  -var expiring_prefixes='{"conformance/" = 1}'
 
 CONFORMANCE_ENV = \
   ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$$($(TERRAFORM) -chdir=$(CURDIR) output -raw account) \

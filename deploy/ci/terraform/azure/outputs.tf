@@ -9,12 +9,12 @@ output "tenant_id" {
 }
 
 output "conformance_client_id" {
-  description = "The data-plane identity's client ID (CONFORMANCE_AZURE_CLIENT_ID); azure/single-bucket grants it its account."
+  description = "The data-plane identity's client ID (CONFORMANCE_AZURE_CLIENT_ID); the lab's azure/single-bucket grants it its account as the app identity."
   value       = azurerm_user_assigned_identity.conformance.client_id
 }
 
 output "conformance_identity" {
-  description = "The data-plane identity's name, which azure/single-bucket looks up."
+  description = "The data-plane identity's name, which deploy/ci/lab-vars.sh looks up to pass as the lab scenarios' app identity."
   value       = azurerm_user_assigned_identity.conformance.name
 }
 
