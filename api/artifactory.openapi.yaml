@@ -760,6 +760,497 @@ paths:
         - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatebowerindex.md
       x-tier: stub
+  /api/build:
+    get:
+      description: Lists every build name the caller may read, with the start time of each build's most recent run.
+      operationId: getAllBuilds
+      parameters:
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AllBuildsResponse'
+          description: The build names.
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getallbuilds.md
+    put:
+      description: Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+      operationId: uploadBuild
+      parameters:
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildInfo'
+          application/vnd.org.jfrog.artifactory+json:
+            schema:
+              $ref: '#/components/schemas/BuildInfo'
+        description: The build-info document.
+        required: true
+      responses:
+        '200':
+          description: Stored.
+          headers:
+            X-Checksum-Sha256:
+              description: SHA-256 of the stored build-info document, which the JFrog CLI reports in its detailed summary.
+              schema:
+                description: 64 lowercase hexadecimal characters.
+                type: string
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/uploadbuild.md
+  /api/build/append/{buildName}/{buildNumber}:
+    post:
+      description: Adds modules to an existing run and stores the extended document. Needs deploy and delete permission on the build.
+      operationId: appendBuild
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Required path parameter. Build number, a free-form string chosen by the CI system. Several runs may share one number; they differ in their started timestamp. A / arrives escaped as %2F.
+          in: path
+          name: buildNumber
+          required: true
+          schema:
+            description: Build number.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+          in: query
+          name: started
+          schema:
+            description: Started timestamp of the run.
+            type: string
+        - description: Optional query parameter. Key of the build-info repository holding the run. Omitted derives it from project.
+          in: query
+          name: buildRepo
+          schema:
+            description: Repository key.
+            type: string
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Modules to add to the run.
+              items:
+                $ref: '#/components/schemas/BuildModule'
+              type: array
+        description: Modules to append.
+        required: true
+      responses:
+        '204':
+          description: Appended.
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/appendbuild.md
+  /api/build/delete:
+    post:
+      description: Deletes runs of one build, selected by number or all at once, optionally with their artifacts. Needs delete permission on the build.
+      operationId: deleteBuildsMultiple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteBuildsRequest'
+        description: The runs to delete.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuildsmultiple.md
+  /api/build/promote/{buildName}/{buildNumber}:
+    post:
+      description: Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+      operationId: promoteBuild
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Required path parameter. Build number, a free-form string chosen by the CI system. Several runs may share one number; they differ in their started timestamp. A / arrives escaped as %2F.
+          in: path
+          name: buildNumber
+          required: true
+          schema:
+            description: Build number.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildPromotionRequest'
+          application/vnd.org.jfrog.artifactory.build.PromotionRequest+json:
+            schema:
+              $ref: '#/components/schemas/BuildPromotionRequest'
+        description: What to promote and where.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildPromotionResponse'
+          description: The promotion report.
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/promotebuild.md
+  /api/build/rename/{buildName}:
+    post:
+      description: Renames every run of a build. Needs deploy and delete permission on the build.
+      operationId: renameBuild
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Required query parameter. New name of the build. It must not name an existing build.
+          in: query
+          name: to
+          required: true
+          schema:
+            description: New build name.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Renamed.
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/renamebuild.md
+  /api/build/retention/{buildName}:
+    post:
+      description: Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+      operationId: controlBuildRetention
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. When true, discarding runs in the background and the request returns at once. Defaults to true.
+          in: query
+          name: async
+          schema:
+            default: true
+            description: Whether to discard in the background.
+            type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuildRetentionRequest'
+        description: The retention settings.
+        required: true
+      responses:
+        '200':
+          description: Documented by JFrog for this operation; artifactweave answers 204 instead (deviation DV-031).
+        '204':
+          description: Accepted. artifactweave answers 204, the only status the JFrog CLI accepts (decision 0014).
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/controlbuildretention.md
+  /api/build/{buildName}:
+    delete:
+      description: Deletes the listed runs of a build, or every run, optionally with their artifacts. Needs delete permission on the build.
+      operationId: deleteBuilds
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. Comma-separated build numbers to delete. Ignored when deleteAll is 1.
+          in: query
+          name: buildNumbers
+          schema:
+            description: Comma-separated build numbers.
+            type: string
+        - description: Optional query parameter. 1 also deletes the runs' artifacts; 0, the default, keeps them.
+          in: query
+          name: artifacts
+          schema:
+            default: 0
+            description: 0 or 1.
+            enum:
+              - 0
+              - 1
+            type: integer
+        - description: Optional query parameter. 1 deletes every run of the build; 0, the default, deletes only buildNumbers.
+          in: query
+          name: deleteAll
+          schema:
+            default: 0
+            description: 0 or 1.
+            enum:
+              - 0
+              - 1
+            type: integer
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: Plain-text confirmation.
+                type: string
+          description: Deleted.
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuilds.md
+    get:
+      description: Lists the runs of one build. Needs read permission on the build.
+      operationId: getBuildRuns
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildRunsResponse'
+          description: The runs.
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildruns.md
+  /api/build/{buildName}/{buildNumber}:
+    get:
+      description: Returns one run's build-info document. Needs read permission on the build.
+      operationId: getBuildInfo
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Required path parameter. Build number, a free-form string chosen by the CI system. Several runs may share one number; they differ in their started timestamp. A / arrives escaped as %2F.
+          in: path
+          name: buildNumber
+          required: true
+          schema:
+            description: Build number.
+            minLength: 1
+            type: string
+        - description: Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+          in: query
+          name: started
+          schema:
+            description: Started timestamp of the run.
+            type: string
+        - description: Optional query parameter. Another build number of the same build to compare with. artifactweave accepts it and returns the run without a comparison.
+          in: query
+          name: diff
+          schema:
+            description: Build number to compare with.
+            type: string
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildInfoResponse'
+          description: The run.
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildinfo.md
+  /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}:
+    get:
+      description: Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+      operationId: getBuildArtifacts
+      parameters:
+        - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          in: path
+          name: buildName
+          required: true
+          schema:
+            description: Build name.
+            minLength: 1
+            type: string
+        - description: Required path parameter. Build number, a free-form string chosen by the CI system. Several runs may share one number; they differ in their started timestamp. A / arrives escaped as %2F.
+          in: path
+          name: buildNumber
+          required: true
+          schema:
+            description: Build number.
+            minLength: 1
+            type: string
+        - description: 'Required path parameter. Key of the build-info repository holding the run: artifactory-build-info, or <project>-build-info for a project''s builds.'
+          in: path
+          name: buildRepo
+          required: true
+          schema:
+            description: Repository key.
+            minLength: 1
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                description: One entry per artifact of the run.
+                items:
+                  $ref: '#/components/schemas/BuildArtifact'
+                type: array
+          description: The artifacts.
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+      tags:
+        - builds
+      x-unverified: true
   /api/cargo/{repoKey}/reindex:
     post:
       description: 'Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.'
@@ -16537,6 +17028,30 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
       description: Credentials were missing or rejected. The body carries the Artifactory error envelope.
+    ArtifactoryBuildsApiBadRequest:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: The request was malformed, for example an unreadable build-info document, a missing required field, or an artifact whose checksums do not match the stored file.
+    ArtifactoryBuildsApiForbidden:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: 'The caller lacks the build permission the operation needs: read to view a build, deploy to upload or promote, deploy and delete to rename or overwrite, delete to discard or delete.'
+    ArtifactoryBuildsApiNotFound:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: No build, run or project with the given name or number exists.
+    ArtifactoryBuildsApiUnauthorized:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+      description: Credentials were missing or rejected.
     ArtifactorySearchesApiBadRequest:
       content:
         application/json:
@@ -16653,6 +17168,44 @@ components:
                 type: integer
             type: object
           type: array
+      type: object
+    AffectedIssue:
+      description: An issue in the tracker that the build relates to.
+      properties:
+        aggregated:
+          description: Optional within this object. Whether the issue was collected from an earlier build rather than this one.
+          type: boolean
+        key:
+          description: Optional within this object. Issue key in the tracker, for example PROJ-123.
+          type: string
+        summary:
+          description: Optional within this object. Issue title.
+          type: string
+        url:
+          description: Optional within this object. Link to the issue.
+          type: string
+      type: object
+    Agent:
+      description: The CI server or tool that ran the build.
+      properties:
+        name:
+          description: Optional within this object. Name of the CI server or tool, for example GitHub Actions or Jenkins.
+          type: string
+        version:
+          description: Optional within this object. Version of that CI server or tool.
+          type: string
+      type: object
+    AllBuildsResponse:
+      description: Every build name the caller may read.
+      properties:
+        builds:
+          description: Optional within this object. One entry per build name.
+          items:
+            $ref: '#/components/schemas/BuildSummary'
+          type: array
+        uri:
+          description: Optional within this object. Absolute URL of /api/build.
+          type: string
       type: object
     ApiKeyResponse:
       description: The API key of the calling user. API keys reached end of life in Artifactory at the end of 2024; artifactweave never issues one.
@@ -17416,6 +17969,31 @@ components:
             type: object
           type: array
       type: object
+    Artifact:
+      description: One artifact a module produced. It must already exist in Artifactory before the build is uploaded.
+      properties:
+        md5:
+          description: Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Upload requires it to match the stored file.
+          type: string
+        name:
+          description: Optional within this object. File name, without the path.
+          type: string
+        originalDeploymentRepo:
+          description: Optional within this object. Key of the repository the file was first deployed to.
+          type: string
+        path:
+          description: Optional within this object. Repository-relative path of the file, including its name, without the repository key.
+          type: string
+        sha1:
+          description: Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Upload requires it to match the stored file.
+          type: string
+        sha256:
+          description: Optional within this object. SHA-256 of the file, 64 lowercase hexadecimal characters.
+          type: string
+        type:
+          description: Optional within this object. File type, usually the extension, for example jar or tgz.
+          type: string
+      type: object
     ArtifactDeleteFailure:
       description: One artifact that could not be deleted while removing a repository.
       properties:
@@ -17585,6 +18163,29 @@ components:
           description: Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), formatted as `nn.nn%`.
           type: string
       type: object
+    BuildAgent:
+      description: The build tool that produced the build's modules.
+      properties:
+        name:
+          description: Optional within this object. Name of the build tool, for example Maven, Gradle or Generic.
+          type: string
+        version:
+          description: Optional within this object. Version of that build tool.
+          type: string
+      type: object
+    BuildArtifact:
+      description: One artifact of a build run, located in the repository that holds it.
+      properties:
+        name:
+          description: Optional within this object. File name.
+          type: string
+        path:
+          description: Optional within this object. Folder of the file inside the repository, without the name; . for the repository root.
+          type: string
+        repo:
+          description: Optional within this object. Key of the repository holding the file.
+          type: string
+      type: object
     BuildArtifactsSearchResult:
       description: Download URIs of the artifacts a build produced.
       properties:
@@ -17724,6 +18325,240 @@ components:
                 type: string
             type: object
           type: array
+      type: object
+    BuildInfo:
+      description: 'A build-info document: one run of a build, with its modules, artifacts and dependencies. artifactweave stores the document as a JSON item in the build-info repository, at <name>/<number>-<started epoch milliseconds>.json (decision 0014).'
+      properties:
+        agent:
+          allOf:
+            - $ref: '#/components/schemas/Agent'
+          description: Optional within this object. The CI server or tool that ran the build.
+        artifactoryPluginVersion:
+          description: Optional within this object. Version of the client or plugin that sent the document.
+          type: string
+        artifactoryPrincipal:
+          description: Optional within this object. User that deployed the build's artifacts.
+          type: string
+        buildAgent:
+          allOf:
+            - $ref: '#/components/schemas/BuildAgent'
+          description: Optional within this object. The build tool that produced the modules.
+        buildRetention:
+          allOf:
+            - $ref: '#/components/schemas/BuildRetention'
+          description: Optional within this object. Retention settings to apply to the build name after upload.
+        durationMillis:
+          description: Optional within this object. Duration of the run in milliseconds.
+          format: int64
+          type: integer
+        issues:
+          allOf:
+            - $ref: '#/components/schemas/Issues'
+          description: Optional within this object. Issue-tracker information collected for the run.
+        licenseControl:
+          allOf:
+            - $ref: '#/components/schemas/LicenseControl'
+          description: Optional within this object. License-check settings, stored and not acted on.
+        modules:
+          description: Optional within this object. Modules of the build.
+          items:
+            $ref: '#/components/schemas/BuildModule'
+          type: array
+        name:
+          description: Optional within this object. Build name. Together with number and started it identifies the run.
+          type: string
+        number:
+          description: Optional within this object. Build number. Several runs may share it.
+          type: string
+        properties:
+          additionalProperties: true
+          description: Optional within this object. Free-form string properties of the run, for example environment variables the client chose to record.
+          type: object
+        started:
+          description: Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+          type: string
+        type:
+          description: Optional within this object. Legacy build type.
+          enum:
+            - MAVEN
+            - GRADLE
+            - ANT
+            - IVY
+            - GENERIC
+          type: string
+        url:
+          description: Optional within this object. Link to the run on the CI server.
+          type: string
+        vcs:
+          description: Optional within this object. Version-control state the build was made from, one entry per repository.
+          items:
+            $ref: '#/components/schemas/VcsInfo'
+          type: array
+        version:
+          description: Optional within this object. Schema version of the document. The JFrog CLI does not send it.
+          type: string
+      type: object
+    BuildInfoResponse:
+      description: One run's build-info document.
+      properties:
+        buildInfo:
+          allOf:
+            - $ref: '#/components/schemas/BuildInfo'
+          description: Optional within this object. The stored build-info document.
+        uri:
+          description: Optional within this object. Absolute URL of the run.
+          type: string
+      type: object
+    BuildModule:
+      description: 'One module of a build: a unit the build tool produced, with its artifacts and dependencies.'
+      properties:
+        artifacts:
+          description: Optional within this object. Artifacts the module produced.
+          items:
+            $ref: '#/components/schemas/Artifact'
+          type: array
+        dependencies:
+          description: Optional within this object. Dependencies the module consumed.
+          items:
+            $ref: '#/components/schemas/Dependency'
+          type: array
+        id:
+          description: Optional within this object. Module id in the build tool's notation. A module of type build names another build as <name>/<number>; clients follow such modules when searching a build's artifacts.
+          type: string
+        properties:
+          additionalProperties: true
+          description: Optional within this object. Free-form string properties of the module.
+          type: object
+        type:
+          description: Optional within this object. Module type, for example generic, maven, gradle, docker, npm, go, python or build.
+          type: string
+      type: object
+    BuildNumber:
+      description: One run of a build.
+      properties:
+        started:
+          description: Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+          type: string
+        uri:
+          description: Optional within this object. Path of the run relative to the build, a slash followed by the build number.
+          type: string
+      type: object
+    BuildPromotionRequest:
+      description: Changes a build run's status and optionally moves or copies its files. JFrog's definition marks ciUser, timestamp, copy, artifacts, dependencies and failFast required, but the JFrog CLI omits all but failFast and Artifactory applies defaults, so artifactweave requires none of them.
+      properties:
+        artifacts:
+          description: Optional within this object. Whether the run's artifacts are moved or copied. Defaults to true.
+          type: boolean
+        ciUser:
+          description: Optional within this object. User of the CI server that requested the promotion, recorded with the status change. Omitted records the authenticated user.
+          type: string
+        comment:
+          description: Optional within this object. Free-text comment recorded with the status change.
+          type: string
+        copy:
+          description: Optional within this object. When true, files are copied to targetRepo; when false they are moved. Defaults to false.
+          type: boolean
+        dependencies:
+          description: Optional within this object. Whether the run's dependencies are moved or copied. Defaults to false.
+          type: boolean
+        dryRun:
+          description: Optional within this object. When true, reports what would happen without changing anything. Defaults to false.
+          type: boolean
+        failFast:
+          description: Optional within this object. When true, the promotion stops at the first error; when false it continues and reports every error. Defaults to true; the JFrog CLI always sends it.
+          type: boolean
+        properties:
+          additionalProperties: true
+          description: Optional within this object. Properties set on every promoted file, as a map from key to an array of values. They are set whether or not a targetRepo is given.
+          type: object
+        scopes:
+          description: Optional within this object. Dependency scopes to include; omitted means every scope. Scopes add to each other.
+          items:
+            description: Scope name.
+            type: string
+          type: array
+        sourceRepo:
+          description: Optional within this object. Only files found in this repository are moved or copied. Omitted means any repository.
+          type: string
+        status:
+          description: Optional within this object. New status recorded for the run, for example staged or released.
+          type: string
+        targetRepo:
+          description: Optional within this object. Repository the files are moved or copied to. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
+          type: string
+        timestamp:
+          description: Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted records the time the request arrived.
+          type: string
+      type: object
+    BuildPromotionResponse:
+      description: The promotion report.
+      properties:
+        messages:
+          description: Optional within this object. One message per notable event. A promotion with no messages succeeded completely.
+          items:
+            $ref: '#/components/schemas/PromotionMessage'
+          type: array
+      type: object
+    BuildRetention:
+      description: Retention settings recorded with the build at upload. They take effect like a retention request for the build name.
+      properties:
+        buildNumbersNotToBeDiscarded:
+          description: Optional within this object. Build numbers kept whatever the other settings say.
+          items:
+            description: Build number.
+            type: string
+          type: array
+        count:
+          description: Optional within this object. Number of most recent runs to keep. Omitted or 0 keeps every run.
+          type: integer
+        deleteBuildArtifacts:
+          description: Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
+          type: boolean
+        minimumBuildDate:
+          description: Optional within this object. Runs started before this time, in Unix epoch milliseconds, are discarded. Omitted keeps runs of any age.
+          format: int64
+          type: integer
+      type: object
+    BuildRetentionRequest:
+      description: Retention settings for a build name. Setting them does not delete anything at once; discarding happens as runs are added or as the request is processed.
+      properties:
+        buildNumbersNotToBeDiscarded:
+          description: Optional within this object. Build numbers kept whatever the other settings say.
+          items:
+            description: Build number.
+            type: string
+          type: array
+        count:
+          description: Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. Omitted keeps every run.
+          x-go-type: json.Number
+        deleteBuildArtifacts:
+          description: Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
+          type: boolean
+        minimumBuildDate:
+          description: Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted keeps runs of any age.
+          type: string
+      type: object
+    BuildRunsResponse:
+      description: The runs of one build.
+      properties:
+        buildsNumbers:
+          description: Optional within this object. One entry per run. A build number appears once per run, so it may repeat.
+          items:
+            $ref: '#/components/schemas/BuildNumber'
+          type: array
+        uri:
+          description: Optional within this object. Absolute URL of the build.
+          type: string
+      type: object
+    BuildSummary:
+      description: One build name in the list of all builds.
+      properties:
+        lastStarted:
+          description: Optional within this object. Started timestamp of the build's most recent run, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+          type: string
+        uri:
+          description: Optional within this object. Path of the build relative to /api/build, a slash followed by the build name.
+          type: string
       type: object
     CertificateInfo:
       description: A client certificate that remote repositories may present to upstreams through clientTlsCertificate.
@@ -18388,6 +19223,30 @@ components:
             type: object
           type: array
       type: object
+    DeleteBuildsRequest:
+      description: Selects runs of one build to delete.
+      properties:
+        buildName:
+          description: Required within this object. Name of the build.
+          type: string
+        buildNumbers:
+          description: Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, newest first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
+          items:
+            description: Build number.
+            type: string
+          type: array
+        deleteAll:
+          description: Optional within this object. When true, every run of the build is deleted. Defaults to false.
+          type: boolean
+        deleteArtifacts:
+          description: Optional within this object. Whether the deleted runs' artifacts are deleted too. Defaults to false.
+          type: boolean
+        project:
+          description: Optional within this object. Key of the project that owns the build. Omitted means builds outside any project.
+          type: string
+      required:
+        - buildName
+      type: object
     DeleteDirectoryTrashPropertyRequest:
       description: Tuning for the trash can compaction task. Every field is optional and defaults as shown.
       properties:
@@ -18414,6 +19273,40 @@ components:
       properties:
         info:
           description: Optional within this object. Human readable confirmation.
+          type: string
+      type: object
+    Dependency:
+      description: One dependency a module consumed.
+      properties:
+        id:
+          description: Optional within this object. Identifier of the dependency in its package type's notation, for example group:artifact:version.
+          type: string
+        md5:
+          description: Optional within this object. MD5 of the dependency, 32 lowercase hexadecimal characters.
+          type: string
+        requestedBy:
+          description: Optional within this object. Chains of module or dependency ids that pulled this dependency in, outermost last.
+          items:
+            description: One chain of requesting ids.
+            items:
+              description: Id of a module or dependency.
+              type: string
+            type: array
+          type: array
+        scopes:
+          description: Optional within this object. Scopes the dependency was used in, for example compile or test. Promotion can filter on them.
+          items:
+            description: Scope name.
+            type: string
+          type: array
+        sha1:
+          description: Optional within this object. SHA-1 of the dependency, 40 lowercase hexadecimal characters.
+          type: string
+        sha256:
+          description: Optional within this object. SHA-256 of the dependency, 64 lowercase hexadecimal characters.
+          type: string
+        type:
+          description: Optional within this object. File type, usually the extension.
           type: string
       type: object
     DistributeArtifactRequest:
@@ -18989,6 +19882,25 @@ components:
       required:
         - importPath
       type: object
+    Issues:
+      description: Issue-tracker information collected for the build.
+      properties:
+        affectedIssues:
+          description: Optional within this object. Issues the build relates to.
+          items:
+            $ref: '#/components/schemas/AffectedIssue'
+          type: array
+        aggregateBuildIssues:
+          description: Optional within this object. Whether issues from earlier builds were aggregated into this one.
+          type: boolean
+        aggregationBuildStatus:
+          description: Optional within this object. Status of the earlier build that aggregation stops at, for example Released.
+          type: string
+        tracker:
+          allOf:
+            - $ref: '#/components/schemas/Tracker'
+          description: Optional within this object. The tracker the issues come from.
+      type: object
     ItemCreated:
       description: Body returned with 201 after a deploy. It is `FileInfo` without the modification fields because the item was just created.
       properties:
@@ -19239,6 +20151,25 @@ components:
         status:
           description: Optional within this object. The overall HTTP-style status, 200 when every entry succeeded.
           type: integer
+      type: object
+    LicenseControl:
+      description: License-check settings recorded with the build. artifactweave stores them and does not act on them.
+      properties:
+        autoDiscover:
+          description: Optional within this object. Whether licenses were discovered automatically.
+          type: boolean
+        includePublishedArtifacts:
+          description: Optional within this object. Whether the build's own artifacts were included in license checks.
+          type: boolean
+        licenseViolationsRecipientsList:
+          description: Optional within this object. Space-separated addresses notified about violations.
+          type: string
+        runChecks:
+          description: Optional within this object. Whether license checks were requested.
+          type: boolean
+        scopesList:
+          description: Optional within this object. Space-separated dependency scopes the checks covered.
+          type: string
       type: object
     LicenseSearchResult:
       description: Items tagged with licence information. artifactweave stores licence tags as ordinary properties and this search reads them; automatic discovery is not supported.
@@ -20186,6 +21117,20 @@ components:
         code:
           type: string
           description: Required within this object. OK when the probe passes.
+    PromotionMessage:
+      description: One line of a promotion report.
+      properties:
+        level:
+          description: Optional within this object. Severity of the message.
+          enum:
+            - error
+            - warning
+            - info
+          type: string
+        message:
+          description: Optional within this object. What happened to one file or to the run.
+          type: string
+      type: object
     PudDirectoryInfo:
       description: Progress of the prune process within one blob store directory.
       properties:
@@ -21436,6 +22381,16 @@ components:
           type: string
           description: >-
             Optional within this object. Always the literal artifactweave. Real Artifactory servers emit a licence type here; no client parses it.
+    Tracker:
+      description: The issue tracker the build's issues come from.
+      properties:
+        name:
+          description: Optional within this object. Name of the issue tracker, for example JIRA.
+          type: string
+        version:
+          description: Optional within this object. Version of the issue tracker.
+          type: string
+      type: object
     TrustedKey:
       description: A stored trusted public key.
       properties:
@@ -21630,6 +22585,22 @@ components:
         loginAttempts:
           description: Optional within this object. Failed attempts before the account locks. Defaults to 5; must be at least 1 when enabled.
           type: integer
+      type: object
+    VcsInfo:
+      description: Version-control state the build was made from.
+      properties:
+        branch:
+          description: Optional within this object. Branch name.
+          type: string
+        message:
+          description: Optional within this object. Commit message of the revision.
+          type: string
+        revision:
+          description: Optional within this object. Revision or commit id.
+          type: string
+        url:
+          description: Optional within this object. Repository URL.
+          type: string
       type: object
     VersionSearchResult:
       description: Versions found for the given Maven group and artifact, ordered newest first.

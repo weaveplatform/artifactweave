@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-10-12T16:48:19.300794Z",
-  "pages": 637,
+  "generated_at": "2026-10-15T12:03:04.62016Z",
+  "pages": 648,
   "schemas": [
     {
       "family": "administration-jfrog-artifactory-import-export-api",
@@ -10329,6 +10329,686 @@
       ],
       "variants": 1,
       "used_by": 5
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "AffectedIssue",
+      "type": "object",
+      "fields": [
+        {
+          "name": "aggregated",
+          "type": "boolean"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "summary",
+          "type": "string"
+        },
+        {
+          "name": "url",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "Agent",
+      "type": "object",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "AllBuildsResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "builds",
+          "type": "array",
+          "items": "BuildSummary"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "Artifact",
+      "type": "object",
+      "fields": [
+        {
+          "name": "md5",
+          "type": "string"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "originalDeploymentRepo",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "sha1",
+          "type": "string"
+        },
+        {
+          "name": "sha256",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 3
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildAgent",
+      "type": "object",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildInfo",
+      "type": "object",
+      "fields": [
+        {
+          "name": "agent",
+          "type": "object",
+          "ref": "Agent"
+        },
+        {
+          "name": "artifactoryPluginVersion",
+          "type": "string"
+        },
+        {
+          "name": "artifactoryPrincipal",
+          "type": "string"
+        },
+        {
+          "name": "buildAgent",
+          "type": "object",
+          "ref": "BuildAgent"
+        },
+        {
+          "name": "buildRetention",
+          "type": "object",
+          "ref": "BuildRetention"
+        },
+        {
+          "name": "durationMillis",
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "name": "issues",
+          "type": "object",
+          "ref": "Issues"
+        },
+        {
+          "name": "licenseControl",
+          "type": "object",
+          "ref": "LicenseControl"
+        },
+        {
+          "name": "modules",
+          "type": "array",
+          "items": "BuildModule"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "number",
+          "type": "string"
+        },
+        {
+          "name": "properties",
+          "type": "object"
+        },
+        {
+          "name": "started",
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "enum": [
+            "ANT",
+            "GENERIC",
+            "GRADLE",
+            "IVY",
+            "MAVEN"
+          ]
+        },
+        {
+          "name": "url",
+          "type": "string"
+        },
+        {
+          "name": "vcs",
+          "type": "array",
+          "items": "VcsInfo"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildInfoResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "buildInfo",
+          "type": "object",
+          "ref": "BuildInfo"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildModule",
+      "type": "object",
+      "fields": [
+        {
+          "name": "artifacts",
+          "type": "array",
+          "items": "Artifact"
+        },
+        {
+          "name": "dependencies",
+          "type": "array",
+          "items": "Dependency"
+        },
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "properties",
+          "type": "object"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 3
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildNumber",
+      "type": "object",
+      "fields": [
+        {
+          "name": "started",
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildPromotionRequest",
+      "type": "object",
+      "fields": [
+        {
+          "name": "artifacts",
+          "type": "boolean",
+          "required": true,
+          "default": true
+        },
+        {
+          "name": "ciUser",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "comment",
+          "type": "string"
+        },
+        {
+          "name": "copy",
+          "type": "boolean",
+          "required": true,
+          "default": false
+        },
+        {
+          "name": "dependencies",
+          "type": "boolean",
+          "required": true,
+          "default": false
+        },
+        {
+          "name": "dryRun",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "failFast",
+          "type": "boolean",
+          "required": true,
+          "default": true
+        },
+        {
+          "name": "properties",
+          "type": "object"
+        },
+        {
+          "name": "scopes",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "sourceRepo",
+          "type": "string"
+        },
+        {
+          "name": "status",
+          "type": "string"
+        },
+        {
+          "name": "targetRepo",
+          "type": "string"
+        },
+        {
+          "name": "timestamp",
+          "type": "string",
+          "format": "date-time",
+          "required": true
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildPromotionResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "messages",
+          "type": "array",
+          "items": "PromotionMessage"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildRetention",
+      "type": "object",
+      "fields": [
+        {
+          "name": "buildNumbersNotToBeDiscarded",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "count",
+          "type": "integer"
+        },
+        {
+          "name": "deleteBuildArtifacts",
+          "type": "boolean"
+        },
+        {
+          "name": "minimumBuildDate",
+          "type": "integer",
+          "format": "int64"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildRetentionRequest",
+      "type": "object",
+      "fields": [
+        {
+          "name": "buildNumbersNotToBeDiscarded",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "count",
+          "type": "integer"
+        },
+        {
+          "name": "deleteBuildArtifacts",
+          "type": "boolean"
+        },
+        {
+          "name": "minimumBuildDate",
+          "type": "string",
+          "format": "date-time"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildRunsResponse",
+      "type": "object",
+      "fields": [
+        {
+          "name": "buildsNumbers",
+          "type": "array",
+          "items": "BuildNumber"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "BuildSummary",
+      "type": "object",
+      "fields": [
+        {
+          "name": "lastStarted",
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "name": "uri",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "DeleteBuildsRequest",
+      "type": "object",
+      "fields": [
+        {
+          "name": "buildName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "buildNumbers",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "deleteAll",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "deleteArtifacts",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "project",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "Dependency",
+      "type": "object",
+      "fields": [
+        {
+          "name": "id",
+          "type": "string"
+        },
+        {
+          "name": "md5",
+          "type": "string"
+        },
+        {
+          "name": "requestedBy",
+          "type": "array",
+          "items": "array"
+        },
+        {
+          "name": "scopes",
+          "type": "array",
+          "items": "string"
+        },
+        {
+          "name": "sha1",
+          "type": "string"
+        },
+        {
+          "name": "sha256",
+          "type": "string"
+        },
+        {
+          "name": "type",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 3
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "DockerPromotionRequest",
+      "type": "object",
+      "fields": [
+        {
+          "name": "copy",
+          "type": "boolean",
+          "default": false
+        },
+        {
+          "name": "dockerRepository",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tag",
+          "type": "string"
+        },
+        {
+          "name": "targetDockerRepository",
+          "type": "string"
+        },
+        {
+          "name": "targetRepo",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "targetTag",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "Issues",
+      "type": "object",
+      "fields": [
+        {
+          "name": "affectedIssues",
+          "type": "array",
+          "items": "AffectedIssue"
+        },
+        {
+          "name": "aggregateBuildIssues",
+          "type": "boolean"
+        },
+        {
+          "name": "aggregationBuildStatus",
+          "type": "string"
+        },
+        {
+          "name": "tracker",
+          "type": "object",
+          "ref": "Tracker"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "LicenseControl",
+      "type": "object",
+      "fields": [
+        {
+          "name": "autoDiscover",
+          "type": "boolean"
+        },
+        {
+          "name": "includePublishedArtifacts",
+          "type": "boolean"
+        },
+        {
+          "name": "licenseViolationsRecipientsList",
+          "type": "string"
+        },
+        {
+          "name": "runChecks",
+          "type": "boolean"
+        },
+        {
+          "name": "scopesList",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "PromotionMessage",
+      "type": "object",
+      "fields": [
+        {
+          "name": "level",
+          "type": "string",
+          "enum": [
+            "error",
+            "info",
+            "warning"
+          ]
+        },
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 1
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "Tracker",
+      "type": "object",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "version",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
+    },
+    {
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "name": "VcsInfo",
+      "type": "object",
+      "fields": [
+        {
+          "name": "branch",
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "type": "string"
+        },
+        {
+          "name": "revision",
+          "type": "string"
+        },
+        {
+          "name": "url",
+          "type": "string"
+        }
+      ],
+      "variants": 1,
+      "used_by": 2
     },
     {
       "family": "integrations-jfrog-artifactory-live-logs-api",
@@ -25781,6 +26461,83 @@
       "key": "PUT /artifactory/{}/{}",
       "family": "artifactory-artifacts-storage-api",
       "tag": "Deploy Artifact APIs",
+      "id": "deployArtifactsFromArchive",
+      "method": "PUT",
+      "path": "/artifactory/{repoKey}/{archivePath}",
+      "source": "https://docs.jfrog.com/artifactory/reference/deployartifactsfromarchive.md",
+      "params": [
+        {
+          "name": "X-Explode-Archive",
+          "in": "header",
+          "required": true,
+          "type": "boolean",
+          "enum": [
+            "true"
+          ]
+        },
+        {
+          "name": "X-Explode-Archive-Atomic",
+          "in": "header",
+          "type": "boolean"
+        },
+        {
+          "name": "archivePath",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/gzip",
+          "schema": "string"
+        },
+        {
+          "media": "application/x-tar",
+          "schema": "string"
+        },
+        {
+          "media": "application/zip",
+          "schema": "string"
+        }
+      ],
+      "responses": {
+        "201": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "401": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ],
+        "403": [
+          {
+            "media": "application/json",
+            "schema": "ErrorResponse"
+          }
+        ]
+      }
+    },
+    {
+      "key": "PUT /artifactory/{}/{}",
+      "family": "artifactory-artifacts-storage-api",
+      "tag": "Deploy Artifact APIs",
       "id": "deployArtifact",
       "method": "PUT",
       "path": "/artifactory/{repoKey}/{filePath}",
@@ -25857,83 +26614,6 @@
           }
         ],
         "409": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ]
-      }
-    },
-    {
-      "key": "PUT /artifactory/{}/{}",
-      "family": "artifactory-artifacts-storage-api",
-      "tag": "Deploy Artifact APIs",
-      "id": "deployArtifactsFromArchive",
-      "method": "PUT",
-      "path": "/artifactory/{repoKey}/{archivePath}",
-      "source": "https://docs.jfrog.com/artifactory/reference/deployartifactsfromarchive.md",
-      "params": [
-        {
-          "name": "X-Explode-Archive",
-          "in": "header",
-          "required": true,
-          "type": "boolean",
-          "enum": [
-            "true"
-          ]
-        },
-        {
-          "name": "X-Explode-Archive-Atomic",
-          "in": "header",
-          "type": "boolean"
-        },
-        {
-          "name": "archivePath",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        },
-        {
-          "name": "repoKey",
-          "in": "path",
-          "required": true,
-          "type": "string"
-        }
-      ],
-      "request": [
-        {
-          "media": "application/gzip",
-          "schema": "string"
-        },
-        {
-          "media": "application/x-tar",
-          "schema": "string"
-        },
-        {
-          "media": "application/zip",
-          "schema": "string"
-        }
-      ],
-      "responses": {
-        "201": [
-          {
-            "media": "text/plain",
-            "schema": "string"
-          }
-        ],
-        "400": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "401": [
-          {
-            "media": "application/json",
-            "schema": "ErrorResponse"
-          }
-        ],
-        "403": [
           {
             "media": "application/json",
             "schema": "ErrorResponse"
@@ -36055,6 +36735,429 @@
             "schema": "ErrorResponse"
           }
         ]
+      }
+    },
+    {
+      "key": "DELETE /artifactory/api/build/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "deleteBuilds",
+      "method": "DELETE",
+      "path": "/artifactory/api/build/{buildName}",
+      "source": "https://docs.jfrog.com/integrations/reference/deletebuilds.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "artifacts",
+          "in": "query",
+          "type": "integer",
+          "enum": [
+            "0",
+            "1"
+          ],
+          "default": 0
+        },
+        {
+          "name": "buildNumbers",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "deleteAll",
+          "in": "query",
+          "type": "integer",
+          "enum": [
+            "0",
+            "1"
+          ],
+          "default": 0
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/build",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "getAllBuilds",
+      "method": "GET",
+      "path": "/artifactory/api/build",
+      "source": "https://docs.jfrog.com/integrations/reference/getallbuilds.md",
+      "params": [
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "AllBuildsResponse"
+          }
+        ],
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/build/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "getBuildRuns",
+      "method": "GET",
+      "path": "/artifactory/api/build/{buildName}",
+      "source": "https://docs.jfrog.com/integrations/reference/getbuildruns.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "BuildRunsResponse"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "GET /artifactory/api/build/{}/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "getBuildInfo",
+      "method": "GET",
+      "path": "/artifactory/api/build/{buildName}/{buildNumber}",
+      "source": "https://docs.jfrog.com/integrations/reference/getbuildinfo.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "buildNumber",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "diff",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "started",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "BuildInfoResponse"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/build/append/{}/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "appendBuild",
+      "method": "POST",
+      "path": "/artifactory/api/build/append/{buildName}/{buildNumber}",
+      "source": "https://docs.jfrog.com/integrations/reference/appendbuild.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "buildNumber",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "buildRepo",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "started",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "[]BuildModule"
+        }
+      ],
+      "responses": {
+        "204": null,
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/build/delete",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "deleteBuildsMultiple",
+      "method": "POST",
+      "path": "/artifactory/api/build/delete",
+      "source": "https://docs.jfrog.com/integrations/reference/deletebuildsmultiple.md",
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "DeleteBuildsRequest"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/build/promote/{}/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "promoteBuild",
+      "method": "POST",
+      "path": "/artifactory/api/build/promote/{buildName}/{buildNumber}",
+      "source": "https://docs.jfrog.com/integrations/reference/promotebuild.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "buildNumber",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "BuildPromotionRequest"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "application/json",
+            "schema": "BuildPromotionResponse"
+          }
+        ],
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/build/rename/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "renameBuild",
+      "method": "POST",
+      "path": "/artifactory/api/build/rename/{buildName}",
+      "source": "https://docs.jfrog.com/integrations/reference/renamebuild.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/build/retention/{}",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "controlBuildRetention",
+      "method": "POST",
+      "path": "/artifactory/api/build/retention/{buildName}",
+      "source": "https://docs.jfrog.com/integrations/reference/controlbuildretention.md",
+      "params": [
+        {
+          "name": "buildName",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "async",
+          "in": "query",
+          "type": "boolean",
+          "default": true
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "BuildRetentionRequest"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "POST /artifactory/api/docker/{}/v2/promote",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "promoteDockerImage",
+      "method": "POST",
+      "path": "/artifactory/api/docker/{repoKey}/v2/promote",
+      "source": "https://docs.jfrog.com/integrations/reference/promotedockerimage.md",
+      "params": [
+        {
+          "name": "repoKey",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "DockerPromotionRequest"
+        }
+      ],
+      "responses": {
+        "200": [
+          {
+            "media": "text/plain",
+            "schema": "string"
+          }
+        ],
+        "400": null,
+        "401": null,
+        "403": null,
+        "404": null
+      }
+    },
+    {
+      "key": "PUT /artifactory/api/build",
+      "family": "integrations-jfrog-artifactory-builds-api",
+      "tag": "Builds",
+      "id": "uploadBuild",
+      "method": "PUT",
+      "path": "/artifactory/api/build",
+      "source": "https://docs.jfrog.com/integrations/reference/uploadbuild.md",
+      "params": [
+        {
+          "name": "project",
+          "in": "query",
+          "type": "string"
+        }
+      ],
+      "request": [
+        {
+          "media": "application/json",
+          "schema": "BuildInfo"
+        }
+      ],
+      "responses": {
+        "200": null,
+        "400": null,
+        "401": null,
+        "403": null
       }
     },
     {

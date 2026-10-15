@@ -49,7 +49,9 @@ the status codes and headers the CLI checks:
 
 **Raw-path routing.** The `{name}` and `{number}` path parameters are matched on the raw,
 still-escaped path. A `%2F` in a build name therefore stays inside its segment, as the
-CLI's escaped promotion URL requires.
+CLI's escaped promotion URL requires. No spec extension is needed: chi routes on
+`URL.RawPath` when the request has one, and the generated binder path-unescapes each
+segment, so the operation receives the name whole.
 
 **Linking artifacts.** The CLI adds `build.name`, `build.number` and `build.timestamp` to
 uploaded files as matrix parameters itself, and they are stored as properties like any
@@ -112,6 +114,8 @@ and treating it as unique would break `jf rt bp --overwrite`.
 - `jf rt u --build-name --build-number`, `jf rt bp` (including `--overwrite`),
   `jf rt build-promote` and `jf rt build-discard` in the acceptance suite.
 - Store tests with several runs of one number, and the encoded item path.
+- `TestBuildRoutesKeepEscapedSlash`: an escaped `/` in a build name or number reaches the
+  operation intact.
 - `builds` domain AQL fixtures.
 - Build webhook events observed by the test receiver.
 
