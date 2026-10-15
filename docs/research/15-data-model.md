@@ -232,7 +232,7 @@ direction (push from a local, pull into a remote) is derived from the repository
 
 | Entity | Fields | Notes |
 |---|---|---|
-| Build | `name, number, started, buildAgent{name, version}, agent{name, version}, artifactoryPrincipal, url, durationMillis, properties{}, modules[], buildDependencies[], issues{}` plus free-form keys | stored as a JSON document; identity `(project, name, number)`; also materialised as the item `<project>-build-info/<name>/<number>-<started ms>.json` |
+| Build | `name, number, started, buildAgent{name, version}, agent{name, version}, artifactoryPrincipal, url, durationMillis, properties{}, modules[], buildDependencies[], issues{}` plus free-form keys | stored as a JSON document; identity `(project, name, number, started)`, because one number may have several runs ([research 22](22-aql-searches-build-info.md#33-identity-and-storage)); also materialised as the item `<project>-build-info/<name>/<number>-<started ms>.json`, with the name and number encoded as the CLI does |
 | Module | `id, type, properties{}, artifacts[], dependencies[]` | inside Build |
 | Artifact / Dependency | `type, name, path, sha1, sha256, md5` (+ `id, scopes[]` on dependencies) | checksums link to Items; the AQL `artifact.module.build` domains join through them |
 | Promotion | `status, comment, ciUser, timestamp, dryRun, sourceRepo, targetRepo, copy, artifacts, dependencies, scopes[], properties{}, failFast` | request `POST /api/build/promote/{name}/{number}`; stored as a promotion record on the build |
@@ -548,7 +548,7 @@ timestamps are UTC; identifiers are the wire identities above.
 | `cleanup_runs` | `id PK, policy_key, trigger_id, item_type, started_at, ended_at, status, dry_run, manual, triggered_by, total_items, cleaned_items, cleaned_size` | policy snapshot, summary, report rows | run views, summary report, CSV |
 | `replications` | `repo_key, url, replication_key PK, enabled, cron_exp, event_replication, sync_deletes, sync_properties, sync_statistics, include_prefix, exclude_prefix, proxy, disable_proxy, check_binary_existence, socket_timeout_ms, username, password (sealed)` | | |
 | `replication_runs` | `replication_key, started_at, completed_at, status` | | status endpoint |
-| `builds` | `project_key, name, number, started_at, created_at` | the build-info document | `(project_key, name, number)` unique; the AQL build domains |
+| `builds` | `project_key, name, number, started_at, created_at` | the build-info document | `(project_key, name, number, started_at)` unique, since one number may have several runs ([research 22](22-aql-searches-build-info.md#33-identity-and-storage)); the AQL build domains |
 | `build_artifacts` | `build_id, module_id, name, type, sha1, sha256, md5` | | join to items by checksum |
 | `build_dependencies` | `build_id, module_id, id, type, sha1, sha256, md5, scopes` | | |
 | `build_promotions` | `build_id, promoted_at, status, source_repo, target_repo, user, comment, dry_run` | | |
@@ -626,7 +626,7 @@ decided:
 | `webhooks`, `project_repositories` | add `description`, `debug`, `created_at`, `updated_at`; `environments` document and `updated_at` | fields of `WebhookSubscription` and `RepositoryAssignment` |
 | `worker_executions (payload, result, logs)` | binary columns; `trigger_kind`, `filter_doc` renamed | non-UTF-8 bytes must round-trip; `trigger` and `filter` are SQL keywords |
 | (none) | `blob_replicas` and `cold_blob_replicas` (migration 0006) | which mirror members hold which blobs, with state, size, attempts and last error ([0028](decisions/0028-blob-mirroring.md)); `updated_at` is 0 when unset so the repair queue pages identically on every engine |
-| `builds`, `build_artifacts`, `build_dependencies`, `build_promotions` | not created | build-info has no oracle block and no domain type yet; its tables arrive with P5 in a new migration once a live capture fixes the shape |
+| `builds`, `build_artifacts`, `build_dependencies`, `build_promotions` | not created | build-info has no oracle block and no domain type yet; its tables arrive with P5 in a new migration, with the shapes in [research 22](22-aql-searches-build-info.md#3-build-info) |
 
 Conventions every table follows: times are BIGINT Unix microseconds (NULL for unset), durations BIGINT
 milliseconds, documents TEXT, sealed values a BLOB or BYTEA column of their own, and every text column a list
@@ -645,7 +645,9 @@ Untyped or free-form in the oracle:
   `unlockUsers` and `expirePassword` request arrays, PyPI JSON endpoints, Puppet module and
   release bodies.
 - Build-info has no block in any crawled family; the shapes above come from the CLI
-  source and must be captured against a live Artifactory before the build-info phase.
+  source. JFrog's Builds API pages do embed OpenAPI blocks, and
+  [research 22](22-aql-searches-build-info.md#3-build-info) records them with the checks
+  the CLI makes.
 - The legacy user and group create, update and delete pages are not in the security
   family index any more (JFrog removed them from the reference while the endpoints still
   exist), so their request shapes are reproduced from [05](05-platform-identity-and-security-apis.md).

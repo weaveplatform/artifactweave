@@ -5,48 +5,119 @@ Status: Proposed
 ## Context
 
 The JFrog CLI's canonical CI loop uploads with `--build-name` and `--build-number`, then
-publishes build-info (`jf rt bp`) and later promotes a build. Build-info is a JSON
-document stored both through `PUT /api/build` and as a file in the
-`artifactory-build-info` repository (or `<project>-build-info`), and the `builds` AQL
-domain and several GET searches query it.
+publishes build-info (`jf rt bp`), later promotes a build (`jf rt build-promote`), and
+discards old runs (`jf rt build-discard`). Build-info is a JSON document stored both through
+`PUT /api/build` and as a file in the `artifactory-build-info` repository (or
+`<project>-build-info`). The `builds` AQL domain and several GET searches query it.
+[Research 22](../22-aql-searches-build-info.md) §3 holds the requests, responses and
+client checks this record relies on.
 
 ## Decision
 
-`internal/service/build` implements `PUT /api/build` (accepting the
-`application/vnd.org.jfrog.artifactory+json` content type and returning the codes the CLI
-accepts), the build runs and build detail reads, build deletion, retention and rename,
-build promotion with the `PromotionRequest` content type, and the
-`buildArtifacts` searches. Uploads carrying `build.name` and `build.number` properties are
-linked to the build. Build-info documents are also written to
-`artifactory-build-info/<name>/<number>-<timestamp>.json` so the storage API, AQL and
-retention see them as items.
+**Endpoints.** `internal/service/build` implements the Builds API in research 22 §3.1, with
+the status codes and headers the CLI checks:
+- **`PUT /api/build`** accepts the `application/vnd.org.jfrog.artifactory+json` content type,
+  answers 200, and sets `X-Checksum-Sha256` to the stored document's SHA-256.
+- **Reads:**
+  - `GET /api/build` always answers 200, with an empty list when there are no builds;
+  - `GET /api/build/{name}` answers 404 for an unknown name;
+  - `GET /api/build/{name}/{number}` takes `started`, `project` and `diff`. Without
+    `started` it answers the latest run with that number.
+- **Changes:**
+  - append answers 204;
+  - rename answers 200 `text/plain`;
+  - promotion takes the `PromotionRequest` content type and answers 200 with `{messages[]}`;
+  - retention answers **204** and accepts `count` as a string or a number;
+  - both delete forms remove one run per listed occurrence of a number.
+- **`GET /api/builds/buildArtifacts/{name}/{number}/{repo}`** answers `[{repo, path, name}]`,
+  so the CLI skips its AQL fallback.
 
-Build promotion copies or moves the build's artifacts between repositories with the
-documented options (`copy`, `dependencies`, `failFast`, `dryRun`, `properties`) and sets
-the promotion status on the build.
+**Run identity.** A run is identified by project, name, number and `started`.
+- The same name and number may be published more than once, and each publish is a new run.
+- The store's unique key is `(project, name, number, started)`.
+- `jf rt bp --overwrite` relies on this: it sends a number once per existing run, and each
+  occurrence deletes one run.
+
+**The document as an item.**
+- **Where it lives.** Each run's document is also written as the item
+  `<project>-build-info/<encoded name>/<encoded number>-<started epoch ms>.json`. The project
+  segment is `artifactory` when the project is empty or `default`.
+- **Encoding.** The name and number use the CLI's encoding (research 22 §3.3), so the CLI's
+  `LATEST` and build-append AQL queries find the item.
+- **One path for both.** Publishing writes the run record and the item together. Deleting a
+  run removes both, so the storage API, AQL and retention see one consistent set.
+
+**Raw-path routing.** The `{name}` and `{number}` path parameters are matched on the raw,
+still-escaped path. A `%2F` in a build name therefore stays inside its segment, as the
+CLI's escaped promotion URL requires.
+
+**Linking artifacts.** The CLI adds `build.name`, `build.number` and `build.timestamp` to
+uploaded files as matrix parameters itself, and they are stored as properties like any
+other matrix parameter. A build's artifacts and dependencies link to items by checksum,
+which is what the AQL build domains join through.
+
+**Permissions** come from the build resource, matched against the build-info repository as
+`<name>/**` through the native evaluator
+([0006](0006-authorization-native-permission-model.md)):
+
+| Operation | Needs |
+|---|---|
+| Publish | deploy; delete as well to replace an existing document item |
+| Read | read |
+| Promote | deploy, plus deploy on the target repositories |
+| Rename | deploy and delete |
+| Retention, delete | delete |
+
+**Promotion** copies or moves the build's artifacts between repositories with the documented
+options, then records a promotion on the run:
+- `copy` or move;
+- `artifacts`, by default true;
+- `dependencies`, by default false;
+- additive `scopes`;
+- `properties`, set with or without a target;
+- `failFast` and `dryRun`.
+
+A virtual target resolves to its default deployment repository. Copy and move go through
+the same service as the item API, with its conflict and checksum rules.
+
+**No Terraform resources.** Neither JFrog provider manages build-info (research 22 §3.5).
 
 ## Rationale
 
 Without build-info the CLI's CI workflow stops at upload, and the `builds` AQL domain and
-the build webhook domain have nothing to serve. Storing the document as an item as well
-as a record keeps one deletion and retention path.
+the build webhook domain have nothing to serve. Storing the document as an item as well as
+a record keeps one deletion and retention path, and lets the CLI's AQL lookups work
+unchanged.
+
+**Identifying a run by `started`** follows what the CLI does: a build number is not unique,
+and treating it as unique would break `jf rt bp --overwrite`.
+
+**Retention answering 204** follows the CLI, which rejects any other status. JFrog documents
+200 ([DV-031](../../implementation/deviations.md#documentation-versus-behaviour)).
 
 **Alternatives considered:**
-- *Storing build-info only as items*: build queries would need JSON parsing per query.
+- *Storing build-info only as items:* build queries would need JSON parsing per query.
+- *A unique key of project, name and number:* rejects a second run of the same number,
+  which Artifactory accepts and the CLI expects.
 
 ## Constraints
 
 - Xray-related build fields are accepted and ignored.
 - Release bundles created from builds belong to a stubbed product.
+- The build-artifacts endpoint is known only from client source; its response shape is
+  what the CLI parses.
 
 ## Verification
 
-- `jf rt u --build-name --build-number`, `jf rt bp`, `jf rt bpr` in the acceptance suite.
+- `jf rt u --build-name --build-number`, `jf rt bp` (including `--overwrite`),
+  `jf rt build-promote` and `jf rt build-discard` in the acceptance suite.
+- Store tests with several runs of one number, and the encoded item path.
 - `builds` domain AQL fixtures.
 - Build webhook events observed by the test receiver.
 
 ## References
 
+- [22-aql-searches-build-info](../22-aql-searches-build-info.md), §3
 - [02-artifactory-core-api-inventory](../02-artifactory-core-api-inventory.md)
 - [09-jfrog-cli-compatibility](../09-jfrog-cli-compatibility.md), build rows
 - <https://docs.jfrog.com/integrations/reference/jfrog-build-info-api>
