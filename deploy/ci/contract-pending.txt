@@ -1,0 +1,26 @@
+# Roots not yet ported to the reference-deployment contract (decision 0030).
+# deploy/ci/lint-contract.sh reports a listed root's findings as warnings
+# instead of failures. The list only shrinks: port a root, then delete its
+# line here in the same change, and the lint holds it to the contract from
+# then on (docs/testing/ci.md, The reference-deployment contract).
+
+# Scenarios.
+deploy/platform/terraform/aws/geo-replicated
+deploy/platform/terraform/aws/multi-region
+deploy/platform/terraform/aws/single-bucket
+deploy/platform/terraform/azure/geo-replicated
+deploy/platform/terraform/azure/multi-region
+deploy/platform/terraform/azure/single-bucket
+deploy/platform/terraform/gcp/geo-replicated
+deploy/platform/terraform/gcp/multi-region
+deploy/platform/terraform/gcp/single-bucket
+
+# Modules.
+deploy/platform/terraform/modules/aws/storage
+deploy/platform/terraform/modules/azure/storage
+deploy/platform/terraform/modules/gcp/storage
+
+# The artifactweave layer.
+deploy/artifactweave/terraform/identity
+deploy/artifactweave/terraform/oidc
+deploy/artifactweave/terraform/repositories

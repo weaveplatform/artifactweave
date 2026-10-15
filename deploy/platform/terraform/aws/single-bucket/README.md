@@ -72,6 +72,10 @@ ends). Destroy the scenario when the run is done.
 | aws | 6.67.0 |
 | random | 3.9.1 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

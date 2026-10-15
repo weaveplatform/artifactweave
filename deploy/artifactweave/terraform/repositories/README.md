@@ -27,6 +27,10 @@ fails when it is stale.
 | ---- | ------- |
 | artifactory | 12.11.14 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

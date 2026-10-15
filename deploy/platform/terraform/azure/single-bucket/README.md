@@ -96,6 +96,10 @@ fails when it is stale.
 | azurerm | 5.9.0 |
 | random | 3.9.1 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

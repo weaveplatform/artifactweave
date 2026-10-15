@@ -1,7 +1,0 @@
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfplan
-tfplan
-# Written by make while the state bucket does not exist (bootstrap.mk).
-local_override.tf

@@ -87,6 +87,10 @@ charge. Destroy the scenario when the run is done.
 | google | 8.6.0 |
 | random | 3.9.1 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

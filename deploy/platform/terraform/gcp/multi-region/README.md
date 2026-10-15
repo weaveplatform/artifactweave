@@ -75,6 +75,12 @@ conformance target is in `single-bucket`.
 | google | 8.6.0 |
 | random | 3.9.1 |
 
+### Modules
+
+| Name | Source | Version |
+| ---- | ------ | ------- |
+| member | ../../modules/gcp/storage | n/a |
+
 ### Resources
 
 | Name | Type |

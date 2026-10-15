@@ -25,6 +25,10 @@ mocked plan, so the scenarios that call the module check only how they compose i
 | ---- | ------- |
 | aws | 6.67.0 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |
