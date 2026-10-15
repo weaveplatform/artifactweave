@@ -17,7 +17,7 @@ applied through the JFrog Terraform providers.
 | `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | [available](terraform/aws/bootstrap/README.md) | [available](terraform/gcp/bootstrap/README.md) | [available](terraform/azure/bootstrap/README.md) |
 | `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
 | `multi-region`: two regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
-| `geo-replicated`: one store with the cloud's own replication | planned (#131) | planned (#131) | planned (#131) |
+| `geo-replicated`: one store with the cloud's own replication | [available](terraform/aws/geo-replicated/README.md) | [available](terraform/gcp/geo-replicated/README.md) | [available](terraform/azure/geo-replicated/README.md) |
 | `cdn`: a store behind CloudFront, Cloud CDN or Front Door | planned (#132) | planned (#133) | planned (#134) |
 
 `multicloud/mirror`, one mirror with a member on each cloud, is planned in #135.
@@ -29,6 +29,10 @@ conformance identity; a CI run applies them as the deployer instead (their `ci-v
 Scenarios build their stores from the child modules in [`terraform/modules`](terraform/modules):
 one private bucket or storage account per call, with its security invariants tested once in
 the module's own `tests/`.
+
+The `multi-region` and `geo-replicated` scenarios have no local container: run artifactweave
+with their `artifactweave_config` output, or dispatch them. The `geo-replicated` READMEs
+cover how the cloud's replica relates to artifactweave and how to fail over.
 
 ## Bootstraps
 
@@ -108,7 +112,7 @@ every cloud's `single-bucket` when the driver changes, each scenario it touches,
 scenario of a cloud whose module it touches. Each proof has its own run tag, so proofs run in
 parallel and each one's `reap` and final check see only its own instances. On AWS, state
 lives in the S3 state bucket and buckets are found by their tags in whichever region they
-are.
+are; reap empties a versioned bucket (geo-replicated's) of its versions before deleting it.
 
 ## Checks
 

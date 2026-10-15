@@ -202,7 +202,12 @@ shows how to dispatch each. Every action goes through `deploy/platform/terraform
 - `reap` destroys expired instances and deletes resources that outlived their state. AWS
   buckets are found by listing the deployer's `artifactweave-` buckets with their regions and
   reading each one's tags there, because a scenario can span regions and the tagging API
-  answers for one region only.
+  answers for one region only. A versioned bucket is emptied of its versions first.
+- The `geo-replicated` scenarios add checks that look past artifactweave at the cloud's own
+  copy: S3's replication status and the replica object, the GCS bucket's real dual-region
+  placement, and the Azure secondary endpoint serving the blob through artifactweave's SAS.
+  A copy still in flight after 12 minutes is reported rather than failed, because the
+  clouds bound replication only by their recovery point objectives.
 - State and plans are never uploaded, and nothing uploads coverage: scenario runs are
   evidence, not coverage, so `make test` leaves `test/platform` out.
 

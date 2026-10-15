@@ -236,8 +236,8 @@ state_json() { # scenario instance
   esac
 }
 
-# aws_tagged_buckets prints "<bucket>\t<expires-at>\t<instance>" for every
-# bucket a scenario run tagged, in any region: a scenario may span several
+# aws_tagged_buckets prints "<bucket>\t<expires-at>\t<instance>\t<region>"
+# for every bucket a scenario run tagged, in any region: a scenario may span several
 # (multi-region), and the tagging API only sees the region it is asked in.
 # It lists the deployer's artifactweave- buckets with their regions and reads
 # each one's tags there.
@@ -251,9 +251,25 @@ aws_tagged_buckets() {
     fi
     # A bucket with no tags answers NoSuchTagSet; it is not a scenario's.
     tags=$(aws s3api get-bucket-tagging --bucket "$name" --region "$region" --output json 2>/dev/null) || continue
-    jq -r --arg n "$name" '(.TagSet | from_entries) as $t | select($t["artifactweave-scenario"] != null) |
-      [$n, ($t["expires-at"] // ""), ($t.instance // "")] | @tsv' <<<"$tags"
+    jq -r --arg n "$name" --arg r "$region" '(.TagSet | from_entries) as $t |
+      select($t["artifactweave-scenario"] != null) |
+      [$n, ($t["expires-at"] // ""), ($t.instance // ""), $r] | @tsv' <<<"$tags"
   done < <(aws s3api list-buckets --prefix artifactweave- --query 'Buckets[].[Name, BucketRegion]' --output text)
+}
+
+# aws_delete_bucket empties a bucket of every object version and delete
+# marker, which s3 rb --force leaves behind in a versioned bucket (the
+# geo-replicated scenario's, which replication needs versioned), then
+# deletes it.
+aws_delete_bucket() { # bucket region
+  local batch
+  while :; do
+    batch=$(aws s3api list-object-versions --bucket "$1" --region "$2" --max-items 1000 --output json |
+      jq -c '{Objects: ([.Versions[]?, .DeleteMarkers[]?] | map({Key, VersionId})), Quiet: true}')
+    [ "$(jq '.Objects | length' <<<"$batch")" -gt 0 ] || break
+    aws s3api delete-objects --bucket "$1" --region "$2" --delete "$batch" >/dev/null
+  done
+  aws s3 rb --force "s3://$1" --region "$2" >/dev/null
 }
 
 # in_scope is true when an instance belongs to this reap: every instance,
@@ -347,11 +363,12 @@ reap() {
       --query '[?tags."artifactweave-scenario" != null].[id, tags."expires-at", tags.instance]' -o tsv)
     ;;
   aws)
-    while IFS=$'\t' read -r name exp inst; do
+    local region
+    while IFS=$'\t' read -r name exp inst region; do
       [ -n "$name" ] || continue
       in_scope "$inst" || continue
       if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
-        if aws s3 rb --force "s3://$name" >/dev/null; then
+        if aws_delete_bucket "$name" "$region"; then
           summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
         else
           failed=$((failed + 1))
@@ -394,11 +411,11 @@ check_clean() {
       jq -r --arg tag "$RUN_TAG" '.[] | select((.tags.instance // "") | startswith($tag)) | .name')
     ;;
   aws)
-    local exp inst
-    while IFS=$'\t' read -r line exp inst; do
+    local exp inst region
+    while IFS=$'\t' read -r line exp inst region; do
       [ -n "$line" ] || continue
       [[ $inst == "$RUN_TAG"* ]] || continue
-      summary "**Left behind:** bucket \`$line\`."
+      summary "**Left behind:** bucket \`$line\` ($region)."
       left=1
     done < <(aws_tagged_buckets)
     ;;
