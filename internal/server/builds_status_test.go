@@ -37,9 +37,9 @@ func seedBuild(t *testing.T, db store.Store, blobs blob.Store, name string) {
 	}
 }
 
-// buildStatusRows covers the Builds API (#165). The fixture published run
-// 1 of st-app, st-ren, st-del and st-del2 (seedStatusBuilds); the rows that
-// change a build each use their own.
+// buildStatusRows covers the Builds API (#165, #166). The fixture published
+// run 1 of st-app, st-ren, st-del, st-del2, st-pro and st-ret
+// (seedStatusBuilds); the rows that change a build each use their own.
 func buildStatusRows() []statusCase {
 	const (
 		all       = "GET /artifactory/api/build"
@@ -51,6 +51,8 @@ func buildStatusRows() []statusCase {
 		remove    = "DELETE /artifactory/api/build/{buildName}"
 		removeAll = "POST /artifactory/api/build/delete"
 		artifacts = "GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}"
+		promote   = "POST /artifactory/api/build/promote/{buildName}/{buildNumber}"
+		retention = "POST /artifactory/api/build/retention/{buildName}"
 		b         = "/artifactory/api/build"
 		arts      = "/artifactory/api/builds/buildArtifacts"
 	)
@@ -123,13 +125,28 @@ func buildStatusRows() []statusCase {
 		{artifacts, arts + "/st-app/1/artifactory-build-info", "user", "", 403},
 		{artifacts, arts + "/st-app/1/artifactory-build-info", "anonymous", "", 401},
 		{artifacts, arts + "/st-app/1/artifactory-build-info", "", "", 401},
+
+		{promote, b + "/promote/st-pro/1", "admin", `{"status":"released"}`, 200},
+		{promote, b + "/promote/st-pro/1", "admin", `{"timestamp":"soon"}`, 400},
+		{promote, b + "/promote/st-pro/1", "admin", `{"targetRepo":"absent"}`, 404},
+		{promote, b + "/promote/st-pro/2", "admin", `{}`, 404},
+		{promote, b + "/promote/st-pro/1", "user", `{}`, 403},
+		{promote, b + "/promote/st-pro/1", "anonymous", `{}`, 401},
+		{promote, b + "/promote/st-pro/1", "", `{}`, 401},
+
+		{retention, b + "/retention/st-ret?async=false", "admin", `{"count":"1"}`, 204},
+		{retention, b + "/retention/st-ret", "admin", `{"count":0}`, 400},
+		{retention, b + "/retention/absent", "admin", `{"count":1}`, 404},
+		{retention, b + "/retention/st-ret", "user", `{"count":1}`, 403},
+		{retention, b + "/retention/st-ret", "anonymous", `{"count":1}`, 401},
+		{retention, b + "/retention/st-ret", "", `{"count":1}`, 401},
 	}
 }
 
 // seedStatusBuilds publishes the runs buildStatusRows act on.
 func seedStatusBuilds(t *testing.T, db store.Store, blobs blob.Store) {
 	t.Helper()
-	for _, name := range []string{"st-app", "st-ren", "st-del", "st-del2"} {
+	for _, name := range []string{"st-app", "st-ren", "st-del", "st-del2", "st-pro", "st-ret"} {
 		seedBuild(t, db, blobs, name)
 	}
 }

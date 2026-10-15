@@ -172,8 +172,10 @@ type BuildPromotion struct {
 	Repo string
 }
 
-// BuildRetention is the retention a build-info document asked for, kept per
-// build name so later publishes and discards apply it.
+// BuildRetention is retention settings: which runs of a build name to keep.
+// The store keeps, per build name, the settings of the latest build-info
+// document that carried a buildRetention; that publish applied them, and
+// later ones without settings discard nothing, as in Artifactory.
 type BuildRetention struct {
 	ProjectKey string
 	Name       string

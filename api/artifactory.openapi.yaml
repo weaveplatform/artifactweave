@@ -916,7 +916,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/integrations/reference/deletebuildsmultiple.md
   /api/build/promote/{buildName}/{buildNumber}:
     post:
-      description: Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+      description: Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
       operationId: promoteBuild
       parameters:
         - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
@@ -958,6 +958,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/BuildPromotionResponse'
           description: The promotion report.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildPromotionResponse'
+          description: The request was malformed, or a fail-fast promotion met an error or a warning and changed nothing. The report says why.
         '401':
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
@@ -1015,7 +1021,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/integrations/reference/renamebuild.md
   /api/build/retention/{buildName}:
     post:
-      description: Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+      description: Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
       operationId: controlBuildRetention
       parameters:
         - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
@@ -1026,13 +1032,19 @@ paths:
             description: Build name.
             minLength: 1
             type: string
-        - description: Optional query parameter. When true, discarding runs in the background and the request returns at once. Defaults to true.
+        - description: Optional query parameter. When true, the request is checked, then answers at once and the runs are discarded in the background. JFrog documents true as the default, but Artifactory discards before answering when the parameter is absent, and so does artifactweave; the JFrog CLI always sends it.
           in: query
           name: async
           schema:
-            default: true
+            default: false
             description: Whether to discard in the background.
             type: boolean
+        - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository. The JFrog CLI sends it; JFrog does not document it.
+          in: query
+          name: project
+          schema:
+            description: Project key.
+            type: string
       requestBody:
         content:
           application/json:
@@ -1044,7 +1056,7 @@ paths:
         '200':
           description: Documented by JFrog for this operation; artifactweave answers 204 instead (deviation DV-031).
         '204':
-          description: Accepted. artifactweave answers 204, the only status the JFrog CLI accepts (decision 0014).
+          description: Discarded, or with async checked and discarding in the background. artifactweave answers 204, the only status the JFrog CLI accepts (decision 0014).
         '400':
           $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
         '401':
@@ -18465,11 +18477,11 @@ components:
           description: Optional within this object. When true, reports what would happen without changing anything. Defaults to false.
           type: boolean
         failFast:
-          description: Optional within this object. When true, the promotion stops at the first error; when false it continues and reports every error. Defaults to true; the JFrog CLI always sends it.
+          description: Optional within this object. When true, the first error or warning aborts the promotion, which then changes nothing and answers 400; when false it continues, reports every error and answers 200. Defaults to true; the JFrog CLI always sends it.
           type: boolean
         properties:
           additionalProperties: true
-          description: Optional within this object. Properties set on every promoted file, as a map from key to an array of values. They are set whether or not a targetRepo is given.
+          description: Optional within this object. Properties set on every promoted file, as a map from key to an array of values or a single value; each replaces the key's values. They are set on the files where they land, or where they are when no targetRepo is given.
           type: object
         scopes:
           description: Optional within this object. Dependency scopes to include; omitted means every scope. Scopes add to each other.
@@ -18478,13 +18490,13 @@ components:
             type: string
           type: array
         sourceRepo:
-          description: Optional within this object. Only files found in this repository are moved or copied. Omitted means any repository.
+          description: Optional within this object. Only artifacts found in this repository are moved or copied. Omitted means any repository. Dependencies are found in any repository either way, as in Artifactory.
           type: string
         status:
-          description: Optional within this object. New status recorded for the run, for example staged or released.
+          description: Optional within this object. New status recorded for the run, for example staged or released. Omitted records no promotion, as in Artifactory; files are still moved or copied and properties set.
           type: string
         targetRepo:
-          description: Optional within this object. Repository the files are moved or copied to. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
+          description: Optional within this object. Repository the files are moved or copied to, each to the path it had. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
           type: string
         timestamp:
           description: Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted records the time the request arrived.
@@ -18500,7 +18512,7 @@ components:
           type: array
       type: object
     BuildRetention:
-      description: Retention settings recorded with the build at upload. They take effect like a retention request for the build name.
+      description: Retention settings recorded with the build at upload. The upload that carries them applies them like a retention request for the build name, as far as the uploader may delete runs; later uploads without them discard nothing.
       properties:
         buildNumbersNotToBeDiscarded:
           description: Optional within this object. Build numbers kept whatever the other settings say.
@@ -18509,18 +18521,18 @@ components:
             type: string
           type: array
         count:
-          description: Optional within this object. Number of most recent runs to keep. Omitted or 0 keeps every run.
+          description: Optional within this object. Number of most recent runs to keep. Omitted, 0 or negative keeps every run.
           type: integer
         deleteBuildArtifacts:
           description: Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
           type: boolean
         minimumBuildDate:
-          description: Optional within this object. Runs started before this time, in Unix epoch milliseconds, are discarded. Omitted keeps runs of any age.
+          description: Optional within this object. Runs started before this time, in Unix epoch milliseconds, are discarded; a timestamp string is accepted too. Omitted keeps runs of any age.
           format: int64
           type: integer
       type: object
     BuildRetentionRequest:
-      description: Retention settings for a build name. Setting them does not delete anything at once; discarding happens as runs are added or as the request is processed.
+      description: Which runs of a build to keep. The request discards the others once, as it is processed; it sets no lasting policy. A protected build number keeps its runs but they still count towards count.
       properties:
         buildNumbersNotToBeDiscarded:
           description: Optional within this object. Build numbers kept whatever the other settings say.
@@ -18529,14 +18541,15 @@ components:
             type: string
           type: array
         count:
-          description: Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. Omitted keeps every run.
+          description: Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. 0 is refused, as Artifactory refuses it; omitted or negative keeps every run.
           x-go-type: json.Number
         deleteBuildArtifacts:
           description: Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
           type: boolean
         minimumBuildDate:
-          description: Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted keeps runs of any age.
+          description: Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes; Unix epoch milliseconds are accepted too. Omitted keeps runs of any age.
           type: string
+          x-go-type: json.RawMessage
       type: object
     BuildRunsResponse:
       description: The runs of one build.
@@ -21121,11 +21134,11 @@ components:
       description: One line of a promotion report.
       properties:
         level:
-          description: Optional within this object. Severity of the message.
+          description: Optional within this object. Severity of the message. JFrog documents the levels in lower case; Artifactory sends its status levels' names, in upper case, and so does artifactweave.
           enum:
-            - error
-            - warning
-            - info
+            - ERROR
+            - WARNING
+            - INFO
           type: string
         message:
           description: Optional within this object. What happened to one file or to the run.

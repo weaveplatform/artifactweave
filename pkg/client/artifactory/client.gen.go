@@ -1066,19 +1066,19 @@ func (e PomRepositoryReferencesCleanupPolicy) Valid() bool {
 
 // Defines values for PromotionMessageLevel.
 const (
-	PromotionMessageLevelError   PromotionMessageLevel = "error"
-	PromotionMessageLevelInfo    PromotionMessageLevel = "info"
-	PromotionMessageLevelWarning PromotionMessageLevel = "warning"
+	PromotionMessageLevelERROR   PromotionMessageLevel = "ERROR"
+	PromotionMessageLevelINFO    PromotionMessageLevel = "INFO"
+	PromotionMessageLevelWARNING PromotionMessageLevel = "WARNING"
 )
 
 // Valid indicates whether the value is a known member of the PromotionMessageLevel enum.
 func (e PromotionMessageLevel) Valid() bool {
 	switch e {
-	case PromotionMessageLevelError:
+	case PromotionMessageLevelERROR:
 		return true
-	case PromotionMessageLevelInfo:
+	case PromotionMessageLevelINFO:
 		return true
-	case PromotionMessageLevelWarning:
+	case PromotionMessageLevelWARNING:
 		return true
 	default:
 		return false
@@ -3524,22 +3524,22 @@ type BuildPromotionRequest struct {
 	// DryRun Optional within this object. When true, reports what would happen without changing anything. Defaults to false.
 	DryRun *bool `json:"dryRun,omitempty"`
 
-	// FailFast Optional within this object. When true, the promotion stops at the first error; when false it continues and reports every error. Defaults to true; the JFrog CLI always sends it.
+	// FailFast Optional within this object. When true, the first error or warning aborts the promotion, which then changes nothing and answers 400; when false it continues, reports every error and answers 200. Defaults to true; the JFrog CLI always sends it.
 	FailFast *bool `json:"failFast,omitempty"`
 
-	// Properties Optional within this object. Properties set on every promoted file, as a map from key to an array of values. They are set whether or not a targetRepo is given.
+	// Properties Optional within this object. Properties set on every promoted file, as a map from key to an array of values or a single value; each replaces the key's values. They are set on the files where they land, or where they are when no targetRepo is given.
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 
 	// Scopes Optional within this object. Dependency scopes to include; omitted means every scope. Scopes add to each other.
 	Scopes *[]string `json:"scopes,omitempty"`
 
-	// SourceRepo Optional within this object. Only files found in this repository are moved or copied. Omitted means any repository.
+	// SourceRepo Optional within this object. Only artifacts found in this repository are moved or copied. Omitted means any repository. Dependencies are found in any repository either way, as in Artifactory.
 	SourceRepo *string `json:"sourceRepo,omitempty"`
 
-	// Status Optional within this object. New status recorded for the run, for example staged or released.
+	// Status Optional within this object. New status recorded for the run, for example staged or released. Omitted records no promotion, as in Artifactory; files are still moved or copied and properties set.
 	Status *string `json:"status,omitempty"`
 
-	// TargetRepo Optional within this object. Repository the files are moved or copied to. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
+	// TargetRepo Optional within this object. Repository the files are moved or copied to, each to the path it had. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
 	TargetRepo *string `json:"targetRepo,omitempty"`
 
 	// Timestamp Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted records the time the request arrived.
@@ -3552,34 +3552,34 @@ type BuildPromotionResponse struct {
 	Messages *[]PromotionMessage `json:"messages,omitempty"`
 }
 
-// BuildRetention Retention settings recorded with the build at upload. They take effect like a retention request for the build name.
+// BuildRetention Retention settings recorded with the build at upload. The upload that carries them applies them like a retention request for the build name, as far as the uploader may delete runs; later uploads without them discard nothing.
 type BuildRetention struct {
 	// BuildNumbersNotToBeDiscarded Optional within this object. Build numbers kept whatever the other settings say.
 	BuildNumbersNotToBeDiscarded *[]string `json:"buildNumbersNotToBeDiscarded,omitempty"`
 
-	// Count Optional within this object. Number of most recent runs to keep. Omitted or 0 keeps every run.
+	// Count Optional within this object. Number of most recent runs to keep. Omitted, 0 or negative keeps every run.
 	Count *int `json:"count,omitempty"`
 
 	// DeleteBuildArtifacts Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
 	DeleteBuildArtifacts *bool `json:"deleteBuildArtifacts,omitempty"`
 
-	// MinimumBuildDate Optional within this object. Runs started before this time, in Unix epoch milliseconds, are discarded. Omitted keeps runs of any age.
+	// MinimumBuildDate Optional within this object. Runs started before this time, in Unix epoch milliseconds, are discarded; a timestamp string is accepted too. Omitted keeps runs of any age.
 	MinimumBuildDate *int64 `json:"minimumBuildDate,omitempty"`
 }
 
-// BuildRetentionRequest Retention settings for a build name. Setting them does not delete anything at once; discarding happens as runs are added or as the request is processed.
+// BuildRetentionRequest Which runs of a build to keep. The request discards the others once, as it is processed; it sets no lasting policy. A protected build number keeps its runs but they still count towards count.
 type BuildRetentionRequest struct {
 	// BuildNumbersNotToBeDiscarded Optional within this object. Build numbers kept whatever the other settings say.
 	BuildNumbersNotToBeDiscarded *[]string `json:"buildNumbersNotToBeDiscarded,omitempty"`
 
-	// Count Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. Omitted keeps every run.
+	// Count Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. 0 is refused, as Artifactory refuses it; omitted or negative keeps every run.
 	Count *json.Number `json:"count,omitempty"`
 
 	// DeleteBuildArtifacts Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
 	DeleteBuildArtifacts *bool `json:"deleteBuildArtifacts,omitempty"`
 
-	// MinimumBuildDate Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted keeps runs of any age.
-	MinimumBuildDate *string `json:"minimumBuildDate,omitempty"`
+	// MinimumBuildDate Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes; Unix epoch milliseconds are accepted too. Omitted keeps runs of any age.
+	MinimumBuildDate *json.RawMessage `json:"minimumBuildDate,omitempty"`
 }
 
 // BuildRunsResponse The runs of one build.
@@ -5147,14 +5147,14 @@ type Probe struct {
 
 // PromotionMessage One line of a promotion report.
 type PromotionMessage struct {
-	// Level Optional within this object. Severity of the message.
+	// Level Optional within this object. Severity of the message. JFrog documents the levels in lower case; Artifactory sends its status levels' names, in upper case, and so does artifactweave.
 	Level *PromotionMessageLevel `json:"level,omitempty"`
 
 	// Message Optional within this object. What happened to one file or to the run.
 	Message *string `json:"message,omitempty"`
 }
 
-// PromotionMessageLevel Optional within this object. Severity of the message.
+// PromotionMessageLevel Optional within this object. Severity of the message. JFrog documents the levels in lower case; Artifactory sends its status levels' names, in upper case, and so does artifactweave.
 type PromotionMessageLevel string
 
 // PudDirectoryInfo Progress of the prune process within one blob store directory.
@@ -6343,8 +6343,11 @@ type RenameBuildParams struct {
 
 // ControlBuildRetentionParams defines parameters for ControlBuildRetention.
 type ControlBuildRetentionParams struct {
-	// Async Optional query parameter. When true, discarding runs in the background and the request returns at once. Defaults to true.
+	// Async Optional query parameter. When true, the request is checked, then answers at once and the runs are discarded in the background. JFrog documents true as the default, but Artifactory discards before answering when the parameter is absent, and so does artifactweave; the JFrog CLI always sends it.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
+
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository. The JFrog CLI sends it; JFrog does not document it.
+	Project *string `form:"project,omitempty" json:"project,omitempty"`
 }
 
 // DeleteBuildsParams defines parameters for DeleteBuilds.
@@ -8957,19 +8960,19 @@ type ClientInterface interface {
 	// PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 	PromoteBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteBuild performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 	PromoteBuild(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type.
 	//
-	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 	PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RenameBuild performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
@@ -8980,13 +8983,13 @@ type ClientInterface interface {
 	// ControlBuildRetentionWithBody performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 	ControlBuildRetentionWithBody(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ControlBuildRetention performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 	ControlBuildRetention(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteBuilds performs a DELETE /api/build/{buildName} (the `DeleteBuilds` operationId) request.
@@ -12562,7 +12565,7 @@ func (c *Client) DeleteBuildsMultiple(ctx context.Context, body DeleteBuildsMult
 // PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 func (c *Client) PromoteBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteBuildRequestWithBody(c.Server, buildName, buildNumber, params, contentType, body)
 	if err != nil {
@@ -12578,7 +12581,7 @@ func (c *Client) PromoteBuildWithBody(ctx context.Context, buildName string, bui
 // PromoteBuild performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 func (c *Client) PromoteBuild(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteBuildRequest(c.Server, buildName, buildNumber, params, body)
 	if err != nil {
@@ -12594,7 +12597,7 @@ func (c *Client) PromoteBuild(ctx context.Context, buildName string, buildNumber
 // PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type.
 //
-// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 func (c *Client) PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteBuildRequestWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(c.Server, buildName, buildNumber, params, body)
 	if err != nil {
@@ -12625,7 +12628,7 @@ func (c *Client) RenameBuild(ctx context.Context, buildName string, params *Rena
 // ControlBuildRetentionWithBody performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
 // with any type of body and a specified content type.
 //
-// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 func (c *Client) ControlBuildRetentionWithBody(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewControlBuildRetentionRequestWithBody(c.Server, buildName, params, contentType, body)
 	if err != nil {
@@ -12641,7 +12644,7 @@ func (c *Client) ControlBuildRetentionWithBody(ctx context.Context, buildName st
 // ControlBuildRetention performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 func (c *Client) ControlBuildRetention(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewControlBuildRetentionRequest(c.Server, buildName, params, body)
 	if err != nil {
@@ -20836,6 +20839,18 @@ func NewControlBuildRetentionRequestWithBody(server string, buildName string, pa
 		if params.Async != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "async", *params.Async, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Project != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "project", *params.Project, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -35198,7 +35213,7 @@ type ClientWithResponsesInterface interface {
 	// PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	PromoteBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
@@ -35206,13 +35221,13 @@ type ClientWithResponsesInterface interface {
 	// PromoteBuildWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 	PromoteBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
 
 	// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 	PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
 
 	// RenameBuildWithResponse performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
@@ -35225,7 +35240,7 @@ type ClientWithResponsesInterface interface {
 	// ControlBuildRetentionWithBodyWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	ControlBuildRetentionWithBodyWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error)
@@ -35233,7 +35248,7 @@ type ClientWithResponsesInterface interface {
 	// ControlBuildRetentionWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+	// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 	ControlBuildRetentionWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error)
 
 	// DeleteBuildsWithResponse performs a DELETE /api/build/{buildName} (the `DeleteBuilds` operationId) request.
@@ -40092,6 +40107,8 @@ type PromoteBuildResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *BuildPromotionResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *BuildPromotionResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ArtifactoryBuildsApiUnauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -40103,6 +40120,11 @@ type PromoteBuildResponse struct {
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r PromoteBuildResponse) GetJSON200() *BuildPromotionResponse {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PromoteBuildResponse) GetJSON400() *BuildPromotionResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -60674,7 +60696,7 @@ func (c *ClientWithResponses) DeleteBuildsMultipleWithResponse(ctx context.Conte
 // PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) PromoteBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
@@ -60688,7 +60710,7 @@ func (c *ClientWithResponses) PromoteBuildWithBodyWithResponse(ctx context.Conte
 // PromoteBuildWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 func (c *ClientWithResponses) PromoteBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
 	rsp, err := c.PromoteBuild(ctx, buildName, buildNumber, params, body, reqEditors...)
 	if err != nil {
@@ -60700,7 +60722,7 @@ func (c *ClientWithResponses) PromoteBuildWithResponse(ctx context.Context, buil
 // PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Records a status change for a run and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build and the repository permissions the moves or copies need. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
 func (c *ClientWithResponses) PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
 	rsp, err := c.PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx, buildName, buildNumber, params, body, reqEditors...)
 	if err != nil {
@@ -60725,7 +60747,7 @@ func (c *ClientWithResponses) RenameBuildWithResponse(ctx context.Context, build
 // ControlBuildRetentionWithBodyWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request,
 // with any type of body and a specified content type.
 //
-// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) ControlBuildRetentionWithBodyWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error) {
@@ -60739,7 +60761,7 @@ func (c *ClientWithResponses) ControlBuildRetentionWithBodyWithResponse(ctx cont
 // ControlBuildRetentionWithResponse performs a POST /api/build/retention/{buildName} (the `ControlBuildRetention` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Sets how many runs of a build are kept and which are discarded. Needs delete permission on the build.
+// Discards the runs of a build that the settings do not keep, with their documents and, when asked, their artifacts. Needs delete permission on the build.
 func (c *ClientWithResponses) ControlBuildRetentionWithResponse(ctx context.Context, buildName string, params *ControlBuildRetentionParams, body ControlBuildRetentionJSONRequestBody, reqEditors ...RequestEditorFn) (*ControlBuildRetentionResponse, error) {
 	rsp, err := c.ControlBuildRetention(ctx, buildName, params, body, reqEditors...)
 	if err != nil {
@@ -67664,6 +67686,13 @@ func ParsePromoteBuildResponse(rsp *http.Response) (*PromoteBuildResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest BuildPromotionResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ArtifactoryBuildsApiUnauthorized

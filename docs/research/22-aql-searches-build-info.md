@@ -31,6 +31,9 @@ Sources:
 - **Source at pinned commits:** jfrog-client-go at `0646d7b50f9a` (the commit `jf` 2.126.0
   pins), jfrog-cli-artifactory at `4a0f3827cfa0`, build-info-go at `f9d40441f262` and
   jfrog-cli-core at `b47892ded3a0`.
+- **Artifactory's own source**, for promotion and retention (§3.6): the open source edition
+  6.20.0 as mirrored at `github.com/knottnhupfer/artifactory-oss` `b99e5649bcad`, and the
+  Java build-info model at `github.com/jfrog/build-info` `4f0d5407279e`.
 
 ## 1. AQL
 
@@ -310,6 +313,45 @@ The Builds API pages carry OpenAPI 3.1 blocks. The spec oracle fetches them from
   (`resource_artifactory_release_bundle_v2_test.go`). Build permissions are already covered
   by `platform_permission` (#85).
 
+### 3.6 Promotion and retention in Artifactory's source
+
+The open source edition carries the REST resource and the promotion logic; the discard
+itself is in the closed Pro build add-on.
+
+- **[S] Promotion** (`BuildResource.promote`, `BuildPromotionHelper`, `BaseBuildPromoter`):
+  - It answers **400 when `failFast` is set and any message is an error or a warning**,
+    and 200 otherwise, with `{messages[]}` either way. A missing build or target repository
+    is 404; a fail-fast promotion with artifacts it cannot find is 400.
+  - A virtual target becomes its default deployment repository.
+  - Artifacts are the items carrying the run's `build.name` and `build.number` properties
+    whose SHA-1 is an artifact's, in `sourceRepo` when one is given. Dependencies are found
+    by checksum alone, in any repository, filtered by `scopes`. An unmatched artifact or
+    dependency is an error: `Unable to find artifact '<name>' of build '<name>' #<number>`.
+  - Files are moved or copied to the target at the paths they had, with the dry-run and
+    fail-fast flags passed on. What a fail-fast move had done before the error stays done.
+  - `properties` are added to the files at the target, or where they are without one; a
+    file the caller may not annotate is a warning.
+  - The promotion is recorded only with a `status`, not in a dry run, and not when a
+    fail-fast promotion met an error or warning. Each case adds an info line such as
+    `Skipping promotion status update: no status received.`
+  - Message levels are the status entries' level names: `ERROR`, `WARNING`, `INFO`
+    (`PromotionResult`). The docs show them in lower case. The Jenkins plugin fails a
+    promotion on a `WARNING` or `ERROR` line (`jfrog/hudson-artifactory-plugin`,
+    `ArtifactoryPromoter`).
+- **[S] Retention** (`BuildResource.retention`, `BuildServiceImpl.addBuild`):
+  - A `count` of 0 is refused with 400 "Max count retention needs to be a positive number".
+    build-info's `BuildRetention` defaults `count` to -1, which keeps any number of runs.
+  - `async` is a plain boolean parameter, so an absent one is false and the request discards
+    before answering, unless the `build.retention.always.async` property is set. The docs give
+    true as the default.
+  - The request is one discard; it records no lasting policy. A published document's
+    `buildRetention` is applied once, after the run is stored.
+  - `minimumBuildDate` is a `java.util.Date`, which Jackson reads from epoch milliseconds or
+    a timestamp.
+- **[I] Protected numbers and `count`.** The closed add-on decides whether runs of a
+  protected number count towards `count`. Build retention mirrors Jenkins's "discard old
+  builds", whose log rotation counts builds kept forever towards the number kept.
+
 ## 4. Inferred and undocumented
 
 These points are not stated by any source. Decision 0012 or 0014 records what artifactweave
@@ -338,3 +380,5 @@ does for each.
 | jfrog-cli-artifactory | `4a0f3827cfa0` |
 | build-info-go | `f9d40441f262` |
 | jfrog-cli-core | `b47892ded3a0` |
+| Artifactory open source edition (mirror) | 6.20.0, `b99e5649bcad` |
+| jfrog/build-info (Java) | `4f0d5407279e` |
