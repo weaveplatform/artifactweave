@@ -8,13 +8,13 @@ import (
 )
 
 // searchCases are the query shapes the GET searches build in code
-// (internal/server/searches.go), where the backends could part ways:
+// (internal/server/searches*.go), where the backends could part ways:
 // criteria without the implicit type=file, a repos parameter as an $or of
 // repository keys that resolve to a remote's cache and a virtual
 // repository's members, inclusive time windows,
 // a statistic that is NULL or before an instant, depth with globs on path
-// and name, and pages of offset and limit that include properties or
-// statistics, which AQL text refuses.
+// and name, a layout's path prefix, and pages of offset and limit that
+// include properties or statistics, which AQL text refuses.
 func searchCases() []Case {
 	file := &aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"}
 	repos := func(keys ...string) aql.Or {
@@ -44,6 +44,21 @@ func searchCases() []Case {
 			&aql.StatCriterion{Field: aql.StatDownloaded, Op: aql.OpEq, Null: true},
 			&aql.StatCriterion{Field: aql.StatDownloaded, Op: aql.OpLt, Time: at(40)},
 		},
+	}
+	// under is the layout searches' narrowing: the full path starts with
+	// prefix, as a deeper folder or as a name in prefix's folder.
+	under := func(dir, rest string) aql.Or {
+		prefix := rest
+		if dir != "." {
+			prefix = dir + "/" + rest
+		}
+		return aql.Or{
+			field(aql.FieldPath, aql.OpMatch, prefix+"*"),
+			aql.And{
+				field(aql.FieldPath, aql.OpMatch, dir),
+				field(aql.FieldName, aql.OpMatch, rest+"*"),
+			},
+		}
 	}
 	page := func(q aql.Query, offset, limit int) *aql.Query {
 		q.Offset, q.HasOffset, q.Limit, q.HasLimit = offset, true, limit, true
@@ -145,6 +160,43 @@ func searchCases() []Case {
 			Name:  "search/usage a page with statistics",
 			Built: page(aql.Query{Criteria: unused, Include: []string{"stat"}}, 2, 3),
 			Want:  []string{util, readme, guide},
+		},
+		{
+			Name:  "search/layout prefix of a folder",
+			Built: &aql.Query{Criteria: aql.And{file, under("org/acme", "")}},
+			Want:  []string{jar, pom, util, cached},
+		},
+		{
+			Name: "search/layout prefix inside a name",
+			Built: &aql.Query{
+				Criteria: aql.And{file, repos("libs-local"), under("org/acme", "app")},
+			},
+			Want: []string{jar, pom},
+		},
+		{
+			Name:  "search/layout prefix with a glob",
+			Built: &aql.Query{Criteria: aql.And{file, under("org/*/lib", "")}},
+			Want:  []string{util},
+		},
+		{
+			Name:  "search/layout prefix at the root",
+			Built: &aql.Query{Criteria: aql.And{file, under(".", "read")}},
+			Want:  []string{readme},
+		},
+		{
+			Name: "search/a property under a folder",
+			Built: &aql.Query{
+				Criteria: aql.And{
+					file,
+					aql.Or{
+						field(aql.FieldPath, aql.OpEq, "org/acme"),
+						field(aql.FieldPath, aql.OpMatch, "org/acme/*"),
+					},
+					prop("release", aql.OpMatch, "*"),
+				},
+				Include: []string{"property"},
+			},
+			Want: []string{jar, util},
 		},
 		{
 			Name: "search/pattern by depth and globs",

@@ -127,6 +127,11 @@ func (q *Query) resolveRepo(c *FieldCriterion, repos Repositories) Node {
 	return c
 }
 
+// Expand returns the stored locations key stands for, as a repo criterion's
+// $eq resolves it: a remote's cache, a virtual repository's members through
+// nested virtual repositories, or the key's own items.
+func (r Repositories) Expand(key string) []RepoRef { return expandRepo(key, r) }
+
 // expandRepo returns the stored locations key stands for.
 func expandRepo(key string, repos Repositories) []RepoRef {
 	var out []RepoRef

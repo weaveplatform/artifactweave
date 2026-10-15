@@ -531,7 +531,8 @@ func TestSearchStoreErrors(t *testing.T) {
 			for _, p := range []string{
 				"artifact?name=lib", "prop?team", "checksum?md5=" + md5Hex("jar"),
 				"badChecksum?type=md5", "creation?from=0", "dates?from=0&dateFields=created",
-				"usage?notUsedSince=0", "pattern?pattern=libs-local:*",
+				"usage?notUsedSince=0", "pattern?pattern=libs-local:*", "gavc?a=lib",
+				"versions?a=lib", "latestVersion?a=lib",
 			} {
 				rec := w.do("GET", "/artifactory/api/search/"+p, "admin", "")
 				if rec.Code != http.StatusInternalServerError ||
@@ -599,14 +600,15 @@ func searchStatusRows() []statusCase {
 			statusCase{op.route, op.invalid, "admin", "", 400},
 		)
 	}
-	return append(rows, statusCase{creation, s + "creation?from=0&repos=missing", "admin", "", 404})
+	rows = append(rows, statusCase{creation, s + "creation?from=0&repos=missing", "admin", "", 404})
+	return append(rows, moreSearchStatusRows()...)
 }
 
 // searchMatrix: the four searches anonymous may make answer anyone, with
 // what each caller may read; the others answer any named user.
 func searchMatrix() []matrixRow {
 	const s = "/artifactory/api/search/"
-	return []matrixRow{
+	return append([]matrixRow{
 		row("GET "+s+"artifact", s+"artifact?name=get", "", anyone, 200),
 		row("GET "+s+"prop", s+"prop?k", "", anyone, 200),
 		row("GET "+s+"checksum", s+"checksum?sha1="+sha1Hex("matrix"), "", anyone, 200),
@@ -615,5 +617,5 @@ func searchMatrix() []matrixRow {
 		row("GET "+s+"dates", s+"dates?from=0&dateFields=created", "", signedIn, 200),
 		row("GET "+s+"usage", s+"usage?notUsedSince=0", "", signedIn, 200),
 		row("GET "+s+"pattern", s+"pattern?pattern=libs-local:work/*", "", signedIn, 200),
-	}
+	}, moreSearchMatrix()...)
 }

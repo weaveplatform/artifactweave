@@ -205,7 +205,7 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 	for _, m := range pr.run.Modules {
 		if pr.p.Artifacts {
 			for _, bf := range slices.DeleteFunc(slices.Clone(m.Artifacts), unsummed) {
-				f, ok, err := pr.find(ctx, bf, pr.isArtifact)
+				f, ok, err := pr.s.findFile(ctx, bf, pr.s.artifactOf(pr.run, pr.fromSource))
 				if err != nil {
 					return nil, err
 				}
@@ -229,7 +229,7 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 				}) {
 				continue
 			}
-			f, ok, err := pr.find(ctx, bf, nil)
+			f, ok, err := pr.s.findFile(ctx, bf, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -246,15 +246,23 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 	return out, nil
 }
 
-// find returns the item a build file is: of those holding its checksum that
-// keep passes, the one with its name, else the first.
-func (pr *promoter) find(
+// fromSource accepts the items in the promotion's source repository, or
+// every item when it names none.
+func (pr *promoter) fromSource(it types.Item) bool {
+	return pr.p.SourceRepo == "" || it.ReportedRepoKey() == pr.p.SourceRepo
+}
+
+// findFile returns the item a build file is: of those holding its checksum
+// that keep passes, the one with its name, else the first. A promotion and
+// the build artifacts search both find files this way, as Artifactory's
+// getBuildArtifactsFileInfos does (research 22 §3.6).
+func (s *Service) findFile(
 	ctx context.Context,
 	bf types.BuildFile,
 	keep func(context.Context, types.Item) (bool, error),
 ) (located, bool, error) {
-	found, err := collect(pr.s.Page, func(pg store.Page) ([]types.Item, string, error) {
-		return pr.s.Store.Items().FindByChecksum(ctx, bf.Checksums, pg)
+	found, err := collect(s.Page, func(pg store.Page) ([]types.Item, string, error) {
+		return s.Store.Items().FindByChecksum(ctx, bf.Checksums, pg)
 	})
 	if err != nil {
 		return located{}, false, fmt.Errorf("build: find %s: %w", bf.Name, err)
@@ -277,25 +285,30 @@ func (pr *promoter) find(
 	if match.ID == 0 {
 		return located{}, false, nil
 	}
-	c, err := pr.s.Store.Repos().Get(ctx, match.RepoKey)
+	c, err := s.Store.Repos().Get(ctx, match.RepoKey)
 	if err != nil {
 		return located{}, false, fmt.Errorf("build: repository %s: %w", match.RepoKey, err)
 	}
 	return located{repo: c, it: match}, true, nil
 }
 
-// isArtifact reports whether it is one of the run's artifacts as
-// Artifactory finds them: by its build properties, in the source
-// repository when one is named.
-func (pr *promoter) isArtifact(ctx context.Context, it types.Item) (bool, error) {
-	if pr.p.SourceRepo != "" && it.ReportedRepoKey() != pr.p.SourceRepo {
-		return false, nil
+// artifactOf returns findFile's keep for run's artifacts as Artifactory
+// finds them: the items that in passes (nil passes all) and that carry the
+// run's build.name and build.number.
+func (s *Service) artifactOf(
+	run types.Build,
+	in func(types.Item) bool,
+) func(context.Context, types.Item) (bool, error) {
+	return func(ctx context.Context, it types.Item) (bool, error) {
+		if in != nil && !in(it) {
+			return false, nil
+		}
+		props, err := s.Store.Items().Properties(ctx, it.ID)
+		if err != nil {
+			return false, fmt.Errorf("build: properties of %s: %w", it.FullPath(), err)
+		}
+		return props.Has("build.name", run.Name) && props.Has("build.number", run.Number), nil
 	}
-	props, err := pr.s.Store.Items().Properties(ctx, it.ID)
-	if err != nil {
-		return false, fmt.Errorf("build: properties of %s: %w", it.FullPath(), err)
-	}
-	return props.Has("build.name", pr.run.Name) && props.Has("build.number", pr.run.Number), nil
 }
 
 // relocate copies or moves each file to the target, at its own path, and

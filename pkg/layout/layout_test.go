@@ -422,3 +422,50 @@ func TestOrgPath(t *testing.T) {
 		t.Error("org conversion")
 	}
 }
+
+func TestHas(t *testing.T) {
+	maven := mustLookup(t, "maven-2-default")
+	for _, tok := range []string{"org", "orgPath", "module", "baseRev", "classifier", "ext"} {
+		if !maven.Has(tok) {
+			t.Errorf("maven lacks %s", tok)
+		}
+	}
+	if maven.Has("type") {
+		t.Error("maven has type")
+	}
+	if npm := mustLookup(t, "npm-default"); !npm.Has("org") || npm.Has("classifier") {
+		t.Error("npm tokens")
+	}
+}
+
+func TestPrefixes(t *testing.T) {
+	tests := []struct {
+		layout string
+		v      layout.Values
+		want   []string
+	}{
+		// The descriptor pattern shares the artifact pattern's start.
+		{
+			"maven-2-default",
+			layout.Values{"org": "org.acme", "module": "lib"},
+			[]string{"org/acme/lib/"},
+		},
+		{
+			"maven-2-default",
+			layout.Values{"orgPath": "org/*", "module": "lib", "baseRev": "1.0"},
+			[]string{"org/*/lib/1.0"},
+		},
+		{"maven-2-default", layout.Values{"module": "lib"}, []string{""}},
+		{
+			"gradle-default",
+			layout.Values{"org": "org.acme", "module": "lib", "baseRev": "2"},
+			[]string{"org.acme/lib/2", "org.acme/lib/ivy-2"},
+		},
+		{"npm-default", layout.Values{"org": "@acme", "module": "ui"}, []string{""}},
+	}
+	for _, tt := range tests {
+		if got := mustLookup(t, tt.layout).Prefixes(tt.v); !cmp.Equal(got, tt.want) {
+			t.Errorf("%s %v: %q, want %q", tt.layout, tt.v, got, tt.want)
+		}
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -422,15 +423,21 @@ func (s artifactoryService) SearchProperty(
 		mediaPropertySearch)
 }
 
-// propertyCriteria reads every query parameter but repos as a property:
-// one criterion per key, holding when the item has the key with one of its
-// values. A key given twice pools its values.
+// propertyCriteria reads every query parameter but repos as a property, as
+// propertyFilters does, and needs at least one.
 func propertyCriteria(raw string) (aql.Node, error) {
 	q, err := rawQuery(raw)
 	if err != nil {
 		return nil, err
 	}
 	delete(q, "repos")
+	return propertyFilters(q, true)
+}
+
+// propertyFilters reads q as properties: one criterion per key, holding
+// when the item has the key with one of its values. A key given twice pools
+// its values. need refuses a q without keys.
+func propertyFilters(q url.Values, need bool) (aql.And, error) {
 	keys := make([]string, 0, len(q))
 	for k := range q {
 		if k == "" {
@@ -438,7 +445,7 @@ func propertyCriteria(raw string) (aql.Node, error) {
 		}
 		keys = append(keys, k)
 	}
-	if len(keys) == 0 {
+	if need && len(keys) == 0 {
 		return nil, badRequest("name at least one property to search for")
 	}
 	slices.Sort(keys)

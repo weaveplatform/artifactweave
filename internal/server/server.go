@@ -141,6 +141,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerTrashRoutes(r)
 	artSvc.registerMultipartRoutes(r)
 	artSvc.registerTokenRoutes(r)
+	artSvc.registerSearchRoutes(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

@@ -120,6 +120,58 @@ func (l *Layout) BuildDescriptor(v Values) (string, error) {
 	return l.descriptor.build(v)
 }
 
+// Has reports whether the artifact pattern uses token; org and orgPath
+// stand for each other, as they do in Match and Build.
+func (l *Layout) Has(token string) bool {
+	if token == TokenOrg || token == TokenOrgPath {
+		return hasToken(l.artifact.nodes, TokenOrg) || hasToken(l.artifact.nodes, TokenOrgPath)
+	}
+	return hasToken(l.artifact.nodes, token)
+}
+
+func hasToken(nodes []node, name string) bool {
+	for _, n := range nodes {
+		if n.token == name || hasToken(n.group, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// Prefixes return the text every path the layout matches with the tokens in
+// v starts with: the artifact pattern's, and the descriptor pattern's when
+// there is one, each rendered up to its first optional group or token
+// without a value. Values are copied as given, so one with * or ? makes a
+// prefix a glob. A search narrows by them before Match decides.
+func (l *Layout) Prefixes(v Values) []string {
+	out := []string{prefix(l.artifact.nodes, v)}
+	if l.descriptor != nil {
+		if p := prefix(l.descriptor.nodes, v); p != out[0] {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func prefix(nodes []node, v Values) string {
+	var sb strings.Builder
+	for _, n := range nodes {
+		switch {
+		case n.group != nil:
+			return sb.String()
+		case n.token != "":
+			val, ok := lookup(v, n.token)
+			if !ok {
+				return sb.String()
+			}
+			sb.WriteString(val)
+		default:
+			sb.WriteString(n.literal)
+		}
+	}
+	return sb.String()
+}
+
 // OrgPath converts a dotted organisation into the slash form used by
 // [orgPath]; Artifactory derives one from the other the same way.
 func OrgPath(org string) string {

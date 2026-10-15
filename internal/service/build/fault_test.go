@@ -120,6 +120,13 @@ func (f faultyBuilds) Rename(ctx context.Context, project, from, to string) erro
 	return f.BuildStore.Rename(ctx, project, from, to)
 }
 
+func (f faultyBuilds) Promotions(ctx context.Context, id int64) ([]types.BuildPromotion, error) {
+	if f.fail == "promotions" {
+		return nil, errBoom
+	}
+	return f.BuildStore.Promotions(ctx, id)
+}
+
 type faultyItems struct {
 	store.ItemStore
 	fail string
@@ -248,6 +255,11 @@ func TestFaults(t *testing.T) {
 			_, err := s.Artifacts(ctx, "", "seeded", "1", everyone)
 			return err
 		}},
+		{"find", searchSeeded},
+		{"properties", searchSeeded},
+		{"runs", findSeeded("")},
+		{"promotions", findSeeded("Released")},
+		{"byid", findSeeded("")},
 	} {
 		w := newWorld(t)
 		w.seed("seeded")
@@ -338,4 +350,21 @@ func TestPromotionFaults(t *testing.T) {
 			t.Errorf("failing %s: %v, want the store's error", tc.fail, err)
 		}
 	}
+}
+
+func findSeeded(status string) func(s *Service) error {
+	return func(s *Service) error {
+		_, err := s.Find(context.Background(), "", "seeded", Latest, status, everyone)
+		return err
+	}
+}
+
+func searchSeeded(s *Service) error {
+	ctx := context.Background()
+	b, err := s.Store.Builds().Get(ctx, "", "seeded", "1", time.Time{})
+	if err != nil {
+		return err
+	}
+	_, err = s.SearchArtifacts(ctx, b, nil, everyone)
+	return err
 }
