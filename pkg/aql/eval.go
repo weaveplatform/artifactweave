@@ -78,6 +78,8 @@ func match(n Node, h Hit, now time.Time) bool {
 		return n.match(h.Properties)
 	case *StatCriterion:
 		return n.match(h.Stats, now)
+	case RepoSet:
+		return n.match(h.Item)
 	}
 	return false
 }

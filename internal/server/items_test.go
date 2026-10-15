@@ -836,6 +836,62 @@ func TestSearchAQLSecondaryDomains(t *testing.T) {
 	}
 }
 
+func TestSearchAQLRemoteAndVirtualKeys(t *testing.T) {
+	ctx := context.Background()
+	w := newItemWorld(t, false)
+	for _, p := range []string{"libs-local/x.jar", "other-local/y.jar"} {
+		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
+	}
+	// Nothing deploys into a cache, so the cached item is stored directly.
+	if _, err := w.db.Items().Put(ctx, types.Item{
+		RepoKey: "up", Cached: true, Path: types.RootPath, Name: "c.jar",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const (
+		include = `.include("repo","path","name")`
+		x       = "libs-local/./x.jar"
+		y       = "other-local/./y.jar"
+		c       = "up-cache/./c.jar"
+	)
+	for _, tc := range []struct {
+		user, query string
+		want        []string
+	}{
+		{"admin", `items.find({"repo":"up"})` + include, []string{c}},
+		{"admin", `items.find({"repo":"up-cache"})` + include, []string{c}},
+		{"admin", `items.find({"repo":"virt"})` + include, []string{x, y, c}},
+		{"admin", `items.find({"repo":{"$ne":"virt-nodeploy"}})` + include, []string{y, c}},
+		{"admin", `items.find({"repo":{"$match":"u?"}})` + include, []string{c}},
+		{"admin", `items.find({"repo":{"$nmatch":"virt*"}})` + include, nil},
+		// Permissions apply to the cache as to any row: reader reads every
+		// repository, deployer only libs-local.
+		{"reader", `items.find({"repo":"up"})` + include, []string{c}},
+		{"deployer", `items.find({"repo":"up"})` + include, nil},
+		{"deployer", `items.find({"repo":"virt"})` + include, []string{x}},
+	} {
+		if rows, _ := aqlRows(t, w, tc.user, tc.query); !slices.Equal(rows, tc.want) {
+			t.Errorf("%s %s: %v, want %v", tc.user, tc.query, rows, tc.want)
+		}
+	}
+	// A virtual repository's key adds virtual_repos to the default fields.
+	rec := w.do("POST", aqlURL+"?compact=true", "admin", `items.find({"repo":"virt"})`)
+	for _, part := range []string{
+		`"repo":"up-cache","path":".","name":"c.jar","type":"file","size":0,`,
+		`"virtual_repos":["virt"]}`,
+		`"virtual_repos":["virt","virt-nodeploy"]}`,
+	} {
+		if !strings.Contains(rec.Body.String(), part) {
+			t.Fatalf("%s lacks %s", rec.Body, part)
+		}
+	}
+	// $ne names no virtual repository's contents, so it adds nothing.
+	rec = w.do("POST", aqlURL+"?compact=true", "admin", `items.find({"repo":{"$ne":"virt"}})`)
+	if strings.Contains(rec.Body.String(), "virtual_repos") {
+		t.Fatalf("$ne added virtual_repos: %s", rec.Body)
+	}
+}
+
 func TestUploadsConfig(t *testing.T) {
 	w := newItemWorld(t, false)
 	rec := w.do("GET", "/artifactory/api/v1/uploads/config", "admin", "")

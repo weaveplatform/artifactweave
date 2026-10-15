@@ -134,6 +134,9 @@ func (c *compiler) node(n Node) error {
 	case *StatCriterion:
 		c.stat(n)
 		return nil
+	case RepoSet:
+		c.repoSet(n)
+		return nil
 	}
 	return fmt.Errorf("%w: criteria node %T", ErrUnsupported, n)
 }
@@ -195,6 +198,48 @@ func (c *compiler) field(f *FieldCriterion) {
 	default:
 		c.text(c.ordered(f.Field), f.Op, f.Text)
 	}
+}
+
+// repoSet writes membership of the item's stored location in s, grouped by
+// the cached flag so each group is one IN over the natural-key index.
+func (c *compiler) repoSet(s RepoSet) {
+	if len(s.Refs) == 0 {
+		if s.Negate {
+			c.b.WriteString("1=1")
+		} else {
+			c.b.WriteString("1=0")
+		}
+		return
+	}
+	if s.Negate {
+		c.b.WriteString("NOT ")
+	}
+	c.b.WriteByte('(')
+	first := true
+	for _, cached := range []bool{false, true} {
+		var keys []string
+		for _, r := range s.Refs {
+			if r.Cached == cached {
+				keys = append(keys, r.Key)
+			}
+		}
+		if len(keys) == 0 {
+			continue
+		}
+		if !first {
+			c.b.WriteString(" OR ")
+		}
+		first = false
+		c.b.WriteString("(items.cached = " + c.bind(cached) + " AND items.repo_key IN (")
+		for i, k := range keys {
+			if i > 0 {
+				c.b.WriteString(", ")
+			}
+			c.b.WriteString(c.bind(k))
+		}
+		c.b.WriteString("))")
+	}
+	c.b.WriteByte(')')
 }
 
 // text writes a comparison of a text expression with a criterion value.
