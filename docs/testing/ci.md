@@ -13,7 +13,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS and Azure; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
-| `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
+| `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
 
 `GOWORK=off` isolates builds from parent workspaces. Actions are pinned by commit SHA.
 
@@ -25,7 +25,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
 | `conformance` | `ubuntu-latest` | P6 | Starts the `-cover` binary with a `docker-local` repo, clones `opencontainers/distribution-spec` at a pinned tag and runs its conformance module with `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials; uploads `cover-conformance` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity and oidc. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
-| `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check` over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
+| `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 | `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
 | `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
@@ -213,8 +213,24 @@ shows how to dispatch each. Every action goes through `deploy/platform/terraform
 
 On a pull request that changes the workflow, the driver, `test/platform`, a scenario or a
 module, the same job runs a proof for each scenario `deploy/platform/terraform/prove-matrix.sh`
-chooses from the changed paths: every cloud's `single-bucket` when the driver changes, each
-scenario the pull request touches, and every scenario of a cloud whose module it touches.
+chooses from the changed paths:
+
+| Changed path | Proves |
+|---|---|
+| The workflow, `scenario-ci.sh` or `prove-matrix.sh` | Every cloud's `single-bucket` |
+| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios, `replica_test.go` the `geo-replicated` ones |
+| A `test/platform` Go file that names none (`harness_test.go`, `generic_test.go`), any other `test/platform` file, or a deleted one | Every cloud's `single-bucket` |
+| A module's top-level `.tf` (`modules/<cloud>/<capability>/*.tf`) | Every scenario, in any cloud directory, whose Terraform sources exactly that module |
+| A scenario's top-level `.tf`, `.terraform.lock.hcl` or `ci-vars.sh` | That scenario |
+| Anything else: READMEs, Makefiles, `tests/`, the local container's scripts, docs | Nothing |
+
+The `prove-all` label proves every scenario that runs in CI (`prove-matrix.sh --all`), on
+the push that adds it and on every later push while it stays. Adding any other label proves
+nothing. The paths filter still decides whether the workflow runs, so the label proves only
+pull requests the workflow covers. `deploy/platform/terraform/prove-matrix_test.sh` checks
+these rules against a generated tree, and that every scenario a `test/platform` file names
+runs in CI; `make deploy-check` runs it first.
+
 Each proof runs `test`; an `apply`, then a `destroy` that has only the remote state; an
 instance applied already expired, then a `reap` that removes it; then `check-clean`, which
 fails if any state, bucket or resource of the run remains. A failed step triggers a
@@ -279,6 +295,7 @@ not listed, so moving one needs no change to the script.
 
 | Step | What |
 |---|---|
+| `prove-matrix` | `deploy/platform/terraform/prove-matrix_test.sh`, the table test of the rules that choose which scenarios a pull request proves. It needs no tools, so it runs before any is fetched |
 | `terraform fmt -check -recursive` | Formatting, including the `tests/*.tftest.hcl` files |
 | `terraform validate` | Each root, with `init -backend=false` against its committed lock file; state and plugins stay in a temporary directory. Roots on the jfrog providers validate through `test/terraform/run.sh`, whose filesystem mirror pins their zips |
 | tflint | Each root, with the rulesets pinned in `.tflint.hcl`. `azurerm_resources_missing_prevent_destroy` is off: every root is created and destroyed on purpose |

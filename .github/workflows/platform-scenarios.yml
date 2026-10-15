@@ -16,8 +16,12 @@ name: deploy | Platform scenarios
 # Pull requests that change this workflow, the scenario driver, test/platform,
 # a scenario or a module run the same driver as a proof, behind the same
 # approval, for the scenarios prove-matrix.sh chooses from the changed paths:
-# every cloud's single-bucket when the driver changes, and each scenario the
-# pull request touches. Each proof runs test, then an apply and a destroy that
+# every cloud's single-bucket when the driver changes, the scenarios a
+# test/platform file names, every scenario that sources a changed module, and
+# each scenario whose Terraform or ci-vars.sh changes. READMEs, Makefiles and
+# mocked tests prove nothing. The prove-all label proves every scenario that
+# runs in CI, on the push that adds it and every later one; adding any other
+# label proves nothing. Each proof runs test, then an apply and a destroy that
 # finds only the remote state (as two separate dispatches would), then an
 # instance that has already expired and a reap that removes it, then a check
 # that nothing of the run remains. A dispatch only finds workflows on the
@@ -49,6 +53,10 @@ on:
         type: string
         default: '240'
   pull_request:
+    # labeled lets the prove-all label start a run; the plan job ignores every
+    # other label. The paths filter still applies, so the label proves only
+    # pull requests this workflow covers.
+    types: [opened, synchronize, reopened, labeled]
     paths:
       - '.github/workflows/platform-scenarios.yml'
       - 'deploy/platform/terraform/scenario-ci.sh'
@@ -101,6 +109,9 @@ jobs:
           EVENT: ${{ github.event_name }}
           SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           PR: ${{ github.event.pull_request.number }}
+          PR_ACTION: ${{ github.event.action }}
+          ADDED_LABEL: ${{ github.event.label.name }}
+          PROVE_ALL: ${{ contains(github.event.pull_request.labels.*.name, 'prove-all') }}
           RUN_ID: ${{ github.run_id }}
           IN_CLOUD: ${{ inputs.cloud }}
           IN_SCENARIO: ${{ inputs.scenario }}
@@ -111,9 +122,16 @@ jobs:
           if [ "$EVENT" = pull_request ]; then
             if [ "$SAME_REPO" != true ]; then
               include='[]'
+            elif [ "$PR_ACTION" = labeled ] && [ "$ADDED_LABEL" != prove-all ]; then
+              # Labelling a pull request is no reason to spend money.
+              include='[]'
             else
-              pairs=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' |
-                deploy/platform/terraform/prove-matrix.sh)
+              if [ "$PROVE_ALL" = true ]; then
+                pairs=$(deploy/platform/terraform/prove-matrix.sh --all)
+              else
+                pairs=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' |
+                  deploy/platform/terraform/prove-matrix.sh)
+              fi
               include=$(jq -Rcn --arg pr "$PR" --arg run "$RUN_ID" '[inputs | select(length > 0) |
                 split(" ") as [$c, $s] | ([$s | splits("-") | .[0:1]] | join("")) as $code |
                 {cloud: $c, scenario: $s, action: "prove", instance: "", ttl: "",

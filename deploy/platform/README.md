@@ -108,8 +108,11 @@ holds the variables a CI run passes.
 A pull request that changes the workflow, the driver, `test/platform`, a scenario or a
 module runs the whole cycle behind the same approval, for the scenarios
 [`terraform/prove-matrix.sh`](terraform/prove-matrix.sh) chooses from its changed paths:
-every cloud's `single-bucket` when the driver changes, each scenario it touches, and every
-scenario of a cloud whose module it touches. Each proof has its own run tag, so proofs run in
+every cloud's `single-bucket` when the driver changes, the scenarios a `test/platform` file
+names, every scenario that sources a changed module, and each scenario whose Terraform or
+`ci-vars.sh` changes. READMEs, Makefiles and mocked tests prove nothing, and the `prove-all`
+label proves every scenario ([the full rules](../../docs/testing/ci.md#platform-scenarios-manual)).
+Each proof has its own run tag, so proofs run in
 parallel and each one's `reap` and final check see only its own instances. On AWS, state
 lives in the S3 state bucket and buckets are found by their tags in whichever region they
 are; reap empties a versioned bucket (geo-replicated's) of its versions before deleting it.
