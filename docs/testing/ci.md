@@ -98,10 +98,10 @@ the deleted temporary parts for the retention period.
 The same tests run from a workstation. They skip unless their variables are set:
 
 ```bash
-make gcp-conformance     # or, by hand, after make gcp-credentials (writes .secrets/container-credentials.json):
+make gcp-conformance     # or, by hand, after make gcp-credentials (writes .local/gcp-credentials.json):
 ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw bucket) \
 ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
-GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.secrets/container-credentials.json \
+GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.local/gcp-credentials.json \
   go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
 
 make aws-conformance     # or, by hand, after aws login:
@@ -116,7 +116,7 @@ ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
 ```
 
 The GCS run acts as the conformance service account through the impersonated credentials
-`up.sh` writes from your own Application Default Credentials
+`make gcp-credentials` writes from your own Application Default Credentials
 (`gcloud auth application-default login`). `deploy/ci/terraform/gcp`
 creates the account, lets your login act as it, and holds the federation for the workflow;
 `gcp/single-bucket` creates the bucket and grants the account.
@@ -185,7 +185,8 @@ shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`
   `configure-aws-credentials` assumes the deployer from the `PLATFORM_AWS_ROLE_ARN` secret,
   with the account ID masked, and the S3 backend locks with `use_lockfile`.
 - `test` builds artifactweave, starts it with the scenario's `artifactweave_config` output,
-  and runs `test/platform`: a 40 MiB deploy and round trip, a ranged GET, the storage
+  and runs `test/platform` through `deploy/ci/platform-tests.sh`, the same step
+  `make verify` runs against a scenario applied from a workstation: a 40 MiB deploy and round trip, a ranged GET, the storage
   API's checksums, a `HEAD` answered by the registry, a `downloadRedirect` 302 to the
   scenario's `storage_host` whose signed URL serves the file and a range of it, and the
   same URL refused without its signature. Scenarios add their own checks in
@@ -217,12 +218,12 @@ chooses from the changed paths:
 
 | Changed path | Proves |
 |---|---|
-| The workflow, `scenario-ci.sh` or `prove-matrix.sh` | Every cloud's `single-bucket` |
+| The workflow, `scenario-ci.sh`, `platform-tests.sh` or `prove-matrix.sh` | Every cloud's `single-bucket` |
 | A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios, `replica_test.go` the `geo-replicated` ones |
 | A `test/platform` Go file that names none (`harness_test.go`, `generic_test.go`), any other `test/platform` file, or a deleted one | Every cloud's `single-bucket` |
 | A module's top-level `.tf` (`modules/<cloud>/<capability>/*.tf`) | Every scenario, in any cloud directory, whose Terraform sources exactly that module |
 | A scenario's top-level `.tf`, `.terraform.lock.hcl` or `ci-vars.sh` | That scenario |
-| Anything else: READMEs, Makefiles, `tests/`, the local container's scripts, the bootstraps and the rest of `deploy/ci`, docs | Nothing |
+| Anything else: READMEs, Makefiles, `tests/`, the local runner (`local.sh`), the bootstraps and the rest of `deploy/ci`, docs | Nothing |
 
 The `prove-all` label proves every scenario that runs in CI (`prove-matrix.sh --all`), on
 the push that adds it and on every later push while it stays. Adding any other label proves
@@ -346,5 +347,6 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | `make deploy-check` | The deploy-terraform job (fetches pinned tools into `.tools/`; set `GITHUB_TOKEN` if tflint hits GitHub's rate limit) |
 | `make deploy-docs` | Rewrite the terraform-docs sections of the READMEs |
 | `make platform-<target> SCENARIO=<cloud>/<scenario>` | A target of a `deploy/platform` scenario on a real cloud, for example `platform-plan SCENARIO=gcp/single-bucket`; `gcp-<target>`, `azure-<target>` and `aws-<target>` are short forms for the three `single-bucket` scenarios. CI never runs these |
+| `make platform-verify SCENARIO=<cloud>/<scenario>` | `test/platform` against a scenario you applied, through the same `deploy/ci/platform-tests.sh` step CI runs; `platform-up`, `platform-smoke` and `platform-down` run artifactweave natively against it (`deploy/ci/local.sh`) |
 | `make ci-<target> CLOUD=<cloud>` | A target of a cloud's bootstrap in `deploy/ci/terraform`, for example `ci-plan CLOUD=azure` or `ci-github-vars CLOUD=aws`. CI never runs these |
 | `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |

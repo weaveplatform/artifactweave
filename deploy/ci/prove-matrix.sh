@@ -3,8 +3,9 @@
 # (platform-scenarios.yml). Reads the pull request's changed paths, one per
 # line, and prints "<cloud> <scenario>" for each scenario to prove:
 #
-#   - the workflow, deploy/ci/scenario-ci.sh or this script: every cloud's
-#     single-bucket, the baseline every scenario builds on;
+#   - the workflow, deploy/ci/scenario-ci.sh, deploy/ci/platform-tests.sh
+#     (the test step both CI and local.sh verify run) or this script: every
+#     cloud's single-bucket, the baseline every scenario builds on;
 #   - a test/platform Go file: the scenarios it names as quoted
 #     "<cloud>/<scenario>" literals (mirror_test.go names the multi-region
 #     scenarios, replica_test.go the geo-replicated ones); a file that names
@@ -15,9 +16,9 @@
 #     module;
 #   - a scenario's top-level .tf, .terraform.lock.hcl or ci-vars.sh: that
 #     scenario;
-#   - anything else proves nothing: READMEs, Makefiles, tests/, the local
-#     container's scripts, docs, and the rest of deploy/ci (the lab's make
-#     files and guards, which CI runs never use) change no cloud run.
+#   - anything else proves nothing: READMEs, Makefiles, tests/, docs, and the
+#     rest of deploy/ci (the local runner, the lab's make files and guards,
+#     which CI runs never use) change no cloud run.
 #
 #   prove-matrix.sh --all   prints every scenario that runs in CI, for the
 #                           prove-all pull request label
@@ -96,7 +97,7 @@ fi
 # arrays, so the script runs on macOS's bash 3.2 too.
 while IFS= read -r file; do
   case $file in
-  .github/workflows/platform-scenarios.yml | "$ci/scenario-ci.sh" | "$ci/prove-matrix.sh")
+  .github/workflows/platform-scenarios.yml | "$ci/scenario-ci.sh" | "$ci/platform-tests.sh" | "$ci/prove-matrix.sh")
     single_buckets
     ;;
   test/platform/*.go)

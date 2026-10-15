@@ -1,6 +1,6 @@
 # An acceptance storage account for artifactweave's azure blob backend: the
-# local container (compose.yaml) and the real-cloud conformance tests
-# (cloud-conformance.yml) both use it, under separate prefixes. Nothing uses
+# local run (make up, deploy/ci/local.sh) and the real-cloud conformance
+# tests (cloud-conformance.yml) both use it, under separate prefixes. Nothing uses
 # an account key: Shared Key is disabled on the account. The conformance
 # identity and GitHub's trust in it live in azure/bootstrap, which outlives
 # this scenario; apply the bootstrap first.
@@ -133,8 +133,7 @@ data "azurerm_user_assigned_identity" "conformance" {
 
 # Storage Blob Data Contributor covers reading, writing and deleting blobs
 # and generating user delegation keys (for SAS and presigned URLs). The
-# operator holds it too: the local tests act as you, and the local container
-# runs on a user delegation SAS minted from your login.
+# operator holds it too: the local run and tests act as you.
 resource "azurerm_role_assignment" "conformance" {
   count                = var.conformance_identity == "" ? 0 : 1
   scope                = azurerm_storage_account.blobs.id

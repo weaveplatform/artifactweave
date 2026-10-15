@@ -35,9 +35,9 @@ The `multi-region` scenarios build their stores from the child modules in
 with its security invariants tested once in the module's own `tests/`. The other scenarios
 move onto the same modules with the scenario contract v2 (epic #189).
 
-The `multi-region` and `geo-replicated` scenarios have no local container: run artifactweave
-with their `artifactweave_config` output, or dispatch them. The `geo-replicated` READMEs
-cover how the cloud's replica relates to artifactweave and how to fail over.
+Every scenario runs locally the same way, from its own `artifactweave_config` output (below).
+The `geo-replicated` READMEs cover how the cloud's replica relates to artifactweave and how to
+fail over.
 
 ## Running a scenario
 
@@ -49,12 +49,20 @@ subscription. From the scenario's directory, `make help` lists its targets; from
 repository root, `make platform-<target> SCENARIO=<cloud>/<scenario>` runs the same target:
 
 ```bash
-make platform-plan  SCENARIO=gcp/single-bucket
-make platform-apply SCENARIO=gcp/single-bucket
-make platform-up    SCENARIO=gcp/single-bucket   # artifactweave in a local container against it
-make platform-smoke SCENARIO=gcp/single-bucket
+make platform-plan    SCENARIO=gcp/single-bucket
+make platform-apply   SCENARIO=gcp/single-bucket
+make platform-up      SCENARIO=gcp/single-bucket   # artifactweave natively, from its artifactweave_config
+make platform-smoke   SCENARIO=gcp/single-bucket   # a round trip and a downloadRedirect 302
+make platform-verify  SCENARIO=gcp/single-bucket   # test/platform, exactly as CI runs it
+make platform-down    SCENARIO=gcp/single-bucket
 make platform-destroy SCENARIO=gcp/single-bucket
 ```
+
+`up`, `smoke` and `verify` work for every scenario, mirrors included, because they use the
+configuration the scenario renders rather than one written by hand. They need the identity the
+scenario grants, which `credentials` (run by `up` and `verify`) sets up: it impersonates the
+app service account on GCP, exports your `aws login` on AWS, and uses your `az login` on Azure. The local runner, its files and the Docker volumes the old local
+container left behind are in [`deploy/ci`](../ci/README.md#running-a-scenario-locally).
 
 `make gcp-<target>`, `make azure-<target>` and `make aws-<target>` are short forms for the
 three `single-bucket` scenarios.

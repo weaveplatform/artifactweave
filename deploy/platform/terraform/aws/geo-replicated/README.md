@@ -70,9 +70,10 @@ terraform output -raw artifactweave_config   # the blob section for artifactweav
 make destroy
 ```
 
-There is no local container or conformance target; `aws/single-bucket` has those. Every
-target that touches AWS first checks that the CLI is signed in to the account holding the
-delegated zone.
+`make up`, `smoke` and `verify` run artifactweave locally from this scenario's configuration
+([running a scenario locally](../../../../ci/README.md#running-a-scenario-locally)); the
+conformance target is in `aws/single-bucket`. Every target that touches AWS first checks that
+the CLI is signed in to the account holding the delegated zone.
 
 ## Scenario runs
 

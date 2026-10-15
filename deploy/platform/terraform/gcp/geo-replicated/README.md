@@ -48,7 +48,9 @@ terraform output -raw artifactweave_config   # the blob section for artifactweav
 make destroy
 ```
 
-There is no local container or conformance target; `gcp/single-bucket` has those.
+`make up`, `smoke` and `verify` run artifactweave locally from this scenario's configuration
+([running a scenario locally](../../../../ci/README.md#running-a-scenario-locally)); the
+conformance target is in `gcp/single-bucket`.
 
 ## Scenario runs
 

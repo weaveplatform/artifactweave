@@ -60,6 +60,7 @@ on:
     paths:
       - '.github/workflows/platform-scenarios.yml'
       - 'deploy/ci/scenario-ci.sh'
+      - 'deploy/ci/platform-tests.sh'
       - 'deploy/ci/prove-matrix.sh'
       # <cloud>/<scenario>/ and modules/<cloud>/<capability>/. The bootstraps
       # live in deploy/ci/terraform, outside this filter; platform-auth-check

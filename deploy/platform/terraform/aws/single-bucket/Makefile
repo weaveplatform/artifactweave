@@ -1,6 +1,6 @@
 # aws/single-bucket: an S3 bucket whose bucket policy grants the bootstrap's
-# conformance role its objects (Terraform), artifactweave in a local container
-# against the bucket, and the real-cloud conformance tests. Apply
+# conformance role its objects (Terraform), artifactweave run natively against
+# it (make up, deploy/ci/local.sh), and the real-cloud conformance tests. Apply
 # deploy/ci/terraform/aws first. Plan and apply need `aws login` and refuse
 # unless that login's account holds the delegated zone.
 

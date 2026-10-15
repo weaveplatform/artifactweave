@@ -89,7 +89,7 @@ use_instance() { # scenario instance expires-at
   mkdir -p "$dir"
   cp -R "$here/modules" "$work/modules"
   cp -R "$here/$CLOUD/$scenario/." "$dir/"
-  rm -rf "$dir/.terraform" "$dir"/terraform.tfstate* "$dir/.local" "$dir/.secrets"
+  rm -rf "$dir/.terraform" "$dir"/terraform.tfstate* "$dir/.local"
   local key
   key=$(state_key "$scenario" "$instance")
   case $CLOUD in
@@ -147,19 +147,12 @@ apply() {
 
 test_scenario() {
   apply
-  local out=${RUNNER_TEMP:-${TMPDIR:-/tmp}}/scenario-run-$INSTANCE
-  mkdir -p "$out"
-  terraform -chdir="$dir" output -raw artifactweave_config >"$out/blob.yaml"
-  # Every output, for the checks a scenario adds (the mirror's members, for
-  # one); the runner's temporary directory is never uploaded.
-  terraform -chdir="$dir" output -json >"$out/outputs.json"
+  # platform-tests.sh is shared with local.sh verify, so a workstation runs
+  # exactly this check against its own applied scenario.
+  "$root/deploy/ci/platform-tests.sh" "$dir" "$CLOUD/$SCENARIO" \
+    "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/scenario-run-$INSTANCE"
   local host
   host=$(terraform -chdir="$dir" output -raw storage_host)
-  (cd "$root" && go build -trimpath -o "$out/artifactweave" ./cmd/artifactweave)
-  (cd "$root" && ARTIFACTWEAVE_SCENARIO="$CLOUD/$SCENARIO" ARTIFACTWEAVE_BIN="$out/artifactweave" \
-    ARTIFACTWEAVE_SCENARIO_CONFIG="$out/blob.yaml" ARTIFACTWEAVE_SCENARIO_STORAGE_HOST="$host" \
-    ARTIFACTWEAVE_SCENARIO_OUTPUTS="$out/outputs.json" \
-    go test -count=1 -v -timeout 40m ./test/platform/...)
   summary "test/platform passed against \`$CLOUD/$SCENARIO\` instance \`$INSTANCE\` (downloads redirected to \`$host\`)."
 }
 

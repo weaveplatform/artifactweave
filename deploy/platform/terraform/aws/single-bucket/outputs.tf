@@ -9,7 +9,7 @@ output "region" {
 }
 
 output "store_prefix" {
-  description = "Key prefix the local container writes under (blob.s3.prefix)."
+  description = "Key prefix the local run writes under (blob.s3.prefix)."
   value       = var.store_prefix
 }
 

@@ -11,7 +11,7 @@ variable "name" {
 }
 
 variable "store_prefix" {
-  description = "Key prefix the local container writes under (blob.s3.prefix)."
+  description = "Key prefix the local run writes under (blob.s3.prefix)."
   type        = string
   default     = "local/"
 }

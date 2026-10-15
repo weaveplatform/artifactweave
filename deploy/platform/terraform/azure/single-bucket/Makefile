@@ -1,8 +1,8 @@
 # azure/single-bucket: a storage account without Shared Key granted to the
-# bootstrap's conformance identity (Terraform), artifactweave in a local
-# container against the account, and the real-cloud conformance tests. Apply
-# deploy/ci/terraform/azure first. Plan and apply need az login and az account
-# set --subscription to the lab's (LAB_AZURE_SUBSCRIPTION in
+# bootstrap's conformance identity (Terraform), artifactweave run natively
+# against it (make up, deploy/ci/local.sh), and the real-cloud conformance
+# tests. Apply deploy/ci/terraform/azure first. Plan and apply need az login
+# and az account set --subscription to the lab's (LAB_AZURE_SUBSCRIPTION in
 # deploy/ci/lab.mk).
 
 CONFORMANCE_ENV = \

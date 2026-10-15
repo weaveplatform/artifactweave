@@ -1,6 +1,6 @@
-# An acceptance bucket for artifactweave's S3 backend: the local container
-# (compose.yaml) and the real-cloud conformance tests (cloud-conformance.yml)
-# both use it, under separate prefixes. GitHub's OIDC provider and the
+# An acceptance bucket for artifactweave's S3 backend: a local run (make
+# up, deploy/ci/local.sh) and the real-cloud conformance tests
+# (cloud-conformance.yml) both use it, under separate prefixes. GitHub's OIDC provider and the
 # conformance role live in aws/bootstrap, which outlives this scenario; apply
 # the bootstrap first.
 

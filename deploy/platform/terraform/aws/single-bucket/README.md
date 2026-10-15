@@ -2,7 +2,7 @@
 
 An S3 acceptance bucket for artifactweave's S3 backend in the lab account, `eu-west-2`
 (decision [0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). The
-real-cloud conformance tests (`cloud-conformance.yml`, job `s3`) and a local container both
+real-cloud conformance tests (`cloud-conformance.yml`, job `s3`) and a local run both
 use it, under separate prefixes. GitHub's OIDC provider and the conformance role live in
 [`deploy/ci/terraform/aws`](../../../../ci/terraform/aws/README.md); apply that first.
 
@@ -29,13 +29,16 @@ make plan
 make apply
 make github-vars     # sets CONFORMANCE_S3_BUCKET for cloud-conformance.yml
 make conformance     # the contract and probes, as your own login
-make up              # artifactweave on http://localhost:8083 against the bucket
-make smoke           # deploys and downloads 40 MiB through it
+make up              # artifactweave on http://127.0.0.1:8083 against the bucket
+make smoke           # 40 MiB through it, and a downloadRedirect 302 to the bucket
+make verify          # test/platform against the bucket, as CI runs it
+make down            # stops it; make clean also drops .local/
 make destroy         # removes the bucket and its objects
 ```
 
-The container gets short-lived credentials exported from your `aws login` session
-(`aws configure export-credentials`); run `make up` again once they expire. Every target
+The local run gets short-lived credentials exported from your `aws login` session
+(`aws configure export-credentials`, into `.local/aws.env`); run `make down up` once they
+expire. Every target
 that touches AWS first checks that the CLI is signed in to the account holding the
 delegated zone.
 
@@ -91,7 +94,7 @@ ends). Destroy the scenario when the run is done.
 | name | Prefix for the bucket name. It must start with artifactweave-, the only buckets the deployer may manage; scenario runs pass artifactweave-awscn-<instance>. | `string` | `"artifactweave-acc"` | no |
 | region | Region of the bucket (the bootstrap's region). | `string` | `"eu-west-2"` | no |
 | scenario\_labels | Tags for the bucket. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches. | `map(string)` | `{}` | no |
-| store\_prefix | Key prefix the local container writes under (blob.s3.prefix). | `string` | `"local/"` | no |
+| store\_prefix | Key prefix the local run writes under (blob.s3.prefix). | `string` | `"local/"` | no |
 
 ### Outputs
 
@@ -103,5 +106,5 @@ ends). Destroy the scenario when the run is done.
 | expires\_at | The expires-at tag (epoch seconds) a scenario run set, read by reap; empty outside scenario runs. |
 | region | Region for blob.s3.region and ARTIFACTWEAVE\_TEST\_S3\_REGION. |
 | storage\_host | Host a downloadRedirect repository's signed URLs point at: the bucket's virtual-hosted endpoint, which the SDK presigns. |
-| store\_prefix | Key prefix the local container writes under (blob.s3.prefix). |
+| store\_prefix | Key prefix the local run writes under (blob.s3.prefix). |
 <!-- END_TF_DOCS -->

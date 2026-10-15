@@ -55,7 +55,9 @@ terraform output -raw artifactweave_config > blob.yaml
 make destroy        # removes both members, their objects included
 ```
 
-There is no local container or conformance target here; `single-bucket` has those.
+`make up`, `smoke` and `verify` run artifactweave locally from this scenario's configuration
+([running a scenario locally](../../../../ci/README.md#running-a-scenario-locally)); the
+conformance target is in `single-bucket`.
 
 <!-- BEGIN_TF_DOCS -->
 ### Requirements

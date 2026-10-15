@@ -15,7 +15,6 @@
 #   CONFORMANCE_PKG     the package holding the real-cloud tests
 #   GITHUB_ENVIRONMENT  GitHub environment github-vars creates first; empty for none
 #   GITHUB_VARS         VARIABLE=output pairs github-vars sets from the outputs
-#   CLEAN_FILES         generated files clean removes
 #
 # The cloud is the name of the scenario's parent directory. It picks the guard
 # every target that touches the cloud runs first (check-account.sh on AWS,
@@ -23,8 +22,14 @@
 # the lab's subscription. The lab's values come from lab.mk.
 #
 # ROOT comes from git rather than a relative path, so a scenario works at any
-# depth; compose.yaml reads its build context from ARTIFACTWEAVE_ROOT for the
-# same reason.
+# depth.
+#
+# The local targets (render, credentials, up, smoke, verify, logs, down,
+# clean) are local.sh, which runs artifactweave natively from the scenario's
+# own artifactweave_config output, so they work for every scenario. The ones
+# that act as the app identity (credentials, up, verify) run the guard first.
+# PORT picks the listen port; each cloud has its own default so scenarios on
+# different clouds can run side by side.
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
@@ -33,18 +38,18 @@ GO ?= go
 ROOT := $(shell git rev-parse --show-toplevel)
 VERSION ?= $(shell git -C $(ROOT) describe --tags --always --dirty 2>/dev/null || echo devel)
 COMMIT ?= $(shell git -C $(ROOT) rev-parse HEAD 2>/dev/null)
-ARTIFACTWEAVE_ROOT := $(ROOT)
-export VERSION COMMIT ARTIFACTWEAVE_ROOT
+export VERSION COMMIT
 
-CLEAN_FILES ?= .local
 CLOUD := $(notdir $(patsubst %/,%,$(dir $(CURDIR))))
+PORT ?= $(if $(filter gcp,$(CLOUD)),8081,$(if $(filter azure,$(CLOUD)),8082,8083))
+LOCAL := CLOUD=$(CLOUD) PORT=$(PORT) TERRAFORM=$(TERRAFORM) $(ROOT)/deploy/ci/local.sh
 
 include $(ROOT)/deploy/ci/lab.mk
 
 GUARD := $(if $(filter aws,$(CLOUD)),check-account,$(if $(filter azure,$(CLOUD)),check-subscription))
 TF_VARS += $(if $(filter azure,$(CLOUD)),-var subscription_id=$(LAB_AZURE_SUBSCRIPTION))
 
-.PHONY: help plan apply credentials up smoke conformance github-vars logs down clean destroy check-account check-subscription
+.PHONY: help plan apply render credentials up smoke verify conformance github-vars logs down clean destroy check-account check-subscription
 
 ## help: list targets
 help:
@@ -68,27 +73,28 @@ apply: $(GUARD)
 	$(TERRAFORM) init -input=false
 	$(TERRAFORM) apply -input=false $(TF_VARS)
 
-# Only some scenarios (the single-bucket ones) ship a local container; the
-# others say so instead of failing on a missing script.
-NO_CONTAINER = { echo "this scenario has no local container; use its artifactweave_config output" >&2; exit 1; }
+## render: write .local/artifactweave.yaml from the artifactweave_config output, and the local secrets
+render:
+	@$(LOCAL) render
 
-## credentials: render the container's configuration and credentials into .local/
-credentials:
-	@[ -x ./credentials.sh ] || $(NO_CONTAINER)
-	./credentials.sh
+## credentials: let this machine act as the scenario's app identity (gcs impersonation, aws export)
+credentials: $(GUARD) render
+	@$(LOCAL) credentials
 
-## up: build the image and start artifactweave in a local container against the scenario
-up:
-	@[ -x ./up.sh ] || $(NO_CONTAINER)
-	./up.sh
+## up: build artifactweave and run it natively on 127.0.0.1:$(PORT) against the applied scenario
+up: $(GUARD) render
+	@$(LOCAL) up
 
-## smoke: deploy and download 40 MiB through the running container
+## smoke: a 40 MiB round trip and a downloadRedirect 302 through the running artifactweave
 smoke:
-	@[ -x ./smoke.sh ] || $(NO_CONTAINER)
-	./smoke.sh
+	@$(LOCAL) smoke
+
+## verify: run test/platform against the applied scenario, as CI does
+verify: $(GUARD) render
+	@$(LOCAL) verify
 
 ## conformance: run the real-cloud blob contract and probes locally
-conformance: $(GUARD) $(CONFORMANCE_DEPS)
+conformance: $(GUARD) credentials $(CONFORMANCE_DEPS)
 	cd $(ROOT) && $(CONFORMANCE_ENV) \
 	  GOWORK=off $(GO) test -count=1 -timeout 25m -v -run '$(CONFORMANCE_RUN)' $(CONFORMANCE_PKG)
 
@@ -101,22 +107,17 @@ github-vars:
 	  gh variable set "$$name" --body "$$($(TERRAFORM) output -raw "$$output")" || exit 1; \
 	done
 
-## logs: follow the container's logs
+## logs: follow the running artifactweave's log
 logs:
-	@[ -f compose.yaml ] || $(NO_CONTAINER)
-	docker compose logs --follow
+	@$(LOCAL) logs
 
-## down: stop the container, keeping its data volume
+## down: stop the running artifactweave, keeping .local/data
 down:
-	@[ -f compose.yaml ] || $(NO_CONTAINER)
-	docker compose down
+	@$(LOCAL) down
 
-## clean: stop the container and remove its data volume and the generated files
-# destroy runs clean first, and a scenario with no local container
-# (multi-region) has no compose.yaml for docker compose to read.
+## clean: stop artifactweave and remove .local
 clean:
-	if [ -f compose.yaml ]; then docker compose down --volumes; fi
-	rm -rf $(CLEAN_FILES)
+	@$(LOCAL) clean
 
 ## destroy: remove everything Terraform created, stored objects included
 destroy: $(GUARD) clean
