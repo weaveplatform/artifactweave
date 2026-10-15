@@ -81,12 +81,20 @@ type Published struct {
 	Run types.Build
 	// SHA256 is the stored document's, which the JFrog CLI reports.
 	SHA256 string
+	// Discarded are the runs the document's buildRetention discarded.
+	Discarded []types.BuildRun
+	// Retention is why the document's buildRetention discarded nothing,
+	// such as a publisher without delete. The publish stands regardless,
+	// as Artifactory's does.
+	Retention error
 }
 
 // Publish stores the run a build-info document publishes, and the document
 // as its item. Publishing needs deploy. A run with the same identity
 // (project, name, number and started) is replaced, which, like overwriting
-// an existing document item, needs delete as well.
+// an existing document item, needs delete as well. A buildRetention in the
+// document is kept as the build name's retention and applied once the run
+// is stored, as the publisher (decision 0014).
 func (s *Service) Publish(
 	ctx context.Context,
 	projectKey string,
@@ -99,6 +107,11 @@ func (s *Service) Publish(
 	if err != nil {
 		return Published{}, err
 	}
+	retention, retains, err := documentRetention(doc)
+	if err != nil {
+		return Published{}, err
+	}
+	retention.ProjectKey, retention.Name = projectKey, b.Name
 	c, err := s.repository(ctx, projectKey)
 	if err != nil {
 		return Published{}, err
@@ -135,10 +148,21 @@ func (s *Service) Publish(
 		}
 		it, err := s.writeDocument(ctx, c, b, by)
 		out = Published{Run: b, SHA256: it.Actual.SHA256}
-		return err
+		if err != nil || !retains {
+			return err
+		}
+		if err := s.Store.Builds().PutRetention(ctx, retention); err != nil {
+			return fmt.Errorf("build: store retention: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
 		return Published{}, err //nolint:wrapcheck // the transaction returns ours
+	}
+	if retains && (retention.Count > 0 || !retention.MinimumBuildDate.IsZero()) {
+		out.Discarded, out.Retention = s.Discard(ctx, Discard{
+			ProjectKey: projectKey, Name: b.Name, Retention: retention, By: by,
+		}, a)
 	}
 	return out, nil
 }

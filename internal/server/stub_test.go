@@ -155,12 +155,14 @@ var implemented = map[string]bool{
 	"PUT /access/api/v1/config/security/password_policy":                             true,
 	"PATCH /access/api/v1/config/security/password_policy":                           true,
 
-	// The Builds API (#165); promotion and retention are #166.
+	// The Builds API (#165), with promotion and retention (#166).
 	"GET /artifactory/api/build":                                                       true,
 	"PUT /artifactory/api/build":                                                       true,
 	"POST /artifactory/api/build/append/{buildName}/{buildNumber}":                     true,
 	"POST /artifactory/api/build/delete":                                               true,
+	"POST /artifactory/api/build/promote/{buildName}/{buildNumber}":                    true,
 	"POST /artifactory/api/build/rename/{buildName}":                                   true,
+	"POST /artifactory/api/build/retention/{buildName}":                                true,
 	"DELETE /artifactory/api/build/{buildName}":                                        true,
 	"GET /artifactory/api/build/{buildName}":                                           true,
 	"GET /artifactory/api/build/{buildName}/{buildNumber}":                             true,

@@ -359,7 +359,7 @@ func matrixTable() []matrixRow {
 	)
 }
 
-// buildMatrix covers the Builds API (#165). Builds are the build resource
+// buildMatrix covers the Builds API (#165, #166). Builds are the build resource
 // on artifactory-build-info: reader reads them, writer also deploys, and
 // member's group team holds read, deploy and delete. A token scoped to
 // artifacts alone reaches no build.
@@ -401,6 +401,14 @@ func buildMatrix() []matrixRow {
 			"",
 			holds(bi, "", read),
 			200,
+		).seeding(mine),
+		row(
+			"POST "+b+"/promote/{buildName}/{buildNumber}", b+"/promote/b-{p}/1",
+			`{"status":"released"}`, holds(bi, "", write), 200,
+		).seeding(mine),
+		row(
+			"POST "+b+"/retention/{buildName}", b+"/retention/b-{p}?async=false", `{"count":"1"}`,
+			holds(bi, "", del), 204,
 		).seeding(mine),
 	}
 }

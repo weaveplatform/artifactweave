@@ -16,13 +16,14 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // The Builds API (decision 0014, research 22 §3): internal/service/build
 // does the work, and these handlers bind its requests and render its
-// answers. Promotion and retention are #166 and stay unimplemented.
+// answers.
 
 const buildsPath = "/artifactory/api/build"
 
@@ -145,6 +146,10 @@ func (s artifactoryService) UploadBuild(
 	pub, err := svc.Publish(ctx, project, rawBody(ctx), p.Name, a)
 	if err != nil {
 		return nil, s.buildError(ctx, p, project, "", err)
+	}
+	if pub.Retention != nil {
+		s.log().WarnContext(ctx, "build retention", "request_id", requestIDFrom(ctx),
+			"build", pub.Run.Name, "error", pub.Retention)
 	}
 	return artgen.UploadBuild200Response{
 		Headers: artgen.UploadBuild200ResponseHeaders{XChecksumSha256: &pub.SHA256},
@@ -360,6 +365,154 @@ func (s artifactoryService) GetBuildArtifacts(
 		})
 	}
 	return out, nil
+}
+
+// PromoteBuild promotes the latest run of a build number. A fail-fast
+// promotion that met an error or a warning answers 400 with its report, as
+// Artifactory does; otherwise the report answers 200, even when files
+// failed.
+func (s artifactoryService) PromoteBuild(
+	ctx context.Context,
+	req artgen.PromoteBuildRequestObject,
+) (artgen.PromoteBuildResponseObject, error) {
+	body := req.JSONBody
+	if body == nil {
+		body = req.ApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody
+	}
+	if body == nil {
+		return refusePromotion("The promotion request must be JSON"), nil
+	}
+	svc, p, a, err := s.buildCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	project := deref(req.Params.Project)
+	at, err := started(body.Timestamp)
+	if err != nil {
+		return refusePromotion("The timestamp " + deref(body.Timestamp) +
+			" is not in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ"), nil
+	}
+	props, bad := promotionProperties(deref(body.Properties))
+	if bad != "" {
+		return refusePromotion(fmt.Sprintf(
+			"The value of property '%s' must be a string or an array of strings", bad)), nil
+	}
+	artifacts, failFast := true, true
+	if body.Artifacts != nil {
+		artifacts = *body.Artifacts
+	}
+	if body.FailFast != nil {
+		failFast = *body.FailFast
+	}
+	res, err := svc.Promote(ctx, build.Promotion{
+		ProjectKey: project, Name: req.BuildName, Number: req.BuildNumber,
+		Status: deref(body.Status), Comment: deref(body.Comment), CIUser: deref(body.CiUser),
+		Timestamp: at, SourceRepo: deref(body.SourceRepo), TargetRepo: deref(body.TargetRepo),
+		Copy: deref(body.Copy), Artifacts: artifacts, Dependencies: deref(body.Dependencies),
+		Scopes: derefSlice(body.Scopes), Properties: props, DryRun: deref(body.DryRun),
+		FailFast: failFast, By: p.Name,
+	}, a)
+	switch {
+	case errors.Is(err, build.ErrNoTarget):
+		return nil, apierror.New(http.StatusNotFound, fmt.Sprintf(
+			"Cannot find target repository by the key '%s'.", deref(body.TargetRepo)))
+	case errors.Is(err, build.ErrInvalid):
+		return refusePromotion(strings.TrimPrefix(err.Error(), build.ErrInvalid.Error()+": ")), nil
+	case err != nil:
+		return nil, s.buildError(ctx, p, project, fmt.Sprintf(
+			"Unable to find build '%s' #%s.", req.BuildName, req.BuildNumber), err)
+	}
+	out := promotionReport(res.Messages)
+	if res.Aborted {
+		return artgen.PromoteBuild400JSONResponse(out), nil
+	}
+	return artgen.PromoteBuild200JSONResponse(out), nil
+}
+
+func refusePromotion(text string) artgen.PromoteBuildResponseObject {
+	return artgen.PromoteBuild400JSONResponse(promotionReport(
+		[]item.Message{{Level: item.LevelError, Text: text}},
+	))
+}
+
+func promotionReport(msgs []item.Message) artgen.BuildPromotionResponse {
+	list := make([]artgen.PromotionMessage, 0, len(msgs))
+	for _, m := range msgs {
+		list = append(list, artgen.PromotionMessage{
+			Level: ptrTo(artgen.PromotionMessageLevel(m.Level)), Message: ptrTo(m.Text),
+		})
+	}
+	return artgen.BuildPromotionResponse{Messages: &list}
+}
+
+// promotionProperties reads a promotion's properties: each key maps to a
+// value or an array of values, as the JFrog CLI sends them. A number or a
+// boolean is kept as its JSON text, as a build-info property is. bad names
+// a key whose value is none of these.
+func promotionProperties(in map[string]any) (props types.Properties, bad string) {
+	props = types.Properties{}
+	for k, v := range in {
+		list, ok := v.([]any)
+		if !ok {
+			list = []any{v}
+		}
+		for _, e := range list {
+			switch e := e.(type) {
+			case nil:
+			case string:
+				props.Add(k, e)
+			case float64, bool:
+				text, _ := json.Marshal(e)
+				props.Add(k, string(text))
+			default:
+				return nil, k
+			}
+		}
+	}
+	return props, ""
+}
+
+// ControlBuildRetention discards the runs of a build its settings do not
+// keep. With async it checks the request, answers, and discards in the
+// background, logging what goes wrong there. The CLI accepts only 204
+// (decision 0014).
+func (s artifactoryService) ControlBuildRetention(
+	ctx context.Context,
+	req artgen.ControlBuildRetentionRequestObject,
+) (artgen.ControlBuildRetentionResponseObject, error) {
+	svc, p, a, err := s.buildCaller(ctx)
+	if err != nil {
+		return nil, err
+	}
+	project := deref(req.Params.Project)
+	// The generated binder always decodes the body, whatever its type.
+	r, err := build.RetentionSettings{
+		Count: deref(req.Body.Count), MinimumBuildDate: deref(req.Body.MinimumBuildDate),
+		DeleteBuildArtifacts:         deref(req.Body.DeleteBuildArtifacts),
+		BuildNumbersNotToBeDiscarded: derefSlice(req.Body.BuildNumbersNotToBeDiscarded),
+	}.Retention(true)
+	if err != nil {
+		return nil, s.buildError(ctx, p, project, "", err)
+	}
+	d := build.Discard{ProjectKey: project, Name: req.BuildName, Retention: r, By: p.Name}
+	if !deref(req.Params.Async) {
+		if _, err := svc.Discard(ctx, d, a); err != nil {
+			return nil, s.buildError(ctx, p, project, noBuild(req.BuildName), err)
+		}
+		return artgen.ControlBuildRetention204Response{}, nil
+	}
+	if _, err := svc.Discards(ctx, d, a); err != nil {
+		return nil, s.buildError(ctx, p, project, noBuild(req.BuildName), err)
+	}
+	// The background discard plans again: runs may have come or gone since.
+	bg := context.WithoutCancel(ctx)
+	go func() {
+		if _, err := svc.Discard(bg, d, a); err != nil {
+			s.log().ErrorContext(bg, "build retention", "request_id", requestIDFrom(bg),
+				"build", d.Name, "error", err)
+		}
+	}()
+	return artgen.ControlBuildRetention204Response{}, nil
 }
 
 // buildInfoProject is the project whose build-info repository key is

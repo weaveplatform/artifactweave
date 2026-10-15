@@ -2,7 +2,8 @@
 Feature: Build-info
   The Builds API (decision 0014) as the JFrog CLI drives it: an upload that
   records a build, jf rt bp, and jf rt bp --overwrite, which deletes each run
-  of the number before publishing it again (research 22 §3.3).
+  of the number before publishing it again (research 22 §3.3); then
+  jf rt bpr, which promotes a build, and jf rt bdi, which discards old runs.
 
   Background:
     Given the registry is running
@@ -109,3 +110,96 @@ Feature: Build-info
     Then the command succeeds
     And the files "app.bin" and "out/app.bin" are identical
     And the file "out/other.bin" does not exist
+
+  # jf rt bpr sends the promotion media type and needs 200; jf rt bdi sends
+  # count as a string and needs 204 (research 22 §3.1).
+  @jf
+  Scenario: jf rt bpr promotes a build and jf rt bdi discards its old runs
+    Given the JFrog CLI is available
+    And I PUT "/artifactory/api/repositories/release-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    And I PUT "/artifactory/api/repositories/archive-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    And a file "app.bin" with content:
+      """
+      promoted artifact
+      """
+    When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=promo-app --build-number=1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bp promo-app 1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    # A dry run changes nothing.
+    When I run jf "rt bpr promo-app 1 release-local --dry-run --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/artifactory/api/storage/release-local/app/app.bin" as admin
+    Then the response status is 404
+    When I run jf "rt bpr promo-app 1 release-local --status=released --comment=approved --copy --props=stage=prod --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered 200 to POST "/artifactory/api/build/promote/promo-app/1"
+    When I GET "/artifactory/api/storage/release-local/app/app.bin?properties" as admin
+    Then the response status is 200
+    And the JSON field "properties.stage.0" equals "prod"
+    When I GET "/artifactory/api/storage/generic-local/app/app.bin" as admin
+    Then the response status is 200
+    When I POST "/artifactory/api/search/aql" as admin with body:
+      """
+      build.promotions.find().include("status","comment","repo")
+      """
+    Then the response status is 200
+    And the response body contains "approved"
+    And the response body contains "release-local"
+    # A move from the one source repository named.
+    When I run jf "rt bpr promo-app 1 archive-local --source-repo=release-local --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/artifactory/api/storage/release-local/app/app.bin" as admin
+    Then the response status is 404
+    When I GET "/artifactory/api/storage/archive-local/app/app.bin" as admin
+    Then the response status is 200
+    When I run jf "rt bpr promo-app 9 release-local --url {url} --user admin --password {password}"
+    Then the command fails
+    # Two more runs, then keep only the newest.
+    When I run jf "rt u {dir}/app.bin generic-local/app2/ --flat --build-name=promo-app --build-number=2 --url {url} --user admin --password {password}"
+    And I run jf "rt bp promo-app 2 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt u {dir}/app.bin generic-local/app3/ --flat --build-name=promo-app --build-number=3 --url {url} --user admin --password {password}"
+    And I run jf "rt bp promo-app 3 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bdi promo-app --max-builds=1 --exclude-builds=1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the server answered 204 to POST "/artifactory/api/build/retention/promo-app"
+    When I GET "/artifactory/api/build/promo-app" as admin
+    Then the JSON field "buildsNumbers" has 2 entries
+    And the JSON field "buildsNumbers.0.uri" equals "/3"
+    And the JSON field "buildsNumbers.1.uri" equals "/1"
+
+  Scenario: Retention over HTTP, and a fail-fast promotion that changes nothing
+    When I PUT "/artifactory/api/build" as admin with body:
+      """
+      {"name": "ret-app", "number": "1", "started": "2026-10-15T09:30:00.000+0000",
+       "modules": [{"id": "m", "artifacts": [{"name": "gone.bin", "sha1": "0123456789abcdef0123456789abcdef01234567"}]}]}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/build/promote/ret-app/1" as admin with body:
+      """
+      {"status": "released", "targetRepo": "generic-local", "failFast": true}
+      """
+    Then the response status is 400
+    And the JSON field "messages.0.level" equals "ERROR"
+    And the JSON field "messages.0.message" equals "Unable to find artifact 'gone.bin' of build 'ret-app' #1"
+    When I PUT "/artifactory/api/build" as admin with body:
+      """
+      {"name": "ret-app", "number": "2", "started": "2026-10-16T09:30:00.000+0000",
+       "buildRetention": {"count": 1}}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/build/ret-app" as admin
+    Then the JSON field "buildsNumbers" has 1 entries
+    When I POST "/artifactory/api/build/retention/ret-app?async=false" as admin with body:
+      """
+      {"count": 0}
+      """
+    Then the response status is 400

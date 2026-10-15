@@ -97,6 +97,22 @@ func (f faultyBuilds) DeleteAll(
 	return f.BuildStore.DeleteAll(ctx, project, name)
 }
 
+func (f faultyBuilds) AddPromotion(
+	ctx context.Context, p types.BuildPromotion,
+) (types.BuildPromotion, error) {
+	if f.fail == "addpromotion" {
+		return p, errBoom
+	}
+	return f.BuildStore.AddPromotion(ctx, p)
+}
+
+func (f faultyBuilds) PutRetention(ctx context.Context, r types.BuildRetention) error {
+	if f.fail == "putretention" {
+		return errBoom
+	}
+	return f.BuildStore.PutRetention(ctx, r)
+}
+
 func (f faultyBuilds) Rename(ctx context.Context, project, from, to string) error {
 	if f.fail == "rename" {
 		return errBoom
@@ -146,6 +162,15 @@ func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 		return nil, errBoom
 	}
 	return f.ItemStore.Properties(ctx, id)
+}
+
+func (f faultyItems) PatchProperties(
+	ctx context.Context, id int64, set types.Properties, remove []string,
+) error {
+	if f.fail == "patch" {
+		return errBoom
+	}
+	return f.ItemStore.PatchProperties(ctx, id, set, remove)
 }
 
 func (f faultyItems) FindByChecksum(
@@ -260,5 +285,57 @@ func deleteSeeded(artifacts bool) func(s *Service) error {
 			Name: "seeded", Numbers: []string{"1"}, Artifacts: artifacts,
 		}, everyone)
 		return err
+	}
+}
+
+// TestPromotionFaults passes every store failure of a promotion, a
+// retention and a publish's retention on.
+func TestPromotionFaults(t *testing.T) {
+	ctx := context.Background()
+	promote := func(p Promotion) func(*Service) error {
+		return func(s *Service) error {
+			p.Name, p.Number, p.By = "app", "1", "admin"
+			_, err := s.Promote(ctx, p, everyone)
+			return err
+		}
+	}
+	tagged := types.Properties{"k": {"v"}}
+	discard := func(s *Service) error {
+		_, err := s.Discard(ctx, Discard{Name: "app", Retention: types.BuildRetention{Count: 1}},
+			everyone)
+		return err
+	}
+	for _, tc := range []struct {
+		fail string
+		op   func(s *Service) error
+	}{
+		{"get", promote(Promotion{})},
+		{"repo:release-local", promote(Promotion{TargetRepo: "release-local"})},
+		{"repo:release-local", promote(Promotion{TargetRepo: "release"})},
+		{"find", promote(Promotion{Artifacts: true})},
+		{"properties", promote(Promotion{Artifacts: true})},
+		{"repo:libs-local", promote(Promotion{Artifacts: true})},
+		{"find", promote(Promotion{Dependencies: true})},
+		{"itemput", promote(Promotion{TargetRepo: "release-local", Artifacts: true})},
+		{"item:app/a.bin", promote(Promotion{Artifacts: true, Properties: tagged})},
+		{"patch", promote(Promotion{Artifacts: true, Properties: tagged})},
+		{"addpromotion", promote(Promotion{Status: "released"})},
+		{"runs", discard},
+		{"deletenumbers", discard},
+		{"putretention", func(s *Service) error {
+			_, err := s.Publish(ctx, "", []byte(`{"name":"app","number":"2","started":"`+
+				at(9)+`","buildRetention":{"count":1}}`), "admin", everyone)
+			return err
+		}},
+	} {
+		w := promotionWorld(t)
+		w.put("libs-local", false, "app/a.bin", "a.bin", buildProps("app", "1"))
+		w.put("libs-local", false, "dep/d.jar", "d.jar", nil)
+		w.publish(doc("app", "1", started0, fileModule([]string{"a.bin"}, []string{"d.jar"})))
+		w.publish(doc("app", "0", at(-1)))
+		s := &Service{Store: faulty{w.db, tc.fail}, Blobs: w.blobs}
+		if err := tc.op(s); !errors.Is(err, errBoom) {
+			t.Errorf("failing %s: %v, want the store's error", tc.fail, err)
+		}
 	}
 }

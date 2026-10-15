@@ -26,8 +26,10 @@ the status codes and headers the CLI checks:
 - **Changes:**
   - append answers 204;
   - rename answers 200 `text/plain`;
-  - promotion takes the `PromotionRequest` content type and answers 200 with `{messages[]}`;
-  - retention answers **204** and accepts `count` as a string or a number;
+  - promotion takes the `PromotionRequest` content type and answers 200 with `{messages[]}`,
+    or 400 with them when a fail-fast promotion met an error or a warning;
+  - retention answers **204**, accepts `count` as a string or a number, and takes `project`
+    and `async`;
   - both delete forms remove one run per listed occurrence of a number.
 - **`GET /api/builds/buildArtifacts/{name}/{number}/{repo}`** answers `[{repo, path, name}]`,
   so the CLI skips its AQL fallback.
@@ -75,21 +77,53 @@ its folder:
 |---|---|
 | Publish | deploy; delete as well to replace an existing document item |
 | Read | read |
-| Promote | deploy, plus deploy on the target repositories |
+| Promote | deploy; each file also needs what its copy or move needs, and annotate for properties |
 | Rename | deploy and delete |
-| Retention, delete | delete |
+| Retention, delete | delete, on the build and on each run removed |
 
-**Promotion** copies or moves the build's artifacts between repositories with the documented
-options, then records a promotion on the run:
-- `copy` or move;
-- `artifacts`, by default true;
-- `dependencies`, by default false;
-- additive `scopes`;
-- `properties`, set with or without a target;
-- `failFast` and `dryRun`.
+**Promotion** acts on the latest run of the number, following Artifactory's source
+(research 22 §3.6):
+- **What moves.** The artifacts are the items holding an artifact's checksum that carry the
+  run's `build.name` and `build.number` properties, in `sourceRepo` when one is named; the
+  item named like the artifact is preferred. Dependencies are found by checksum in any
+  repository, limited by `scopes`. `artifacts` defaults to true, `dependencies` to false.
+  An artifact or dependency that is nowhere is an error line.
+- **Where it goes.** Each file is copied or moved to `targetRepo` at the path it had,
+  through the item API's copy and move, with its conflict and overwrite rules. A virtual
+  target resolves to its default deployment repository; a missing target is 404 and one that
+  takes no deploys is 400. A file already in the target stays, with an info line. Without a
+  target nothing moves.
+- **Per-file permissions.** A file the caller may not read, delete for a move, or deploy at
+  the target, a move out of a remote cache, and an overwrite without delete are error lines,
+  not refusals, as Artifactory reports them.
+- **Properties** replace their keys' values on the files where they landed, or where they
+  are without a target. A file the caller may not annotate is a warning line.
+- **The record.** The promotion is recorded only with a `status`, and not in a dry run. It
+  keeps `timestamp` (or now), the caller, `ciUser` (or the caller), the comment, the source
+  repository and the resolved target, where the `build.promotions` AQL domain finds it.
+- **Fail-fast**, the default and what the JFrog CLI sends, stops at the first error or
+  warning and answers 400. The promotion runs in one transaction, so a fail-fast promotion
+  that stops is rolled back whole and its report keeps only the error and warning lines
+  ([DV-032](../../implementation/deviations.md#api-behaviour)). Without fail-fast, what can
+  be done is done and the status is recorded; the answer is 200.
+- **A dry run** plans each file and checks each permission, and changes nothing.
 
-A virtual target resolves to its default deployment repository. Copy and move go through
-the same service as the item API, with its conflict and checksum rules.
+**Retention** discards the runs of a build that its settings do not keep, each as a delete
+of that run would: its document goes, and its artifacts too with `deleteBuildArtifacts`.
+- **Which runs.** Newest first by `started`, the runs past the newest `count` and those
+  started before `minimumBuildDate`, less every run of a number in
+  `buildNumbersNotToBeDiscarded`. Those protected runs still count towards `count`, as
+  Jenkins's log rotation counts builds kept forever (research 22 §3.6). A retention request
+  for a build with no runs is 404.
+- **Values.** `count` of 0 is 400, as in Artifactory; absent or negative keeps any number.
+  `minimumBuildDate` is a timestamp or epoch milliseconds.
+- **`async`** absent or false discards before answering. True checks the request and the
+  caller's delete permission, answers 204, and discards in the background, planning again
+  then; a failure there is logged.
+- **A published `buildRetention`** is stored as the build name's retention and applied once,
+  after the run is stored, as the publisher. A publisher without delete keeps its publish and
+  discards nothing, with a warning in the log. Later publishes without settings discard
+  nothing, and a retention request records no lasting policy.
 
 **No Terraform resources.** Neither JFrog provider manages build-info (research 22 §3.5).
 
@@ -106,6 +140,17 @@ and treating it as unique would break `jf rt bp --overwrite`.
 **Retention answering 204** follows the CLI, which rejects any other status. JFrog documents
 200 ([DV-031](../../implementation/deviations.md#documentation-versus-behaviour)).
 
+**Promotion and retention follow Artifactory's source over JFrog's pages** where they
+differ: fail-fast's 400, upper-case message levels, the refused `count` of 0 and `async`
+defaulting to false
+([DV-033](../../implementation/deviations.md#documentation-versus-behaviour)).
+
+**Rolling a fail-fast promotion back** rather than leaving what it had done
+([DV-032](../../implementation/deviations.md#api-behaviour)): Artifactory's partial
+promotion leaves a build's files split between two repositories, which the JFrog CLI's
+own help warns of. One transaction makes fail-fast mean "all or nothing", which is what a
+pipeline that stops on the error assumes.
+
 **Alternatives considered:**
 - *Storing build-info only as items:* build queries would need JSON parsing per query.
 - *A unique key of project, name and number:* rejects a second run of the same number,
@@ -121,7 +166,11 @@ and treating it as unique would break `jf rt bp --overwrite`.
 ## Verification
 
 - `jf rt u --build-name --build-number`, `jf rt bp` (including `--overwrite`),
-  `jf rt build-promote` and `jf rt build-discard` in the acceptance suite.
+  `jf rt build-promote` (dry run, copy with properties, move from one source repository)
+  and `jf rt build-discard` (with a protected number) in the acceptance suite.
+- Service tests for every promotion line, the fail-fast rollback, the retention arithmetic
+  and a publish's `buildRetention`; handler tests for the media types, the 400 report and
+  the background discard.
 - Store tests with several runs of one number, and the encoded item path.
 - `TestBuildRoutesKeepEscapedSlash`: an escaped `/` in a build name or number reaches the
   operation intact.
