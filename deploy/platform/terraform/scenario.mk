@@ -84,8 +84,10 @@ down:
 	docker compose down
 
 ## clean: stop the container and remove its data volume and the generated files
+# destroy runs clean first, and a scenario with no local container
+# (multi-region) has no compose.yaml for docker compose to read.
 clean:
-	docker compose down --volumes
+	if [ -f compose.yaml ]; then docker compose down --volumes; fi
 	rm -rf $(CLEAN_FILES)
 
 ## destroy: remove everything Terraform created, stored objects included

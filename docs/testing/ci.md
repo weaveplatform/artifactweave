@@ -13,7 +13,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS and Azure; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
-| `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform` or a `single-bucket` scenario) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
+| `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
 
 `GOWORK=off` isolates builds from parent workspaces. Actions are pinned by commit SHA.
 
@@ -189,18 +189,34 @@ shows how to dispatch each. Every action goes through `deploy/platform/terraform
   API's checksums, a `HEAD` answered by the registry, a `downloadRedirect` 302 to the
   scenario's `storage_host` whose signed URL serves the file and a range of it, and the
   same URL refused without its signature. Scenarios add their own checks in
-  `test/platform`. The instance is destroyed in a step that always runs.
-- `reap` destroys expired instances and deletes resources that outlived their state.
+  `test/platform`: the `multi-region` mirrors show a copy on each member, the redirect
+  preferring the member in the instance's zone, uploads and reads with that member drained
+  (artifactweave restarted with its `write_enabled` off), and repair copying back to it once
+  re-enabled. Every output reaches the checks through `ARTIFACTWEAVE_SCENARIO_OUTPUTS`. The
+  instance is destroyed in a step that always runs.
+- `destroy` reads the instance's state from the store first. An instance whose state is
+  empty or absent, because its apply failed early, needs no configuration: `destroy`
+  removes the empty state and succeeds, so a failed run's clean-up never fails on it.
+- Each run works on a copy of the scenario beside a copy of `modules/`, so module sources
+  (`../../modules/<cloud>/<capability>`) resolve as they do in the repository.
+- `reap` destroys expired instances and deletes resources that outlived their state. AWS
+  buckets are found by listing the deployer's `artifactweave-` buckets with their regions and
+  reading each one's tags there, because a scenario can span regions and the tagging API
+  answers for one region only.
 - State and plans are never uploaded, and nothing uploads coverage: scenario runs are
   evidence, not coverage, so `make test` leaves `test/platform` out.
 
-On a pull request that changes the workflow, the driver, `test/platform` or a
-`single-bucket` scenario, the same job runs a proof for GCP and Azure (`single-bucket`; AWS is
-wired for dispatch and joins the proof once a dispatched run has proven it):
-`test`; an `apply`, then a `destroy` that has only the remote state; an instance applied
-already expired, then a `reap` that removes it; then `check-clean`, which fails if any
-state, bucket or resource of the run remains. A failed step triggers a clean-up step that
-destroys the run's instances.
+On a pull request that changes the workflow, the driver, `test/platform`, a scenario or a
+module, the same job runs a proof for each scenario `deploy/platform/terraform/prove-matrix.sh`
+chooses from the changed paths: every cloud's `single-bucket` when the driver changes, each
+scenario the pull request touches, and every scenario of a cloud whose module it touches.
+Each proof runs `test`; an `apply`, then a `destroy` that has only the remote state; an
+instance applied already expired, then a `reap` that removes it; then `check-clean`, which
+fails if any state, bucket or resource of the run remains. A failed step triggers a
+clean-up step that destroys the run's instances. Each proof has its own run tag (the pull
+request, the run and the scenario's initials) and its own concurrency group, so proofs run in
+parallel; its `reap` takes `REAP_PREFIX` and its `check-clean` the run tag, so neither touches
+another proof's instances.
 
 ## Terraform scenarios
 

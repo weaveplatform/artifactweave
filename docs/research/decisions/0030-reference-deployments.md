@@ -36,6 +36,8 @@ deploy/
       scenario.mk                     shared make targets for every scenario
       bootstrap.mk                    shared make targets for the bootstraps
       github-environments.sh          creates the cloud-conformance and cloud-platform environments
+      scenario-ci.sh                  the CI driver: apply, test, destroy, reap, check-clean
+      prove-matrix.sh                 which scenarios a pull request proves, from its changed paths
       modules/<cloud>/<capability>    child modules: storage, cdn, ci-access; no provider blocks
       aws/ gcp/ azure/
         bootstrap/                    long-lived: CI identities, remote state, DNS zone, APIs, budget
@@ -57,7 +59,12 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
   `single-bucket` only looks its identity up and grants it the scenario's store.
   `make destroy` refuses on a bootstrap.
 - Child modules are per cloud. There is no cross-cloud abstraction module: each cloud's
-  storage, CDN and identity resources differ too much for one interface to help.
+  storage, CDN and identity resources differ too much for one interface to help. A module's
+  security invariants are tested once, in its own `tests/` on a mocked plan; a scenario that
+  calls it tests only how it composes it. `modules/<cloud>/storage` is one private bucket or
+  storage account with its grant; `multi-region` calls it once per region. The AWS module
+  names each resource's `region` (the provider's per-resource region, from 6.0), so one
+  provider configuration serves several regions without aliases.
 - Compute hosting of artifactweave itself, when it is added, is a further `deploy/platform`
   scenario.
 - `test/terraform` keeps only its driver. The provider fixture becomes the
@@ -193,14 +200,20 @@ and `ttl_minutes` (how long until an applied instance's `expires-at`):
   unlabelled ones carrying the `awscn-` name prefix once they are two hours old and belong
   to no live instance, so a run still applying keeps its resources.
 - A dispatch only finds workflows on the default branch, so a pull request that changes the
-  workflow, the driver, `test/platform` or a `single-bucket` scenario runs a proof instead,
-  behind the same approval: for each cloud, `test`, an `apply` followed by a `destroy` from
+  workflow, the driver, `test/platform`, a scenario or a module runs a proof instead, behind
+  the same approval, for what `prove-matrix.sh` chooses: every cloud's `single-bucket` when
+  the driver changes, each scenario the pull request touches, and every scenario of a cloud
+  whose module it touches. Each proof runs `test`, an `apply` followed by a `destroy` from
   the remote state alone, an instance applied already expired and a `reap` that removes it,
-  then a check that nothing of the run remains. Pull requests from forks get no OIDC token
-  and do not run. A cloud joins that proof once a dispatched run has proven its wiring.
+  then a check that nothing of the run remains. Each has its own run tag and concurrency
+  group, and its `reap` is limited to that tag (`REAP_PREFIX`), so proofs on one cloud run in
+  parallel without racing for each other's state. Pull requests from forks get no OIDC token
+  and do not run.
 - On AWS the deployer may only manage buckets named `artifactweave-*`, so a scenario run
   names its bucket `artifactweave-awscn-<instance>-…`, and reap finds AWS buckets by their
-  tags through the tagging API rather than by the `awscn-` prefix.
+  tags rather than by the `awscn-` prefix: it lists the `artifactweave-` buckets with their
+  regions and reads each one's tags there, because a scenario may span regions and the
+  tagging API answers for one region at a time.
 - `test/platform` is a Go suite of `_test.go` files only, gated on `ARTIFACTWEAVE_SCENARIO`
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.
