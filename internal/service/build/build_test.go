@@ -610,6 +610,97 @@ func TestArtifacts(t *testing.T) {
 	}
 }
 
+func TestFind(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	runs := map[string]types.Build{}
+	for _, r := range []struct{ key, number, started string }{
+		{"1", "1", started0}, {"2a", "2", at(1)}, {"2b", "2", at(2)}, {"3", "3", at(3)},
+	} {
+		runs[r.key] = w.publish(doc("app", r.number, r.started, artifactModule("artifact"))).Run
+	}
+	promote := func(key string, statuses ...string) {
+		for _, st := range statuses {
+			if _, err := w.db.Builds().AddPromotion(ctx, types.BuildPromotion{
+				BuildID: runs[key].ID, Status: st, Created: time.Now(),
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	promote("2a", "Released")
+	promote("3", "Released", "Staged")
+	find := func(number, status string, a Access) (types.Build, error) {
+		return w.svc.Find(ctx, "default", "app", number, status, a)
+	}
+	for _, tc := range []struct{ number, status, want string }{
+		{Latest, "", "3"},
+		// Only a run's latest promotion counts.
+		{Latest, "Released", "2a"},
+		{"2", "", "2b"},
+		{"2", "Released", "2a"},
+	} {
+		b, err := find(tc.number, tc.status, everyone)
+		if err != nil || b.ID != runs[tc.want].ID || len(b.Modules) != 1 {
+			t.Errorf("%s %q: run %d %v, want run %s", tc.number, tc.status, b.ID, err, tc.want)
+		}
+	}
+	for _, tc := range []struct{ number, status string }{{"1", "Released"}, {"9", ""}} {
+		if _, err := find(tc.number, tc.status, everyone); !errors.Is(err, ErrNotFound) {
+			t.Errorf("%s %q: %v, want not found", tc.number, tc.status, err)
+		}
+	}
+	// A run the caller may not read is skipped; when it was the only one,
+	// the answer is a refusal.
+	no3 := perms{build: func(_, path string, _ bool, _ types.Actions) bool {
+		return !strings.HasPrefix(path, "app/3-")
+	}}
+	if b, err := find(Latest, "", no3); err != nil || b.ID != runs["2b"].ID {
+		t.Errorf("latest readable: run %d %v", b.ID, err)
+	}
+	if _, err := find("3", "", no3); !errors.Is(err, ErrForbidden) {
+		t.Errorf("unreadable run: %v", err)
+	}
+}
+
+// TestSearchArtifacts: the build artifacts search finds a run's files as a
+// promotion does, unlike Artifacts.
+func TestSearchArtifacts(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	w.deploy("other/x.bin", "artifact", buildProps("app", "1"))
+	w.deploy("copy/a.bin", "artifact", nil)
+	w.seed("app")
+	run := must(w.svc.Run(ctx, "", "app", "1", time.Time{}, everyone))
+	paths := func(in func(types.Item) bool, a Access) []string {
+		t.Helper()
+		var out []string
+		for _, it := range must(w.svc.SearchArtifacts(ctx, run, in, a)) {
+			out = append(out, it.FullPath())
+		}
+		return out
+	}
+	// The file named like the artifact wins over the one found first, and
+	// one without the run's build properties never counts.
+	if got := paths(nil, everyone); !slices.Equal(got, []string{"app/a.bin"}) {
+		t.Errorf("artifacts %v", got)
+	}
+	notApp := func(it types.Item) bool { return !strings.HasPrefix(it.Path, "app") }
+	if got := paths(notApp, everyone); !slices.Equal(got, []string{"other/x.bin"}) {
+		t.Errorf("outside app/ %v", got)
+	}
+	// A file the caller may not read is left out, not replaced.
+	noApp := perms{item: func(_ repo.Config, path string, _ types.Actions) bool {
+		return !strings.HasPrefix(path, "app/")
+	}}
+	if got := paths(nil, noApp); got != nil {
+		t.Errorf("unreadable %v", got)
+	}
+	if got := must(w.svc.Artifacts(ctx, "", "app", "1", everyone)); len(got) != 3 {
+		t.Errorf("Artifacts matches by checksum alone: %d items", len(got))
+	}
+}
+
 func must[T any](v T, err error) T {
 	if err != nil {
 		panic(err)

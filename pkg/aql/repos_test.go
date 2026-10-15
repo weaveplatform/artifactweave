@@ -142,3 +142,20 @@ func TestCompileRepoSet(t *testing.T) {
 		}
 	}
 }
+
+func TestExpand(t *testing.T) {
+	repos := Repositories{
+		"libs": {Class: RepoLocal},
+		"rem":  {Class: RepoRemote},
+		"virt": {Class: RepoVirtual, Members: []string{"rem", "libs", "virt"}},
+	}
+	for key, want := range map[string][]RepoRef{
+		"virt":      {{"libs", false}, {"rem", false}, {"rem", true}},
+		"rem-cache": {{"rem", true}},
+		"nope":      {{"nope", false}},
+	} {
+		if got := repos.Expand(key); !slices.Equal(got, want) {
+			t.Errorf("%s: %v, want %v", key, got, want)
+		}
+	}
+}

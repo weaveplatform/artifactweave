@@ -9031,7 +9031,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchbadchecksum.md
   /api/search/buildArtifacts:
     post:
-      description: Lists the artifacts a build produced, optionally filtered by repository, promotion status and path patterns. Depends on build-info and answers 501 until that lands.
+      description: Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
       operationId: searchBuildArtifacts
       requestBody:
         content:
@@ -9059,12 +9059,13 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
         - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchbuildartifacts.md
-      x-tier: stub
   /api/search/checksum:
     get:
       description: Finds items whose content has the given checksum. Exactly one of md5, sha1 or sha256 should be given; when several are given all must match. The search covers local repositories, remote caches and virtual repositories. Anonymous callers may search when anonymous access is enabled.
@@ -9205,10 +9206,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchdates.md
   /api/search/dependency:
     get:
-      description: Finds the builds whose recorded dependencies include the artifact with the given SHA-1. Depends on build-info and answers 501 until that lands.
+      description: Finds the build runs whose recorded dependencies include the artifact with the given SHA-1, among the runs the caller may read, in the order they were published. A build number with several runs is listed once. Anonymous callers may search when anonymous access is enabled.
       operationId: searchDependency
       parameters:
-        - description: Required query parameter. Hex SHA-1 of the dependency.
+        - description: Required query parameter. Hex SHA-1 of the dependency, 40 characters in either case.
           in: query
           name: sha1
           required: true
@@ -9236,10 +9237,9 @@ paths:
       tags:
         - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchdependency.md
-      x-tier: stub
   /api/search/gavc:
     get:
-      description: Finds items by Maven coordinates in repositories whose layout defines the group, module, version and classifier tokens (Maven, Gradle, Ivy, sbt). At least one coordinate is required. Without specific the search covers local repositories and remote caches and returns file info URIs; with specific=true it also covers remote and virtual repositories and returns the download URL with the extracted ext, version and classifier. Anonymous callers may search when anonymous access is enabled.
+      description: Finds files by Maven coordinates read through each repository's layout, in repositories whose layout defines the organisation, module and base revision tokens, as the Maven, Gradle, Ivy and sbt layouts do. A file's version is its base revision with any folder integration revision, such as 1.0-SNAPSHOT. At least one coordinate is required. Without specific the search covers local repositories and remote caches and returns file info URIs; with specific=true repos may also name virtual repositories, searched through their members, and each entry carries the download URL under the key the search named, with the extracted ext, version and classifier. Anonymous callers may search when anonymous access is enabled.
       operationId: searchGavc
       parameters:
         - description: Optional query parameter. Group id; * and ? wildcards are allowed.
@@ -9267,7 +9267,7 @@ paths:
             description: Classifier pattern.
             type: string
         - $ref: '#/components/parameters/Repos'
-        - description: Optional query parameter. When true the result entries carry downloadUri, ext, version and classifier instead of uri, and remote and virtual repositories are searched too. Defaults to false.
+        - description: Optional query parameter. When true the result entries carry downloadUri, ext, version and classifier instead of uri, and virtual repositories named in repos are searched too. X-Result-Detail is ignored. Defaults to false.
           in: query
           name: specific
           schema:
@@ -9298,7 +9298,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchgavc.md
   /api/search/latestVersion:
     get:
-      description: Returns the highest version of a module as plain text, using the repository layout to extract versions and Maven version ordering to compare them. Without v the highest release is returned; with an integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. By default only local repositories and remote caches are consulted; remote=1 also queries the upstream of remote repositories. The response is the bare version string, not JSON. Returns 404 when nothing matches.
+      description: Returns the highest version of a module as plain text, using the repository layout to extract versions and Maven version ordering to compare them. Without v the highest release is returned; with an integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 when nothing matches. Anonymous callers may search when anonymous access is enabled.
       operationId: searchLatestVersion
       parameters:
         - description: Optional query parameter. Organisation (Maven group id).
@@ -9307,7 +9307,7 @@ paths:
           schema:
             description: Group id.
             type: string
-        - description: Optional query parameter. Module name (Maven artifact id). Required unless the layout derives it from the group.
+        - description: Optional query parameter. Module name (Maven artifact id). At least one of g and a is required.
           in: query
           name: a
           schema:
@@ -9319,7 +9319,7 @@ paths:
           schema:
             description: Version pattern.
             type: string
-        - description: Optional query parameter. 1 also asks the upstream of remote repositories; 0 (default) uses local repositories and caches only.
+        - description: Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
           in: query
           name: remote
           schema:
@@ -9344,6 +9344,8 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '404':
+          $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
@@ -9542,7 +9544,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchusage.md
   /api/search/versions:
     get:
-      description: Lists every version of a module found through the repository layout, newest first. Without v both release and integration versions are returned; with an integration pattern only integration versions are. By default only local repositories and remote caches are consulted; remote=1 also queries the upstream of remote repositories. Virtual repositories may be named in repos.
+      description: Lists every version of a module found through the repository layout, newest first. Without v both release and integration versions are returned; v filters them by pattern, so an integration pattern returns only integration versions. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Anonymous callers may search when anonymous access is enabled.
       operationId: searchVersions
       parameters:
         - description: Optional query parameter. Organisation (Maven group id).
@@ -9551,7 +9553,7 @@ paths:
           schema:
             description: Group id.
             type: string
-        - description: Optional query parameter. Module name (Maven artifact id).
+        - description: Optional query parameter. Module name (Maven artifact id). At least one of g and a is required.
           in: query
           name: a
           schema:
@@ -9563,7 +9565,7 @@ paths:
           schema:
             description: Version pattern.
             type: string
-        - description: Optional query parameter. 1 also asks the upstream of remote repositories; 0 (default) uses local repositories and caches only.
+        - description: Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
           in: query
           name: remote
           schema:
@@ -16271,10 +16273,10 @@ paths:
       x-tier: stub
   /api/versions/{repo}/{path}:
     get:
-      description: Returns the highest value of the lowercase version property among items under a path, compared with Maven version ordering, together with the items that carry it. _any for repo searches every repository and _any for path searches every path. Any further query parameter is read as a property the items must also carry, for example os=win. A named user is required. Returns 404 when no item carries the property.
+      description: Returns the highest value of the lowercase version property among the files under a path, compared with Maven version ordering, and with listFiles=1 the files that carry it. _any for repo searches every local repository and remote cache, and _any for path searches every path. Any further query parameter is read as a property the files must also carry, as in the property search, for example os=win. Only files the caller may read count. A named user is required. Returns 404 when no file carries the property.
       operationId: searchLatestVersionByProperties
       parameters:
-        - description: Required path parameter. Repository key, or _any for every repository.
+        - description: Required path parameter. Repository key, or _any for every repository. A remote key stands for its cache and a virtual key for its members.
           in: path
           name: repo
           required: true
@@ -16288,7 +16290,7 @@ paths:
           schema:
             description: Repository-relative folder path or _any.
             type: string
-        - description: Optional query parameter. 0 (default) returns the folder of the latest version; 1 returns the files instead.
+        - description: Optional query parameter. 0 (default) returns the latest version with an empty artifacts list; 1 also lists the files that carry it.
           in: query
           name: listFiles
           schema:
@@ -18058,31 +18060,31 @@ components:
         - archiveType
       type: object
     ArtifactorySearchesApiBuildArtifactsRequest:
-      description: Selects a build whose artifacts should be listed. Served once build-info lands; until then the operation answers 501.
+      description: Selects the build run whose artifacts should be listed, and narrows them.
       properties:
         buildName:
           description: Required within this object. Name of the build as published with jf rt build-publish.
           minLength: 1
           type: string
         buildNumber:
-          description: Required within this object. Build number, or LATEST for the most recent run.
+          description: Required within this object. Build number, or LATEST for the most recently started run of the build. A number with several runs selects its most recently started run.
           minLength: 1
           type: string
         buildStatus:
-          description: Optional within this object. Restricts the match to builds whose latest promotion status equals this value.
+          description: Optional within this object. Selects only runs whose latest promotion has exactly this status, for example Released; with LATEST, the most recently started such run. Omitted ignores promotions.
           type: string
         mappings:
-          description: Optional within this object. Regular expressions that an artifact path must match to be returned. Omitted returns every artifact of the build.
+          description: Optional within this object. Regular expressions, any of which a file's path must match to be returned. Omitted or empty returns every artifact of the build.
           items:
             description: One pattern to filter by.
             properties:
               input:
-                description: Optional within this object. Regular expression applied to the artifact path.
+                description: Optional within this object. Go regular expression (RE2) that must match the whole path of the file relative to its repository, for example (.+)-sources.jar. An empty input is ignored; an invalid one is a 400.
                 type: string
             type: object
           type: array
         repos:
-          description: Optional within this object. Repository keys to look in. Omitted searches every readable repository.
+          description: Optional within this object. Repository keys to look in. A remote key stands for its cache and a virtual key for its members. Omitted searches every readable repository.
           items:
             description: A repository key.
             type: string
@@ -20073,12 +20075,12 @@ components:
       description: The highest version found among items carrying a lowercase version property, and the items that carry it.
       properties:
         artifacts:
-          description: Optional within this object. Items at the winning version. Contains the folder URI by default and the file URIs when listFiles=1.
+          description: Optional within this object. The files that carry the winning version when listFiles=1; empty otherwise.
           items:
-            description: One item at the latest version.
+            description: One file at the latest version.
             properties:
               uri:
-                description: Optional within this object. Absolute storage URI of the item.
+                description: Optional within this object. Absolute download URL of the file.
                 format: uri
                 type: string
             type: object

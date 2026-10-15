@@ -199,10 +199,31 @@ The cached definitions in `.specoracle/artifactory-searches-api/` match the spec
   - `X-Result-Detail: info` and `properties` widen each result beyond the `uri`.
 - **[D] GAVC, versions and latest version** read Maven coordinates through the repository's
   layout (`pkg/layout`, P0).
-  - `latestVersion` answers `text/plain`.
-  - `/api/versions/{repo}/{path}` compares the lowercase `version` property.
+  - GAVC, versions, latest version, dependency and build artifacts search allow anonymous
+    callers; latest version by properties needs "an authenticated user (not anonymous)".
+  - `latestVersion` answers `text/plain`. It needs a layout with `[org]` and `[module]`;
+    without `v` it returns the latest release, and with an integration version such as
+    `1.0-SNAPSHOT` the latest integration version (the page's example answers
+    `1.0-201203131455-2`, a file integration revision).
+  - `versions` returns release and integration versions unless `v` names one. Its example lists
+    `1.2`, `1.0-SNAPSHOT`, `1.0` in that order, which is not Maven order.
+  - `remote=1` asks remote repositories' upstream: `maven-metadata.xml` for Maven, a remote
+    listing for other layouts.
+  - `specific=true` (7.37.9) adds remote and virtual repositories to GAVC and answers
+    `downloadUri`, `ext`, `version` and `classifier`; the example's `downloadUri` names the
+    virtual repository searched.
+  - `/api/versions/{repo}/{path}` compares the lowercase `version` property. Its example answers
+    `artifacts: []` without `listFiles=1`, and download URLs with it.
 - **[D] Build-info searches.** `dependency` and `buildArtifacts` read build-info. `license`
   belongs to the licence feature and `archive` is deprecated; neither is in P5.
+  - `buildArtifacts` takes `buildNumber: LATEST`, the latest promotion status as
+    `buildStatus`, and `mappings[].input` regular expressions. No page documents a 404.
+  - [S] It finds a run's files as a promotion does (`BuildServiceImpl.getBuildArtifactsFileInfos`,
+    §3.6): by the run's build properties and an artifact's SHA-1, limited to `repos`.
+- **[S] No JFrog CLI caller.** jfrog-client-go v1.55.0 and jfrog-cli-core v2.60.0 call none of
+  GAVC, versions, latest version, latest version by properties, dependency or build artifacts
+  search: `jf rt dl --build` finds a build's files through
+  `GET /api/builds/buildArtifacts/...` and AQL (§3.1).
 - **[D] Limits for internal and anonymous users.** "All searches return limited results for
   internal and anonymous users (same limits as in the user interface)", configurable by
   system property. This is the shared description on every cached search page.

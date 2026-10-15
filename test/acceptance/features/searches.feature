@@ -1,8 +1,9 @@
 Feature: GET searches
-  The quick, property, checksum, bad checksum, usage, dates, creation and
-  pattern searches build AQL internally and answer their documented shapes
-  (decision 0012, research 22 §2). The JFrog CLI's skill search uses the
-  property search.
+  The quick, property, checksum, bad checksum, usage, dates, creation,
+  pattern, GAVC, versions and latest version searches build AQL internally
+  and answer their documented shapes (decision 0012, research 22 §2); the
+  dependency and build artifacts searches read build-info. The JFrog CLI's
+  skill search uses the property search.
 
   Background:
     Given the registry is running
@@ -66,6 +67,88 @@ Feature: GET searches
     Then the response status is 400
     When I GET "/artifactory/api/search/usage?notUsedSince=0"
     Then the response status is 401
+
+  Scenario: GAVC, versions and latest version read Maven coordinates through the layout
+    Given I PUT "/artifactory/api/repositories/maven-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "maven"}
+      """
+    And I PUT "/artifactory/maven-local/org/acme/lib/1.0/lib-1.0.jar;version=1.0" as admin with body:
+      """
+      one
+      """
+    And I PUT "/artifactory/maven-local/org/acme/lib/1.1/lib-1.1.jar;version=1.1" as admin with body:
+      """
+      one point one
+      """
+    And I PUT "/artifactory/maven-local/org/acme/lib/1.1/lib-1.1-sources.jar" as admin with body:
+      """
+      sources
+      """
+    And I PUT "/artifactory/maven-local/org/acme/lib/2.0-SNAPSHOT/lib-2.0-20260101.120000-1.jar" as admin with body:
+      """
+      snapshot
+      """
+    When I GET "/artifactory/api/search/gavc?g=org.acme&a=lib&v=1.1&c=sources" as admin
+    Then the response status is 200
+    And the JSON field "results" has 1 entries
+    And the response body contains "/artifactory/api/storage/maven-local/org/acme/lib/1.1/lib-1.1-sources.jar"
+    When I GET "/artifactory/api/search/gavc?g=org.acme&a=lib&v=1.1&specific=true&repos=maven-local" as admin
+    Then the response status is 200
+    And the JSON field "results.0.ext" equals "jar"
+    And the JSON field "results.0.version" equals "1.1"
+    And the JSON field "results.1.classifier" equals "sources"
+    And the response body contains "/artifactory/maven-local/org/acme/lib/1.1/lib-1.1.jar"
+    When I GET "/artifactory/api/search/versions?g=org.acme&a=lib" as admin
+    Then the response status is 200
+    And the JSON field "results" has 3 entries
+    And the JSON field "results.0.version" equals "2.0-SNAPSHOT"
+    And the JSON field "results.0.integration" equals "true"
+    When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=lib" as admin
+    Then the response status is 200
+    And the response header "Content-Type" contains "text/plain"
+    And the response body is "1.1"
+    When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=lib&v=2.0-SNAPSHOT" as admin
+    Then the response body is "2.0-20260101.120000-1"
+    When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=none" as admin
+    Then the response status is 404
+    When I GET "/artifactory/api/versions/maven-local/org/acme?listFiles=1" as admin
+    Then the response status is 200
+    And the JSON field "version" equals "1.1"
+    And the JSON field "artifacts" has 1 entries
+    And the response body contains "/artifactory/maven-local/org/acme/lib/1.1/lib-1.1.jar"
+    When I GET "/artifactory/api/versions/_any/_any"
+    Then the response status is 401
+
+  Scenario: Dependency and build artifacts searches read build-info
+    Given I PUT "/artifactory/generic-local/dist/a.bin;build.name=app;build.number=7" as admin with body:
+      """
+      artifact a
+      """
+    And I PUT "/artifactory/api/build" as admin with body:
+      """
+      {"name": "app", "number": "7", "started": "2026-10-15T09:30:00.000+0000",
+       "modules": [{"id": "m",
+         "artifacts": [{"name": "a.bin", "sha1": "78d9aabd9545cc42a965eccb43ea43215a78efd3"}],
+         "dependencies": [{"id": "org:app:1.0", "sha1": "7d1043473d55bfa90e8530d35801d4e381bc69f0"}]}]}
+      """
+    When I GET "/artifactory/api/search/dependency?sha1=7d1043473d55bfa90e8530d35801d4e381bc69f0" as admin
+    Then the response status is 200
+    And the JSON field "results" has 1 entries
+    And the response body contains "/artifactory/api/build/app/7"
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "app", "buildNumber": "LATEST", "repos": ["generic-local"],
+       "mappings": [{"input": "dist/.+"}]}
+      """
+    Then the response status is 200
+    And the JSON field "results" has 1 entries
+    And the response body contains "/artifactory/generic-local/dist/a.bin"
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "app", "buildNumber": "8"}
+      """
+    Then the response status is 404
 
   @jf
   Scenario: jf skills search --prop finds a skill through the property search

@@ -470,6 +470,97 @@ func (s *Service) Artifacts(
 	return out, err
 }
 
+// SearchArtifacts returns the items run b's artifacts are that the caller
+// may read, in module and artifact order, found as a promotion finds them:
+// of the items that in passes (nil passes all), hold an artifact's checksum
+// and carry the run's build properties, the one with its name, else the
+// first. Artifacts, which the JFrog CLI ranks itself, matches by checksum
+// alone.
+func (s *Service) SearchArtifacts(
+	ctx context.Context,
+	b types.Build,
+	in func(types.Item) bool,
+	a Access,
+) ([]types.Item, error) {
+	keep := s.artifactOf(b, in)
+	seen := map[int64]bool{}
+	var out []types.Item
+	for _, m := range b.Modules {
+		for _, bf := range m.Artifacts {
+			if bf.Checksums == (types.Checksums{}) {
+				continue
+			}
+			f, ok, err := s.findFile(ctx, bf, keep)
+			if err != nil {
+				return nil, err
+			}
+			if !ok || seen[f.it.ID] || !a.Item(f.repo, f.it.FullPath(), types.ActionRead) {
+				continue
+			}
+			seen[f.it.ID] = true
+			out = append(out, f.it)
+		}
+	}
+	return out, nil
+}
+
+// Latest is the build number that stands for a build's most recently
+// started run.
+const Latest = "LATEST"
+
+// Find returns the most recently started run of a build number, or of the
+// build when number is Latest, whose latest promotion has status when status
+// is not empty, skipping runs the caller may not read. ErrNotFound when no
+// run qualifies, ErrForbidden when the caller may read none that does.
+func (s *Service) Find(
+	ctx context.Context,
+	projectKey, name, number, status string,
+	a Access,
+) (types.Build, error) {
+	projectKey = ProjectKey(projectKey)
+	all, err := s.runs(ctx, projectKey, name)
+	if err != nil {
+		return types.Build{}, err
+	}
+	repoKey, hidden := types.BuildInfoRepo(projectKey), false
+	for _, r := range all {
+		if number != Latest && r.Number != number {
+			continue
+		}
+		if status != "" {
+			ok, err := s.promotedTo(ctx, r.ID, status)
+			if err != nil {
+				return types.Build{}, err
+			}
+			if !ok {
+				continue
+			}
+		}
+		if !a.Build(repoKey, documentPath(r), false, types.ActionRead) {
+			hidden = true
+			continue
+		}
+		b, err := s.Store.Builds().ByID(ctx, r.ID)
+		if err != nil {
+			return types.Build{}, fmt.Errorf("build: get run: %w", err)
+		}
+		return b, nil
+	}
+	if hidden {
+		return types.Build{}, ErrForbidden
+	}
+	return types.Build{}, fmt.Errorf("build: run %s/%s: %w", name, number, ErrNotFound)
+}
+
+// promotedTo reports whether run id's latest promotion has status.
+func (s *Service) promotedTo(ctx context.Context, id int64, status string) (bool, error) {
+	ps, err := s.Store.Builds().Promotions(ctx, id)
+	if err != nil {
+		return false, fmt.Errorf("build: promotions of run %d: %w", id, err)
+	}
+	return len(ps) > 0 && ps[len(ps)-1].Status == status, nil
+}
+
 // deleteArtifacts deletes the items of run b's artifacts that carry its
 // build properties.
 func (s *Service) deleteArtifacts(ctx context.Context, b types.Build, by string, a Access) error {

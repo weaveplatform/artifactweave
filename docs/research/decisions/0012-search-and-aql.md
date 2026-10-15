@@ -158,10 +158,11 @@ and stays the first thing the parser must pass:
 **GET searches.** The GET search endpoints build AQL internally, run it through the item
 store's search, and render their documented response shapes (research 22 §2), including
 `X-Result-Detail`.
-- **Callers.** Quick, property, checksum and bad checksum search allow anonymous callers,
-  as JFrog's page for each says. Creation, dates, usage and pattern search need a named
-  user and answer an anonymous caller 401. Results are what the caller may read, filtered
-  as AQL's are, so a caller who may read nothing gets no results rather than a 403.
+- **Callers.** Quick, property, checksum, bad checksum, GAVC, versions, latest version,
+  dependency and build artifacts search allow anonymous callers, as JFrog's page for each
+  says. Creation, dates, usage, pattern and latest version by properties search need a
+  named user and answer an anonymous caller 401. Results are what the caller may read,
+  filtered as AQL's are, so a caller who may read nothing gets no results rather than a 403.
 - **`repos`.** A remote's key and its `-cache` key both search the cache, and results
   report the cache key. Quick, creation, dates, usage and pattern search ignore a virtual
   key; property, checksum and bad checksum search its members. A key that names no
@@ -174,11 +175,79 @@ store's search, and render their documented response shapes (research 22 §2), i
   checksum the client never declared counts as bad. Time windows include both ends.
   Pattern search's `*` and `?` stay within a segment, and `**` or a trailing `/` is a 400.
 - **Limits.** `search.user_query_limit` (1,000) caps quick, property, checksum, usage,
-  dates and creation search for anonymous callers, and for every non-admin when
+  dates, creation and GAVC search for anonymous callers, and for every non-admin when
   `search.limit_anonymous_users_only` is false, as Artifactory's
   `artifactory.search.userQueryLimit` and `limitAnonymousUsersOnly` do. Bad checksum search
-  stops at its documented 10,000, and `search.aql.max_results` caps every search. Results
-  past a limit are dropped silently, since these responses have no `range` to report it.
+  stops at its documented 10,000, and `search.aql.max_results` caps every search, the files
+  versions and latest version read included. Results past a limit are dropped silently,
+  since these responses have no `range` to report it.
+
+**Layout searches.** GAVC, versions and latest version read Maven coordinates from each
+file's path through its repository's layout (`pkg/layout`), so Maven, Gradle, Ivy, sbt and
+custom layouts follow one rule.
+- **Which files.** Files only, descriptors such as POMs included, in repositories whose layout
+  defines the organisation, module and base revision tokens. A layout that does not compile
+  reads nothing.
+- **Coordinates.** `g` matches the dotted organisation, `a` the module and `c` the
+  classifier. A file's version is its base revision with its folder integration revision,
+  or its file's when the folder has none: `1.0-SNAPSHOT` for every unique snapshot in that
+  folder. Its file version prefers the file integration revision: `1.0-20260101.120000-1`.
+  Parameters take `*` and `?` and match case-sensitively.
+- **Narrowing.** The query takes the files under the start each layout renders for `g` and
+  `a`, up to its first optional group or token without a value; the layout's match on each
+  file decides. No layout pattern is translated to SQL.
+- **GAVC** needs one of `g`, `a`, `v` and `c`.
+  - Without `specific` it searches local repositories and caches and answers `uri` results,
+    widened by `X-Result-Detail`.
+  - With `specific=true`, `repos` may name virtual repositories, searched through their
+    members. Each entry has `downloadUri` under the first key in `repos` that reaches the file,
+    else under the file's own key, with `ext`, `version` and a `classifier` only when there is
+    one. `X-Result-Detail` is ignored.
+- **Versions** needs `g` or `a`. It answers each module version once, with whether it is an
+  integration version, newest first in Maven order. `v` filters them by pattern, so an
+  integration pattern keeps only integration versions. `repos` takes virtual keys.
+- **Latest version** needs `g` or `a` and answers `text/plain`.
+  - Without `v` it is the highest release, in Maven order.
+  - A `v` that names an integration version under a file's layout asks for the highest file
+    version among that layout's integration files whose version matches `v`. A `v` names one
+    when, after one of its hyphens, comes text the layout's folder integration revision
+    expression accepts in full, or its file one in a layout without a folder one:
+    `1.0-SNAPSHOT` under Maven.
+  - Any other `v` filters the releases. Nothing found is a 404, `Unable to find artifact
+    versions`.
+- **`remote=1`** is accepted and answered from local repositories and caches, as `remote=0`
+  is, until remote repositories proxy their upstream (P9). Any other value is a 400.
+
+**Latest version by properties.** `GET /api/versions/{repo}/{path}` answers the highest value
+of the lowercase `version` property, in Maven order, among the files the caller may read in
+`repo` under the folder `path`.
+- `_any` stands for every local repository and cache, or every path. A remote key stands for
+  its cache and a virtual key for its members.
+- Every query parameter but `listFiles` is a property the files must also carry, read as
+  property search reads them. A file's every `version` value counts.
+- `artifacts` is empty unless `listFiles=1`, when it lists the files that carry the winning
+  version, by download URL, as JFrog's examples show. `listFiles` other than 0 or 1 is a 400.
+- No file carrying the property is a 404.
+
+**Build searches.**
+- **Dependency search** takes a SHA-1 of 40 hex characters in either case; anything else is a
+  400. It answers one `uri` under `/api/build` per build number with a run the caller may
+  read whose dependencies include that SHA-1, in the order the runs were published, with
+  `?project=` for another project's build.
+- **Build artifacts search** reads the default project's builds.
+  - The run is the most recently started run of `buildNumber`, or of the build for `LATEST`,
+    whose latest promotion has exactly the `buildStatus` given, among the runs the caller may
+    read. No such run is a 404; when the caller may read none of the runs that qualify, it is
+    the build-info API's refusal.
+  - The files are found as a promotion finds them, as in Artifactory (research 22 §3.6):
+    for each artifact, of the items in `repos` that hold its checksums and carry the run's
+    `build.name` and `build.number`, the one with its name, else the first. In `repos` a
+    remote key stands for its cache and a virtual key for its members; without `repos` every
+    repository counts. A file the caller may not read is left out. `mappings` keep the files
+    whose whole path matches any `input`, an RE2 expression; an empty `input` is ignored and
+    an invalid one is a 400. `GET /api/builds/buildArtifacts/...` still matches by checksum
+    alone, since the JFrog CLI ranks its matches itself.
+  - A run whose filters leave nothing answers 200 with no results.
 
 ## Rationale
 
@@ -198,6 +267,19 @@ documents neither choice (research 22 §4).
 run leaves a mistyped or forgotten suffix harmless. Read permission is required beside
 delete or annotate because every row the response lists is one the caller then sees.
 
+**Coordinates through the layout**, rather than parsing Maven paths, is what JFrog
+describes: the search works for any layout with the tokens it needs. Narrowing by the
+rendered start of a path keeps the dialects' only job to a `$match`, which the parity
+fixtures already cover, and leaves the regular expressions of custom tokens to Go.
+
+**The folder version for GAVC and versions** groups a unique snapshot's files under the
+`1.0-SNAPSHOT` a Maven user asks for; latest version's file version is what JFrog's
+integration example returns.
+
+**Build artifacts answering 200 with no results** for an existing run matches the build
+artifacts endpoint and the other searches. JFrog documents no 404 for it; the spec adds one
+for a run that does not exist.
+
 **The default result cap** protects the server's memory from an unbounded query, and is the
 value JFrog SaaS uses. Self-managed Artifactory has no default cap, so this is a deviation
 ([DV-030](../../implementation/deviations.md#api-behaviour)). Operators who want
@@ -214,6 +296,10 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - *`properties.update` adding keys an item lacks:* the update would then reach every item
   the criteria match, which no JFrog example asks for.
 - *No default result cap:* matches self-managed Artifactory, but leaves memory unbounded.
+- *GAVC and versions only on Maven paths:* simpler, but wrong for Gradle, Ivy and custom
+  layouts, which JFrog says the searches support.
+- *Answering `remote=1` 501 until P9:* would refuse a request whose local answer is still
+  correct for what is cached.
 
 ## Constraints
 
@@ -225,6 +311,9 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
   locations, which is to verify against a live Artifactory.
+- `remote=1` does not consult the upstream until P9.
+- JFrog's versions example lists `1.0-SNAPSHOT` above `1.0`; Maven order, used here, puts it
+  below. Both, and latest version's 404 wording, are to verify against a live Artifactory.
 
 ## Verification
 
@@ -244,7 +333,9 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
   remote's cache.
 - Dry-run and real-run tests for both actions, including skipped items, and shared
   fixtures for their criteria run in memory and on SQLite and PostgreSQL.
-- GET search endpoint response-shape tests.
+- GET search endpoint response-shape tests, against Maven, Ivy and broken layouts and
+  published builds, with shared fixtures for the layout prefix and the version property
+  query shapes run in memory and on SQLite and PostgreSQL.
 
 ## References
 

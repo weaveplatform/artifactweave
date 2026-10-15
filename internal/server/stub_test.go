@@ -48,6 +48,12 @@ var implemented = map[string]bool{
 	"GET /artifactory/api/search/pattern":     true,
 	"GET /artifactory/api/search/prop":        true,
 	"GET /artifactory/api/search/usage":       true,
+	// The layout and build searches (#170).
+	"GET /artifactory/api/search/gavc":            true,
+	"GET /artifactory/api/search/versions":        true,
+	"GET /artifactory/api/search/latestVersion":   true,
+	"GET /artifactory/api/search/dependency":      true,
+	"POST /artifactory/api/search/buildArtifacts": true,
 
 	"GET /artifactory/api/security/users":                                            true,
 	"GET /artifactory/api/security/users/{userName}":                                 true,

@@ -276,11 +276,11 @@ func (s *Service) translator(
 		})
 		return nil, false, nil
 	}
-	src, err := s.layout(ctx, from)
+	src, err := s.Layout(ctx, from)
 	if err != nil {
 		return nil, false, err
 	}
-	dst, err := s.layout(ctx, to)
+	dst, err := s.Layout(ctx, to)
 	if err != nil {
 		return nil, false, err
 	}
@@ -300,9 +300,9 @@ func (s *Service) translator(
 	}, true, nil
 }
 
-// layout compiles a repository layout: one the descriptor stored, else a
+// Layout compiles a repository layout: one the descriptor stored, else a
 // bundled one.
-func (s *Service) layout(ctx context.Context, name string) (*layout.Layout, error) {
+func (s *Service) Layout(ctx context.Context, name string) (*layout.Layout, error) {
 	doc, err := s.Store.Configs().Get(ctx, types.ConfigLayout, name)
 	if errors.Is(err, store.ErrNotFound) {
 		l, err := layout.Lookup(name)

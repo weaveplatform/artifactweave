@@ -546,6 +546,7 @@ Decision: [0007](../research/decisions/0007-remote-repositories.md).
 2. `-cache` aliasing and `zap`.
 3. Per-format upstream adapters with metadata rewriting through the base-URL resolver.
 4. `internal/fakeupstream` with fault modes; nightly `-tags e2e` job.
+5. `remote=1` on the versions and latest version searches: the upstream's `maven-metadata.xml`, or a remote listing for other layouts ([0012](../research/decisions/0012-search-and-aql.md)).
 
 **Exit criteria**
 - Every format except Go resolves through a remote against the fakes, including each fault mode; Go remotes are proven in P10.

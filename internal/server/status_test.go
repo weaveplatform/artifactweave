@@ -156,6 +156,7 @@ func newStatusFixture(
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
 	seedStatusBuilds(t, db, blobs)
+	seedStatusSearches(t, db, blobs)
 	libs, err := db.Repos().Get(ctx, "libs-local")
 	if err != nil {
 		t.Fatal(err)
@@ -492,6 +493,7 @@ var implementedHandwritten = map[string]bool{
 	"POST " + uploadsAbort:                                   true,
 	"POST /artifactory/api/zap/{repoPath}":                   true,
 	"GET /artifactory/api/storage/auto-trashcan":             true,
+	"GET /artifactory/api/versions/{repo}/{path}":            true,
 }
 
 func descriptorStatusRows() []statusCase {
