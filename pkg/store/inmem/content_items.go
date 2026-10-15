@@ -235,12 +235,17 @@ func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.H
 	err := i.s.do(ctx, func() error {
 		rows := i.t().rows
 		props := i.props().rows
+		stats := i.stats().rows
 		candidates := make([]aql.Hit, 0, len(rows))
 		for id, it := range rows {
-			candidates = append(candidates, aql.Hit{Item: it, Properties: props[id]})
+			h := aql.Hit{Item: it, Properties: props[id]}
+			if st, ok := stats[id]; ok {
+				h.Stats = &st
+			}
+			candidates = append(candidates, h)
 		}
 		// Matching reads the stored rows in place; only the hits returned
-		// are copied.
+		// are copied. Stats already points at a copy.
 		out = aql.Select(q, o, candidates)
 		for n := range out {
 			out[n].Properties = store.Clone(out[n].Properties)

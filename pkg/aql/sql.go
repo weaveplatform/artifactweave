@@ -17,8 +17,8 @@ const (
 	PostgreSQL
 )
 
-// Compiled is a query as SQL over the store's items and item_properties
-// tables (internal/sqlstore migrations): the caller selects its item
+// Compiled is a query as SQL over the store's items, item_properties and
+// item_stats tables (internal/sqlstore migrations): the caller selects its item
 // columns FROM items, then appends " WHERE " + Where and Tail, binding
 // Args in order. Placeholders are "?"; a PostgreSQL caller rebinds them.
 type Compiled struct {
@@ -38,6 +38,16 @@ var columns = map[Field]string{
 	FieldOriginalMD5: "items.original_md5", FieldActualMD5: "items.md5",
 	FieldOriginalSHA1: "items.original_sha1", FieldActualSHA1: "items.sha1",
 	FieldSHA256: "items.sha256",
+}
+
+// statColumns maps statistic fields onto the item_stats table, whose times
+// are Unix microseconds and NULL when unset.
+var statColumns = map[StatField]string{
+	StatDownloaded: "last_downloaded_at", StatDownloads: "download_count",
+	StatDownloadedBy: "last_downloaded_by", StatRemoteDownloads: "remote_download_count",
+	StatRemoteDownloaded:   "remote_last_downloaded_at",
+	StatRemoteDownloadedBy: "remote_last_downloaded_by",
+	StatRemoteOrigin:       "remote_origin", StatRemotePath: "remote_path",
 }
 
 // repoExpr is the repository key as AQL reports it: a remote's cached items
@@ -117,6 +127,12 @@ func (c *compiler) node(n Node) error {
 		return nil
 	case *PropertyCriterion:
 		c.property(n)
+		return nil
+	case MSP:
+		c.msp(n)
+		return nil
+	case *StatCriterion:
+		c.stat(n)
 		return nil
 	}
 	return fmt.Errorf("%w: criteria node %T", ErrUnsupported, n)
@@ -214,7 +230,7 @@ func (c *compiler) ordered(f Field) string {
 }
 
 // property writes an EXISTS over the item's properties, NOT EXISTS for $ne
-// and $nmatch, so each @key criterion is independent of the others.
+// and $nmatch, so each property criterion is independent of the others.
 func (c *compiler) property(p *PropertyCriterion) {
 	op, exists := p.Op, "EXISTS"
 	switch p.Op {
@@ -224,16 +240,86 @@ func (c *compiler) property(p *PropertyCriterion) {
 		op, exists = OpMatch, "NOT EXISTS"
 	}
 	c.b.WriteString(exists + " (SELECT 1 FROM item_properties p WHERE p.item_id = items.id")
+	c.propertyRow(p, op)
+	c.b.WriteByte(')')
+}
+
+// msp writes one EXISTS whose property row satisfies every criterion. A
+// negative operator is a condition on that row, and "*" there (any key or
+// value) leaves no row to satisfy it.
+func (c *compiler) msp(m MSP) {
+	c.b.WriteString("EXISTS (SELECT 1 FROM item_properties p WHERE p.item_id = items.id")
+	for _, p := range m {
+		if p.Op != OpNe && p.Op != OpNMatch {
+			c.propertyRow(p, p.Op)
+			continue
+		}
+		col := c.propertyColumn(p)
+		if p.Value == "*" {
+			c.b.WriteString(" AND 1=0")
+			continue
+		}
+		if c.d == PostgreSQL && p.Op == OpNMatch {
+			col += ` COLLATE "C"`
+		}
+		c.b.WriteString(" AND ")
+		c.text(col, p.Op, p.Value)
+	}
+	c.b.WriteByte(')')
+}
+
+// propertyRow writes the conditions one property row p meets for the
+// criterion, with op in place of its own operator.
+func (c *compiler) propertyRow(p *PropertyCriterion, op Op) {
+	col := c.propertyColumn(p)
+	if p.Value == "*" && (op == OpEq || op == OpMatch) {
+		return
+	}
+	if c.d == PostgreSQL && op != OpEq {
+		col += ` COLLATE "C"`
+	}
+	c.b.WriteString(" AND ")
+	c.text(col, op, p.Value)
+}
+
+// propertyColumn writes the key condition of an "@key" criterion and returns
+// the column the criterion's value compares with.
+func (c *compiler) propertyColumn(p *PropertyCriterion) string {
+	switch p.Part {
+	case PartKey:
+		return "p.key"
+	case PartValue:
+		return "p.value"
+	}
 	if p.Key != "*" {
 		c.b.WriteString(" AND p.key = " + c.bind(p.Key))
 	}
-	if p.Value != "*" || (op != OpEq && op != OpMatch) {
-		value := "p.value"
-		if c.d == PostgreSQL && op != OpEq {
-			value += ` COLLATE "C"`
+	return "p.value"
+}
+
+// stat writes a comparison of a statistic. The scalar subquery is NULL for an
+// item without statistics, so a comparison fails there as it does on a NULL
+// time column, and null criteria are IS NULL tests.
+func (c *compiler) stat(s *StatCriterion) {
+	expr := "(SELECT s." + statColumns[s.Field] + " FROM item_stats s WHERE s.item_id = items.id)"
+	k := statKinds[s.Field]
+	switch {
+	case s.Null && s.Op == OpEq:
+		c.b.WriteString(expr + " IS NULL")
+	case s.Null:
+		c.b.WriteString(expr + " IS NOT NULL")
+	case k == kindNumber:
+		c.b.WriteString(expr + sqlOps[s.Op] + c.bind(s.Number))
+	case k == kindTime && s.Op == OpBefore:
+		c.b.WriteString(expr + " < " + c.bind(s.Span.back(c.now).UnixMicro()))
+	case k == kindTime && s.Op == OpLast:
+		c.b.WriteString(expr + " > " + c.bind(s.Span.back(c.now).UnixMicro()))
+	case k == kindTime:
+		c.b.WriteString(expr + sqlOps[s.Op] + c.bind(s.Time.UnixMicro()))
+	default:
+		if c.d == PostgreSQL && s.Op != OpEq && s.Op != OpNe {
+			expr += ` COLLATE "C"`
 		}
-		c.b.WriteString(" AND ")
-		c.text(value, op, p.Value)
+		c.text(expr, s.Op, s.Text)
 	}
-	c.b.WriteByte(')')
 }

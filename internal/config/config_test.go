@@ -135,6 +135,10 @@ download:
   redirect:
     min_size: 4MiB
     ttl: 90s
+search:
+  aql:
+    max_results: 1000
+    non_admin_scan_factor: 3
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -181,6 +185,7 @@ download:
 		Download: DownloadConfig{
 			Redirect: RedirectConfig{MinSize: 4 << 20, TTL: 90 * time.Second},
 		},
+		Search: SearchConfig{AQL: AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3}},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -199,7 +204,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, "_size"):
 			env[envName(k)] = "8MiB"
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
-			strings.HasSuffix(k, ".write_quorum"):
+			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."):
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"):
@@ -220,6 +225,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.ColdBlob.Azure.AccountKey != "true" || cfg.GC.Interval != 45*time.Second ||
 		cfg.GC.GracePeriod != 45*time.Second || cfg.Download.Redirect.MinSize != 8<<20 ||
 		cfg.Download.Redirect.TTL != 45*time.Second ||
+		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -728,6 +734,35 @@ func TestDownloadRedirectConfig(t *testing.T) {
 	if err != nil || got.Download.Redirect.MinSize != 0 ||
 		got.Download.Redirect.TTL != 7*24*time.Hour {
 		t.Fatalf("flags: %+v, %v", got.Download.Redirect, err)
+	}
+}
+
+func TestSearchAQLConfig(t *testing.T) {
+	if d := Default().Search.AQL; d.MaxResults != 500000 || d.NonAdminScanFactor != 1 {
+		t.Fatalf("defaults: %+v", d)
+	}
+	cfg := Default()
+	if err := set(&cfg, "search.aql.max_results", "many"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("bad integer: %v", err)
+	}
+	for key, value := range map[string]string{
+		"search.aql.max_results": "-1", "search.aql.non_admin_scan_factor": "0",
+	} {
+		_, err := Load(LoadOptions{Flags: map[string]string{key: value}})
+		if !errors.Is(err, ErrInvalidValue) {
+			t.Fatalf("%s=%s: %v", key, value, err)
+		}
+	}
+	// Zero lifts the cap; the flag beats the environment.
+	got, err := Load(LoadOptions{
+		Env: envOf(map[string]string{
+			"ARTIFACTWEAVE_SEARCH_AQL_MAX_RESULTS":           "10",
+			"ARTIFACTWEAVE_SEARCH_AQL_NON_ADMIN_SCAN_FACTOR": "4",
+		}),
+		Flags: map[string]string{"search.aql.max_results": "0"},
+	})
+	if err != nil || got.Search.AQL != (AQLConfig{MaxResults: 0, NonAdminScanFactor: 4}) {
+		t.Fatalf("load: %+v, %v", got.Search.AQL, err)
 	}
 }
 

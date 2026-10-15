@@ -1,17 +1,21 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum here
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -616,13 +620,219 @@ func TestSearchAQL(t *testing.T) {
 		t.Fatalf("too long %d %s", tooLong.Code, tooLong.Body)
 	}
 	wantStatus(t, w.do("POST", "/artifactory/api/search/aql", "", query), http.StatusUnauthorized)
+	empty := w.do("POST", "/artifactory/api/search/aql", "admin", " \n")
+	if empty.Code != 400 || !strings.Contains(empty.Body.String(), "empty query") {
+		t.Fatalf("empty %d %s", empty.Code, empty.Body)
+	}
+	// An output rule refused by the parser is a 400 too.
+	wantStatus(t, w.do("POST", "/artifactory/api/search/aql", "admin",
+		`items.find().include("property").limit(1)`), http.StatusBadRequest)
 
-	orig := aqlHardLimit
-	aqlHardLimit = 2
-	t.Cleanup(func() { aqlHardLimit = orig })
-	rec = w.do("POST", "/artifactory/api/search/aql", "admin", query)
-	if !strings.Contains(rec.Body.String(), `"notification":`) {
-		t.Fatalf("a capped search gave no notification: %s", rec.Body)
+	// Indented by default, as Artifactory answers; ?compact=true minifies,
+	// and stream: true changes nothing.
+	pretty := w.do("POST", "/artifactory/api/search/aql", "admin", query)
+	if !strings.HasPrefix(pretty.Body.String(), "{\n  \"results\": [\n    {\n") {
+		t.Fatalf("pretty %s", pretty.Body)
+	}
+	compact := w.do("POST", "/artifactory/api/search/aql?compact=true", "admin", query,
+		"stream", "true")
+	var want bytes.Buffer
+	if err := json.Compact(&want, pretty.Body.Bytes()); err != nil {
+		t.Fatal(err)
+	}
+	if compact.Body.String() != want.String() ||
+		compact.Header().Get("Content-Type") != "application/json" {
+		t.Fatalf("compact %s", compact.Body)
+	}
+}
+
+const aqlURL = "/artifactory/api/search/aql"
+
+// aqlRows runs query as user and returns each row as "<repo>/<path>/<name>"
+// and the range block.
+func aqlRows(
+	t *testing.T,
+	w *itemWorld,
+	user, query string,
+	headers ...string,
+) ([]string, map[string]any) {
+	t.Helper()
+	rec := w.do("POST", aqlURL, user, query, headers...)
+	var res struct {
+		Results []map[string]any `json:"results"`
+		Range   map[string]any   `json:"range"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != 200 {
+		t.Fatalf("%s: %d %s", query, rec.Code, rec.Body)
+	}
+	out := make([]string, len(res.Results))
+	for n, r := range res.Results {
+		out[n] = fmt.Sprintf("%v/%v/%v", r["repo"], r["path"], r["name"])
+	}
+	return out, res.Range
+}
+
+func TestSearchAQLAnonymous(t *testing.T) {
+	// With anonymous access on, an anonymous query reaches the handler,
+	// which refuses it: Artifactory answers 403, not 401.
+	w := newItemWorld(t, true)
+	rec := w.do("POST", aqlURL, "", `items.find()`)
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "authenticated") {
+		t.Fatalf("anonymous %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestSearchAQLCap(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.AQL.MaxResults = 2 })
+	for _, p := range []string{"a.jar", "b.jar", "c.jar"} {
+		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
+	}
+	const all = `items.find({"name":{"$match":"*.jar"}}).include("repo","path","name")`
+	for query, wantTrimmed := range map[string]bool{
+		all:                            true,
+		all + `.limit(5)`:              true,
+		all + `.limit(2)`:              false,
+		all + `.limit(1)`:              false,
+		`items.find({"name":"a.jar"})`: false,
+	} {
+		rows, rng := aqlRows(t, w, "admin", query)
+		if note, _ := rng["notification"].(string); wantTrimmed != (note != "") ||
+			(wantTrimmed && (note != aqlTrimmed || len(rows) != 2)) {
+			t.Errorf("%s: %v %v", query, rows, rng)
+		}
+	}
+	if !strings.HasPrefix(
+		aqlTrimmed,
+		"AQL query reached the search hard limit, results are trimmed.",
+	) {
+		t.Fatal(aqlTrimmed)
+	}
+}
+
+func TestSearchAQLScanFactor(t *testing.T) {
+	put := func(w *itemWorld) {
+		// other-local's rows come first, and deployer may not read them.
+		for _, p := range []string{
+			"other-local/a.jar", "other-local/b.jar",
+			"libs-local/c.jar", "libs-local/d.jar", "libs-local/e.jar",
+		} {
+			wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
+		}
+	}
+	const query = `items.find({"name":{"$match":"*.jar"}}).include("repo","path","name").limit(2)`
+	w := newItemWorld(t, false)
+	put(w)
+	for factor, want := range map[string][]string{
+		"":    {},
+		"1":   {},
+		"x":   {},
+		"2":   {"libs-local/./c.jar", "libs-local/./d.jar"},
+		"3":   {"libs-local/./c.jar", "libs-local/./d.jar"},
+		"100": {"libs-local/./c.jar", "libs-local/./d.jar"},
+	} {
+		rows, rng := aqlRows(t, w, "deployer", query, "scan-factor", factor)
+		if !slices.Equal(rows, want) || rng["limit"] != float64(2) {
+			t.Errorf("scan-factor %q: %v %v", factor, rows, rng)
+		}
+	}
+	// Administrators see everything, so they read no further.
+	if rows, _ := aqlRows(t, w, "admin", query, "scan-factor", "3"); !slices.Equal(rows,
+		[]string{"other-local/./a.jar", "other-local/./b.jar"}) {
+		t.Fatalf("admin %v", rows)
+	}
+	// The configured factor applies without a header, and a huge one does
+	// not overflow.
+	for _, f := range []int{2, math.MaxInt} {
+		w = newItemWorld(t, false, func(c *Config) { c.AQL.ScanFactor = f })
+		put(w)
+		if rows, _ := aqlRows(t, w, "deployer", query); len(rows) != 2 {
+			t.Fatalf("factor %d: %v", f, rows)
+		}
+	}
+}
+
+func TestSearchAQLRepositoryPatterns(t *testing.T) {
+	ctx := context.Background()
+	w := newItemWorld(t, false)
+	for _, p := range []string{"a/x.jar", "a/x-sources.jar", "b/y.jar", "b/y.txt", "c/z.jar"} {
+		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
+	}
+	c, err := w.db.Repos().Get(ctx, "libs-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.IncludesPattern = ptr("a/**, b/*.jar")
+	c.ExcludesPattern = ptr("**/*-sources.jar")
+	if err := w.db.Repos().Update(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	const query = `items.find({"repo":"libs-local","type":"any"}).include("repo","path","name")`
+	rows, _ := aqlRows(t, w, "deployer", query)
+	want := []string{
+		"libs-local/./a", "libs-local/a/x.jar", "libs-local/./b", "libs-local/b/y.jar",
+	}
+	if !slices.Equal(rows, want) {
+		t.Fatalf("deployer %v", rows)
+	}
+	// Administrators are not filtered.
+	if rows, _ := aqlRows(t, w, "admin", query); len(rows) != 8 {
+		t.Fatalf("admin %v", rows)
+	}
+}
+
+func TestSearchAQLSecondaryDomains(t *testing.T) {
+	ctx := context.Background()
+	w := newItemWorld(t, false)
+	for _, p := range []string{"libs-local/x.jar", "other-local/y.jar", "server-local/z.jar"} {
+		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", p), http.StatusCreated)
+	}
+	x := w.item("libs-local", false, "x.jar")
+	at := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
+	if err := w.db.Items().PutStats(ctx, x.ID, types.ItemStats{
+		DownloadCount: 3, LastDownloaded: at, LastDownloadedBy: "admin",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Items().SetProperties(ctx, x.ID, types.Properties{
+		"keep": {"1"}, "drop": {"2"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	rec := w.do(
+		"POST",
+		aqlURL+"?compact=true",
+		"admin",
+		`items.find({"name":{"$match":"*.jar"}}).include("repo","path","name","virtual_repos","stat","@keep")`,
+	)
+	want := `{"results":[{"repo":"libs-local","path":".","name":"x.jar",` +
+		`"virtual_repos":["virt","virt-nodeploy"],"properties":[{"key":"keep","value":"1"}],` +
+		`"stats":[{"downloaded":"2026-02-03T04:05:06.000Z","downloads":3,"downloaded_by":"admin",` +
+		`"remote_downloads":0}]}],"range":{"start_pos":0,"end_pos":1,"total":1}}`
+	if rec.Body.String() != want {
+		t.Fatalf("got\n%s\nwant\n%s", rec.Body, want)
+	}
+	// virtual_repos follows nested virtual repositories, and a repository in
+	// none renders an empty list.
+	if err := w.db.Repos().Create(ctx, *repo.Defaults(&repo.Config{
+		Key: "outer", Class: repo.Virtual, Repositories: []string{"virt"},
+	})); err != nil {
+		t.Fatal(err)
+	}
+	rec = w.do("POST", aqlURL+"?compact=true", "admin",
+		`items.find({"name":{"$match":"*.jar"}}).include("repo","path","name","virtual_repos")`)
+	for _, part := range []string{
+		`"name":"y.jar","virtual_repos":["outer","virt"]`,
+		`"name":"z.jar","virtual_repos":[]`,
+	} {
+		if !strings.Contains(rec.Body.String(), part) {
+			t.Fatalf("%s lacks %s", rec.Body, part)
+		}
+	}
+	// A non-admin's virtual_repos query is filtered like any other.
+	rows, _ := aqlRows(t, w, "deployer",
+		`items.find({"name":{"$match":"*.jar"}}).include("repo","path","name","virtual_repos")`)
+	if !slices.Equal(rows, []string{"libs-local/./x.jar"}) {
+		t.Fatalf("deployer %v", rows)
 	}
 }
 

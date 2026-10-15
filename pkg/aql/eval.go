@@ -9,25 +9,32 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Hit is one item a query found, with its properties when the query
-// includes them.
+// Hit is one item a query found, with its properties and statistics when
+// the query includes them. Stats is nil for an item that has no statistics
+// record. VirtualRepos is filled by the caller, which knows the repository
+// configurations, when the query includes virtual_repos.
 type Hit struct {
-	Item       types.Item
-	Properties types.Properties
+	Item         types.Item
+	Properties   types.Properties
+	Stats        *types.ItemStats
+	VirtualRepos []string
 }
 
 // Select runs q over candidates the way the SQL compiler's output does:
 // filter, sort (by ID when the query does not sort, and by ID within equal
-// sort keys), then offset and limit. Properties are dropped unless the
-// query includes them. It is the reference the SQL backends are tested
-// against.
+// sort keys), then offset and limit. Properties and statistics are dropped
+// unless the query includes them. It is the reference the SQL backends are
+// tested against; candidates must carry their properties and statistics.
 func Select(q *Query, o Options, candidates []Hit) []Hit {
 	now := o.now()
 	var out []Hit
 	for _, h := range candidates {
-		if q.Match(h.Item, h.Properties, now) {
+		if q.Match(h, now) {
 			if !q.Properties() {
 				h.Properties = nil
+			}
+			if len(q.Stats()) == 0 {
+				h.Stats = nil
 			}
 			out = append(out, h)
 		}
@@ -41,31 +48,36 @@ func Select(q *Query, o Options, candidates []Hit) []Hit {
 	return out
 }
 
-// Match reports whether the item satisfies the criteria.
-func (q *Query) Match(it types.Item, props types.Properties, now time.Time) bool {
-	return q.Criteria == nil || match(q.Criteria, it, props, now)
+// Match reports whether the hit's item, with its properties and statistics,
+// satisfies the criteria.
+func (q *Query) Match(h Hit, now time.Time) bool {
+	return q.Criteria == nil || match(q.Criteria, h, now)
 }
 
-func match(n Node, it types.Item, props types.Properties, now time.Time) bool {
+func match(n Node, h Hit, now time.Time) bool {
 	switch n := n.(type) {
 	case And:
 		for _, c := range n {
-			if !match(c, it, props, now) {
+			if !match(c, h, now) {
 				return false
 			}
 		}
 		return true
 	case Or:
 		for _, c := range n {
-			if match(c, it, props, now) {
+			if match(c, h, now) {
 				return true
 			}
 		}
 		return false
 	case *FieldCriterion:
-		return n.match(it, now)
+		return n.match(h.Item, now)
 	case *PropertyCriterion:
-		return n.match(props)
+		return n.match(h.Properties)
+	case MSP:
+		return n.match(h.Properties)
+	case *StatCriterion:
+		return n.match(h.Stats, now)
 	}
 	return false
 }
@@ -103,8 +115,8 @@ func (c *FieldCriterion) match(it types.Item, now time.Time) bool {
 	return compareOp(c.Op, strings.Compare(s, c.Text))
 }
 
-// match holds when some value of the key satisfies the positive operator;
-// $ne and $nmatch hold when none does.
+// match holds when some property satisfies the positive operator; $ne and
+// $nmatch hold when none does.
 func (c *PropertyCriterion) match(props types.Properties) bool {
 	positive, negate := c.Op, false
 	switch c.Op {
@@ -115,16 +127,136 @@ func (c *PropertyCriterion) match(props types.Properties) bool {
 	}
 	found := false
 	for k, vs := range props {
-		if c.Key != "*" && k != c.Key {
-			continue
-		}
 		for _, v := range vs {
-			if valueMatches(positive, c.Value, v) {
+			if c.row(positive, k, v) {
 				found = true
 			}
 		}
 	}
 	return found != negate
+}
+
+// row reports whether the property k=v satisfies the criterion with op in
+// place of its own operator.
+func (c *PropertyCriterion) row(op Op, k, v string) bool {
+	switch c.Part {
+	case PartKey:
+		return valueMatches(op, c.Value, k)
+	case PartValue:
+		return valueMatches(op, c.Value, v)
+	}
+	return (c.Key == "*" || k == c.Key) && valueMatches(op, c.Value, v)
+}
+
+// match holds when one property satisfies every criterion. A negative
+// operator tests that property's own key or value, so "*" there excludes
+// everything.
+func (m MSP) match(props types.Properties) bool {
+	for k, vs := range props {
+		for _, v := range vs {
+			if m.row(k, v) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (m MSP) row(k, v string) bool {
+	for _, c := range m {
+		var ok bool
+		switch c.Op {
+		case OpNe, OpNMatch:
+			positive := OpEq
+			if c.Op == OpNMatch {
+				positive = OpMatch
+			}
+			switch c.Part {
+			case PartKey:
+				ok = !valueMatches(positive, c.Value, k)
+			case PartValue:
+				ok = !valueMatches(positive, c.Value, v)
+			default:
+				ok = (c.Key == "*" || k == c.Key) && !valueMatches(positive, c.Value, v)
+			}
+		default:
+			ok = c.row(c.Op, k, v)
+		}
+		if !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// match compares the statistic. With no statistics record every field is
+// NULL; an existing record's empty time is NULL too, while its texts and
+// counts are values ("" and 0), as the SQL columns hold them.
+func (c *StatCriterion) match(st *types.ItemStats, now time.Time) bool {
+	null := st == nil
+	if !null && statKinds[c.Field] == kindTime {
+		null = statTime(st, c.Field).IsZero()
+	}
+	if c.Null {
+		return null == (c.Op == OpEq)
+	}
+	if null {
+		return false
+	}
+	switch statKinds[c.Field] {
+	case kindNumber:
+		return compareOp(c.Op, cmp.Compare(statNumber(st, c.Field), c.Number))
+	case kindTime:
+		t := statTime(st, c.Field)
+		switch c.Op {
+		case OpBefore:
+			return t.Before(micro(c.Span.back(now)))
+		case OpLast:
+			return t.After(micro(c.Span.back(now)))
+		}
+		return compareOp(c.Op, t.Compare(micro(c.Time)))
+	}
+	s := statText(st, c.Field)
+	switch c.Op {
+	case OpMatch:
+		return globMatch(c.Text, s)
+	case OpNMatch:
+		return !globMatch(c.Text, s)
+	}
+	return compareOp(c.Op, strings.Compare(s, c.Text))
+}
+
+func statNumber(st *types.ItemStats, f StatField) int64 {
+	if f == StatRemoteDownloads {
+		return st.RemoteDownloadCount
+	}
+	return st.DownloadCount
+}
+
+// statTime is a statistic time truncated to the microseconds the SQL stores
+// keep.
+func statTime(st *types.ItemStats, f StatField) time.Time {
+	t := st.LastDownloaded
+	if f == StatRemoteDownloaded {
+		t = st.RemoteLastDownloaded
+	}
+	if t.IsZero() {
+		return t
+	}
+	return micro(t)
+}
+
+func statText(st *types.ItemStats, f StatField) string {
+	switch f {
+	case StatDownloadedBy:
+		return st.LastDownloadedBy
+	case StatRemoteDownloadedBy:
+		return st.RemoteLastDownloadedBy
+	case StatRemoteOrigin:
+		return st.RemoteOrigin
+	default:
+		return st.RemotePath
+	}
 }
 
 func valueMatches(op Op, want, got string) bool {

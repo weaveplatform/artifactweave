@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"slices"
+
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // timeFormat is how results render times: ISO 8601 with milliseconds, as
@@ -25,20 +27,27 @@ type Response struct {
 }
 
 // Row is one result: the query's fields of an item and, when included, its
-// properties.
+// virtual repositories, properties and statistics.
 type Row struct {
-	fields []Field
-	hit    Hit
-	props  bool
+	fields  []Field
+	hit     Hit
+	virtual bool
+	props   bool
+	keys    []string
+	stats   []StatField
 }
 
 // Response builds the body for hits, which Select or a store returned for
-// q.
+// q and the caller gave their virtual repositories when q includes them.
 func (q *Query) Response(hits []Hit) Response {
-	fields, props := q.Fields(), q.Properties()
+	row := Row{
+		fields: q.Fields(), virtual: q.VirtualRepos(), props: q.Properties(),
+		keys: q.PropertyKeys(), stats: q.Stats(),
+	}
 	rows := make([]Row, len(hits))
 	for i, h := range hits {
-		rows[i] = Row{fields: fields, hit: h, props: props}
+		rows[i] = row
+		rows[i].hit = h
 	}
 	return Response{
 		Rows: rows, Start: q.Offset, Total: len(rows), Limit: q.Limit, HasLimit: q.HasLimit,
@@ -81,7 +90,8 @@ func (r Row) MarshalJSON() ([]byte, error) {
 }
 
 // write renders the row. Empty texts and missing times are left out, as
-// Artifactory leaves out null fields; numbers are always present.
+// Artifactory leaves out null fields; numbers are always present. An item
+// without a statistics record renders no "stats".
 func (r Row) write(b *bytes.Buffer) {
 	it := r.hit.Item
 	b.WriteByte('{')
@@ -111,7 +121,10 @@ func (r Row) write(b *bytes.Buffer) {
 			}
 		}
 	}
-	if r.props && len(r.hit.Properties) > 0 {
+	if r.virtual {
+		put(FieldVirtualRepos, append([]string{}, r.hit.VirtualRepos...))
+	}
+	if r.props {
 		type kv struct {
 			Key   string `json:"key"`
 			Value string `json:"value"`
@@ -119,7 +132,9 @@ func (r Row) write(b *bytes.Buffer) {
 		var list []kv
 		keys := make([]string, 0, len(r.hit.Properties))
 		for k := range r.hit.Properties {
-			keys = append(keys, k)
+			if r.keys == nil || slices.Contains(r.keys, k) {
+				keys = append(keys, k)
+			}
 		}
 		slices.Sort(keys)
 		for _, k := range keys {
@@ -127,7 +142,45 @@ func (r Row) write(b *bytes.Buffer) {
 				list = append(list, kv{k, v})
 			}
 		}
-		put("properties", list)
+		if len(list) > 0 {
+			put("properties", list)
+		}
+	}
+	if st := r.hit.Stats; len(r.stats) > 0 && st != nil {
+		var sb bytes.Buffer
+		r.writeStats(&sb, st)
+		put("stats", []json.RawMessage{sb.Bytes()})
+	}
+	b.WriteByte('}')
+}
+
+// writeStats renders the included statistics as one object, the shape
+// jfrog-client-go reads ("stats":[{...}]).
+func (r Row) writeStats(b *bytes.Buffer, st *types.ItemStats) {
+	b.WriteByte('{')
+	first := true
+	put := func(key StatField, v any) {
+		if !first {
+			b.WriteByte(',')
+		}
+		first = false
+		writeJSON(b, string(key))
+		b.WriteByte(':')
+		writeJSON(b, v)
+	}
+	for _, f := range r.stats {
+		switch statKinds[f] {
+		case kindNumber:
+			put(f, statNumber(st, f))
+		case kindTime:
+			if t := statTime(st, f); !t.IsZero() {
+				put(f, t.UTC().Format(timeFormat))
+			}
+		default:
+			if s := statText(st, f); s != "" {
+				put(f, s)
+			}
+		}
 	}
 	b.WriteByte('}')
 }

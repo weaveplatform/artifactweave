@@ -12,17 +12,23 @@ import (
 )
 
 // testItemSearch runs the shared AQL cases (pkg/aql/aqltest): every backend
-// must return the reference evaluator's rows in the reference order, which
-// is what keeps the SQL dialects' globbing, collation and NULL handling
-// honest.
+// must return the reference evaluator's rows in the reference order, with the
+// properties and statistics the query includes, which is what keeps the SQL
+// dialects' globbing, collation and NULL handling honest.
 func testItemSearch(t *testing.T, s store.ItemStore) {
 	ctx := context.Background()
 	props := map[string]types.Properties{}
+	stats := map[string]*types.ItemStats{}
 	for _, seed := range aqltest.Seeds() {
 		it := get[types.Item](t)(s.Put(ctx, seed.Item))
+		key := aqltest.Paths([]aql.Hit{{Item: it}})[0]
 		if seed.Properties != nil {
 			must(t, s.SetProperties(ctx, it.ID, seed.Properties))
-			props[aqltest.Paths([]aql.Hit{{Item: it}})[0]] = seed.Properties
+			props[key] = seed.Properties
+		}
+		if seed.Stats != nil {
+			must(t, s.PutStats(ctx, it.ID, *seed.Stats))
+			stats[key] = seed.Stats
 		}
 	}
 	for _, c := range aqltest.Cases() {
@@ -35,11 +41,19 @@ func testItemSearch(t *testing.T, s store.ItemStore) {
 				t.Fatalf("got  %q\nwant %q", got, c.Want)
 			}
 			for _, h := range hits {
-				var want types.Properties
+				key := aqltest.Paths([]aql.Hit{h})[0]
+				var (
+					wantProps types.Properties
+					wantStats *types.ItemStats
+				)
 				if q.Properties() {
-					want = props[aqltest.Paths([]aql.Hit{h})[0]]
+					wantProps = props[key]
 				}
-				same(t, "properties of "+h.Item.FullPath(), want, h.Properties)
+				if len(q.Stats()) > 0 {
+					wantStats = stats[key]
+				}
+				same(t, "properties of "+h.Item.FullPath(), wantProps, h.Properties)
+				same(t, "statistics of "+h.Item.FullPath(), wantStats, h.Stats)
 			}
 		})
 	}

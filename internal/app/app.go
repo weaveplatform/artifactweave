@@ -98,6 +98,10 @@ func serve(
 			Redirect: server.Redirect{
 				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
 			},
+			AQL: server.AQLLimits{
+				MaxResults: cfg.Search.AQL.MaxResults,
+				ScanFactor: cfg.Search.AQL.NonAdminScanFactor,
+			},
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

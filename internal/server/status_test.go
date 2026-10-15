@@ -293,7 +293,8 @@ func itemStatusRows() []statusCase {
 		{aqlOp, "/artifactory/api/search/aql", "admin", q, 200},
 		{aqlOp, "/artifactory/api/search/aql", "user", q, 200},
 		{aqlOp, "/artifactory/api/search/aql", "admin", "items.find(", 400},
-		{aqlOp, "/artifactory/api/search/aql", "anonymous", q, 401},
+		{aqlOp, "/artifactory/api/search/aql", "anonymous", q, 403},
+		{aqlOp, "/artifactory/api/search/aql", "admin", "", 400},
 		{aqlOp, "/artifactory/api/search/aql", "", q, 401},
 
 		{upl, "/artifactory/api/v1/uploads/config", "admin", "", 200},

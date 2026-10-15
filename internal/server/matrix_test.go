@@ -167,6 +167,16 @@ func signedIn(p matrixPrincipal) int {
 	return 0
 }
 
+// aqlCaller: a signed-in caller. Anonymous is told to authenticate while
+// anonymous access is off and refused while it is on, as Artifactory refuses
+// anonymous AQL (research 22 §1.3).
+func aqlCaller(p matrixPrincipal) int {
+	if p.anonymous && p.anonymousOn {
+		return http.StatusForbidden
+	}
+	return signedIn(p)
+}
+
 // wholeIdentity: a signed-in caller with its whole identity, a password or an
 // identity-scoped token, for requests that mint a credential.
 func wholeIdentity(p matrixPrincipal) int {
@@ -447,7 +457,7 @@ func contentMatrix() []matrixRow {
 		),
 		row(
 			aql, "/artifactory/api/search/aql",
-			`items.find({"repo":"libs-local"}).include("repo","path","name")`, signedIn, 200,
+			`items.find({"repo":"libs-local"}).include("repo","path","name")`, aqlCaller, 200,
 		),
 		row(
 			create, uploadsCreate+"?repoKey=libs-local&repoPath=work/big-{p}.bin&partSizeMB=1", "",
