@@ -95,7 +95,8 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
   one workload identity provider admits only the two environment subjects (its attribute
   condition), and each service account grants `roles/iam.workloadIdentityUser` to one
   subject (`principal://…/subject/<sub>`), not to the provider. On Azure, each identity has
-  one federated credential for one subject.
+  one federated credential for one subject. On AWS, each role's trust policy matches the
+  audience and one subject with `StringEquals`, never `StringLike`.
 - `cloud-platform` requires the maintainer's approval and has no branch restriction, so a
   pull request's branch can prove its own scenario before merge. "Prevent self-reviews"
   stays off, so the maintainer can approve a run they dispatched.
@@ -107,7 +108,13 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
     `artifactweave-scenarios-rg`, where every scenario instance is created; Role Based Access
     Control Administrator there, limited by condition to assigning Storage Blob Data
     Contributor and Reader; DNS Zone Contributor on the scenarios' zone.
-  - AWS: a permission boundary.
+  - AWS: buckets with the scenario prefix (`artifactweave-*`), CloudFront and ACM, records
+    in the scenarios' hosted zone, and roles under `/artifactweave-scenarios/` only. A
+    permissions boundary caps the deployer and must be attached to every role it creates,
+    so it cannot grant more than it holds; the boundary also keeps it out of the
+    bootstrap's state, roles, policies and OIDC provider.
+  - AWS's data-plane role holds no policy: the `single-bucket` bucket policy grants it that
+    bucket, so its rights leave with the bucket.
 - Bootstrap enables the APIs and resource providers scenarios need, so a deployer never
   needs service-usage administration.
 
@@ -120,8 +127,10 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
   state into the bucket it created with `terraform init -migrate-state`, so no single
   machine holds it. Its committed backend block names the store, so the store's name is
   fixed rather than generated (`artifactweave-tfstate-<project number>` on GCP,
-  `awtfstate<subscription prefix>` on Azure); while the store does not exist, `make init`
-  writes a git-ignored `local_override.tf` that replaces the backend with local state.
+  `awtfstate<subscription prefix>` on Azure, `artifactweave-tfstate-<fixed random suffix>`
+  on AWS, so the account ID stays out of the repository); while the store does not exist,
+  `make init` writes a git-ignored `local_override.tf` that replaces the backend with local
+  state.
 - State and plan files are never uploaded as workflow artifacts.
 
 **Keys.**
@@ -136,6 +145,10 @@ test/terraform/run.sh                 the driver: builds a -cover server, mints 
   `aws.artifact.weaveplatform.run` (Route 53), `gcp.artifact.weaveplatform.run` (Cloud DNS)
   and `azure.artifact.weaveplatform.run` (Azure DNS). `weaveplatform.run` is served by
   GoDaddy, where the maintainer adds each zone's NS records from the bootstrap's output.
+  The three zones were created by CLI before their bootstraps, so the delegation could be
+  set up first, and each bootstrap imports its zone; Terraform refuses to destroy them.
+- The AWS roots recognise the lab account by its hosted zone (`aws/check-account.sh`)
+  rather than an account ID, which this public repository does not record.
 - A CDN host is a sibling of artifactweave's host, never a subdomain of it (for example
   `registry.gcp.artifact.weaveplatform.run` and `cdn.gcp.artifact.weaveplatform.run`), so
   clients drop credentials on the redirect (decision 0029).
@@ -184,7 +197,10 @@ and `ttl_minutes` (how long until an applied instance's `expires-at`):
   behind the same approval: for each cloud, `test`, an `apply` followed by a `destroy` from
   the remote state alone, an instance applied already expired and a `reap` that removes it,
   then a check that nothing of the run remains. Pull requests from forks get no OIDC token
-  and do not run.
+  and do not run. A cloud joins that proof once a dispatched run has proven its wiring.
+- On AWS the deployer may only manage buckets named `artifactweave-*`, so a scenario run
+  names its bucket `artifactweave-awscn-<instance>-…`, and reap finds AWS buckets by their
+  tags through the tagging API rather than by the `awscn-` prefix.
 - `test/platform` is a Go suite of `_test.go` files only, gated on `ARTIFACTWEAVE_SCENARIO`
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.

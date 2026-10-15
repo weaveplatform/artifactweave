@@ -1,9 +1,10 @@
 name: go | Real-cloud conformance
 
 # Runs the blob contract and the research 18 probes against real Google Cloud
-# Storage and Azure Blob Storage (issue #12). Emulators miss behaviour the
-# backends rely on (compose preconditions, copy-source authorisation, signed
-# URLs, service limits), so this run is the only check of it. It is opt-in and
+# Storage, Azure Blob Storage (issue #12) and Amazon S3 (issue #128).
+# Emulators miss behaviour the backends rely on (compose preconditions,
+# copy-source authorisation, signed URLs, service limits), so this run is the
+# only check of it. It is opt-in and
 # manual because it needs cloud credentials and costs a few cents a run; it is
 # not part of the quality gate. docs/testing/ci.md lists the secrets and
 # variables it reads.
@@ -14,8 +15,8 @@ on:
       target:
         description: 'Which clouds to test'
         type: choice
-        options: [both, gcs, azure]
-        default: both
+        options: [all, gcs, azure, s3]
+        default: all
 
 permissions:
   contents: read
@@ -26,7 +27,7 @@ env:
 jobs:
   gcs:
     name: 'Google Cloud Storage'
-    if: inputs.target == 'both' || inputs.target == 'gcs'
+    if: inputs.target == 'all' || inputs.target == 'gcs'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The workload identity provider admits this repository's environment
@@ -98,7 +99,7 @@ jobs:
 
   azure:
     name: 'Azure Blob Storage'
-    if: inputs.target == 'both' || inputs.target == 'azure'
+    if: inputs.target == 'all' || inputs.target == 'azure'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Azure matches the federated credential's subject exactly; running in an
@@ -177,5 +178,81 @@ jobs:
             echo '### Azure Blob Storage probes'
             echo '```'
             grep -o 'PROBE .*' "$RUNNER_TEMP/azure.log" || echo 'no probe output'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  s3:
+    name: 'Amazon S3'
+    if: inputs.target == 'all' || inputs.target == 's3'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The conformance role trusts this environment's subject exactly
+    # (deploy/platform/terraform/aws/bootstrap), whatever branch or event
+    # dispatched the run.
+    environment: cloud-conformance
+    # id-token lets configure-aws-credentials exchange the job's OIDC token
+    # for the role (sts:AssumeRoleWithWebIdentity): no stored AWS key.
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARTIFACTWEAVE_TEST_S3_BUCKET: ${{ vars.CONFORMANCE_S3_BUCKET }}
+      ARTIFACTWEAVE_TEST_S3_REGION: ${{ vars.CONFORMANCE_AWS_REGION }}
+      # A secret, so the account ID in the ARN stays out of the public logs.
+      CONFORMANCE_AWS_ROLE_ARN: ${{ secrets.CONFORMANCE_AWS_ROLE_ARN }}
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: Check configuration
+        shell: bash
+        run: |
+          for v in ARTIFACTWEAVE_TEST_S3_BUCKET ARTIFACTWEAVE_TEST_S3_REGION CONFORMANCE_AWS_ROLE_ARN; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Set the CONFORMANCE_S3_BUCKET and CONFORMANCE_AWS_REGION variables and the CONFORMANCE_AWS_ROLE_ARN secret (make platform-github-vars SCENARIO=aws/bootstrap, then make aws-github-vars)"
+              exit 1
+            fi
+          done
+
+      # The tests use the AWS default credential chain, which finds the
+      # session this step exports.
+      - name: Authenticate to AWS
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.CONFORMANCE_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.CONFORMANCE_AWS_REGION }}
+          role-session-name: cloud-conformance-${{ github.run_id }}
+          mask-aws-account-id: true
+
+      - name: Contract and probes
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -count=1 -timeout 25m -v -run 'TestContractOnRealS3|TestRealS3Probes' ./pkg/blob/s3/ \
+            | tee "$RUNNER_TEMP/s3.log"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo '### Amazon S3 probes'
+            echo '```'
+            grep -o 'PROBE .*' "$RUNNER_TEMP/s3.log" || echo 'no probe output'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

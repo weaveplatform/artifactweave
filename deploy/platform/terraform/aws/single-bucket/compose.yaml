@@ -1,0 +1,22 @@
+# artifactweave in a local container, storing blobs in the acceptance bucket.
+# Port 8083, so it can run beside the GCS (8081) and Azure (8082)
+# environments. credentials.sh renders .local/ from the Terraform outputs and
+# your `aws login` session first; the exported credentials are short-lived,
+# so rerun make up when they expire.
+name: acceptance-aws
+services:
+  artifactweave:
+    build:
+      context: ${ARTIFACTWEAVE_ROOT:?run through make, or set ARTIFACTWEAVE_ROOT to the repository root}
+      args:
+        VERSION: ${VERSION:-devel}
+        COMMIT: ${COMMIT:-unknown}
+    image: artifactweave:acceptance
+    ports:
+      - "8083:8081"
+    env_file: .local/env
+    volumes:
+      - ./.local/artifactweave.yaml:/etc/artifactweave/artifactweave.yaml:ro
+      - data:/data
+volumes:
+  data: {}

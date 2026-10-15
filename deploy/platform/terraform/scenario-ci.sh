@@ -15,7 +15,7 @@
 #   scenario-ci.sh check-clean  fail if any state or labelled resource of an
 #                               instance starting with RUN_TAG remains
 #
-# Environment: CLOUD (gcp or azure; aws arrives with #128), SCENARIO,
+# Environment: CLOUD (gcp, azure or aws), SCENARIO,
 # INSTANCE, TTL_MINUTES and RUN_TAG as the action needs them, and the
 # PLATFORM_* repository variables the bootstraps set.
 #
@@ -50,10 +50,7 @@ utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-
 case $CLOUD in
 gcp) : "${PLATFORM_GCP_STATE_BUCKET:?}" "${PLATFORM_GCP_PROJECT:?}" ;;
 azure) : "${PLATFORM_AZURE_STATE_ACCOUNT:?}" "${PLATFORM_AZURE_RESOURCE_GROUP:?}" ;;
-aws)
-  echo "aws scenarios need aws/bootstrap (#128)" >&2
-  exit 1
-  ;;
+aws) : "${PLATFORM_AWS_STATE_BUCKET:?}" "${PLATFORM_AWS_REGION:?}" ;;
 *)
   echo "unknown cloud: $CLOUD" >&2
   exit 1
@@ -103,6 +100,13 @@ use_instance() { # scenario instance expires-at
       -backend-config="container_name=tfstate" -backend-config="key=$key" \
       -backend-config="use_azuread_auth=true"
     ;;
+  aws)
+    printf 'terraform {\n  backend "s3" {}\n}\n' >"$dir/ci_backend.tf"
+    terraform -chdir="$dir" init -input=false -no-color \
+      -backend-config="bucket=$PLATFORM_AWS_STATE_BUCKET" -backend-config="key=$key" \
+      -backend-config="region=$PLATFORM_AWS_REGION" -backend-config="encrypt=true" \
+      -backend-config="use_lockfile=true"
+    ;;
   esac
 }
 
@@ -114,6 +118,10 @@ delete_state() { # scenario instance
   azure)
     az storage blob delete --account-name "$PLATFORM_AZURE_STATE_ACCOUNT" --container-name tfstate \
       --name "$key" --auth-mode login --only-show-errors 2>/dev/null || true
+    ;;
+  aws)
+    aws s3 rm --only-show-errors "s3://$PLATFORM_AWS_STATE_BUCKET/$key" 2>/dev/null || true
+    aws s3 rm --only-show-errors "s3://$PLATFORM_AWS_STATE_BUCKET/$key.tflock" 2>/dev/null || true
     ;;
   esac
 }
@@ -178,6 +186,12 @@ states() {
       --prefix scenarios/azure/ --auth-mode login --only-show-errors --query '[].name' -o tsv |
       sed -n 's#^scenarios/azure/\([^/]*\)/\([^/]*\)$#\1 \2#p'
     ;;
+  aws)
+    # The S3 backend keeps a key.tflock beside each state while it is locked.
+    aws s3api list-objects-v2 --bucket "$PLATFORM_AWS_STATE_BUCKET" --prefix scenarios/aws/ \
+      --query 'Contents[].Key' --output text | tr '\t' '\n' |
+      sed -n 's#^scenarios/aws/\([^/]*\)/\([^/.]*\)$#\1 \2#p'
+    ;;
   esac
 }
 
@@ -194,7 +208,18 @@ state_json() { # scenario instance
     cat "$tmp"
     rm -f "$tmp"
     ;;
+  aws) aws s3 cp --only-show-errors "s3://$PLATFORM_AWS_STATE_BUCKET/$key" - ;;
   esac
+}
+
+# aws_tagged_buckets prints "<bucket>\t<expires-at>\t<instance>" for every
+# bucket a scenario run tagged, through the tagging API, which the deployer
+# may read (bucket tags are indexed in the bucket's region).
+aws_tagged_buckets() {
+  aws resourcegroupstaggingapi get-resources --region "$PLATFORM_AWS_REGION" \
+    --resource-type-filters s3 --tag-filters Key=artifactweave-scenario --output json |
+    jq -r '.ResourceTagMappingList[] | (.Tags | from_entries) as $t |
+      [(.ResourceARN | sub("^arn:aws:s3:::"; "")), ($t["expires-at"] // ""), ($t.instance // "")] | @tsv'
 }
 
 reap() {
@@ -278,6 +303,18 @@ reap() {
     done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors \
       --query '[?tags."artifactweave-scenario" != null].[id, tags."expires-at", tags.instance]' -o tsv)
     ;;
+  aws)
+    while IFS=$'\t' read -r name exp inst; do
+      [ -n "$name" ] || continue
+      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
+        if aws s3 rb --force "s3://$name" >/dev/null; then
+          summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
+        else
+          failed=$((failed + 1))
+        fi
+      fi
+    done < <(aws_tagged_buckets)
+    ;;
   esac
 
   summary "Reap of \`$CLOUD\`: $reaped expired instance(s) destroyed, $failed failure(s); live:${live% }."
@@ -311,6 +348,15 @@ check_clean() {
       left=1
     done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors -o json |
       jq -r --arg tag "$RUN_TAG" '.[] | select((.tags.instance // "") | startswith($tag)) | .name')
+    ;;
+  aws)
+    local exp inst
+    while IFS=$'\t' read -r line exp inst; do
+      [ -n "$line" ] || continue
+      [[ $inst == "$RUN_TAG"* ]] || continue
+      summary "**Left behind:** bucket \`$line\`."
+      left=1
+    done < <(aws_tagged_buckets)
     ;;
   esac
   if [ "$left" = 0 ]; then
