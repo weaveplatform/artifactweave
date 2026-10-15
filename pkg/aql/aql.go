@@ -10,7 +10,9 @@
 // Compare are the reference semantics (the in-memory store uses them), and
 // Compile turns the query into SQL for SQLite or PostgreSQL. The store
 // contract suite runs the same queries on every backend and expects the
-// same ordered rows.
+// same ordered rows. Before either, Resolve rewrites repo criteria against
+// the configured repositories, so remote and virtual keys match what they
+// stand for.
 package aql
 
 import (
@@ -162,7 +164,8 @@ const (
 )
 
 // Node is a criteria tree node: And, Or, *FieldCriterion,
-// *PropertyCriterion, *StatCriterion or MSP.
+// *PropertyCriterion, *StatCriterion, MSP, or the RepoSet that Resolve puts
+// in place of repo criteria.
 type Node interface{ node() }
 
 // And holds when every child holds; an empty And always holds.
@@ -286,6 +289,9 @@ type Query struct {
 	// search to make transitive.
 	Transitive bool
 	Distinct   bool
+	// impliedVirtualRepos is set by Resolve when an $eq names a virtual
+	// repository: the rows then carry virtual_repos without the include.
+	impliedVirtualRepos bool
 }
 
 // Options are the caller's settings for running a query.
@@ -328,14 +334,19 @@ func (q *Query) Fields() []Field {
 			out = append(out, f)
 		}
 	}
-	if len(out) == 0 && !q.VirtualRepos() {
+	// Only an include of virtual_repos replaces the defaults; the
+	// virtual_repos a virtual repository's key implies are added to them.
+	if len(out) == 0 && !slices.Contains(q.Include, FieldVirtualRepos) {
 		return slices.Clone(defaultFields)
 	}
 	return out
 }
 
-// VirtualRepos reports whether result rows carry virtual_repos.
-func (q *Query) VirtualRepos() bool { return slices.Contains(q.Include, FieldVirtualRepos) }
+// VirtualRepos reports whether result rows carry virtual_repos: the query
+// includes them, or its criteria name a virtual repository (Resolve).
+func (q *Query) VirtualRepos() bool {
+	return q.impliedVirtualRepos || slices.Contains(q.Include, FieldVirtualRepos)
+}
 
 // Properties reports whether result rows carry the item's properties: an
 // include of "property", "property.*", "property.key", "property.value" or

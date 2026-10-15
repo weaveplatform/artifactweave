@@ -49,6 +49,8 @@ type world struct {
 	header http.Header
 	body   []byte
 	lastRC int
+	// dataDir is the running server's data directory.
+	dataDir string
 	// dir holds the files a scenario writes, for {dir} in jf arguments.
 	dir string
 	// next holds headers for the next request only.
@@ -111,6 +113,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 		return ctx, err
 	})
 	w.registerCDN(sc)
+	w.registerCache(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
@@ -175,6 +178,7 @@ func (w *world) start() error {
 		return err
 	}
 	w.t.Cleanup(func() { _ = os.RemoveAll(dataDir) })
+	w.dataDir = dataDir
 	w.url = "http://127.0.0.1:" + strconv.Itoa(port)
 	w.server = exec.Command(
 		binary,

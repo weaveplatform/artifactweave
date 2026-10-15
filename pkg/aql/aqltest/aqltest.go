@@ -2,11 +2,12 @@
 // on (decision 0012): seed items chosen to trip the dialect traps (a GLOB
 // character class, LIKE wildcards in names, a multi-byte character, a
 // missing time, a remote cache, an item without statistics beside one whose
-// statistics are zero), the query shapes the JFrog CLI generates, and the
-// rows each query returns, in order.
+// statistics are zero), the repositories they live in, the query shapes the
+// JFrog CLI generates, and the rows each query returns, in order.
 //
 // The pkg/aql tests run the cases through aql.Select; the store contract
-// suite runs them through every ItemStore.Search.
+// suite runs them through every ItemStore.Search. Both resolve each query
+// against Repositories first, as the server does.
 package aqltest
 
 import (
@@ -128,12 +129,41 @@ func Hits() []aql.Hit {
 	return out
 }
 
+// Repositories configures the seeds' repositories, and virtual ones over
+// them: libs-virtual nests the remote, all-virtual nests libs-virtual and a
+// member nothing configures, and loop-virtual names itself.
+func Repositories() aql.Repositories {
+	return aql.Repositories{
+		"libs-local":    {Class: aql.RepoLocal},
+		"generic-local": {Class: aql.RepoLocal},
+		"remote":        {Class: aql.RepoRemote},
+		"libs-virtual":  {Class: aql.RepoVirtual, Members: []string{"libs-local", "remote"}},
+		"all-virtual": {
+			Class: aql.RepoVirtual, Members: []string{"libs-virtual", "generic-local", "missing"},
+		},
+		"loop-virtual": {
+			Class:   aql.RepoVirtual,
+			Members: []string{"loop-virtual", "generic-local"},
+		},
+	}
+}
+
 // Case is a query and the rows it returns, as "<reported repo>/<path>".
 type Case struct {
 	Name    string
 	Query   string
 	Options aql.Options
 	Want    []string
+}
+
+// Parse parses the case's query and resolves it against Repositories.
+func (c Case) Parse() (*aql.Query, error) {
+	q, err := aql.Parse(c.Query)
+	if err != nil {
+		return nil, err
+	}
+	q.Resolve(Repositories())
+	return q, nil
 }
 
 // Paths renders hits the way Case.Want lists them.
@@ -169,11 +199,9 @@ var cliWant = map[string][]string{
 	"search_root_offset_limit": {pom, readme},
 	"search_root_properties":   {jar, pom, util},
 	"download_exclusions":      {jar, util},
-	// The CLI names a remote repository by its own key, never "-cache", and
-	// repo equality matches the stored key outside its cache, so a download
-	// from a remote finds nothing here. Whether Artifactory's AQL counts the
-	// cache under the remote's key is unverified (issue #51).
-	"download_remote":      {},
+	// The CLI names a remote repository by its own key, never "-cache"; the
+	// key matches the remote's cache (decision 0012), reported as "-cache".
+	"download_remote":      {cached},
 	"delete_any":           {"libs-local/org/acme", "libs-local/org/acme/lib", jar, pom, util},
 	"copy_move_file":       {jar},
 	"set_props_with_props": {jar, util},
@@ -214,6 +242,30 @@ func Cases() []Case {
 		guide, aUnder, axb, pct, abc, naive, cached)
 	q("repo match sees the cache", `items.find({"repo":{"$match":"*-cache"}})`, cached)
 	q("repo ordering", `items.find({"repo":{"$gt":"libs"}})`, jar, pom, util, readme, cached)
+	// Repository keys resolve against Repositories (decision 0012).
+	q("remote key is its cache", `items.find({"repo":"remote"})`, cached)
+	q("cache alias", `items.find({"repo":"remote-cache"})`, cached)
+	q("virtual key is its members", `items.find({"repo":"libs-virtual"})`,
+		jar, pom, util, readme, cached)
+	q("nested virtual", `items.find({"repo":"all-virtual"})`,
+		jar, pom, util, readme, guide, aUnder, axb, pct, abc, naive, cached)
+	q("virtual cycle", `items.find({"repo":"loop-virtual"})`,
+		guide, aUnder, axb, pct, abc, naive)
+	q("remote ne", `items.find({"repo":{"$ne":"remote"}})`,
+		jar, pom, util, readme, guide, aUnder, axb, pct, abc, naive)
+	q("virtual ne", `items.find({"repo":{"$ne":"libs-virtual"}})`,
+		guide, aUnder, axb, pct, abc, naive)
+	q("match a remote key", `items.find({"repo":{"$match":"remot?"}})`, cached)
+	q("match a virtual key", `items.find({"repo":{"$match":"libs-v*"}})`,
+		jar, pom, util, readme, cached)
+	q("nmatch a remote key", `items.find({"repo":{"$nmatch":"remot?"}})`,
+		jar, pom, util, readme, guide, aUnder, axb, pct, abc, naive)
+	q("nmatch a virtual key", `items.find({"repo":{"$nmatch":"libs-*"}})`,
+		guide, aUnder, axb, pct, abc, naive)
+	q("remote key with other criteria",
+		`items.find({"$or":[{"$and":[{"repo":"remote","name":"app-1.0.jar"}]},`+
+			`{"$and":[{"repo":"libs-local","name":"readme.md"}]}]})`,
+		readme, cached)
 	q("created after a partial time", `items.find({"created":{"$gt":"2026-01-01T00:12"}})`,
 		abc, naive, cached)
 	q("created before an offset time",

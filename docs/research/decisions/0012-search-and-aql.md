@@ -33,13 +33,24 @@ compiler to SQL per dialect.
   modifications.
 - **The deprecated `archive` domain and `entry` fields** answer the documented parse error.
 
-**Remote and virtual repositories.** A `repo` criterion follows research 22 §1.4:
+**Remote and virtual repositories.** A `repo` criterion follows research 22 §1.4. Its keys
+resolve against the configured repositories before the query runs, on every engine:
 - **A remote's key matches its cached items** without `.transitive()`.
-- **`<remote>-cache` matches the same items.**
+- **`<remote>-cache` matches the same items.** A key ending in `-cache` names a cache only
+  when no repository has that key, so a local repository called `x-cache` keeps its own.
 - **Result rows report `<remote>-cache`.** The CLI's follow-up `GET` of that path then
   reaches the cache.
 - **A virtual repository's key expands** to its local members and its remote members'
-  caches, and `virtual_repos` is added to the rows implicitly.
+  caches, through nested virtual repositories. A member that leads back to a virtual
+  repository already expanded is skipped. An `$eq` naming a virtual repository adds
+  `virtual_repos` to the rows implicitly, beside the default fields.
+- **A key no repository has** keeps the plain comparison.
+- **Operators.** `$eq` holds for an item in the expansion of its key, and `$ne` for an item
+  outside it. `$match` holds for an item whose reported key matches the pattern, or that
+  lies in the expansion of a configured key the pattern matches; `$nmatch` holds exactly
+  when `$match` does not. So `"libs-*"` reaches what `libs-virtual` stands for under
+  `$match`, and excludes it under `$nmatch`. The ordering operators compare the reported
+  key, like any text field.
 - **`.transitive()`** adds items found on Smart Remote members, through the remote client
   ([0007](0007-remote-repositories.md)), for the first five remote members, as in
   Artifactory. A query against a repository with no such member gets the same rows as
@@ -145,9 +156,9 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 
 - The `builds` domain depends on build-info ([0014](0014-build-info.md)).
 - Sorting on secondary-domain fields is not supported, as in Artifactory.
-- No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key, so
-  they apply to the expanded set of repository keys. This is to verify against a live
-  Artifactory.
+- No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
+  They are defined above as the complements of `$eq` and `$match` over the expanded
+  locations, which is to verify against a live Artifactory.
 
 ## Verification
 
@@ -155,7 +166,10 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - Compiler fixtures run in memory and on SQLite and PostgreSQL, with identical ordered
   output.
 - CLI-generated queries captured as fixtures and replayed, including `download_remote` for
-  a remote's cache.
+  a remote's cache, and shared cases for remote, cache, nested and cyclic virtual keys
+  under every operator.
+- An acceptance round trip: `jf rt dl remote/*.jar` downloads a file seeded into the
+  remote's cache.
 - Dry-run and real-run tests for both actions, including skipped items.
 - GET search endpoint response-shape tests.
 

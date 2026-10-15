@@ -125,9 +125,13 @@ Feature: JFrog CLI round trip
     And the files "org/acme/app-1.0.jar" and "dl/org/acme/app-1.0.jar" are identical
     And the files "org/acme/lib/util-2.0.jar" and "dl/org/acme/lib/util-2.0.jar" are identical
     And the file "dl/org/acme/app-1.0.pom" does not exist
-    # download_remote_cache
+    # download_remote: the CLI names the remote by its own key, the query
+    # finds the cached jar in remote-cache, and the CLI downloads it from there.
+    Given the remote "remote" caches the file "org/acme/app-1.0.jar" at "org/acme/app-1.0.jar"
     When I run jf "rt dl remote/*.jar remote-dl/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    And the files "org/acme/app-1.0.jar" and "remote-dl/org/acme/app-1.0.jar" are identical
+    And the server answered 200 to GET "/artifactory/remote-cache/org/acme/app-1.0.jar"
     # set_props_with_props
     When I run jf "rt sp libs-local/* checked=yes --props release=* --url {url} --user admin --password {password}"
     Then the command succeeds

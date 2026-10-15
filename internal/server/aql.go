@@ -45,9 +45,10 @@ const aqlTrimmed = "AQL query reached the search hard limit, results are trimmed
 
 // searchAQL answers POST /api/search/aql. Every JFrog CLI file command
 // resolves its file specs through it (research 09). Callers must be
-// authenticated; non-admin queries must return repo, path and name, and
-// their rows are limited to what the caller may read and the repository's
-// include and exclude patterns accept.
+// authenticated; repository keys resolve against the configured
+// repositories (aql.Query.Resolve); non-admin queries must return repo, path
+// and name, and their rows are limited to what the caller may read and the
+// repository's include and exclude patterns accept.
 func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -80,6 +81,12 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, apierror.New(http.StatusBadRequest, aqlMessage(err)))
 		return
 	}
+	configs, err := repoConfigs(ctx, st)
+	if err != nil {
+		writeErr(w, r, s.internalError(ctx, "aql repositories", err))
+		return
+	}
+	q.Resolve(aqlRepositories(configs))
 	run := q
 	if !p.Admin {
 		if err := q.CheckRestricted(); err != nil {
@@ -109,13 +116,6 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	trimmed := limit > 0 && len(hits) > limit
 	if trimmed {
 		hits = hits[:limit]
-	}
-	var configs map[string]repo.Config
-	if !p.Admin || q.VirtualRepos() {
-		if configs, err = repoConfigs(ctx, st); err != nil {
-			writeErr(w, r, s.internalError(ctx, "aql repositories", err))
-			return
-		}
 	}
 	if !p.Admin {
 		if hits, err = readable(ctx, st, p, configs, hits); err != nil {
@@ -180,6 +180,24 @@ func repoConfigs(ctx context.Context, st store.Store) (map[string]repo.Config, e
 		byKey[c.Key] = c
 	}
 	return byKey, nil
+}
+
+// aqlRepositories is what a repo criterion resolves keys against: remote and
+// virtual repositories stand for their caches and members, and every other
+// class holds its own items.
+func aqlRepositories(configs map[string]repo.Config) aql.Repositories {
+	out := make(aql.Repositories, len(configs))
+	for key, c := range configs {
+		switch c.Class {
+		case repo.Remote:
+			out[key] = aql.Repository{Class: aql.RepoRemote}
+		case repo.Virtual:
+			out[key] = aql.Repository{Class: aql.RepoVirtual, Members: c.Repositories}
+		default:
+			out[key] = aql.Repository{Class: aql.RepoLocal}
+		}
+	}
+	return out
 }
 
 // readable keeps the rows p may read, by repository and path, that the

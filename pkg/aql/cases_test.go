@@ -17,7 +17,7 @@ func TestCases(t *testing.T) {
 			if strings.HasPrefix(c.Name, "cli/") && c.Want == nil {
 				t.Fatal("CLI fixture without expected rows in aqltest.cliWant")
 			}
-			q, err := aql.Parse(c.Query)
+			q, err := c.Parse()
 			if err != nil {
 				t.Fatal(err)
 			}

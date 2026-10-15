@@ -33,7 +33,7 @@ func testItemSearch(t *testing.T, s store.ItemStore) {
 	}
 	for _, c := range aqltest.Cases() {
 		t.Run(c.Name, func(t *testing.T) {
-			q, err := aql.Parse(c.Query)
+			q, err := c.Parse()
 			must(t, err)
 			hits, err := s.Search(ctx, q, c.Options)
 			must(t, err)
