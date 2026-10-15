@@ -68,6 +68,8 @@ c=deploy/ci
 
 check 'workflow change' "$singles" .github/workflows/platform-scenarios.yml
 check 'driver change' "$singles" $c/scenario-ci.sh
+check 'shared test step changes' "$singles" $c/platform-tests.sh
+check 'local runner' '' $c/local.sh
 check 'this script changes' "$singles" $c/prove-matrix.sh
 check 'table test changes' '' $c/prove-matrix_test.sh
 check 'module .tf' $'aws geo-replicated\naws multi-region\nmulticloud mirror' $p/modules/aws/storage/main.tf
@@ -88,7 +90,7 @@ check 'deleted .tf of a scenario' 'azure single-bucket' $p/azure/single-bucket/m
 check 'scenario README' '' $p/aws/single-bucket/README.md
 check 'scenario Makefile' '' $p/aws/single-bucket/Makefile
 check 'scenario tests' '' $p/aws/single-bucket/tests/security.tftest.hcl
-check 'scenario local container script' '' $p/aws/single-bucket/up.sh
+check 'other file in a scenario' '' $p/aws/single-bucket/notes.txt
 check 'bootstrap' '' $c/terraform/aws/main.tf
 check 'lab constants' '' $c/lab.mk
 check 'scenario make targets' '' $c/scenario.mk

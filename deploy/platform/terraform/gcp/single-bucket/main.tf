@@ -1,6 +1,6 @@
-# An acceptance bucket for artifactweave's GCS backend: the local container
-# (compose.yaml) and the real-cloud conformance tests (cloud-conformance.yml)
-# both use it, under separate prefixes. The APIs, the conformance service
+# An acceptance bucket for artifactweave's GCS backend: a local run (make
+# up, deploy/ci/local.sh) and the real-cloud conformance tests
+# (cloud-conformance.yml) both use it, under separate prefixes. The APIs, the conformance service
 # account and GitHub's trust in it live in gcp/bootstrap, which outlives this
 # scenario; apply the bootstrap first.
 

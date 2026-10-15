@@ -1,24 +1,22 @@
 # azure/single-bucket: the Azure acceptance environment
 
 A real Azure storage account for artifactweave's `azure` blob backend. It's used by
-artifactweave running in a local container, by the real-cloud conformance tests run locally,
+artifactweave run locally against it, by the real-cloud conformance tests run locally,
 and by the manually dispatched `cloud-conformance.yml` workflow.
 
 Nothing uses an account key: the account has Shared Key disabled.
 - **Terraform** runs with your Azure CLI login.
-- **The local tests** run as you through `DefaultAzureCredential`, with the Azure CLI.
+- **The local run and tests** act as you through `DefaultAzureCredential`, with the Azure CLI.
 - **The workflow** uses the `artifactweave-conformance` managed identity from
   [`deploy/ci/terraform/azure`](../../../../ci/terraform/azure/README.md), through a federated credential for this
   repository's `cloud-conformance` environment. Apply the bootstrap first: this root looks
   the identity up and grants it the account.
-- **The local container** runs on a short-lived user delegation SAS minted from your login,
-  because `DefaultAzureCredential` can't reach the host's Azure CLI from inside the image.
 
 ## Subscription guard
 
 Terraform is pinned to `subscription_id`: `make` passes the lab's, `LAB_AZURE_SUBSCRIPTION`
 in [`deploy/ci/lab.mk`](../../../../ci/lab.mk). Every `az` command the scripts run passes
-`--subscription`. `plan`, `apply`, `destroy`, `credentials` and `conformance` first run
+`--subscription`. `plan`, `apply`, `destroy`, `credentials`, `up`, `verify` and `conformance` first run
 [`deploy/ci/check-subscription.sh`](../../../../ci/check-subscription.sh) (shared with every
 Azure root and the bootstrap), which refuses unless:
 - the Azure CLI's active subscription is that one; and
@@ -36,8 +34,7 @@ In `uksouth`, in resource group `artifactweave-acc-rg`:
   `conformance/` blobs after 1 day. Uncommitted blocks aren't blobs; Azure discards them
   after 7 days.
 - **Storage Blob Data Contributor** on the account, for the bootstrap's conformance
-  identity and for you. The role includes `generateUserDelegationKey`, for presigned URLs
-  and the container's SAS.
+  identity and for you. The role includes `generateUserDelegationKey`, for presigned URLs.
 
 ## Use
 
@@ -45,25 +42,22 @@ In `uksouth`, in resource group `artifactweave-acc-rg`:
 az login
 az account set --subscription c33dbc35-f86d-4b7c-a81e-2a33eb3f7946
 make apply        # from the repository root: make azure-apply, or make platform-apply SCENARIO=azure/single-bucket
-make up           # mints the SAS, builds the image, starts artifactweave on port 8082
-make smoke        # deploys and downloads 40 MiB, then reads the blob's committed block list
+make up           # builds artifactweave and starts it on port 8082, acting as your az login
+make smoke        # 40 MiB through it, and a downloadRedirect 302 to the account
+make verify       # test/platform against the account, as CI runs it
 make conformance  # the real-Azure blob contract and probes, as you
 make conformance LARGE_RANGES=1  # adds Put Block From URL ranges up to 4,000 MiB (about a minute)
 make github-vars  # sets the account and container variables; the identity's come from deploy/ci/terraform/azure
-make down         # stops the container; make clean also drops its data and .local/
+make down         # stops it; make clean also drops .local/
 make destroy      # removes everything, the account's blobs included
 ```
 
-## Limits of the container's SAS
+## Local files
 
-- **Expiry:** the SAS lasts at most seven days, the user delegation limit. `make credentials`
-  or `make up` mints a new one.
-- **No presigning:** a backend on a SAS can't presign, so a repository with
-  `downloadRedirect` serves downloads through artifactweave instead.
-- **Copy sources:** the backend copies into place with Put Block From URL, the source
-  carrying the same SAS.
-- **Git-ignored:** `.local/` (configuration, master key, admin password, SAS) and the
-  Terraform state.
+`make up` ([`deploy/ci/local.sh`](../../../../ci/local.sh)) keeps the configuration, a
+generated master key and admin password, and the database in `.local/`, which is git-ignored
+with the Terraform state. None of it is a storage credential: artifactweave reaches the
+account through your `az login` and signs downloads with a user delegation SAS.
 
 
 ## Moved from `deploy/terraform/acceptance-azure`
@@ -129,7 +123,7 @@ fails when it is stale.
 | register\_resource\_providers | Register Microsoft.Storage and Microsoft.ManagedIdentity. Scenario runs pass false: the deployer has no subscription-level rights, and the bootstrap's subscription has them registered already. | `bool` | `true` | no |
 | resource\_group\_name | An existing resource group to create the account in. Empty creates <name>-rg; scenario runs pass azure/bootstrap's scenarios group, where the deployer's rights end. | `string` | `""` | no |
 | scenario\_labels | Tags for the account (and the resource group when this root creates it). Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches. | `map(string)` | `{}` | no |
-| store\_prefix | Blob prefix the local container writes under (blob.azure.prefix). | `string` | `"local/"` | no |
+| store\_prefix | Blob prefix the local run writes under (blob.azure.prefix). | `string` | `"local/"` | no |
 | subscription\_id | Subscription that holds the acceptance storage account. Nothing is created anywhere else. | `string` | `"c33dbc35-f86d-4b7c-a81e-2a33eb3f7946"` | no |
 
 ### Outputs
@@ -142,6 +136,6 @@ fails when it is stale.
 | expires\_at | The expires-at tag (epoch seconds) a scenario run set, read by reap; empty outside scenario runs. |
 | resource\_group | Resource group holding the account. |
 | storage\_host | Host a downloadRedirect repository's signed URLs point at. |
-| store\_prefix | Blob name prefix the local container writes under (blob.azure.prefix). |
-| subscription\_id | Subscription holding the account, which credentials.sh checks the CLI against. |
+| store\_prefix | Blob name prefix the local run writes under (blob.azure.prefix). |
+| subscription\_id | Subscription holding the account. |
 <!-- END_TF_DOCS -->

@@ -15,6 +15,8 @@ decision [0030](../../docs/research/decisions/0030-reference-deployments.md).
 | [`check-account.sh`](check-account.sh), [`check-subscription.sh`](check-subscription.sh) | The guards: refuse an AWS run outside the account holding the lab's zone, and an Azure run outside the lab's subscription |
 | [`github-environments.sh`](github-environments.sh) | Creates the `cloud-conformance` and `cloud-platform` GitHub environments |
 | [`scenario-ci.sh`](scenario-ci.sh) | The CI driver `platform-scenarios.yml` runs: apply, test, destroy, reap, check-clean |
+| [`platform-tests.sh`](platform-tests.sh) | Runs `test/platform` against an applied scenario: the test step of `scenario-ci.sh test` and of `make verify`, so a local check is the check CI makes |
+| [`local.sh`](local.sh) | The local runner behind `scenario.mk`'s `render`, `credentials`, `up`, `smoke`, `verify`, `logs`, `down` and `clean` |
 | [`prove-matrix.sh`](prove-matrix.sh), [`prove-matrix_test.sh`](prove-matrix_test.sh) | Which scenarios a pull request proves, and its table test (`make deploy-check` runs it) |
 
 ## Bootstraps
@@ -55,3 +57,23 @@ Every action works on a fresh copy of the scenario, with the state at
 `ci-vars.sh` supplies the variables a CI run passes. How to dispatch it and which scenarios a
 pull request proves are in [`deploy/platform`](../platform/README.md#running-a-scenario-in-ci)
 and [`docs/testing/ci.md`](../../docs/testing/ci.md#platform-scenarios-manual).
+
+## Running a scenario locally
+
+[`local.sh`](local.sh) runs artifactweave natively against an applied scenario, from the
+scenario's own `artifactweave_config` output, so the local run uses exactly the configuration
+the reference documents and works for every scenario, mirrors included. From a scenario
+directory, or `make platform-<target> SCENARIO=<cloud>/<scenario>` from the root:
+
+| Target | What it does |
+|---|---|
+| `render` | Writes `.local/artifactweave.yaml` from `artifactweave_config` and `.local/outputs.json`; generates `.local/secrets.env` (master key, admin password) once and keeps it, because the database is sealed with that key |
+| `credentials` | Lets this machine act as the scenario's app identity. GCS: `.local/gcp-credentials.json` impersonates the configuration's `google_access_id` from your Application Default Credentials (the lab forbids service account keys). S3: `.local/aws.env` from `aws configure export-credentials`, short-lived. Azure: nothing; the SDK chain uses your `az login` |
+| `up` | Builds `.local/artifactweave` and starts it in the background on `127.0.0.1:$PORT` (8081 on GCP, 8082 on Azure, 8083 on AWS by default), then waits until it is ready |
+| `smoke` | A 40 MiB round trip, then a `downloadRedirect` repository's 302, which must land on the scenario's storage host and serve the same bytes |
+| `verify` | `test/platform` against the applied scenario, through [`platform-tests.sh`](platform-tests.sh) as CI runs it |
+| `logs`, `down`, `clean` | Follow the log; stop artifactweave, keeping `.local/data`; stop it and remove `.local` |
+
+Everything lands in `.local/`, which ignores itself. The Docker container these targets
+replaced left volumes behind (`acceptance_data`, `acceptance-azure_data`,
+`acceptance-aws_data`); remove them with `docker volume rm` once you no longer need their data.

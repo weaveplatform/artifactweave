@@ -1,14 +1,14 @@
 # gcp/single-bucket: the GCS acceptance environment
 
 A real Google Cloud Storage bucket for artifactweave's `gcs` blob backend. Three things use it:
-- artifactweave running in a local container;
+- artifactweave run locally against it (`make up`);
 - the real-cloud conformance tests (`pkg/blob/gcs/real_test.go`), run locally;
 - the manually dispatched `cloud-conformance.yml` workflow.
 
 Nothing uses a service account key. The organisation enforces
 `iam.disableServiceAccountKeyCreation`:
 - **Terraform** runs with your own Application Default Credentials.
-- **The local container and tests** impersonate the conformance service account.
+- **The local run and tests** impersonate the conformance service account.
 - **The workflow** reaches that account through Workload Identity Federation, limited to
   this repository's `cloud-conformance` environment.
 
@@ -32,22 +32,24 @@ grants it the bucket.
 gcloud auth application-default login          # once
 gcloud auth application-default set-quota-project <project>
 make apply        # from the repository root: make gcp-apply, or make platform-apply SCENARIO=gcp/single-bucket
-make up           # builds the image, starts artifactweave against the bucket on port 8081
-make smoke        # deploys and downloads 40 MiB through the container
+make up           # builds artifactweave and starts it against the bucket on port 8081
+make smoke        # 40 MiB through it, and a downloadRedirect 302 to the bucket
+make verify       # test/platform against the bucket, as CI runs it
 make conformance  # the real-GCS blob contract and probes
 make github-vars  # sets CONFORMANCE_GCS_BUCKET; the identity variables come from deploy/ci/terraform/gcp
-make down         # stops the container; make clean also drops its data
+make down         # stops it; make clean also drops .local/
 make destroy      # removes everything, the bucket's objects included
 ```
 
 ## Files
 
-- **`credentials.sh`** writes `.secrets/container-credentials.json`, the
-  `impersonated_service_account` file `gcloud --impersonate-service-account` would write,
-  built from your ADC. It also writes the container's configuration and a generated master
-  key and admin password in `.local/`. The key and password are kept across runs, because
+- **`make credentials`** ([`deploy/ci/local.sh`](../../../../ci/local.sh)) writes
+  `.local/gcp-credentials.json`, the `impersonated_service_account` file
+  `gcloud --impersonate-service-account` would write, built from your ADC. `make render`
+  writes the configuration from the `artifactweave_config` output, and a generated master
+  key and admin password, in `.local/`. The key and password are kept across runs, because
   the database is sealed with that key.
-- **Git-ignored:** `.secrets/`, `.local/` and the Terraform state.
+- **Git-ignored:** `.local/` and the Terraform state.
 
 
 ## Moved from `deploy/terraform/acceptance`
@@ -105,7 +107,7 @@ fails when it is stale.
 | project\_id | Project that holds the acceptance bucket (the bootstrap's lab project). | `string` | `"project-0c0b2d7a-9ad7-4221-9a8"` | no |
 | region | Location of the bucket. | `string` | `"europe-west2"` | no |
 | scenario\_labels | Labels for the bucket. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches. | `map(string)` | `{}` | no |
-| store\_prefix | Object prefix the local container writes under (blob.gcs.prefix). | `string` | `"local/"` | no |
+| store\_prefix | Object prefix the local run writes under (blob.gcs.prefix). | `string` | `"local/"` | no |
 
 ### Outputs
 
@@ -116,5 +118,5 @@ fails when it is stale.
 | expires\_at | The expires-at label (epoch seconds) a scenario run set, read by reap; empty outside scenario runs. |
 | service\_account | The service account artifactweave runs as (the bootstrap's conformance account unless app\_service\_account names another), for blob.gcs.google\_access\_id and ARTIFACTWEAVE\_TEST\_GCS\_ACCESS\_ID. |
 | storage\_host | Host a downloadRedirect repository's signed URLs point at. |
-| store\_prefix | Object prefix the local container writes under (blob.gcs.prefix). |
+| store\_prefix | Object prefix the local run writes under (blob.gcs.prefix). |
 <!-- END_TF_DOCS -->

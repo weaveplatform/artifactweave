@@ -9,7 +9,7 @@ output "service_account" {
 }
 
 output "store_prefix" {
-  description = "Object prefix the local container writes under (blob.gcs.prefix)."
+  description = "Object prefix the local run writes under (blob.gcs.prefix)."
   value       = var.store_prefix
 }
 

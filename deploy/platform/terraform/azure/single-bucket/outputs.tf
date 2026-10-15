@@ -9,7 +9,7 @@ output "container" {
 }
 
 output "store_prefix" {
-  description = "Blob name prefix the local container writes under (blob.azure.prefix)."
+  description = "Blob name prefix the local run writes under (blob.azure.prefix)."
   value       = var.store_prefix
 }
 
@@ -19,7 +19,7 @@ output "resource_group" {
 }
 
 output "subscription_id" {
-  description = "Subscription holding the account, which credentials.sh checks the CLI against."
+  description = "Subscription holding the account."
   value       = var.subscription_id
 }
 

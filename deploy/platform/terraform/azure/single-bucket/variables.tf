@@ -23,7 +23,7 @@ variable "container" {
 }
 
 variable "store_prefix" {
-  description = "Blob prefix the local container writes under (blob.azure.prefix)."
+  description = "Blob prefix the local run writes under (blob.azure.prefix)."
   type        = string
   default     = "local/"
 }

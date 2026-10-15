@@ -17,7 +17,7 @@ variable "name" {
 }
 
 variable "store_prefix" {
-  description = "Object prefix the local container writes under (blob.gcs.prefix)."
+  description = "Object prefix the local run writes under (blob.gcs.prefix)."
   type        = string
   default     = "local/"
 }
