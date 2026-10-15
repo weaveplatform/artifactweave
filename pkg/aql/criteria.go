@@ -7,14 +7,15 @@ import (
 	"time"
 )
 
-// criteria builds the tree for an object: an implicit $and of its members.
-func criteria(v value, depth int) (Node, error) {
+// criteria builds the tree for an object: an implicit $and of its members,
+// whose keys name fields of d or paths from it.
+func criteria(v value, depth int, d Domain) (Node, error) {
 	if depth > maxDepth {
 		return nil, syntaxErr(v.pos, "nesting deeper than %d levels", maxDepth)
 	}
 	out := make(And, 0, len(v.members))
 	for _, m := range v.members {
-		n, err := criterion(m, depth)
+		n, err := criterion(m, depth, d)
 		if err != nil {
 			return nil, err
 		}
@@ -26,7 +27,7 @@ func criteria(v value, depth int) (Node, error) {
 	return out, nil
 }
 
-func criterion(m member, depth int) (Node, error) {
+func criterion(m member, depth int, d Domain) (Node, error) {
 	switch {
 	case m.key == "$and" || m.key == "$or":
 		if m.val.kind != vArray {
@@ -46,7 +47,7 @@ func criterion(m member, depth int) (Node, error) {
 				return nil, syntaxErr(item.pos, "%s takes an array of objects", m.key)
 			}
 			for _, im := range item.members {
-				n, err := criterion(im, depth+1)
+				n, err := criterion(im, depth+1, d)
 				if err != nil {
 					return nil, err
 				}
@@ -58,11 +59,13 @@ func criterion(m member, depth int) (Node, error) {
 		}
 		return Or(children), nil
 	case m.key == "$msp":
-		return msp(m)
+		return msp(m, d)
 	case m.key == "$rf":
 		return nil, fmt.Errorf("%w: %s", ErrUnsupported, m.key)
 	case strings.HasPrefix(m.key, "$"):
 		return nil, syntaxErr(m.pos, "unknown operator %q", m.key)
+	case d != DomainItems:
+		return relCriterion(m, d.rel())
 	case strings.HasPrefix(m.key, "@"), m.key == "property.key", m.key == "property.value":
 		return property(m)
 	case strings.HasPrefix(m.key, "stat."):
@@ -75,10 +78,7 @@ func criterion(m member, depth int) (Node, error) {
 	k, ok := fieldKinds[f]
 	if !ok {
 		if strings.Contains(m.key, ".") {
-			return nil, fmt.Errorf(
-				"%w: field %q (secondary domains other than property and stat)",
-				ErrUnsupported, m.key,
-			)
+			return relCriterion(m, relItem)
 		}
 		return nil, syntaxErr(m.pos, "unknown field %q", m.key)
 	}
@@ -86,22 +86,29 @@ func criterion(m member, depth int) (Node, error) {
 }
 
 // msp reads $msp: an array of objects whose members are property criteria,
-// all of which one property of the item must satisfy (research 22 §1.1).
-func msp(m member) (Node, error) {
+// all of which one property must satisfy (research 22 §1.1). The
+// properties are the found item's or build's, or those of the item, module
+// or build one relation path reaches; every member must name the same.
+func msp(m member, d Domain) (Node, error) {
 	if m.val.kind != vArray {
 		return nil, syntaxErr(m.val.pos, "$msp takes an array of objects")
 	}
 	var out MSP
+	path, to, first := "", d.rel(), true
 	for _, item := range m.val.items {
 		if item.kind != vObject {
 			return nil, syntaxErr(item.pos, "$msp takes an array of objects")
 		}
 		for _, im := range item.members {
-			if !strings.HasPrefix(im.key, "@") && im.key != "property.key" &&
-				im.key != "property.value" {
+			p, r, rest, _ := splitPath(d.rel(), im.key)
+			if !isPropertyKey(rest) || !r.hasProperties() {
 				return nil, syntaxErr(im.pos, "$msp takes property criteria, not %q", im.key)
 			}
-			n, err := property(im)
+			if !first && p != path {
+				return nil, syntaxErr(im.pos, "$msp criteria must name the properties of one row")
+			}
+			path, to, first = p, r, false
+			n, err := property(member{key: rest, pos: im.pos, val: im.val})
 			if err != nil {
 				return nil, err
 			}
@@ -111,7 +118,10 @@ func msp(m member) (Node, error) {
 	if len(out) == 0 {
 		return nil, syntaxErr(m.val.pos, "$msp has no criteria")
 	}
-	return out, nil
+	if d == DomainItems && path == "" {
+		return out, nil
+	}
+	return &PathMSP{Path: path, MSP: out, rel: to}, nil
 }
 
 // appendProperty adds the property criteria of n, which property built: one

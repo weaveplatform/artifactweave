@@ -233,20 +233,13 @@ func (i items) FindByChecksum(
 func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
 	var out []aql.Hit
 	err := i.s.do(ctx, func() error {
-		rows := i.t().rows
-		props := i.props().rows
-		stats := i.stats().rows
-		candidates := make([]aql.Hit, 0, len(rows))
-		for id, it := range rows {
-			h := aql.Hit{Item: it, Properties: props[id]}
-			if st, ok := stats[id]; ok {
-				h.Stats = &st
-			}
-			candidates = append(candidates, h)
+		c := &aql.Corpus{Items: i.hits(true)}
+		if q.Joins() {
+			buildStore{i.s}.addBuilds(c)
 		}
 		// Matching reads the stored rows in place; only the hits returned
 		// are copied. Stats already points at a copy.
-		out = aql.Select(q, o, candidates)
+		out = aql.SelectItems(q, o, c)
 		for n := range out {
 			out[n].Properties = store.Clone(out[n].Properties)
 		}

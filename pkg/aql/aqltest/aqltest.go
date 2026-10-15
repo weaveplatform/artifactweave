@@ -5,8 +5,13 @@
 // statistics are zero), the repositories they live in, the query shapes the
 // JFrog CLI generates, and the rows each query returns, in order.
 //
-// The pkg/aql tests run the cases through aql.Select; the store contract
-// suite runs them through every ItemStore.Search. Both resolve each query
+// BuildSeeds add build runs and promotions that relate to the items by
+// checksum, for the relation-path cases and the builds and
+// build.promotions cases (BuildCases).
+//
+// The pkg/aql tests run the cases through aql.SelectItems and
+// aql.SelectBuilds over Corpus; the store contract suite runs them through
+// every ItemStore.Search and BuildStore.Search. Both resolve each query
 // against Repositories first, as the server does.
 package aqltest
 
@@ -391,6 +396,7 @@ func Cases() []Case {
 		Options: aql.Options{Max: 2}, Want: []string{guide},
 	})
 	out = append(out, searchCases()...)
+	out = append(out, pathCases()...)
 	for n := range out {
 		out[n].Options.Now = Now
 	}

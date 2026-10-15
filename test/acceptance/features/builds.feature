@@ -79,3 +79,33 @@ Feature: Build-info
     When I GET "/artifactory/api/build/accept-app" as admin
     Then the JSON field "buildsNumbers" has 1 entries
     And the JSON field "buildsNumbers.0.uri" equals "/7"
+
+  # With a pattern, the CLI finds a build's files through AQL on
+  # artifact.module.build.name and .number (decision 0012), then keeps those
+  # whose build.name and build.number properties match.
+  @jf
+  Scenario: jf rt s --build and jf rt dl --build find what a build produced
+    Given the JFrog CLI is available
+    And a file "app.bin" with content:
+      """
+      build artifact
+      """
+    And a file "other.bin" with content:
+      """
+      not in the build
+      """
+    When I run jf "rt u {dir}/app.bin generic-local/app/ --flat --build-name=search-app --build-number=3 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt u {dir}/other.bin generic-local/app/ --flat --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bp search-app 3 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt s generic-local/ --build=search-app/3 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the output contains "generic-local/app/app.bin"
+    And the output does not contain "other.bin"
+    And the server answered 200 to POST "/artifactory/api/search/aql"
+    When I run jf "rt dl generic-local/app/ {dir}/out/ --flat --build=search-app/3 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the files "app.bin" and "out/app.bin" are identical
+    And the file "out/other.bin" does not exist

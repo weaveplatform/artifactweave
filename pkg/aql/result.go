@@ -27,10 +27,12 @@ type Response struct {
 }
 
 // Row is one result: the query's fields of an item and, when included, its
-// virtual repositories, properties and statistics.
+// virtual repositories, properties and statistics; or the query's fields
+// of a run or a promotion.
 type Row struct {
 	fields  []Field
 	hit     Hit
+	build   *BuildHit
 	virtual bool
 	props   bool
 	keys    []string
@@ -48,6 +50,19 @@ func (q *Query) Response(hits []Hit) Response {
 	for i, h := range hits {
 		rows[i] = row
 		rows[i].hit = h
+	}
+	return Response{
+		Rows: rows, Start: q.Offset, Total: len(rows), Limit: q.Limit, HasLimit: q.HasLimit,
+	}
+}
+
+// BuildResponse builds the body for hits, which SelectBuilds or a store
+// returned for a builds or build.promotions query.
+func (q *Query) BuildResponse(hits []BuildHit) Response {
+	fields := q.Fields()
+	rows := make([]Row, len(hits))
+	for i := range hits {
+		rows[i] = Row{fields: fields, build: &hits[i]}
 	}
 	return Response{
 		Rows: rows, Start: q.Offset, Total: len(rows), Limit: q.Limit, HasLimit: q.HasLimit,
@@ -93,6 +108,10 @@ func (r Row) MarshalJSON() ([]byte, error) {
 // Artifactory leaves out null fields; numbers are always present. An item
 // without a statistics record renders no "stats".
 func (r Row) write(b *bytes.Buffer) {
+	if r.build != nil {
+		r.writeBuild(b)
+		return
+	}
 	it := r.hit.Item
 	b.WriteByte('{')
 	first := true
@@ -150,6 +169,39 @@ func (r Row) write(b *bytes.Buffer) {
 		var sb bytes.Buffer
 		r.writeStats(&sb, st)
 		put("stats", []json.RawMessage{sb.Bytes()})
+	}
+	b.WriteByte('}')
+}
+
+// writeBuild renders a run's fields as "build.<field>", or a promotion's
+// as "build.promotion.<field>" (Artifactory's AqlRestResult names). Empty
+// texts and missing times are left out, as for items.
+func (r Row) writeBuild(b *bytes.Buffer) {
+	found, prefix := hitRow(r.build), "build."
+	if found.rel == relPromotion {
+		prefix = "build.promotion."
+	}
+	b.WriteByte('{')
+	first := true
+	for _, f := range r.fields {
+		var v string
+		if k, _ := found.rel.fieldKind(string(f)); k == kindTime {
+			if t := found.time(string(f)); !t.IsZero() {
+				v = t.UTC().Format(timeFormat)
+			}
+		} else {
+			v = found.text(string(f))
+		}
+		if v == "" {
+			continue
+		}
+		if !first {
+			b.WriteByte(',')
+		}
+		first = false
+		writeJSON(b, prefix+string(f))
+		b.WriteByte(':')
+		writeJSON(b, v)
 	}
 	b.WriteByte('}')
 }

@@ -4,9 +4,13 @@
 // $and and $or, field comparisons, $match and $nmatch globs, @property and
 // property.key/property.value criteria, $msp, the stat domain, and the
 // include, sort, offset, limit, transitive and distinct suffixes with
-// Artifactory's output rules (research 22 §1). It also parses the two
-// actions, items.delete and properties.update (research 22 §1.5), whose
-// criteria select items the same way; the server carries them out.
+// Artifactory's output rules (research 22 §1). The builds and
+// build.promotions domains are served too, and every domain reaches the
+// others through relation paths such as artifact.module.build.name (see
+// Joined), which is how the JFrog CLI finds a build's files. It also
+// parses the two actions, items.delete and properties.update (research 22
+// §1.5), whose criteria select items the same way; the server carries
+// them out.
 //
 // A parsed Query is run two ways that must agree row for row: Match and
 // Compare are the reference semantics (the in-memory store uses them), and
@@ -167,8 +171,10 @@ const (
 )
 
 // Node is a criteria tree node: And, Or, *FieldCriterion,
-// *PropertyCriterion, *StatCriterion, MSP, or the RepoSet that Resolve puts
-// in place of repo criteria.
+// *PropertyCriterion, *StatCriterion, MSP, the RepoSet that Resolve puts in
+// place of repo criteria, or a criterion of the builds domains and relation
+// paths: *PathCriterion, *PathProperty, *PathMSP and the *Joined that
+// gathers those naming paths.
 type Node interface{ node() }
 
 // And holds when every child holds; an empty And always holds.
@@ -283,8 +289,11 @@ const (
 	UpdateProperties
 )
 
-// Query is a parsed items query, or an action over items.
+// Query is a parsed query, or an action over items.
 type Query struct {
+	// Domain is the primary domain: what the query finds. Actions are on
+	// items.
+	Domain Domain
 	// Action is Find unless the query is items.delete or properties.update.
 	Action Action
 	// DryRun is an action's .dryRun(), true unless it says false, so an
@@ -351,6 +360,9 @@ func (q *Query) Window(o Options) (offset, limit int) {
 // none. Including only properties or statistics keeps the defaults, as
 // Artifactory does.
 func (q *Query) Fields() []Field {
+	if q.Domain != DomainItems {
+		return q.domainFields()
+	}
 	var out []Field
 	for _, f := range fieldOrder {
 		if slices.Contains(q.Include, string(f)) || slices.Contains(q.Include, "*") {
@@ -429,11 +441,28 @@ func (q *Query) primaryOnly() bool {
 	return !q.Properties() && len(q.Stats()) == 0
 }
 
-// CheckRestricted applies decision 0012's rule for non-admin callers: they
-// may query only items and every result must carry repo, path and name, so
-// each row can be checked against the caller's permissions.
+// CheckRestricted applies decision 0012's rule for non-admin callers: every
+// items result must carry repo, path and name, and every builds result
+// name, number and repo, so each row can be checked against the caller's
+// permissions. Whether the caller may query builds at all is the caller's
+// to decide, from its token's scope.
 func (q *Query) CheckRestricted() error {
 	fields := q.Fields()
+	switch q.Domain {
+	case DomainBuilds:
+		for _, f := range []Field{"name", "number", "repo"} {
+			if !slices.Contains(fields, f) {
+				return fmt.Errorf(
+					"%w: non-admin builds queries must include name, number and repo",
+					ErrRestricted,
+				)
+			}
+		}
+		return nil
+	case DomainPromotions:
+		// A promotion is checked against its run, which every row carries.
+		return nil
+	}
 	for _, f := range []Field{FieldRepo, FieldPath, FieldName} {
 		if !slices.Contains(fields, f) {
 			return fmt.Errorf(

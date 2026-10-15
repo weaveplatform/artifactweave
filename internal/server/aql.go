@@ -82,6 +82,10 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, apierror.New(http.StatusBadRequest, aqlMessage(err)))
 		return
 	}
+	if q.Domain != aql.DomainItems {
+		s.searchBuildsAQL(w, r, st, p, q)
+		return
+	}
 	configs, err := repoConfigs(ctx, st)
 	if err != nil {
 		writeErr(w, r, s.internalError(ctx, "aql repositories", err))

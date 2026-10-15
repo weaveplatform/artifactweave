@@ -69,6 +69,14 @@ func TestParseScope(t *testing.T) {
 			"",
 		},
 		{
+			"build:artifactory-build-info/app/**:r",
+			[]types.ScopeEntry{{
+				Kind: types.ScopeBuild, Target: "artifactory-build-info", Path: "app/**",
+				Actions: types.ScopeRead,
+			}},
+			"",
+		},
+		{
 			"project:proj/members/users:r",
 			[]types.ScopeEntry{
 				{
@@ -140,7 +148,7 @@ func TestParseScopeErrors(t *testing.T) {
 		`applied-permissions/groups:a"b`, "applied-permissions/roles:proj", "applied-permissions/roles::dev",
 		`applied-permissions/roles:p"q:dev`, "applied-permissions/roles:p:",
 		`artifact:"unterminated:r`, "artifact:libs", "artifact:libs:", "artifact:libs:q", "artifact:libs:rw",
-		"artifact::r", "repo::r", "project:proj:r", "project:proj/:r", "project:/area:r", "system:@x:r",
+		"artifact::r", "build::r", "repo::r", "project:proj:r", "project:proj/:r", "project:/area:r", "system:@x:r",
 		"widget:x:r", "nocolons", "artifact:\xff:r",
 	} {
 		if _, err := types.ParseScope(in); !errors.Is(err, types.ErrInvalidScope) {
@@ -200,6 +208,10 @@ func TestScopeNarrows(t *testing.T) {
 		{"artifact:libs:w", "artifact:libs:r", false},
 		{"artifact:libs:*", "artifact:libs:r,w,d,a,x,s,m", false},
 		{"artifact:libs:r", "repo:libs:r", false},
+		{"build:artifactory-build-info/app/**:r", "build:artifactory-build-info/**:r", true},
+		{"build:artifactory-build-info/**:r", "build:artifactory-build-info/app/**:r", false},
+		{"build:artifactory-build-info:r", "artifact:artifactory-build-info:r", false},
+		{"build:artifactory-build-info:r", "applied-permissions/user", true},
 		{"repo:libs:r", "repo:*:r", true},
 		{"repo:libs:r", "repo:other:r", false},
 		{"project:p/members/users:r", "project:p/members:r", true},

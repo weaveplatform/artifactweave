@@ -195,6 +195,21 @@ func TestEvaluation(t *testing.T) {
 			art(libs, "x.jar", d, false),
 			{types.ResourceBuild, builds, "app/1", false, r, true},
 		}},
+		{"build scope intersects", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "build:"+types.BuildInfoRepository+"/app/4*:r")}, false, false, []check{
+			{types.ResourceBuild, builds, "app/42", false, r, true},
+			{types.ResourceBuild, builds, "app/1", false, r, false},
+			{types.ResourceBuild, builds, "lib/4", false, r, false},
+			{types.ResourceBuild, builds, "app/42", false, w, false},
+			art(libs, "org/acme/a.txt", r, false),
+		}},
+		{"build scope on top of applied permissions", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/user build:*:r")}, false, false, []check{
+			{types.ResourceBuild, builds, "app/1", false, r, true},
+			{types.ResourceBuild, builds, "lib/1", false, r, false},
+			art(libs, "org/acme/a.txt", r, true),
+		}},
+		{"a repo scope reaches no artifact", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "repo:libs-local:r")}, false, false, []check{
+			art(libs, "org/acme/a.txt", r, false),
+		}},
 		{"an admin's resource-only token keeps content, loses admin", Subject{Name: "root", Admin: true, Scope: scope(t, "artifact:ext-local:r")}, false, false, []check{
 			art(ext, "x/y", r, true), art(ext, "x/y", w, false), art(libs, "x", r, false),
 		}},

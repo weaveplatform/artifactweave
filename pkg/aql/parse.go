@@ -261,7 +261,7 @@ func (p *parser) object(depth int) (value, error) {
 // otherDomains are AQL's other primary domains, refused as unsupported
 // rather than as a syntax error.
 var otherDomains = []string{
-	"builds", "build", "entries", "archive", "property", "releases",
+	"entries", "archive", "property", "releases",
 	"release_artifacts", "promotions", "modules", "dependencies", "artifacts",
 }
 
@@ -269,8 +269,17 @@ var otherDomains = []string{
 // properties domain is served for its update action only: it selects items
 // by their "item.<field>" criteria.
 var methods = map[string]map[string]Action{
-	"items":      {"find": Find, "delete": DeleteItems},
-	"properties": {"update": UpdateProperties},
+	"items":            {"find": Find, "delete": DeleteItems},
+	"properties":       {"update": UpdateProperties},
+	"builds":           {"find": Find},
+	"build.promotions": {"find": Find},
+}
+
+// domains maps each served domain to what its queries find; the actions
+// both work on items.
+var domains = map[string]Domain{
+	"items": DomainItems, "properties": DomainItems,
+	"builds": DomainBuilds, "build.promotions": DomainPromotions,
 }
 
 // String is the action as a query spells it.
@@ -284,8 +293,9 @@ func (a Action) String() string {
 	return "items.find"
 }
 
-// Parse parses an items query, items.delete or properties.update. Errors
-// wrap ErrEmpty, ErrSyntax, ErrUnsupported, ErrInvalid or ErrTooLong.
+// Parse parses an items, builds or build.promotions query, items.delete or
+// properties.update. Errors wrap ErrEmpty, ErrSyntax, ErrUnsupported,
+// ErrInvalid or ErrTooLong.
 func Parse(src string) (*Query, error) {
 	if strings.TrimSpace(src) == "" {
 		return nil, ErrEmpty
@@ -300,18 +310,22 @@ func Parse(src string) (*Query, error) {
 	if p.tok.kind != tokIdent {
 		return nil, syntaxErr(p.tok.pos, "expected a domain, found %s", p.describe())
 	}
-	domain := p.tok.text
+	domain, err := p.domain()
+	if err != nil {
+		return nil, err
+	}
 	served, ok := methods[domain]
 	if !ok {
 		if slices.Contains(otherDomains, domain) {
 			return nil, fmt.Errorf(
-				"%w: the %s domain (only items and properties.update are served)",
+				"%w: the %s domain (items, builds, build.promotions and properties.update are served)",
 				ErrUnsupported,
 				domain,
 			)
 		}
 		return nil, syntaxErr(p.tok.pos, "unknown domain %q", domain)
 	}
+	d := domains[domain]
 	if err := p.advance(); err != nil {
 		return nil, err
 	}
@@ -334,7 +348,7 @@ func Parse(src string) (*Query, error) {
 	}
 	// An action without .dryRun() is a dry run: Artifactory documents no
 	// default, and the one that cannot destroy anything by omission is safe.
-	q := &Query{Distinct: true, Action: action, DryRun: action != Find}
+	q := &Query{Distinct: true, Domain: d, Action: action, DryRun: action != Find}
 	var root Node
 	if !p.punct(")") {
 		v, err := p.value(0)
@@ -350,7 +364,7 @@ func Parse(src string) (*Query, error) {
 			}
 		}
 		if len(v.members) > 0 {
-			if root, err = criteria(v, 0); err != nil {
+			if root, err = criteria(v, 0, d); err != nil {
 				return nil, err
 			}
 		}
@@ -368,7 +382,7 @@ func Parse(src string) (*Query, error) {
 	}
 	// The implicit type=file is the items domain's; properties.update
 	// reaches folders too, since they carry properties.
-	if action != UpdateProperties && !mentionsType(root) {
+	if d == DomainItems && action != UpdateProperties && !mentionsType(root) {
 		root = append(root.(And), &FieldCriterion{Field: FieldType, Op: OpEq, Text: "file"})
 	}
 	q.Criteria = root
@@ -421,7 +435,27 @@ func Parse(src string) (*Query, error) {
 		}
 		q.Criteria = append(q.Criteria.(And), has)
 	}
+	q.Criteria = joinRoot(q.Criteria.(And)) //nolint:forcetypeassert // the root is always an And
 	return q, nil
+}
+
+// domain reads the primary domain's name. build.promotions is the one with
+// a dot, so it spans three tokens; the parser is left on the last.
+func (p *parser) domain() (string, error) {
+	name := p.tok.text
+	if name != "build" {
+		return name, nil
+	}
+	if err := p.advance(); err != nil {
+		return "", err
+	}
+	if err := p.expect("."); err != nil {
+		return "", err
+	}
+	if p.tok.kind != tokIdent {
+		return "", syntaxErr(p.tok.pos, "expected a domain, found %s", p.describe())
+	}
+	return name + "." + p.tok.text, nil
 }
 
 // itemCriteria rewrites properties.update criteria, whose item fields are
@@ -560,14 +594,14 @@ func (p *parser) modifier(q *Query, name string, pos int) error {
 			if a.kind != vString {
 				return syntaxErr(a.pos, "include takes field names")
 			}
-			if !includable(a.text) {
+			if !includable(a.text, q.Domain) {
 				return fmt.Errorf("%w: include of %q", ErrUnsupported, a.text)
 			}
 			q.Include = append(q.Include, a.text)
 		}
 		return nil
 	case "sort":
-		s, err := sortOf(args, pos)
+		s, err := sortOf(args, pos, q.Domain)
 		q.Sort = s
 		return err
 	case "offset", "limit":
@@ -617,11 +651,17 @@ func boolArg(args []value) (b, ok bool) {
 	return false, false
 }
 
-// includable reports whether name may appear in an include: an item field,
-// "*", virtual_repos, the property secondary domain ("property",
-// "property.*", "property.key", "property.value" or "@<key>"), or the stat
-// domain ("stat", "stat.*" or "stat.<field>").
-func includable(name string) bool {
+// includable reports whether name may appear in an include of d. For items
+// that is an item field, "*", virtual_repos, the property secondary domain
+// ("property", "property.*", "property.key", "property.value" or
+// "@<key>"), or the stat domain ("stat", "stat.*" or "stat.<field>"). For
+// builds and build.promotions it is a field of the domain or "*": rows
+// nested from other domains are not rendered yet.
+func includable(name string, d Domain) bool {
+	if d != DomainItems {
+		_, ok := d.rel().fieldKind(name)
+		return ok || name == "*"
+	}
 	if _, ok := fieldKinds[Field(name)]; ok {
 		return true
 	}
@@ -638,7 +678,7 @@ func includable(name string) bool {
 	return ok && k != "" && k != "*"
 }
 
-func sortOf(args []value, pos int) (*Sort, error) {
+func sortOf(args []value, pos int, d Domain) (*Sort, error) {
 	if len(args) != 1 || args[0].kind != vObject || len(args[0].members) != 1 {
 		return nil, syntaxErr(pos, `sort takes {"$asc":[...]} or {"$desc":[...]}`)
 	}
@@ -651,8 +691,10 @@ func sortOf(args []value, pos int) (*Sort, error) {
 		if f.kind != vString {
 			return nil, syntaxErr(f.pos, "sort takes field names")
 		}
-		if _, ok := fieldKinds[Field(f.text)]; !ok {
-			return nil, fmt.Errorf("%w: sort on %q (only item fields sort)", ErrUnsupported, f.text)
+		if _, ok := d.rel().fieldKind(f.text); !ok {
+			return nil, fmt.Errorf(
+				"%w: sort on %q (only fields of %s sort)", ErrUnsupported, f.text, d,
+			)
 		}
 		s.Fields = append(s.Fields, Field(f.text))
 	}

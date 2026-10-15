@@ -67,8 +67,10 @@ type Decider struct {
 	// (resource scopes only), so only its artifact entries can grant.
 	open bool
 	// filter, when set, limits artifact actions to what the scope's
-	// artifact entries allow.
+	// artifact entries allow; builds, when set, limits build actions to
+	// what its build entries allow.
 	filter []types.ScopeEntry
+	builds []types.ScopeEntry
 	scope  *types.Scope
 	// user and groups are the identities the subject's grants are read
 	// for, after a token scope narrowed them: user is empty when the scope
@@ -86,7 +88,13 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 	d := &Decider{open: sc.open, scope: s.Scope, rules: map[types.ResourceType][]rule{}}
 	if sc.filtered {
 		d.filter = sc.artifact
+		if d.filter == nil {
+			// Resource entries alone, none of them for artifacts: a build
+			// or repo scope reaches no artifact.
+			d.filter = []types.ScopeEntry{}
+		}
 	}
+	d.builds = sc.build
 	groups := sc.groups(s.Groups)
 	d.groups = groups
 	user := ""
@@ -179,6 +187,8 @@ func (d *Decider) Actions(
 	switch {
 	case rt == types.ResourceArtifact && d.filter != nil:
 		have &= scopeActions(d.filter, repo, path, folder)
+	case rt == types.ResourceBuild && d.builds != nil:
+		have &= scopeActions(d.builds, repo, path, folder)
 	case rt != types.ResourceArtifact && !d.open:
 		have = 0
 	}
@@ -327,13 +337,16 @@ type scopeShape struct {
 	// adminAllowed: the subject's own admin flag survives the scope.
 	adminAllowed bool
 	// open: applied permissions exist, so resources other than artifacts
-	// are reachable; false for a scope of resource entries only.
+	// and builds are reachable; false for a scope of resource entries
+	// only, where only artifact entries reach artifacts and build entries
+	// builds.
 	open bool
 	// named: the groups a groups scope names; all is the subject's groups.
 	named    []string
 	all      bool
 	filtered bool
 	artifact []types.ScopeEntry
+	build    []types.ScopeEntry
 }
 
 func analyse(s *types.Scope) scopeShape {
@@ -354,12 +367,15 @@ func analyse(s *types.Scope) scopeShape {
 			applied = true
 		case types.ScopeArtifact:
 			sh.artifact = append(sh.artifact, e)
+		case types.ScopeBuild:
+			sh.build = append(sh.build, e)
 		}
 	}
 	sh.open = applied
 	if !applied {
 		// Resource entries alone intersect the subject's own permissions
-		// (research 05), and only artifact entries reach artifacts.
+		// (research 05): only artifact entries reach artifacts, and only
+		// build entries builds.
 		sh.user, sh.all, sh.filtered = true, true, true
 	}
 	if len(sh.artifact) > 0 {
@@ -410,7 +426,8 @@ func toActions(s types.ScopeActions) types.Actions {
 	return a
 }
 
-// scopeActions is what a token's artifact entries allow at path in repo.
+// scopeActions is what a token's artifact or build entries allow at path in
+// repo.
 func scopeActions(entries []types.ScopeEntry, repo Repo, path string, folder bool) types.Actions {
 	key, _ := types.ResolveRepoKey(repo.Key)
 	var a types.Actions
