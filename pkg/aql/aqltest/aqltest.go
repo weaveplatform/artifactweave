@@ -150,17 +150,24 @@ func Repositories() aql.Repositories {
 
 // Case is a query and the rows it returns, as "<reported repo>/<path>".
 type Case struct {
-	Name    string
-	Query   string
+	Name  string
+	Query string
+	// Built is a query built in code, run instead of Query: the GET
+	// searches' queries, which AQL text cannot always say.
+	Built   *aql.Query
 	Options aql.Options
 	Want    []string
 }
 
-// Parse parses the case's query and resolves it against Repositories.
+// Parse returns the case's query, Built or Query parsed, resolved against
+// Repositories.
 func (c Case) Parse() (*aql.Query, error) {
-	q, err := aql.Parse(c.Query)
-	if err != nil {
-		return nil, err
+	q := c.Built
+	if q == nil {
+		var err error
+		if q, err = aql.Parse(c.Query); err != nil {
+			return nil, err
+		}
 	}
 	q.Resolve(Repositories())
 	return q, nil
@@ -359,6 +366,7 @@ func Cases() []Case {
 		Name: "own limit below the cap", Query: `items.find({"repo":"generic-local"}).limit(1)`,
 		Options: aql.Options{Max: 2}, Want: []string{guide},
 	})
+	out = append(out, searchCases()...)
 	for n := range out {
 		out[n].Options.Now = Now
 	}

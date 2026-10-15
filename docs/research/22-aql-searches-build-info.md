@@ -160,12 +160,14 @@ Confidence:
 ## 2. Searches
 
 The cached definitions in `.specoracle/artifactory-searches-api/` match the specification in
-`api/src/artifactory/paths-searches.yaml`, authored in P1. Every GET search is still a
-generated 501 stub.
+`api/src/artifactory/paths-searches.yaml`, authored in P1.
 
 - **[D] Quick (`artifact`), property (`prop`), checksum, bad checksum, usage, dates, creation
-  and pattern** search local repositories and remote caches.
-  - Property search and quick search allow anonymous callers.
+  and pattern** search local repositories and remote caches. Property, checksum and bad
+  checksum search also take virtual repositories in `repos`.
+  - Quick, property, checksum and bad checksum search allow anonymous callers ("Requires a
+    privileged user (can be anonymous)"); creation, dates, usage and pattern search need "a
+    privileged non-anonymous user".
   - `X-Result-Detail: info` and `properties` widen each result beyond the `uri`.
 - **[D] GAVC, versions and latest version** read Maven coordinates through the repository's
   layout (`pkg/layout`, P0).

@@ -82,15 +82,19 @@ func collectionSlash(next http.Handler) http.Handler {
 }
 
 // requestDetails keeps what the strict handlers need beyond their decoded
-// request: the Accept header for media-type negotiation, and the raw body of
-// a repository or Access v2 group update. repo.Config cannot tell a field
-// left out (keep the stored value) from one sent as null (reset it to its
-// default), and an update needs both. A build-info publish or append keeps
-// its raw body too, because the document is stored as published (decision
-// 0014). It runs after bodyLimit, so the copy is bounded.
+// request: the Accept header for media-type negotiation, the raw query of a
+// property search, and the raw body of a repository or Access v2 group
+// update. repo.Config cannot tell a field left out (keep the stored value)
+// from one sent as null (reset it to its default), and an update needs both.
+// A build-info publish or append keeps its raw body too, because the
+// document is stored as published (decision 0014). It runs after bodyLimit,
+// so the copy is bounded.
 func requestDetails(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := withAccept(r.Context(), r.Header.Get("Accept"))
+		if r.URL.Path == propertySearchPath {
+			ctx = withSearchQuery(ctx, r.URL.RawQuery)
+		}
 		if r.Method == http.MethodPut && policyPaths[r.URL.Path] {
 			if err := normalizePolicyBody(r); err != nil {
 				bindingError(http.StatusBadRequest)(w, r, err)

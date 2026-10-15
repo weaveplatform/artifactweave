@@ -13,6 +13,7 @@ const (
 	ctxAccept
 	ctxRawBody
 	ctxCause
+	ctxSearchQuery
 )
 
 func withRequestID(ctx context.Context, id string) context.Context {
@@ -70,4 +71,15 @@ func noteCause(ctx context.Context, err error) {
 	if slot, ok := ctx.Value(ctxCause).(*error); ok {
 		*slot = err
 	}
+}
+
+func withSearchQuery(ctx context.Context, raw string) context.Context {
+	return context.WithValue(ctx, ctxSearchQuery, raw)
+}
+
+// rawSearchQuery returns the raw query requestDetails kept for the property
+// search, whose parameters are property keys the generated binding drops.
+func rawSearchQuery(ctx context.Context) string {
+	v, _ := ctx.Value(ctxSearchQuery).(string)
+	return v
 }

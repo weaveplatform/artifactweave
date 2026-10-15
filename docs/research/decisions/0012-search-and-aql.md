@@ -121,9 +121,30 @@ and stays the first thing the parser must pass:
 - the fixed include list;
 - the suffix order: include, sort, offset, transitive, limit.
 
-**GET searches.** The GET search endpoints build AQL internally and render their documented
-response shapes (research 22 §2), including `X-Result-Detail`. Quick search and property
-search allow anonymous callers, and every other search needs an authenticated caller.
+**GET searches.** The GET search endpoints build AQL internally, run it through the item
+store's search, and render their documented response shapes (research 22 §2), including
+`X-Result-Detail`.
+- **Callers.** Quick, property, checksum and bad checksum search allow anonymous callers,
+  as JFrog's page for each says. Creation, dates, usage and pattern search need a named
+  user and answer an anonymous caller 401. Results are what the caller may read, filtered
+  as AQL's are, so a caller who may read nothing gets no results rather than a 403.
+- **`repos`.** A remote's key and its `-cache` key both search the cache, and results
+  report the cache key. Quick, creation, dates, usage and pattern search ignore a virtual
+  key; property, checksum and bad checksum search its members. A key that names no
+  repository finds nothing, except in creation search, which answers its documented 404
+  for a key naming no repository the caller may see. Pattern search treats the key in its
+  pattern the same way: one naming no local repository or remote cache finds no files.
+- **What is searched.** Files only, except property search, which finds folders too. Quick
+  search matches the name case-sensitively, as `$match` does. Bad checksum search compares
+  the declared and computed checksums itself, because AQL cannot compare two fields; a
+  checksum the client never declared counts as bad. Time windows include both ends.
+  Pattern search's `*` and `?` stay within a segment, and `**` or a trailing `/` is a 400.
+- **Limits.** `search.user_query_limit` (1,000) caps quick, property, checksum, usage,
+  dates and creation search for anonymous callers, and for every non-admin when
+  `search.limit_anonymous_users_only` is false, as Artifactory's
+  `artifactory.search.userQueryLimit` and `limitAnonymousUsersOnly` do. Bad checksum search
+  stops at its documented 10,000, and `search.aql.max_results` caps every search. Results
+  past a limit are dropped silently, since these responses have no `range` to report it.
 
 ## Rationale
 
