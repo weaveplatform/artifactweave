@@ -59,10 +59,11 @@ on:
     types: [opened, synchronize, reopened, labeled]
     paths:
       - '.github/workflows/platform-scenarios.yml'
-      - 'deploy/platform/terraform/scenario-ci.sh'
-      - 'deploy/platform/terraform/prove-matrix.sh'
-      # <cloud>/<scenario>/ and modules/<cloud>/; a bootstrap change matches
-      # too, and prove-matrix.sh chooses nothing for it.
+      - 'deploy/ci/scenario-ci.sh'
+      - 'deploy/ci/prove-matrix.sh'
+      # <cloud>/<scenario>/ and modules/<cloud>/<capability>/. The bootstraps
+      # live in deploy/ci/terraform, outside this filter; platform-auth-check
+      # proves their trust instead.
       - 'deploy/platform/terraform/*/*/**'
       - 'test/platform/**'
 
@@ -127,10 +128,10 @@ jobs:
               include='[]'
             else
               if [ "$PROVE_ALL" = true ]; then
-                pairs=$(deploy/platform/terraform/prove-matrix.sh --all)
+                pairs=$(deploy/ci/prove-matrix.sh --all)
               else
                 pairs=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' |
-                  deploy/platform/terraform/prove-matrix.sh)
+                  deploy/ci/prove-matrix.sh)
               fi
               include=$(jq -Rcn --arg pr "$PR" --arg run "$RUN_ID" '[inputs | select(length > 0) |
                 split(" ") as [$c, $s] | ([$s | splits("-") | .[0:1]] | join("")) as $code |
@@ -191,8 +192,10 @@ jobs:
       PLATFORM_AZURE_STATE_ACCOUNT: ${{ vars.PLATFORM_AZURE_STATE_ACCOUNT }}
       PLATFORM_AWS_REGION: ${{ vars.PLATFORM_AWS_REGION }}
       PLATFORM_AWS_STATE_BUCKET: ${{ vars.PLATFORM_AWS_STATE_BUCKET }}
-      # A secret, so the account ID in the ARN stays out of the public logs;
-      # aws/single-bucket's ci-vars.sh grants the bucket to this role.
+      # A secret, so the account ID in the ARN stays out of the public logs.
+      # Every scenario's ci-vars.sh makes the deployer the run acts as its app
+      # principal (this role on AWS, PLATFORM_GCP_SERVICE_ACCOUNT on GCP, and
+      # whoever applies on Azure), so each scenario grants its stores to it.
       PLATFORM_AWS_ROLE_ARN: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
       CLOUDSDK_CORE_PROJECT: ${{ vars.PLATFORM_GCP_PROJECT }}
       # Terraform's azurerm provider and backend exchange the job's OIDC
@@ -262,11 +265,11 @@ jobs:
       # Dispatch: the one action asked for.
       - name: ${{ matrix.action }}
         if: matrix.action != 'prove'
-        run: deploy/platform/terraform/scenario-ci.sh "$ACTION"
+        run: deploy/ci/scenario-ci.sh "$ACTION"
 
       - name: Destroy the test instance
         if: always() && matrix.action == 'test'
-        run: deploy/platform/terraform/scenario-ci.sh destroy
+        run: deploy/ci/scenario-ci.sh destroy
 
       # Pull request proof.
       - name: 'Prove: test (apply, test/platform)'
@@ -274,33 +277,33 @@ jobs:
         env:
           INSTANCE: ${{ matrix.run_tag }}-t
           TTL_MINUTES: '120'
-        run: deploy/platform/terraform/scenario-ci.sh test
+        run: deploy/ci/scenario-ci.sh test
 
       - name: 'Prove: destroy the test instance'
         if: always() && matrix.action == 'prove'
         env:
           INSTANCE: ${{ matrix.run_tag }}-t
-        run: deploy/platform/terraform/scenario-ci.sh destroy
+        run: deploy/ci/scenario-ci.sh destroy
 
       - name: 'Prove: apply, as one dispatch would'
         if: matrix.action == 'prove'
         env:
           INSTANCE: ${{ matrix.run_tag }}-l
           TTL_MINUTES: '120'
-        run: deploy/platform/terraform/scenario-ci.sh apply
+        run: deploy/ci/scenario-ci.sh apply
 
       - name: 'Prove: destroy from the remote state alone, as a later dispatch would'
         if: matrix.action == 'prove'
         env:
           INSTANCE: ${{ matrix.run_tag }}-l
-        run: deploy/platform/terraform/scenario-ci.sh destroy
+        run: deploy/ci/scenario-ci.sh destroy
 
       - name: 'Prove: apply an instance that has already expired'
         if: matrix.action == 'prove'
         env:
           INSTANCE: ${{ matrix.run_tag }}-o
           TTL_MINUTES: '-5'
-        run: deploy/platform/terraform/scenario-ci.sh apply
+        run: deploy/ci/scenario-ci.sh apply
 
       # Only this proof's instances: proofs of other scenarios on the same
       # cloud run alongside and keep theirs.
@@ -308,11 +311,11 @@ jobs:
         if: matrix.action == 'prove'
         env:
           REAP_PREFIX: ${{ matrix.run_tag }}
-        run: deploy/platform/terraform/scenario-ci.sh reap
+        run: deploy/ci/scenario-ci.sh reap
 
       - name: 'Prove: nothing of this run remains'
         if: matrix.action == 'prove'
-        run: deploy/platform/terraform/scenario-ci.sh check-clean
+        run: deploy/ci/scenario-ci.sh check-clean
 
       # A failed proof step must not leave anything billable behind.
       - name: 'Prove: clean up after a failure'
@@ -320,7 +323,7 @@ jobs:
         run: |
           status=0
           for suffix in t l o; do
-            INSTANCE="$RUN_TAG-$suffix" deploy/platform/terraform/scenario-ci.sh destroy || status=1
+            INSTANCE="$RUN_TAG-$suffix" deploy/ci/scenario-ci.sh destroy || status=1
           done
-          deploy/platform/terraform/scenario-ci.sh check-clean || status=1
+          deploy/ci/scenario-ci.sh check-clean || status=1
           exit "$status"

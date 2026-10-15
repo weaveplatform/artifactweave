@@ -1,8 +1,8 @@
-# azure/bootstrap
+# The Azure bootstrap (`deploy/ci/terraform/azure`)
 
 The long-lived foundation every Azure scenario stands on, in the lab subscription
 `c33dbc35-f86d-4b7c-a81e-2a33eb3f7946` (decision
-[0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). It is not a
+[0030](../../../../docs/research/decisions/0030-reference-deployments.md)). It is not a
 scenario: an operator applies it once, and scenarios are created and destroyed without
 touching it.
 
@@ -37,18 +37,20 @@ touching it.
 
 `az login` and `az account set --subscription c33dbc35-f86d-4b7c-a81e-2a33eb3f7946` first.
 Every target checks the active subscription and tenant before touching Azure. From this
-directory, or with `make platform-<target> SCENARIO=azure/bootstrap` from the repository
+directory, or with `make ci-<target> CLOUD=azure` from the repository
 root:
 
 ```bash
 make plan
-make apply           # first run: on local state, because the state account doesn't exist yet
+make apply FIRST_RUN=1   # first run only: on local state, because the state account doesn't exist yet
 make migrate-state   # once: moves the state into the account just created
 make github-vars     # creates both GitHub environments and sets the repository variables
 ```
 
-`make init` writes a git-ignored `local_override.tf` while the state account is missing,
-replacing the azurerm backend with local state, and removes it once the account exists.
+Only with `FIRST_RUN=1` does `make init` write a git-ignored `local_override.tf`, replacing
+the azurerm backend with local state while the state account is missing; it removes it once the
+account exists. Without `FIRST_RUN`, a state probe that fails stops the run, so an expired
+login can never plan this bootstrap from empty local state.
 The backend reaches the account with your Entra ID login (`use_azuread_auth`). The
 Storage Blob Data Contributor grant can take a few minutes to apply after the first
 apply, so a `migrate-state` straight afterwards may need a retry.

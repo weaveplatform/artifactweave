@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 sub=$(terraform output -raw subscription_id)
-../check-subscription.sh "$sub"
+"$(git rev-parse --show-toplevel)/deploy/ci/check-subscription.sh" "$sub"
 account=$(terraform output -raw account)
 container=$(terraform output -raw container)
 prefix=$(terraform output -raw store_prefix)

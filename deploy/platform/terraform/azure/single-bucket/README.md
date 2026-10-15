@@ -8,7 +8,7 @@ Nothing uses an account key: the account has Shared Key disabled.
 - **Terraform** runs with your Azure CLI login.
 - **The local tests** run as you through `DefaultAzureCredential`, with the Azure CLI.
 - **The workflow** uses the `artifactweave-conformance` managed identity from
-  [`azure/bootstrap`](../bootstrap/README.md), through a federated credential for this
+  [`deploy/ci/terraform/azure`](../../../../ci/terraform/azure/README.md), through a federated credential for this
   repository's `cloud-conformance` environment. Apply the bootstrap first: this root looks
   the identity up and grants it the account.
 - **The local container** runs on a short-lived user delegation SAS minted from your login,
@@ -16,9 +16,11 @@ Nothing uses an account key: the account has Shared Key disabled.
 
 ## Subscription guard
 
-Terraform is pinned to `subscription_id`, by default `c33dbc35-f86d-4b7c-a81e-2a33eb3f7946`.
-Every `az` command the scripts run passes `--subscription`. `plan`, `apply`, `destroy`,
-`credentials` and `conformance` first run `../check-subscription.sh` (shared with `azure/bootstrap`), which refuses unless:
+Terraform is pinned to `subscription_id`: `make` passes the lab's, `LAB_AZURE_SUBSCRIPTION`
+in [`deploy/ci/lab.mk`](../../../../ci/lab.mk). Every `az` command the scripts run passes
+`--subscription`. `plan`, `apply`, `destroy`, `credentials` and `conformance` first run
+[`deploy/ci/check-subscription.sh`](../../../../ci/check-subscription.sh) (shared with every
+Azure root and the bootstrap), which refuses unless:
 - the Azure CLI's active subscription is that one; and
 - the login's tenant owns it.
 
@@ -47,7 +49,7 @@ make up           # mints the SAS, builds the image, starts artifactweave on por
 make smoke        # deploys and downloads 40 MiB, then reads the blob's committed block list
 make conformance  # the real-Azure blob contract and probes, as you
 make conformance LARGE_RANGES=1  # adds Put Block From URL ranges up to 4,000 MiB (about a minute)
-make github-vars  # sets the account and container variables; the identity's come from azure/bootstrap
+make github-vars  # sets the account and container variables; the identity's come from deploy/ci/terraform/azure
 make down         # stops the container; make clean also drops its data and .local/
 make destroy      # removes everything, the account's blobs included
 ```

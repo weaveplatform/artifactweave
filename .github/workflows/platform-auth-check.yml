@@ -1,11 +1,11 @@
 name: deploy | Platform deployer check
 
 # Proves GitHub's trust in the deployer identities that the bootstraps create
-# (deploy/platform/terraform/{gcp,azure,aws}/bootstrap, decision 0030): the job
+# (deploy/ci/terraform/{gcp,azure,aws}, decision 0030): the job
 # runs in the cloud-platform environment, exchanges its OIDC token for the
 # deployer on each cloud, and makes read-only calls that need the deployer's
-# rights. It creates nothing and costs nothing. The scenario workflow (#129)
-# builds on the same trust.
+# rights. It creates nothing and costs nothing. The scenario workflow
+# (platform-scenarios.yml) builds on the same trust.
 
 # Also on pull requests that change the trust itself, so such a change is
 # proven before it merges (a dispatch only finds workflows on the default
@@ -15,8 +15,8 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'deploy/platform/terraform/*/bootstrap/**'
-      - 'deploy/platform/terraform/github-environments.sh'
+      - 'deploy/ci/terraform/**'
+      - 'deploy/ci/github-environments.sh'
       - '.github/workflows/platform-auth-check.yml'
 
 permissions:
@@ -63,7 +63,7 @@ jobs:
             PLATFORM_AZURE_SUBSCRIPTION_ID PLATFORM_AZURE_RESOURCE_GROUP PLATFORM_AZURE_STATE_ACCOUNT \
             PLATFORM_AWS_ROLE_ARN PLATFORM_AWS_REGION PLATFORM_AWS_STATE_BUCKET PLATFORM_AWS_DNS_ZONE_ID; do
             if [ -z "${!v}" ]; then
-              echo "::error::$v is not set (make platform-github-vars with SCENARIO=gcp/bootstrap, azure/bootstrap and aws/bootstrap)"
+              echo "::error::$v is not set (make ci-github-vars with CLOUD=gcp, azure and aws)"
               exit 1
             fi
           done

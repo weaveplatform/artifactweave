@@ -5,7 +5,7 @@ storage (RA-GZRS), with its primary in `uksouth` and its secondary in `ukwest` (
 [0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). It is the
 shape for operators who want the cloud's own replication rather than artifactweave's
 mirror. Shared Key is off, as in `azure/single-bucket`. Apply
-[`azure/bootstrap`](../bootstrap/README.md) first.
+[`deploy/ci/terraform/azure`](../../../../ci/terraform/azure/README.md) first.
 
 ## How it relates to artifactweave
 
@@ -63,8 +63,8 @@ target that touches Azure first checks the CLI's active subscription and tenant.
 
 `platform-scenarios.yml` runs this root as the deployer
 (`-f cloud=azure -f scenario=geo-replicated`), through
-[`../../scenario-ci.sh`](../../scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh), inside the
-bootstrap's scenarios resource group, with the account tagged for reap.
+[`deploy/ci/scenario-ci.sh`](../../../../ci/scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh),
+inside the bootstrap's scenarios resource group, with the account tagged for reap.
 
 Besides the generic checks, [`test/platform`](../../../../../test/platform/replica_test.go)
 asks artifactweave for a signed download URL and swaps in the secondary host. It retries

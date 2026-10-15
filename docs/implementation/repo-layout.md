@@ -102,17 +102,22 @@ Terraform lives under `deploy/` (decision
 [0030](../research/decisions/0030-reference-deployments.md)): infrastructure per cloud and
 scenario in `deploy/platform`, and artifactweave's own configuration through the JFrog
 providers in `deploy/artifactweave`. Each scenario is a documented reference deployment
-that CI checks on every pull request and applies on real clouds by manual dispatch.
+that CI checks on every pull request and applies on real clouds by manual dispatch. The
+project's own lab harness, which no consumer copies, lives apart in `deploy/ci`.
 
 ```text
 deploy/
+  ci/
+    README.md                         # the lab harness: bootstraps, guards, CI driver
+    lab.mk                            # every lab constant: project, subscription, region, zone
+    scenario.mk bootstrap.mk          # shared make targets for scenarios and bootstraps
+    scenario-ci.sh prove-matrix.sh    # the platform-scenarios.yml driver and its proof rules
+    terraform/aws/ gcp/ azure/        # bootstraps: CI identities, remote state, DNS zone, budget
   platform/
     README.md                         # scenario catalogue, costs, how CI runs them
     terraform/
-      scenario.mk                     # shared make targets for every scenario
       modules/<cloud>/<capability>/   # child modules (storage, cdn, ci-access), no provider blocks
       aws/ gcp/ azure/
-        bootstrap/                    # long-lived CI identities, remote state, DNS zone, budget
         single-bucket/ multi-region/ geo-replicated/ cdn/   # scenarios
       multicloud/
         mirror/                       # one mirror with a member on each cloud

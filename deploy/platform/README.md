@@ -1,10 +1,14 @@
 # Platform reference deployments
 
-Terraform for the cloud infrastructure artifactweave runs on: object storage, regions, CDNs
-and the CI trust that tests them. Each scenario is a documented reference deployment that
-CI checks on every pull request and that runs on real clouds only when someone dispatches
-it. The layout, the scenario contract and the CI identities are in decision
+Terraform for the cloud infrastructure artifactweave runs on: object storage, regions and
+CDNs. Each scenario is a documented reference deployment that CI checks on every pull
+request and that runs on real clouds only when someone dispatches it. The layout, the
+scenario contract and the CI identities are in decision
 [0030](../../docs/research/decisions/0030-reference-deployments.md).
+
+The lab harness that tests them, each cloud's bootstrap (CI trust, remote state, DNS zone,
+budget), the CI driver, the guards and the lab's constants, lives apart in
+[`deploy/ci`](../ci/README.md): nothing there is a reference.
 
 What artifactweave is configured with once it runs (repositories, users, permissions,
 tokens, OIDC) is the other half, in [`deploy/artifactweave`](../artifactweave/README.md),
@@ -14,7 +18,6 @@ applied through the JFrog Terraform providers.
 
 | Scenario | AWS | GCP | Azure |
 |---|---|---|---|
-| `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | [available](terraform/aws/bootstrap/README.md) | [available](terraform/gcp/bootstrap/README.md) | [available](terraform/azure/bootstrap/README.md) |
 | `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
 | `multi-region`: two regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
 | `geo-replicated`: one store with the cloud's own replication | [available](terraform/aws/geo-replicated/README.md) | [available](terraform/gcp/geo-replicated/README.md) | [available](terraform/azure/geo-replicated/README.md) |
@@ -25,45 +28,25 @@ applied through the JFrog Terraform providers.
 The three `single-bucket` scenarios are also the acceptance environments the real-cloud blob
 conformance tests run against. An operator's `make platform-apply` grants the bootstrap's
 conformance identity; a CI run applies them as the deployer instead (their `ci-vars.sh`).
+Every scenario needs its cloud's bootstrap applied first ([`deploy/ci`](../ci/README.md)).
 
-Scenarios build their stores from the child modules in [`terraform/modules`](terraform/modules):
-one private bucket or storage account per call, with its security invariants tested once in
-the module's own `tests/`.
+The `multi-region` scenarios build their stores from the child modules in
+[`terraform/modules`](terraform/modules): one private bucket or storage account per call,
+with its security invariants tested once in the module's own `tests/`. The other scenarios
+move onto the same modules with the scenario contract v2 (epic #189).
 
 The `multi-region` and `geo-replicated` scenarios have no local container: run artifactweave
 with their `artifactweave_config` output, or dispatch them. The `geo-replicated` READMEs
 cover how the cloud's replica relates to artifactweave and how to fail over.
 
-## Bootstraps
-
-Each cloud's `bootstrap` holds what every scenario on that cloud relies on and outlives
-them all: GitHub's trust in a data-plane identity (`cloud-conformance`) and a deployer
-(`cloud-platform`), the remote state store, the cloud's DNS zone under
-`artifact.weaveplatform.run`, the APIs or resource providers, and a budget. Apply it once,
-before any scenario:
-
-```bash
-make platform-undelete-pool SCENARIO=gcp/bootstrap   # GCP only, once: restores the pool deleted on 2026-10-14
-make platform-apply         SCENARIO=gcp/bootstrap   # first run uses local state
-make platform-migrate-state SCENARIO=gcp/bootstrap   # then moves it into the bucket it made
-make platform-github-vars   SCENARIO=gcp/bootstrap   # environments and repository variables
-```
-
-`azure/bootstrap` and `aws/bootstrap` take the same steps, without `undelete-pool`. Each
-cloud's guard runs first: Azure checks the CLI's subscription, and AWS checks that the CLI
-is signed in to the account holding the delegated hosted zone, so the account ID stays out
-of this repository.
-
-`make platform-destroy` refuses on a bootstrap. The trusts and environments are described in
-[`docs/testing/ci.md`](../../docs/testing/ci.md#cloud-trust-and-environments), and the
-`platform-auth-check.yml` workflow proves the deployer trust on demand.
-
 ## Running a scenario
 
 Every scenario is a Terraform root with a Makefile built on
-[`terraform/scenario.mk`](terraform/scenario.mk). From the scenario's directory, `make help`
-lists its targets; from the repository root, `make platform-<target>
-SCENARIO=<cloud>/<scenario>` runs the same target:
+[`deploy/ci/scenario.mk`](../ci/scenario.mk), which takes the lab's values from
+[`deploy/ci/lab.mk`](../ci/lab.mk) and runs the cloud's guard first: on AWS, that the CLI is
+signed in to the account holding the lab's zone; on Azure, that the CLI is on the lab's
+subscription. From the scenario's directory, `make help` lists its targets; from the
+repository root, `make platform-<target> SCENARIO=<cloud>/<scenario>` runs the same target:
 
 ```bash
 make platform-plan  SCENARIO=gcp/single-bucket
@@ -102,12 +85,12 @@ gh workflow run platform-scenarios.yml -f cloud=gcp -f action=reap
 An instance is billed while it exists. `test` cleans up after itself; after an `apply`,
 dispatch `destroy`, or let a `reap` remove it once it expires. Instance state lives in the
 bootstrap's state store under `scenarios/<cloud>/<scenario>/<instance>`. The driver is
-[`terraform/scenario-ci.sh`](terraform/scenario-ci.sh), and each scenario's `ci-vars.sh`
+[`deploy/ci/scenario-ci.sh`](../ci/scenario-ci.sh), and each scenario's `ci-vars.sh`
 holds the variables a CI run passes.
 
 A pull request that changes the workflow, the driver, `test/platform`, a scenario or a
 module runs the whole cycle behind the same approval, for the scenarios
-[`terraform/prove-matrix.sh`](terraform/prove-matrix.sh) chooses from its changed paths:
+[`deploy/ci/prove-matrix.sh`](../ci/prove-matrix.sh) chooses from its changed paths:
 every cloud's `single-bucket` when the driver changes, the scenarios a `test/platform` file
 names, every scenario that sources a changed module, and each scenario whose Terraform or
 `ci-vars.sh` changes. READMEs, Makefiles and mocked tests prove nothing, and the `prove-all`

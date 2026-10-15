@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Shared by the azure/ roots. Refuses to continue unless the Azure CLI's
-# active subscription is the one given and its tenant owns that
+# Guard for every Azure root, run by scenario.mk and bootstrap.mk with the
+# lab's LAB_AZURE_SUBSCRIPTION (lab.mk). Refuses to continue unless the Azure
+# CLI's active subscription is the one given and its tenant owns that
 # subscription. Terraform pins the subscription as well; this stops a login
 # aimed at another subscription from being used for anything, including the
 # az commands the scripts run.

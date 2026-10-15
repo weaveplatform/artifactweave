@@ -12,7 +12,7 @@ Nothing uses a service account key. The organisation enforces
 - **The workflow** reaches that account through Workload Identity Federation, limited to
   this repository's `cloud-conformance` environment.
 
-The service account, its federation and the APIs live in [`gcp/bootstrap`](../bootstrap/README.md),
+The service account, its federation and the APIs live in [`deploy/ci/terraform/gcp`](../../../../ci/terraform/gcp/README.md),
 which outlives this scenario. Apply the bootstrap first: this root looks the account up and
 grants it the bucket.
 
@@ -35,7 +35,7 @@ make apply        # from the repository root: make gcp-apply, or make platform-a
 make up           # builds the image, starts artifactweave against the bucket on port 8081
 make smoke        # deploys and downloads 40 MiB through the container
 make conformance  # the real-GCS blob contract and probes
-make github-vars  # sets CONFORMANCE_GCS_BUCKET; the identity variables come from gcp/bootstrap
+make github-vars  # sets CONFORMANCE_GCS_BUCKET; the identity variables come from deploy/ci/terraform/gcp
 make down         # stops the container; make clean also drops its data
 make destroy      # removes everything, the bucket's objects included
 ```

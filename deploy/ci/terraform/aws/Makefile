@@ -1,12 +1,11 @@
-# aws/bootstrap: GitHub's OIDC provider, the conformance and deployer roles,
-# the deployer's permissions boundary, the remote state bucket, the DNS zone
-# and a budget. Plan and apply need `aws login` (or any credentials for the
-# lab account) and refuse unless that account holds the delegated zone.
+# The AWS bootstrap (deploy/ci/terraform/aws): GitHub's OIDC provider, the
+# conformance and deployer roles, the deployer's permissions boundary, the
+# remote state bucket, the DNS zone and a budget. Plan and apply need
+# `aws login` (or any credentials for the lab account) and refuse unless that
+# account holds the lab's delegated zone (lab.mk). Run from the repository
+# root with make ci-<target> CLOUD=aws.
 
-ZONE_ID ?= Z06607493A97HOZP218UN
-REGION ?= eu-west-2
-GUARD := check-account
-STATE_PROBE := aws s3api head-bucket --bucket artifactweave-tfstate-56920abd --region $(REGION)
+STATE_PROBE = aws s3api head-bucket --bucket artifactweave-tfstate-56920abd --region $(LAB_AWS_REGION)
 # The address the budget alerts go to, given on the command line the first
 # time (make apply BUDGET_EMAIL=you@example.com), so none enters the
 # repository; a standalone account cannot read its own primary contact
@@ -28,10 +27,4 @@ GITHUB_SECRETS := \
   CONFORMANCE_AWS_ROLE_ARN=conformance_role_arn \
   PLATFORM_AWS_ROLE_ARN=deployer_role_arn
 
-.PHONY: check-account
-
-## check-account: refuse unless the AWS CLI is signed in to the account holding the delegated zone
-check-account:
-	@../check-account.sh $(ZONE_ID)
-
-include $(shell git rev-parse --show-toplevel)/deploy/platform/terraform/bootstrap.mk
+include $(shell git rev-parse --show-toplevel)/deploy/ci/bootstrap.mk
