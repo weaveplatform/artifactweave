@@ -4,7 +4,9 @@
 // $and and $or, field comparisons, $match and $nmatch globs, @property and
 // property.key/property.value criteria, $msp, the stat domain, and the
 // include, sort, offset, limit, transitive and distinct suffixes with
-// Artifactory's output rules (research 22 §1).
+// Artifactory's output rules (research 22 §1). It also parses the two
+// actions, items.delete and properties.update (research 22 §1.5), whose
+// criteria select items the same way; the server carries them out.
 //
 // A parsed Query is run two ways that must agree row for row: Match and
 // Compare are the reference semantics (the in-memory store uses them), and
@@ -48,7 +50,8 @@ var (
 	// ErrInvalid reports a query that parses but breaks an output rule:
 	// sort, offset or limit beside an include of another domain, a sort on
 	// a field the output leaves out, or virtual_repos without repo, path
-	// and name.
+	// and name. It also reports a suffix the query's action does not take,
+	// and a properties.update without .keys() or .newValue().
 	ErrInvalid = errors.New("aql: invalid query")
 )
 
@@ -268,8 +271,28 @@ type Sort struct {
 	Fields []Field
 }
 
-// Query is a parsed items query.
+// Action is what a query does with the items its criteria select.
+type Action int
+
+// Actions. Find returns the items; DeleteItems is items.delete, which
+// removes them, and UpdateProperties is properties.update, which replaces
+// the values of the query's Keys on them.
+const (
+	Find Action = iota
+	DeleteItems
+	UpdateProperties
+)
+
+// Query is a parsed items query, or an action over items.
 type Query struct {
+	// Action is Find unless the query is items.delete or properties.update.
+	Action Action
+	// DryRun is an action's .dryRun(), true unless it says false, so an
+	// action that leaves it out changes nothing. Find has none.
+	DryRun bool
+	// Keys and NewValue are properties.update's .keys() and .newValue().
+	Keys     []string
+	NewValue string
 	// Criteria is the find criteria; it already carries the implicit
 	// type=file that applies when the query names no type.
 	Criteria Node
@@ -350,9 +373,9 @@ func (q *Query) VirtualRepos() bool {
 
 // Properties reports whether result rows carry the item's properties: an
 // include of "property", "property.*", "property.key", "property.value" or
-// "@<key>".
+// "@<key>", or a properties.update, whose rows show the keys it changes.
 func (q *Query) Properties() bool {
-	return slices.ContainsFunc(q.Include, func(s string) bool {
+	return q.Action == UpdateProperties || slices.ContainsFunc(q.Include, func(s string) bool {
 		return s == "property" || strings.HasPrefix(s, "property.") || strings.HasPrefix(s, "@")
 	})
 }
@@ -361,6 +384,9 @@ func (q *Query) Properties() bool {
 // properties to, in include order; nil means every key, which an include of
 // the whole property domain also asks for.
 func (q *Query) PropertyKeys() []string {
+	if q.Action == UpdateProperties {
+		return q.Keys
+	}
 	for _, s := range q.Include {
 		if s == "property" || s == "property.*" || s == "property.key" || s == "property.value" {
 			return nil

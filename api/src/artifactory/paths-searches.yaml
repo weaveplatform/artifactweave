@@ -610,7 +610,12 @@ paths:
         a limited query reads before that filtering, so the limit can still be met. Every query returns at most
         the configured result cap (500,000 by default), its own limit included, and a trimmed result says
         so in range.notification. The response is indented unless compact=true is in the query string; a stream
-        header is accepted and changes nothing.'
+        header is accepted and changes nothing. The actions items.delete(criteria).dryRun("true"|"false") and
+        properties.update(criteria).keys(key,...).newValue(value).dryRun(...) change what their criteria select
+        and answer in the same shape, listing the rows they change, or would change on a dry run. An action without
+        dryRun is a dry run, and takes no include, sort, offset or limit. properties.update names item fields as
+        item.<field> and replaces the values of the keys an item already has. A user without admin rights changes
+        only rows they may read and also delete, or annotate; other rows are left out.'
       operationId: searchAql
       requestBody:
         content:

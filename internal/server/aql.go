@@ -48,7 +48,8 @@ const aqlTrimmed = "AQL query reached the search hard limit, results are trimmed
 // authenticated; repository keys resolve against the configured
 // repositories (aql.Query.Resolve); non-admin queries must return repo, path
 // and name, and their rows are limited to what the caller may read and the
-// repository's include and exclude patterns accept.
+// repository's include and exclude patterns accept. items.delete and
+// properties.update run here too (aqlAction).
 func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -117,7 +118,13 @@ func (s artifactoryService) searchAQL(w http.ResponseWriter, r *http.Request) {
 	if trimmed {
 		hits = hits[:limit]
 	}
-	if !p.Admin {
+	switch {
+	case q.Action != aql.Find:
+		if hits, err = s.aqlAction(ctx, st, p, q, configs, hits); err != nil {
+			writeErr(w, r, s.internalError(ctx, q.Action.String(), err))
+			return
+		}
+	case !p.Admin:
 		if hits, err = readable(ctx, st, p, configs, hits); err != nil {
 			writeErr(w, r, s.internalError(ctx, "aql permissions", err))
 			return
@@ -215,6 +222,17 @@ func readable(
 	if err != nil {
 		return nil, err
 	}
+	return acc.rows(configs, hits, 0), nil
+}
+
+// rows keeps the hits the caller may read, and also act on with want when
+// it names any action, that their repository's include and exclude patterns
+// accept.
+func (a access) rows(
+	configs map[string]repo.Config,
+	hits []aql.Hit,
+	want types.Actions,
+) []aql.Hit {
 	patterns := map[string]repoPatterns{}
 	out := hits[:0]
 	for _, h := range hits {
@@ -228,11 +246,12 @@ func readable(
 			patterns[c.Key] = pat
 		}
 		full := h.Item.FullPath()
-		if pat.accepts(full, h.Item.Folder) && acc.item(c, full, h.Item.Folder, types.ActionRead) {
+		if pat.accepts(full, h.Item.Folder) && a.item(c, full, h.Item.Folder, types.ActionRead) &&
+			(want == 0 || a.file(c, full, want)) {
 			out = append(out, h)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // repoPatterns are a repository's include and exclude patterns: Ant
