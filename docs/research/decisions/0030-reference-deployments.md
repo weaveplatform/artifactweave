@@ -200,10 +200,12 @@ mirror, whose first entry is the instance's own zone.
 | `resource_group` | Azure | Azure | Azure | `outputs.tf` |
 | `expires_at`: the instance's `expires-at` label, which reap reads from state | yes | yes | yes | `harness.tf` |
 | `mirror_members`: each member's store and host, which `test/platform` reads | n/a | yes | n/a | `harness.tf` |
+| `service_account`: the app service account, which `make conformance` passes to the real-GCS tests as their signing identity | GCP | n/a | n/a | `harness.tf` |
 
 `artifactweave_config` renders the sections of `artifactweave.yaml` the scenario needs:
 `blob` for every scenario, and `cdn` as well for the CDN scenarios. Outputs that only echo an
-input (`store_prefix`, the app principal, the account scope) are not outputs.
+input (`store_prefix`, the app principal, the account scope) are not outputs, except in
+`harness.tf` where the harness reads one.
 
 **Lab values.**
 

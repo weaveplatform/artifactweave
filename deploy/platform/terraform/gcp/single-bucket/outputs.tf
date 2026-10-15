@@ -1,38 +1,22 @@
-output "bucket" {
-  description = "Bucket for blob.gcs.bucket and ARTIFACTWEAVE_TEST_GCS_BUCKET."
-  value       = google_storage_bucket.blobs.name
-}
-
-output "service_account" {
-  description = "The service account artifactweave runs as (the bootstrap's conformance account unless app_service_account names another), for blob.gcs.google_access_id and ARTIFACTWEAVE_TEST_GCS_ACCESS_ID."
-  value       = local.app_service_account
-}
-
-output "store_prefix" {
-  description = "Object prefix the local run writes under (blob.gcs.prefix)."
-  value       = var.store_prefix
-}
-
 output "artifactweave_config" {
-  description = "The blob section of artifactweave.yaml for this bucket, signing download URLs as the app service account."
+  description = "The blob section of artifactweave.yaml for the bucket. artifactweave authenticates with Application Default Credentials, as the app service account, which also signs download URLs."
   value = yamlencode({
     blob = {
       backend = "gcs"
-      gcs = {
-        bucket           = google_storage_bucket.blobs.name
-        prefix           = var.store_prefix
-        google_access_id = local.app_service_account
-      }
+      gcs = merge(
+        { bucket = module.bucket.bucket, google_access_id = var.app_service_account },
+        var.store_prefix == "" ? {} : { prefix = var.store_prefix },
+      )
     }
   })
 }
 
 output "storage_host" {
-  description = "Host a downloadRedirect repository's signed URLs point at."
+  description = "Where a downloadRedirect repository's signed URLs point: Cloud Storage's path-style endpoint."
   value       = "storage.googleapis.com"
 }
 
-output "expires_at" {
-  description = "The expires-at label (epoch seconds) a scenario run set, read by reap; empty outside scenario runs."
-  value       = lookup(var.scenario_labels, "expires-at", "")
+output "bucket" {
+  description = "The bucket's name (blob.gcs.bucket)."
+  value       = module.bucket.bucket
 }

@@ -1,8 +1,8 @@
-# gcp/geo-replicated: one dual-region GCS bucket that Google replicates across
-# two regions, granted to the bootstrap's conformance service account. Apply
-# deploy/ci/terraform/gcp first. Plan and apply need `gcloud auth
-# application-default login`. make up, smoke and verify run artifactweave
-# natively from the artifactweave_config output (deploy/ci/local.sh); the
-# conformance target is in gcp/single-bucket.
+# gcp/geo-replicated in the lab: make plan, apply and destroy pass these and
+# deploy/ci/lab-vars.sh's inputs (the lab's project, and the bootstrap's
+# conformance service account as the app service account). The README's
+# "How this scenario is tested" lists them.
+
+TF_VARS = -var name=artifactweave-geo -var location=EUR4
 
 include $(shell git rev-parse --show-toplevel)/deploy/ci/scenario.mk

@@ -1,12 +1,13 @@
-# Sourced by ../../scenario-ci.sh for a scenario run (platform-scenarios.yml):
-# the variables this root takes when the deployer applies it in CI rather
-# than an operator on a workstation. The run names the deployer as the app
-# service account (it runs artifactweave in the same job, and cannot read
-# service accounts to look up the conformance one), names the bucket after
-# the instance so it is recognisable, and passes the labels reap matches.
+# Sourced by deploy/ci/scenario-ci.sh for a scenario run
+# (platform-scenarios.yml): the inputs this root takes when the deployer
+# applies it in CI. The deployer is also the app service account: it runs
+# artifactweave in the same job. NAME_PREFIX is the start reap knows
+# scenario names by. The location is the lab's choice.
 # shellcheck shell=bash
 
 export TF_VAR_project_id="$PLATFORM_GCP_PROJECT"
-export TF_VAR_name="awscn-$INSTANCE"
+export TF_VAR_name="${NAME_PREFIX}${INSTANCE}"
+export TF_VAR_location=europe-west2
 export TF_VAR_app_service_account="$PLATFORM_GCP_SERVICE_ACCOUNT"
-export TF_VAR_scenario_labels="$SCENARIO_LABELS"
+export TF_VAR_labels="$SCENARIO_LABELS"
+export TF_VAR_force_destroy=true
