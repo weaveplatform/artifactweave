@@ -19,8 +19,3 @@ deploy/platform/terraform/gcp/single-bucket
 deploy/platform/terraform/modules/aws/storage
 deploy/platform/terraform/modules/azure/storage
 deploy/platform/terraform/modules/gcp/storage
-
-# The artifactweave layer.
-deploy/artifactweave/terraform/identity
-deploy/artifactweave/terraform/oidc
-deploy/artifactweave/terraform/repositories

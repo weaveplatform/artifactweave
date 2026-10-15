@@ -131,13 +131,17 @@ if [ -z "$token" ]; then
 fi
 export TF_VAR_url=$url TF_VAR_access_token=$token
 
+# Each reference takes its names as inputs; the run passes the fixture's,
+# exported so the plan and destroy that follow see the same values.
+
 # The repositories scenario: the provider cannot deploy content, so the file
 # its properties go on is deployed between a first apply without them and
 # the full one.
 apply_repositories() {
+	export TF_VAR_repository_key=tf-generic-local TF_VAR_item_path=fixture.txt
 	tf apply -auto-approve -var with_properties=false
 	curl -fsS -u "admin:$password" -X PUT --data-binary 'fixture' \
-		"$url/artifactory/tf-generic-local/fixture.txt" >/dev/null
+		"$url/artifactory/$TF_VAR_repository_key/$TF_VAR_item_path" >/dev/null
 	tf apply -auto-approve
 }
 
@@ -155,11 +159,22 @@ apply_identity() {
 	TF_VAR_keypair_public_key=$(cat "$work/keypair.pub")
 	TF_VAR_user_password=Terraform-user-1
 	export TF_VAR_keypair_private_key TF_VAR_keypair_public_key TF_VAR_user_password
+	export TF_VAR_repository_key=tf-team-local TF_VAR_developers_group=tf-developers \
+		TF_VAR_auditors_group=tf-auditors TF_VAR_developer_user=tf-developer \
+		TF_VAR_ci_user=tf-ci TF_VAR_permission_name=tf-team TF_VAR_keypair_name=tf-signing
 	tf apply -auto-approve
 	# The permission written through Access v2 must read back through the
 	# legacy v2 permission target API with its repository.
-	tf state show data.artifactory_permission_target.team | grep -q '"tf-team-local"' ||
-		{ echo "the legacy permission target API does not report tf-team-local" >&2; exit 1; }
+	tf state show data.artifactory_permission_target.team | grep -q "\"$TF_VAR_repository_key\"" ||
+		{ echo "the legacy permission target API does not report $TF_VAR_repository_key" >&2; exit 1; }
+}
+
+# The oidc scenario: the providers are never contacted, so any organisation
+# and issuer will do.
+apply_oidc() {
+	export TF_VAR_github_organization=octo-org TF_VAR_ci_project_path='octo-org/**' \
+		TF_VAR_github_provider_name=tf-github TF_VAR_ci_provider_name=tf-ci
+	tf apply -auto-approve
 }
 
 for scenario in "${scenarios[@]}"; do
@@ -167,7 +182,7 @@ for scenario in "${scenarios[@]}"; do
 	case $scenario in
 	deploy/artifactweave/terraform/repositories) apply_repositories ;;
 	deploy/artifactweave/terraform/identity) apply_identity ;;
-	deploy/artifactweave/terraform/oidc) tf apply -auto-approve ;;
+	deploy/artifactweave/terraform/oidc) apply_oidc ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1
