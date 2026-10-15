@@ -75,6 +75,12 @@ conformance target is in `single-bucket`.
 | aws | 6.67.0 |
 | random | 3.9.1 |
 
+### Modules
+
+| Name | Source | Version |
+| ---- | ------ | ------- |
+| member | ../../modules/aws/storage | n/a |
+
 ### Resources
 
 | Name | Type |

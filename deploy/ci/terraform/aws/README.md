@@ -82,6 +82,10 @@ zone is billed per zone per month (about $0.50) and stays, because its delegatio
 | ---- | ------- |
 | aws | 6.67.0 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

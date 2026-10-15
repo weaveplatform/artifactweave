@@ -75,6 +75,12 @@ conformance target is in `single-bucket`.
 | azurerm | 5.9.0 |
 | random | 3.9.1 |
 
+### Modules
+
+| Name | Source | Version |
+| ---- | ------ | ------- |
+| member | ../../modules/azure/storage | n/a |
+
 ### Resources
 
 | Name | Type |

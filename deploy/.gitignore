@@ -1,0 +1,13 @@
+# One ignore file for every Terraform root under deploy/ (decision 0030, G1):
+# a root carries no .gitignore of its own.
+.terraform/
+*.tfstate*
+*.tfplan
+tfplan
+# Written by scenario runs and by local runs' credentials.
+.local/
+.secrets/
+# Written by make while a bootstrap's state store does not exist (bootstrap.mk).
+local_override.tf
+# Written by deploy/ci/scenario-ci.sh to point a scenario run at its state.
+ci_backend.tf

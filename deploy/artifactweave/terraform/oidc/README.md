@@ -28,6 +28,10 @@ fails when it is stale.
 | ---- | ------- |
 | platform | 2.2.11 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

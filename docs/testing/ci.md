@@ -25,7 +25,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
 | `conformance` | `ubuntu-latest` | P6 | Starts the `-cover` binary with a `docker-local` repo, clones `opencontainers/distribution-spec` at a pinned tag and runs its conformance module with `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials; uploads `cover-conformance` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity and oidc. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
-| `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
+| `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 | `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
 | `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
@@ -297,6 +297,7 @@ not listed, so moving one needs no change to the script.
 | Step | What |
 |---|---|
 | `prove-matrix` | `deploy/ci/prove-matrix_test.sh`, the table test of the rules that choose which scenarios a pull request proves. It needs no tools, so it runs before any is fetched |
+| `contract` | `deploy/ci/lint-contract.sh`, then its `--self-test`: every root against decision 0030's rules for its kind; see [The reference-deployment contract](#the-reference-deployment-contract). It needs no tools either |
 | `terraform fmt -check -recursive` | Formatting, including the `tests/*.tftest.hcl` files |
 | `terraform validate` | Each root, with `init -backend=false` against its committed lock file; state and plugins stay in a temporary directory. Roots on the jfrog providers validate through `test/terraform/run.sh`, whose filesystem mirror pins their zips |
 | tflint | Each root, with the rulesets pinned in `.tflint.hcl`. `azurerm_resources_missing_prevent_destroy` is off: every root is created and destroyed on purpose |
@@ -322,6 +323,49 @@ files, minor and patch versions only: a provider major merged on mocked tests al
 break a real apply. `deploy/artifactweave` is left out: `run.sh` pins its provider zips by
 SHA-256, so its providers move by hand, following the steps under
 [Terraform scenarios](#terraform-scenarios).
+
+## The reference-deployment contract
+
+`deploy/ci/lint-contract.sh` checks each Terraform root under `deploy/` against the rules
+decision [0030](../research/decisions/0030-reference-deployments.md) sets for its kind, and
+the root's path decides its kind:
+
+| Root | Kind | Rules |
+|---|---|---|
+| `deploy/platform/terraform/{aws,gcp,azure,multicloud}/<name>` | scenario | S1 to S11 |
+| `deploy/platform/terraform/modules/<cloud>/<capability>` | module | M1 to M6, and S6 |
+| `deploy/artifactweave/terraform/<name>` | app layer | A1 to A4 |
+| `deploy/ci/terraform/<cloud>` | bootstrap | B1 |
+| all of `deploy/` | global | G1 and G2 |
+
+A directory holding `*.tf` that fits none of these fails as `layout`. Each finding names its
+rule with the decision's ID:
+
+```text
+FAIL [S5] deploy/platform/terraform/aws/single-bucket: harness.tf lacks output "expires_at"
+```
+
+The lab values that S6 and S8 forbid are every value in `deploy/ci/lab.mk` plus the lab's
+fixed names: the conformance and deployer identities, the Azure resource groups, the AWS
+permission boundary and role path, and `weaveplatform.run`. S6 also covers comments and
+defaults, so an example region in a scenario or module cannot be the lab's `eu-west-2`.
+
+The lint reads the sources with grep and awk and relies on `terraform fmt`'s layout, so it
+needs no tools. `--self-test` builds a repository in a temporary directory, with a passing
+root of each kind that follows the real README templates, then breaks one rule per case and
+expects the lint to fail it; it also checks the ratchet's three warnings.
+
+**The ratchet.** `deploy/ci/contract-pending.txt` lists the roots not yet ported to the
+contract. A listed root's findings print as one `WARN` line and do not fail the check; any
+other root fails on its first finding, so a new root meets the contract from its first
+commit. The lint also warns when a listed root already meets the contract, and when a listed
+path is no longer a root. To take a root off the list:
+
+1. run `deploy/ci/lint-contract.sh --verbose`, which prints a pending root's findings in full;
+2. fix them;
+3. delete the root's line from `contract-pending.txt` in the same pull request.
+
+From then on `make deploy-check` fails on any finding in that root. The list only shrinks.
 
 ## AQL fixtures from the JFrog CLI
 

@@ -2,8 +2,9 @@
 # Static checks and mocked tests over every Terraform root under deploy/ and
 # test/terraform, with pinned tools (decision 0030):
 #
-#   check.sh        the prove-matrix table test, then fmt, validate, tflint,
-#                   trivy, terraform test and the terraform-docs drift check
+#   check.sh        the prove-matrix table test and the contract lint, then
+#                   fmt, validate, tflint, trivy, terraform test and the
+#                   terraform-docs drift check
 #   check.sh docs   rewrite the terraform-docs sections of the READMEs
 #
 # Each tool is fetched once into .tools/ and checked against the SHA-256 in
@@ -52,11 +53,14 @@ fail() {
 	failed=1
 }
 
-# The table test needs no tools, so it runs before any is fetched and a wrong
-# proof rule fails fast.
+# The table test and the contract lint need no tools, so they run before any
+# is fetched and a wrong proof rule or a root off the contract fails fast.
 if [ "$mode" = check ]; then
 	echo "== prove-matrix"
 	"$root/deploy/ci/prove-matrix_test.sh" || fail "prove-matrix.sh chooses the wrong scenarios (deploy/ci/prove-matrix_test.sh)"
+	echo "== contract"
+	"$root/deploy/ci/lint-contract.sh" || fail "a Terraform root breaks the reference-deployment contract (deploy/ci/lint-contract.sh)"
+	"$root/deploy/ci/lint-contract.sh" --self-test || fail "the contract lint misjudges its fixtures (deploy/ci/lint-contract.sh --self-test)"
 fi
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')

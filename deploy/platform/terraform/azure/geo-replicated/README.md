@@ -94,6 +94,10 @@ both endpoints. Destroy the scenario when the run is done.
 | azurerm | 5.9.0 |
 | random | 3.9.1 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

@@ -24,6 +24,10 @@ that call the module check only how they compose it.
 | ---- | ------- |
 | azurerm | 5.9.0 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

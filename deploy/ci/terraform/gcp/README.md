@@ -74,6 +74,10 @@ does.
 | google | 8.6.0 |
 | google.billing | 8.6.0 |
 
+### Modules
+
+No modules.
+
 ### Resources
 
 | Name | Type |

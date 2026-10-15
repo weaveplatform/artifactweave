@@ -11,8 +11,9 @@ output:
 
 sections:
   # The README's own prose says what the root is for; main.tf's leading
-  # comment would repeat it.
-  hide: [header, footer, modules]
+  # comment would repeat it. Module calls stay: a scenario's reference names
+  # the modules it composes (decision 0030, Documentation).
+  hide: [header, footer]
 
 sort:
   enabled: true
