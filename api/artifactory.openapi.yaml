@@ -1069,7 +1069,7 @@ paths:
             description: Build name.
             minLength: 1
             type: string
-        - description: Optional query parameter. Comma-separated build numbers to delete. Ignored when deleteAll is 1.
+        - description: Optional query parameter. Comma-separated build numbers to delete. A number deletes one run for each time it is listed, the earliest-started first. Ignored when deleteAll is 1.
           in: query
           name: buildNumbers
           schema:
@@ -19230,7 +19230,7 @@ components:
           description: Required within this object. Name of the build.
           type: string
         buildNumbers:
-          description: Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, newest first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
+          description: Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, the earliest-started first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
           items:
             description: Build number.
             type: string

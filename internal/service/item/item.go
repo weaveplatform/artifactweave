@@ -473,7 +473,6 @@ func TrashEnabled(ctx context.Context, st store.Store) (bool, error) {
 // is on, keeping their blob references for a restore; otherwise, and for
 // remote caches, the references are released for garbage collection.
 func (s *Service) Delete(ctx context.Context, t Target, by string) (store.DeleteResult, error) {
-	full := strings.Trim(t.Path, "/")
 	trash := !t.Cached
 	if trash {
 		on, err := TrashEnabled(ctx, s.Store)
@@ -482,6 +481,25 @@ func (s *Service) Delete(ctx context.Context, t Target, by string) (store.Delete
 		}
 		trash = on
 	}
+	return s.remove(ctx, t, by, trash)
+}
+
+// Purge is Delete bypassing the trash can: the references are released at
+// once. It is for an item whose record lives elsewhere, such as a build-info
+// document (decision 0014), which a restore would bring back without its run.
+func (s *Service) Purge(ctx context.Context, t Target) (store.DeleteResult, error) {
+	return s.remove(ctx, t, "", false)
+}
+
+// remove deletes the item at t.Path and everything below it, moving files to
+// the trash can when trash is set.
+func (s *Service) remove(
+	ctx context.Context,
+	t Target,
+	by string,
+	trash bool,
+) (store.DeleteResult, error) {
+	full := strings.Trim(t.Path, "/")
 	now := s.now()
 	var res store.DeleteResult
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {

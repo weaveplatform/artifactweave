@@ -145,6 +145,17 @@ var implemented = map[string]bool{
 	"PUT /access/api/v1/config/security/password_policy":                             true,
 	"PATCH /access/api/v1/config/security/password_policy":                           true,
 
+	// The Builds API (#165); promotion and retention are #166.
+	"GET /artifactory/api/build":                                                       true,
+	"PUT /artifactory/api/build":                                                       true,
+	"POST /artifactory/api/build/append/{buildName}/{buildNumber}":                     true,
+	"POST /artifactory/api/build/delete":                                               true,
+	"POST /artifactory/api/build/rename/{buildName}":                                   true,
+	"DELETE /artifactory/api/build/{buildName}":                                        true,
+	"GET /artifactory/api/build/{buildName}":                                           true,
+	"GET /artifactory/api/build/{buildName}/{buildNumber}":                             true,
+	"GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}": true,
+
 	// The OIDC integration (#83).
 	"GET /access/api/v1/oidc":                                                     true,
 	"POST /access/api/v1/oidc":                                                    true,

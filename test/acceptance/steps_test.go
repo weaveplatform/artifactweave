@@ -145,6 +145,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the JSON field "([^"]*)" equals "([^"]*)"$`, w.jsonFieldEquals)
 	sc.Step(`^the JSON field "([^"]*)" is not empty$`, w.jsonFieldNotEmpty)
 	sc.Step(`^the JSON field "([^"]*)" exists$`, w.jsonFieldExists)
+	sc.Step(`^the JSON field "([^"]*)" has (\d+) entries$`, w.jsonFieldLen)
 	sc.Step(`^the JFrog CLI is available$`, w.jfAvailable)
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
@@ -636,6 +637,22 @@ func (w *world) jsonFieldNotEmpty(key string) error {
 func (w *world) jsonFieldExists(key string) error {
 	_, err := w.jsonField(key)
 	return err
+}
+
+// jsonFieldLen checks the length of an array field.
+func (w *world) jsonFieldLen(key string, want int) error {
+	v, err := w.jsonField(key)
+	if err != nil {
+		return err
+	}
+	list, ok := v.([]any)
+	if !ok {
+		return fmt.Errorf("field %q is not an array: %v", key, v)
+	}
+	if len(list) != want {
+		return fmt.Errorf("field %q has %d entries, want %d: %v", key, len(list), want, list)
+	}
+	return nil
 }
 
 // jfAvailable skips the scenario when no CLI binary is configured, so the

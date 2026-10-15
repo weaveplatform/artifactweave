@@ -4106,7 +4106,7 @@ type DeleteBuildsRequest struct {
 	// BuildName Required within this object. Name of the build.
 	BuildName string `json:"buildName"`
 
-	// BuildNumbers Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, newest first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
+	// BuildNumbers Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, the earliest-started first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
 	BuildNumbers *[]string `json:"buildNumbers,omitempty"`
 
 	// DeleteAll Optional within this object. When true, every run of the build is deleted. Defaults to false.
@@ -6349,7 +6349,7 @@ type ControlBuildRetentionParams struct {
 
 // DeleteBuildsParams defines parameters for DeleteBuilds.
 type DeleteBuildsParams struct {
-	// BuildNumbers Optional query parameter. Comma-separated build numbers to delete. Ignored when deleteAll is 1.
+	// BuildNumbers Optional query parameter. Comma-separated build numbers to delete. A number deletes one run for each time it is listed, the earliest-started first. Ignored when deleteAll is 1.
 	BuildNumbers *string `form:"buildNumbers,omitempty" json:"buildNumbers,omitempty"`
 
 	// Artifacts Optional query parameter. 1 also deletes the runs' artifacts; 0, the default, keeps them.

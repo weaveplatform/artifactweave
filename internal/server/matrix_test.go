@@ -73,11 +73,24 @@ var matrixPrincipals = []matrixPrincipal{
 	// An administrator through a group with admin privileges, not the flag.
 	{name: "gadmin", user: "gadmin", admin: true, grants: []matrixGrant{{"*", "", allContent}}},
 	{name: "nobody", user: "nobody"},
-	{name: "reader", user: "reader", grants: []matrixGrant{{"libs-local", "", types.ActionRead}}},
-	{name: "writer", user: "writer", grants: []matrixGrant{{"libs-local", "work/", rwd}}},
-	// member holds A through its group and reads B through a direct grant.
+	// Grants on artifactory-build-info are the build resource's (#165).
+	{name: "reader", user: "reader", grants: []matrixGrant{
+		{"libs-local", "", types.ActionRead}, {types.BuildInfoRepository, "", types.ActionRead},
+	}},
+	{name: "writer", user: "writer", grants: []matrixGrant{
+		{"libs-local", "work/", rwd},
+		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
+	}},
+	// member holds A and every build through its group, and reads B through
+	// a direct grant.
 	{name: "member", user: "member", grants: []matrixGrant{
-		{"libs-local", "", rawd}, {"libs-b", "", types.ActionRead},
+		{
+			"libs-local",
+			"",
+			rawd,
+		},
+		{"libs-b", "", types.ActionRead},
+		{types.BuildInfoRepository, "", rwd},
 	}},
 	// The seeded Any Remote permission: anonymous reads and deploys to
 	// remote repositories while anonymous access is on.
@@ -98,7 +111,9 @@ var matrixPrincipals = []matrixPrincipal{
 	// on B.
 	{
 		name: "tok-groups", user: "member", token: true, scope: "applied-permissions/groups:team",
-		narrowed: true, grants: []matrixGrant{{"libs-local", "", rawd}},
+		narrowed: true, grants: []matrixGrant{
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
+		},
 	},
 	// admin's token scoped to A: every action there, but no admin endpoint.
 	{
@@ -306,6 +321,14 @@ func trashed(path string) seeder {
 	}
 }
 
+// published seeds run 1 of the build name, {p} the principal's name.
+func published(name string) seeder {
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		seedBuild(t, f.db, f.items.Blobs, strings.ReplaceAll(name, "{p}", p))
+	}
+}
+
 // want is the status p must get.
 func (r matrixRow) want(p matrixPrincipal) int {
 	if p.bad {
@@ -331,7 +354,54 @@ func matrixTable() []matrixRow {
 		securityMatrix(),
 		accessIdentityMatrix(),
 		oidcMatrix(),
+		buildMatrix(),
 	)
+}
+
+// buildMatrix covers the Builds API (#165). Builds are the build resource
+// on artifactory-build-info: reader reads them, writer also deploys, and
+// member's group team holds read, deploy and delete. A token scoped to
+// artifacts alone reaches no build.
+func buildMatrix() []matrixRow {
+	const (
+		b    = "/artifactory/api/build"
+		arts = "GET /artifactory/api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}"
+		bi   = types.BuildInfoRepository
+	)
+	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	mine := published("b-{p}")
+	return []matrixRow{
+		at("GET "+b, "", anyone, 200),
+		at("PUT "+b, buildDoc("new-{p}", "1", testStarted), holds(bi, "", write), 200),
+		row("GET "+b+"/{buildName}", b+"/b-{p}", "", holds(bi, "", read), 200).seeding(mine),
+		row(
+			"GET "+b+"/{buildName}/{buildNumber}", b+"/b-{p}/1", "", holds(bi, "", read), 200,
+		).seeding(mine),
+		row(
+			"POST "+b+"/append/{buildName}/{buildNumber}", b+"/append/b-{p}/1", `[{"id":"m"}]`,
+			holds(bi, "", write|del), 204,
+		).seeding(mine),
+		row(
+			"POST "+b+"/rename/{buildName}", b+"/rename/b-{p}?to=renamed-{p}", "",
+			holds(bi, "", write|del), 200,
+		).seeding(mine),
+		row(
+			"DELETE "+b+"/{buildName}", b+"/b-{p}?buildNumbers=1", "", holds(bi, "", del), 200,
+		).seeding(mine),
+		at(
+			"POST "+b+"/delete",
+			`{"buildName":"b-{p}","buildNumbers":["1"]}`,
+			holds(bi, "", del),
+			200,
+		).seeding(mine),
+		row(
+			arts,
+			"/artifactory/api/builds/buildArtifacts/b-{p}/1/"+bi,
+			"",
+			holds(bi, "", read),
+			200,
+		).seeding(mine),
+	}
 }
 
 // oidcMatrix covers the OIDC integration (#83): providers and mappings are
@@ -948,6 +1018,19 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	for _, p := range names {
 		grant("perm-"+p, users("v-"+p, types.ActionRead), "perm-local", "**")
 	}
+	buildGrant := func(name string, g types.Grants) {
+		must(db.Permissions().Create(ctx, types.Permission{
+			Name: name,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceBuild: {
+				Actions: g, Targets: map[string]types.Target{
+					types.BuildInfoRepository: {Include: []string{"**"}},
+				},
+			}},
+		}))
+	}
+	buildGrant("matrix-build-reader", users("reader", types.ActionRead))
+	buildGrant("matrix-build-writer", users("writer", types.ActionRead|types.ActionWrite))
+	buildGrant("matrix-build-team", types.Grants{Groups: map[string]types.Actions{"team": rwd}})
 
 	blobs, err := fs.New(t.TempDir())
 	must(err)

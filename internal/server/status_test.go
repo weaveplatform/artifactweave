@@ -62,6 +62,7 @@ func statusTable() []statusCase {
 		permissionStatusRows(),
 		accessIdentityStatusRows(),
 		oidcStatusRows(),
+		buildStatusRows(),
 	)
 }
 
@@ -153,6 +154,7 @@ func newStatusFixture(
 		t.Fatal(err)
 	}
 	items := &item.Service{Store: db, Blobs: blobs}
+	seedStatusBuilds(t, db, blobs)
 	libs, err := db.Repos().Get(ctx, "libs-local")
 	if err != nil {
 		t.Fatal(err)
