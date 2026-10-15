@@ -3,7 +3,7 @@
 # (platform-scenarios.yml). Reads the pull request's changed paths, one per
 # line, and prints "<cloud> <scenario>" for each scenario to prove:
 #
-#   - the workflow, scenario-ci.sh or this script: every cloud's
+#   - the workflow, deploy/ci/scenario-ci.sh or this script: every cloud's
 #     single-bucket, the baseline every scenario builds on;
 #   - a test/platform Go file: the scenarios it names as quoted
 #     "<cloud>/<scenario>" literals (mirror_test.go names the multi-region
@@ -16,18 +16,21 @@
 #   - a scenario's top-level .tf, .terraform.lock.hcl or ci-vars.sh: that
 #     scenario;
 #   - anything else proves nothing: READMEs, Makefiles, tests/, the local
-#     container's scripts and docs change no cloud run.
+#     container's scripts, docs, and the rest of deploy/ci (the lab's make
+#     files and guards, which CI runs never use) change no cloud run.
 #
 #   prove-matrix.sh --all   prints every scenario that runs in CI, for the
 #                           prove-all pull request label
 #
-# Only scenarios with a ci-vars.sh run in CI; bootstraps have none, so a
-# bootstrap change proves nothing here (platform-auth-check.yml covers it).
+# Only scenarios with a ci-vars.sh run in CI. The bootstraps live under
+# deploy/ci/terraform, not beside the scenarios, so a bootstrap change proves
+# nothing here (platform-auth-check.yml covers it).
 # PROVE_MATRIX_ROOT points the script at another tree (prove-matrix_test.sh).
 set -euo pipefail
 
 root=${PROVE_MATRIX_ROOT:-$(git rev-parse --show-toplevel)}
 here=deploy/platform/terraform
+ci=deploy/ci
 
 ci_capable() { [ -f "$root/$here/$1/$2/ci-vars.sh" ]; }
 
@@ -93,7 +96,7 @@ fi
 # arrays, so the script runs on macOS's bash 3.2 too.
 while IFS= read -r file; do
   case $file in
-  .github/workflows/platform-scenarios.yml | "$here/scenario-ci.sh" | "$here/prove-matrix.sh")
+  .github/workflows/platform-scenarios.yml | "$ci/scenario-ci.sh" | "$ci/prove-matrix.sh")
     single_buckets
     ;;
   test/platform/*.go)

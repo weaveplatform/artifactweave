@@ -32,13 +32,15 @@ updates:
       prefix: "chore"
       include: "scope"
 
-  # The infrastructure roots. deploy/artifactweave is left out:
+  # The infrastructure roots: the reference deployments and their modules,
+  # and the lab's bootstraps. deploy/artifactweave is left out:
   # test/terraform/run.sh pins its jfrog provider zips by SHA-256, which
   # Dependabot cannot update, so those providers move by hand with their pins
   # (docs/testing/ci.md, "Terraform scenarios").
   - package-ecosystem: "terraform"
     directories:
       - "/deploy/platform/terraform/**"
+      - "/deploy/ci/terraform/*"
     schedule:
       interval: "daily"
     ignore:

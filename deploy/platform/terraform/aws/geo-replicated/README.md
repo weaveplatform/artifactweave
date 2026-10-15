@@ -4,7 +4,7 @@ One S3 store that S3 itself copies to a second region: a primary bucket in `eu-w
 and a replica in `eu-west-1`, joined by S3 cross-region replication (decision
 [0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). It is the
 shape for operators who want the cloud's own replication rather than artifactweave's
-mirror. Apply [`aws/bootstrap`](../bootstrap/README.md) first: it holds GitHub's trust,
+mirror. Apply [`deploy/ci/terraform/aws`](../../../../ci/terraform/aws/README.md) first: it holds GitHub's trust,
 the roles and the permissions boundary.
 
 ## How it relates to artifactweave
@@ -78,9 +78,9 @@ delegated zone.
 
 `platform-scenarios.yml` runs this root as the deployer
 (`-f cloud=aws -f scenario=geo-replicated`), through
-[`../../scenario-ci.sh`](../../scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh). The buckets
-are named `artifactweave-awscn-<instance>-<suffix>` and `…-r`, granted to the deployer, and
-tagged for reap. Reap finds them in either region.
+[`deploy/ci/scenario-ci.sh`](../../../../ci/scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh).
+The buckets are named `artifactweave-awscn-<instance>-<suffix>` and `…-r`, granted to the
+deployer, and tagged for reap. Reap finds them in either region.
 
 Besides the generic checks, [`test/platform`](../../../../../test/platform/replica_test.go)
 waits up to 12 minutes for S3 to mark the blob's replication `COMPLETED`, then reads the

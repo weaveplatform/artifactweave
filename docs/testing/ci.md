@@ -77,18 +77,18 @@ subject and nothing else (see [Cloud trust and environments](#cloud-trust-and-en
 | Name | Kind | Value |
 |---|---|---|
 | `CONFORMANCE_GCS_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/platform/terraform/gcp/single-bucket`) |
-| `CONFORMANCE_GCP_SERVICE_ACCOUNT` | variable | The data-plane service account the job acts as (`terraform output conformance_service_account` in `gcp/bootstrap`). `gcp/single-bucket` grants it `roles/storage.objectAdmin` on the bucket, and it signs URLs through IAM `signBlob` as itself |
-| `CONFORMANCE_GCP_WIF_PROVIDER` | variable | The Workload Identity Federation provider (`terraform output workload_identity_provider` in `gcp/bootstrap`). The job exchanges its GitHub OIDC token for the service account, so no key is stored; organisations enforcing `iam.disableServiceAccountKeyCreation` allow no keys anyway |
+| `CONFORMANCE_GCP_SERVICE_ACCOUNT` | variable | The data-plane service account the job acts as (`terraform output conformance_service_account` in `deploy/ci/terraform/gcp`). `gcp/single-bucket` grants it `roles/storage.objectAdmin` on the bucket, and it signs URLs through IAM `signBlob` as itself |
+| `CONFORMANCE_GCP_WIF_PROVIDER` | variable | The Workload Identity Federation provider (`terraform output workload_identity_provider` in `deploy/ci/terraform/gcp`). The job exchanges its GitHub OIDC token for the service account, so no key is stored; organisations enforcing `iam.disableServiceAccountKeyCreation` allow no keys anyway |
 | `CONFORMANCE_AZURE_ACCOUNT` | variable | The storage account (`terraform output account` in `deploy/platform/terraform/azure/single-bucket`). It allows no Shared Key |
 | `CONFORMANCE_AZURE_CONTAINER` | variable | The container in that account |
-| `CONFORMANCE_AZURE_CLIENT_ID`, `CONFORMANCE_AZURE_TENANT_ID`, `CONFORMANCE_AZURE_SUBSCRIPTION_ID` | variables | The data-plane managed identity the job logs in as with `azure/login` (OpenID Connect), from `azure/bootstrap`. `azure/single-bucket` grants it Storage Blob Data Contributor on the account |
+| `CONFORMANCE_AZURE_CLIENT_ID`, `CONFORMANCE_AZURE_TENANT_ID`, `CONFORMANCE_AZURE_SUBSCRIPTION_ID` | variables | The data-plane managed identity the job logs in as with `azure/login` (OpenID Connect), from `deploy/ci/terraform/azure`. `azure/single-bucket` grants it Storage Blob Data Contributor on the account |
 | `CONFORMANCE_S3_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/platform/terraform/aws/single-bucket`) |
-| `CONFORMANCE_AWS_ROLE_ARN` | secret | The data-plane role the job assumes with `aws-actions/configure-aws-credentials` (OpenID Connect), from `aws/bootstrap`. A secret rather than a variable because the ARN carries the account ID, which the public workflow logs must not show; the action also masks the account ID. The role has no policy of its own: `aws/single-bucket`'s bucket policy grants it that bucket's objects |
+| `CONFORMANCE_AWS_ROLE_ARN` | secret | The data-plane role the job assumes with `aws-actions/configure-aws-credentials` (OpenID Connect), from `deploy/ci/terraform/aws`. A secret rather than a variable because the ARN carries the account ID, which the public workflow logs must not show; the action also masks the account ID. The role has no policy of its own: `aws/single-bucket`'s bucket policy grants it that bucket's objects |
 | `CONFORMANCE_AWS_REGION` | variable | The role's region |
 
-`make platform-github-vars SCENARIO=gcp/bootstrap` (and `azure/bootstrap`,
-`aws/bootstrap`) sets the identity variables; `make gcp-github-vars`,
-`make azure-github-vars` and `make aws-github-vars` set the bucket and account.
+`make ci-github-vars CLOUD=gcp` (and `CLOUD=azure`, `CLOUD=aws`) sets the identity
+variables; `make gcp-github-vars`, `make azure-github-vars` and `make aws-github-vars` set
+the bucket and account.
 
 Give every store a lifecycle rule that deletes `conformance/` objects after a day, in
 case a cancelled run skips its cleanup; on S3, also abort incomplete multipart uploads,
@@ -117,7 +117,7 @@ ARTIFACTWEAVE_TEST_AZURE_CONTAINER=artifactweave \
 
 The GCS run acts as the conformance service account through the impersonated credentials
 `up.sh` writes from your own Application Default Credentials
-(`gcloud auth application-default login`). `deploy/platform/terraform/gcp/bootstrap`
+(`gcloud auth application-default login`). `deploy/ci/terraform/gcp`
 creates the account, lets your login act as it, and holds the federation for the workflow;
 `gcp/single-bucket` creates the bucket and grants the account.
 
@@ -133,11 +133,12 @@ account, and the probes sign copy sources with a user delegation SAS from it. An
 `ARTIFACTWEAVE_TEST_AZURE_ACCOUNT_KEY`, for an account that still allows Shared Key, switches
 the contract and probes to that key instead. `make azure-conformance` refuses to run unless
 the Azure CLI's active subscription is the acceptance one
-(`deploy/platform/terraform/azure/check-subscription.sh`, shared by the azure roots).
+(`deploy/ci/check-subscription.sh`, shared by the azure roots, with the subscription in
+`deploy/ci/lab.mk`).
 
 ## Cloud trust and environments
 
-Each cloud's bootstrap (`deploy/platform/terraform/<cloud>/bootstrap`, decision 0030)
+Each cloud's bootstrap (`deploy/ci/terraform/<cloud>`, decision 0030)
 holds GitHub's trust, in two GitHub environments:
 
 | Environment | Identity on each cloud | Rights | Used by |
@@ -151,9 +152,8 @@ provider admits only the two environment subjects and each service account trust
 each Azure identity has one federated credential for one subject; each AWS role's trust
 policy matches one subject with `StringEquals`. `cloud-platform` asks
 the maintainer to approve every run, from any branch, so a pull request can prove its own
-scenario; self-approval is allowed. `make platform-github-vars SCENARIO=<cloud>/bootstrap`
-creates both environments (`deploy/platform/terraform/github-environments.sh`) and sets
-these variables:
+scenario; self-approval is allowed. `make ci-github-vars CLOUD=<cloud>` creates both
+environments (`deploy/ci/github-environments.sh`) and sets these variables:
 
 | Name | Value |
 |---|---|
@@ -176,7 +176,7 @@ state bucket and the hosted zone's records. It creates nothing.
 real clouds, from the `cloud-platform` environment, so the maintainer approves every run.
 Its inputs are `cloud`, `scenario`, `action` (`test`, `apply`, `destroy` or `reap`),
 `instance` and `ttl_minutes`; [`deploy/platform/README.md`](../../deploy/platform/README.md#running-a-scenario-in-ci)
-shows how to dispatch each. Every action goes through `deploy/platform/terraform/scenario-ci.sh`:
+shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`:
 
 - Terraform 1.16.4, pinned by SHA-256 as in the `terraform` job, works on a fresh copy of
   the scenario with a backend generated for the instance's state, at
@@ -212,7 +212,7 @@ shows how to dispatch each. Every action goes through `deploy/platform/terraform
   evidence, not coverage, so `make test` leaves `test/platform` out.
 
 On a pull request that changes the workflow, the driver, `test/platform`, a scenario or a
-module, the same job runs a proof for each scenario `deploy/platform/terraform/prove-matrix.sh`
+module, the same job runs a proof for each scenario `deploy/ci/prove-matrix.sh`
 chooses from the changed paths:
 
 | Changed path | Proves |
@@ -222,12 +222,12 @@ chooses from the changed paths:
 | A `test/platform` Go file that names none (`harness_test.go`, `generic_test.go`), any other `test/platform` file, or a deleted one | Every cloud's `single-bucket` |
 | A module's top-level `.tf` (`modules/<cloud>/<capability>/*.tf`) | Every scenario, in any cloud directory, whose Terraform sources exactly that module |
 | A scenario's top-level `.tf`, `.terraform.lock.hcl` or `ci-vars.sh` | That scenario |
-| Anything else: READMEs, Makefiles, `tests/`, the local container's scripts, docs | Nothing |
+| Anything else: READMEs, Makefiles, `tests/`, the local container's scripts, the bootstraps and the rest of `deploy/ci`, docs | Nothing |
 
 The `prove-all` label proves every scenario that runs in CI (`prove-matrix.sh --all`), on
 the push that adds it and on every later push while it stays. Adding any other label proves
 nothing. The paths filter still decides whether the workflow runs, so the label proves only
-pull requests the workflow covers. `deploy/platform/terraform/prove-matrix_test.sh` checks
+pull requests the workflow covers. `deploy/ci/prove-matrix_test.sh` checks
 these rules against a generated tree, and that every scenario a `test/platform` file names
 runs in CI; `make deploy-check` runs it first.
 
@@ -295,7 +295,7 @@ not listed, so moving one needs no change to the script.
 
 | Step | What |
 |---|---|
-| `prove-matrix` | `deploy/platform/terraform/prove-matrix_test.sh`, the table test of the rules that choose which scenarios a pull request proves. It needs no tools, so it runs before any is fetched |
+| `prove-matrix` | `deploy/ci/prove-matrix_test.sh`, the table test of the rules that choose which scenarios a pull request proves. It needs no tools, so it runs before any is fetched |
 | `terraform fmt -check -recursive` | Formatting, including the `tests/*.tftest.hcl` files |
 | `terraform validate` | Each root, with `init -backend=false` against its committed lock file; state and plugins stay in a temporary directory. Roots on the jfrog providers validate through `test/terraform/run.sh`, whose filesystem mirror pins their zips |
 | tflint | Each root, with the rulesets pinned in `.tflint.hcl`. `azurerm_resources_missing_prevent_destroy` is off: every root is created and destroyed on purpose |
@@ -345,5 +345,6 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
 | `make deploy-check` | The deploy-terraform job (fetches pinned tools into `.tools/`; set `GITHUB_TOKEN` if tflint hits GitHub's rate limit) |
 | `make deploy-docs` | Rewrite the terraform-docs sections of the READMEs |
-| `make platform-<target> SCENARIO=<cloud>/<scenario>` | A target of a `deploy/platform` root on a real cloud, for example `platform-plan SCENARIO=gcp/single-bucket` or `platform-apply SCENARIO=azure/bootstrap`; `gcp-<target>` and `azure-<target>` are short forms for the two `single-bucket` scenarios. CI never runs these |
+| `make platform-<target> SCENARIO=<cloud>/<scenario>` | A target of a `deploy/platform` scenario on a real cloud, for example `platform-plan SCENARIO=gcp/single-bucket`; `gcp-<target>`, `azure-<target>` and `aws-<target>` are short forms for the three `single-bucket` scenarios. CI never runs these |
+| `make ci-<target> CLOUD=<cloud>` | A target of a cloud's bootstrap in `deploy/ci/terraform`, for example `ci-plan CLOUD=azure` or `ci-github-vars CLOUD=aws`. CI never runs these |
 | `make capture-aql` | Refresh the AQL fixtures from the pinned `jf` (needs `ARTIFACTWEAVE_JF_BIN`) |

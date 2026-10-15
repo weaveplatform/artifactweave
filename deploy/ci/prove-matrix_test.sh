@@ -32,8 +32,8 @@ scenario gcp/single-bucket
 scenario gcp/multi-region ../../modules/gcp/storage
 scenario azure/single-bucket
 scenario multicloud/mirror ../../modules/aws/storage ../../modules/gcp/storage
-# A bootstrap has no ci-vars.sh, so it never runs in CI.
-mkdir -p "$t/aws/bootstrap" && : >"$t/aws/bootstrap/main.tf"
+# The bootstraps live under deploy/ci/terraform and never run in CI.
+mkdir -p "$fixture/deploy/ci/terraform/aws" && : >"$fixture/deploy/ci/terraform/aws/main.tf"
 mkdir -p "$t/modules/aws/storage" "$t/modules/aws/storage-cdn" "$t/modules/gcp/storage"
 mkdir -p "$fixture/test/platform"
 cat >"$fixture/test/platform/harness_test.go" <<'EOF'
@@ -64,11 +64,12 @@ check() {
 
 singles=$'aws single-bucket\nazure single-bucket\ngcp single-bucket'
 p=deploy/platform/terraform
+c=deploy/ci
 
 check 'workflow change' "$singles" .github/workflows/platform-scenarios.yml
-check 'driver change' "$singles" $p/scenario-ci.sh
-check 'this script changes' "$singles" $p/prove-matrix.sh
-check 'table test changes' '' $p/prove-matrix_test.sh
+check 'driver change' "$singles" $c/scenario-ci.sh
+check 'this script changes' "$singles" $c/prove-matrix.sh
+check 'table test changes' '' $c/prove-matrix_test.sh
 check 'module .tf' $'aws geo-replicated\naws multi-region\nmulticloud mirror' $p/modules/aws/storage/main.tf
 check 'sibling module is not the module' 'aws cdn' $p/modules/aws/storage-cdn/variables.tf
 check 'deleted module .tf' $'gcp multi-region\nmulticloud mirror' $p/modules/gcp/storage/gone.tf
@@ -88,7 +89,12 @@ check 'scenario README' '' $p/aws/single-bucket/README.md
 check 'scenario Makefile' '' $p/aws/single-bucket/Makefile
 check 'scenario tests' '' $p/aws/single-bucket/tests/security.tftest.hcl
 check 'scenario local container script' '' $p/aws/single-bucket/up.sh
-check 'bootstrap' '' $p/aws/bootstrap/main.tf
+check 'bootstrap' '' $c/terraform/aws/main.tf
+check 'lab constants' '' $c/lab.mk
+check 'scenario make targets' '' $c/scenario.mk
+check 'bootstrap make targets' '' $c/bootstrap.mk
+check 'guard' '' $c/check-account.sh
+check 'environments' '' $c/github-environments.sh
 check 'deleted scenario' '' $p/aws/retired/main.tf
 check 'platform README' '' deploy/platform/README.md
 check 'docs' '' docs/testing/ci.md
@@ -105,7 +111,7 @@ fi
 
 # The real tree: a test/platform file that names a scenario must name one
 # that exists and runs in CI.
-root=$(cd "$here/../../.." && pwd)
+root=$(cd "$here/../.." && pwd)
 for file in "$root"/test/platform/*.go; do
   for pair in $(grep -oE '"(gcp|azure|aws|multicloud)/[a-z][a-z0-9-]*"' "$file" | tr -d '"' | sort -u); do
     if [ ! -f "$root/$p/$pair/ci-vars.sh" ]; then

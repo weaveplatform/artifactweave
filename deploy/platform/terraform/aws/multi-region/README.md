@@ -6,7 +6,7 @@ to both, an upload succeeds once `write_quorum` of them hold it, and reads prefe
 this instance's zone. It is the reference for regional resilience under artifactweave's
 control: either region can be lost without losing a blob or stopping uploads.
 
-One AWS provider serves both regions through the per-resource `region` of the AWS provider 6. Each bucket policy grants the bootstrap's `artifactweave-conformance` role, or in a scenario run the deployer, which runs artifactweave in the same job. Apply [`aws/bootstrap`](../bootstrap/README.md) first.
+One AWS provider serves both regions through the per-resource `region` of the AWS provider 6. Each bucket policy grants the bootstrap's `artifactweave-conformance` role, or in a scenario run the deployer, which runs artifactweave in the same job. Apply [`deploy/ci/terraform/aws`](../../../../ci/terraform/aws/README.md) first.
 
 ## What Terraform creates
 

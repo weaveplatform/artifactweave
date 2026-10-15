@@ -122,6 +122,13 @@ platform-%:
 		echo "set SCENARIO to one of: $$(cd $(PLATFORM_DIR) && ls -d */*/Makefile | sed 's|/Makefile||' | tr '\n' ' ')" >&2; exit 1; }
 	$(MAKE) -C $(PLATFORM_DIR)/$(SCENARIO) $*
 
+## ci-<target>: run a target of a cloud's bootstrap in deploy/ci, e.g. make ci-plan CLOUD=gcp
+CI_DIR := deploy/ci/terraform
+ci-%:
+	@[ -n "$(CLOUD)" ] && [ -f $(CI_DIR)/$(CLOUD)/Makefile ] || { \
+		echo "set CLOUD to one of: $$(cd $(CI_DIR) && ls -d */Makefile | sed 's|/Makefile||' | tr '\n' ' ')" >&2; exit 1; }
+	$(MAKE) -C $(CI_DIR)/$(CLOUD) $*
+
 ## gcp-<target>: platform-<target> for gcp/single-bucket (the GCS acceptance environment), e.g. make gcp-up
 gcp-%:
 	$(MAKE) -C $(PLATFORM_DIR)/gcp/single-bucket $*

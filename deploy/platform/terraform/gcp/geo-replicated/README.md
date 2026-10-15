@@ -4,7 +4,7 @@ One GCS bucket that Google replicates across two regions: a dual-region, `EUR4` 
 and the Netherlands) by default (decision
 [0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). It is the
 shape for operators who want the cloud's own replication rather than artifactweave's
-mirror. Apply [`gcp/bootstrap`](../bootstrap/README.md) first.
+mirror. Apply [`deploy/ci/terraform/gcp`](../../../../ci/terraform/gcp/README.md) first.
 
 ## How it relates to artifactweave
 
@@ -54,8 +54,9 @@ There is no local container or conformance target; `gcp/single-bucket` has those
 
 `platform-scenarios.yml` runs this root as the deployer
 (`-f cloud=gcp -f scenario=geo-replicated`), through
-[`../../scenario-ci.sh`](../../scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh), with the
-bucket named `awscn-<instance>-<suffix>`, granted to the deployer and labelled for reap.
+[`deploy/ci/scenario-ci.sh`](../../../../ci/scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh),
+with the bucket named `awscn-<instance>-<suffix>`, granted to the deployer and labelled for
+reap.
 
 GCS exposes no per-object replication status. So beyond the generic checks,
 [`test/platform`](../../../../../test/platform/replica_test.go) reads the real bucket's

@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The workload identity provider admits this repository's environment
-    # subjects only (deploy/platform/terraform/gcp/bootstrap), so the job must
+    # subjects only (deploy/ci/terraform/gcp), so the job must
     # run in cloud-conformance to be trusted at all.
     environment: cloud-conformance
     # id-token lets google-github-actions/auth exchange the job's OIDC token
@@ -69,7 +69,7 @@ jobs:
         run: |
           if [ -z "$ARTIFACTWEAVE_TEST_GCS_BUCKET" ] || [ -z "$ARTIFACTWEAVE_TEST_GCS_ACCESS_ID" ] \
             || [ -z "$GCP_WIF_PROVIDER" ]; then
-            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (make platform-github-vars SCENARIO=gcp/bootstrap, then make gcp-github-vars)"
+            echo "::error::Set the CONFORMANCE_GCS_BUCKET, CONFORMANCE_GCP_SERVICE_ACCOUNT and CONFORMANCE_GCP_WIF_PROVIDER variables (make ci-github-vars CLOUD=gcp, then make gcp-github-vars)"
             exit 1
           fi
 
@@ -148,7 +148,7 @@ jobs:
           for v in ARTIFACTWEAVE_TEST_AZURE_ACCOUNT ARTIFACTWEAVE_TEST_AZURE_CONTAINER \
             CONFORMANCE_AZURE_CLIENT_ID CONFORMANCE_AZURE_TENANT_ID CONFORMANCE_AZURE_SUBSCRIPTION_ID; do
             if [ -z "${!v}" ]; then
-              echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT, CONFORMANCE_AZURE_CONTAINER, CONFORMANCE_AZURE_CLIENT_ID, CONFORMANCE_AZURE_TENANT_ID and CONFORMANCE_AZURE_SUBSCRIPTION_ID variables (make platform-github-vars SCENARIO=azure/bootstrap, then make azure-github-vars)"
+              echo "::error::Set the CONFORMANCE_AZURE_ACCOUNT, CONFORMANCE_AZURE_CONTAINER, CONFORMANCE_AZURE_CLIENT_ID, CONFORMANCE_AZURE_TENANT_ID and CONFORMANCE_AZURE_SUBSCRIPTION_ID variables (make ci-github-vars CLOUD=azure, then make azure-github-vars)"
               exit 1
             fi
           done
@@ -187,7 +187,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The conformance role trusts this environment's subject exactly
-    # (deploy/platform/terraform/aws/bootstrap), whatever branch or event
+    # (deploy/ci/terraform/aws), whatever branch or event
     # dispatched the run.
     environment: cloud-conformance
     # id-token lets configure-aws-credentials exchange the job's OIDC token
@@ -224,7 +224,7 @@ jobs:
         run: |
           for v in ARTIFACTWEAVE_TEST_S3_BUCKET ARTIFACTWEAVE_TEST_S3_REGION CONFORMANCE_AWS_ROLE_ARN; do
             if [ -z "${!v}" ]; then
-              echo "::error::Set the CONFORMANCE_S3_BUCKET and CONFORMANCE_AWS_REGION variables and the CONFORMANCE_AWS_ROLE_ARN secret (make platform-github-vars SCENARIO=aws/bootstrap, then make aws-github-vars)"
+              echo "::error::Set the CONFORMANCE_S3_BUCKET and CONFORMANCE_AWS_REGION variables and the CONFORMANCE_AWS_ROLE_ARN secret (make ci-github-vars CLOUD=aws, then make aws-github-vars)"
               exit 1
             fi
           done

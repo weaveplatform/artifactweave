@@ -1,10 +1,11 @@
-# aws/bootstrap
+# The AWS bootstrap (`deploy/ci/terraform/aws`)
 
 The long-lived foundation every AWS scenario stands on, in the lab account in `eu-west-2`
-(decision [0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). It is
+(decision [0030](../../../../docs/research/decisions/0030-reference-deployments.md)). It is
 not a scenario: an operator applies it once, and scenarios are created and destroyed without
 touching it. The account ID is not recorded in this repository; the Makefile recognises the
-lab account by the delegated hosted zone instead (`../check-account.sh`).
+lab account by the delegated hosted zone instead (`deploy/ci/check-account.sh`, given the
+zone's ID and name from `deploy/ci/lab.mk`).
 
 ## What it holds
 
@@ -38,12 +39,12 @@ lab account by the delegated hosted zone instead (`../check-account.sh`).
 
 ## Use
 
-`aws login` first. From this directory (or `make platform-<target> SCENARIO=aws/bootstrap`
+`aws login` first. From this directory (or `make ci-<target> CLOUD=aws`
 from the repository root):
 
 ```bash
 make plan  BUDGET_EMAIL=you@example.com   # BUDGET_EMAIL only until the budget exists
-make apply BUDGET_EMAIL=you@example.com   # first run: on local state, because the state bucket doesn't exist yet
+make apply BUDGET_EMAIL=you@example.com FIRST_RUN=1   # first run only: on local state, because the state bucket doesn't exist yet
 make migrate-state   # once: moves the state into the bucket just created
 make github-vars     # creates both GitHub environments; sets the variables, and the role ARNs as secrets
 ```
@@ -52,8 +53,10 @@ The role ARNs carry the account ID, so `github-vars` stores them as repository s
 which the public workflow logs mask, and the workflows ask `configure-aws-credentials` to
 mask the account ID too.
 
-`make init` writes a git-ignored `local_override.tf` while the state bucket is missing,
-replacing the S3 backend with local state, and removes it once the bucket exists. Every
+Only with `FIRST_RUN=1` does `make init` write a git-ignored `local_override.tf`, replacing
+the S3 backend with local state while the state bucket is missing; it removes it once the
+bucket exists. Without `FIRST_RUN`, a state probe that fails stops the run, so an expired
+login can never plan this bootstrap from empty local state. Every
 target first checks that the AWS CLI is signed in to the account holding the zone.
 
 `make destroy` refuses: CI trust, state and the delegated zone live here. To retire a part,

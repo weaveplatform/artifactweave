@@ -6,7 +6,7 @@ to both, an upload succeeds once `write_quorum` of them hold it, and reads prefe
 this instance's zone. It is the reference for regional resilience under artifactweave's
 control: either region can be lost without losing a blob or stopping uploads.
 
-Shared Key is off on both accounts. They are granted to whoever applies and to the bootstrap's `artifactweave-conformance` identity; in a scenario run the deployer applies them in the bootstrap's scenarios resource group and runs artifactweave, which signs download URLs with a user delegation SAS. Apply [`azure/bootstrap`](../bootstrap/README.md) first.
+Shared Key is off on both accounts. They are granted to whoever applies and to the bootstrap's `artifactweave-conformance` identity; in a scenario run the deployer applies them in the bootstrap's scenarios resource group and runs artifactweave, which signs download URLs with a user delegation SAS. Apply [`deploy/ci/terraform/azure`](../../../../ci/terraform/azure/README.md) first.
 
 ## What Terraform creates
 

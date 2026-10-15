@@ -56,7 +56,7 @@ fail() {
 # proof rule fails fast.
 if [ "$mode" = check ]; then
 	echo "== prove-matrix"
-	"$root/deploy/platform/terraform/prove-matrix_test.sh" || fail "prove-matrix.sh chooses the wrong scenarios (deploy/platform/terraform/prove-matrix_test.sh)"
+	"$root/deploy/ci/prove-matrix_test.sh" || fail "prove-matrix.sh chooses the wrong scenarios (deploy/ci/prove-matrix_test.sh)"
 fi
 
 os=$(uname -s | tr '[:upper:]' '[:lower:]')

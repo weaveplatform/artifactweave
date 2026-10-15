@@ -6,7 +6,7 @@ to both, an upload succeeds once `write_quorum` of them hold it, and reads prefe
 this instance's zone. It is the reference for regional resilience under artifactweave's
 control: either region can be lost without losing a blob or stopping uploads.
 
-The buckets are granted to the bootstrap's `artifactweave-conformance` service account, or in a scenario run to the deployer, which signs download URLs for both through IAM `signBlob`. Apply [`gcp/bootstrap`](../bootstrap/README.md) first.
+The buckets are granted to the bootstrap's `artifactweave-conformance` service account, or in a scenario run to the deployer, which signs download URLs for both through IAM `signBlob`. Apply [`deploy/ci/terraform/gcp`](../../../../ci/terraform/gcp/README.md) first.
 
 ## What Terraform creates
 

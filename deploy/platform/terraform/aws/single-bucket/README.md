@@ -4,7 +4,7 @@ An S3 acceptance bucket for artifactweave's S3 backend in the lab account, `eu-w
 (decision [0030](../../../../../docs/research/decisions/0030-reference-deployments.md)). The
 real-cloud conformance tests (`cloud-conformance.yml`, job `s3`) and a local container both
 use it, under separate prefixes. GitHub's OIDC provider and the conformance role live in
-[`aws/bootstrap`](../bootstrap/README.md); apply that first.
+[`deploy/ci/terraform/aws`](../../../../ci/terraform/aws/README.md); apply that first.
 
 ## What it creates
 
@@ -42,11 +42,11 @@ delegated zone.
 ## Scenario runs
 
 `platform-scenarios.yml` can drive this root as the deployer (`-f cloud=aws`), through
-[`../../scenario-ci.sh`](../../scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh): the bucket is
-named `artifactweave-awscn-<instance>-<suffix>` (inside the `artifactweave-` prefix the
-deployer may manage), the bucket policy grants the deployer, which runs artifactweave in the
-same job, and the bucket is tagged with the scenario, instance and `expires-at` that reap
-matches. The pull request proof runs it alongside GCP and Azure.
+[`deploy/ci/scenario-ci.sh`](../../../../ci/scenario-ci.sh) and [`ci-vars.sh`](ci-vars.sh):
+the bucket is named `artifactweave-awscn-<instance>-<suffix>` (inside the `artifactweave-`
+prefix the deployer may manage), the bucket policy grants the deployer, which runs
+artifactweave in the same job, and the bucket is tagged with the scenario, instance and
+`expires-at` that reap matches. The pull request proof runs it alongside GCP and Azure.
 
 ## Cost
 

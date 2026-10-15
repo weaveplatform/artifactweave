@@ -1,14 +1,14 @@
 # The make targets every deploy/platform scenario shares (decision 0030).
+# Run them from the scenario's directory, or from the repository root with
+# make platform-<target> SCENARIO=<cloud>/<scenario>.
 #
 # A scenario's Makefile sets the variables below, then includes this file as
 # its last line:
 #
-#   include $(shell git rev-parse --show-toplevel)/deploy/platform/terraform/scenario.mk
+#   include $(shell git rev-parse --show-toplevel)/deploy/ci/scenario.mk
 #
-#   GUARD               target run first by every target that touches the cloud
-#                       (Azure's subscription check); empty for none
 #   TF_VARS             extra -var flags for plan, apply and destroy
-#   CONFORMANCE_DEPS    prerequisites of conformance
+#   CONFORMANCE_DEPS    prerequisites of conformance besides the guard
 #   CONFORMANCE_ENV     environment for the real-cloud tests; define it with =, not
 #                       :=, so the $$(terraform output ...) calls run in the recipe
 #   CONFORMANCE_RUN     the go test -run pattern
@@ -16,6 +16,11 @@
 #   GITHUB_ENVIRONMENT  GitHub environment github-vars creates first; empty for none
 #   GITHUB_VARS         VARIABLE=output pairs github-vars sets from the outputs
 #   CLEAN_FILES         generated files clean removes
+#
+# The cloud is the name of the scenario's parent directory. It picks the guard
+# every target that touches the cloud runs first (check-account.sh on AWS,
+# check-subscription.sh on Azure, none on GCP) and, on Azure, pins Terraform to
+# the lab's subscription. The lab's values come from lab.mk.
 #
 # ROOT comes from git rather than a relative path, so a scenario works at any
 # depth; compose.yaml reads its build context from ARTIFACTWEAVE_ROOT for the
@@ -32,12 +37,26 @@ ARTIFACTWEAVE_ROOT := $(ROOT)
 export VERSION COMMIT ARTIFACTWEAVE_ROOT
 
 CLEAN_FILES ?= .local
+CLOUD := $(notdir $(patsubst %/,%,$(dir $(CURDIR))))
 
-.PHONY: help plan apply credentials up smoke conformance github-vars logs down clean destroy
+include $(ROOT)/deploy/ci/lab.mk
+
+GUARD := $(if $(filter aws,$(CLOUD)),check-account,$(if $(filter azure,$(CLOUD)),check-subscription))
+TF_VARS += $(if $(filter azure,$(CLOUD)),-var subscription_id=$(LAB_AZURE_SUBSCRIPTION))
+
+.PHONY: help plan apply credentials up smoke conformance github-vars logs down clean destroy check-account check-subscription
 
 ## help: list targets
 help:
 	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | column -t -s ':'
+
+## check-account: (aws) refuse unless the AWS CLI is signed in to the account holding the lab's zone
+check-account:
+	@$(ROOT)/deploy/ci/check-account.sh $(LAB_AWS_ZONE_ID) $(LAB_AWS_ZONE_NAME)
+
+## check-subscription: (azure) refuse unless az's active subscription and tenant are the lab's
+check-subscription:
+	@$(ROOT)/deploy/ci/check-subscription.sh $(LAB_AZURE_SUBSCRIPTION)
 
 ## plan: terraform plan
 plan: $(GUARD)
@@ -69,7 +88,7 @@ smoke:
 	./smoke.sh
 
 ## conformance: run the real-cloud blob contract and probes locally
-conformance: $(CONFORMANCE_DEPS)
+conformance: $(GUARD) $(CONFORMANCE_DEPS)
 	cd $(ROOT) && $(CONFORMANCE_ENV) \
 	  GOWORK=off $(GO) test -count=1 -timeout 25m -v -run '$(CONFORMANCE_RUN)' $(CONFORMANCE_PKG)
 
