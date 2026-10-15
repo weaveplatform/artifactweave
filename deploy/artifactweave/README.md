@@ -9,11 +9,17 @@ infrastructure it runs on has its own references in `deploy/platform`
 empty plan and destroys it, so a reference that stops working fails the build (see
 [docs/testing/ci.md](../../docs/testing/ci.md#terraform-scenarios)).
 
-| Scenario | What it manages |
-|---|---|
-| [repositories](terraform/repositories) | A local generic repository (`artifactory_local_generic_repository`) and properties on a file deployed into it (`artifactory_item_properties`) |
-| [identity](terraform/identity) | Users (`artifactory_user`, `artifactory_managed_user`), groups (`platform_group`, `artifactory_group`), a permission over one repository (`platform_permission`, read back with the `artifactory_permission_target` data source), a repository-scoped token (`artifactory_scoped_token`) and a signing key pair (`artifactory_keypair`) |
-| [oidc](terraform/oidc) | OIDC token exchange for CI: a GitHub Actions provider and a generic one (`platform_oidc_configuration`), each with an identity mapping (`platform_oidc_identity_mapping`), one for a named user and one for a group through a synthetic subject |
+| Scenario | What it configures | Inputs without a default |
+|---|---|---|
+| [repositories](terraform/repositories/README.md) | A local generic repository (`artifactory_local_generic_repository`) and properties on a file deployed into it (`artifactory_item_properties`) | `url`, `access_token` |
+| [identity](terraform/identity/README.md) | Users (`artifactory_user`, `artifactory_managed_user`), groups (`platform_group`, `artifactory_group`), a permission over one repository (`platform_permission`, read back with the `artifactory_permission_target` data source), a repository-scoped token (`artifactory_scoped_token`) and a signing key pair (`artifactory_keypair`) | `url`, `access_token`, `user_password`, `keypair_private_key`, `keypair_public_key` |
+| [oidc](terraform/oidc/README.md) | OIDC token exchange for CI: a GitHub Actions provider and a generic one (`platform_oidc_configuration`), each with an identity mapping (`platform_oidc_identity_mapping`), one for a named user and one for a group through a synthetic subject | `url`, `access_token`, `github_organization`, `ci_project_path` |
+
+Every name a reference creates (repository keys, users, groups, permissions, OIDC providers)
+is an input with a default you can keep or change. Each README follows
+[TEMPLATE.md](TEMPLATE.md): what it configures, prerequisites, inputs, applying, security,
+teardown and how it is tested ([decision 0030](../../docs/research/decisions/0030-reference-deployments.md),
+rules A1 to A4).
 
 ## Providers
 
