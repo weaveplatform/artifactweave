@@ -61,11 +61,12 @@ Two failures came from the runners rather than the code, and each needed a manua
 ## Real-cloud conformance (manual)
 
 `cloud-conformance.yml` runs the blob contract (`blobtest.Run`) and the research 18
-probes against a real Google Cloud Storage bucket and a real Azure Blob Storage
-container. fake-gcs-server and Azurite do not enforce compose preconditions,
-copy-source authorisation, signed URLs or service limits, so this is the only check of
-them. The workflow is not part of the gate: it needs cloud credentials and is started
-from the Actions tab (**Run workflow**, target `both`, `gcs` or `azure`). Each run
+probes against a real Google Cloud Storage bucket, a real Azure Blob Storage container
+and a real Amazon S3 bucket. fake-gcs-server, Azurite and MinIO do not enforce compose
+preconditions, copy-source authorisation, signed URLs, S3's copy limits or service
+limits, so this is the only check of them. The workflow is not part of the gate: it needs
+cloud credentials and is started from the Actions tab (**Run workflow**, target `all`,
+`gcs`, `azure` or `s3`). Each run
 writes under `conformance/<random>/` and deletes that prefix when it ends. The step
 summary lists the `PROBE` lines that answer the open questions in
 [research 18 §4](../research/18-cloud-blob-storage.md#4-open-questions-for-a-real-cloud-check).
@@ -81,13 +82,17 @@ subject and nothing else (see [Cloud trust and environments](#cloud-trust-and-en
 | `CONFORMANCE_AZURE_ACCOUNT` | variable | The storage account (`terraform output account` in `deploy/platform/terraform/azure/single-bucket`). It allows no Shared Key |
 | `CONFORMANCE_AZURE_CONTAINER` | variable | The container in that account |
 | `CONFORMANCE_AZURE_CLIENT_ID`, `CONFORMANCE_AZURE_TENANT_ID`, `CONFORMANCE_AZURE_SUBSCRIPTION_ID` | variables | The data-plane managed identity the job logs in as with `azure/login` (OpenID Connect), from `azure/bootstrap`. `azure/single-bucket` grants it Storage Blob Data Contributor on the account |
+| `CONFORMANCE_S3_BUCKET` | variable | The bucket (`terraform output bucket` in `deploy/platform/terraform/aws/single-bucket`) |
+| `CONFORMANCE_AWS_ROLE_ARN` | secret | The data-plane role the job assumes with `aws-actions/configure-aws-credentials` (OpenID Connect), from `aws/bootstrap`. A secret rather than a variable because the ARN carries the account ID, which the public workflow logs must not show; the action also masks the account ID. The role has no policy of its own: `aws/single-bucket`'s bucket policy grants it that bucket's objects |
+| `CONFORMANCE_AWS_REGION` | variable | The role's region |
 
-`make platform-github-vars SCENARIO=gcp/bootstrap` (and `azure/bootstrap`) sets the
-identity variables; `make gcp-github-vars` and `make azure-github-vars` set the bucket and
-account.
+`make platform-github-vars SCENARIO=gcp/bootstrap` (and `azure/bootstrap`,
+`aws/bootstrap`) sets the identity variables; `make gcp-github-vars`,
+`make azure-github-vars` and `make aws-github-vars` set the bucket and account.
 
-Give both stores a lifecycle rule that deletes `conformance/` objects after a day, in
-case a cancelled run skips its cleanup. On GCS, a bucket with soft delete enabled bills
+Give every store a lifecycle rule that deletes `conformance/` objects after a day, in
+case a cancelled run skips its cleanup; on S3, also abort incomplete multipart uploads,
+which are billed until aborted. On GCS, a bucket with soft delete enabled bills
 the deleted temporary parts for the retention period.
 
 The same tests run from a workstation. They skip unless their variables are set:
@@ -98,6 +103,11 @@ ARTIFACTWEAVE_TEST_GCS_BUCKET=$(terraform -chdir=deploy/platform/terraform/gcp/s
 ARTIFACTWEAVE_TEST_GCS_ACCESS_ID=$(terraform -chdir=deploy/platform/terraform/gcp/single-bucket output -raw service_account) \
 GOOGLE_APPLICATION_CREDENTIALS=deploy/platform/terraform/gcp/single-bucket/.secrets/container-credentials.json \
   go test -count=1 -v -run 'TestContractOnRealGCS|TestRealGCSProbes' ./pkg/blob/gcs/
+
+make aws-conformance     # or, by hand, after aws login:
+ARTIFACTWEAVE_TEST_S3_BUCKET=$(terraform -chdir=deploy/platform/terraform/aws/single-bucket output -raw bucket) \
+ARTIFACTWEAVE_TEST_S3_REGION=eu-west-2 \
+  go test -count=1 -v -run 'TestContractOnRealS3|TestRealS3Probes' ./pkg/blob/s3/
 
 make azure-conformance   # or, by hand, after az login:
 ARTIFACTWEAVE_TEST_AZURE_ACCOUNT=$(terraform -chdir=deploy/platform/terraform/azure/single-bucket output -raw account) \
@@ -110,6 +120,12 @@ The GCS run acts as the conformance service account through the impersonated cre
 (`gcloud auth application-default login`). `deploy/platform/terraform/gcp/bootstrap`
 creates the account, lets your login act as it, and holds the federation for the workflow;
 `gcp/single-bucket` creates the bucket and grants the account.
+
+The S3 run uses the AWS default credential chain: your `aws login` session locally, the
+role `configure-aws-credentials` assumes in the workflow. Locally it acts as your own login
+rather than the conformance role, which only GitHub's OIDC token can assume. The contract
+lowers the copy limits, so committing its large blob takes the `UploadPartCopy` path that
+objects over 5 GiB take on S3.
 
 The Azure run authenticates with `DefaultAzureCredential`: your `az login` locally, the
 `azure/login` OIDC session in the workflow. Both hold Storage Blob Data Contributor on the
@@ -127,12 +143,13 @@ holds GitHub's trust, in two GitHub environments:
 | Environment | Identity on each cloud | Rights | Used by |
 |---|---|---|---|
 | `cloud-conformance` | data plane: `artifactweave-conformance` | objects in the `single-bucket` bucket or account only | `cloud-conformance.yml` |
-| `cloud-platform` | deployer: `artifactweave-deployer` | create and destroy scenario resources: the GCP lab project's storage, load balancing, Certificate Manager and the scenarios' DNS zone; Azure's `artifactweave-scenarios-rg` and DNS zone; each cloud's state store | `platform-auth-check.yml`, `platform-scenarios.yml` |
+| `cloud-platform` | deployer: `artifactweave-deployer` | create and destroy scenario resources: the GCP lab project's storage, load balancing, Certificate Manager and the scenarios' DNS zone; Azure's `artifactweave-scenarios-rg` and DNS zone; AWS buckets named `artifactweave-*`, CloudFront, ACM, the scenarios' hosted zone and roles under `/artifactweave-scenarios/`, inside a permissions boundary every role it creates must carry; each cloud's state store | `platform-auth-check.yml`, `platform-scenarios.yml` |
 
 Every trust matches this repository's immutable OIDC subject,
 `repo:weaveplatform@336817058/artifactweave@1415179278:environment:<env>`, exactly: GCP's
 provider admits only the two environment subjects and each service account trusts one;
-each Azure identity has one federated credential for one subject. `cloud-platform` asks
+each Azure identity has one federated credential for one subject; each AWS role's trust
+policy matches one subject with `StringEquals`. `cloud-platform` asks
 the maintainer to approve every run, from any branch, so a pull request can prove its own
 scenario; self-approval is allowed. `make platform-github-vars SCENARIO=<cloud>/bootstrap`
 creates both environments (`deploy/platform/terraform/github-environments.sh`) and sets
@@ -144,12 +161,14 @@ these variables:
 | `PLATFORM_GCP_PROJECT`, `PLATFORM_GCP_STATE_BUCKET` | The lab project and the remote state bucket |
 | `PLATFORM_AZURE_CLIENT_ID`, `PLATFORM_AZURE_TENANT_ID`, `PLATFORM_AZURE_SUBSCRIPTION_ID` | The deployer identity, for `azure/login` |
 | `PLATFORM_AZURE_RESOURCE_GROUP`, `PLATFORM_AZURE_STATE_ACCOUNT` | The scenarios resource group and the remote state account |
+| `PLATFORM_AWS_ROLE_ARN` (secret), `PLATFORM_AWS_REGION` | The deployer role, for `configure-aws-credentials`, stored as a secret because the ARN carries the account ID; and the region |
+| `PLATFORM_AWS_STATE_BUCKET`, `PLATFORM_AWS_DNS_ZONE_ID` | The remote state bucket and the scenarios' hosted zone |
 
 `platform-auth-check.yml` (`cloud-platform`; dispatched by hand, and run on pull requests
-that change a bootstrap, after the maintainer approves) logs in to both clouds as the
+that change a bootstrap, after the maintainer approves) logs in to all three clouds as the
 deployer and makes read-only calls that need its rights: the GCS state bucket and the DNS
-zone's records, the scenarios resource group and the Azure state container. It creates
-nothing.
+zone's records, the scenarios resource group and the Azure state container, and the S3
+state bucket and the hosted zone's records. It creates nothing.
 
 ## Platform scenarios (manual)
 
@@ -162,7 +181,9 @@ shows how to dispatch each. Every action goes through `deploy/platform/terraform
 - Terraform 1.16.4, pinned by SHA-256 as in the `terraform` job, works on a fresh copy of
   the scenario with a backend generated for the instance's state, at
   `scenarios/<cloud>/<scenario>/<instance>` in the bootstrap's state store. On Azure the
-  provider and backend exchange the job's OIDC token themselves (`ARM_USE_OIDC`).
+  provider and backend exchange the job's OIDC token themselves (`ARM_USE_OIDC`). On AWS,
+  `configure-aws-credentials` assumes the deployer from the `PLATFORM_AWS_ROLE_ARN` secret,
+  with the account ID masked, and the S3 backend locks with `use_lockfile`.
 - `test` builds artifactweave, starts it with the scenario's `artifactweave_config` output,
   and runs `test/platform`: a 40 MiB deploy and round trip, a ranged GET, the storage
   API's checksums, a `HEAD` answered by the registry, a `downloadRedirect` 302 to the
@@ -174,7 +195,8 @@ shows how to dispatch each. Every action goes through `deploy/platform/terraform
   evidence, not coverage, so `make test` leaves `test/platform` out.
 
 On a pull request that changes the workflow, the driver, `test/platform` or a
-`single-bucket` scenario, the same job runs a proof for GCP and Azure (`single-bucket`):
+`single-bucket` scenario, the same job runs a proof for GCP and Azure (`single-bucket`; AWS is
+wired for dispatch and joins the proof once a dispatched run has proven it):
 `test`; an `apply`, then a `destroy` that has only the remote state; an instance applied
 already expired, then a `reap` that removes it; then `check-clean`, which fails if any
 state, bucket or resource of the run remains. A failed step triggers a clean-up step that

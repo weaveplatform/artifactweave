@@ -12,6 +12,9 @@
 #   TF_VARS      extra -var flags for plan and apply
 #   STATE_PROBE  a command that succeeds once the state backend exists
 #   GITHUB_VARS  VARIABLE=output pairs github-vars sets from the outputs
+#   GITHUB_SECRETS  SECRET=output pairs github-vars stores as repository
+#                secrets instead: values that would otherwise appear in the
+#                public workflow logs (AWS role ARNs carry the account ID)
 #
 # The first apply cannot use the backend it is about to create, so while
 # STATE_PROBE fails, init runs against a git-ignored local_override.tf that
@@ -56,13 +59,18 @@ migrate-state: $(GUARD)
 	$(TERRAFORM) init -input=false -migrate-state -force-copy
 	@echo "state moved; the local terraform.tfstate* files are now stale copies and can be deleted"
 
-## github-vars: create the cloud-conformance and cloud-platform environments and set the repository variables
+## github-vars: create the cloud-conformance and cloud-platform environments and set the repository variables and secrets
 github-vars:
 	$(ROOT)/deploy/platform/terraform/github-environments.sh
 	@for pair in $(GITHUB_VARS); do \
 	  name=$${pair%%=*}; output=$${pair#*=}; \
 	  echo "gh variable set $$name"; \
 	  gh variable set "$$name" --body "$$($(TERRAFORM) output -raw "$$output")" || exit 1; \
+	done
+	@for pair in $(GITHUB_SECRETS); do \
+	  name=$${pair%%=*}; output=$${pair#*=}; \
+	  echo "gh secret set $$name"; \
+	  $(TERRAFORM) output -raw "$$output" | gh secret set "$$name" || exit 1; \
 	done
 
 ## destroy: refused; the bootstrap is long-lived (see its README for removing parts of it)

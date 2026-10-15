@@ -130,6 +130,10 @@ gcp-%:
 azure-%:
 	$(MAKE) -C $(PLATFORM_DIR)/azure/single-bucket $*
 
+## aws-<target>: platform-<target> for aws/single-bucket (the S3 acceptance environment), e.g. make aws-up
+aws-%:
+	$(MAKE) -C $(PLATFORM_DIR)/aws/single-bucket $*
+
 ## bundle: merge api/src/<service>/*.yaml fragments into api/<service>.openapi.yaml
 # Authors edit fragments (one per API family) so families can be written in
 # parallel; the bundled file is what codegen and the parity test read.

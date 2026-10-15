@@ -20,7 +20,9 @@ name: deploy | Platform scenarios
 # instance that has already expired and a reap that removes it, then a check
 # that nothing of the run remains. A dispatch only finds workflows on the
 # default branch, so this is how a change is proven before it merges. Pull
-# requests from forks get no OIDC token and do not run.
+# requests from forks get no OIDC token and do not run. AWS is wired for
+# dispatch (aws/bootstrap, #128) but joins the pull request proof only once
+# a dispatched run has proven it.
 on:
   workflow_dispatch:
     inputs:
@@ -150,6 +152,11 @@ jobs:
       PLATFORM_AZURE_SUBSCRIPTION_ID: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
       PLATFORM_AZURE_RESOURCE_GROUP: ${{ vars.PLATFORM_AZURE_RESOURCE_GROUP }}
       PLATFORM_AZURE_STATE_ACCOUNT: ${{ vars.PLATFORM_AZURE_STATE_ACCOUNT }}
+      PLATFORM_AWS_REGION: ${{ vars.PLATFORM_AWS_REGION }}
+      PLATFORM_AWS_STATE_BUCKET: ${{ vars.PLATFORM_AWS_STATE_BUCKET }}
+      # A secret, so the account ID in the ARN stays out of the public logs;
+      # aws/single-bucket's ci-vars.sh grants the bucket to this role.
+      PLATFORM_AWS_ROLE_ARN: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
       CLOUDSDK_CORE_PROJECT: ${{ vars.PLATFORM_GCP_PROJECT }}
       # Terraform's azurerm provider and backend exchange the job's OIDC
       # token for the deployer themselves; az login below serves the CLI
@@ -203,6 +210,17 @@ jobs:
           client-id: ${{ vars.PLATFORM_AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
           subscription-id: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+
+      # Terraform, the S3 backend, the CLI and artifactweave's AWS SDK chain
+      # all read the session this step exports (an hour, the role's limit).
+      - name: Authenticate to AWS as the deployer
+        if: matrix.cloud == 'aws'
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PLATFORM_AWS_REGION }}
+          role-session-name: platform-scenarios-${{ github.run_id }}
+          mask-aws-account-id: true
 
       # Dispatch: the one action asked for.
       - name: ${{ matrix.action }}

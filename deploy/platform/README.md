@@ -14,17 +14,18 @@ applied through the JFrog Terraform providers.
 
 | Scenario | AWS | GCP | Azure |
 |---|---|---|---|
-| `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | planned (#128) | [available](terraform/gcp/bootstrap/README.md) | [available](terraform/azure/bootstrap/README.md) |
-| `single-bucket`: one private bucket or container | planned (#128) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
+| `bootstrap`: CI identities, remote state, DNS zone, budget; applied once by an operator, not a scenario | [available](terraform/aws/bootstrap/README.md) | [available](terraform/gcp/bootstrap/README.md) | [available](terraform/azure/bootstrap/README.md) |
+| `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
 | `multi-region`: two regional stores as artifactweave mirror members | planned (#130) | planned (#130) | planned (#130) |
 | `geo-replicated`: one store with the cloud's own replication | planned (#131) | planned (#131) | planned (#131) |
 | `cdn`: a store behind CloudFront, Cloud CDN or Front Door | planned (#132) | planned (#133) | planned (#134) |
 
 `multicloud/mirror`, one mirror with a member on each cloud, is planned in #135.
 
-The two `single-bucket` scenarios are also the acceptance environments the real-cloud blob
+The three `single-bucket` scenarios are also the acceptance environments the real-cloud blob
 conformance tests run against. An operator's `make platform-apply` grants the bootstrap's
 conformance identity; a CI run applies them as the deployer instead (their `ci-vars.sh`).
+`aws/single-bucket` is wired for CI runs but no dispatched run has proven it yet.
 
 ## Bootstraps
 
@@ -40,6 +41,11 @@ make platform-apply         SCENARIO=gcp/bootstrap   # first run uses local stat
 make platform-migrate-state SCENARIO=gcp/bootstrap   # then moves it into the bucket it made
 make platform-github-vars   SCENARIO=gcp/bootstrap   # environments and repository variables
 ```
+
+`azure/bootstrap` and `aws/bootstrap` take the same steps, without `undelete-pool`. Each
+cloud's guard runs first: Azure checks the CLI's subscription, and AWS checks that the CLI
+is signed in to the account holding the delegated hosted zone, so the account ID stays out
+of this repository.
 
 `make platform-destroy` refuses on a bootstrap. The trusts and environments are described in
 [`docs/testing/ci.md`](../../docs/testing/ci.md#cloud-trust-and-environments), and the
@@ -60,8 +66,8 @@ make platform-smoke SCENARIO=gcp/single-bucket
 make platform-destroy SCENARIO=gcp/single-bucket
 ```
 
-`make gcp-<target>` and `make azure-<target>` remain as short forms for the two
-`single-bucket` scenarios.
+`make gcp-<target>`, `make azure-<target>` and `make aws-<target>` are short forms for the
+three `single-bucket` scenarios.
 
 Applying a scenario creates real, billed resources in the account your CLI is signed in to.
 Destroy it when you're done.
@@ -94,7 +100,9 @@ holds the variables a CI run passes.
 
 A pull request that changes the workflow, the driver, `test/platform` or a `single-bucket`
 scenario runs the whole cycle for GCP and Azure behind the same approval, and checks that
-nothing of the run is left.
+nothing of the run is left. AWS (`-f cloud=aws`) is wired the same way, with its state in
+the S3 state bucket and its buckets found by tag, and joins that proof once a dispatched
+run has proven it.
 
 ## Checks
 

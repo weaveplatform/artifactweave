@@ -1,7 +1,7 @@
 name: deploy | Platform deployer check
 
 # Proves GitHub's trust in the deployer identities that the bootstraps create
-# (deploy/platform/terraform/{gcp,azure}/bootstrap, decision 0030): the job
+# (deploy/platform/terraform/{gcp,azure,aws}/bootstrap, decision 0030): the job
 # runs in the cloud-platform environment, exchanges its OIDC token for the
 # deployer on each cloud, and makes read-only calls that need the deployer's
 # rights. It creates nothing and costs nothing. The scenario workflow (#129)
@@ -38,6 +38,8 @@ jobs:
       PLATFORM_GCP_STATE_BUCKET: ${{ vars.PLATFORM_GCP_STATE_BUCKET }}
       PLATFORM_AZURE_RESOURCE_GROUP: ${{ vars.PLATFORM_AZURE_RESOURCE_GROUP }}
       PLATFORM_AZURE_STATE_ACCOUNT: ${{ vars.PLATFORM_AZURE_STATE_ACCOUNT }}
+      PLATFORM_AWS_STATE_BUCKET: ${{ vars.PLATFORM_AWS_STATE_BUCKET }}
+      PLATFORM_AWS_DNS_ZONE_ID: ${{ vars.PLATFORM_AWS_DNS_ZONE_ID }}
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
@@ -52,12 +54,16 @@ jobs:
           PLATFORM_AZURE_CLIENT_ID: ${{ vars.PLATFORM_AZURE_CLIENT_ID }}
           PLATFORM_AZURE_TENANT_ID: ${{ vars.PLATFORM_AZURE_TENANT_ID }}
           PLATFORM_AZURE_SUBSCRIPTION_ID: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
+          # A secret, so the account ID in the ARN stays out of the public logs.
+          PLATFORM_AWS_ROLE_ARN: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
+          PLATFORM_AWS_REGION: ${{ vars.PLATFORM_AWS_REGION }}
         run: |
           for v in PLATFORM_GCP_WIF_PROVIDER PLATFORM_GCP_SERVICE_ACCOUNT PLATFORM_GCP_PROJECT \
             PLATFORM_GCP_STATE_BUCKET PLATFORM_AZURE_CLIENT_ID PLATFORM_AZURE_TENANT_ID \
-            PLATFORM_AZURE_SUBSCRIPTION_ID PLATFORM_AZURE_RESOURCE_GROUP PLATFORM_AZURE_STATE_ACCOUNT; do
+            PLATFORM_AZURE_SUBSCRIPTION_ID PLATFORM_AZURE_RESOURCE_GROUP PLATFORM_AZURE_STATE_ACCOUNT \
+            PLATFORM_AWS_ROLE_ARN PLATFORM_AWS_REGION PLATFORM_AWS_STATE_BUCKET PLATFORM_AWS_DNS_ZONE_ID; do
             if [ -z "${!v}" ]; then
-              echo "::error::$v is not set (make platform-github-vars SCENARIO=gcp/bootstrap and SCENARIO=azure/bootstrap)"
+              echo "::error::$v is not set (make platform-github-vars with SCENARIO=gcp/bootstrap, azure/bootstrap and aws/bootstrap)"
               exit 1
             fi
           done
@@ -91,3 +97,21 @@ jobs:
           az group show --name "$PLATFORM_AZURE_RESOURCE_GROUP" --query '{name:name,location:location}' -o tsv
           az storage blob list --account-name "$PLATFORM_AZURE_STATE_ACCOUNT" --container-name tfstate \
             --auth-mode login --num-results 5 --query '[].name' -o tsv
+
+      - name: Authenticate to AWS as the deployer
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PLATFORM_AWS_REGION }}
+          role-session-name: platform-auth-check-${{ github.run_id }}
+          mask-aws-account-id: true
+
+      # Buckets with the scenario prefix (the state bucket among them, listable
+      # but otherwise held by the boundary), and records in the scenarios' zone.
+      - name: Read the state bucket and the hosted zone
+        shell: bash
+        run: |
+          aws sts get-caller-identity --query 'Arn' --output text | sed 's/::[0-9]*:/::<account>:/'
+          aws s3api list-objects-v2 --bucket "$PLATFORM_AWS_STATE_BUCKET" --max-items 5 --query 'Contents[].Key' --output text
+          aws route53 list-resource-record-sets --hosted-zone-id "$PLATFORM_AWS_DNS_ZONE_ID" \
+            --max-items 5 --query 'ResourceRecordSets[].[Name,Type]' --output text
