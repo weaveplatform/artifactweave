@@ -7,7 +7,9 @@
 #
 #   include $(shell git rev-parse --show-toplevel)/deploy/ci/scenario.mk
 #
-#   TF_VARS             extra -var flags for plan, apply and destroy
+#   TF_VARS             the scenario's own -var flags for plan, apply and
+#                       destroy; define it with =, so a $(LAB_*) value in it
+#                       expands after lab.mk is included
 #   CONFORMANCE_DEPS    prerequisites of conformance besides the guard
 #   CONFORMANCE_ENV     environment for the real-cloud tests; define it with =, not
 #                       :=, so the $$(terraform output ...) calls run in the recipe
@@ -18,8 +20,10 @@
 #
 # The cloud is the name of the scenario's parent directory. It picks the guard
 # every target that touches the cloud runs first (check-account.sh on AWS,
-# check-subscription.sh on Azure, none on GCP) and, on Azure, pins Terraform to
-# the lab's subscription. The lab's values come from lab.mk.
+# check-subscription.sh on Azure, none on GCP) and the inputs lab-vars.sh
+# adds to the Makefile's for plan, apply and destroy: the account scope, the
+# bootstrap's conformance identity as the app principal, and force_destroy.
+# The lab's values come from lab.mk.
 #
 # ROOT comes from git rather than a relative path, so a scenario works at any
 # depth.
@@ -45,9 +49,12 @@ PORT ?= $(if $(filter gcp,$(CLOUD)),8081,$(if $(filter azure,$(CLOUD)),8082,8083
 LOCAL := CLOUD=$(CLOUD) PORT=$(PORT) TERRAFORM=$(TERRAFORM) $(ROOT)/deploy/ci/local.sh
 
 include $(ROOT)/deploy/ci/lab.mk
+# lab-vars.sh reads these from the environment.
+export LAB_GCP_PROJECT LAB_AZURE_SUBSCRIPTION LAB_AZURE_BOOTSTRAP_RG
 
 GUARD := $(if $(filter aws,$(CLOUD)),check-account,$(if $(filter azure,$(CLOUD)),check-subscription))
-TF_VARS += $(if $(filter azure,$(CLOUD)),-var subscription_id=$(LAB_AZURE_SUBSCRIPTION))
+# Sourced in the recipe line that runs terraform, so its exports reach it.
+LAB_VARS = . $(ROOT)/deploy/ci/lab-vars.sh $(CLOUD) &&
 
 .PHONY: help plan apply render credentials up smoke verify conformance github-vars logs down clean destroy check-account check-subscription
 
@@ -66,12 +73,12 @@ check-subscription:
 ## plan: terraform plan
 plan: $(GUARD)
 	$(TERRAFORM) init -input=false
-	$(TERRAFORM) plan -input=false $(TF_VARS)
+	$(LAB_VARS) $(TERRAFORM) plan -input=false $(TF_VARS)
 
 ## apply: create the scenario's resources
 apply: $(GUARD)
 	$(TERRAFORM) init -input=false
-	$(TERRAFORM) apply -input=false $(TF_VARS)
+	$(LAB_VARS) $(TERRAFORM) apply -input=false $(TF_VARS)
 
 ## render: write .local/artifactweave.yaml from the artifactweave_config output, and the local secrets
 render:
@@ -121,4 +128,4 @@ clean:
 
 ## destroy: remove everything Terraform created, stored objects included
 destroy: $(GUARD) clean
-	$(TERRAFORM) destroy -input=false $(TF_VARS)
+	$(LAB_VARS) $(TERRAFORM) destroy -input=false $(TF_VARS)

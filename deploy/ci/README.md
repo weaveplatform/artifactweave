@@ -12,6 +12,7 @@ decision [0030](../../docs/research/decisions/0030-reference-deployments.md).
 | [`terraform/aws`](terraform/aws/README.md), [`terraform/gcp`](terraform/gcp/README.md), [`terraform/azure`](terraform/azure/README.md) | The bootstraps |
 | [`bootstrap.mk`](bootstrap.mk) | The make targets the bootstraps share |
 | [`scenario.mk`](scenario.mk) | The make targets every `deploy/platform` scenario shares |
+| [`lab-vars.sh`](lab-vars.sh) | The inputs an operator run passes besides the scenario's Makefile, resolved with the operator's CLI and sourced by `scenario.mk`'s `plan`, `apply` and `destroy`: the account scope, the bootstrap's conformance identity as the app principal, on Azure the signed-in operator as an additional principal, and `force_destroy=true` |
 | [`check-account.sh`](check-account.sh), [`check-subscription.sh`](check-subscription.sh) | The guards: refuse an AWS run outside the account holding the lab's zone, and an Azure run outside the lab's subscription |
 | [`github-environments.sh`](github-environments.sh) | Creates the `cloud-conformance` and `cloud-platform` GitHub environments |
 | [`scenario-ci.sh`](scenario-ci.sh) | The CI driver `platform-scenarios.yml` runs: apply, test, destroy, reap, check-clean |
@@ -56,7 +57,9 @@ environments are described in
 `platform-scenarios.yml` runs [`scenario-ci.sh`](scenario-ci.sh) as each cloud's deployer.
 Every action works on a fresh copy of the scenario, with the state at
 `scenarios/<cloud>/<scenario>/<instance>` in the bootstrap's state store, and the scenario's
-`ci-vars.sh` supplies the variables a CI run passes. How to dispatch it and which scenarios a
+`ci-vars.sh` supplies the variables a CI run passes. Every name a run gives its resources
+starts with the driver's `NAME_PREFIX`: `artifactweave-awscn-` on AWS, where the deployer may
+manage only `artifactweave-*` buckets, and `awscn-` on GCP and Azure. How to dispatch it and which scenarios a
 pull request proves are in [`deploy/platform`](../platform/README.md#running-a-scenario-in-ci)
 and [`docs/testing/ci.md`](../../docs/testing/ci.md#platform-scenarios-manual).
 

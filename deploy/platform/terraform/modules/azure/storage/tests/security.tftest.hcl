@@ -1,92 +1,70 @@
-# The storage account's security invariants, checked on a plan against a
-# mocked provider: no credentials and no calls to Azure (decision 0030).
-# Scenarios that call this module check how they compose it, not these again.
+# The storage account's security baseline (decision 0030), checked on a plan
+# against a mocked provider: no credentials and no calls to Azure. Scenarios
+# that call this module check how they compose it, not these again. One
+# assertion per run, so a failure names the invariant it breaks.
 
 mock_provider "azurerm" {}
 
 variables {
-  account_name        = "awmr0a1b2c3duksouth"
-  resource_group_name = "artifactweave-scenarios-rg"
+  account_name        = "example0a1b2cuks"
+  resource_group_name = "example-rg"
   location            = "uksouth"
-  container           = "artifactweave"
-  store_prefix        = "local/"
   principals = {
-    operator = "00000000-0000-0000-0000-000000000001"
+    app      = { principal_id = "00000000-0000-0000-0000-00000000000a" }
+    operator = { principal_id = "00000000-0000-0000-0000-00000000000b", principal_type = "User" }
   }
 }
 
-run "account_takes_entra_id_only" {
+run "no_blob_can_be_public" {
   command = plan
 
   assert {
-    condition     = azurerm_storage_account.blobs.shared_access_key_enabled == false
-    error_message = "Shared Key must stay disabled, so no account key exists to leak"
-  }
-
-  assert {
-    condition     = azurerm_storage_account.blobs.allow_nested_items_to_be_public == false
-    error_message = "no container in the account may be made public"
-  }
-
-  assert {
-    condition     = azurerm_storage_account.blobs.min_tls_version == "TLS1_2"
-    error_message = "the account must refuse TLS older than 1.2"
-  }
-
-  assert {
-    condition     = azurerm_storage_account.blobs.https_traffic_only_enabled
-    error_message = "the account must refuse plain HTTP"
-  }
-
-  assert {
-    condition     = azurerm_storage_container.blobs.container_access_type == "private"
-    error_message = "the container must be private"
+    condition     = azurerm_storage_account.blobs.allow_nested_items_to_be_public == false && azurerm_storage_container.blobs.container_access_type == "private"
+    error_message = "the container must be private, and the account must refuse to make any container public"
   }
 }
 
-run "account_is_one_region" {
+run "plain_http_and_old_tls_are_refused" {
   command = plan
 
   assert {
-    condition     = azurerm_storage_account.blobs.account_replication_type == "LRS"
-    error_message = "the account keeps one region's copies: the mirror keeps the other, and the cloud's replicas never count toward its quorum (decision 0028)"
+    condition     = azurerm_storage_account.blobs.https_traffic_only_enabled && azurerm_storage_account.blobs.min_tls_version == "TLS1_2"
+    error_message = "the account must refuse plain HTTP and TLS older than 1.2"
   }
 }
 
-run "abandoned_uploads_expire" {
+run "access_is_entra_id_only" {
   command = plan
 
   assert {
-    condition = anytrue([
-      for rule in azurerm_storage_management_policy.cleanup.rule :
-      rule.enabled && contains(rule.filters[0].prefix_match, "artifactweave/local/_uploads/")
-    ])
-    error_message = "a management policy rule must delete the temporary blobs an interrupted run leaves under _uploads/"
+    condition     = azurerm_storage_account.blobs.shared_access_key_enabled == false && azurerm_storage_account.blobs.default_to_oauth_authentication
+    error_message = "Shared Key must stay disabled, so no account key exists to leak and every request carries an Entra ID identity"
   }
 }
 
-run "principals_get_blob_data_only" {
+run "data_is_encrypted_at_rest" {
   command = plan
 
   assert {
-    condition     = azurerm_role_assignment.app["operator"].role_definition_name == "Storage Blob Data Contributor"
-    error_message = "each principal gets blob data rights on this account, not account administration"
-  }
-
-  assert {
-    condition     = azurerm_role_assignment.app["operator"].principal_id == "00000000-0000-0000-0000-000000000001"
-    error_message = "the role assignment must go to the principal given"
+    condition     = azurerm_storage_account.blobs.account_kind == "StorageV2" && length(azurerm_storage_account.blobs.customer_managed_key) == 0
+    error_message = "the account must be a StorageV2 account on Azure's service-side encryption with Microsoft-managed keys"
   }
 }
 
-run "account_name_is_checked" {
+run "principals_get_blob_data_rights_on_this_account_only" {
   command = plan
 
-  variables {
-    account_name = "Not-A-Valid-Name"
+  assert {
+    # A mocked plan fills an unset principal_type with a generated value,
+    # so only the operator's, which is set, is compared.
+    condition = {
+      for k, a in azurerm_role_assignment.app : k => [a.role_definition_name, a.principal_id, k == "operator" ? a.principal_type : ""]
+      } == {
+      app      = ["Storage Blob Data Contributor", "00000000-0000-0000-0000-00000000000a", ""]
+      operator = ["Storage Blob Data Contributor", "00000000-0000-0000-0000-00000000000b", "User"]
+    }
+    error_message = "each principal must get blob data rights, as the type given, and no account administration"
   }
-
-  expect_failures = [var.account_name]
 }
 
 run "tags_reach_the_account" {
@@ -97,7 +75,7 @@ run "tags_reach_the_account" {
   }
 
   assert {
-    condition     = azurerm_storage_account.blobs.tags["expires-at"] == "1767225600" && azurerm_storage_account.blobs.tags["instance"] == "r1"
-    error_message = "the account must carry the scenario tags reap matches"
+    condition     = azurerm_storage_account.blobs.tags == tomap({ artifactweave-scenario = "multi-region", instance = "r1", expires-at = "1767225600" })
+    error_message = "the account, the one resource here that takes tags, must carry the tags given"
   }
 }

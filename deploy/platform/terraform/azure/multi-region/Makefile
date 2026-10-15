@@ -1,9 +1,8 @@
-# azure/multi-region: two storage accounts in two regions as members of one
-# artifactweave mirror, granted to the bootstrap's conformance identity and to
-# you. Apply the bootstrap (deploy/ci/terraform/azure) first. Plan and apply
-# need az login and az account set --subscription to the lab's
-# (LAB_AZURE_SUBSCRIPTION in deploy/ci/lab.mk). make up, smoke and verify run
-# artifactweave natively from the artifactweave_config output
-# (deploy/ci/local.sh); the conformance target is in azure/single-bucket.
+# azure/multi-region in the lab: make plan, apply and destroy pass these and
+# deploy/ci/lab-vars.sh's inputs (the lab's subscription, the bootstrap's
+# conformance identity as the app identity, and you as an additional
+# principal). The README's "How this scenario is tested" lists them.
+
+TF_VARS = -var name=artifactweave-mr -var locations='["uksouth", "ukwest"]'
 
 include $(shell git rev-parse --show-toplevel)/deploy/ci/scenario.mk
