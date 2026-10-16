@@ -49,6 +49,8 @@ deploy/
     prove-matrix_test.sh          table test of prove-matrix.sh
     lint-contract.sh              the scenario, module, app-layer and bootstrap contract
     local.sh                      the local runner for any applied scenario
+    cloudfront-key.sh             the CloudFront key pair a CDN scenario signs with, made
+                                  outside Terraform
     github-environments.sh        creates the cloud-conformance and cloud-platform environments
     check-account.sh              refuses an AWS run outside the lab account
     check-subscription.sh         refuses an Azure run outside the lab subscription
@@ -103,9 +105,10 @@ test/terraform/run.sh             the app-layer driver: builds a -cover server, 
 
 | Module | Creates | Inputs (default) |
 |---|---|---|
-| `aws/storage` | one private S3 bucket and its policy | `name`, `region`, `principals` (map of role ARNs, at least one), `store_prefix` (`""`), `versioning` (false), `expiring_prefixes` ({}), `force_destroy` (false), `tags` ({}) |
+| `aws/storage` | one private S3 bucket and its policy | `name`, `region`, `principals` (map of role ARNs, at least one), `store_prefix` (`""`), `versioning` (false), `expiring_prefixes` ({}), `force_destroy` (false), `policy_statements` ([]), `tags` ({}) |
 | `aws/replication` | S3 cross-region replication from one bucket to another, and its IAM role | `name`, `source_bucket` and `destination_bucket` (`aws/storage` outputs; `source` is reserved in a `module` block), `prefix`, `replicate_deletes` (false), `replication_time_control` (false), `storage_class` ("STANDARD"), `permissions_boundary_arn` (null), `iam_role_path` (null), `tags` ({}) |
 | `gcp/storage` | one private GCS bucket and its grants | `name`, `location`, `data_locations` ([], zero or two), `rpo` (null), `principals` (map of service-account emails), `store_prefix` (`""`), `expiring_prefixes` ({}), `force_destroy` (false), `labels` ({}) |
+| `aws/cdn` | a CloudFront distribution in front of one `aws/storage` bucket: origin access control, the cache policy, the key group and its public keys, and with `domain_name` an ACM certificate in `us-east-1` and alias records | `name`, `origin_bucket` (the storage module's `bucket`, `arn` and `region`), `public_keys` (map of PEM public keys, one to five), `store_prefix` (`""`), `domain_name` (null), `zone_id` (null, set with `domain_name`), `price_class` ("PriceClass_All"), `tags` ({}) |
 | `azure/storage` | one storage account, its container, lifecycle policy and grants | `account_name`, `resource_group_name`, `location`, `replication_type` ("LRS"), `container` ("artifactweave"), `store_prefix` (`""`), `principals` (map of `{principal_id, principal_type}`, type optional), `expiring_prefixes` ({}), `tags` ({}) |
 
 Every storage module enforces, and tests, the same baseline in its cloud's terms: no public
@@ -127,7 +130,9 @@ buckets and needs its own IAM role, so it is the separate `aws/replication` modu
 CDN capabilities are a flat `modules/<cloud>/cdn` beside storage, composed by the `cdn`
 scenarios. Storage interfaces only grow additively for them: on AWS the CDN module outputs
 the origin access control's bucket-policy statement and the scenario passes it to
-`aws/storage` (S3 allows one policy per bucket); on GCP the CDN module grants
+`aws/storage`'s `policy_statements` (S3 allows one policy per bucket), handing the CDN module
+the storage module's outputs one by one, since a reference to the whole storage module would
+wait for the policy that waits for the statement; on GCP the CDN module grants
 `cloud-cdn-fill` read access itself, because IAM members are not authoritative; on Azure
 storage gains `public_network_access_enabled` and the CDN module owns the Private Link
 origin. The multicloud mirror composes all three storage modules, one call each; its inputs
@@ -206,22 +211,24 @@ placements and the three app identities, and refuses a bare `region` or `locatio
 
 **Outputs.**
 
-| Output | single-bucket | multi-region | geo-replicated | File |
-|---|---|---|---|---|
-| `artifactweave_config` | yes | yes | yes | `outputs.tf` |
-| `storage_host`: where a `downloadRedirect` repository's signed URLs point | yes | the first member | the primary | `outputs.tf` |
-| `bucket` and `region` (AWS), `bucket` (GCP), `account` and `container` (Azure) | yes | n/a | yes | `outputs.tf` |
-| `buckets` or `accounts`, a map by placement | n/a | yes | n/a | `outputs.tf` |
-| `replica_bucket`, `replica_region`, `replicated_prefix`, `failover_artifactweave_config` | n/a | n/a | AWS | `outputs.tf` |
-| `location`, `rpo` | n/a | n/a | GCP | `outputs.tf` |
-| `replication_type`, `secondary_location`, `secondary_storage_host` | n/a | n/a | Azure | `outputs.tf` |
-| `resource_group` | Azure | Azure | Azure | `outputs.tf` |
-| `expires_at`: the instance's `expires-at` label, which reap reads from state | yes | yes | yes | `harness.tf` |
-| `mirror_members`: each member's store and host, which `test/platform` reads | n/a | yes, and `multicloud/mirror` | n/a | `harness.tf` |
-| `service_account`: the app service account, which `make conformance` passes to the real-GCS tests as their signing identity | GCP | n/a | n/a | `harness.tf` |
+| Output | single-bucket | multi-region | geo-replicated | cdn | File |
+|---|---|---|---|---|---|
+| `artifactweave_config` | yes | yes | yes | yes | `outputs.tf` |
+| `storage_host`: where a `downloadRedirect` repository's signed URLs point | yes | the first member | the primary | the CDN host | `outputs.tf` |
+| `bucket` and `region` (AWS), `bucket` (GCP), `account` and `container` (Azure) | yes | n/a | yes | yes | `outputs.tf` |
+| `buckets` or `accounts`, a map by placement | n/a | yes | n/a | n/a | `outputs.tf` |
+| `replica_bucket`, `replica_region`, `replicated_prefix`, `failover_artifactweave_config` | n/a | n/a | AWS | n/a | `outputs.tf` |
+| `location`, `rpo` | n/a | n/a | GCP | n/a | `outputs.tf` |
+| `replication_type`, `secondary_location`, `secondary_storage_host` | n/a | n/a | Azure | n/a | `outputs.tf` |
+| `origin_host`: the store's own host, where `X-JFrog-Download-Redirect-To: S3` sends a `downloadRedirect` repository's download | n/a | n/a | n/a | yes | `outputs.tf` |
+| `distribution_id`, `distribution_domain` | n/a | n/a | n/a | AWS | `outputs.tf` |
+| `resource_group` | Azure | Azure | Azure | Azure | `outputs.tf` |
+| `expires_at`: the instance's `expires-at` label, which reap reads from state | yes | yes | yes | yes | `harness.tf` |
+| `mirror_members`: each member's store and host, which `test/platform` reads | n/a | yes, and `multicloud/mirror` | n/a | n/a | `harness.tf` |
+| `service_account`: the app service account, which `make conformance` passes to the real-GCS tests as their signing identity | GCP | n/a | n/a | n/a | `harness.tf` |
 
 `artifactweave_config` renders the sections of `artifactweave.yaml` the scenario needs:
-`blob` for every scenario, and `cdn` as well for the CDN scenarios. Outputs that only echo an
+`blob` for every scenario, with its store's `cdn` block for the CDN scenarios. Outputs that only echo an
 input (`store_prefix`, the app principal, the account scope) are not outputs, except in
 `harness.tf` where the harness reads one.
 
@@ -378,6 +385,9 @@ identity would.
 
 - CDN signing keys are generated in the workflow job, outside Terraform, and handed to
   artifactweave through a file. Only the CloudFront public key reaches Terraform.
+  `deploy/ci/cloudfront-key.sh` makes the pair: `scenario-ci.sh` calls it with a fresh
+  directory for each instance whose `ci-vars.sh` names `CLOUDFRONT_PUBLIC_KEY`, and
+  `lab-vars.sh` once in an operator's scenario directory, under the ignored `.secrets/`.
 - The Cloud CDN key is added with `gcloud` after apply, because
   `google_compute_backend_bucket_signed_url_key` stores its `key_value` in state as plain
   text and has no write-only variant. If the provider gains one, the scenario switches to it.
@@ -459,6 +469,13 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   clouds, but only for resources whose `artifactweave-scenario` label names a multicloud
   scenario; a single cloud's reap leaves those alone, so each instance has one reap that owns
   it.
+- For `aws/cdn`, reap lists CloudFront distributions and `us-east-1` certificates and reads
+  their tags, disabling a distribution and waiting for the change to reach every edge before
+  deleting it. The origin access control, cache policy, key group and public keys take no
+  tags and are found by name, `NAME_PREFIX` then the instance; the instance's records by its
+  host, `cdn-<instance>`, in the bootstrap's zone. An instance with a tagged piece not yet
+  expired, or an untagged one younger than two hours, keeps every piece. Only an AWS reap
+  deletes these: a multicloud reap shares the name prefix but cannot see `aws/cdn`'s states.
 - A dispatch finds only workflows on the default branch, so a pull request runs proofs
   instead, behind the same approval. `prove-matrix.sh` chooses them from the changed paths:
 
@@ -468,6 +485,7 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   | a `test/platform` file naming scenarios in `"<cloud>/<scenario>"` literals | exactly those scenarios |
   | any other `test/platform` file | every cloud's `single-bucket` |
   | the driver, `prove-matrix.sh` or the workflow | every cloud's `single-bucket` |
+  | `cloudfront-key.sh` | every scenario whose `ci-vars.sh` takes its key pair |
   | a scenario's `*.tf`, lock file or `ci-vars.sh` | that scenario |
   | only a README, `Makefile` or `tests/` | nothing |
   | a pull request labelled `prove-all` | every scenario |
@@ -591,7 +609,9 @@ roles, because those are part of what a reference shows.
 - A consumer who copies a scenario must keep the `../../modules/<cloud>` layout beside it, or
   switch its module sources to the git form.
 - CloudFront distributions, Front Door profiles and managed certificates take minutes to tens
-  of minutes to create and delete, which bounds how fast a `test` run can be.
+  of minutes to create and delete, which bounds how fast a `test` run can be. A CDN proof can
+  outlast the AWS deployer's one-hour session, so the workflow renews it before the proof's
+  second half and before a clean-up after a failure.
 - Front Door Premium bills each started hour that a profile exists (section 5), so the Azure
   CDN scenario proves with `test` alone.
 - The GCP pool `github-actions` was deleted on 2026-10-14 and undeleted for the bootstrap,

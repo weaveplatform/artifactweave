@@ -118,3 +118,23 @@ run "expiring_prefix_days_are_whole_and_positive" {
 
   expect_failures = [var.expiring_prefixes]
 }
+
+run "policy_statements_need_their_own_sid" {
+  command = plan
+
+  variables {
+    policy_statements = [{ Sid = "TLSOnly", Effect = "Allow", Principal = "*", Action = "s3:GetObject", Resource = "*" }]
+  }
+
+  expect_failures = [var.policy_statements]
+}
+
+run "policy_statements_need_a_sid" {
+  command = plan
+
+  variables {
+    policy_statements = [{ Effect = "Allow", Principal = { Service = "cloudfront.amazonaws.com" }, Action = "s3:GetObject", Resource = "*" }]
+  }
+
+  expect_failures = [var.policy_statements]
+}

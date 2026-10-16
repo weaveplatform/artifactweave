@@ -203,12 +203,25 @@ shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`
 - `reap` destroys expired instances and deletes resources that outlived their state. AWS
   buckets are found by listing the deployer's `artifactweave-` buckets with their regions and
   reading each one's tags there, because a scenario can span regions and the tagging API
-  answers for one region only. A versioned bucket is emptied of its versions first.
+  answers for one region only. A versioned bucket is emptied of its versions first. For
+  `aws/cdn`, an AWS `reap` also lists CloudFront distributions and `us-east-1` certificates
+  by their tags, disabling a distribution and waiting for every edge before deleting it, and
+  finds the untagged origin access control, cache policy, key group, public keys and the
+  instance's records by name; `check-clean` looks for all of them. A multicloud `reap` leaves
+  these to AWS's.
 - `cloud` may be `multicloud`, for `multicloud/mirror`: the job logs in to GCP, Azure and AWS
   as their deployers, the state lives in GCP's state bucket under `scenarios/multicloud/`, and
   names take AWS's `artifactweave-awscn-` prefix. Its `reap` and `check-clean` look on all
   three clouds; its `reap` deletes only resources labelled with a multicloud scenario, which
   a single cloud's `reap` skips.
+- The `cdn` scenarios run with a host of their own, `cdn-<instance>` in the bootstrap's zone,
+  and a CloudFront key pair `scenario-ci.sh` generates for each instance, outside Terraform,
+  through `deploy/ci/cloudfront-key.sh`. Their generic checks' redirects go through the real
+  edge; `cdn_test.go` adds `cdnRedirect` alone, the `S3` redirect header, filenames kept
+  through the edge cache, an expired signature refused, and `jf rt dl` across the edge, with
+  the pinned `jf` the job installs (`.github/actions/jfrog-cli`, the acceptance job's pin
+  too). The AWS session lasts an hour, so the job renews it before a proof's second half and
+  before a clean-up after a failure.
 - The `geo-replicated` scenarios add checks that look past artifactweave at the cloud's own
   copy: S3's replication status and the replica object, the GCS bucket's real dual-region
   placement, and the Azure secondary endpoint serving the blob through artifactweave's SAS.
@@ -224,7 +237,8 @@ chooses from the changed paths:
 | Changed path | Proves |
 |---|---|
 | The workflow, `scenario-ci.sh`, `platform-tests.sh` or `prove-matrix.sh` | Every cloud's `single-bucket` |
-| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios and `multicloud/mirror`, `replica_test.go` the `geo-replicated` ones |
+| `cloudfront-key.sh` | Every scenario whose `ci-vars.sh` takes its key pair (`CLOUDFRONT_*`): `aws/cdn` |
+| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios and `multicloud/mirror`, `replica_test.go` the `geo-replicated` ones, `cdn_test.go` the `cdn` ones |
 | A `test/platform` Go file that names none (`harness_test.go`, `generic_test.go`), any other `test/platform` file, or a deleted one | Every cloud's `single-bucket` |
 | A module's top-level `.tf` (`modules/<cloud>/<capability>/*.tf`) | Every scenario, in any cloud directory, whose Terraform sources exactly that module |
 | A scenario's top-level `.tf`, `.terraform.lock.hcl` or `ci-vars.sh` | That scenario |
@@ -249,7 +263,7 @@ scenario's initials can begin another's (`mirror`'s `m`, `multi-region`'s `mr`).
 ## Terraform scenarios
 
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
-identity and OIDC references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
+identity, OIDC and CDN repositories references in `deploy/artifactweave/terraform/`. `test/terraform/` holds only
 the driver.
 - It downloads `terraform-provider-artifactory_<version>_<os>_<arch>.zip` and
   `terraform-provider-platform_<version>_<os>_<arch>.zip` once into a filesystem mirror,

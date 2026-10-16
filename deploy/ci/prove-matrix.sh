@@ -6,6 +6,8 @@
 #   - the workflow, deploy/ci/scenario-ci.sh, deploy/ci/platform-tests.sh
 #     (the test step both CI and local.sh verify run) or this script: every
 #     cloud's single-bucket, the baseline every scenario builds on;
+#   - deploy/ci/cloudfront-key.sh: the scenarios whose ci-vars.sh takes the
+#     key pair it makes (CLOUDFRONT_*), aws/cdn;
 #   - a test/platform Go file: the scenarios it names as quoted
 #     "<cloud>/<scenario>" literals (mirror_test.go names the multi-region
 #     scenarios and multicloud/mirror, replica_test.go the geo-replicated
@@ -58,6 +60,14 @@ scenarios() {
   done
 }
 
+# key_users prints the scenarios whose ci-vars.sh takes the CloudFront key
+# pair scenario-ci.sh makes with cloudfront-key.sh.
+key_users() {
+  scenarios | while read -r cloud scenario; do
+    if grep -qs CLOUDFRONT_ "$root/$here/$cloud/$scenario/ci-vars.sh"; then echo "$cloud $scenario"; fi
+  done
+}
+
 single_buckets() {
   local cloud
   for cloud in $(clouds); do
@@ -100,6 +110,9 @@ while IFS= read -r file; do
   case $file in
   .github/workflows/platform-scenarios.yml | "$ci/scenario-ci.sh" | "$ci/platform-tests.sh" | "$ci/prove-matrix.sh")
     single_buckets
+    ;;
+  "$ci/cloudfront-key.sh")
+    key_users
     ;;
   test/platform/*.go)
     if [ -n "$(named "$root/$file")" ]; then

@@ -59,6 +59,22 @@ variable "force_destroy" {
   default     = false
 }
 
+variable "policy_statements" {
+  description = "Further bucket policy statements, appended after the module's own, because S3 allows one policy per bucket: a CDN's read grant, for one (modules/aws/cdn's bucket_policy_statement). Each needs a Sid other than the module's TLSOnly, AppObjects and AppListing."
+  # A statement's Principal, Resource and Condition each take several
+  # shapes, so no object type fits every statement.
+  type    = any
+  default = []
+
+  # S3 refuses, at apply, a policy whose statements repeat a Sid.
+  validation {
+    condition = alltrue([
+      for s in var.policy_statements : can(s.Sid) && !contains(["TLSOnly", "AppObjects", "AppListing"], try(s.Sid, ""))
+    ])
+    error_message = "each policy statement needs a Sid other than TLSOnly, AppObjects and AppListing."
+  }
+}
+
 variable "tags" {
   description = "Tags for the bucket, the one resource here that takes them."
   type        = map(string)

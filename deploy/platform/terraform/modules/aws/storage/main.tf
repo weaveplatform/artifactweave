@@ -128,13 +128,15 @@ resource "aws_s3_bucket_lifecycle_configuration" "blobs" {
 
 # The principals get this bucket's objects through the bucket policy, so
 # their rights end with the bucket and leave with it. Within one account a
-# bucket policy alone grants access.
+# bucket policy alone grants access. The caller's policy_statements follow
+# the module's own, which they add to but never replace; the public access
+# block still refuses any statement that would make the bucket public.
 resource "aws_s3_bucket_policy" "blobs" {
   region = var.region
   bucket = aws_s3_bucket.blobs.id
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         Sid       = "TLSOnly"
         Effect    = "Deny"
@@ -160,7 +162,7 @@ resource "aws_s3_bucket_policy" "blobs" {
         Action    = ["s3:ListBucket", "s3:ListBucketMultipartUploads"]
         Resource  = local.bucket_arn
       },
-    ]
+    ], var.policy_statements)
   })
   depends_on = [aws_s3_bucket_public_access_block.blobs]
 }

@@ -177,12 +177,20 @@ apply_oidc() {
 	tf apply -auto-approve
 }
 
+# The cdn-repositories scenario: the redirect flags must read back as
+# written, so the plan after the apply is empty.
+apply_cdn_repositories() {
+	export TF_VAR_cdn_repository_key=tf-generic-cdn TF_VAR_direct_repository_key=tf-generic-direct
+	tf apply -auto-approve
+}
+
 for scenario in "${scenarios[@]}"; do
 	dir="$work/scenarios/$scenario"
 	case $scenario in
 	deploy/artifactweave/terraform/repositories) apply_repositories ;;
 	deploy/artifactweave/terraform/identity) apply_identity ;;
 	deploy/artifactweave/terraform/oidc) apply_oidc ;;
+	deploy/artifactweave/terraform/cdn-repositories) apply_cdn_repositories ;;
 	*)
 		echo "run.sh has no apply steps for $scenario" >&2
 		exit 1

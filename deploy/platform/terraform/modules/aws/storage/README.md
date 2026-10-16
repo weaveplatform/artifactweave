@@ -2,12 +2,14 @@
 
 One private S3 bucket and its bucket policy, granting the IAM roles in `principals` the
 bucket's objects. [`aws/single-bucket`](../../../aws/single-bucket/README.md) calls it once,
-[`aws/multi-region`](../../../aws/multi-region/README.md) once per region, and
+[`aws/multi-region`](../../../aws/multi-region/README.md) once per region,
 [`aws/geo-replicated`](../../../aws/geo-replicated/README.md) twice, versioned, for
-[`modules/aws/replication`](../replication/README.md) to join. The module holds no provider
-block: every resource names its `region`, the per-resource region of the AWS provider 6, so
-one provider configuration serves buckets in several regions without aliases (decision
-[0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
+[`modules/aws/replication`](../replication/README.md) to join,
+[`aws/cdn`](../../../aws/cdn/README.md) once, with [`modules/aws/cdn`](../cdn/README.md)'s read
+grant in `policy_statements`, and [`multicloud/mirror`](../../../multicloud/mirror/README.md)
+once, for its AWS mirror member. The module holds no provider block: every resource names its
+`region`, the per-resource region of the AWS provider 6, so one provider configuration serves
+buckets in several regions without aliases (decision [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
 
 ## What it creates
 
@@ -19,7 +21,9 @@ one provider configuration serves buckets in several regions without aliases (de
   by default.
 - `aws_s3_bucket_versioning.blobs`: only when `versioning` is true, as S3 replication needs.
 - `aws_s3_bucket_lifecycle_configuration.blobs`: the expiry backstops below.
-- `aws_s3_bucket_policy.blobs`: TLS required, and object and listing rights for `principals`.
+- `aws_s3_bucket_policy.blobs`: TLS required, and object and listing rights for `principals`,
+  followed by any `policy_statements`, such as a CDN's read grant from
+  [`modules/aws/cdn`](../cdn/README.md): S3 allows one policy per bucket.
 
 ## Invariants
 
@@ -36,6 +40,11 @@ one provider configuration serves buckets in several regions without aliases (de
 - The principals reach this bucket and its objects only (`tests/security.tftest.hcl`, run
   `principals_reach_this_bucket_only`), with object and listing actions and no bucket
   administration (run `principals_get_object_and_listing_rights_only`).
+- A caller's `policy_statements` follow the module's own, never replacing them
+  (`tests/security.tftest.hcl`, run `policy_statements_follow_the_modules_own`), and each
+  has a Sid of its own (`tests/inputs.tftest.hcl`, runs `policy_statements_need_their_own_sid`
+  and `policy_statements_need_a_sid`). The public access block still refuses one that would
+  make the bucket public.
 - Tags reach the bucket, the one resource that takes them (`tests/security.tftest.hcl`, run
   `tags_reach_the_bucket`).
 - `<store_prefix>_uploads/` expires after 2 days (`tests/lifecycle.tftest.hcl`, run
@@ -118,6 +127,7 @@ No modules.
 | expiring\_prefixes | Further key prefixes, from the bucket's root, whose objects expire after the given number of days, for example { "scratch/" = 1 }. | `map(number)` | `{}` | no |
 | force\_destroy | Let terraform destroy delete the bucket with every object (and version) still in it. Off, a destroy fails on a bucket that holds anything. | `bool` | `false` | no |
 | name | Bucket name: 3 to 63 lowercase letters, digits and hyphens, globally unique. | `string` | n/a | yes |
+| policy\_statements | Further bucket policy statements, appended after the module's own, because S3 allows one policy per bucket: a CDN's read grant, for one (modules/aws/cdn's bucket\_policy\_statement). Each needs a Sid other than the module's TLSOnly, AppObjects and AppListing. | `any` | `[]` | no |
 | principals | ARNs of the IAM roles that get this bucket's objects and listing through the bucket policy, by a static name (app, for one), so the plan does not wait for the ARNs. | `map(string)` | n/a | yes |
 | region | Region of the bucket and of every resource that configures it. | `string` | n/a | yes |
 | store\_prefix | Key prefix artifactweave writes under (blob.s3.prefix), normalised as the backend does: no leading slash, one trailing slash. Its \_uploads/ parts expire after two days. | `string` | `""` | no |
@@ -131,6 +141,7 @@ No modules.
 | arn | The bucket's ARN, for policies and replication rules that name it. |
 | bucket | The bucket's name, for blob.s3.bucket. |
 | host | The bucket's virtual-hosted endpoint, where the SDK's presigned URLs point. |
+| policy | The bucket policy's JSON: the module's own statements, then policy\_statements. |
 | region | The bucket's region, for blob.s3.region. |
 | signed\_url\_prefix | What a presigned URL for an object in this bucket starts with after the scheme. |
 | versioned | Whether versioning is on, which S3 replication requires of both buckets. |

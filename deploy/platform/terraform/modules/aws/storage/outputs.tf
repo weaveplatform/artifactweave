@@ -30,3 +30,8 @@ output "signed_url_prefix" {
   description = "What a presigned URL for an object in this bucket starts with after the scheme."
   value       = "${aws_s3_bucket.blobs.bucket}.s3.${var.region}.amazonaws.com/"
 }
+
+output "policy" {
+  description = "The bucket policy's JSON: the module's own statements, then policy_statements."
+  value       = aws_s3_bucket_policy.blobs.policy
+}

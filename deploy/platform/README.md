@@ -21,7 +21,7 @@ applied through the JFrog Terraform providers.
 | `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
 | `multi-region`: regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
 | `geo-replicated`: one store with the cloud's own replication | [available](terraform/aws/geo-replicated/README.md) | [available](terraform/gcp/geo-replicated/README.md) | [available](terraform/azure/geo-replicated/README.md) |
-| `cdn`: a store behind CloudFront, Cloud CDN or Front Door | planned (#132) | planned (#133) | planned (#134) |
+| `cdn`: a store behind CloudFront, Cloud CDN or Front Door | [available](terraform/aws/cdn/README.md) | planned (#133) | planned (#134) |
 
 [`multicloud/mirror`](terraform/multicloud/mirror/README.md) puts one mirror member on each
 cloud: an S3 bucket, a Cloud Storage bucket and an Azure storage account, so no one provider's
@@ -44,10 +44,11 @@ lists each invariant beside the test run that asserts it.
 
 | Module | What it creates | Used by |
 |---|---|---|
-| [`aws/storage`](terraform/modules/aws/storage/README.md) | one private S3 bucket and its bucket policy | `aws/single-bucket`, `aws/multi-region`, `aws/geo-replicated` |
+| [`aws/storage`](terraform/modules/aws/storage/README.md) | one private S3 bucket and its bucket policy | `aws/single-bucket`, `aws/multi-region`, `aws/geo-replicated`, `aws/cdn`, `multicloud/mirror` |
 | [`aws/replication`](terraform/modules/aws/replication/README.md) | S3 replication between two buckets, and the role S3 assumes for it | `aws/geo-replicated` |
-| [`gcp/storage`](terraform/modules/gcp/storage/README.md) | one private Cloud Storage bucket, single, dual or multi-region | `gcp/single-bucket`, `gcp/multi-region`, `gcp/geo-replicated` |
-| [`azure/storage`](terraform/modules/azure/storage/README.md) | one storage account and private container, without Shared Key | `azure/single-bucket`, `azure/multi-region`, `azure/geo-replicated` |
+| [`aws/cdn`](terraform/modules/aws/cdn/README.md) | a CloudFront distribution in front of one bucket, serving only URLs artifactweave signs | `aws/cdn` |
+| [`gcp/storage`](terraform/modules/gcp/storage/README.md) | one private Cloud Storage bucket, single, dual or multi-region | `gcp/single-bucket`, `gcp/multi-region`, `gcp/geo-replicated`, `multicloud/mirror` |
+| [`azure/storage`](terraform/modules/azure/storage/README.md) | one storage account and private container, without Shared Key | `azure/single-bucket`, `azure/multi-region`, `azure/geo-replicated`, `multicloud/mirror` |
 
 ### Using a scenario
 
@@ -138,7 +139,8 @@ label proves every scenario ([the full rules](../../docs/testing/ci.md#platform-
 Each proof has its own run tag, so proofs run in
 parallel and each one's `reap` and final check see only its own instances. On AWS, state
 lives in the S3 state bucket and buckets are found by their tags in whichever region they
-are; reap empties a versioned bucket (geo-replicated's) of its versions before deleting it.
+are; reap empties a versioned bucket (geo-replicated's) of its versions before deleting it,
+and disables and deletes a CloudFront distribution (`aws/cdn`'s) with the pieces it used.
 
 ## Checks
 
