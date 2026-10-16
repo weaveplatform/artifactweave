@@ -42,10 +42,48 @@ adapter, its version comparator for the package index and its reindex endpoint.
 **Docker access method.** Repository-path routing is native and the default:
 `/v2/{repo}/{image...}` is routed to the Docker handler for `{repo}` without any reverse
 proxy, which is what `docker push host/<repo>/<image>` sends and what the OCI conformance
-suite needs. Subdomain matching on the `Host` header is a configuration option. Port per
-repository is out of scope. `/v2/_catalog` lists across repositories. A repository key must
-not collide with the first path segment of another repository's images; the validator
-rejects such keys.
+suite needs. Port per repository is out of scope. The registry answers on these paths
+(decision [0031](0031-docker-oci-registry.md) has what each operation does):
+
+| Path | Serves |
+|---|---|
+| `/v2/` and `/artifactory/api/docker/{repo}/v2/` | the version probe |
+| `/v2/token` and `/artifactory/api/docker/{repo or null}/v2/token` | the registry token ([0005](0005-authentication-and-tokens.md)) |
+| `/artifactory/api/docker/{repo}/v2/auth` and `.../v1/auth` | the `config.json` entry |
+| `/v2/_catalog` | the images of every Docker repository the caller can read, each as `<repo>/<image>` |
+| `/v2/{repo}/_catalog` and `/artifactory/api/docker/{repo}/v2/_catalog` | the images of one repository, as `<image>` |
+| `/v2/{repo}/{name}/...` and `/artifactory/api/docker/{repo}/v2/{name}/...` | the registry operations on `{name}` |
+
+`POST /artifactory/api/docker/{repo}/v2/promote`, `POST .../v2/parentManifests` and
+`DELETE .../v2/delete` are JFrog REST operations and stay with the generated server. `_catalog` and `tags/list` stay in the
+OpenAPI sources for documentation, marked `x-handwritten: true`, because the registry
+handler serves them.
+
+- **Repository lookup.** The key segment is matched without regard to case, as keys are
+  unique, because Docker clients send references in lower case only. A key that is no
+  repository answers 404 `NAME_UNKNOWN`, and so does a repository whose package type is not
+  `docker`, `oci` or `helmoci`.
+- **No key collisions.** On the repository-path method the first segment is always the
+  key, so no image name can be taken for another repository's key, and the registry-wide
+  paths (`/v2/token`, `/v2/_catalog`) have fewer segments than any repository operation.
+  No key is reserved and the validator checks nothing Docker-specific. Keys Artifactory
+  accepts but a client cannot send (a leading `-` or `_`, a trailing separator, characters
+  outside `[a-z0-9._-]` in lower case) are accepted as Artifactory accepts them and are
+  documented as unreachable from Docker clients.
+- **Subdomain option.** `docker.subdomain_match: true` adds the subdomain method beside
+  the repository path, and needs `base_url`, whose host is the parent domain; the server
+  refuses to start without it. The addressed host is the first `X-Forwarded-Host` value,
+  else `Host`, without its port and in lower case. When it is `<label>.<base_url host>`
+  and `<label>` names a Docker, OCI or Helm OCI repository, the request is for that
+  repository: `/v2/{name}/...` carries no key, `/v2/_catalog` lists that repository and the
+  token realm names it. Any other host is the repository-path method. Reads of
+  `dockerReverseProxyMethod` answer `SUBDOMAIN` when the option is on and `REPOPATHPREFIX`
+  otherwise, with `serverName` the `base_url` host.
+- **Remote and virtual Docker repositories** answer every registry operation with 405
+  `UNSUPPORTED` and a message naming the class, until upstream fetching and member
+  resolution exist ([0007](0007-remote-repositories.md), [0008](0008-virtual-repositories.md)).
+  The version probe, the token and the `auth` endpoints work for them, so logging in to a
+  virtual repository already works.
 
 **Repositories API** (research 02). The behaviour where JFrog leaves room:
 - **Keys:** unique without regard to case, as Artifactory enforces them.
@@ -85,20 +123,33 @@ infrastructure, so it is the one a single static binary must own.
 - *Accepting `federated` as a local-only shim*: the first version of this decision; it
   kept single-member plans working but could not honour real member lists.
 - *Subdomain as default*: needs wildcard DNS and certificates before the first push works.
+- *A key-collision validator*: the first version of this decision rejected keys equal to
+  the first segment of another repository's images. On the repository-path method that
+  segment is always the key, so nothing can collide, and the rule only refused valid keys
+  ([research 23](../23-docker-oci-registry.md) section 2.2).
+- *404 `NAME_UNKNOWN` for remote and virtual Docker repositories*: tells the user the
+  repository does not exist when it does. An explicit `UNSUPPORTED` names the reason.
+- *`/v2/_catalog` empty or refused, as Artifactory's per-repository catalog suggests*: the
+  registry-wide catalog is what `crane catalog <host>` asks for, and prefixing each name
+  with its key gives references that pull.
 
 ## Constraints
 
 - Keys and types that Artifactory accepts but artifactweave does not implement must fail
   loudly at create time, never at first use.
 - `terraformbackend` is out of v1 scope and is rejected at create time.
-- The repository-path method means image names cannot start with a segment equal to
-  another repository key; this is documented in the operator guide.
+- A Docker repository whose key a client cannot send is reachable only through the
+  Artifactory REST API; this is documented in the operator guide.
+- The subdomain option needs wildcard DNS and a certificate for `*.<base_url host>`; a
+  key used as a subdomain must also be a valid DNS label.
 
 ## Verification
 
 - `pkg/repo` round-trip tests for every field in the research tables, including string
   and boolean forms per class.
-- Validation tests for the package-type sets per class and for key collisions.
+- Validation tests for the package-type sets per class.
+- Routing tests for both prefixes, the subdomain option, keys in any case, names that
+  contain reserved words and each repository class.
 - Terraform acceptance: every in-scope `artifactory_<class>_<type>_repository` resource
   applies, plans clean and destroys.
 - OCI conformance against `/v2/<repo>/<image>`.
@@ -107,5 +158,6 @@ infrastructure, so it is the one a single static binary must own.
 
 - [03-repository-configuration-model](../03-repository-configuration-model.md)
 - [04-package-protocols](../04-package-protocols.md), Docker section
+- [23-docker-oci-registry](../23-docker-oci-registry.md), sections 2.1 to 2.3
 - [08-terraform-providers](../08-terraform-providers.md)
 - <https://docs.jfrog.com/integrations/docs/configuration-json-files>

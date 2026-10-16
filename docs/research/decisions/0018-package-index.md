@@ -22,6 +22,20 @@ NuGet SemVer2; manifest timestamps for Docker tags.
 Retention, search and the registration and version endpoints read the index. The item
 tree remains the source of truth; a reindex rebuilds the index from it.
 
+**Docker, OCI and Helm OCI images** ([0031](0031-docker-oci-registry.md),
+[research 23](../23-docker-oci-registry.md) section 8):
+- **Package:** an image, keyed by its repository and `<name>`, present while the image
+  holds any manifest, tagged or not.
+- **Version:** a tag, the name of a tag folder that holds `manifest.json` or
+  `list.manifest.json`. Digest folders (`sha256__<hex>`) are not versions; they are the
+  manifests that tags and indexes point at.
+- **Files:** the tag folder's items: the manifest, the config and the layers.
+- **Order:** the tag's last push time. Overwriting a tag moves it to the newest place.
+- **Retention:** `maxUniqueTags` and `dockerTagRetention` run after each push, on the
+  pushed image only, with the rules in decision 0031; a tag removed by `maxUniqueTags`
+  takes its retained versions with it.
+- **Reads:** the tags list and the catalogs read the index, not the folder tree.
+
 ## Rationale
 
 Without a shared index each format would grow its own path-globbing version logic and
@@ -42,6 +56,8 @@ rebuilt keeps the item tree authoritative.
 - Comparator tests per package type against documented ordering examples.
 - Index maintenance tests for every write path per format.
 - Reindex rebuild equivalence test.
+- Docker: tag order after overwrites, `maxUniqueTags` and `dockerTagRetention` after a push,
+  and a multi-architecture tag removed as one unit.
 
 ## References
 

@@ -1,0 +1,415 @@
+# Docker and OCI registry
+
+Research baseline: **2026-10-16**.
+
+Phase P6 serves Docker and OCI images from local `docker`, `oci` and `helmoci` repositories.
+[Research 04](04-package-protocols.md) sketched the protocol, [research 17](17-undocumented-shapes.md)
+resolved the token challenge, and decisions [0003](decisions/0003-repository-model.md),
+[0005](decisions/0005-authentication-and-tokens.md), [0015](decisions/0015-testing-and-acceptance.md),
+[0018](decisions/0018-package-index.md) and [0029](decisions/0029-cdn-delivery-and-download-redirect.md)
+set the direction. This report collects what the specification, Artifactory and its clients
+do where those leave a point open. Decision [0031](decisions/0031-docker-oci-registry.md)
+records the choices.
+
+Each claim is labelled:
+
+| Label | Means |
+|---|---|
+| **[D]** | documented at the cited URL, read on 2026-10-16 |
+| **[S]** | seen in source code at the cited commit |
+| **[I]** | inferred from the documented facts; not stated by any source |
+
+Sources:
+- **The OCI Distribution Specification** v1.1.1 (`spec.md` at tag `v1.1.1`), and `main` at
+  `9727462` for what was added after that release.
+- **The conformance suite** in the same repository, `conformance/` at tag `v1.1.1`.
+- **The reference registry** `distribution/distribution` v3.0.0 (`678b095af9c9`),
+  `registry/api/errcode/register.go`, for the status each error code is sent with.
+- **JFrog's documentation:** `docker-repositories` and `additional-docker-information` under
+  `https://docs.jfrog.com/artifactory/docs/` (read with `.md` appended), and
+  `https://docs.jfrog.com/integrations/reference/promotedockerimage.md`.
+- **JFrog's knowledge base:** "Docker login" in *How to debug Docker configuration issues*
+  (`jfrog.com/help/r/artifactory-how-to-debug-docker-configuration-issues/docker-login`),
+  *How to troubleshoot Docker problems* (`.../docker-login-docker.art.local`) and *How to fix
+  a missing signature key Docker client error* (2021).
+- **The cached search definitions** in `.specoracle/artifactory-searches-api/`:
+  `listDockerRepositories`, `listDockerTags` and `findParentManifestLists`, and the reverse
+  proxy configuration in `.specoracle/administration-jfrog-platform-rest-apis/`.
+- **The JFrog CLI** `jf` 2.126.0 and the modules it pins: jfrog-cli-artifactory
+  `4a0f3827cfa0` (`artifactory/commands/ocicontainer`, `artifactory/commands/container`) and
+  jfrog-client-go `0646d7b50f9a` (`artifactory/services/dockerpromote.go`).
+- **Docker's deprecation list**, `docs/deprecated.md` in `docker/cli` on 2026-10-16.
+
+Artifactory's Docker support is not in the open-source edition, so the
+`knottnhupfer/artifactory-oss` mirror used by research 22 holds none of it. Artifactory's own
+behaviour below is documented or seen in its clients; where neither shows it, the claim is
+**[I]** and the point is on the live-capture list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+
+## 1. The protocol
+
+### 1.1 Endpoints
+
+- **[D]** The specification's endpoints, from its summary table:
+
+  | ID | Method | Path | Success | Failure |
+  |---|---|---|---|---|
+  | end-1 | `GET` | `/v2/` | 200 | 404, 401 |
+  | end-2 | `GET`, `HEAD` | `/v2/<name>/blobs/<digest>` | 200 | 404 |
+  | end-3 | `GET`, `HEAD` | `/v2/<name>/manifests/<reference>` | 200 | 404 |
+  | end-4a | `POST` | `/v2/<name>/blobs/uploads/` | 202 | 404 |
+  | end-4b | `POST` | `/v2/<name>/blobs/uploads/?digest=<digest>` | 201, 202 | 404, 400 |
+  | end-5 | `PATCH` | `/v2/<name>/blobs/uploads/<reference>` | 202 | 404, 416 |
+  | end-6 | `PUT` | `/v2/<name>/blobs/uploads/<reference>?digest=<digest>` | 201 | 404, 400 |
+  | end-7 | `PUT` | `/v2/<name>/manifests/<reference>` | 201 | 404, 413 |
+  | end-8a | `GET` | `/v2/<name>/tags/list` | 200 | 404 |
+  | end-8b | `GET` | `/v2/<name>/tags/list?n=<integer>&last=<tagname>` | 200 | 404 |
+  | end-9 | `DELETE` | `/v2/<name>/manifests/<reference>` | 202 | 404, 400, 405 |
+  | end-10 | `DELETE` | `/v2/<name>/blobs/<digest>` | 202 | 404, 400, 405 |
+  | end-11 | `POST` | `/v2/<name>/blobs/uploads/?mount=<digest>&from=<other_name>` | 201, 202 | 404 |
+  | end-12a | `GET` | `/v2/<name>/referrers/<digest>` | 200 | 404, 400 |
+  | end-12b | `GET` | `/v2/<name>/referrers/<digest>?artifactType=<artifactType>` | 200 | 404, 400 |
+  | end-13 | `GET` | `/v2/<name>/blobs/uploads/<reference>` | 204 | 404 |
+
+- **[D]** Three endpoints are on `main` only: `end-4c`
+  (`POST .../blobs/uploads/?digest-algorithm=<algorithm>`, for a digest other than
+  `sha256`), `end-7b` (`PUT .../manifests/<digest>?tag=a&tag=b`, which answers an `OCI-Tag`
+  header for each accepted tag) and `end-14` (`DELETE` on the upload location, 204, which
+  cancels a session). v1.1.1, the latest release, has none of them, and its conformance
+  suite tests none of them.
+- **[D]** `<name>` matches
+  `[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*(\/[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*)*`. A tag is at
+  most 128 characters and matches `[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}`. A `<reference>` is a
+  tag or a digest and nothing else.
+- **[D]** `Docker-Content-Digest` and `Docker-Distribution-API-Version` are legacy headers
+  clients should not depend on; `TAG_INVALID` and `MANIFEST_UNVERIFIED` are legacy schema-1
+  codes in the same position.
+
+### 1.2 Rules for pushes and reads
+
+- **[D] Blob uploads.** `POST` opens a session: 202 with a `Location` holding a unique
+  session id. A chunk's `Content-Range` is inclusive, the first starts at 0, and chunks must
+  arrive in order or the registry answers 416. Each accepted chunk answers 202 with
+  `Location` and `Range`. Closing with `PUT ?digest=` answers 201 with the blob's
+  `Location`, and a `GET` on the session answers 204 with `Range` and `Location`. A registry
+  that does not take single-request monolithic uploads answers 202 and the client follows
+  with a `PUT`. If it has a minimum chunk size it says so with `OCI-Chunk-Min-Length`.
+- **[D] Mounts.** A mount answers 201 with the blob's `Location`; a registry that cannot
+  mount the blob answers 202 with a session instead.
+- **[D] Manifests.** A successful push answers 201 with `Location`, and
+  `Docker-Content-Digest` equal to the client's digest. Registries should accept manifests
+  of at least 4 MB and answer 413 above their limit. A manifest whose blobs or child
+  manifests are unknown is refused with `MANIFEST_BLOB_UNKNOWN`, except that a `subject`
+  naming a manifest that does not exist must be accepted. When the manifest has a
+  `mediaType`, clients set `Content-Type` to it.
+- **[D] Subject and referrers.** A registry with the referrers API answers a push carrying
+  `subject` with `OCI-Subject: <subject digest>`. The referrers response is an image index
+  (`application/vnd.oci.image.index.v1+json`), never 404 once supported, and empty when
+  nothing matches. Each descriptor carries the manifest's `artifactType`, or for an image
+  manifest without one the config's `mediaType`, and the manifest's annotations. Filtering
+  on `artifactType` is a should; when applied, `OCI-Filters-Applied: artifactType` says so.
+- **[D] Tags.** `tags/list` returns tags "in lexical order (i.e. case-insensitive
+  alphanumeric order)", limited by `n` and continuing after `last`, with a `Link` header
+  for the next page.
+- **[D] Deletes.** Deleting a tag or a manifest answers 202; a registry that disables
+  either answers 400 or 405. Deleting a blob answers 202, 404 when unknown, and 400 or 405
+  when disabled. After a manifest delete its digest and every tag pointing at it answer 404.
+
+### 1.3 Error codes
+
+- **[D]** A 4xx body may be in any format; a JSON body must be
+  `{"errors":[{"code","message","detail"}]}`. `code` is one of the fourteen in the table
+  below, `message` is optional and `detail` is optional arbitrary JSON.
+- **[S]** The reference registry sends each code with one status, which the clients have
+  been written against:
+
+  | Code | Status | Code | Status |
+  |---|---|---|---|
+  | `BLOB_UNKNOWN` | 404 | `NAME_INVALID` | 400 |
+  | `BLOB_UPLOAD_INVALID` | 404 | `NAME_UNKNOWN` | 404 |
+  | `BLOB_UPLOAD_UNKNOWN` | 404 | `SIZE_INVALID` | 400 |
+  | `DIGEST_INVALID` | 400 | `UNAUTHORIZED` | 401 |
+  | `MANIFEST_BLOB_UNKNOWN` | 400 | `DENIED` | 403 |
+  | `MANIFEST_INVALID` | 400 | `UNSUPPORTED` | 405 |
+  | `MANIFEST_UNKNOWN` | 404 | `TOOMANYREQUESTS` | 429 |
+
+  It also defines `RANGE_INVALID` with 416, for an out-of-order chunk, outside the
+  specification's list.
+- **[D]** The conformance suite expects `UNSUPPORTED` when a tag delete answers 400, and a
+  body with a code from the list when a malformed manifest reference
+  (`sha256:totallywrong`) answers 400; 404 is also accepted there.
+
+### 1.4 Schema 1
+
+- **[D]** Docker deprecated pushing and pulling image manifest v2 schema 1 in 19.03,
+  disabled it by default in 26.0 and removed it in 28.2, which refuses to pull such an
+  image. Its replacements are schema 2 and the OCI image specification.
+- **[D]** Artifactory's repository configuration has `blockPushingSchema1`, documented as
+  `false` by default (research 03). A captured repository showed it `true`.
+
+## 2. Routing and access methods
+
+### 2.1 What Artifactory serves
+
+- **[D]** Artifactory's own path is `<base>/artifactory/api/docker/<repo>/v2/...`. The
+  `dockerReverseProxyMethod` field of the reverse proxy configuration
+  (`GET /api/system/configuration/webServer`) names the access method: `SUBDOMAIN`,
+  `REPOPATHPREFIX` or `PORTPERREPO`. `serverName` holds the base host and
+  `serverNameExpression` its wildcard, for example `*.jfrog.com`.
+- **[D]** Clients address `<host>/<repo>/<image>:<tag>` on the repository-path method and
+  `docker login` takes the host alone. The credentials endpoint is
+  `<base>/artifactory/api/docker/<repo>/<v1|v2>/auth`, and a context path cannot be part of
+  a registry reference (`docker-repositories`).
+- **[D]** Under the subdomain method a proxy maps `<repo>.<host>` to the repository, so the
+  server sees `/v2/<image>/...` and takes the repository from the host. Under the ports
+  method each repository has its own listener (research 04).
+- **[D]** `GET <base>/artifactory/api/docker/<repo>/v2/_catalog[?n=&last=]` answers
+  `{"repositories":[...]}` with the image names of one repository, and
+  `GET .../v2/<image>/tags/list[?n=&last=]` answers `{"name","tags"}`. From 7.90.1 the tags
+  list leaves out tags that do not follow the OCI and Docker naming rules; the switch that
+  turns this off is named `...docker.filter.digests.from.tags.list.enabled`, so what it
+  drops is digest-named entries. Both lists have been paginated since 5.4.6. The catalog
+  needs read permission; JFrog's page for the tags list says it needs "a privileged user".
+- **[I]** No source shows Artifactory answering a registry-wide `GET /v2/_catalog` on the
+  repository-path method: its catalog belongs to one repository, and a bare `/v2/_catalog`
+  names none.
+- **[D]** JFrog's two knowledge-base walk-throughs of `docker login` disagree on one point.
+  Both show an unauthenticated `GET .../v2/` answering 401, then a token `GET` answering 200
+  (one with the repository `null`), then the authenticated probe answering 200. One says
+  the first 401 is always seen; the other says the 401 is expected when anonymous access is
+  off, and that a client which receives 200 "won't use credentials".
+
+### 2.2 Parsing a registry path
+
+- **[I]** On the repository-path method the first segment after `/v2/` is always the
+  repository key and the rest is `<name>`, so no image name can be mistaken for a key. The
+  two registry-wide paths, `/v2/token` and `/v2/_catalog`, have one segment, and every
+  repository operation has at least three (`<repo>/<name>/<kind>`), so a repository called
+  `token` stays addressable.
+- **[I]** `<name>` may contain `blobs`, `manifests`, `tags`, `referrers` and `uploads` as
+  components (`team/manifests/app` is valid). Matching the operation from the end of the
+  path is unambiguous: a reference never contains `/`, a digest always contains `:`, and
+  `uploads` cannot be a digest.
+- **[I]** `_catalog` cannot be a name component (the grammar forbids a leading `_`), so
+  `/v2/<repo>/_catalog` cannot be a repository operation either.
+- **[D]** Docker clients refuse upper-case letters in a reference, so a repository key
+  reaches the server in lower case only. Artifactory keys are unique without regard to case
+  (decision 0003), so a case-insensitive lookup reaches every key. Underscores and upper
+  case in keys are a recommendation to avoid, not a server-side rule (research 04).
+- **[I]** A key that is not a valid name component even in lower case (a leading `-` or
+  `_`, a trailing separator, a character outside `[a-z0-9._-]`) cannot be sent by a client
+  that checks references. Artifactory accepts such keys.
+- **[I]** On a layout of tag folders, the tag `app` of the image `team` and the image
+  `team/app` share the folder `team/app/`. Both can exist: the folder is a tag because it
+  holds a manifest file, and an image because a child of it does.
+
+### 2.3 Remote and virtual repositories
+
+- **[D]** A virtual Docker repository resolves by member order and pushes to
+  `defaultDeploymentRepo`. A remote to Docker Hub needs `enableTokenAuthentication`, and
+  `externalDependenciesEnabled` allows foreign layers (research 04).
+- **[S]** jf reads a remote's content from `<key>-cache` and looks under `library/` for
+  single-segment Docker Hub names (`ocicontainer/docker_utils.go`). For a virtual
+  repository it reads `/api/repositories/<key>` and keeps the layers in its
+  `defaultDeploymentRepo` (`ocicontainer/buildinfo.go`).
+- **[I]** Upstream fetching arrives with remote repositories and member resolution with
+  virtual ones. Until then a remote Docker repository has nothing in its cache to serve,
+  and a virtual one has neither the tag union nor `resolveDockerTagsByTimestamp`
+  (decision 0008).
+
+## 3. Authentication and tokens
+
+- **[D]** The challenge, realm, `service`, `scope`, the `GET`-only token endpoint with the
+  repository `null` on the bare probe, and the `{"token","expires_in":3600}` body are in
+  research 17 and were confirmed there.
+- **[D]** JFrog's walk-through says "The Docker client gets an access token" from the
+  token endpoint, with `expires_in` 3600.
+- **[D]** Artifactory does not store an access token whose expiry is under the Access
+  persistence threshold, 10800 seconds by default (`docs/resources/scoped_token.md` in
+  `jfrog/terraform-provider-artifactory` at `990e8dfdb64e`). **[I]** A one-hour registry
+  token is therefore never stored.
+- **[I]** A reported 600-second lifetime for registry tokens obtained with an access token
+  is not confirmed by any source read here.
+- **[D]** The Docker token scope is `repository:<name>:<actions>` with the actions `pull`,
+  `push`, `delete` and `*` (Docker's registry token specification, research 04). On the repository-path method `<name>` includes the repository
+  key, so the realm's repository and the scope's first segment are the same key.
+- **[I]** A registry token is useful only for the registry. Nothing in the clients sends
+  it anywhere else.
+
+## 4. Permissions
+
+- **[D]** Artifactory's actions are Read, Annotate, Deploy/Cache, Delete/Overwrite and
+  Manage (decision 0006).
+- **[D]** "Strict Tag Overwrite", on by default and to become permanent by the end of 2026,
+  requires Delete/Overwrite to push an existing name and tag (`additional-docker-information`).
+- **[D]** Promotion "Requires a privileged user", and JFrog's page for the tags list says
+  the same; the catalog needs Read.
+- **[I]** The rest follows the item model: pulls, tag lists, referrers and the catalog need
+  Read on the image's folder, pushes need Deploy, deletes need Delete, and a mount needs Read
+  on the source and Deploy on the target. The properties Artifactory sets on a manifest it
+  sets itself, so pushing needs no Annotate.
+- **[D]** Anonymous pulls work when anonymous access is on and the anonymous user can read
+  (research 04, research 17).
+
+## 5. Storage layout
+
+### 5.1 Files
+
+- **[D]** A tag is a folder: `<repo>/<image>/<tag>/manifest.json`, with the config and
+  layers beside it as `sha256__<hex>` files (research 04). Upload sessions and finished
+  uploads live under `<image>/_uploads/` (research 04).
+- **[S]** jf's searches confirm the names. It reads `manifest.json`, `list.manifest.json`
+  and `sha256__<hex>` in the tag folder, excludes `<image>/_uploads` "which are copied to
+  their final location", and finds an image pushed by digest in the folder
+  `<image>/sha256__<hex>/` (`ocicontainer/remoteagent.go`, `ocicontainer/docker_utils.go`).
+- **[S]** For a multi-architecture tag jf reads `<image>/<tag>/list.manifest.json`, then
+  searches every folder under `<image>/` for a `manifest.json` and keys each by its
+  `sha256`, which it matches against the list's entries. The platform manifests therefore
+  live in folders of their own under the image, which jf finds by digest
+  (`ocicontainer/buildinfo.go`, `performMultiPlatformImageSearch`).
+- **[S]** jf takes the image's config digest from `manifest.json` and expects the config as
+  `sha256__<config hex>` in the same folder, and takes a manifest's digest from the file's
+  `sha256`. The stored `manifest.json` must therefore be the exact bytes the client pushed.
+- **[D]** From 7.81 the user interface shows the platform manifests nested under the tag
+  folder of a list manifest. From 7.90.1 referrers are tracked in a `referrers.json` in the
+  image folder; and from 7.21.2 pushing a platform image also publishes `<tag>-<os>-<arch>`
+  tags (research 04). None of the three is read by jf.
+
+### 5.2 Properties
+
+- **[D]** A knowledge-base article lists the properties a `manifest.json` must carry, and
+  says a missing or wrong one makes the Docker client fail with "missing signature key":
+  - `docker.manifest`: the tag, the folder's name;
+  - `docker.manifest.digest`: `sha256:<hex of manifest.json>`;
+  - `docker.manifest.type`: the media type, usually `application/vnd.docker.distribution.manifest.v2+json`;
+  - `docker.repoName`: the image name;
+  - `sha256`: the hex digest of `manifest.json`.
+- **[S]** jf finds a manifest by digest with the AQL
+  `items.find({"repo","name":"manifest.json","@sha256":"<hex>","@docker.manifest.digest":"sha256:<hex>"})`,
+  so both are properties, not only checksum fields, and it warns when
+  `docker.manifest.digest` differs from the local image's digest.
+- **[D]** Artifactory extracts an image's labels into properties on `manifest.json`
+  (`additional-docker-information`). **[I]** The property name is `docker.label.<label>`; no
+  source read here shows the prefix.
+- **[D]** Schema-1 images carried `docker.imageId`, `docker.size`, `docker.tag.name`,
+  `docker.tag.content` and `docker.repoName` under a V1 layout (`.images`, `repositories`).
+
+### 5.3 Deleting and retention
+
+- **[D]** "the Docker client does not support DELETE commands"; images are deleted through
+  the REST API with `DELETE <base>/artifactory/<repo>/<image>[/<tag>]`, which also removes
+  layers no other tag uses. Empty folders are pruned every five minutes.
+- **[D]** From 7.91.0 `DELETE <base>/artifactory/api/docker/<repo>/v2/delete` with
+  `{"dockerRepository","tag"}` deletes a multi-architecture tag and its platform
+  manifests. Before 7.118.0 that also deleted manifests and layers other tags shared; from
+  7.118.0 "shared manifests and layers are protected from deletion". Research 02 lists it
+  with 200.
+- **[D] Max Unique Tags** (`maxUniqueTags`) defaults to 0, no limit. When a push takes an
+  image over the limit, the oldest tag is removed, first in first out; `latest` is not
+  exempt; only the pushed image is checked.
+- **[D] Tag Retention** (`dockerTagRetention`) defaults to 1, keeping no overwritten
+  versions. From 2 it keeps that many minus one previous versions of a tag, "renamed by
+  their SHA2 hash", first in first out. Removing a tag through Max Unique Tags removes its
+  retained versions. Retention removes a list manifest with its platform manifests as one
+  unit, for tags pushed through the current upload service. Removed tags go to the trash
+  can when it is on.
+- **[D]** Overwriting a list manifest overwrites only the list unless
+  `artifactory.docker.complete.manifest.override.enabled` is set. From 7.117.1 a promotion
+  that overwrites a tag leaves layers other tags share.
+- **[I]** No source shows what a `DELETE /v2/<name>/blobs/<digest>` or
+  `DELETE /v2/<name>/manifests/<reference>` answers on Artifactory.
+
+## 6. What the JFrog CLI reads
+
+- **[S] `jf docker push` and `jf docker pull`** run the `docker` client, then build the
+  build-info from the stored image: `GET /api/repositories/<key>`, AQL over `items` with
+  `$match` and `$nmatch` on `path` (excluding `<image>/_uploads`) and the property search
+  in section 5.2, a download of `manifest.json` or `list.manifest.json` and the config
+  blob, and `PUT /api/storage` properties (`build.name`, `build.number`, `build.timestamp`)
+  on every layer. Paths tried: `<image>/<tag>/*`, then without the first segment, then
+  under `library/`, then the digest folder.
+- **[S] `jf rt build-docker-create`** records an image pushed by another tool (kaniko,
+  buildx) from a file of `<image>:<tag>@sha256:<digest>` lines, by the same search.
+- **[S] `jf rt docker-promote`** sends `POST api/docker/<source>/v2/promote` with
+  `{targetRepo, dockerRepository, targetDockerRepository, tag, targetTag, copy}` and
+  expects 200 (`dockerpromote.go`).
+- **[S]** `jf docker scan` calls Xray, which answers from a stub (research 10). `jf docker
+  build` runs `docker buildx` and then the same push search.
+
+## 7. JFrog REST operations for Docker
+
+- **[D] Promote** (`promoteDockerImage`, since 3.7): `targetRepo` and `dockerRepository`
+  required; `targetDockerRepository` and `targetTag` default to the source's; `tag` omitted
+  promotes every tag of the image (since 4.10); `copy` false moves. Answers 200 with plain
+  text, 400 for a malformed body, 404 for an unknown repository or image. Local and
+  federated sources; Helm OCI images too.
+- **[D] Parent manifests** (`findParentManifestLists`, 7.119.0): `POST
+  .../v2/parentManifests` with `{dockerRepository, tag}` answers
+  `{"parentManifestLists":[{"dockerRepository","digest","tags"}]}`; Read on the repository.
+- **[D] Catalog and tags list:** section 2.1. **Multi-architecture delete:** section 5.3.
+
+## 8. Tag retention and the package index
+
+- **[I]** For decision 0018 an image is a package (`<image>` in its repository), a tag is a
+  version, and the files of the tag folder are the version's files. The order Max Unique
+  Tags needs is push time, which is the "manifest timestamps for Docker tags" that
+  decision 0018 already names.
+- **[I]** A digest-only folder (`sha256__<hex>`) is not a tag: the 7.90.1 filter keeps it
+  out of the tags list, and Max Unique Tags counts tags.
+- **[I]** Where Artifactory puts a version kept by Tag Retention ("renamed by their SHA2
+  hash") is not shown by any source.
+
+## 9. The conformance suite at v1.1.1
+
+- **[D]** Four categories, each switched on by its variable: Pull (`OCI_TEST_PULL`), Push
+  (`OCI_TEST_PUSH`), Content Discovery (`OCI_TEST_CONTENT_DISCOVERY`) and Content Management
+  (`OCI_TEST_CONTENT_MANAGEMENT`). Content Management depends on Push and Content Discovery.
+- **[D]** It reads `OCI_ROOT_URL`, `OCI_NAMESPACE`, `OCI_CROSSMOUNT_NAMESPACE`,
+  `OCI_USERNAME`, `OCI_PASSWORD`, `OCI_AUTH_SCOPE`, `OCI_AUTOMATIC_CROSSMOUNT`,
+  `OCI_SKIP_EMPTY_LAYER_PUSH_TEST`, `OCI_DELETE_MANIFEST_BEFORE_BLOBS` (default 1),
+  `OCI_HIDE_SKIPPED_WORKFLOWS`, `OCI_DEBUG`, `OCI_REPORT_DIR`, and for pull-only runs
+  `OCI_MANIFEST_DIGEST`, `OCI_TAG_NAME`, `OCI_BLOB_DIGEST` and `OCI_TAG_LIST`.
+- **[S]** What it accepts where the specification gives a choice:
+  - a blob delete may answer 202, 404 or 405; on 405 the "deleted blob answers 404" check is
+    skipped, and every teardown accepts 405;
+  - a tag delete may answer 202, or 400 or 405 when disabled;
+  - a manifest with no layers must be accepted unless `OCI_SKIP_EMPTY_LAYER_PUSH_TEST` is
+    set;
+  - a mount without `from` answers 201 when `OCI_AUTOMATIC_CROSSMOUNT=1`, 202 when it is 0,
+    and is not tested when unset;
+  - a referrers request for an unknown digest answers 200 with an empty index; a filtered
+    request answers two descriptors with `OCI-Filters-Applied`, or all five with a warning.
+- **[D]** It is a Ginkgo module in `conformance/`, built with Go and run against the
+  registry's URL; it writes an HTML and JUnit report.
+
+## 10. Inferred and undocumented
+
+These go to the live-capture list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)):
+
+1. What `GET /v2/` answers an anonymous caller when anonymous access is on: 401 with the
+   challenge, or 200 (section 2.1).
+2. What `DELETE /v2/<name>/blobs/<digest>` and `DELETE /v2/<name>/manifests/<tag|digest>`
+   answer (section 5.3).
+3. Whether a schema-1 push is accepted when `blockPushingSchema1` is false, and what is
+   answered when it is true (section 1.4).
+4. Whether a registry-wide `GET /v2/_catalog` answers on the repository-path method (section 2.1).
+5. The label property prefix (section 5.2) and the properties on `list.manifest.json`.
+6. The folder and name of a version kept by Tag Retention (section 8).
+7. The format of `referrers.json` (section 5.1).
+8. The lifetime of a registry token obtained with an access token (section 3).
+9. Where an uploaded blob stays under `_uploads/` after a manifest references it, and when
+   it is removed.
+10. The error envelope and status for a push to a remote, and for a registry request to a
+    repository of another package type.
+11. Which secret the `auth` endpoints put in the `config.json` entry for a caller who
+    authenticated with a token.
+
+## 11. Versions at the research baseline
+
+| Component | Version |
+|---|---|
+| OCI distribution-spec | v1.1.1 (`spec.md`, `conformance/`); `main` at `9727462` |
+| distribution/distribution | v3.0.0 (`678b095af9c9`) |
+| jf | 2.126.0 |
+| jfrog-cli-artifactory | `4a0f3827cfa0` |
+| jfrog-client-go | `0646d7b50f9a` |
+| Docker Engine deprecations | `docker/cli` `docs/deprecated.md`, 2026-10-16 |

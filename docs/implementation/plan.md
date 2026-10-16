@@ -507,14 +507,32 @@ Decisions: [0012](../research/decisions/0012-search-and-aql.md),
 
 Decisions: [0003](../research/decisions/0003-repository-model.md),
 [0005](../research/decisions/0005-authentication-and-tokens.md),
-[0018](../research/decisions/0018-package-index.md).
+[0015](../research/decisions/0015-testing-and-acceptance.md),
+[0018](../research/decisions/0018-package-index.md),
+[0029](../research/decisions/0029-cdn-delivery-and-download-redirect.md),
+[0031](../research/decisions/0031-docker-oci-registry.md); research
+[23](../research/23-docker-oci-registry.md).
 
 **Tasks**
 1. `/v2/{repo}/...` repository-path routing, `/artifactory/api/docker/{repo}/v2/...`, optional subdomain match.
-2. Token challenge and issuance with values captured from a live Artifactory ([research 12](../research/12-open-questions.md)).
+2. Token challenge and issuance with the values from [research 17](../research/17-undocumented-shapes.md).
 3. Blobs, chunked and monolithic uploads with resumable `Range`, cross-repo mount, manifests (single, index, `subject` with `OCI-Subject`), referrers API, tags list with Link pagination, `_catalog`, delete, `promote`, `parentManifests`, multi-arch delete.
-4. Artifactory storage layout (`manifest.json`, `list.manifest.json`, `sha256__` layers, `referrers.json`, labels as properties) and tag retention through the package index.
+4. Artifactory storage layout (`manifest.json`, `list.manifest.json`, `sha256__` layers, digest folders, the manifest properties, labels as properties) and tag retention through the package index.
 5. The `conformance` CI job.
+
+**Tracking.** Epic #217 holds one GitHub issue per PR:
+1. Research 23 and decision amendments for Docker and OCI (#218).
+2. Docker REST operations in the OpenAPI sources: promote and the listings (#219).
+3. Registry routing: `/v2`, `/artifactory/api/docker/{repo}/v2` and the subdomain option (#220).
+4. Docker token challenge and issuance (#221).
+5. Blobs: pull, monolithic and chunked uploads, resumable sessions and cross-repository mount (#222).
+6. Image manifests in Artifactory's storage layout (#223).
+7. OCI conformance CI job (#224).
+8. Manifest lists and OCI indexes, subject and the referrers API (#225).
+9. Tags list, catalogs and deletes, with the multi-architecture delete (#226).
+10. Docker tags in the package index and tag retention (#227).
+11. Docker promote and parent manifest lists (#228).
+12. P6 exit checks: `docker`, `crane`, `oras`, `cosign` and `jf rt docker-promote` (#229).
 
 **Exit criteria**
 - OCI conformance suite green for push, pull, discovery and management.
