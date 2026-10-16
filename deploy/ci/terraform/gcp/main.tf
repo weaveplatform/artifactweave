@@ -68,11 +68,12 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 # The data-plane identity: object rights on the conformance bucket only,
 # granted by gcp/single-bucket on its bucket. It signs download URLs through
 # IAM signBlob as itself, and the operator's own login may act as it, so the
-# local container needs no key (the organisation forbids keys).
+# local runner (deploy/ci/local.sh) needs no key (the organisation forbids
+# keys).
 resource "google_service_account" "conformance" {
   account_id   = "artifactweave-conformance"
   display_name = "artifactweave conformance"
-  description  = "cloud-conformance.yml and the local container; object rights on the single-bucket scenario's bucket only."
+  description  = "cloud-conformance.yml and the local runner; object rights on the single-bucket scenario's bucket only."
   depends_on   = [google_project_service.this]
 }
 

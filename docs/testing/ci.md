@@ -353,19 +353,12 @@ defaults, so an example region in a scenario or module cannot be the lab's `eu-w
 The lint reads the sources with grep and awk and relies on `terraform fmt`'s layout, so it
 needs no tools. `--self-test` builds a repository in a temporary directory, with a passing
 root of each kind that follows the real README templates, then breaks one rule per case and
-expects the lint to fail it; it also checks the ratchet's three warnings.
+expects the lint to fail it.
 
-**The ratchet.** `deploy/ci/contract-pending.txt` lists the roots not yet ported to the
-contract. A listed root's findings print as one `WARN` line and do not fail the check; any
-other root fails on its first finding, so a new root meets the contract from its first
-commit. The lint also warns when a listed root already meets the contract, and when a listed
-path is no longer a root. To take a root off the list:
-
-1. run `deploy/ci/lint-contract.sh --verbose`, which prints a pending root's findings in full;
-2. fix them;
-3. delete the root's line from `contract-pending.txt` in the same pull request.
-
-From then on `make deploy-check` fails on any finding in that root. The list only shrinks.
+Every finding fails `make deploy-check`, so a new root meets the contract from its first
+commit; there is no list of exempt roots, since epic #189 ported the last of them. A new
+scenario starts from a copy of one that passes, and its README from
+`deploy/platform/SCENARIO-TEMPLATE.md`.
 
 ## AQL fixtures from the JFrog CLI
 

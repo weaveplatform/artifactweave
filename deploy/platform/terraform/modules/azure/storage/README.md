@@ -4,8 +4,8 @@ One storage account and private container, without Shared Key, with Storage Blob
 Contributor for the principals in `principals`. [`azure/single-bucket`](../../../azure/single-bucket/README.md)
 calls it once, [`azure/multi-region`](../../../azure/multi-region/README.md) once per location,
 and [`azure/geo-replicated`](../../../azure/geo-replicated/README.md) once with a
-`replication_type` that keeps Azure's own copies in the paired region. The module holds no provider block, so the caller's `azurerm` provider and
-subscription apply (decision
+`replication_type` that keeps Azure's own copies in the paired region. The module holds no
+provider block, so the caller's `azurerm` provider and subscription apply (decision
 [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
 
 ## What it creates

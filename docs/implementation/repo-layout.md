@@ -109,18 +109,21 @@ project's own lab harness, which no consumer copies, lives apart in `deploy/ci`.
 deploy/
   ci/
     README.md                         # the lab harness: bootstraps, guards, CI driver
-    lab.mk                            # every lab constant: project, subscription, region, zone
+    lab.mk lab-vars.sh                # every lab constant, and the inputs an operator's run resolves
     scenario.mk bootstrap.mk          # shared make targets for scenarios and bootstraps
     scenario-ci.sh prove-matrix.sh    # the platform-scenarios.yml driver and its proof rules
+    lint-contract.sh                  # the contract every root under deploy/ is held to
+    local.sh                          # runs artifactweave against any applied scenario
     terraform/aws/ gcp/ azure/        # bootstraps: CI identities, remote state, DNS zone, budget
   platform/
-    README.md                         # scenario catalogue, costs, how CI runs them
+    README.md                         # scenario and module catalogue, how to use and run them
+    SCENARIO-TEMPLATE.md MODULE-TEMPLATE.md   # the README templates the linter checks
     terraform/
-      modules/<cloud>/<capability>/   # child modules (storage, cdn, ci-access), no provider blocks
+      modules/<cloud>/<capability>/   # child modules (storage; replication on AWS), no provider blocks
       aws/ gcp/ azure/
-        single-bucket/ multi-region/ geo-replicated/ cdn/   # scenarios
+        single-bucket/ multi-region/ geo-replicated/   # scenarios; cdn/ planned (#132-#134)
       multicloud/
-        mirror/                       # one mirror with a member on each cloud
+        mirror/                       # planned (#135): one mirror with a member on each cloud
   artifactweave/
     README.md                         # managing artifactweave with the JFrog Terraform providers
     terraform/<scenario>/             # repositories, identity, oidc, cdn-repositories, ...

@@ -1,9 +1,11 @@
 # modules/gcp/storage
 
 One private Cloud Storage bucket, with object rights on it for the service accounts in
-`principals`. [`gcp/multi-region`](../../../gcp/multi-region/README.md) calls it once per
-location; with `data_locations` and `rpo` it is also a dual-region bucket. The module holds no
-provider block, so the caller's `google` provider and project apply (decision
+`principals`. [`gcp/single-bucket`](../../../gcp/single-bucket/README.md) calls it once,
+[`gcp/multi-region`](../../../gcp/multi-region/README.md) once per location, and
+[`gcp/geo-replicated`](../../../gcp/geo-replicated/README.md) once in a dual or multi-region
+location, with `data_locations` and `rpo` choosing its regions and replication. The module
+holds no provider block, so the caller's `google` provider and project apply (decision
 [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
 
 ## What it creates

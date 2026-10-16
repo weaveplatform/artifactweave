@@ -3,9 +3,8 @@
 # under deploy/ is checked against the rules for its kind, which its path
 # gives it, and each finding names the rule it breaks.
 #
-#   lint-contract.sh [--verbose] [repo]  lint a repository (default: this one)
-#   lint-contract.sh --self-test         check the linter against fixtures it
-#                                        generates
+#   lint-contract.sh [repo]      lint a repository (default: this one)
+#   lint-contract.sh --self-test check the linter against fixtures it generates
 #
 # | Path                                        | Kind      | Rules    |
 # |---------------------------------------------|-----------|----------|
@@ -15,9 +14,7 @@
 # | deploy/ci/terraform/<cloud>                 | bootstrap | B1       |
 # | deploy/                                     | global    | G1 G2    |
 #
-# Roots listed in deploy/ci/contract-pending.txt report their findings as
-# warnings until they are ported to the contract; every other finding fails.
-# The checks read the sources with grep and awk only, so they run before
+# Every finding fails. The checks read the sources with grep and awk only, so they run before
 # check.sh fetches any tool. They rely on terraform fmt's layout (top-level
 # blocks unindented, their attributes two spaces in), which check.sh's fmt
 # step enforces. There is no set -e: a grep that finds nothing is an answer
@@ -28,7 +25,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 emdash=$'\xe2\x80\x94'
 
 usage() {
-  echo "usage: $0 [--verbose] [repo] | --self-test" >&2
+  echo "usage: $0 [repo] | --self-test" >&2
   exit 2
 }
 
@@ -142,11 +139,10 @@ trivy_ids() {
 # ------------------------------------------------------------------- lint
 
 lint() {
-  local repo=$1 verbose=$2
-  local found pending deny roots r kind cloud n status=0
+  local repo=$1
+  local found deny roots r kind cloud n status=0
   found=$(mktemp)
   deny=$(mktemp)
-  pending=$(mktemp)
 
   # v records one finding: the root (or deploy for a global one), the
   # rule's ID and what is wrong.
@@ -160,10 +156,6 @@ lint() {
   printf '%s\n' artifactweave-conformance artifactweave-deployer artifactweave-bootstrap-rg \
     artifactweave-scenarios-rg artifactweave-scenario-boundary /artifactweave-scenarios/ \
     weaveplatform.run >>"$deny"
-
-  if [ -f "$repo/deploy/ci/contract-pending.txt" ]; then
-    sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$repo/deploy/ci/contract-pending.txt" | grep -v '^$' >"$pending" || true
-  fi
 
   roots=$(cd "$repo" && find deploy -name '*.tf' -not -path '*/.terraform/*' -exec dirname {} \; 2>/dev/null | sort -u)
 
@@ -192,8 +184,8 @@ lint() {
   done
   lint_global "$repo"
 
-  report "$roots" "$found" "$pending" "$verbose" || status=1
-  rm -f "$found" "$deny" "$pending"
+  report "$roots" "$found" || status=1
+  rm -f "$found" "$deny"
   return $status
 }
 
@@ -559,38 +551,16 @@ lint_bootstrap() {
   return 0
 }
 
-# by_rule sorts rule IDs by letter, then number: S2 before S10.
-by_rule() { sed -E 's/^([A-Za-z]+)([0-9]*)$/\1 \2 &/' | sort -k1,1 -k2,2n | cut -d' ' -f3; }
-
-# report prints the findings and returns 1 when any is a failure.
+# report prints the findings and returns 1 when any is found.
 report() {
-  local roots=$1 found=$2 pending=$3 verbose=$4 r ids count fails=0 warns=0
+  local roots=$1 found=$2 r count fails=0
   for r in deploy $roots; do
     count=$(awk -F'\t' -v r="$r" '$1 == r' "$found" | wc -l | tr -d ' ')
-    # A global finding is no root's, so the list cannot hold it back.
-    if [ "$r" != deploy ] && grep -q -x -F "$r" "$pending"; then
-      if [ "$count" = 0 ]; then
-        echo "WARN $r: meets the contract; remove it from deploy/ci/contract-pending.txt"
-        warns=$((warns + 1))
-        continue
-      fi
-      ids=$(awk -F'\t' -v r="$r" '$1 == r { print $2 }' "$found" | sort -u | by_rule | tr '\n' ' ')
-      echo "WARN $r: pending, $count findings (${ids% })"
-      warns=$((warns + 1))
-      [ "$verbose" = 1 ] && awk -F'\t' -v r="$r" '$1 == r { print "     [" $2 "] " $3 }' "$found"
-      continue
-    fi
     [ "$count" = 0 ] && continue
     awk -F'\t' -v r="$r" '$1 == r { print "FAIL [" $2 "] " r ": " $3 }' "$found"
     fails=$((fails + count))
   done
-  while IFS= read -r r; do
-    echo "$roots" | grep -q -x -F "$r" || {
-      echo "WARN $r: listed in deploy/ci/contract-pending.txt but not a root; remove it"
-      warns=$((warns + 1))
-    }
-  done <"$pending"
-  echo "contract: $(echo "$roots" | grep -c .) roots, $fails failing findings, $warns warnings"
+  echo "contract: $(echo "$roots" | grep -c .) roots, $fails failing findings"
   [ "$fails" = 0 ]
 }
 
@@ -916,8 +886,8 @@ self_test() {
   c g2-emdash G2 $sc "printf 'a $emdash b\n' >>$sc/README.md"
   c layout layout deploy/platform/terraform/stray "mkdir -p deploy/platform/terraform/stray && echo 'locals {}' >deploy/platform/terraform/stray/main.tf"
 
-  # The passing fixture passes, with nothing pending.
-  if ! out=$(lint "$good" 0 2>&1); then
+  # The passing fixture passes.
+  if ! out=$(lint "$good" 2>&1); then
     echo "self-test: the passing fixture fails:" >&2
     echo "$out" >&2
     return 1
@@ -932,7 +902,7 @@ self_test() {
       failures=$((failures + 1))
     }
     find "$dir" -name '*.bak' -exec rm {} +
-    (lint "$dir" 1 >"$dir.out" 2>&1 && echo pass || echo fail) >"$dir.status" &
+    (lint "$dir" >"$dir.out" 2>&1 && echo pass || echo fail) >"$dir.status" &
   done <"$cases"
   wait
 
@@ -945,60 +915,24 @@ self_test() {
     fi
   done <"$cases"
 
-  # The ratchet: a pending root warns instead of failing, a pending root
-  # that passes asks to be removed, an entry that is no root warns, and a
-  # global finding fails even when deploy itself is listed.
-  dir=$base/ratchet
-  cp -R "$good" "$dir"
-  rm "$dir/$sc/harness.tf"
-  printf '%s\n' "# fixture" "$sc" "$sg" deploy/platform/terraform/aws/gone >"$dir/deploy/ci/contract-pending.txt"
-  if ! out=$(lint "$dir" 0 2>&1); then
-    echo "self-test: a pending root failed instead of warning:" >&2
-    echo "$out" | indent >&2
-    failures=$((failures + 1))
-  fi
-  for result in "WARN $sc: pending" "WARN $sg: meets the contract" "WARN deploy/platform/terraform/aws/gone: listed"; do
-    echo "$out" | grep -q -F "$result" || {
-      echo "self-test: the ratchet did not print \"$result\":" >&2
-      echo "$out" | indent >&2
-      failures=$((failures + 1))
-    }
-  done
-
-  dir=$base/ratchet-global
-  cp -R "$good" "$dir"
-  rm "$dir/deploy/.gitignore"
-  echo deploy >"$dir/deploy/ci/contract-pending.txt"
-  if out=$(lint "$dir" 0 2>&1) || ! echo "$out" | grep -q -F "FAIL [G1] deploy:"; then
-    echo "self-test: listing deploy held back a global finding:" >&2
-    echo "$out" | indent >&2
-    failures=$((failures + 1))
-  fi
-
   n=$(grep -c . "$cases")
   if [ "$failures" -gt 0 ]; then
     echo "self-test: $failures checks failed" >&2
     return 1
   fi
-  echo "contract self-test: $n rule cases, the passing fixture and the ratchet pass"
+  echo "contract self-test: $n rule cases and the passing fixture pass"
 }
 
 # ------------------------------------------------------------------- main
 
-verbose=0
-repo=
 case ${1:-} in
 --self-test)
   [ $# = 1 ] || usage
   self_test
   exit
   ;;
---verbose)
-  verbose=1
-  shift
-  ;;
 -*) usage ;;
 esac
 [ $# -le 1 ] || usage
 repo=$(cd "${1:-$here/../..}" && pwd)
-lint "$repo" "$verbose"
+lint "$repo"

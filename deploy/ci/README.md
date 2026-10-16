@@ -20,7 +20,6 @@ decision [0030](../../docs/research/decisions/0030-reference-deployments.md).
 | [`local.sh`](local.sh) | The local runner behind `scenario.mk`'s `render`, `credentials`, `up`, `smoke`, `verify`, `logs`, `down` and `clean` |
 | [`prove-matrix.sh`](prove-matrix.sh), [`prove-matrix_test.sh`](prove-matrix_test.sh) | Which scenarios a pull request proves, and its table test (`make deploy-check` runs it) |
 | [`lint-contract.sh`](lint-contract.sh) | The reference-deployment contract: checks every Terraform root under `deploy/` against decision 0030's rules for its kind (`make deploy-check` runs it and its `--self-test`) |
-| [`contract-pending.txt`](contract-pending.txt) | The roots not yet ported to the contract, whose findings warn instead of failing; see [`docs/testing/ci.md`](../../docs/testing/ci.md#the-reference-deployment-contract) |
 
 ## Bootstraps
 

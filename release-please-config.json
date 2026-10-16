@@ -10,6 +10,10 @@
       "extra-files": [
         {
           "type": "generic",
+          "path": "deploy/platform/README.md"
+        },
+        {
+          "type": "generic",
           "path": "deploy/platform/terraform/modules/aws/storage/README.md"
         },
         {

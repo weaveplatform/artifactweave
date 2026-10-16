@@ -585,6 +585,18 @@ roles, because those are part of what a reference shows.
 - Each scenario has a recorded `platform-scenarios` run that applied, passed `test/platform`
   and destroyed, linked from its pull request, and a CLI check after the run found nothing of
   it left.
+
+  Every scenario passed on contract v2 (epic #189), and each run left nothing behind:
+
+  | Scenario | Proof runs | Pull request |
+  |---|---|---|
+  | `aws/multi-region`, `gcp/multi-region`, `azure/multi-region` | [38746874394](https://github.com/weaveplatform/artifactweave/actions/runs/38746874394), [38752999957](https://github.com/weaveplatform/artifactweave/actions/runs/38752999957), [38754603808](https://github.com/weaveplatform/artifactweave/actions/runs/38754603808) | #205 |
+  | `azure/single-bucket`, `azure/geo-replicated` | [38760230700](https://github.com/weaveplatform/artifactweave/actions/runs/38760230700) | #208 |
+  | `gcp/single-bucket`, `gcp/geo-replicated` | [38760335950](https://github.com/weaveplatform/artifactweave/actions/runs/38760335950), [38763804471](https://github.com/weaveplatform/artifactweave/actions/runs/38763804471) | #209 |
+  | `aws/single-bucket`, `aws/geo-replicated` | [38761559805](https://github.com/weaveplatform/artifactweave/actions/runs/38761559805), [38763587235](https://github.com/weaveplatform/artifactweave/actions/runs/38763587235) | #210 |
+
+  The #205 runs also proved every cloud's `single-bucket` before its port, and the #208 and
+  #210 runs re-proved their cloud's `multi-region` after its module changed.
 - After a bootstrap moves or changes, `make ci-plan CLOUD=<cloud>` shows no changes, and lint
   rule B1 keeps each bootstrap's backend key tied to its cloud.
 - `make terraform TERRAFORM_MODE=apply` applies each `deploy/artifactweave` root through

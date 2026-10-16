@@ -1,10 +1,12 @@
 # modules/aws/storage
 
 One private S3 bucket and its bucket policy, granting the IAM roles in `principals` the
-bucket's objects. [`aws/multi-region`](../../../aws/multi-region/README.md) calls it once per
-region. The module holds no provider block: every resource names its `region`, the
-per-resource region of the AWS provider 6, so one provider configuration serves buckets in
-several regions without aliases (decision
+bucket's objects. [`aws/single-bucket`](../../../aws/single-bucket/README.md) calls it once,
+[`aws/multi-region`](../../../aws/multi-region/README.md) once per region, and
+[`aws/geo-replicated`](../../../aws/geo-replicated/README.md) twice, versioned, for
+[`modules/aws/replication`](../replication/README.md) to join. The module holds no provider
+block: every resource names its `region`, the per-resource region of the AWS provider 6, so
+one provider configuration serves buckets in several regions without aliases (decision
 [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
 
 ## What it creates
