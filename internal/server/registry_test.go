@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/go-cmp/cmp"
 
+	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
@@ -401,16 +403,16 @@ func TestRegistrySubdomainThroughServer(t *testing.T) {
 		`{"rclass":"local","packageType":"docker"}`); rec.Code != http.StatusOK {
 		t.Fatalf("create: %d %s", rec.Code, rec.Body)
 	}
-	// On the repository's subdomain app is the image; on the parent it
-	// would be a repository, which does not exist.
-	for host, want := range map[string]int{
-		"docker-local.reg.example.com": http.StatusMethodNotAllowed,
-		"reg.example.com":              http.StatusNotFound,
+	// On the repository's subdomain app is the image, which has no such
+	// tag; on the parent it would be a repository, which does not exist.
+	for host, want := range map[string]string{
+		"docker-local.reg.example.com": docker.CodeManifestUnknown,
+		"reg.example.com":              docker.CodeNameUnknown,
 	} {
 		headers := basic("admin", "pw")
 		headers["X-Forwarded-Host"] = host
 		rec := do(t, h, http.MethodGet, "/v2/app/manifests/latest", headers, "")
-		if rec.Code != want {
+		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), want) {
 			t.Errorf("%s: %d %s", host, rec.Code, rec.Body)
 		}
 	}
@@ -527,5 +529,165 @@ func TestRegistryBlobsDownloadAsFiles(t *testing.T) {
 	if rec.Code != http.StatusForbidden ||
 		rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" {
 		t.Fatalf("deployer: %d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+}
+
+// The manifest routes (#223), on the repository path.
+const (
+	manifestRoute = "/v2/{repo}/{name}/manifests/{reference}"
+	headManifest  = "HEAD " + manifestRoute
+	getManifest   = "GET " + manifestRoute
+	putManifest   = "PUT " + manifestRoute
+)
+
+// registryConfig is the config of the images the fixtures push.
+const registryConfig = `{"architecture":"amd64","os":"linux","config":{"Labels":{"team":"matrix"}}}`
+
+// registryManifest is an OCI image manifest of registryConfig and
+// registryLayer; note varies its digest. A row sends it with the prefix
+// manifest:, which sets its Content-Type.
+func registryManifest(note string) string {
+	return `{"schemaVersion":2,"mediaType":"` + layout.MediaTypeOCIManifest + `",` +
+		`"config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"` +
+		sha256Digest(registryConfig) + `","size":` + strconv.Itoa(len(registryConfig)) + `},` +
+		`"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"` +
+		registryLayer + `","size":14}],"annotations":{"note":"` + note + `"}}`
+}
+
+// manifestBody is a row body that sends body as an OCI image manifest.
+func manifestBody(body string) string { return "manifest:" + body }
+
+// contentTypeOf takes a row body's prefix off and returns the Content-Type
+// it names: a manifest's, a form's, or JSON's.
+func contentTypeOf(body string) (contentType, rest string) {
+	if b, ok := strings.CutPrefix(body, "manifest:"); ok {
+		return layout.MediaTypeOCIManifest, b
+	}
+	if b, ok := strings.CutPrefix(body, "form:"); ok {
+		return "application/x-www-form-urlencoded", b
+	}
+	return "application/json", body
+}
+
+// pushImage stores registryConfig in the image name of c and pushes body
+// to tag, as a client would after uploading its blobs; registryLayer must
+// already be in the image.
+func pushImage(
+	t *testing.T,
+	db store.Store,
+	blobs blob.Store,
+	c repo.Config,
+	name, tag, body string,
+) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
+		Target: item.Target{
+			Repo: c,
+			Path: name + "/_uploads/sha256__" + sha256Digest(registryConfig)[7:],
+		},
+		Body: strings.NewReader(registryConfig),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	m, err := layout.ParseManifest(
+		layout.MediaTypeOCIManifest,
+		[]byte(body),
+		sha256Digest(body)[7:],
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (&registry.Service{Store: db, Blobs: blobs}).PutManifest(ctx, registry.Push{
+		Owner:    registry.Owner{Repo: c, Name: name, By: "admin"},
+		Manifest: m, Body: []byte(body), Folders: []string{tag},
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// seedRegistryManifests pushes registryManifest("v1") to docker-blobs'
+// image app as v1.
+func seedRegistryManifests(t *testing.T, db store.Store, blobs blob.Store) {
+	t.Helper()
+	c, err := db.Repos().Get(context.Background(), "docker-blobs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pushImage(t, db, blobs, c, "app", "v1", registryManifest("v1"))
+}
+
+// registryManifestStatusRows: pulls need Read on the image and pushes
+// Deploy, which only admin holds on docker-blobs; anonymous is always
+// challenged.
+func registryManifestStatusRows() []statusCase {
+	const base = "/v2/docker-blobs/app/manifests/"
+	v1, digest := base+"v1", base+sha256Digest(registryManifest("v1"))
+	push := manifestBody(registryManifest("v2"))
+	return []statusCase{
+		{headManifest, v1, "admin", "", 200},
+		{headManifest, base + "v9", "admin", "", 404},
+		{headManifest, v1, "user", "", 403},
+		{headManifest, v1, "anonymous", "", 401},
+		{getManifest, v1, "admin", "", 200},
+		{getManifest, digest, "admin", "", 200},
+		{getManifest, base + sha256Digest("absent"), "admin", "", 404},
+		{getManifest, base + "sha256:totallywrong", "admin", "", 404},
+		{getManifest, v1, "user", "", 403},
+		{getManifest, v1, "anonymous", "", 401},
+		{getManifest, v1, "", "", 401},
+		{getManifest, v1, "expired", "", 401},
+		{putManifest, base + "v2", "admin", push, 201},
+		// The same push again changes nothing.
+		{putManifest, base + "v2", "admin", push, 201},
+		{putManifest, base + sha256Digest(registryManifest("v2")), "admin", push, 201},
+		{putManifest, base + sha256Digest("other"), "admin", push, 400},
+		{putManifest, base + "_uploads", "admin", push, 400},
+		{putManifest, base + "v3", "admin", manifestBody("{}"), 400},
+		{putManifest, base + "v3", "admin", `{"schemaVersion":2}`, 400},
+		{
+			putManifest,
+			base + "v3",
+			"admin",
+			manifestBody(
+				strings.Replace(registryManifest("v3"), registryLayer, sha256Digest("absent"), 1),
+			),
+			400,
+		},
+		{putManifest, base + "v3", "user", push, 403},
+		{putManifest, base + "v3", "anonymous", push, 401},
+		{putManifest, base + "v3", "", push, 401},
+	}
+}
+
+// seedMatrixManifests pushes registryManifest("v1") to docker-a's image
+// work/app as v1.
+func seedMatrixManifests(t *testing.T, f *matrixFixture) {
+	t.Helper()
+	c, err := f.db.Repos().Get(context.Background(), dockerA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pushImage(t, f.db, f.items.Blobs, c, "work/app", "v1", registryManifest("v1"))
+}
+
+// registryManifestMatrix: pulls need Read on the image and pushes Deploy;
+// a push over a tag that holds another manifest needs Delete too (DV-035),
+// while repeating the push it holds needs no more than Deploy. Anonymous
+// is challenged whatever it holds.
+func registryManifestMatrix() []matrixRow {
+	const base = "/v2/" + dockerA + "/work/app/manifests/"
+	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	return []matrixRow{
+		row(headManifest, base+"v1", "", holds(dockerA, "work/app/", read), 200),
+		row(getManifest, base+sha256Digest(registryManifest("v1")), "",
+			holds(dockerA, "work/app/", read), 200),
+		// A new tag of the principal's own.
+		row(putManifest, base+"{p}", manifestBody(registryManifest("v1")),
+			holds(dockerA, "work/app/", write), 201),
+		row(putManifest, base+"v1", manifestBody(registryManifest("v1")),
+			holds(dockerA, "work/app/", write), 201),
+		row(putManifest, base+"v1", manifestBody(registryManifest("other")),
+			holds(dockerA, "work/app/v1/", write|del), 201).alone(),
 	}
 }

@@ -8,6 +8,7 @@ package format
 import (
 	"context"
 
+	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -23,6 +24,11 @@ type Handler interface {
 	Deleting(ctx context.Context, st store.Store, c repo.Config, it types.Item) error
 }
 
-// For returns the handler of a package type. Every type is generic until
-// its format lands (P7 onwards): generic keeps no package index.
-func For(repo.PackageType) Handler { return generic.Handler{} }
+// For returns the handler of a package type. A type is generic until its
+// format lands: generic keeps no package index.
+func For(t repo.PackageType) Handler {
+	if docker.Serves(t) {
+		return docker.Handler{}
+	}
+	return generic.Handler{}
+}

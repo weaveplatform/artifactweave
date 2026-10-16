@@ -66,6 +66,7 @@ func statusTable() []statusCase {
 		searchStatusRows(),
 		registryStatusRows(),
 		registryBlobStatusRows(),
+		registryManifestStatusRows(),
 	)
 }
 
@@ -182,6 +183,7 @@ func newStatusFixture(
 	}
 	tokens, secrets := seedTokens(t, db)
 	seedRegistryStatus(t, db, blobs, secrets)
+	seedRegistryManifests(t, db, blobs)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
 		Hash: testHash, Tokens: tokens,
 	})
@@ -453,13 +455,9 @@ func TestStatusTable(t *testing.T) {
 			if headers == nil {
 				headers = map[string]string{}
 			}
-			headers["Content-Type"] = "application/json"
 			// A form: prefix sends the rest form-encoded, for the legacy
-			// token routes.
-			if form, ok := strings.CutPrefix(body, "form:"); ok {
-				headers["Content-Type"] = "application/x-www-form-urlencoded"
-				body = form
-			}
+			// token routes, and manifest: as an OCI image manifest.
+			headers["Content-Type"], body = contentTypeOf(body)
 		}
 		rec := do(t, h, c.method(), fill.Replace(c.path), headers, body)
 		if rec.Code != c.want {
@@ -507,6 +505,9 @@ var implementedHandwritten = map[string]bool{
 	finishUpload:  true,
 	uploadStatus:  true,
 	cancelUpload:  true,
+	headManifest:  true,
+	getManifest:   true,
+	putManifest:   true,
 }
 
 func descriptorStatusRows() []statusCase {

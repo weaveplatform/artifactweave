@@ -101,3 +101,45 @@ Feature: Docker and OCI registry
     When I GET "/artifactory/api/storage/docker-local/team/app/_uploads/sha256__c089183495a5984e2c76941009c89d4e8f881c799c4beb102aec7d515cb32ed2" as admin
     Then the response status is 200
     And the JSON field "checksums.sha256" equals "c089183495a5984e2c76941009c89d4e8f881c799c4beb102aec7d515cb32ed2"
+
+  @jf
+  Scenario: An image pushed by tag is stored as Artifactory lays it out
+    Given the JFrog CLI is available
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8" as admin with body:
+      """
+      {"architecture":"amd64","os":"linux","config":{"Labels":{"org.example.team":"platform"}}}
+      """
+    Then the response status is 201
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin with body:
+      """
+      hello blob
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/v1" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8","size":89},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f","size":10}]}
+      """
+    Then the response status is 201
+    And the response header "Docker-Content-Digest" contains "sha256:"
+    And the response header "Location" contains "/v2/docker-local/team/app/manifests/sha256:"
+    When the next request has header "Accept" "application/vnd.oci.image.manifest.v1+json"
+    And I GET "/v2/docker-local/team/app/manifests/v1" as admin
+    Then the response status is 200
+    And the response header "Content-Type" contains "application/vnd.oci.image.manifest.v1+json"
+    And the JSON field "layers.0.digest" equals "sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"
+    When I run jf "rt s docker-local/team/app/v1/manifest.json --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the output contains "docker-local/team/app/v1/manifest.json"
+    And the output contains "docker.manifest.digest"
+    And the output contains "application/vnd.oci.image.manifest.v1+json"
+    And the output contains "docker.label.org.example.team"
+    When I run jf "rt s docker-local/team/app/v1/ --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the output contains "docker-local/team/app/v1/sha256__fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8"
+    And the output contains "docker-local/team/app/v1/sha256__e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"

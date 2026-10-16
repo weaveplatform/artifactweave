@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -25,6 +26,10 @@ const (
 	CodeDenied              = "DENIED"
 	CodeUnsupported         = "UNSUPPORTED"
 	CodeTooManyRequests     = "TOOMANYREQUESTS"
+	// CodeTagInvalid is the one code outside the specification's list: a
+	// push to a tag that would collide with the layout's own folders
+	// (decision 0031).
+	CodeTagInvalid = "TAG_INVALID"
 )
 
 // Errorf builds a registry error: the status, the specification's code and
@@ -36,3 +41,20 @@ func Errorf(status int, code, format string, args ...any) *apierror.Error {
 // Write renders err in the OCI envelope. An error that is not an
 // *apierror.Error becomes a 500 without its detail, as everywhere else.
 func Write(w http.ResponseWriter, err error) { apierror.Write(w, apierror.OCI, err) }
+
+// WriteAll renders several errors in one OCI envelope with status, as for
+// a manifest that references more than one unknown blob: clients report
+// each code and detail.
+func WriteAll(w http.ResponseWriter, status int, errs ...*apierror.Error) {
+	items := make([]map[string]any, 0, len(errs))
+	for _, e := range errs {
+		it := map[string]any{"code": e.Code, "message": e.Message}
+		if e.Detail != nil {
+			it["detail"] = e.Detail
+		}
+		items = append(items, it)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(map[string]any{"errors": items})
+}
