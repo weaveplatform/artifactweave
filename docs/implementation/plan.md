@@ -38,6 +38,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P16 Cold storage archive and retention | Not started | |
 | P17 Workers | Not started | **M4** |
 | P18 Hardening and release | Not started | v0.1.0-rc |
+| P19 Live Artifactory comparison and tidy-up | Not started | After P18. One comparison against a JFrog trial instance for everything earlier phases could only infer (#216) |
 
 ## Milestones
 
@@ -81,9 +82,10 @@ flowchart LR
   P16 --> P18
   P17 --> P18
   P4b --> P18
+  P18 --> P19[P19 Live Artifactory comparison]
 ```
 
-**Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P10 → P11 → P13 → P15 → P18.
+**Critical path:** P0 → P1 → P1b → P2 → P3 → P4 → P6 → P9 → P10 → P11 → P13 → P15 → P18 → P19.
 
 **Parallel lanes:** P16 and P17 run beside P13 to P15 once P11 has landed; P12 runs
 beside all of them. P5 runs beside P6–P8. P6, P7 and P8 are independent of each other
@@ -719,3 +721,26 @@ Decision: [0016](../research/decisions/0016-observability-and-health.md).
 
 **Exit criteria**
 - v0.1.0-rc tagged; the full Terraform fixture applies clean against a fresh instance; the manual smoke list in [testing/ci.md](../testing/ci.md) passes against the container image.
+
+## P19: Live Artifactory comparison and tidy-up
+
+Decided on 2026-10-16: P1 to P18 are implemented first, and the comparison with a real
+Artifactory runs once, here, against a JFrog trial instance, rather than as captures along the
+way. Until then every phase labels what it can only infer, as [I] in the research documents and
+as entries in the [deviations register](deviations.md), and adds each such item to #216.
+
+**Tracking.** Milestone "P19 Live Artifactory comparison and tidy-up", starting with #216.
+
+**Tasks**
+1. Stand up a JFrog trial instance and a capture harness that records requests and responses
+   for the JFrog CLI, the Terraform providers and the native clients of every format.
+2. Capture every item listed on #216, every [I] fact in the research documents, and every
+   deviation whose Artifactory side is unconfirmed.
+3. Replace inferred fixtures with captured ones. Each divergence becomes a fix, or a deviation
+   recorded with the captured evidence.
+4. Settle the decisions that rest on inferences, amending them in place.
+
+**Exit criteria**
+- Every item on #216 is either matched by a captured fixture or recorded as a deviation with
+  evidence; no [I] fact remains where a capture could settle it.
+
