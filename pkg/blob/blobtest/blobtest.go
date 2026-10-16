@@ -9,6 +9,7 @@ import (
 	"crypto/md5"  //nolint:gosec // wire checksum under test
 	"crypto/sha1" //nolint:gosec // wire checksum under test
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -67,13 +68,15 @@ func Run(t *testing.T, newStore func(t *testing.T) blob.Store, o Options) {
 	}
 }
 
-// Digest returns all three digests of b, the oracle the suite checks against.
+// Digest returns all four digests of b, the oracle the suite checks against.
 func Digest(b []byte) blob.Digests {
 	s256 := sha256.Sum256(b)
+	s512 := sha512.Sum512(b)
 	s1 := sha1.Sum(b) //nolint:gosec // wire checksum
 	m5 := md5.Sum(b)  //nolint:gosec // wire checksum
 	return blob.Digests{
 		SHA256: hex.EncodeToString(s256[:]),
+		SHA512: hex.EncodeToString(s512[:]),
 		SHA1:   hex.EncodeToString(s1[:]),
 		MD5:    hex.EncodeToString(m5[:]),
 	}
@@ -219,9 +222,11 @@ func digestMismatch(ctx context.Context, t *testing.T, s blob.Store) {
 	wrong := Digest([]byte("other"))
 	for _, want := range []blob.Digests{
 		{SHA256: wrong.SHA256},
+		{SHA512: wrong.SHA512},
 		{SHA1: wrong.SHA1},
 		{MD5: wrong.MD5},
 		{SHA256: right.SHA256, SHA1: wrong.SHA1},
+		{SHA256: right.SHA256, SHA512: wrong.SHA512},
 	} {
 		u, err := s.BeginUpload(ctx)
 		if err != nil {
@@ -261,7 +266,9 @@ func invalidDigests(ctx context.Context, t *testing.T, s blob.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []blob.Digests{{SHA256: "zz"}, {SHA1: "zz"}, {MD5: "zz"}} {
+	for _, want := range []blob.Digests{
+		{SHA256: "zz"}, {SHA512: "zz"}, {SHA1: "zz"}, {MD5: "zz"},
+	} {
 		if _, err := u.Commit(ctx, want); !errors.Is(err, blob.ErrInvalidDigest) {
 			t.Errorf("commit %+v: %v", want, err)
 		}

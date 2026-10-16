@@ -369,7 +369,7 @@ distribution, Access Federation and topology. Added 2026-10-13 with
 | Entity | Fields | Notes |
 |---|---|---|
 | Release bundle version | `name, version, description, release_notes{syntax, content}, storing_repository, state, spec{queries[{aql, query_name, mappings[{input, output}], added_props[{key, values[]}], exclude_props_patterns[]}]}, created, created_by, signed_at, signing_key_alias, signature, project_key, origin (source or received)` | `(name, version)`; editable only while open; create body untyped in the oracle |
-| Bundle artifact | `bundle, source_path, target_path, sha256, sha1, md5, size, props[{key, values[]}]` | frozen at creation |
+| Bundle artifact | `bundle, source_path, target_path, sha256, sha512, sha1, md5, size, props[{key, values[]}]` | frozen at creation |
 | Signing key (wire `keys/pgp`) | `alias, public_key, private_key (sealed), passphrase (sealed), is_default, propagated_to[]` | `alias` |
 | Distribution target | `peer_id, site_name, city_name, country_code` | an edge is a peer with the `distribution` use case |
 | Distribution tracker | `id (int64), bundle, kind (distribute, delete), dry_run, auto_create_missing_repositories, rules[{site_name, city_name, country_codes[], priority}], created_at, created_by, status` | wire `{id, sites[{service_id, name, type}]}` |
@@ -515,10 +515,10 @@ timestamps are UTC; identifiers are the wire identities above.
 | `repositories` | `key PK, rclass, package_type, project_key, created_at, updated_at` | the full configuration minus sealed fields | listing filters by class, package type and project; the document is the wire shape |
 | `repository_secrets` | `repo_key PK, password (sealed)` | | sealed column separate from the document so a read never leaks it |
 | `repository_members` | `virtual_key, member_key, position` | | ordered virtual membership; FK to repositories |
-| `items` | `id PK, repo_key, path (parent, "." for root), name, depth, type (file/folder), cached, sha256, sha1, md5, original_sha1, original_md5, size, mime_type, created_at, created_by, modified_at, modified_by, updated_at, remote_url` | | every AQL item field is a column; unique `(repo_key, cached, path, name)`; indexes on `(repo_key, path)`, `sha256`, `sha1`, `md5`, `modified_at`, `created_at` |
+| `items` | `id PK, repo_key, path (parent, "." for root), name, depth, type (file/folder), cached, sha256, sha512, sha1, md5, original_sha256, original_sha512, original_sha1, original_md5, size, mime_type, created_at, created_by, modified_at, modified_by, updated_at, remote_url` | | every AQL item field is a column (AQL has no sha512 field); unique `(repo_key, cached, path, name)`; indexes on `(repo_key, path)`, `sha256`, `sha1`, `md5`, `modified_at`, `created_at`; sha512 is never a lookup key, so it has none |
 | `item_properties` | `item_id, key, value` | | EAV; index `(key, value)` and `(item_id, key)`; AQL `@key` criteria and property search |
 | `item_stats` | `item_id PK, download_count, last_downloaded_at, last_downloaded_by, remote_download_count, remote_last_downloaded_at, remote_last_downloaded_by, remote_origin, remote_path` | | updated out of band on download, so it is not on `items` |
-| `blobs` | `sha256 PK, sha1, md5, size, created_at, ref_count` | | content-addressed store index; checksum deploy and checksum search |
+| `blobs` | `sha256 PK, sha512, sha1, md5, size, created_at, ref_count` | | content-addressed store index; checksum deploy, checksum search and checksum files |
 | `uploads` | `id PK, repo_key, path, backend_handle, started_at, bytes` | | upload sessions (chunked Docker uploads, S3 multipart) |
 | `packages` | `id PK, repo_key, package_type, name, created_at` | | package index ([0018](decisions/0018-package-index.md)); unique `(repo_key, package_type, name)` |
 | `package_versions` | `id PK, package_id, version, order_key, created_at, last_downloaded_at` | per-type metadata | `order_key` is the comparator-normalised sort key; retention and tag limits |
@@ -566,15 +566,15 @@ timestamps are UTC; identifiers are the wire identities above.
 | `federation_members` | `repo_key, peer_id, remote_repo_key, enabled`; PK `(repo_key, peer_id)` | | the `members` list, normalised; settings (`priority`, `propagate_created_time`, `disabled`) live in the repository document |
 | `full_sync_runs` | `id PK, repo_key, peer_id, forced, snapshot_seq, started_at, finished_at, status` | result paths | |
 | `release_bundles` | `name, version, state, storing_repo, project_key, origin, created_at, created_by, signed_at, signing_key_alias`; PK `(name, version)` | spec, release notes, signature | |
-| `bundle_artifacts` | `bundle_name, bundle_version, source_path, target_path, sha256, sha1, md5, size` | props | frozen artifact list; join to blobs |
+| `bundle_artifacts` | `bundle_name, bundle_version, source_path, target_path, sha256, sha512, sha1, md5, size` | props | frozen artifact list; join to blobs |
 | `signing_keys` | `alias PK, public_key, private_key (sealed), passphrase (sealed), is_default` | | Distribution `keys/pgp` |
 | `distribution_trackers` | `id PK (int64), bundle_name, bundle_version, kind, dry_run, status, created_at, created_by` | rules | |
 | `distribution_jobs` | `tracker_id, peer_id, status, priority, started_at, finished_at, error`; PK `(tracker_id, peer_id)` | | per-target status |
 | `bundle_retention` | `bundle_name, bundle_version, keep, operation, created_at, created_by` | | keep marks and audit; the config is a `settings` row |
 | `archive_policies` | `key PK, family (retention_v1, smart_v2), enabled, cron_exp, project_key, duration_minutes, expiration_months, skip_trashcan, created_at, updated_at` | selection criteria | both JFrog policy families |
 | `archive_executions` | `id PK, policy_key, kind (archive, restore, purge), state, started_at, finished_at, total, completed, failed, total_bytes, success_bytes, failure_bytes, triggered_by` | destination configuration | |
-| `cold_blobs` | `sha256 PK, sha1, md5, size, created_at, ref_count` | | index of the cold blob store ([0024](decisions/0024-cold-storage-tier.md)); purge decrements and removes |
-| `archived_items` | `id PK, namespace, repo_key, path, name, sha256, sha1, md5, size, package_type, package_name, package_version, policy_key, execution_id, archived_at, expires_at` | item metadata, properties, statistics | AQL items-domain columns for `retention/search`; indexes as on `items` |
+| `cold_blobs` | `sha256 PK, sha512, sha1, md5, size, created_at, ref_count` | | index of the cold blob store ([0024](decisions/0024-cold-storage-tier.md)); purge decrements and removes |
+| `archived_items` | `id PK, namespace, repo_key, path, name, sha256, sha512, sha1, md5, size, package_type, package_name, package_version, policy_key, execution_id, archived_at, expires_at` | item metadata, properties, statistics | AQL items-domain columns for `retention/search`; indexes as on `items` |
 | `access_federation_targets` | `name PK, peer_id, active, created_at` | entities, filters | |
 | `platform_federations` | `id PK, name, description` | connection groups, entities | |
 | `topologies` | `key PK, name, description, created_at, modified_at` | | `topology_sites (topology_key, peer_id, site_name)` |

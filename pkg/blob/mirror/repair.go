@@ -283,7 +283,7 @@ func (s *Store) copyTo(ctx context.Context, m *member, sha string) (int64, error
 func (s *Store) knownDigests(ctx context.Context, sha string) blob.Digests {
 	want := blob.Digests{SHA256: sha}
 	if b, err := s.repair.blobs.Get(ctx, sha); err == nil {
-		want.SHA1, want.MD5 = b.Checksums.SHA1, b.Checksums.MD5
+		want.SHA512, want.SHA1, want.MD5 = b.Checksums.SHA512, b.Checksums.SHA1, b.Checksums.MD5
 	}
 	return want
 }
@@ -297,6 +297,9 @@ func (s *Store) copyFrom(ctx context.Context, src, dst *member, want blob.Digest
 		return 0, fmt.Errorf("open on %s: %w", src.Name, err)
 	}
 	defer func() { _ = rc.Close() }()
+	if want.SHA512 == "" {
+		want.SHA512 = info.Digests.SHA512
+	}
 	if want.SHA1 == "" {
 		want.SHA1 = info.Digests.SHA1
 	}

@@ -3,12 +3,16 @@
 -- +up
 CREATE TABLE blobs (
     sha256     TEXT COLLATE "C" PRIMARY KEY,
+    sha512     TEXT NOT NULL DEFAULT '',
     sha1       TEXT NOT NULL DEFAULT '',
     md5        TEXT NOT NULL DEFAULT '',
     size       BIGINT NOT NULL,
     created_at BIGINT,
     ref_count  BIGINT NOT NULL DEFAULT 0
 );
+-- Checksum deploy and the checksum searches look content up by sha1 and
+-- md5 (sha256 is the key). Nothing looks it up by sha512: whatever holds a
+-- sha512 holds the sha256 too, so it has no index.
 CREATE INDEX blobs_sha1 ON blobs (sha1);
 CREATE INDEX blobs_md5 ON blobs (md5);
 CREATE INDEX blobs_unreferenced ON blobs (ref_count, sha256);
@@ -58,9 +62,11 @@ CREATE TABLE items (
     type            TEXT NOT NULL,
     size            BIGINT NOT NULL DEFAULT 0,
     sha256          TEXT NOT NULL DEFAULT '',
+    sha512          TEXT NOT NULL DEFAULT '',
     sha1            TEXT NOT NULL DEFAULT '',
     md5             TEXT NOT NULL DEFAULT '',
     original_sha256 TEXT NOT NULL DEFAULT '',
+    original_sha512 TEXT NOT NULL DEFAULT '',
     original_sha1   TEXT NOT NULL DEFAULT '',
     original_md5    TEXT NOT NULL DEFAULT '',
     mime_type       TEXT NOT NULL DEFAULT '',

@@ -32,6 +32,7 @@ func blob(i int) types.Blob {
 	return types.Blob{
 		Checksums: types.Checksums{
 			SHA256: fmt.Sprintf("%064x", i),
+			SHA512: fmt.Sprintf("%0128x", i),
 			SHA1:   fmt.Sprintf("%040x", i),
 			MD5:    fmt.Sprintf("%032x", i),
 		},
@@ -159,6 +160,7 @@ func testBlobs(t *testing.T, b store.BlobIndex) {
 	)(
 		b.Ref(ctx, partial, 2),
 	); got.Refs != 3 ||
+		got.Checksums.SHA512 != one.Checksums.SHA512 ||
 		got.Checksums.SHA1 != one.Checksums.SHA1 {
 		t.Fatalf("second Ref = %+v", got)
 	}
@@ -169,6 +171,10 @@ func testBlobs(t *testing.T, b store.BlobIndex) {
 	wantErr(t, err, store.ErrConflict)
 	bad = one
 	bad.Checksums.MD5 = fmt.Sprintf("%032x", 99)
+	_, err = b.Ref(ctx, bad, 1)
+	wantErr(t, err, store.ErrConflict)
+	bad = one
+	bad.Checksums.SHA512 = fmt.Sprintf("%0128x", 99)
 	_, err = b.Ref(ctx, bad, 1)
 	wantErr(t, err, store.ErrConflict)
 	_, err = b.Ref(ctx, types.Blob{Size: 1}, 1)
@@ -305,7 +311,8 @@ func testBlobDeletion(t *testing.T, b store.BlobIndex) {
 	}
 	must(t, b.FinishDelete(ctx, orphan.Checksums.SHA256, at(21)))
 	full := get[types.Blob](t)(b.Ref(ctx, blob(2), 1))
-	if full.Checksums.SHA1 != blob(2).Checksums.SHA1 ||
+	if full.Checksums.SHA512 != blob(2).Checksums.SHA512 ||
+		full.Checksums.SHA1 != blob(2).Checksums.SHA1 ||
 		full.Checksums.MD5 != blob(2).Checksums.MD5 {
 		t.Fatalf("revived orphan digests = %+v", full.Checksums)
 	}

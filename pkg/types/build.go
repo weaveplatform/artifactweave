@@ -136,7 +136,8 @@ type BuildModule struct {
 
 // BuildFile is an artifact a module produced or a dependency it consumed.
 // Its checksums link it to items, which is how the AQL build domains join
-// (decision 0014).
+// (decision 0014). Build-info records sha1, sha256 and md5, so SHA512 is
+// always empty here.
 type BuildFile struct {
 	// ID is a dependency's id; artifacts have none.
 	ID   string

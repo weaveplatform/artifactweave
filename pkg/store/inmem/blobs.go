@@ -45,6 +45,7 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 			// Revived by content written again: the missing digests are
 			// filled in and Deleted stays, as on the SQL stores.
 			cur.State, cur.Refs, cur.Created = types.BlobLive, n, blob.Created
+			cur.Checksums.SHA512 = cmpOr(cur.Checksums.SHA512, blob.Checksums.SHA512)
 			cur.Checksums.SHA1 = cmpOr(cur.Checksums.SHA1, blob.Checksums.SHA1)
 			cur.Checksums.MD5 = cmpOr(cur.Checksums.MD5, blob.Checksums.MD5)
 		default:
@@ -71,7 +72,8 @@ func sameContent(stored, b types.Blob) bool {
 		return false
 	}
 	differ := func(x, y string) bool { return x != "" && y != "" && !strings.EqualFold(x, y) }
-	return !differ(stored.Checksums.SHA1, b.Checksums.SHA1) &&
+	return !differ(stored.Checksums.SHA512, b.Checksums.SHA512) &&
+		!differ(stored.Checksums.SHA1, b.Checksums.SHA1) &&
 		!differ(stored.Checksums.MD5, b.Checksums.MD5)
 }
 

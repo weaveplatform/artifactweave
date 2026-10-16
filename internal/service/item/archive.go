@@ -6,10 +6,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
-	"crypto/md5"  //nolint:gosec // MD5 is a wire checksum here
-	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum here
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -416,8 +412,8 @@ func spool(body io.Reader, declared types.Checksums, verify bool) (*os.File, int
 		_ = os.Remove(f.Name())
 		return nil, 0, err
 	}
-	h1, h256, h5 := sha1.New(), sha256.New(), md5.New() //nolint:gosec // wire checksums
-	n, err := io.Copy(io.MultiWriter(f, h1, h256, h5), io.LimitReader(body, maxExplodeBytes+1))
+	h := blob.NewHasher()
+	n, err := io.Copy(io.MultiWriter(f, h), io.LimitReader(body, maxExplodeBytes+1))
 	if err != nil {
 		return fail(fmt.Errorf("item: spool archive: %w", err))
 	}
@@ -425,10 +421,12 @@ func spool(body io.Reader, declared types.Checksums, verify bool) (*os.File, int
 		return fail(fmt.Errorf("%w: the archive exceeds %d bytes", ErrBadArchive, maxExplodeBytes))
 	}
 	if verify {
+		got := h.Sum()
 		for _, c := range [][2]string{
-			{declared.SHA1, hex.EncodeToString(h1.Sum(nil))},
-			{declared.SHA256, hex.EncodeToString(h256.Sum(nil))},
-			{declared.MD5, hex.EncodeToString(h5.Sum(nil))},
+			{declared.SHA256, got.SHA256},
+			{declared.SHA512, got.SHA512},
+			{declared.SHA1, got.SHA1},
+			{declared.MD5, got.MD5},
 		} {
 			if c[0] != "" && c[0] != c[1] {
 				return fail(ErrChecksumMismatch)
@@ -439,9 +437,8 @@ func spool(body io.Reader, declared types.Checksums, verify bool) (*os.File, int
 }
 
 func digestsOf(info blob.Info) types.Checksums {
-	return types.Checksums{
-		SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
-	}
+	d := info.Digests
+	return types.Checksums{SHA256: d.SHA256, SHA512: d.SHA512, SHA1: d.SHA1, MD5: d.MD5}
 }
 
 // readerAt gives random access over a blob reader for zip, which reads its

@@ -419,6 +419,8 @@ func itemCreated(ctx context.Context, it types.Item) map[string]any {
 	return body
 }
 
+// checksumsJSON is the file info's checksum object, which in Artifactory names
+// sha1, md5 and sha256 only; SHA-512 reaches clients as a ".sha512" file.
 func checksumsJSON(c types.Checksums) map[string]string {
 	out := map[string]string{}
 	for k, v := range map[string]string{"sha1": c.SHA1, "md5": c.MD5, "sha256": c.SHA256} {
@@ -621,7 +623,7 @@ func anyIn(want, have []string) bool {
 	return false
 }
 
-// getSidecar serves "<file>.sha1", ".sha256" and ".md5" from the file's
+// getSidecar serves "<file>.sha256", ".sha512", ".sha1" and ".md5" from the file's
 // recorded checksums (decision 0004); they are never stored as items. The
 // computed digest is served: under client-checksums the declared one must
 // equal it, and under server-generated-checksums it is the one that counts.

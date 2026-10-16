@@ -97,7 +97,7 @@ func (b bundleStore) insertArtifacts(
 ) error {
 	cols := []string{
 		"bundle_name", "bundle_version", "target_path", "source_path",
-		"sha256", "sha1", "md5", "size", "props",
+		"sha256", "sha512", "sha1", "md5", "size", "props",
 	}
 	for _, a := range list {
 		if _, err := b.s.exec(
@@ -109,6 +109,7 @@ func (b bundleStore) insertArtifacts(
 			a.TargetPath,
 			a.SourcePath,
 			a.Checksums.SHA256,
+			a.Checksums.SHA512,
 			a.Checksums.SHA1,
 			a.Checksums.MD5,
 			a.Size,
@@ -255,7 +256,8 @@ func (b bundleStore) Artifacts(
 	err := b.s.rows(
 		ctx,
 		"list bundle artifacts",
-		"SELECT bundle_name, bundle_version, target_path, source_path, sha256, sha1, md5, size, props"+
+		"SELECT bundle_name, bundle_version, target_path, source_path,"+
+			" sha256, sha512, sha1, md5, size, props"+
 			" FROM bundle_artifacts WHERE bundle_name = ? AND bundle_version = ? ORDER BY target_path",
 		[]any{name, version},
 		func(r *sql.Rows) error {
@@ -269,6 +271,7 @@ func (b bundleStore) Artifacts(
 				&a.TargetPath,
 				&a.SourcePath,
 				&a.Checksums.SHA256,
+				&a.Checksums.SHA512,
 				&a.Checksums.SHA1,
 				&a.Checksums.MD5,
 				&a.Size,
@@ -890,7 +893,7 @@ func (a archiveStore) Executions(
 }
 
 var archivedCols = []string{
-	"namespace", "repo_key", "path", "name", "depth", "sha256", "sha1", "md5", "size",
+	"namespace", "repo_key", "path", "name", "depth", "sha256", "sha512", "sha1", "md5", "size",
 	"created_at", "created_by", "modified_at", "modified_by", "package_type", "package_name",
 	"package_version", "policy_key", "execution_id", "archived_at", "expires_at",
 	"cold_blob_sha256", "item", "properties", "stats",
@@ -918,6 +921,7 @@ func archivedRow(a types.ArchivedItem) ([]any, error) {
 		name,
 		depth,
 		it.Actual.SHA256,
+		it.Actual.SHA512,
 		it.Actual.SHA1,
 		it.Actual.MD5,
 		it.Size,

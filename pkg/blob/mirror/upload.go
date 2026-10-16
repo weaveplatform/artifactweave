@@ -42,6 +42,7 @@ type target struct {
 
 type digests struct {
 	SHA256 string `json:"sha256"`
+	SHA512 string `json:"sha512,omitempty"`
 	SHA1   string `json:"sha1,omitempty"`
 	MD5    string `json:"md5,omitempty"`
 }
@@ -413,7 +414,7 @@ func (s *Store) commitMember(
 // just sha.
 func (u *upload) knownDigests(sha string) blob.Digests {
 	if d := u.ss.Data.Digests; d != nil && d.SHA256 == sha {
-		return blob.Digests{SHA256: d.SHA256, SHA1: d.SHA1, MD5: d.MD5}
+		return blob.Digests{SHA256: d.SHA256, SHA512: d.SHA512, SHA1: d.SHA1, MD5: d.MD5}
 	}
 	return blob.Digests{SHA256: sha}
 }
@@ -426,7 +427,7 @@ func (u *upload) previousInfo() blob.Info {
 	}
 	return blob.Info{
 		Size:    u.ss.Size,
-		Digests: blob.Digests{SHA256: d.SHA256, SHA1: d.SHA1, MD5: d.MD5},
+		Digests: blob.Digests{SHA256: d.SHA256, SHA512: d.SHA512, SHA1: d.SHA1, MD5: d.MD5},
 	}
 }
 
@@ -437,6 +438,7 @@ func (u *upload) markCommitted(i int, info blob.Info) {
 	if d := u.ss.Data.Digests; d == nil || d.SHA1 == "" {
 		u.ss.Data.Digests = &digests{
 			SHA256: info.Digests.SHA256,
+			SHA512: info.Digests.SHA512,
 			SHA1:   info.Digests.SHA1,
 			MD5:    info.Digests.MD5,
 		}
