@@ -35,3 +35,27 @@ variable "with_properties" {
   default     = true
   description = "Whether to set the properties on item_path. Apply with false first, deploy the file, then apply with true."
 }
+
+variable "npm_repository_key" {
+  type        = string
+  default     = "npm-local"
+  description = "Key of the local npm repository."
+}
+
+variable "go_repository_key" {
+  type        = string
+  default     = "go-local"
+  description = "Key of the local Go modules repository."
+}
+
+variable "maven_repository_key" {
+  type        = string
+  default     = "maven-releases-local"
+  description = "Key of the local Maven release repository."
+}
+
+variable "gradle_repository_key" {
+  type        = string
+  default     = "gradle-snapshots-local"
+  description = "Key of the local Gradle snapshot repository."
+}
