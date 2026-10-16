@@ -117,6 +117,24 @@ SDK offer.
 - **Credentials:** shared key, connection string, SAS token, `DefaultAzureCredential`,
   managed identity or workload identity.
 
+**`s3`: must-not-exist writes** (amended 2026-10-16, #255).
+- **Every write of a content key carries `If-None-Match: *`,** as the gcs and azure
+  backends write: the small-blob PutObject, the CompleteMultipartUpload of parts that
+  target the content key, and the copy into place (CopyObject, or the final
+  CompleteMultipartUpload of a multipart copy above 5 GiB). There is no HeadObject before
+  the write.
+- **A 412 `PreconditionFailed` means the blob is already stored.** The existing object
+  is adopted when its size matches. Its key is its SHA-256, and an object reaches a
+  content key only after that digest has been verified, so the size is what is left to
+  tell a whole blob from a damaged one; any other size is refused. A refused
+  CompleteMultipartUpload leaves the upload open, so it is aborted.
+- **Stores without the condition.** The condition never guards correctness, only work
+  and races, because a write over an existing content key stores the same bytes:
+  - a store that ignores it writes anyway (MinIO ignores it on CopyObject, while honouring
+    it on PutObject and CompleteMultipartUpload);
+  - a store that refuses it with 501 `NotImplemented` is written once more without it,
+    and the store sends no condition from then on.
+
 **Both backends.** Following the s3 pattern, each backend wraps its SDK in a narrow `API`
 interface, so the backend can be tested on every platform against a fake that models the
 real service (including the behaviours the emulators get wrong) and has fault injection.
@@ -158,6 +176,12 @@ the SDK wiring on Linux CI.
 - *Hierarchical-namespace rename:* atomic, but only on ADLS Gen2 accounts and through a
   separate SDK and endpoint. It remains a possible later fast path.
 
+**s3.**
+- Real S3 enforces `If-None-Match: *` on PutObject, CopyObject and
+  CompleteMultipartUpload (research 18 §4, `cloud-conformance` run 38892387927). A
+  conditional write makes "must not exist" atomic, so two uploads of one blob cannot race,
+  and it saves the HeadObject every commit used to send.
+
 ## Constraints
 
 **GCS.**
@@ -190,6 +214,12 @@ the SDK wiring on Linux CI.
 - Signing tests with generated keys and no network.
 - The session-layer test shows that two stores of one kind keep separate sessions in a
   single `uploads` table.
+
+**s3:**
+- `blobtest.Run` against MinIO, plus `TestConcurrentCommitsOnMinIO`, which commits one blob
+  from several sessions at once on each write path.
+- Fake tests for adoption, refusal of a damaged object, a retried write whose first
+  attempt landed unseen, a store that ignores the condition and one that refuses it.
 
 **Real cloud:** an opt-in workflow runs the contract against real accounts.
 

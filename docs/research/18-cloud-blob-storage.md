@@ -458,9 +458,11 @@ From `TestRealS3Probes` (`pkg/blob/s3/real_test.go`) in run 38892387927, against
 
 | Question | Answer | Consequence |
 |---|---|---|
-| 6: conditional writes onto an existing key | PutObject, CopyObject and CompleteMultipartUpload with `If-None-Match: *` all answer 412 `PreconditionFailed` | S3 enforces must-not-exist itself, as GCS and Azure do. The backend's HeadObject check before a write is safe because keys are content addresses; a conditional write could replace it and close the window between the check and the write |
+| 6: conditional writes onto an existing key | PutObject, CopyObject and CompleteMultipartUpload with `If-None-Match: *` all answer 412 `PreconditionFailed` | S3 enforces must-not-exist itself, as GCS and Azure do. The backend now writes every content key conditionally instead of checking with HeadObject first (decision [0027](decisions/0027-cloud-blob-backends.md), #255) |
 | 7: default checksum | `FULL_OBJECT` CRC32; no CRC64NVME | Informational: the contract computes its own SHA-256 |
 | 8: a URL presigned for GET, used for HEAD | HEAD answers 403, GET answers 200 | Confirms the inference in research [19](19-cdn-and-download-redirect.md) section 2 for S3: HEAD and conditional requests on a redirecting repository are answered locally and never redirected, as decision [0029](decisions/0029-cdn-delivery-and-download-redirect.md) requires |
+
+**[probe]** MinIO, the image `pkg/containertest` pins (2026-10-16), refuses `If-None-Match: *` onto an existing key with 412 on PutObject and CompleteMultipartUpload, but ignores it on CopyObject and overwrites the destination. Content keys make that harmless: the copy writes the same bytes.
 
 ## Sources
 
