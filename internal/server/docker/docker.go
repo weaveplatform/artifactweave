@@ -43,6 +43,13 @@ const (
 	apiVersion       = "registry/2.0"
 )
 
+// RegistryHeader names, on a manifest read, the repository that holds the
+// manifest, by its stored key. jf docker push and pull HEAD the manifest
+// through the registry after the docker client finishes and read the key
+// from here; without it they fail before collecting build-info
+// (jfrog-cli-artifactory ocicontainer/image.go, GetRemoteRepo).
+const RegistryHeader = "X-Artifactory-Docker-Registry"
+
 // prefix is Artifactory's own path to a repository's registry.
 const prefix = "/artifactory/api/docker/"
 

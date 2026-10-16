@@ -77,6 +77,7 @@ func (g *Registry) getManifest(w http.ResponseWriter, r *http.Request, q Request
 	h.Set("Content-Type", mediaType)
 	h.Set(contentDigestHeader, digest)
 	h.Set("ETag", `"`+digest+`"`)
+	h.Set(RegistryHeader, q.Repo.Key)
 	http.ServeContent(w, r, "", it.Modified, content)
 }
 

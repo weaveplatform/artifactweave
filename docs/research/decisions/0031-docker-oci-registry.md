@@ -153,7 +153,9 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   each tag, and answers 201 with an `OCI-Tag` header for each tag accepted.
 - **Reads.** `GET` and `HEAD` by tag read the tag folder's manifest; by digest they read the
   manifest with that SHA-256 in any of the image's own folders. `Content-Type` is
-  `docker.manifest.type`, and `Docker-Content-Digest` and `ETag` carry the digest. A
+  `docker.manifest.type`, and `Docker-Content-Digest` and `ETag` carry the digest.
+  `X-Artifactory-Docker-Registry` names the repository that holds the manifest, by its
+  stored key, which `jf docker push` and `pull` read (R23 6). A
   manifest is never converted: a request whose `Accept` lists manifest types but not the
   stored one answers 404 `MANIFEST_UNKNOWN`, and no `Accept` or a wildcard gets the stored
   type. A reference that is neither a valid

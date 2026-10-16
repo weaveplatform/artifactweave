@@ -71,13 +71,15 @@ func TestPushAndPullByTagAndDigest(t *testing.T) {
 		expect(t, get, http.StatusOK, "")
 		h := get.Header()
 		if get.Body.String() != body || h.Get("Content-Type") != layout.MediaTypeOCIManifest ||
-			h.Get(contentDigestHeader) != d || h.Get("ETag") != `"`+d+`"` {
+			h.Get(contentDigestHeader) != d || h.Get("ETag") != `"`+d+`"` ||
+			h.Get(RegistryHeader) != "docker-local" {
 			t.Fatalf("%s: %v %q", target, h, get.Body)
 		}
 		head := w.do(http.MethodHead, target, "", nil)
 		expect(t, head, http.StatusOK, "")
 		if head.Body.Len() != 0 || head.Header().Get("Content-Length") != strconv.Itoa(len(body)) ||
-			head.Header().Get(contentDigestHeader) != d {
+			head.Header().Get(contentDigestHeader) != d ||
+			head.Header().Get(RegistryHeader) != "docker-local" {
 			t.Fatalf("HEAD %s: %v", target, head.Header())
 		}
 	}
