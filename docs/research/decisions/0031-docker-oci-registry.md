@@ -298,7 +298,18 @@ a `referrers.json` (DV-036).
 - Layout tests: after `docker push`, a multi-architecture `buildx` push and a push by digest,
   AQL finds the files and properties `jf` searches for (R23 6).
 - The OCI conformance job (decision [0015](0015-testing-and-acceptance.md)) with all four
-  categories.
+  categories. Of the suite's 79 specifications at v1.1.1, 73 pass and these 6 are skipped
+  by design:
+  - "Get tag name from environment" and "Populate registry with test tags (no push)" run
+    only when the job pulls or discovers without pushing; it pushes.
+  - "Cross-mounting without from", with automatic content discovery on and off, run only
+    with `OCI_AUTOMATIC_CROSSMOUNT` set; a mount without `from` opens a session instead.
+  - "GET request to test digest within cross-mount namespace" follows only a mount that
+    answered 201. The suite asks for tokens scoped to the target repository alone, so the
+    mount falls back to an upload session (202), which the specification allows, and the
+    suite runs its 202 follow-up instead.
+  - "GET request to deleted blob URL should yield 404" follows only a blob `DELETE` that
+    succeeded; blob `DELETE` answers 405 here.
 - Acceptance: `docker`, `crane`, `oras` and `cosign` round trips, `jf docker push` and
   `jf docker pull` with `--build-name` and `--build-number` followed by
   `jf rt build-publish`, `jf rt build-docker-create` for an image pushed by `crane`, and

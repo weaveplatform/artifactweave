@@ -441,7 +441,7 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | Command | What |
 |---|---|
 | `make gate` | Everything the per-PR jobs run except acceptance |
-| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN` and `ARTIFACTWEAVE_CRANE_BIN` name the pinned `jf` and `crane`; their scenarios skip without them, and `docker login` runs on Linux only, where the daemon shares the binary's 127.0.0.1 |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN` and `ARTIFACTWEAVE_COSIGN_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras` and `cosign` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1 |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
