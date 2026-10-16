@@ -771,6 +771,10 @@ func (w *world) runJF(args string) error {
 	}
 	home := w.jfHome
 	argv := strings.Fields(w.expand(args))
+	// Arguments split on whitespace, so "{sp}" puts a space inside one.
+	for i := range argv {
+		argv[i] = strings.ReplaceAll(argv[i], "{sp}", " ")
+	}
 	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_JF_BIN"), argv...)
 	// Relative file specs resolve against the scenario's files, so an
 	// upload of "org/*" keeps the tree's layout under the target.

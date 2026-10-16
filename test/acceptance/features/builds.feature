@@ -82,6 +82,29 @@ Feature: Build-info
     Then the JSON field "buildsNumbers" has 1 entries
     And the JSON field "buildsNumbers.0.uri" equals "/7"
 
+  # The CLI escapes properties with url.QueryEscape, so a space travels as
+  # "+" and must be stored as a space, as Artifactory's URLDecoder stores it
+  # (#260). "{sp}" is a space inside one argument.
+  @jf
+  Scenario: jf rt u with a build name and a property holding spaces
+    Given the JFrog CLI is available
+    And a file "spaced.bin" with content:
+      """
+      spaced build artifact
+      """
+    When I run jf "rt u {dir}/spaced.bin generic-local/spaced/ --flat --build-name=my{sp}build --build-number=1 --target-props=team=platform{sp}eng --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bp my{sp}build 1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/artifactory/api/storage/generic-local/spaced/spaced.bin?properties=team" as admin
+    Then the response status is 200
+    And the JSON field "properties.team.0" equals "platform eng"
+    # --build matches the build.name property on the item, which a "+"
+    # would have broken.
+    When I run jf "rt s generic-local/spaced/ --build=my{sp}build/1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the output contains "generic-local/spaced/spaced.bin"
+
   # With a pattern, the CLI finds a build's files through AQL on
   # artifact.module.build.name and .number (decision 0012), then keeps those
   # whose build.name and build.number properties match.
