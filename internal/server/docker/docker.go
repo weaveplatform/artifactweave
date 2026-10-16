@@ -111,6 +111,7 @@ func New(o Options) *Registry {
 	// Each feature registers its endpoints with one call here.
 	g.registerProbe()
 	g.registerBlobs()
+	g.registerManifests()
 	return g
 }
 

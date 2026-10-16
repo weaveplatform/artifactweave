@@ -362,6 +362,7 @@ func matrixTable() []matrixRow {
 		searchMatrix(),
 		registryMatrix(),
 		registryBlobMatrix(),
+		registryManifestMatrix(),
 	)
 }
 
@@ -945,11 +946,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	}
 	body := fill.Replace(r.body)
 	if body != "" {
-		headers["Content-Type"] = "application/json"
-		if form, ok := strings.CutPrefix(body, "form:"); ok {
-			headers["Content-Type"] = "application/x-www-form-urlencoded"
-			body = form
-		}
+		headers["Content-Type"], body = contentTypeOf(body)
 	}
 	rec := do(t, f.h, r.method(), fill.Replace(r.path), headers, body)
 	return rec.Code, rec.Body.String()
@@ -1084,6 +1081,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	)
 	f.deploy(t, "libs-b", "b/get.txt", []byte("matrix"))
 	seedMatrixRegistry(t, f)
+	seedMatrixManifests(t, f)
 	k := testKeys()
 	rs := roles.Service{Store: db}
 	for _, p := range names {
