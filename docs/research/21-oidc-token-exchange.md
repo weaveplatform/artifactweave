@@ -81,6 +81,42 @@ From <https://docs.jfrog.com/administration/docs/openid-connect-integration>:
 - **[D]** The errors for a token that matches no mapping, or does not verify, are not
   documented beyond the 400 and 401 of the operation.
 
+## 3a. Exchanged tokens at the Docker registry
+
+Researched for #248 on 2026-10-16: whether a token from the exchange is meant to reach
+Artifactory's Docker registry, and as whom.
+
+- **[S]** `setup-jfrog-cli` declares the outputs `oidc-token` ("JFrog OIDC token generated
+  by the Setup JFrog CLI when setting oidc-provider-name") and `oidc-user` ("JFrog OIDC
+  username from the OIDC token") (`action.yml` at setup-jfrog-cli `1e5845068719`).
+- **[D]** Its README's OIDC examples configure the CLI with `oidc-provider-name` alone, then
+  run `jf docker build` and `jf docker push` to a `docker-local` repository
+  (`README.md` at the same commit).
+- **[S]** `jf docker push` and `pull` log the Docker client in before running it: the
+  password is the configured access token, and the user name is the configured one or,
+  when there is none, the one extracted from the access token
+  (`ContainerManagerLogin`, `artifactory/commands/ocicontainer/containermanager.go`, lines
+  248-257, at jfrog-cli-artifactory `4a0f3827cfa0`). With an exchanged token that is
+  Basic with the exchanged user and token, from which the Docker client fetches a registry
+  token at the realm.
+- **[S]** The JFrog Terraform providers' `oidc_provider_name` posts
+  `{grant_type: "urn:ietf:params:oauth:grant-type:token-exchange", subject_token_type:
+  "urn:ietf:params:oauth:token-type:id_token", subject_token, provider_name}` to
+  `/access/api/v1/oidc/token`, taking the subject token from `TFC_WORKLOAD_IDENTITY_TOKEN`
+  (Terraform Cloud's workload identity, not GitHub's), reads only `access_token`, and uses
+  it as the Bearer credential (`OIDCTokenExchange`, `util/util.go`, and `client/client.go`
+  `SetAuthToken`, at terraform-provider-shared `adad42471470`). They never reach the
+  registry.
+- **[D]** As section 3 records, the exchanged token's user may be transient, with its
+  permissions coming from the auto-join groups, or a synthetic subject acting through its
+  groups scope.
+- **[I]** Artifactory therefore authorizes a `docker login` and the registry token behind
+  it as it authorizes the exchanged token itself: the same user, the same scope. How it
+  binds a registry token to the exchanged one, and whether revoking the exchanged token
+  ends registry tokens already issued, is not documented; artifactweave binds them and
+  revokes them together, the more secure reading (decision 0005). Both points are on
+  #216 for the live capture.
+
 ## 4. Inferred
 
 - **[I]** GitHub's organisation check compares the token's `repository_owner` claim,
@@ -98,3 +134,6 @@ From <https://docs.jfrog.com/administration/docs/openid-connect-integration>:
 | JFrog CLI | 2.126.0 (acceptance) |
 | jfrog/platform Terraform provider | 2.2.11 |
 | go-jose | v4.1.5 |
+| setup-jfrog-cli | `1e5845068719` (section 3a) |
+| jfrog-cli-artifactory | `4a0f3827cfa0` (section 3a) |
+| terraform-provider-shared | `adad42471470` (section 3a) |

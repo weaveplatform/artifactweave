@@ -254,6 +254,85 @@ func TestTokenFromARegistryToken(t *testing.T) {
 	}
 }
 
+// A token from an OIDC exchange may name a user who is not stored; the
+// registry token it obtains keeps its identity and scope (decision 0005),
+// so it later resolves to the same transient or synthetic user.
+func TestTokenKeepsTheCallersIdentityAndScope(t *testing.T) {
+	w := newTokenWorld(t)
+	groups, err := types.ParseScope("applied-permissions/groups:ci")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, c := range map[string]struct {
+		p       auth.Principal
+		wantScp string
+	}{
+		// reader holds Read on docker-local/pub/ but is not a stored user.
+		"transient": {
+			auth.Principal{Name: "reader", Identity: types.IdentityTransient},
+			"applied-permissions/user",
+		},
+		"synthetic": {
+			auth.Principal{Name: "oidc-github-ci", Identity: types.IdentitySynthetic, Scope: groups},
+			"applied-permissions/groups:ci",
+		},
+	} {
+		rec := w.get("/v2/token?scope=repository:docker-local/pub/app:pull", &c.p, "")
+		var body tokenResponse
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil {
+			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+		got, err := w.tokens.Verify(context.Background(), body.Token)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if got.Identity != c.p.Identity || got.Scope.String() != c.wantScp {
+			t.Errorf("%s: identity %q scope %q", name, got.Identity, got.Scope)
+		}
+	}
+}
+
+// A registry token is bound to the stored token behind its caller, and a
+// registry token caller passes on the one it was bound to, so revoking
+// that token ends every registry token descended from it.
+func TestTokenBindsToTheParentToken(t *testing.T) {
+	w := newTokenWorld(t)
+	ctx := context.Background()
+	hour := time.Hour
+	parent, err := w.tokens.Issue(ctx, token.Request{
+		Username: "writer", ExpiresIn: &hour, ByAdmin: true, ForceRevocable: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	have := &types.RegistryAccess{Grants: []types.RegistryGrant{
+		{Type: scopeRepository, Name: "docker-local/app", Actions: []string{"pull"}},
+	}}
+	for name, p := range map[string]auth.Principal{
+		"token":          {Name: "writer", TokenID: parent.Record.ID},
+		"registry token": {Name: "writer", TokenID: "not-stored", Registry: have, TokenParent: parent.Record.ID},
+	} {
+		rec := w.get("/v2/token?scope=repository:docker-local/app:pull", &p, "")
+		var body tokenResponse
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil {
+			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+		got, err := w.tokens.Verify(ctx, body.Token)
+		if err != nil || got.Parent != parent.Record.ID {
+			t.Errorf("%s: parent %q, %v", name, got.Parent, err)
+		}
+	}
+	// A password caller's token has no parent.
+	rec := w.get("/v2/token", &auth.Principal{Name: "writer"}, "")
+	var body tokenResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := w.tokens.Verify(ctx, body.Token); err != nil || got.Parent != "" {
+		t.Errorf("password: parent %q, %v", got.Parent, err)
+	}
+}
+
 func TestLifetime(t *testing.T) {
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 	for name, c := range map[string]struct {

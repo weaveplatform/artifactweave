@@ -226,6 +226,18 @@ type RegistryRequest struct {
 	// types.RegistryTokenExpiry.
 	ExpiresIn time.Duration
 	Access    types.RegistryAccess
+	// Scope is the scope of the credential that obtained the token, which
+	// the token keeps so it never acts more broadly; it defaults to
+	// applied-permissions/user, a password's.
+	Scope types.Scope
+	// Identity is that credential's identity when it came from an OIDC
+	// exchange, so the token resolves to the same transient or synthetic
+	// user it does.
+	Identity types.TokenIdentity
+	// Parent is the id of the stored token that obtained it, empty for a
+	// password or anonymous caller. The token is refused once the parent is
+	// revoked.
+	Parent string
 }
 
 // IssueRegistry signs a registry token: an access token with the user's
@@ -241,6 +253,9 @@ func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, e
 		return Issued{}, fmt.Errorf("%w: a registry token lives at most %s",
 			ErrInvalidRequest, types.RegistryTokenExpiry)
 	}
+	if !knownIdentity(r.Identity) {
+		return Issued{}, fmt.Errorf("%w: unknown identity %q", ErrInvalidRequest, r.Identity)
+	}
 	now := s.now().Truncate(time.Second)
 	access := r.Access
 	if access.Grants == nil {
@@ -248,14 +263,20 @@ func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, e
 		// specification writes it.
 		access.Grants = []types.RegistryGrant{}
 	}
+	scope := r.Scope
+	if len(scope.Entries) == 0 {
+		scope = types.UserScope()
+	}
 	rec := types.Token{
 		ID:        newUUID(),
 		Subject:   s.issuer + "/users/" + r.Username,
-		Scope:     types.UserScope(),
+		Scope:     scope,
 		Audience:  DefaultAudience,
 		IssuedAt:  now,
 		ExpiresAt: now.Add(r.ExpiresIn),
+		Identity:  r.Identity,
 		Registry:  &access,
+		Parent:    r.Parent,
 	}
 	s.mu.Lock()
 	keys := s.keys
@@ -263,6 +284,7 @@ func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, e
 	raw, err := sign(keys.priv, keys.active, claims{
 		Ver: "2", Sub: rec.Subject, Scp: rec.Scope.String(), Aud: rec.Audience, Iss: s.issuer,
 		Iat: now.Unix(), Exp: rec.ExpiresAt.Unix(), Jti: rec.ID, Registry: &access,
+		Idn: r.Identity, Ptk: r.Parent,
 	})
 	if err != nil {
 		return Issued{}, err
@@ -360,7 +382,7 @@ func (s *Service) verifyJWT(
 		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
 	}
 	if c.Registry != nil {
-		return registryRecord(c, allowExpired)
+		return s.registryRecord(ctx, c, allowExpired)
 	}
 	rec, err := s.st.Tokens().Get(ctx, c.Jti)
 	if errors.Is(err, store.ErrNotFound) {
@@ -376,20 +398,50 @@ func (s *Service) verifyJWT(
 }
 
 // registryRecord is the record a verified registry token stands for: no
-// store holds one. A registry token never refreshes, and one without an
-// expiry was not issued here.
-func registryRecord(c claims, allowExpired bool) (types.Token, error) {
+// store holds one, but the token it descends from must still be stored,
+// so revoking that token revokes this one.
+func (s *Service) registryRecord(
+	ctx context.Context,
+	c claims,
+	allowExpired bool,
+) (types.Token, error) {
+	rec, err := registryClaims(c, allowExpired)
+	if err != nil || rec.Parent == "" {
+		return rec, err
+	}
+	_, err = s.st.Tokens().Get(ctx, rec.Parent)
+	if errors.Is(err, store.ErrNotFound) {
+		return types.Token{}, fmt.Errorf("%w: its parent token was revoked", auth.ErrInvalidToken)
+	}
+	if err != nil {
+		return types.Token{}, fmt.Errorf("token: parent of a registry token: %w", err)
+	}
+	return rec, nil
+}
+
+// registryClaims is the record a registry token's claims describe. A
+// registry token never refreshes, and one without an expiry was not issued
+// here.
+func registryClaims(c claims, allowExpired bool) (types.Token, error) {
 	if allowExpired || c.Exp == 0 {
 		return types.Token{}, fmt.Errorf("%w: registry token", auth.ErrInvalidToken)
 	}
 	scope, err := types.ParseScope(c.Scp)
-	if err != nil {
+	if err != nil || !knownIdentity(c.Idn) {
 		return types.Token{}, errMalformed
 	}
 	return types.Token{
 		ID: c.Jti, Subject: c.Sub, Scope: scope, Audience: c.Aud,
 		IssuedAt: time.Unix(c.Iat, 0), ExpiresAt: time.Unix(c.Exp, 0), Registry: c.Registry,
+		Identity: c.Idn, Parent: c.Ptk,
 	}, nil
+}
+
+// knownIdentity reports whether id is a stored user's or one an OIDC
+// exchange issues.
+func knownIdentity(id types.TokenIdentity) bool {
+	return id == types.IdentityStored || id == types.IdentityTransient ||
+		id == types.IdentitySynthetic
 }
 
 // publicKey returns the key with kid, reloading once when it is unknown,

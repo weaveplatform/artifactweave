@@ -37,6 +37,13 @@ type Principal struct {
 	// Registry is what a registry token grants, nil for any other
 	// credential. Such a principal reaches the registry's routes alone.
 	Registry *types.RegistryAccess
+	// Identity is how the token's subject resolved to a user: transient or
+	// synthetic for a token from an OIDC exchange, which a registry token
+	// obtained with it keeps (decision 0005).
+	Identity types.TokenIdentity
+	// TokenParent is, for a registry token, the stored token it descends
+	// from: a registry token it obtains descends from the same one.
+	TokenParent string
 	// PasswordExpired marks a principal whose correct password has expired.
 	// The middleware lets it through only to change its own password.
 	PasswordExpired bool

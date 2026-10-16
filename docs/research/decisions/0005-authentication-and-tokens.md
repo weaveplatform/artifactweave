@@ -186,17 +186,40 @@ behaviour from [research 23](../23-docker-oci-registry.md) section 3; routes in
   `{"token","access_token","expires_in","issued_at"}`, with `token` and `access_token`
   equal.
 - **The token** is a short-lived access token from the token service: the same RS256 key,
-  issuer and subject form as every access token, with the registry grants as its scope,
-  `repository:<name>:<actions>` for each requested scope with only the actions the caller's
-  permissions allow (`pull` needs Read, `push` Deploy, `delete` Delete, `*` all three).
-  Unlike other tokens it is never stored, as Artifactory stores no token below its
-  persistence threshold. Its lifetime is 3600 seconds, or less when the credentials that
-  obtained it expire sooner. It is accepted only on the registry's routes and answers 401
-  anywhere else.
+  issuer and subject form as every access token, with the registry grants in its
+  `registry` claim, `repository:<name>:<actions>` for each requested scope with only the
+  actions the caller's permissions allow (`pull` needs Read, `push` Deploy, `delete`
+  Delete, `*` all three). Unlike other tokens it is never stored, as Artifactory stores no
+  token below its persistence threshold. Its lifetime is 3600 seconds, or less when the
+  credentials that obtained it expire sooner. It is accepted only on the registry's routes
+  and answers 401 anywhere else.
+- **It stands for the credential that obtained it** (#248). Its `scp` is that credential's
+  scope (`applied-permissions/user` for a password), so it never acts more broadly. A
+  token from an OIDC exchange passes on its `transient` or `synthetic` marker in the
+  `idn` claim, so the registry token resolves to the same user the exchanged token does,
+  by the rules under **The token** above: the stored user of that name when there is one,
+  otherwise a transient user in the auto-join groups, and a synthetic subject through its
+  scope's groups alone. A registry token obtained with a token carries that token's id
+  in the `ptk` claim. Nothing stores a registry token, so the parent must still be stored
+  on every use, and revoking the parent ends every registry token descended from it; a
+  registry token that obtains another passes its own parent on. One obtained with a
+  password has no parent.
+- **Why it is issued, not refused, for an OIDC-exchanged user** (research 21, section
+  3a). JFrog's own tooling uses an exchanged token for the registry: `setup-jfrog-cli`
+  with `oidc-provider-name` configures the JFrog CLI with the exchanged token and its
+  username and exports both as `oidc-user` and `oidc-token`; its documented examples then
+  run `jf docker push`, which logs the Docker client in with that username and the
+  exchanged token as the password. Access documents that such a token's user may be
+  transient, with its permissions from the groups scope. The exchanged token must
+  therefore work for `docker login` and the token flow behind it. The secure form chosen:
+  grants are the requested actions intersected with the exchanged token's scope and the
+  current permissions, at issue and on every use; the lifetime never outlasts the
+  exchanged token; and revoking the exchanged token revokes the registry token.
 - **On each registry request** the granted actions for the addressed `<name>` are
-  intersected with the caller's current permissions, so a token for one image never
-  authorizes another and a removed permission applies at once. A disabled or deleted
-  user's token answers 401.
+  intersected with the caller's current permissions, under the token's scope, so a token
+  for one image never authorizes another and a removed permission applies at once. A
+  disabled or deleted stored user's token answers 401, as does one whose parent token has
+  been revoked.
 - **Basic on the registry.** Clients that skip the token flow may send Basic credentials on
   every request; they are checked as on any other route.
 - **`auth` endpoints.** `GET /artifactory/api/docker/<repo>/v2/auth` and `.../v1/auth`

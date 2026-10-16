@@ -38,6 +38,15 @@ type claims struct {
 	Jti string `json:"jti"`
 	// Registry marks a registry token, which no record backs (IssueRegistry).
 	Registry *types.RegistryAccess `json:"registry,omitempty"`
+	// Idn carries, on a registry token alone, the identity of the token from
+	// an OIDC exchange that obtained it. The exchanged token's own identity
+	// lives in its stored record, but nothing stores a registry token, so
+	// without the claim its subject would have to be a stored user.
+	Idn types.TokenIdentity `json:"idn,omitempty"`
+	// Ptk is, on a registry token alone, the id of the stored token that
+	// obtained it, checked on every use: nothing stores a registry token,
+	// so this is how revoking its parent reaches it.
+	Ptk string `json:"ptk,omitempty"`
 }
 
 var b64 = base64.RawURLEncoding

@@ -62,9 +62,9 @@ func (a *Authenticator) Token(ctx context.Context, raw, user string) (Principal,
 		}
 	}
 	p := tokenPrincipal(u, t.Scope)
-	p.TokenID, p.TokenExpires = t.ID, t.ExpiresAt
+	p.TokenID, p.TokenExpires, p.Identity = t.ID, t.ExpiresAt, t.Identity
 	if t.Registry != nil {
-		p.Registry = t.Registry
+		p.Registry, p.TokenParent = t.Registry, t.Parent
 		if u.Name == AnonymousUser {
 			// An anonymous registry token works only while anonymous
 			// access does: turning it off ends the pulls at once.

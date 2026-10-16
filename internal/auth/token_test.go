@@ -286,6 +286,21 @@ func TestOIDCTokenIdentities(t *testing.T) {
 			Scope:    scope(t, "applied-permissions/groups:ci"),
 			Identity: types.IdentitySynthetic,
 		},
+		// Registry tokens obtained with those (decision 0005): no record
+		// backs them, so the identity travels in the token itself.
+		"registry-transient": {
+			Subject: iss + "robot", Scope: types.UserScope(), Identity: types.IdentityTransient,
+			Registry: &types.RegistryAccess{},
+		},
+		"registry-synthetic": {
+			Subject:  iss + "oidc-github-ci",
+			Scope:    scope(t, "applied-permissions/groups:ci"),
+			Identity: types.IdentitySynthetic,
+			Registry: &types.RegistryAccess{},
+		},
+		"registry-stored-missing": {
+			Subject: iss + "robot", Scope: types.UserScope(), Registry: &types.RegistryAccess{},
+		},
 	}
 	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v, Groups: db.Groups()})
 	if err != nil {
@@ -307,6 +322,32 @@ func TestOIDCTokenIdentities(t *testing.T) {
 	}
 	if _, err := a.Token(ctx, "transient-disabled", ""); !errors.Is(err, ErrBadCredentials) {
 		t.Errorf("a disabled stored user still wins over the transient one: %v", err)
+	}
+	// A registry token stands for the same user as the exchanged token that
+	// obtained it, and still reaches the registry alone.
+	for raw, want := range map[string]struct {
+		groups   []string
+		identity types.TokenIdentity
+	}{
+		"registry-transient": {[]string{"everyone"}, types.IdentityTransient},
+		"registry-synthetic": {nil, types.IdentitySynthetic},
+	} {
+		p, err := a.Token(ctx, raw, "")
+		if err != nil || !slices.Equal(p.Groups, want.groups) || p.Identity != want.identity ||
+			p.Registry == nil {
+			t.Errorf("%s: %+v, %v", raw, p, err)
+		}
+	}
+	if p, err := a.Token(ctx, "registry-synthetic", ""); err == nil &&
+		!slices.Contains(p.Subject().Groups, "ci") {
+		t.Errorf(
+			"a synthetic registry token acts through its scope's groups: %v",
+			p.Subject().Groups,
+		)
+	}
+	// Without the identity a registry token's subject must be stored.
+	if _, err := a.Token(ctx, "registry-stored-missing", ""); !errors.Is(err, ErrBadCredentials) {
+		t.Errorf("an unstored subject without an OIDC identity: %v", err)
 	}
 	// Without a group store a transient user joins nothing.
 	bare, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v})
