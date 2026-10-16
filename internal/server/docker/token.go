@@ -83,8 +83,18 @@ func (g *Registry) serveToken(w http.ResponseWriter, r *http.Request, q Request)
 	if p.Anonymous {
 		username = auth.AnonymousUser
 	}
+	// The token keeps the caller's scope, so it never acts more broadly than
+	// the credential behind it, and an OIDC-exchanged caller's identity, so
+	// a transient or synthetic user it names need not be stored. It is bound
+	// to the stored token behind the caller, which a registry token caller
+	// passes on, so revoking that token ends it too.
+	parent := p.TokenID
+	if p.Registry != nil {
+		parent = p.TokenParent
+	}
 	issued, err := g.tokens.IssueRegistry(r.Context(), token.RegistryRequest{
 		Username: username, ExpiresIn: lifetime(p, time.Now()), Access: access,
+		Scope: p.Scope, Identity: p.Identity, Parent: parent,
 	})
 	if err != nil {
 		g.writeErr(w, r, err)

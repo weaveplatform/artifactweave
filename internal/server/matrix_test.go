@@ -58,6 +58,9 @@ type matrixPrincipal struct {
 	// registry: a registry token, which only the registry's routes accept
 	// (decision 0005).
 	registry bool
+	// identity: the OIDC identity a registry token keeps, so its user need
+	// not be stored.
+	identity types.TokenIdentity
 	// admin: acts as an administrator.
 	admin  bool
 	grants []matrixGrant
@@ -138,6 +141,12 @@ var matrixPrincipals = []matrixPrincipal{
 	// member's registry token, granting nothing (seedMatrixTokens): every
 	// route outside the registry answers it 401.
 	{name: "tok-registry", user: "member", token: true, registry: true, narrowed: true},
+	// The registry token of a transient user from an OIDC exchange, who is
+	// not stored (#248): it answers exactly as tok-registry does.
+	{
+		name: "tok-registry-oidc", user: "ci-oidc", token: true, registry: true, narrowed: true,
+		identity: types.IdentityTransient,
+	},
 }
 
 // holds reports whether p holds every action in want at path in repo.
@@ -1195,7 +1204,7 @@ func seedMatrixTokens(t *testing.T, db store.Store) (*token.Service, map[string]
 			secrets[p.name] = issue(past, p.user, p.scope).AccessToken
 		case p.registry:
 			issued, err := tokens.IssueRegistry(ctx, token.RegistryRequest{
-				Username: p.user, ExpiresIn: time.Hour,
+				Username: p.user, ExpiresIn: time.Hour, Identity: p.identity,
 			})
 			must(err)
 			secrets[p.name] = issued.AccessToken

@@ -76,6 +76,9 @@ type Token struct {
 	// Registry is set on a registry token alone, which the Docker token
 	// endpoint issues and nothing stores (decision 0005): what it grants.
 	Registry *RegistryAccess `json:"-"`
+	// Parent is, on a registry token obtained with a token, the stored
+	// token it descends from; revoking that token revokes it.
+	Parent string `json:"-"`
 }
 
 // Registry token defaults (decision 0005).
