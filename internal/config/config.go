@@ -151,6 +151,9 @@ type BootstrapConfig struct {
 
 // DockerConfig holds the Docker access-method options.
 type DockerConfig struct {
+	// SubdomainMatch adds the subdomain method to repository-path routing:
+	// <repo>.<base_url host>/v2/<image> addresses an image in repo. It needs
+	// base_url, whose host the repository subdomains sit under.
 	SubdomainMatch bool `yaml:"subdomain_match"`
 }
 
@@ -377,6 +380,13 @@ func (c Config) Validate() error {
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			errs = append(errs, fmt.Errorf("%w: %q", ErrBadBaseURL, c.BaseURL))
 		}
+	} else if c.Docker.SubdomainMatch {
+		// Without a configured parent every host would be a candidate
+		// subdomain, and a repository named after the first label of the
+		// registry's own host would capture all of its /v2 traffic.
+		errs = append(errs, fmt.Errorf(
+			"%w: docker.subdomain_match needs base_url, whose host repository subdomains sit under",
+			ErrMissingValue))
 	}
 	switch c.Database.Driver {
 	case "sqlite":

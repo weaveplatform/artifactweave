@@ -289,6 +289,11 @@ func TestBadValues(t *testing.T) {
 			ErrBadBaseURL,
 		},
 		{
+			"docker subdomains without base url",
+			LoadOptions{Flags: map[string]string{"docker.subdomain_match": "true"}},
+			ErrMissingValue,
+		},
+		{
 			"unknown driver",
 			LoadOptions{Flags: map[string]string{"database.driver": "mysql"}},
 			ErrUnknownDriver,

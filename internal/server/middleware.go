@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/docker"
 )
 
 // requestIDHeader is what Artifactory's own responses carry, so logs on both
@@ -128,11 +129,13 @@ func bodyLimit(limit int64) func(http.Handler) http.Handler {
 // onto application/json so the generated strict decoders accept them. The
 // original value is kept in a context value for handlers that care about the
 // exact type. application/yaml is left alone; the descriptor PATCH handler is
-// hand-written and reads it directly.
+// hand-written and reads it directly. So is every registry request: a
+// manifest's media type (application/vnd.oci.image.manifest.v1+json) is
+// part of what the registry stores and serves back.
 func normalizeContentType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ct := r.Header.Get("Content-Type")
-		if ct != "" {
+		if ct != "" && !docker.IsRegistryPath(r.URL.Path) {
 			if mt, params, err := mime.ParseMediaType(
 				ct,
 			); err == nil &&

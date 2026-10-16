@@ -64,6 +64,7 @@ func statusTable() []statusCase {
 		oidcStatusRows(),
 		buildStatusRows(),
 		searchStatusRows(),
+		registryStatusRows(),
 	)
 }
 
@@ -494,6 +495,8 @@ var implementedHandwritten = map[string]bool{
 	"POST /artifactory/api/zap/{repoPath}":                   true,
 	"GET /artifactory/api/storage/auto-trashcan":             true,
 	"GET /artifactory/api/versions/{repo}/{path}":            true,
+	registryProbe: true,
+	prefixProbe:   true,
 }
 
 func descriptorStatusRows() []statusCase {

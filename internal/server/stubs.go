@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/docker"
 )
 
 // surfaceFor picks the error envelope from the request path. Clients parse
@@ -22,7 +23,9 @@ func surfaceFor(path string) apierror.Surface {
 	case strings.HasPrefix(path, "/artifactory/api/go/"),
 		strings.HasPrefix(path, "/artifactory/api/pypi/"):
 		return apierror.Text
-	case strings.HasPrefix(path, "/v2/"), strings.Contains(path, "/api/docker/"):
+	case docker.IsRegistryPath(path):
+		// The JFrog operations beside the registry (promote,
+		// parentManifests) keep the Artifactory envelope (decision 0031).
 		return apierror.OCI
 	case strings.HasPrefix(path, "/access/"), strings.HasPrefix(path, "/event/"),
 		strings.HasPrefix(path, "/worker/"):

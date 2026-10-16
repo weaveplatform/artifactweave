@@ -501,9 +501,11 @@ paths:
       - system
   /api/system/configuration/webServer:
     get:
-      description: Returns the stored reverse proxy settings. Both sslPort and httpsPort are emitted with the same
-        value because the documentation names the former and the platform_reverse_proxy Terraform resource reads
-        the latter. Admin only.
+      description: Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its
+        own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match
+        is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression
+        is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation
+        names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
       operationId: getReverseProxyConfiguration
       responses:
         '200':
