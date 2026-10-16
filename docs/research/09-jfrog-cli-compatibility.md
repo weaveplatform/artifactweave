@@ -147,12 +147,18 @@ capture" with the server logging each query at debug level):
 - A folder pattern such as `org/*` also matches `path:"org"` with any name, so deleting it
   removes the folders below `org` as well as their files.
 - A remote repository is named by its own key (`"repo":"remote"`), never `<key>-cache`.
+- `--build=<name>/<number>` with a pattern sends one query, the same from `jf rt s` and
+  `jf rt dl`: `"$and"` of an `$or` on `artifact.module.build.name` and `.number` and the
+  pattern's `$or`, including `property`. The CLI then keeps the files whose `build.name`
+  and `build.number` properties match.
+- `jf rt ba` reads the appended run with `GET /api/build/<name>/<number>`, then finds its
+  stored build-info document by AQL on the build-info repository to read its checksums.
 
 Minimum AQL subset for the M1 milestone: the `items` domain, `$and` and `$or`, the
 operators `$eq`, `$ne`, `$match`, `$nmatch`, `$gt`, `$lt`, property criteria `@key`,
 `type` in `any | file | folder`, and the `include`, `sort`, `offset`, `transitive`, `limit`
 suffixes. Build searches add the `builds` domain and the `artifact.module.build.*` fields
-after build-info lands. Every query shape the CLI generates is captured as a fixture under
+(P5). Every query shape the CLI generates is captured as a fixture under
 `pkg/aql/aqltest/testdata` and executed on the in-memory store and both SQL dialects with
 identical ordered output ([ADR 0012](decisions/0012-search-and-aql.md)). Refresh the
 fixtures with `make capture-aql` whenever the pinned jf changes.

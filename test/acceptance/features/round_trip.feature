@@ -138,6 +138,20 @@ Feature: JFrog CLI round trip
     # copy_move_file
     When I run jf "rt cp libs-local/org/acme/app-1.0.jar libs-copy/ --url {url} --user admin --password {password}"
     Then the command succeeds
+    # The --build shapes: the jar and the pom become app/1's artifacts, as
+    # they are in pkg/aql/aqltest's build seeds.
+    When I run jf "rt u org/acme/app-1.0.* libs-local/org/acme/ --flat --build-name=app --build-number=1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bp app 1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    # search_build, search_build_properties
+    When I run jf "rt s libs-local/ --build=app/1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the output contains "libs-local/org/acme/app-1.0.pom"
+    # download_build
+    When I run jf "rt dl libs-local/ build-dl/ --build=app/1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the files "org/acme/app-1.0.pom" and "build-dl/org/acme/app-1.0.pom" are identical
     # delete_any
     When I run jf "rt del libs-local/org/* --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
