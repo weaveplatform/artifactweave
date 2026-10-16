@@ -29,7 +29,10 @@ func TestPage(t *testing.T) {
 	if _, err := (store.Page{After: after}).Key(3); !errors.Is(err, store.ErrInvalidCursor) {
 		t.Fatalf("wrong part count: %v", err)
 	}
-	if parts, err := (store.Page{After: after}).Key(2); err != nil || parts[0] != "a" || parts[1] != "b" {
+	if parts, err := (store.Page{After: after}).Key(
+		2,
+	); err != nil || parts[0] != "a" ||
+		parts[1] != "b" {
 		t.Fatalf("Key = %v, %v", parts, err)
 	}
 }
@@ -80,7 +83,8 @@ func TestCloneAndNormalise(t *testing.T) {
 	c.Map["k"][0] = 9
 	c.Any.([]int)[0] = 9 //nolint:forcetypeassert // fixture
 	*c.Ptr = 0
-	if in.Map["k"][0] != 1 || in.Any.([]int)[0] != 1 || *in.Ptr != d { //nolint:forcetypeassert // fixture
+	if in.Map["k"][0] != 1 || in.Any.([]int)[0] != 1 ||
+		*in.Ptr != d { //nolint:forcetypeassert // fixture
 		t.Fatal("Clone shares memory with its input")
 	}
 	c.Bytes[0] = 'S'

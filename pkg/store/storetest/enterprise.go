@@ -85,7 +85,11 @@ func testBundles(t *testing.T, s store.Store) {
 
 	wantErr(t, bs.Create(ctx, b, nil), store.ErrConflict)
 	// Two artifacts on one target path fail the whole create.
-	wantErr(t, bs.Create(ctx, fxBundle("app", "dup"), []types.BundleArtifact{jar, jar}), store.ErrConflict)
+	wantErr(
+		t,
+		bs.Create(ctx, fxBundle("app", "dup"), []types.BundleArtifact{jar, jar}),
+		store.ErrConflict,
+	)
 	_, err := bs.Get(ctx, "app", "dup")
 	wantErr(t, err, store.ErrNotFound)
 	_, err = bs.Get(ctx, "app", "9.9")
@@ -107,7 +111,11 @@ func testBundles(t *testing.T, s store.Store) {
 	must(t, bs.ReplaceArtifacts(ctx, "app", "1.0", []types.BundleArtifact{exe, jar}))
 	same(t, "Artifacts after replace", owned("app", "1.0", exe, jar),
 		get[[]types.BundleArtifact](t)(bs.Artifacts(ctx, "app", "1.0")))
-	wantErr(t, bs.ReplaceArtifacts(ctx, "app", "1.0", []types.BundleArtifact{exe, exe}), store.ErrConflict)
+	wantErr(
+		t,
+		bs.ReplaceArtifacts(ctx, "app", "1.0", []types.BundleArtifact{exe, exe}),
+		store.ErrConflict,
+	)
 	same(t, "Artifacts after a failed replace", owned("app", "1.0", exe, jar),
 		get[[]types.BundleArtifact](t)(bs.Artifacts(ctx, "app", "1.0")))
 	wantErr(t, bs.ReplaceArtifacts(ctx, "app", "9.9", nil), store.ErrNotFound)
@@ -141,9 +149,24 @@ func testBundles(t *testing.T, s store.Store) {
 		}
 		return out
 	}
-	same(t, "List", []string{"Zed/1", "app/1.0", "app/1.1", "app/2.0", "lib/0.1"}, keys(store.BundleFilter{}))
-	same(t, "List by name", []string{"app/1.0", "app/1.1", "app/2.0"}, keys(store.BundleFilter{Name: "app"}))
-	same(t, "List by origin", []string{"lib/0.1"}, keys(store.BundleFilter{Origin: types.BundleReceived}))
+	same(
+		t,
+		"List",
+		[]string{"Zed/1", "app/1.0", "app/1.1", "app/2.0", "lib/0.1"},
+		keys(store.BundleFilter{}),
+	)
+	same(
+		t,
+		"List by name",
+		[]string{"app/1.0", "app/1.1", "app/2.0"},
+		keys(store.BundleFilter{Name: "app"}),
+	)
+	same(
+		t,
+		"List by origin",
+		[]string{"lib/0.1"},
+		keys(store.BundleFilter{Origin: types.BundleReceived}),
+	)
 	same(t, "List by project", []string{"lib/0.1"}, keys(store.BundleFilter{ProjectKey: "p1"}))
 	_, _, err = bs.List(ctx, store.BundleFilter{}, store.Page{After: store.Cursor("only-one-part")})
 	wantErr(t, err, store.ErrInvalidCursor)
@@ -193,11 +216,35 @@ func testBundleRetention(t *testing.T, s store.Store) {
 	}
 
 	audits := []types.BundleRetentionAudit{
-		{BundleName: "app", BundleVersion: "1.0", Operation: types.BundleKeep, Created: at(1), CreatedBy: "a"},
-		{BundleName: "app", BundleVersion: "0.9", Operation: types.BundleDelete, Created: at(3), CreatedBy: "retention"},
-		{BundleName: "lib", BundleVersion: "2", Operation: types.BundleUnkeep, Created: at(2), CreatedBy: "b"},
+		{
+			BundleName:    "app",
+			BundleVersion: "1.0",
+			Operation:     types.BundleKeep,
+			Created:       at(1),
+			CreatedBy:     "a",
+		},
+		{
+			BundleName:    "app",
+			BundleVersion: "0.9",
+			Operation:     types.BundleDelete,
+			Created:       at(3),
+			CreatedBy:     "retention",
+		},
+		{
+			BundleName:    "lib",
+			BundleVersion: "2",
+			Operation:     types.BundleUnkeep,
+			Created:       at(2),
+			CreatedBy:     "b",
+		},
 		// Same instant as the first: the later record lists first.
-		{BundleName: "app", BundleVersion: "1.0", Operation: types.BundleUnkeep, Created: at(1), CreatedBy: "c"},
+		{
+			BundleName:    "app",
+			BundleVersion: "1.0",
+			Operation:     types.BundleUnkeep,
+			Created:       at(1),
+			CreatedBy:     "c",
+		},
 	}
 	for _, a := range audits {
 		must(t, bs.AddAudit(ctx, a))
@@ -216,7 +263,12 @@ func testBundleRetention(t *testing.T, s store.Store) {
 func testBundleExports(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	bs := s.Bundles()
-	e := types.BundleExport{BundleName: "app", BundleVersion: "1.0", Status: types.JobInProgress, Created: at(2)}
+	e := types.BundleExport{
+		BundleName:    "app",
+		BundleVersion: "1.0",
+		Status:        types.JobInProgress,
+		Created:       at(2),
+	}
 	wantErr(t, bs.PutExport(ctx, e), store.ErrNotFound)
 	must(t, bs.Create(ctx, fxBundle("app", "1.0"), nil))
 	must(t, bs.PutExport(ctx, e))
@@ -259,8 +311,16 @@ func testDistribution(t *testing.T, s store.Store) {
 	ds := s.Distribution()
 	t1 := fxTracker("app", "1.0", 1)
 	jobB := types.DistributionJob{PeerInstanceID: "edge-b", Status: types.JobInQueue, Priority: 2}
-	jobA := types.DistributionJob{PeerInstanceID: "edge-a", Status: types.JobInProgress, Started: at(2)}
-	got := get[types.DistributionTracker](t)(ds.CreateTracker(ctx, t1, []types.DistributionJob{jobB, jobA}))
+	jobA := types.DistributionJob{
+		PeerInstanceID: "edge-a",
+		Status:         types.JobInProgress,
+		Started:        at(2),
+	}
+	got := get[types.DistributionTracker](
+		t,
+	)(
+		ds.CreateTracker(ctx, t1, []types.DistributionJob{jobB, jobA}),
+	)
 	if got.ID <= 0 {
 		t.Fatalf("tracker ID = %d", got.ID)
 	}
@@ -268,7 +328,12 @@ func testDistribution(t *testing.T, s store.Store) {
 	same(t, "CreateTracker", t1, got)
 	same(t, "Tracker", t1, get[types.DistributionTracker](t)(ds.Tracker(ctx, t1.ID)))
 	jobA.TrackerID, jobB.TrackerID = t1.ID, t1.ID
-	same(t, "Jobs", []types.DistributionJob{jobA, jobB}, get[[]types.DistributionJob](t)(ds.Jobs(ctx, t1.ID)))
+	same(
+		t,
+		"Jobs",
+		[]types.DistributionJob{jobA, jobB},
+		get[[]types.DistributionJob](t)(ds.Jobs(ctx, t1.ID)),
+	)
 
 	_, err := ds.CreateTracker(ctx, fxTracker("app", "1.0", 9), []types.DistributionJob{jobA, jobA})
 	wantErr(t, err, store.ErrConflict)
@@ -279,8 +344,13 @@ func testDistribution(t *testing.T, s store.Store) {
 	wantErr(t, err, store.ErrNotFound)
 
 	t2 := get[types.DistributionTracker](t)(ds.CreateTracker(ctx, fxTracker("app", "1.0", 2), nil))
-	t3 := get[types.DistributionTracker](t)(ds.CreateTracker(ctx, fxTracker("app", "2.0", 3),
-		[]types.DistributionJob{{PeerInstanceID: "edge-a", Status: types.JobFailed, Error: "unreachable"}}))
+	t3 := get[types.DistributionTracker](t)(ds.CreateTracker(
+		ctx,
+		fxTracker("app", "2.0", 3),
+		[]types.DistributionJob{
+			{PeerInstanceID: "edge-a", Status: types.JobFailed, Error: "unreachable"},
+		},
+	))
 	t4 := get[types.DistributionTracker](t)(ds.CreateTracker(ctx, fxTracker("lib", "1", 4), nil))
 	if !(t1.ID < t2.ID && t2.ID < t3.ID && t3.ID < t4.ID) {
 		t.Fatalf("tracker IDs not increasing: %d %d %d %d", t1.ID, t2.ID, t3.ID, t4.ID)
@@ -306,11 +376,19 @@ func testDistribution(t *testing.T, s store.Store) {
 
 	jobA.Status, jobA.Finished = types.JobCompleted, at(4)
 	must(t, ds.PutJob(ctx, jobA))
-	jobC := types.DistributionJob{TrackerID: t1.ID, PeerInstanceID: "edge-c", Status: types.JobNotDistributed}
+	jobC := types.DistributionJob{
+		TrackerID:      t1.ID,
+		PeerInstanceID: "edge-c",
+		Status:         types.JobNotDistributed,
+	}
 	must(t, ds.PutJob(ctx, jobC))
 	same(t, "Jobs after PutJob", []types.DistributionJob{jobA, jobB, jobC},
 		get[[]types.DistributionJob](t)(ds.Jobs(ctx, t1.ID)))
-	wantErr(t, ds.PutJob(ctx, types.DistributionJob{TrackerID: missing.ID, PeerInstanceID: "x"}), store.ErrNotFound)
+	wantErr(
+		t,
+		ds.PutJob(ctx, types.DistributionJob{TrackerID: missing.ID, PeerInstanceID: "x"}),
+		store.ErrNotFound,
+	)
 	_, err = ds.Jobs(ctx, missing.ID)
 	wantErr(t, err, store.ErrNotFound)
 	same(t, "Jobs of a tracker without jobs", []types.DistributionJob(nil),
@@ -321,8 +399,16 @@ func testDistribution(t *testing.T, s store.Store) {
 	}
 	same(t, "JobsForPeer", []types.DistributionJob{jobA, failed},
 		get[[]types.DistributionJob](t)(ds.JobsForPeer(ctx, "edge-a", nil)))
-	same(t, "JobsForPeer by status", []types.DistributionJob{failed},
-		get[[]types.DistributionJob](t)(ds.JobsForPeer(ctx, "edge-a", []types.JobStatus{types.JobFailed, types.JobAborted})))
+	same(
+		t,
+		"JobsForPeer by status",
+		[]types.DistributionJob{failed},
+		get[[]types.DistributionJob](
+			t,
+		)(
+			ds.JobsForPeer(ctx, "edge-a", []types.JobStatus{types.JobFailed, types.JobAborted}),
+		),
+	)
 	same(t, "JobsForPeer unknown", []types.DistributionJob(nil),
 		get[[]types.DistributionJob](t)(ds.JobsForPeer(ctx, "edge-z", nil)))
 }
@@ -402,15 +488,27 @@ func testArchiveExecutions(t *testing.T, s store.Store) {
 		same(t, "CreateExecution", e, got)
 		created = append(created, e)
 	}
-	same(t, "Execution", created[2], get[types.ArchiveExecution](t)(as.Execution(ctx, created[2].ID)))
+	same(
+		t,
+		"Execution",
+		created[2],
+		get[types.ArchiveExecution](t)(as.Execution(ctx, created[2].ID)),
+	)
 	_, err := as.Execution(ctx, created[4].ID+100)
 	wantErr(t, err, store.ErrNotFound)
 
 	done := created[2]
-	done.State, done.Finished, done.Completed, done.Failed = types.ExecutionCompleteWithErrors, at(20), 28, 2
+	done.State, done.Finished, done.Completed, done.Failed = types.ExecutionCompleteWithErrors, at(
+		20,
+	), 28, 2
 	done.SuccessBytes, done.FailureBytes, done.Destination = 2900, 100, nil
 	must(t, as.UpdateExecution(ctx, done))
-	same(t, "Execution after update", done, get[types.ArchiveExecution](t)(as.Execution(ctx, done.ID)))
+	same(
+		t,
+		"Execution after update",
+		done,
+		get[types.ArchiveExecution](t)(as.Execution(ctx, done.ID)),
+	)
 	missing := done
 	missing.ID = created[4].ID + 100
 	wantErr(t, as.UpdateExecution(ctx, missing), store.ErrNotFound)
@@ -426,8 +524,18 @@ func testArchiveExecutions(t *testing.T, s store.Store) {
 	}
 	id := func(i int) int64 { return created[i-1].ID }
 	same(t, "Executions", []int64{id(5), id(4), id(3), id(2), id(1)}, ids(store.ExecutionFilter{}))
-	same(t, "Executions(policy b)", []int64{id(5), id(3), id(1)}, ids(store.ExecutionFilter{PolicyKey: "b"}))
-	same(t, "Executions(restore)", []int64{id(5), id(4)}, ids(store.ExecutionFilter{Kind: types.ExecutionRestore}))
+	same(
+		t,
+		"Executions(policy b)",
+		[]int64{id(5), id(3), id(1)},
+		ids(store.ExecutionFilter{PolicyKey: "b"}),
+	)
+	same(
+		t,
+		"Executions(restore)",
+		[]int64{id(5), id(4)},
+		ids(store.ExecutionFilter{Kind: types.ExecutionRestore}),
+	)
 	_, _, err = as.Executions(ctx, store.ExecutionFilter{}, store.Page{After: store.Cursor("x")})
 	wantErr(t, err, store.ErrInvalidCursor)
 	_, _, err = as.Executions(ctx, store.ExecutionFilter{}, store.Page{After: "%%%"})
@@ -443,13 +551,29 @@ func fxArchived(repoKey, full string, i int) types.ArchivedItem {
 	return types.ArchivedItem{
 		Namespace: "ns-1",
 		Item: types.Item{
-			ID: int64(100 + i), RepoKey: repoKey, Path: parent, Name: name, Depth: depth,
-			Size: int64(10 * i), Actual: blob(i).Checksums, Original: types.Checksums{SHA1: blob(i).Checksums.SHA1},
-			MimeType: "application/java-archive", Created: at(i), CreatedBy: "ci",
-			Modified: at(i + 1), ModifiedBy: "ci", Updated: at(i + 2),
+			ID:      int64(100 + i),
+			RepoKey: repoKey,
+			Path:    parent,
+			Name:    name,
+			Depth:   depth,
+			Size: int64(
+				10 * i,
+			),
+			Actual:     blob(i).Checksums,
+			Original:   types.Checksums{SHA1: blob(i).Checksums.SHA1},
+			MimeType:   "application/java-archive",
+			Created:    at(i),
+			CreatedBy:  "ci",
+			Modified:   at(i + 1),
+			ModifiedBy: "ci",
+			Updated:    at(i + 2),
 		},
-		Properties:     types.Properties{"build.number": {fmt.Sprint(i)}, "env": {"dev", "prod"}},
-		Stats:          types.ItemStats{DownloadCount: int64(i), LastDownloaded: at(i + 3), LastDownloadedBy: "u"},
+		Properties: types.Properties{"build.number": {fmt.Sprint(i)}, "env": {"dev", "prod"}},
+		Stats: types.ItemStats{
+			DownloadCount:    int64(i),
+			LastDownloaded:   at(i + 3),
+			LastDownloadedBy: "u",
+		},
 		PackageType:    "maven",
 		PackageName:    "com.acme:app",
 		PackageVersion: fmt.Sprintf("1.%d", i),
@@ -516,10 +640,24 @@ func testArchivedItems(t *testing.T, s store.Store) {
 	}
 	id := func(i int) int64 { return added[i-1].ID }
 	same(t, "Items", []int64{id(1), id(2), id(3), id(4), id(5)}, ids(store.ArchivedFilter{}))
-	same(t, "Items(libs)", []int64{id(1), id(2), id(3), id(5)}, ids(store.ArchivedFilter{RepoKey: "libs"}))
-	same(t, "Items(policy p-b)", []int64{id(1), id(3), id(5)}, ids(store.ArchivedFilter{PolicyKey: "p-b"}))
+	same(
+		t,
+		"Items(libs)",
+		[]int64{id(1), id(2), id(3), id(5)},
+		ids(store.ArchivedFilter{RepoKey: "libs"}),
+	)
+	same(
+		t,
+		"Items(policy p-b)",
+		[]int64{id(1), id(3), id(5)},
+		ids(store.ArchivedFilter{PolicyKey: "p-b"}),
+	)
 	same(t, "Items(execution 1)", []int64{id(2), id(4)}, ids(store.ArchivedFilter{ExecutionID: 1}))
-	_, _, err = as.Items(ctx, store.ArchivedFilter{}, store.Page{After: store.Cursor("not-a-number")})
+	_, _, err = as.Items(
+		ctx,
+		store.ArchivedFilter{},
+		store.Page{After: store.Cursor("not-a-number")},
+	)
 	wantErr(t, err, store.ErrInvalidCursor)
 	_, _, err = as.Items(ctx, store.ArchivedFilter{}, store.Page{After: "%%%"})
 	wantErr(t, err, store.ErrInvalidCursor)
@@ -587,9 +725,19 @@ func testWorkers(t *testing.T, s store.Store) {
 		return out
 	}
 	same(t, "List", []string{"Tagger", "audit", "block-snapshots"}, keys(store.WorkerFilter{}))
-	same(t, "List(action)", []string{"Tagger", "audit"}, keys(store.WorkerFilter{Action: "AFTER_CREATE"}))
+	same(
+		t,
+		"List(action)",
+		[]string{"Tagger", "audit"},
+		keys(store.WorkerFilter{Action: "AFTER_CREATE"}),
+	)
 	same(t, "List(project)", []string{"Tagger"}, keys(store.WorkerFilter{ProjectKey: "p1"}))
-	same(t, "List(enabled)", []string{"Tagger", "audit"}, keys(store.WorkerFilter{EnabledOnly: true}))
+	same(
+		t,
+		"List(enabled)",
+		[]string{"Tagger", "audit"},
+		keys(store.WorkerFilter{EnabledOnly: true}),
+	)
 
 	must(t, ws.Delete(ctx, "audit"))
 	_, err = ws.Get(ctx, "audit")
@@ -601,14 +749,29 @@ func testWorkerState(t *testing.T, s store.Store) {
 	ctx := context.Background()
 	ws := s.Workers()
 	must(t, ws.Create(ctx, fxWorker("w", "AFTER_CREATE")))
-	same(t, "State of a new worker", map[string]string{}, get[map[string]string](t)(ws.State(ctx, "w")))
+	same(
+		t,
+		"State of a new worker",
+		map[string]string{},
+		get[map[string]string](t)(ws.State(ctx, "w")),
+	)
 	must(t, ws.SetState(ctx, "w", "count", "1"))
 	must(t, ws.SetState(ctx, "w", "count", "2"))
 	must(t, ws.SetState(ctx, "w", "last", "lib.jar"))
-	same(t, "State", map[string]string{"count": "2", "last": "lib.jar"}, get[map[string]string](t)(ws.State(ctx, "w")))
+	same(
+		t,
+		"State",
+		map[string]string{"count": "2", "last": "lib.jar"},
+		get[map[string]string](t)(ws.State(ctx, "w")),
+	)
 	must(t, ws.DeleteState(ctx, "w", "last"))
 	must(t, ws.DeleteState(ctx, "w", "last"))
-	same(t, "State after delete", map[string]string{"count": "2"}, get[map[string]string](t)(ws.State(ctx, "w")))
+	same(
+		t,
+		"State after delete",
+		map[string]string{"count": "2"},
+		get[map[string]string](t)(ws.State(ctx, "w")),
+	)
 	wantErr(t, ws.SetState(ctx, "nope", "k", "v"), store.ErrNotFound)
 	_, err := ws.State(ctx, "nope")
 	wantErr(t, err, store.ErrNotFound)
@@ -616,7 +779,12 @@ func testWorkerState(t *testing.T, s store.Store) {
 	// State goes with the worker.
 	must(t, ws.Delete(ctx, "w"))
 	must(t, ws.Create(ctx, fxWorker("w", "AFTER_CREATE")))
-	same(t, "State of a recreated worker", map[string]string{}, get[map[string]string](t)(ws.State(ctx, "w")))
+	same(
+		t,
+		"State of a recreated worker",
+		map[string]string{},
+		get[map[string]string](t)(ws.State(ctx, "w")),
+	)
 }
 
 func testWorkerSecrets(t *testing.T, s store.Store) {
@@ -624,7 +792,12 @@ func testWorkerSecrets(t *testing.T, s store.Store) {
 	ws := s.Workers()
 	must(t, ws.Create(ctx, fxWorker("w", "AFTER_CREATE")))
 	must(t, ws.Create(ctx, fxWorker("x", "AFTER_CREATE")))
-	same(t, "Secrets of a new worker", map[string]string{}, get[map[string]string](t)(ws.Secrets(ctx, "w")))
+	same(
+		t,
+		"Secrets of a new worker",
+		map[string]string{},
+		get[map[string]string](t)(ws.Secrets(ctx, "w")),
+	)
 	must(t, ws.PutSecret(ctx, "w", "token", "s3cret"))
 	must(t, ws.PutSecret(ctx, "w", "token", "rotated"))
 	must(t, ws.PutSecret(ctx, "w", "slack", "xoxb-1"))
@@ -644,7 +817,12 @@ func testWorkerSecrets(t *testing.T, s store.Store) {
 	// Secrets go with the worker.
 	must(t, ws.Delete(ctx, "w"))
 	must(t, ws.Create(ctx, fxWorker("w", "AFTER_CREATE")))
-	same(t, "Secrets of a recreated worker", map[string]string{}, get[map[string]string](t)(ws.Secrets(ctx, "w")))
+	same(
+		t,
+		"Secrets of a recreated worker",
+		map[string]string{},
+		get[map[string]string](t)(ws.Secrets(ctx, "w")),
+	)
 }
 
 func testWorkerExecutions(t *testing.T, s store.Store) {
@@ -669,7 +847,11 @@ func testWorkerExecutions(t *testing.T, s store.Store) {
 		must(t, ws.AddExecution(ctx, e))
 	}
 	same(t, "Execution", e1, get[types.WorkerExecution](t)(ws.Execution(ctx, "e1")))
-	if got := get[types.WorkerExecution](t)(ws.Execution(ctx, "e1")); got.Duration != 1234*time.Millisecond {
+	if got := get[types.WorkerExecution](
+		t,
+	)(
+		ws.Execution(ctx, "e1"),
+	); got.Duration != 1234*time.Millisecond {
 		t.Fatalf("Duration = %v, want 1.234s", got.Duration)
 	}
 	wantErr(t, ws.AddExecution(ctx, e1), store.ErrConflict)
@@ -688,8 +870,16 @@ func testWorkerExecutions(t *testing.T, s store.Store) {
 	}
 	same(t, "Executions", []string{"e5", "e4", "e2", "e3", "e1"}, ids(""))
 	same(t, "Executions(a)", []string{"e4", "e2", "e1"}, ids("a"))
-	same(t, "Executions(b) full records", []types.WorkerExecution{e5, e3},
-		pages(t, 1, func(p store.Page) ([]types.WorkerExecution, string, error) { return ws.Executions(ctx, "b", p) }))
+	same(
+		t,
+		"Executions(b) full records",
+		[]types.WorkerExecution{e5, e3},
+		pages(
+			t,
+			1,
+			func(p store.Page) ([]types.WorkerExecution, string, error) { return ws.Executions(ctx, "b", p) },
+		),
+	)
 	_, _, err = ws.Executions(ctx, "", store.Page{After: store.Cursor("x", "e1")})
 	wantErr(t, err, store.ErrInvalidCursor)
 	_, _, err = ws.Executions(ctx, "", store.Page{After: "%%%"})

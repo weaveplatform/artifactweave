@@ -296,7 +296,12 @@ func (gs groups) List(ctx context.Context, p store.Page) ([]types.Group, string,
 	err := gs.s.do(ctx, func() error {
 		rows := gs.s.groupsT().all(nil, compareByKey(groupName))
 		var err error
-		out, next, err = paginate(rows, p, false, func(g types.Group) []any { return []any{g.Name} })
+		out, next, err = paginate(
+			rows,
+			p,
+			false,
+			func(g types.Group) []any { return []any{g.Name} },
+		)
 		for i := range out {
 			out[i].Members = gs.s.membersOf(out[i].Name)
 		}
@@ -403,23 +408,36 @@ func (ps permissions) List(ctx context.Context, p store.Page) ([]types.Permissio
 	err := ps.s.do(ctx, func() error {
 		rows := ps.s.permissionsT().all(nil, compareByKey(permissionName))
 		var err error
-		out, next, err = paginate(rows, p, false, func(v types.Permission) []any { return []any{v.Name} })
+		out, next, err = paginate(
+			rows,
+			p,
+			false,
+			func(v types.Permission) []any { return []any{v.Name} },
+		)
 		return err
 	})
 	return out, next, err
 }
 
 // where lists the permissions matching keep, by name.
-func (ps permissions) where(ctx context.Context, keep func(types.Permission) bool) ([]types.Permission, error) {
+func (ps permissions) where(
+	ctx context.Context,
+	keep func(types.Permission) bool,
+) ([]types.Permission, error) {
 	var out []types.Permission
 	err := ps.s.do(ctx, func() error {
-		out = ps.s.permissionsT().all(func(_ string, p types.Permission) bool { return keep(p) }, compareByKey(permissionName))
+		out = ps.s.permissionsT().
+			all(func(_ string, p types.Permission) bool { return keep(p) }, compareByKey(permissionName))
 		return nil
 	})
 	return out, err
 }
 
-func (ps permissions) ForPrincipal(ctx context.Context, user string, groups []string) ([]types.Permission, error) {
+func (ps permissions) ForPrincipal(
+	ctx context.Context,
+	user string,
+	groups []string,
+) ([]types.Permission, error) {
 	return ps.where(ctx, func(p types.Permission) bool {
 		for _, r := range p.Resources {
 			if r.Actions.Users[user] != 0 {

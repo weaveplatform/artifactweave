@@ -109,6 +109,12 @@ jobs:
           version: ${{ steps.lintver.outputs.version }}
           args: --config=.golangci.yml --new=false --fix=false
 
+      # golangci-lint run does not report golines, so formatting is checked
+      # on its own: fmt --diff prints each change it would make and exits 1.
+      # The action above put the pinned binary on PATH.
+      - name: Formatting
+        run: make fmt-check
+
       # The bundled specs, generated servers, clients and 501 stubs are
       # committed; a fragment edit without `make generate` fails here.
       - name: Generated code is current

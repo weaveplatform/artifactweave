@@ -66,7 +66,10 @@ func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
 	ctx := context.Background()
 	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
 	b := types.ReleaseBundle{Name: "app", Version: "1", State: types.BundleOpen, Created: now}
-	art := types.BundleArtifact{TargetPath: "a.jar", Props: []types.PropertyValues{{Key: "k", Values: []string{"v"}}}}
+	art := types.BundleArtifact{
+		TargetPath: "a.jar",
+		Props:      []types.PropertyValues{{Key: "k", Values: []string{"v"}}},
+	}
 	must := func(err error) {
 		t.Helper()
 		if err != nil {
@@ -74,12 +77,17 @@ func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
 		}
 	}
 	must(s.Bundles().Create(ctx, b, []types.BundleArtifact{art}))
-	must(s.Bundles().AddAudit(ctx, types.BundleRetentionAudit{BundleName: "app", BundleVersion: "1", Created: now}))
-	tr, err := s.Distribution().CreateTracker(ctx, types.DistributionTracker{BundleName: "app", BundleVersion: "1"},
-		[]types.DistributionJob{{PeerInstanceID: "edge"}})
+	must(
+		s.Bundles().
+			AddAudit(ctx, types.BundleRetentionAudit{BundleName: "app", BundleVersion: "1", Created: now}),
+	)
+	tr, err := s.Distribution().
+		CreateTracker(ctx, types.DistributionTracker{BundleName: "app", BundleVersion: "1"},
+			[]types.DistributionJob{{PeerInstanceID: "edge"}})
 	must(err)
 	must(s.Archive().CreatePolicy(ctx, types.ArchivePolicy{Key: "p", Family: types.ArchiveSmartV2}))
-	ex, err := s.Archive().CreateExecution(ctx, types.ArchiveExecution{Kind: types.ExecutionArchive})
+	ex, err := s.Archive().
+		CreateExecution(ctx, types.ArchiveExecution{Kind: types.ExecutionArchive})
 	must(err)
 	it, err := s.Archive().AddItem(ctx, types.ArchivedItem{
 		Item: types.Item{RepoKey: "libs", Path: ".", Name: "a.jar"}, ExpiresAt: now,
@@ -87,7 +95,10 @@ func entSeed(t *testing.T, s store.Store) (tracker, execution, archived int64) {
 	must(err)
 	must(s.Workers().Create(ctx, types.Worker{Key: "w", Action: "AFTER_CREATE"}))
 	must(s.Workers().PutSecret(ctx, "w", "token", "s3cret"))
-	must(s.Workers().AddExecution(ctx, types.WorkerExecution{ID: "e1", WorkerKey: "w", Started: now}))
+	must(
+		s.Workers().
+			AddExecution(ctx, types.WorkerExecution{ID: "e1", WorkerKey: "w", Started: now}),
+	)
 	return tr.ID, ex.ID, it.ID
 }
 
@@ -123,37 +134,44 @@ func TestEnterpriseClosedDatabase(t *testing.T) {
 		"Distribution.Trackers":    entErr(d.Trackers(ctx, "app", "1")),
 		"Distribution.PutJob":      d.PutJob(ctx, types.DistributionJob{TrackerID: 1}),
 		"Distribution.Jobs":        entErr(d.Jobs(ctx, 1)),
-		"Distribution.JobsForPeer": entErr(d.JobsForPeer(ctx, "edge", []types.JobStatus{types.JobFailed})),
-		"Archive.CreatePolicy":     a.CreatePolicy(ctx, types.ArchivePolicy{Key: "p"}),
-		"Archive.Policy":           entErr(a.Policy(ctx, "p")),
-		"Archive.UpdatePolicy":     a.UpdatePolicy(ctx, types.ArchivePolicy{Key: "p"}),
-		"Archive.DeletePolicy":     a.DeletePolicy(ctx, "p"),
-		"Archive.Policies":         entErr(a.Policies(ctx, types.ArchiveSmartV2)),
-		"Archive.CreateExecution":  entErr(a.CreateExecution(ctx, ex)),
-		"Archive.Execution":        entErr(a.Execution(ctx, 1)),
-		"Archive.UpdateExecution":  a.UpdateExecution(ctx, ex),
-		"Archive.Executions":       entErr3(a.Executions(ctx, store.ExecutionFilter{}, store.Page{})),
-		"Archive.AddItem":          entErr(a.AddItem(ctx, item)),
-		"Archive.Item":             entErr(a.Item(ctx, 1)),
-		"Archive.FindItems":        entErr(a.FindItems(ctx, "r", "n")),
-		"Archive.Items":            entErr3(a.Items(ctx, store.ArchivedFilter{}, store.Page{})),
-		"Archive.DeleteItem":       a.DeleteItem(ctx, 1),
-		"Archive.ExpiredItems":     entErr(a.ExpiredItems(ctx, time.Now(), 0)),
-		"Workers.Create":           w.Create(ctx, types.Worker{Key: "w"}),
-		"Workers.Get":              entErr(w.Get(ctx, "w")),
-		"Workers.Update":           w.Update(ctx, types.Worker{Key: "w"}),
-		"Workers.Delete":           w.Delete(ctx, "w"),
-		"Workers.List":             entErr(w.List(ctx, store.WorkerFilter{})),
-		"Workers.State":            entErr(w.State(ctx, "w")),
-		"Workers.SetState":         w.SetState(ctx, "w", "k", "v"),
-		"Workers.DeleteState":      w.DeleteState(ctx, "w", "k"),
-		"Workers.PutSecret":        w.PutSecret(ctx, "w", "k", "v"),
-		"Workers.Secrets":          entErr(w.Secrets(ctx, "w")),
-		"Workers.DeleteSecret":     w.DeleteSecret(ctx, "w", "k"),
-		"Workers.AddExecution":     w.AddExecution(ctx, types.WorkerExecution{ID: "e", WorkerKey: "w"}),
-		"Workers.Execution":        entErr(w.Execution(ctx, "e")),
-		"Workers.Executions":       entErr3(w.Executions(ctx, "", store.Page{})),
-		"Workers.PruneExecutions":  entErr(w.PruneExecutions(ctx, time.Now())),
+		"Distribution.JobsForPeer": entErr(
+			d.JobsForPeer(ctx, "edge", []types.JobStatus{types.JobFailed}),
+		),
+		"Archive.CreatePolicy":    a.CreatePolicy(ctx, types.ArchivePolicy{Key: "p"}),
+		"Archive.Policy":          entErr(a.Policy(ctx, "p")),
+		"Archive.UpdatePolicy":    a.UpdatePolicy(ctx, types.ArchivePolicy{Key: "p"}),
+		"Archive.DeletePolicy":    a.DeletePolicy(ctx, "p"),
+		"Archive.Policies":        entErr(a.Policies(ctx, types.ArchiveSmartV2)),
+		"Archive.CreateExecution": entErr(a.CreateExecution(ctx, ex)),
+		"Archive.Execution":       entErr(a.Execution(ctx, 1)),
+		"Archive.UpdateExecution": a.UpdateExecution(ctx, ex),
+		"Archive.Executions": entErr3(
+			a.Executions(ctx, store.ExecutionFilter{}, store.Page{}),
+		),
+		"Archive.AddItem":      entErr(a.AddItem(ctx, item)),
+		"Archive.Item":         entErr(a.Item(ctx, 1)),
+		"Archive.FindItems":    entErr(a.FindItems(ctx, "r", "n")),
+		"Archive.Items":        entErr3(a.Items(ctx, store.ArchivedFilter{}, store.Page{})),
+		"Archive.DeleteItem":   a.DeleteItem(ctx, 1),
+		"Archive.ExpiredItems": entErr(a.ExpiredItems(ctx, time.Now(), 0)),
+		"Workers.Create":       w.Create(ctx, types.Worker{Key: "w"}),
+		"Workers.Get":          entErr(w.Get(ctx, "w")),
+		"Workers.Update":       w.Update(ctx, types.Worker{Key: "w"}),
+		"Workers.Delete":       w.Delete(ctx, "w"),
+		"Workers.List":         entErr(w.List(ctx, store.WorkerFilter{})),
+		"Workers.State":        entErr(w.State(ctx, "w")),
+		"Workers.SetState":     w.SetState(ctx, "w", "k", "v"),
+		"Workers.DeleteState":  w.DeleteState(ctx, "w", "k"),
+		"Workers.PutSecret":    w.PutSecret(ctx, "w", "k", "v"),
+		"Workers.Secrets":      entErr(w.Secrets(ctx, "w")),
+		"Workers.DeleteSecret": w.DeleteSecret(ctx, "w", "k"),
+		"Workers.AddExecution": w.AddExecution(
+			ctx,
+			types.WorkerExecution{ID: "e", WorkerKey: "w"},
+		),
+		"Workers.Execution":       entErr(w.Execution(ctx, "e")),
+		"Workers.Executions":      entErr3(w.Executions(ctx, "", store.Page{})),
+		"Workers.PruneExecutions": entErr(w.PruneExecutions(ctx, time.Now())),
 	})
 }
 
@@ -220,8 +238,10 @@ func TestEnterpriseFailingStatements(t *testing.T) {
 	ctx := context.Background()
 	tracker, _, _ := entSeed(t, s)
 	b, d, w := s.Bundles(), s.Distribution(), s.Workers()
-	for _, table := range []string{"bundle_keeps", "bundle_exports", "distribution_trackers",
-		"distribution_jobs", "worker_state", "worker_secrets", "worker_executions"} {
+	for _, table := range []string{
+		"bundle_keeps", "bundle_exports", "distribution_trackers",
+		"distribution_jobs", "worker_state", "worker_secrets", "worker_executions",
+	} {
 		entExec(t, s, "CREATE TRIGGER fail_"+table+" BEFORE INSERT ON "+table+
 			" BEGIN SELECT RAISE(ABORT, 'injected'); END")
 	}
@@ -230,12 +250,21 @@ func TestEnterpriseFailingStatements(t *testing.T) {
 	entFails(t, map[string]error{
 		"Bundles.ReplaceArtifacts": b.ReplaceArtifacts(ctx, "app", "1", nil),
 		"Bundles.SetKeep":          b.SetKeep(ctx, "app", "1", true),
-		"Bundles.PutExport":        b.PutExport(ctx, types.BundleExport{BundleName: "app", BundleVersion: "1"}),
-		"Distribution.PutJob":      d.PutJob(ctx, types.DistributionJob{TrackerID: tracker, PeerInstanceID: "x"}),
-		"Distribution.Create":      entErr(d.CreateTracker(ctx, types.DistributionTracker{}, nil)),
-		"Workers.SetState":         w.SetState(ctx, "w", "k", "v"),
-		"Workers.PutSecret":        w.PutSecret(ctx, "w", "k", "v"),
-		"Workers.AddExecution":     w.AddExecution(ctx, types.WorkerExecution{ID: "e2", WorkerKey: "w"}),
+		"Bundles.PutExport": b.PutExport(
+			ctx,
+			types.BundleExport{BundleName: "app", BundleVersion: "1"},
+		),
+		"Distribution.PutJob": d.PutJob(
+			ctx,
+			types.DistributionJob{TrackerID: tracker, PeerInstanceID: "x"},
+		),
+		"Distribution.Create": entErr(d.CreateTracker(ctx, types.DistributionTracker{}, nil)),
+		"Workers.SetState":    w.SetState(ctx, "w", "k", "v"),
+		"Workers.PutSecret":   w.PutSecret(ctx, "w", "k", "v"),
+		"Workers.AddExecution": w.AddExecution(
+			ctx,
+			types.WorkerExecution{ID: "e2", WorkerKey: "w"},
+		),
 	})
 	// The failed replace left the artifact list as it was.
 	got, err := b.Artifacts(ctx, "app", "1")

@@ -21,10 +21,14 @@ func TestRetentionSettings(t *testing.T) {
 		want types.BuildRetention
 	}{
 		{`{}`, types.BuildRetention{}},
-		{`{"count":"3","buildNumbersNotToBeDiscarded":["1"," ",""]}`,
-			types.BuildRetention{Count: 3, KeepNumbers: []string{"1"}}},
-		{`{"count":3,"deleteBuildArtifacts":true}`,
-			types.BuildRetention{Count: 3, DeleteArtifacts: true}},
+		{
+			`{"count":"3","buildNumbersNotToBeDiscarded":["1"," ",""]}`,
+			types.BuildRetention{Count: 3, KeepNumbers: []string{"1"}},
+		},
+		{
+			`{"count":3,"deleteBuildArtifacts":true}`,
+			types.BuildRetention{Count: 3, DeleteArtifacts: true},
+		},
 		{`{"count":-1}`, types.BuildRetention{}},
 		{`{"count":0}`, types.BuildRetention{}},
 		{`{"minimumBuildDate":1792056600000}`, types.BuildRetention{MinimumBuildDate: ms}},

@@ -7,7 +7,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 
 | Workflow | Checks |
 |---|---|
-| `quality-gate.yml` | Vet and race/shuffled unit tests on `ubuntu-latest`, `macos-latest` and `windows-latest`; blocking golangci-lint followed by `make verify-generate` (bundled specs, generated servers, clients and 501 stubs must be committed current); govulncheck; cross-compile of every `cmd/*` binary; merged coverage gate (95% total, 90% per package) |
+| `quality-gate.yml` | Vet and race/shuffled unit tests on `ubuntu-latest`, `macos-latest` and `windows-latest`; blocking golangci-lint, then `make fmt-check` (`golangci-lint fmt --diff`, because `golangci-lint run` does not report golines), then `make verify-generate` (bundled specs, generated servers, clients and 501 stubs must be committed current); govulncheck; cross-compile of every `cmd/*` binary; merged coverage gate (95% total, 90% per package) |
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
