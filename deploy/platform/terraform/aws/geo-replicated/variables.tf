@@ -1,13 +1,21 @@
-variable "region" {
-  description = "Region of the primary bucket, which artifactweave writes to (the bootstrap's region)."
+variable "name" {
+  description = "Start of every name: the buckets are <name>-<8 hex> and <name>-<8 hex>-r, within S3's 63 characters, and the replication role <name, cut to 40 characters>-<8 hex>-repl."
   type        = string
-  default     = "eu-west-2"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,51}$", var.name))
+    error_message = "name must be 1 to 52 lowercase letters, digits and hyphens, starting with a letter or digit, so <name>-<8 hex>-r fits S3's 63 characters."
+  }
+}
+
+variable "region" {
+  description = "Region of the primary bucket, where artifactweave writes and signs download URLs (blob.s3.region)."
+  type        = string
 }
 
 variable "replica_region" {
-  description = "Region of the replica bucket S3 replicates into."
+  description = "Region of the replica bucket, where S3 copies the committed blobs."
   type        = string
-  default     = "eu-west-1"
 
   validation {
     condition     = var.replica_region != var.region
@@ -15,55 +23,54 @@ variable "replica_region" {
   }
 }
 
-variable "name" {
-  description = "Prefix for the bucket names. It must start with artifactweave-, the only buckets the deployer may manage, and leave room for the suffixes within S3's 63 characters; scenario runs pass artifactweave-awscn-<instance>."
+variable "app_role_arn" {
+  description = "ARN of the IAM role artifactweave runs as (its instance profile's or workload's role). Both bucket policies grant it their objects: the primary's in normal running, the replica's after a failover."
   type        = string
-  default     = "artifactweave-geo"
 
   validation {
-    condition     = startswith(var.name, "artifactweave-") && length(var.name) <= 52
-    error_message = "name must start with artifactweave- and be at most 52 characters, so <name>-<8 hex>-r fits S3's 63."
+    condition     = can(regex("^arn:aws[a-z-]*:iam::[0-9]{12}:role/", var.app_role_arn))
+    error_message = "app_role_arn must be an IAM role ARN."
   }
 }
 
 variable "store_prefix" {
-  description = "Key prefix artifactweave writes under (blob.s3.prefix). Keys under <store_prefix>sha256/ replicate."
-  type        = string
-  default     = "local/"
-}
-
-variable "replication_time_control" {
-  description = "S3 Replication Time Control: 99.9% of objects replicated within 15 minutes, with replication metrics, billed per GB replicated. Off by default."
-  type        = bool
-  default     = false
-}
-
-variable "conformance_role_name" {
-  description = "Name of the data-plane role aws/bootstrap created; the bucket policies grant it both buckets' objects."
-  type        = string
-  default     = "artifactweave-conformance"
-}
-
-variable "app_role_arn" {
-  description = "ARN of the role artifactweave runs as, which the bucket policies grant. Empty looks up conformance_role_name; scenario runs pass the deployer."
+  description = "Key prefix artifactweave writes under (blob.s3.prefix). Keys under <store_prefix>sha256/, the committed blobs, replicate."
   type        = string
   default     = ""
 }
 
-variable "scenario_role_path" {
-  description = "IAM path for the replication role: aws/bootstrap's scenario path, the only one the deployer may create roles under."
-  type        = string
-  default     = "/artifactweave-scenarios/"
+variable "expiring_prefixes" {
+  description = "Key prefixes, from each bucket's root, whose objects expire after the given number of days, for example { \"scratch/\" = 1 }."
+  type        = map(number)
+  default     = {}
 }
 
-variable "boundary_policy_name" {
-  description = "Name of aws/bootstrap's permissions boundary (under /artifactweave/), which every role a scenario creates must carry."
-  type        = string
-  default     = "artifactweave-scenario-boundary"
+variable "replication_time_control" {
+  description = "S3 Replication Time Control: 99.9% of objects replicated within 15 minutes, with replication metrics, billed per GB replicated."
+  type        = bool
+  default     = false
 }
 
-variable "scenario_labels" {
-  description = "Tags for the buckets and the replication role. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches."
+variable "force_destroy" {
+  description = "Let terraform destroy delete the buckets with every object version still in them. Off, a destroy fails while a bucket holds anything."
+  type        = bool
+  default     = false
+}
+
+variable "tags" {
+  description = "Tags for both buckets and the replication role."
   type        = map(string)
   default     = {}
+}
+
+variable "permissions_boundary_arn" {
+  description = "Permissions boundary for the replication role, when the deployer may create roles only with one attached."
+  type        = string
+  default     = null
+}
+
+variable "iam_role_path" {
+  description = "IAM path of the replication role, beginning and ending with /. Null leaves IAM's default, /."
+  type        = string
+  default     = null
 }

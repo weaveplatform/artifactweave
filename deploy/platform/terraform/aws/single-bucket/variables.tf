@@ -1,35 +1,48 @@
-variable "region" {
-  description = "Region of the bucket (the bootstrap's region)."
-  type        = string
-  default     = "eu-west-2"
-}
-
 variable "name" {
-  description = "Prefix for the bucket name. It must start with artifactweave-, the only buckets the deployer may manage; scenario runs pass artifactweave-awscn-<instance>."
+  description = "Start of the bucket name, which is <name>-<8 hex> and must fit S3's 63 characters."
   type        = string
-  default     = "artifactweave-acc"
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9-]{0,53}$", var.name))
+    error_message = "name must be 1 to 54 lowercase letters, digits and hyphens, starting with a letter or digit, so <name>-<8 hex> fits S3's 63 characters."
+  }
 }
 
-variable "store_prefix" {
-  description = "Key prefix the local run writes under (blob.s3.prefix)."
+variable "region" {
+  description = "Region of the bucket (blob.s3.region)."
   type        = string
-  default     = "local/"
-}
-
-variable "conformance_role_name" {
-  description = "Name of the data-plane role aws/bootstrap created; the bucket policy grants it this bucket's objects."
-  type        = string
-  default     = "artifactweave-conformance"
 }
 
 variable "app_role_arn" {
-  description = "ARN of the role artifactweave runs as, which the bucket policy grants. Empty looks up conformance_role_name; scenario runs pass the deployer, which runs artifactweave in the same job and cannot read the bootstrap's roles."
+  description = "ARN of the IAM role artifactweave runs as (its instance profile's or workload's role). The bucket policy grants it the bucket's objects."
+  type        = string
+
+  validation {
+    condition     = can(regex("^arn:aws[a-z-]*:iam::[0-9]{12}:role/", var.app_role_arn))
+    error_message = "app_role_arn must be an IAM role ARN."
+  }
+}
+
+variable "store_prefix" {
+  description = "Key prefix artifactweave writes under (blob.s3.prefix). Empty writes at the bucket's root."
   type        = string
   default     = ""
 }
 
-variable "scenario_labels" {
-  description = "Tags for the bucket. Scenario runs set artifactweave-scenario, instance and expires-at (epoch seconds), which reap matches."
+variable "expiring_prefixes" {
+  description = "Key prefixes, from the bucket's root, whose objects expire after the given number of days, for example { \"scratch/\" = 1 }."
+  type        = map(number)
+  default     = {}
+}
+
+variable "force_destroy" {
+  description = "Let terraform destroy delete the bucket with every object still in it. Off, a destroy fails while the bucket holds anything."
+  type        = bool
+  default     = false
+}
+
+variable "tags" {
+  description = "Tags for the bucket."
   type        = map(string)
   default     = {}
 }
