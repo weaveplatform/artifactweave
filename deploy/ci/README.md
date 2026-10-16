@@ -21,6 +21,7 @@ decision [0030](../../docs/research/decisions/0030-reference-deployments.md).
 | [`platform-tests.sh`](platform-tests.sh) | Runs `test/platform` against an applied scenario: the test step of `scenario-ci.sh test` and of `make verify`, so a local check is the check CI makes |
 | [`local.sh`](local.sh) | The local runner behind `scenario.mk`'s `render`, `credentials`, `up`, `smoke`, `verify`, `logs`, `down` and `clean` |
 | [`prove-matrix.sh`](prove-matrix.sh), [`prove-matrix_test.sh`](prove-matrix_test.sh) | Which scenarios a pull request proves, and its table test (`make deploy-check` runs it) |
+| [`jfrog-providers.sh`](jfrog-providers.sh), [`jfrog-providers_test.sh`](jfrog-providers_test.sh), [`jfrog-terraform-providers.asc`](jfrog-terraform-providers.asc) | Moves the JFrog Terraform providers the app-layer references in `deploy/artifactweave` pin to their latest releases: versions, `test/terraform/run.sh`'s checksums from the signed `SHA256SUMS`, the locks and the READMEs. Run daily by `deps-refresh.yml`. Its offline table test (`make deploy-check` runs it), and the release signing key it checks against |
 | [`lint-contract.sh`](lint-contract.sh) | The reference-deployment contract: checks every Terraform root under `deploy/` against decision 0030's rules for its kind (`make deploy-check` runs it and its `--self-test`) |
 
 ## Bootstraps

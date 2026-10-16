@@ -11,7 +11,15 @@ name: deps | Refresh
 #
 # The result goes up as one PR from the org App, so the quality gate runs on
 # it like any other change, and auto-merge.yml merges it when the gate
-# passes. Nothing here edits workflow files: Dependabot owns action pins, and
+# passes.
+#
+# A second job moves the JFrog Terraform providers the app-layer references
+# in deploy/artifactweave use, which Dependabot cannot: test/terraform/run.sh
+# pins their release zips by SHA-256 (deploy/ci/jfrog-providers.sh). Its PR is
+# separate, on deps/jfrog-providers, which auto-merge.yml merges once the
+# gate (including the terraform apply job and deploy-check) passes. A major
+# goes up on deps/jfrog-providers-major instead, which it never merges, so a
+# person reviews it, as Dependabot holds majors for deploy/platform. Nothing here edits workflow files: Dependabot owns action pins, and
 # an App push that touched .github/workflows would need the workflows
 # permission the App deliberately lacks.
 on:
@@ -107,4 +115,73 @@ jobs:
             gh pr create --head "$BRANCH" \
               --title "chore(deps): refresh Go, modules, tools and golangci-lint to latest" \
               --body "Raised by deps-refresh.yml. Merges automatically once the quality gate passes."
+          fi
+
+  jfrog-providers:
+    name: '♻️ Refresh the JFrog Terraform providers'
+    if: ${{ github.event_name != 'push' || github.event.created }}
+    runs-on: ubuntu-latest
+    env:
+      MINOR_BRANCH: deps/jfrog-providers
+      MAJOR_BRANCH: deps/jfrog-providers-major
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          app-id: ${{ vars.RP_APP_ID }}
+          private-key: ${{ secrets.RP_APP_PRIVATE_KEY }}
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      # run.sh validate, which the update ends with, reads go env.
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+          cache: false
+
+      # Checks each release's signed SHA256SUMS, rewrites the pins, the
+      # checksums, the locks and the READMEs, and validates every reference
+      # against them before anything is committed.
+      - name: Move the pins
+        id: refresh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./deploy/ci/jfrog-providers.sh update
+
+      - name: Open or update the refresh PR
+        if: steps.refresh.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          MAJOR: ${{ steps.refresh.outputs.major }}
+          VERSIONS: ${{ steps.refresh.outputs.versions }}
+        run: |
+          set -euo pipefail
+          branch=$MINOR_BRANCH
+          body="Raised by deps-refresh.yml (deploy/ci/jfrog-providers.sh). Merges automatically once the quality gate, including the terraform apply job and deploy-check, passes."
+          if [ "$MAJOR" = true ]; then
+            branch=$MAJOR_BRANCH
+            body="Raised by deps-refresh.yml (deploy/ci/jfrog-providers.sh). A major version: held for review, auto-merge.yml does not merge this branch."
+          fi
+          title="chore(deps): refresh the JFrog Terraform providers to $VERSIONS"
+          git config user.name "weaveplatform-release-please[bot]"
+          git config user.email "weaveplatform-release-please[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add -A deploy/artifactweave test/terraform/run.sh
+          git commit -qm "$title"
+          git push --force -u origin "$branch"
+          pr=$(gh pr list --head "$branch" --state open --json number -q '.[].number')
+          if [ -z "$pr" ]; then
+            gh pr create --head "$branch" --title "$title" --body "$body"
+          else
+            gh pr edit "$pr" --title "$title" --body "$body"
           fi

@@ -5,7 +5,10 @@ name: deps | Auto-merge
 # job rather than GitHub's auto-merge so it does not depend on the plan
 # allowing auto-merge or on branch protection naming the gate: the gate's own
 # result is the condition. Majors merge too; a major that breaks the build
-# fails the gate and the PR stays open for a person.
+# fails the gate and the PR stays open for a person. The one exception is the
+# JFrog Terraform providers: deps-refresh.yml raises their majors on
+# deps/jfrog-providers-major, which is not listed here, so a person reviews
+# them.
 #
 # workflow_run runs with this repository's secrets, so it never checks out or
 # executes PR code. It reads the PR's metadata and merges by API.
@@ -24,7 +27,8 @@ jobs:
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion == 'success' &&
       (startsWith(github.event.workflow_run.head_branch, 'dependabot/') ||
-       github.event.workflow_run.head_branch == 'deps/refresh')
+       github.event.workflow_run.head_branch == 'deps/refresh' ||
+       github.event.workflow_run.head_branch == 'deps/jfrog-providers')
     runs-on: ubuntu-latest
     permissions:
       contents: write
