@@ -69,6 +69,22 @@ else
 	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate) $(TERRAFORM_SCENARIOS)
 endif
 
+# The OCI conformance categories (decision 0015). Each P6 ticket switches its
+# own on here when its operations land; docs/testing/ci.md lists which.
+OCI_TEST_PULL ?= 1
+OCI_TEST_PUSH ?= 1
+OCI_TEST_CONTENT_DISCOVERY ?= 0
+OCI_TEST_CONTENT_MANAGEMENT ?= 0
+
+## oci-conformance: the OCI distribution-spec conformance suite against one -cover server (coverage to cover/oci, reports to oci-report/)
+oci-conformance:
+	@rm -rf $(COVER_DIR)/oci oci-report && mkdir -p $(COVER_DIR)/oci oci-report
+	GOCOVERDIR=$(CURDIR)/$(COVER_DIR)/oci OCI_REPORT_DIR=$(CURDIR)/oci-report \
+		OCI_TEST_PULL=$(OCI_TEST_PULL) OCI_TEST_PUSH=$(OCI_TEST_PUSH) \
+		OCI_TEST_CONTENT_DISCOVERY=$(OCI_TEST_CONTENT_DISCOVERY) \
+		OCI_TEST_CONTENT_MANAGEMENT=$(OCI_TEST_CONTENT_MANAGEMENT) \
+		./test/oci/run.sh
+
 ## deploy-check: fmt, validate, tflint, trivy, mocked terraform test and the terraform-docs drift check over deploy/ and test/terraform, with pinned tools in .tools/
 deploy-check:
 	./deploy/check.sh
@@ -191,4 +207,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
