@@ -305,7 +305,6 @@ func TestCommitFailures(t *testing.T) {
 		after int
 		body  []byte
 	}{
-		{"HeadObject", 0, []byte("small")},
 		{"PutObject", 0, []byte("small")},
 		{"UploadPart", 2, big},
 		{"CompleteMultipartUpload", 0, big},

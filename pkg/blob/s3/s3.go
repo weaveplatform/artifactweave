@@ -19,6 +19,11 @@
 //     up front the multipart upload already targets the content key; otherwise
 //     it targets a temporary key and is copied into place, with a multipart
 //     copy above S3's 5 GiB single-copy limit.
+//   - Every write of a content key is a must-not-exist write (If-None-Match:
+//     *, decision 0027), as the GCS and Azure backends write, so a blob that
+//     is already stored is never written again and two uploads of one blob
+//     cannot race. S3 answers 412 for a taken key, and the existing object is
+//     adopted. There is no HeadObject before the write.
 package s3
 
 import (
@@ -29,6 +34,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -127,6 +133,10 @@ var (
 // ErrConfig reports an unusable store configuration.
 var ErrConfig = errors.New("blob/s3: invalid configuration")
 
+// errPrecondition is S3's 412 PreconditionFailed: a must-not-exist write
+// (If-None-Match: *) found its key taken.
+var errPrecondition = errors.New("blob/s3: key already stored")
+
 // Options configures New.
 type Options struct {
 	// Bucket must already exist.
@@ -156,6 +166,9 @@ type Store struct {
 	prefix   string
 	partSize int64
 	sessions session.Store
+	// unconditional is set once the store has refused If-None-Match as
+	// NotImplemented; writes then go without it (see writeOnce).
+	unconditional atomic.Bool
 }
 
 var (
@@ -312,17 +325,13 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 	mp := &u.ss.Data
 	info := blob.Info{Size: u.ss.Size, Digests: got}
 	target := u.s.blobKey(got.SHA256)
-	exists, err := u.s.exists(ctx, target)
-	if err != nil {
-		return blob.Info{}, err
-	}
-	if exists {
-		return info, u.Abort(ctx)
-	}
 	if mp.UploadID == "" {
-		_, err := u.s.api.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: &u.s.bucket, Key: &target, Body: bytes.NewReader(u.ss.Pending),
-			ContentLength: aws.Int64(int64(len(u.ss.Pending))),
+		_, err := u.s.writeOnce(ctx, target, u.ss.Size, func(ifNoneMatch *string) error {
+			_, err := u.s.api.PutObject(ctx, &s3.PutObjectInput{
+				Bucket: &u.s.bucket, Key: &target, Body: bytes.NewReader(u.ss.Pending),
+				ContentLength: aws.Int64(int64(len(u.ss.Pending))), IfNoneMatch: ifNoneMatch,
+			})
+			return err //nolint:wrapcheck // writeOnce names the write
 		})
 		if err != nil {
 			return blob.Info{}, fmt.Errorf("blob/s3: put %s: %w", got.SHA256, err)
@@ -337,24 +346,95 @@ func (u *upload) Commit(ctx context.Context, want blob.Digests) (blob.Info, erro
 			return blob.Info{}, fmt.Errorf("blob/s3: %w", err)
 		}
 	}
-	if err := u.complete(ctx); err != nil {
-		return blob.Info{}, err
-	}
-	if mp.Key != target {
-		if err := u.s.copy(ctx, mp.Key, target, u.ss.Size); err != nil {
+	if mp.Key == target {
+		// The parts target the content key, so completing them is the write.
+		adopted, err := u.s.writeOnce(ctx, target, u.ss.Size, func(ifNoneMatch *string) error {
+			return u.complete(ctx, ifNoneMatch)
+		})
+		if err != nil {
 			return blob.Info{}, err
 		}
-		if _, err := u.s.api.DeleteObject(
-			ctx,
-			&s3.DeleteObjectInput{Bucket: &u.s.bucket, Key: &mp.Key},
-		); err != nil {
-			return blob.Info{}, fmt.Errorf("blob/s3: remove temporary %s: %w", mp.Key, err)
+		if adopted {
+			// A refused completion leaves the upload open; its parts are
+			// not needed.
+			return info, u.Abort(ctx)
 		}
+		return info, u.forget(ctx)
+	}
+	if err := u.complete(ctx, nil); err != nil {
+		return blob.Info{}, err
+	}
+	if _, err := u.s.writeOnce(ctx, target, u.ss.Size, func(ifNoneMatch *string) error {
+		return u.s.copy(ctx, mp.Key, target, u.ss.Size, ifNoneMatch)
+	}); err != nil {
+		return blob.Info{}, err
+	}
+	if _, err := u.s.api.DeleteObject(
+		ctx,
+		&s3.DeleteObjectInput{Bucket: &u.s.bucket, Key: &mp.Key},
+	); err != nil {
+		return blob.Info{}, fmt.Errorf("blob/s3: remove temporary %s: %w", mp.Key, err)
 	}
 	return info, u.forget(ctx)
 }
 
-func (u *upload) complete(ctx context.Context) error {
+// writeOnce runs write as a must-not-exist write (If-None-Match: *) of
+// key and reports whether key was already taken, in which case the object
+// there is adopted when it is size bytes long.
+//
+// Keys are content addressed, so the condition never guards correctness,
+// only work and races: a store that ignores it (MinIO does on CopyObject)
+// overwrites with the same bytes, and a store that refuses it as
+// NotImplemented is written once more without it and never asked again.
+func (s *Store) writeOnce(
+	ctx context.Context,
+	key string,
+	size int64,
+	write func(ifNoneMatch *string) error,
+) (bool, error) {
+	cond := aws.String("*")
+	if s.unconditional.Load() {
+		cond = nil
+	}
+	err := write(cond)
+	if cond != nil && isNotImplemented(err) {
+		s.unconditional.Store(true)
+		err = write(nil)
+	}
+	switch {
+	case err == nil:
+		return false, nil
+	case errors.Is(translate(err), errPrecondition):
+		return true, s.adopt(ctx, key, size)
+	default:
+		return false, err
+	}
+}
+
+// adopt accepts the object already stored under key when it is size bytes
+// long. Its key is its SHA-256, and an object reaches a content key only
+// after that digest has been verified, so the size is what is left to tell
+// a whole blob from a damaged one.
+func (s *Store) adopt(ctx context.Context, key string, size int64) error {
+	out, err := s.api.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &s.bucket, Key: &key})
+	if err != nil {
+		return fmt.Errorf("blob/s3: check existing %s: %w", key, translate(err))
+	}
+	if got := aws.ToInt64(out.ContentLength); got != size {
+		return fmt.Errorf(
+			"blob/s3: %s exists with other content (%d bytes, want %d): %w",
+			key,
+			got,
+			size,
+			errPrecondition,
+		)
+	}
+	return nil
+}
+
+// complete completes the multipart upload, as a must-not-exist write when
+// ifNoneMatch is set.
+func (u *upload) complete(ctx context.Context, ifNoneMatch *string) error {
 	mp := &u.ss.Data
 	parts := make([]types.CompletedPart, len(mp.Parts))
 	for i, p := range mp.Parts {
@@ -363,6 +443,7 @@ func (u *upload) complete(ctx context.Context) error {
 	_, err := u.s.api.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket: &u.s.bucket, Key: &mp.Key, UploadId: &mp.UploadID,
 		MultipartUpload: &types.CompletedMultipartUpload{Parts: parts},
+		IfNoneMatch:     ifNoneMatch,
 	})
 	if err != nil {
 		return fmt.Errorf("blob/s3: complete multipart: %w", translate(err))
@@ -391,14 +472,14 @@ func (u *upload) Abort(ctx context.Context) error {
 }
 
 // copy moves src to dst, in one CopyObject when S3 allows it and as a
-// multipart copy above the single-copy limit.
-func (s *Store) copy(ctx context.Context, src, dst string, size int64) error {
+// multipart copy above the single-copy limit, as a must-not-exist write of
+// dst when ifNoneMatch is set.
+func (s *Store) copy(ctx context.Context, src, dst string, size int64, ifNoneMatch *string) error {
 	source := s.bucket + "/" + src
 	if size <= copyLimit {
-		_, err := s.api.CopyObject(
-			ctx,
-			&s3.CopyObjectInput{Bucket: &s.bucket, Key: &dst, CopySource: &source},
-		)
+		_, err := s.api.CopyObject(ctx, &s3.CopyObjectInput{
+			Bucket: &s.bucket, Key: &dst, CopySource: &source, IfNoneMatch: ifNoneMatch,
+		})
 		if err != nil {
 			return fmt.Errorf("blob/s3: copy into place: %w", err)
 		}
@@ -439,22 +520,17 @@ func (s *Store) copy(ctx context.Context, src, dst string, size int64) error {
 	_, err = s.api.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
 		Bucket: &s.bucket, Key: &dst, UploadId: id,
 		MultipartUpload: &types.CompletedMultipartUpload{Parts: parts},
+		IfNoneMatch:     ifNoneMatch,
 	})
 	if err != nil {
+		// A refused or failed completion leaves the copy's parts behind.
+		_, _ = s.api.AbortMultipartUpload(
+			ctx,
+			&s3.AbortMultipartUploadInput{Bucket: &s.bucket, Key: &dst, UploadId: id},
+		)
 		return fmt.Errorf("blob/s3: complete multipart copy: %w", err)
 	}
 	return nil
-}
-
-func (s *Store) exists(ctx context.Context, key string) (bool, error) {
-	_, err := s.api.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &s.bucket, Key: &key})
-	if err == nil {
-		return true, nil
-	}
-	if errors.Is(translate(err), blob.ErrNotFound) {
-		return false, nil
-	}
-	return false, fmt.Errorf("blob/s3: head %s: %w", key, err)
 }
 
 // Stat returns a blob's size and digest.
@@ -686,6 +762,16 @@ func translate(err error) error {
 		return fmt.Errorf("%w: %w", blob.ErrNotFound, err)
 	case "NoSuchUpload":
 		return fmt.Errorf("%w: %w", blob.ErrUploadUnknown, err)
+	case "PreconditionFailed":
+		return fmt.Errorf("%w: %w", errPrecondition, err)
 	}
 	return err
+}
+
+// isNotImplemented reports a store refusing a request it does not support,
+// as an S3-compatible store without conditional writes may refuse
+// If-None-Match.
+func isNotImplemented(err error) bool {
+	var apiErr smithy.APIError
+	return errors.As(err, &apiErr) && apiErr.ErrorCode() == "NotImplemented"
 }

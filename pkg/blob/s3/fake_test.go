@@ -30,6 +30,16 @@ type fakeS3 struct {
 	calls   map[string]int
 	fail    map[string]failure
 	pageLen int32
+	// conds is how the fake treats If-None-Match: "" refuses a taken key
+	// with 412 as S3 does, "ignore" writes anyway as MinIO does on
+	// CopyObject, and "unsupported" refuses the header as NotImplemented.
+	conds string
+	// conditional counts the writes of each operation that carried
+	// If-None-Match: *.
+	conditional map[string]int
+	// landFirst makes the next conditional write store its bytes and then
+	// answer 412, as a retry does whose first attempt landed unseen.
+	landFirst bool
 }
 
 type failure struct {
@@ -44,12 +54,42 @@ type fakeMultipart struct {
 
 func newFake() *fakeS3 {
 	return &fakeS3{
-		objects: map[string][]byte{},
-		uploads: map[string]*fakeMultipart{},
-		calls:   map[string]int{},
-		fail:    map[string]failure{},
-		pageLen: 2,
+		objects:     map[string][]byte{},
+		uploads:     map[string]*fakeMultipart{},
+		calls:       map[string]int{},
+		fail:        map[string]failure{},
+		pageLen:     2,
+		conditional: map[string]int{},
 	}
+}
+
+func preconditionFailed() error {
+	return &smithy.GenericAPIError{
+		Code:    "PreconditionFailed",
+		Message: "At least one of the pre-conditions you specified did not hold",
+	}
+}
+
+// guard applies an If-None-Match: * write of key, which store performs, as
+// f.conds says. Callers hold f.mu.
+func (f *fakeS3) guard(op, key string, ifNoneMatch *string, store func()) error {
+	if aws.ToString(ifNoneMatch) != "*" {
+		store()
+		return nil
+	}
+	f.conditional[op]++
+	switch _, taken := f.objects[key]; {
+	case f.conds == "unsupported":
+		return &smithy.GenericAPIError{Code: "NotImplemented", Message: "If-None-Match"}
+	case f.landFirst:
+		f.landFirst = false
+		store()
+		return preconditionFailed()
+	case taken && f.conds != "ignore":
+		return preconditionFailed()
+	}
+	store()
+	return nil
 }
 
 // failOn makes op fail with err from its (after+1)th call onwards.
@@ -96,7 +136,10 @@ func (f *fakeS3) PutObject(
 	if err != nil {
 		return nil, err
 	}
-	f.objects[aws.ToString(in.Key)] = b
+	key := aws.ToString(in.Key)
+	if err := f.guard("PutObject", key, in.IfNoneMatch, func() { f.objects[key] = b }); err != nil {
+		return nil, err
+	}
 	return &s3.PutObjectOutput{ETag: aws.String(etag(b))}, nil
 }
 
@@ -186,7 +229,12 @@ func (f *fakeS3) CopyObject(
 	if !ok {
 		return nil, &types.NoSuchKey{}
 	}
-	f.objects[aws.ToString(in.Key)] = append([]byte(nil), b...)
+	key := aws.ToString(in.Key)
+	if err := f.guard("CopyObject", key, in.IfNoneMatch, func() {
+		f.objects[key] = append([]byte(nil), b...)
+	}); err != nil {
+		return nil, err
+	}
 	return &s3.CopyObjectOutput{}, nil
 }
 
@@ -310,8 +358,12 @@ func (f *fakeS3) CompleteMultipartUpload(
 		}
 		all = append(all, b...)
 	}
-	f.objects[mp.key] = all
-	delete(f.uploads, aws.ToString(in.UploadId))
+	if err := f.guard("CompleteMultipartUpload", mp.key, in.IfNoneMatch, func() {
+		f.objects[mp.key] = all
+		delete(f.uploads, aws.ToString(in.UploadId))
+	}); err != nil {
+		return nil, err
+	}
 	return &s3.CompleteMultipartUploadOutput{}, nil
 }
 
