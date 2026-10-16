@@ -484,17 +484,17 @@ func TestDockerOperationsReachTheGeneratedServer(t *testing.T) {
 			t.Errorf("%s was not checked: %v", id, seen)
 		}
 	}
-	// Over HTTP: the generated stub answers, in the Artifactory envelope,
-	// without the registry's header or its anonymous challenge.
+	// Over HTTP: the generated server's handler answers, in the Artifactory
+	// envelope, without the registry's header or its anonymous challenge.
 	h := statusFixture(t, true)
-	want := `{"errors":[{"status":501,"message":"not implemented by artifactweave yet"}]}`
+	want := `{"errors":[{"status":404,"message":"Repository 'nope' does not exist"}]}`
 	for op, body := range map[string]string{
 		"parentManifests": `{"dockerRepository":"app","tag":"v1"}`,
 		"promote":         `{"targetRepo":"libs-b","dockerRepository":"app"}`,
 	} {
-		rec := do(t, h, http.MethodPost, "/artifactory/api/docker/libs-local/v2/"+op,
+		rec := do(t, h, http.MethodPost, "/artifactory/api/docker/nope/v2/"+op,
 			map[string]string{"Content-Type": "application/json"}, body)
-		if rec.Code != http.StatusNotImplemented ||
+		if rec.Code != http.StatusNotFound ||
 			rec.Header().Get(docker.APIVersionHeader) != "" {
 			t.Fatalf("%s: %d %v %s", op, rec.Code, rec.Header(), rec.Body)
 		}
@@ -819,9 +819,11 @@ const (
 	jfrogCatalog    = "GET /artifactory/api/docker/{repo-key}/v2/_catalog"
 	jfrogTags       = "GET /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list"
 	multiArchDelete = "DELETE /artifactory/api/docker/{repoKey}/v2/delete"
+	promoteRoute    = "POST /artifactory/api/docker/{repo-key}/v2/promote"
+	parentsRoute    = "POST /artifactory/api/docker/{repo-key}/v2/parentManifests"
 )
 
-// seedRegistryDeletes pushes the tags the status rows delete to
+// seedRegistryDeletes pushes the tags the status rows delete or promote to
 // docker-blobs' image app, each with a manifest of its own.
 func seedRegistryDeletes(t *testing.T, db store.Store, blobs blob.Store) {
 	t.Helper()
@@ -829,7 +831,7 @@ func seedRegistryDeletes(t *testing.T, db store.Store, blobs blob.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tag := range []string{"del-tag", "del-digest", "del-multi"} {
+	for _, tag := range []string{"del-tag", "del-digest", "del-multi", "promo"} {
 		pushImage(t, db, blobs, c, "app", tag, registryManifest(tag))
 	}
 }
@@ -846,6 +848,11 @@ func registryListingStatusRows() []statusCase {
 		prefixed = "/artifactory/api/docker/docker-blobs/v2/"
 		multi    = prefixed + "delete"
 		body     = `{"dockerRepository":"app","tag":"del-multi"}`
+		promote  = prefixed + "promote"
+		promo    = `{"targetRepo":"docker-blobs","dockerRepository":"app","tag":"promo",` +
+			`"targetDockerRepository":"copied","copy":true}`
+		parents      = prefixed + "parentManifests"
+		promoParents = `{"dockerRepository":"app","tag":"promo"}`
 	)
 	return []statusCase{
 		{tagsRoute, tags, "admin", "", 200},
@@ -890,6 +897,83 @@ func registryListingStatusRows() []statusCase {
 		{multiArchDelete, "/artifactory/api/docker/libs-local/v2/delete", "admin", body, 404},
 		{multiArchDelete, multi, "admin", body, 200},
 		{multiArchDelete, multi, "admin", body, 404},
+		{promoteRoute, promote, "user", promo, 403},
+		{promoteRoute, promote, "anonymous", promo, 401},
+		{promoteRoute, promote, "", promo, 401},
+		{promoteRoute, promote, "admin", `{"dockerRepository":"app"}`, 400},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"docker-blobs","dockerRepository":"App"}`,
+			400,
+		},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"docker-blobs","dockerRepository":"app","targetTag":"x"}`,
+			400,
+		},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"docker-blobs","dockerRepository":"app","tag":"-x"}`,
+			400,
+		},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"libs-local","dockerRepository":"app","tag":"promo"}`,
+			400,
+		},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"nope","dockerRepository":"app","tag":"promo"}`,
+			404,
+		},
+		{promoteRoute, "/artifactory/api/docker/nope/v2/promote", "admin", promo, 404},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"docker-blobs","dockerRepository":"app","tag":"absent"}`,
+			404,
+		},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"docker-blobs","dockerRepository":"none"}`,
+			404,
+		},
+		{
+			promoteRoute,
+			promote,
+			"admin",
+			`{"targetRepo":"docker-blobs","dockerRepository":"app","tag":"promo"}`,
+			400,
+		},
+		{promoteRoute, promote, "admin", promo, 200},
+		{promoteRoute, promote, "admin", promo, 200},
+		{parentsRoute, parents, "user", promoParents, 403},
+		{parentsRoute, parents, "anonymous", promoParents, 401},
+		{parentsRoute, parents, "admin", `{"dockerRepository":"app"}`, 400},
+		{parentsRoute, parents, "admin", `{"dockerRepository":"App","tag":"x"}`, 400},
+		{parentsRoute, parents, "admin", `{"dockerRepository":"app","tag":"-x"}`, 400},
+		{
+			parentsRoute,
+			"/artifactory/api/docker/nope/v2/parentManifests",
+			"admin",
+			promoParents,
+			404,
+		},
+		{parentsRoute, parents, "admin", `{"dockerRepository":"app","tag":"absent"}`, 404},
+		{parentsRoute, parents, "admin", promoParents, 200},
 	}
 }
 
@@ -929,6 +1013,36 @@ func registryListingMatrix() []matrixRow {
 			holds(dockerA, "work/app/", del), 202).alone(),
 		row(multiArchDelete, prefixed+"delete", `{"dockerRepository":"work/app","tag":"t-{p}"}`,
 			holds(dockerA, "work/app/", del), 200).seeding(taggedFor),
+		row(
+			promoteRoute,
+			prefixed+"promote",
+			`{"targetRepo":"`+dockerA+`","dockerRepository":"work/app",`+
+				`"tag":"t-{p}","targetDockerRepository":"work/promoted-{p}","copy":true}`,
+			allOf(
+				holds(dockerA, "work/app/", read),
+				holds(dockerA, "work/promoted-{p}/", types.ActionWrite),
+			),
+			200,
+		).seeding(taggedFor),
+		row(
+			parentsRoute,
+			prefixed+"parentManifests",
+			`{"dockerRepository":"work/app","tag":"t-{p}"}`,
+			holds(dockerA, "work/app/", read),
+			200,
+		).seeding(taggedFor),
+	}
+}
+
+// allOf: a caller every rule allows; the first refusal answers.
+func allOf(rules ...rule) rule {
+	return func(p matrixPrincipal) int {
+		for _, r := range rules {
+			if s := r(p); s != 0 {
+				return s
+			}
+		}
+		return 0
 	}
 }
 

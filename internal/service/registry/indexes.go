@@ -88,6 +88,21 @@ func (s *Service) UnreferencedPlatforms(
 	if err != nil {
 		return nil, err
 	}
+	return s.unreferenced(ctx, o, folder, m.Children())
+}
+
+// unreferenced returns the digest folders, below o's image, of the manifests
+// among digests that no tag folder other than exclude holds and no index in
+// another folder lists: platform manifests nothing would name once exclude
+// is gone. exclude "" leaves out no folder. A digest whose folder the image
+// does not hold is left out.
+func (s *Service) unreferenced(
+	ctx context.Context,
+	o Owner,
+	exclude string,
+	digests []string,
+) ([]string, error) {
+	items := s.Store.Items()
 	hits, err := layout.ImageManifests(ctx, items, o.Repo.Key, o.Name)
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the layout names itself
@@ -96,7 +111,7 @@ func (s *Service) UnreferencedPlatforms(
 	for _, h := range hits {
 		f := path.Base(h.Item.Path)
 		switch {
-		case f == folder:
+		case exclude != "" && f == exclude:
 		case h.Item.Name == layout.ListManifestFile:
 			other, err := s.stored(ctx, h)
 			if err != nil {
@@ -110,7 +125,7 @@ func (s *Service) UnreferencedPlatforms(
 		}
 	}
 	var out []string
-	for _, d := range m.Children() {
+	for _, d := range digests {
 		hex, ok := layout.SHA256Hex(d)
 		if !ok || kept[d] {
 			continue

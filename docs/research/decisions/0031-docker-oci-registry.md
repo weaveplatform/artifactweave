@@ -199,7 +199,7 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
 | Push a different manifest over an existing tag | Deploy and Delete; the identical manifest needs Deploy only |
 | Mount | Read on the source and Deploy on the target |
 | Delete a tag, a manifest or a multi-architecture tag | Delete |
-| Promote | Read on the source (and Delete when moving), Deploy on the target (and Delete when the target tag exists) |
+| Promote | Read on the source (and Delete when moving), Deploy on the target (and Delete when a target tag holds a different manifest, as DV-035 has it for a push) |
 
 The properties the registry sets on manifests need no Annotate. Anonymous callers act as
 the anonymous user.
@@ -213,8 +213,20 @@ the anonymous user.
   takes its platform manifests' digest folders with it. Answers 200 with a plain-text
   message, 400 for a malformed body, 404 for an unknown repository, image or tag. Local and
   federated sources and targets of the same package type.
+  - The promotion goes through the item service's copy and move, so the trash can, the
+    package index and events follow; a move keeps the items' history, and the platform
+    manifests nothing left in the source image names go with it.
+  - A target tag holding a different manifest is replaced as a push replaces it, kept under
+    Tag Retention; one holding the same manifest is left as it is. The target image's Max
+    Unique Tags then applies.
+  - The landed manifest's `docker.repoName` and `docker.manifest` name the target image and
+    tag.
+  - `targetTag` without `tag` answers 400: promoting every tag keeps their names. A
+    promotion onto itself (same repository, image and tag) answers 400.
 - **Parent manifests** (`POST .../v2/parentManifests`): the indexes in the repository that
-  list the manifest the tag names, as `{dockerRepository, digest, tags}`.
+  list the manifest the tag names, as `{dockerRepository, digest, tags}`. A push stores an
+  index only where its platforms already are, so the tag's image is searched; each index
+  appears once, ordered by digest, with the tags it sits under (a digest folder adds none).
 
 ### Package index
 
