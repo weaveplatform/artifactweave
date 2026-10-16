@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -149,9 +150,9 @@ func TestSearchBuildArtifacts(t *testing.T) {
 			[]string{"libs-local/app/a.bin", "libs-local/app/b-sources.jar"},
 		},
 		{`{"buildName":"app","buildNumber":"LATEST"}`, []string{"libs-local/app/a.bin"}},
-		// The status selects run 1; repos and mappings narrow its files.
+		// The status alone selects run 1; repos and mappings narrow its files.
 		{
-			`{"buildName":"app","buildNumber":"LATEST","buildStatus":"Released",` +
+			`{"buildName":"app","buildNumber":" ","buildStatus":"Released",` +
 				`"repos":["libs-local"," ",""],"mappings":[{"input":"(.+)-sources.jar"},{"input":""}]}`,
 			[]string{"libs-local/app/b-sources.jar"},
 		},
@@ -160,8 +161,6 @@ func TestSearchBuildArtifacts(t *testing.T) {
 		{`{"buildName":"app","buildNumber":"1","repos":["virt"]}`, []string{
 			"libs-local/app/a.bin", "libs-local/app/b-sources.jar",
 		}},
-		{`{"buildName":"app","buildNumber":"1","repos":["up"]}`, nil},
-		{`{"buildName":"tool","buildNumber":"5"}`, nil},
 	} {
 		if got := artifacts(tc.body, "admin"); !slices.Equal(got, tc.want) {
 			t.Errorf("%s: %v, want %v", tc.body, got, tc.want)
@@ -173,12 +172,38 @@ func TestSearchBuildArtifacts(t *testing.T) {
 		"Accept", mediaBuildArtifactsSearch); !slices.Equal(got, []string{"libs-local/app/a.bin"}) {
 		t.Fatalf("deployer %v", got)
 	}
+	// Finding no file is a 404 naming what was asked for, whether the run is
+	// missing or nothing it produced is left.
+	const none = "Could not find any build artifacts for build "
+	for body, want := range map[string]string{
+		`{"buildName":"app","buildNumber":"9"}`:                            none + "'app' number '9'",
+		`{"buildName":"none","buildNumber":"LATEST"}`:                      none + "'none' number 'LATEST'",
+		`{"buildName":"tool","buildStatus":"Released"}`:                    none + "'tool' status 'Released'",
+		`{"buildName":"app","buildNumber":"1","repos":["up"]}`:             none + "'app' number '1'",
+		`{"buildName":"tool","buildNumber":"5"}`:                           none + "'tool' number '5'",
+		`{"buildName":"app","buildNumber":"1","mappings":[{"input":"x"}]}`: none + "'app' number '1'",
+	} {
+		wantNotFound(t, w.do("POST", q, "admin", body, json...), want)
+	}
+	// The body is checked before the caller: a name, and a number or a
+	// status but not both.
+	for body, want := range map[string]string{
+		`{"buildNumber":"1"}`:                                   "Cannot search without build name.",
+		`{"buildName":" ","buildNumber":"1"}`:                   "Cannot search without build name.",
+		`{"buildName":"app"}`:                                   "Cannot search without build number or build status.",
+		`{"buildName":"app","buildNumber":"","buildStatus":""}`: "Cannot search without build number or build status.",
+		`{"buildName":"app","buildNumber":"LATEST","buildStatus":"Released"}`: "Cannot search with both build " +
+			"number and build status parameters, please omit build number if your are looking for latest " +
+			"build by status or omit build status to search for specific build version.",
+	} {
+		for _, as := range []string{"admin", ""} {
+			rec := w.do("POST", q, as, body, json...)
+			if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), want) {
+				t.Errorf("%s as %q: %d %s, want 400 %q", body, as, rec.Code, rec.Body, want)
+			}
+		}
+	}
 	for body, want := range map[string]int{
-		`{"buildName":"app","buildNumber":"9"}`:                            http.StatusNotFound,
-		`{"buildName":"none","buildNumber":"LATEST"}`:                      http.StatusNotFound,
-		`{"buildName":"tool","buildNumber":"5","buildStatus":"Released"}`:  http.StatusNotFound,
-		`{"buildName":"app"}`:                                              http.StatusBadRequest,
-		`{"buildNumber":"1"}`:                                              http.StatusBadRequest,
 		`{"buildName":"app","buildNumber":"1","mappings":[{"input":"("}]}`: http.StatusBadRequest,
 		`[]`: http.StatusBadRequest,
 	} {
@@ -188,6 +213,26 @@ func TestSearchBuildArtifacts(t *testing.T) {
 	}
 	wantStatus(t, w.do("POST", q, "deployer", `{"buildName":"tool","buildNumber":"5"}`, json...),
 		http.StatusForbidden)
+	// Anonymous callers are told to authenticate, even with anonymous
+	// access on and read on the run, which the dependency search shows.
+	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+		Name: "anonymous-builds", Resources: map[types.ResourceType]types.Resource{
+			types.ResourceBuild: {
+				Actions: types.Grants{
+					Users: map[string]types.Actions{auth.AnonymousUser: types.ActionRead},
+				},
+				Targets: map[string]types.Target{
+					types.BuildInfoRepository: {Include: []string{"app/**"}},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(hitsOf(t, w.do("GET", "/artifactory/api/search/dependency?sha1="+sha1Hex("dep"),
+		"", ""))); n != 2 {
+		t.Fatalf("anonymous reads %d of app's runs", n)
+	}
 	wantStatus(t, w.do("POST", q, "", `{"buildName":"app","buildNumber":"1"}`, json...),
 		http.StatusUnauthorized)
 	wantStatus(t, w.do("POST", q, "admin", "", "Content-Type", "text/plain"),

@@ -342,8 +342,8 @@ func (r *searchRun) namedKeys(scope aql.Node) map[aql.RepoRef]string {
 
 // moduleSearch checks a versions or latest version search's parameters: a
 // group or a module, and remote 0 or 1. remote=1 asks for the upstream of
-// remote repositories too; until they proxy (P9), both answer from local
-// repositories and caches.
+// remote repositories too; until they proxy (P9, #213), both answer from
+// local repositories and caches.
 func moduleSearch[R ~int](g, a *string, remote *R) error {
 	if deref(g) == "" && deref(a) == "" {
 		return badRequest("name the group (g), the module (a) or both")
@@ -354,9 +354,85 @@ func moduleSearch[R ~int](g, a *string, remote *R) error {
 	return nil
 }
 
-// SearchVersions answers the versions search: the distinct module versions
-// of the files whose organisation and module match g and a, and whose
-// version matches v, newest first in Maven order.
+// The versions and latest version searches answer from one list, as
+// Artifactory's do (its search add-on's getArtifactVersions, read by
+// ArtifactVersionsSearchResource and ArtifactLatestVersionSearchResource):
+// the module's versions, newest first in Mercury order.
+
+// Artifactory's messages for a versions or latest version search that finds
+// nothing.
+const (
+	noVersions          = "Unable to find artifact versions"
+	noLatestRelease     = "Latest release version not found"
+	noLatestIntegration = "Latest integration version not found"
+)
+
+// versionEntry is one version a module search lists.
+type versionEntry struct {
+	v           string
+	integration bool
+}
+
+// hasWildcard reports whether a v parameter is a pattern, which filters the
+// listed versions, rather than the module version whose integration
+// versions to list.
+func hasWildcard(v string) bool { return strings.ContainsAny(v, "*?") }
+
+// moduleVersions lists, each once and newest first in Mercury order, the
+// versions of the files in ls whose organisation and module match g and a.
+// A v without wildcards lists only the integration file versions of the
+// module version v, as 1.0-20260101.120000-1 is of 1.0-SNAPSHOT. Otherwise
+// every version counts: an integration one by its file version when files
+// is set, else by its module version, which groups a folder's unique
+// snapshots as 1.0-SNAPSHOT. A v with wildcards is the caller's to apply.
+func moduleVersions(
+	ctx context.Context,
+	r *searchRun,
+	ls layoutScope,
+	g, a *string,
+	v string,
+	files bool,
+) ([]versionEntry, error) {
+	exact := v != "" && !hasWildcard(v)
+	gp, ap := wildcard(g), wildcard(a)
+	found, err := ls.find(ctx, r, nil, r.capped(0), func(co coordinates) bool {
+		return matches(gp, co.org) && matches(ap, co.module) &&
+			(!exact || co.integration() && co.version() == v)
+	})
+	if err != nil {
+		return nil, err
+	}
+	var out []versionEntry
+	seen := map[string]bool{}
+	for _, f := range found {
+		ver := f.version()
+		if f.integration() && (files || exact) {
+			ver = f.fileVersion()
+		}
+		if !seen[ver] {
+			seen[ver] = true
+			out = append(out, versionEntry{ver, f.integration()})
+		}
+	}
+	slices.SortStableFunc(
+		out,
+		func(x, y versionEntry) int { return types.CompareMercury(y.v, x.v) },
+	)
+	return out, nil
+}
+
+// moduleScope resolves a versions or latest version search's repositories,
+// virtual keys searching their members, to the layouts that read g and a.
+func (r *searchRun) moduleScope(ctx context.Context, repos, g, a *string) (layoutScope, error) {
+	scope, _ := r.repoScope(repos, true)
+	return r.layoutScope(ctx, scope, g, a)
+}
+
+// SearchVersions answers the versions search: the module versions of the
+// files whose organisation and module match g and a, with whether each is
+// an integration version, newest first in Mercury order. A v with wildcards
+// keeps the versions it matches; any other v lists the integration
+// versions of that module version. Nothing to list is a 404.
 func (s artifactoryService) SearchVersions(
 	ctx context.Context,
 	req artgen.SearchVersionsRequestObject,
@@ -369,43 +445,35 @@ func (s artifactoryService) SearchVersions(
 	if err != nil {
 		return nil, err
 	}
-	scope, _ := r.repoScope(p.Repos, true)
-	ls, err := r.layoutScope(ctx, scope, p.G, p.A)
+	ls, err := r.moduleScope(ctx, p.Repos, p.G, p.A)
 	if err != nil {
 		return nil, err
 	}
-	g, a, v := wildcard(p.G), wildcard(p.A), wildcard(p.V)
-	found, err := ls.find(ctx, r, nil, r.capped(0), func(co coordinates) bool {
-		return matches(g, co.org) && matches(a, co.module) && matches(v, co.version())
-	})
+	v := deref(p.V)
+	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, false)
 	if err != nil {
 		return nil, err
 	}
-	type version struct {
-		v           string
-		integration bool
+	if len(versions) == 0 {
+		return nil, apierror.New(http.StatusNotFound, noVersions)
 	}
-	var versions []version
-	seen := map[string]bool{}
-	for _, f := range found {
-		if v := f.version(); !seen[v] {
-			seen[v] = true
-			versions = append(versions, version{v, f.integration()})
-		}
-	}
-	slices.SortStableFunc(versions, func(x, y version) int { return types.CompareMaven(y.v, x.v) })
+	pattern := wildcard(p.V)
 	entries := make([]map[string]any, 0, len(versions))
 	for _, x := range versions {
+		if hasWildcard(v) && !matches(pattern, x.v) {
+			continue
+		}
 		entries = append(entries, map[string]any{"version": x.v, "integration": x.integration})
 	}
 	return answer(ctx, mediaVersionsSearch, results(entries)), nil
 }
 
-// SearchLatestVersion answers the latest version search, in plain text: the
-// highest release version of the module g and a name, in Maven order. A v
-// that names an integration version under a file's layout, as 1.0-SNAPSHOT
-// does under Maven's, asks for the highest integration file version of the
-// matching module versions instead; any other v filters the releases.
+// SearchLatestVersion answers the latest version search, in plain text, the
+// first of the module's versions as the versions search lists them, by file
+// version: without v the first release; with a v that has wildcards the
+// first version of either kind it matches; with any other v the first
+// integration version of that module version. Each way of finding nothing
+// has Artifactory's own 404.
 func (s artifactoryService) SearchLatestVersion(
 	ctx context.Context,
 	req artgen.SearchLatestVersionRequestObject,
@@ -418,63 +486,28 @@ func (s artifactoryService) SearchLatestVersion(
 	if err != nil {
 		return nil, err
 	}
-	scope, _ := r.repoScope(p.Repos, true)
-	ls, err := r.layoutScope(ctx, scope, p.G, p.A)
+	ls, err := r.moduleScope(ctx, p.Repos, p.G, p.A)
 	if err != nil {
 		return nil, err
 	}
-	g, a, v := wildcard(p.G), wildcard(p.A), wildcard(p.V)
-	found, err := ls.find(ctx, r, nil, r.capped(0), func(co coordinates) bool {
-		return matches(g, co.org) && matches(a, co.module) && matches(v, co.version())
-	})
+	v := deref(p.V)
+	versions, err := moduleVersions(ctx, r, ls, p.G, p.A, v, true)
 	if err != nil {
 		return nil, err
 	}
-	integration := map[*layout.Layout]bool{}
-	best := ""
-	for _, f := range found {
-		l := ls.layouts[f.Item.RepoKey]
-		wantInteg, ok := integration[l]
-		if !ok {
-			wantInteg = integrationVersion(l, deref(p.V))
-			integration[l] = wantInteg
-		}
-		if f.integration() != wantInteg {
-			continue
-		}
-		cand := f.version()
-		if wantInteg {
-			cand = f.fileVersion()
-		}
-		if best == "" || types.CompareMaven(cand, best) > 0 {
-			best = cand
-		}
+	if len(versions) == 0 {
+		return nil, apierror.New(http.StatusNotFound, noVersions)
 	}
-	if best == "" {
-		return nil, apierror.New(http.StatusNotFound, "Unable to find artifact versions")
+	keep, missing := func(e versionEntry) bool { return !e.integration }, noLatestRelease
+	switch pattern := wildcard(p.V); {
+	case hasWildcard(v):
+		keep, missing = func(e versionEntry) bool { return matches(pattern, e.v) }, noLatestIntegration
+	case v != "":
+		keep, missing = func(e versionEntry) bool { return e.integration }, noLatestIntegration
 	}
-	return artgen.SearchLatestVersion200TextResponse(best), nil
-}
-
-// integrationVersion reports whether v names an integration version under
-// l: after one of its hyphens comes text l's integration revision expression
-// accepts in full, its folder's or, in a layout without one, its file's.
-func integrationVersion(l *layout.Layout, v string) bool {
-	def := l.Definition()
-	expr := def.FolderIntegrationRevisionRegExp
-	switch {
-	case l.Has(layout.TokenFolderItegRev):
-	case l.Has(layout.TokenFileItegRev):
-		expr = def.FileIntegrationRevisionRegExp
-	default:
-		return false
+	i := slices.IndexFunc(versions, keep)
+	if i < 0 {
+		return nil, apierror.New(http.StatusNotFound, missing)
 	}
-	// Compile substituted the same expression, so it compiles here too.
-	re := regexp.MustCompile(`^(?:` + cmp.Or(expr, ".+") + `)$`)
-	for i, ch := range v {
-		if ch == '-' && re.MatchString(v[i+1:]) {
-			return true
-		}
-	}
-	return false
+	return artgen.SearchLatestVersion200TextResponse(versions[i].v), nil
 }

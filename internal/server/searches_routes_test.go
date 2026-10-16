@@ -14,9 +14,11 @@ import (
 
 // seedStatusSearches deploys libs-local's maven/lib/1.0/lib-1.0.jar, a
 // Maven-layout file carrying version=1.0, for the layout and version
-// searches' rows.
+// searches' rows, and publishes st-arts, which produced work/st-arts/a.bin,
+// for the build artifacts search's.
 func seedStatusSearches(t *testing.T, db store.Store, blobs blob.Store) {
 	t.Helper()
+	seedBuildArtifact(t, db, blobs, "st-arts", "work/st-arts/a.bin")
 	ctx := context.Background()
 	libs, err := db.Repos().Get(ctx, "libs-local")
 	if err != nil {
@@ -30,10 +32,11 @@ func seedStatusSearches(t *testing.T, db store.Store, blobs blob.Store) {
 	}
 }
 
-// moreSearchStatusRows: GAVC, versions and dependency search answer anyone
-// while anonymous access is on, with what each may read; latest version
-// answers 404 to a caller who reads no match. The build artifacts search
-// needs read on the run, and the latest version by properties a named user.
+// moreSearchStatusRows: GAVC and dependency search answer anyone while
+// anonymous access is on, with what each may read; versions and latest
+// version answer 404 to a caller who reads no match. The build artifacts
+// search checks its body first, then needs a named user who reads the run;
+// the latest version by properties needs a named user.
 func moreSearchStatusRows() []statusCase {
 	const (
 		gavc       = "GET /artifactory/api/search/gavc"
@@ -44,12 +47,11 @@ func moreSearchStatusRows() []statusCase {
 		byProps    = "GET /artifactory/api/versions/{repo}/{path}"
 		s          = "/artifactory/api/search/"
 		v          = "/artifactory/api/versions/libs-local/maven"
-		run        = `{"buildName":"st-app","buildNumber":"1"}`
+		run        = `{"buildName":"st-arts","buildNumber":"1"}`
 	)
 	var rows []statusCase
 	for _, op := range []struct{ route, path, invalid string }{
 		{gavc, s + "gavc?a=lib", s + "gavc"},
-		{versions, s + "versions?a=lib", s + "versions?v=1.0"},
 		{dependency, s + "dependency?sha1=" + sha1Hex("fixture"), s + "dependency?sha1=x"},
 	} {
 		rows = append(rows,
@@ -62,6 +64,11 @@ func moreSearchStatusRows() []statusCase {
 	}
 	return append(
 		rows,
+		statusCase{versions, s + "versions?a=lib", "admin", "", 200},
+		statusCase{versions, s + "versions?a=lib", "user", "", 404},
+		statusCase{versions, s + "versions?a=lib", "anonymous", "", 404},
+		statusCase{versions, s + "versions?a=lib", "", "", 401},
+		statusCase{versions, s + "versions?v=1.0", "admin", "", 400},
 		statusCase{latest, s + "latestVersion?a=lib", "admin", "", 200},
 		statusCase{latest, s + "latestVersion?a=lib", "user", "", 404},
 		statusCase{latest, s + "latestVersion?a=lib", "anonymous", "", 404},
@@ -80,7 +87,15 @@ func moreSearchStatusRows() []statusCase {
 			`{"buildName":"absent","buildNumber":"1"}`,
 			404,
 		},
-		statusCase{artifacts, s + "buildArtifacts", "admin", `{"buildName":"st-app"}`, 400},
+		// The body is checked before the caller.
+		statusCase{artifacts, s + "buildArtifacts", "admin", `{"buildName":"st-arts"}`, 400},
+		statusCase{
+			artifacts,
+			s + "buildArtifacts",
+			"anonymous",
+			`{"buildName":"st-arts","buildNumber":"1","buildStatus":"Released"}`,
+			400,
+		},
 		statusCase{artifacts, s + "buildArtifacts", "user", run, 403},
 		statusCase{artifacts, s + "buildArtifacts", "anonymous", run, 401},
 		statusCase{artifacts, s + "buildArtifacts", "", run, 401},
@@ -121,15 +136,41 @@ func versioned(path string) seeder {
 	}
 }
 
-// moreSearchMatrix: GAVC, versions and dependency search answer anyone;
-// latest version and latest version by properties find a match only for
-// who reads it; build artifacts search needs read on the run.
+// built publishes run 1 of name, {p} the principal's name, which produced
+// libs-local's work/<name>/a.bin, a path every principal that reads builds
+// may read.
+func built(name string) seeder {
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		name := strings.ReplaceAll(name, "{p}", p)
+		seedBuildArtifact(t, f.db, f.items.Blobs, name, "work/"+name+"/a.bin")
+	}
+}
+
+// signedInHolds: a signed-in caller holding want at path in repoKey;
+// anonymous is told to authenticate even when it holds them.
+func signedInHolds(repoKey, path string, want types.Actions) rule {
+	held := holds(repoKey, path, want)
+	return func(p matrixPrincipal) int {
+		if s := signedIn(p); s != 0 {
+			return s
+		}
+		return held(p)
+	}
+}
+
+// moreSearchMatrix: GAVC and dependency search answer anyone; versions,
+// latest version and latest version by properties find a match only for who
+// reads it; build artifacts search needs a named user who reads the run.
 func moreSearchMatrix() []matrixRow {
 	const s = "/artifactory/api/search/"
 	bi := types.BuildInfoRepository
 	return []matrixRow{
 		row("GET "+s+"gavc", s+"gavc?a=lib", "", anyone, 200),
-		row("GET "+s+"versions", s+"versions?a=lib", "", anyone, 200),
+		row(
+			"GET "+s+"versions", s+"versions?a=lib-{p}&repos=libs-local", "",
+			readsOrMissing("libs-local", "maven/", false), 200,
+		).seeding(deployed("maven/lib-{p}/1.0/lib-{p}-1.0.jar")),
 		row("GET "+s+"dependency", s+"dependency?sha1="+sha1Hex("matrix"), "", anyone, 200),
 		row(
 			"GET "+s+"latestVersion", s+"latestVersion?a=lib-{p}&repos=libs-local", "",
@@ -144,8 +185,8 @@ func moreSearchMatrix() []matrixRow {
 			"POST "+s+"buildArtifacts",
 			s+"buildArtifacts",
 			`{"buildName":"b-{p}","buildNumber":"1"}`,
-			holds(bi, "", types.ActionRead),
+			signedInHolds(bi, "", types.ActionRead),
 			200,
-		).seeding(published("b-{p}")),
+		).seeding(built("b-{p}")),
 	}
 }

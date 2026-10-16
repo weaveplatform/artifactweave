@@ -206,7 +206,17 @@ The cached definitions in `.specoracle/artifactory-searches-api/` match the spec
     `1.0-SNAPSHOT` the latest integration version (the page's example answers
     `1.0-201203131455-2`, a file integration revision).
   - `versions` returns release and integration versions unless `v` names one. Its example lists
-    `1.2`, `1.0-SNAPSHOT`, `1.0` in that order, which is not Maven order.
+    `1.2`, `1.0-SNAPSHOT`, `1.0` in that order, which is neither Maven order nor the Mercury
+    order Artifactory sorts with.
+  - [S] Artifactory 6.20's handlers (`ArtifactVersionsSearchResource`,
+    `ArtifactLatestVersionSearchResource`) read one list from the search add-on's
+    `getArtifactVersions`, sorted newest first by `MavenVersionComparator`, which wraps
+    versions-maven-plugin's "mercury" comparator (snapshot < alpha < beta < milestone < rc <
+    release < sp). An empty list is a 404 `Unable to find artifact versions` from both.
+    Latest version takes the first release (404 `Latest release version not found`), the
+    first entry a wildcard `v` matches, or the first integration entry for any other `v`
+    (both 404 `Latest integration version not found`). The add-on documents `v` as relating
+    "to integration versions only".
   - `remote=1` asks remote repositories' upstream: `maven-metadata.xml` for Maven, a remote
     listing for other layouts.
   - `specific=true` (7.37.9) adds remote and virtual repositories to GAVC and answers
@@ -218,6 +228,10 @@ The cached definitions in `.specoracle/artifactory-searches-api/` match the spec
   belongs to the licence feature and `archive` is deprecated; neither is in P5.
   - `buildArtifacts` takes `buildNumber: LATEST`, the latest promotion status as
     `buildStatus`, and `mappings[].input` regular expressions. No page documents a 404.
+  - [S] Artifactory 6.20's `BuildArtifactsSearchResource` refuses a blank `buildName`,
+    neither or both of `buildNumber` and `buildStatus` (400s), then an unauthenticated
+    caller (401), and answers 404 `Could not find any build artifacts for build '<name>'
+    number '<n>'` (or `status '<s>'`) whenever it finds no file.
   - [S] It finds a run's files as a promotion does (`BuildServiceImpl.getBuildArtifactsFileInfos`,
     §3.6): by the run's build properties and an artifact's SHA-1, limited to `repos`.
 - **[S] No JFrog CLI caller.** jfrog-client-go v1.55.0 and jfrog-cli-core v2.60.0 call none of

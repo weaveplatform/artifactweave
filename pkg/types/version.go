@@ -408,19 +408,30 @@ var mavenQualifiers = []string{"alpha", "beta", "milestone", "rc", "snapshot", "
 var mavenAliases = map[string]string{"ga": "", "final": "", "release": "", "cr": "rc"}
 
 // releaseIndex is the comparable form of the empty qualifier: a string item
-// is equivalent to a missing item exactly when it ranks here.
+// is equivalent to a missing item exactly when it ranks here. The release
+// is sixth in both mavenQualifiers and mercuryQualifiers.
 const releaseIndex = "5"
 
-func comparableQualifier(q string) string {
-	for i, known := range mavenQualifiers {
-		if q == known {
+// rankQualifier is q's comparable form: its index among known, or after
+// every known qualifier, ordered lexically, when it is none of them.
+func rankQualifier(known []string, q string) string {
+	for i, k := range known {
+		if q == k {
 			return string(rune('0' + i))
 		}
 	}
-	return string(rune('0'+len(mavenQualifiers))) + "-" + q
+	return string(rune('0'+len(known))) + "-" + q
 }
 
-func newMavenString(s string, followedByDigit bool) mavenItem {
+// newQualifier is the string item for s, a qualifier ranked among known
+// after aliases; a single a, b or m followed by a digit stands for alpha,
+// beta or milestone.
+func newQualifier(
+	s string,
+	followedByDigit bool,
+	known []string,
+	aliases map[string]string,
+) mavenItem {
 	if followedByDigit && len(s) == 1 {
 		switch s[0] {
 		case 'a':
@@ -431,10 +442,14 @@ func newMavenString(s string, followedByDigit bool) mavenItem {
 			s = "milestone"
 		}
 	}
-	if alias, ok := mavenAliases[s]; ok {
+	if alias, ok := aliases[s]; ok {
 		s = alias
 	}
-	return mavenItem{kind: mavenString, value: comparableQualifier(s)}
+	return mavenItem{kind: mavenString, value: rankQualifier(known, s)}
+}
+
+func newMavenString(s string, followedByDigit bool) mavenItem {
+	return newQualifier(s, followedByDigit, mavenQualifiers, mavenAliases)
 }
 
 func newMavenItem(isDigit bool, s string) mavenItem {
@@ -599,6 +614,95 @@ func compareMavenLists(a, b []mavenItem) int {
 // ComparableVersion does, so 1.0-SNAPSHOT < 1.0 < 1.0-sp1 and 1.10 > 1.9.
 func CompareMaven(a, b string) int {
 	ia, ib := parseMaven(a), parseMaven(b)
+	return sign(compareMavenItem(ia, &ib))
+}
+
+// --- Mercury ---------------------------------------------------------------------
+
+// The Mercury comparison follows org.apache.maven.mercury.artifact.version.
+// ComparableVersion (mercury-artifact 1.0-alpha-6), the comparator
+// versions-maven-plugin names "mercury" and Artifactory's
+// MavenVersionComparator wraps to order its versions searches. Its items
+// compare as ComparableVersion's do (compareMavenItem); it parses and ranks
+// differently:
+//   - snapshot ranks below every other qualifier, so 1.0-SNAPSHOT <
+//     1.0-alpha-1 < 1.0-rc1 < 1.0, where ComparableVersion puts SNAPSHOT
+//     just below the release;
+//   - release is not an alias of the release, so 1.0-release sorts as an
+//     unknown qualifier, after 1.0-sp;
+//   - only a '-' between digits opens a sublist, so 1.0-alpha-1 and
+//     1.0-alpha.1 are one flat list and equal;
+//   - normalising drops trailing null items up to the first item that is
+//     not null, a list included.
+
+var mercuryQualifiers = []string{"snapshot", "alpha", "beta", "milestone", "rc", "", "sp"}
+
+var mercuryAliases = map[string]string{"ga": "", "final": "", "cr": "rc"}
+
+func newMercuryItem(isDigit bool, s string) mavenItem {
+	if isDigit {
+		return mavenItem{kind: mavenInt, value: strings.TrimLeft(s, "0")}
+	}
+	return newQualifier(s, false, mercuryQualifiers, mercuryAliases)
+}
+
+func parseMercury(version string) mavenItem {
+	version = strings.ToLower(version)
+	b := &mavenBuilder{root: mavenItem{kind: mavenList}, stack: [][]int{{}}}
+	isDigit := false
+	start := 0
+	for i := 0; i < len(version); i++ {
+		c := version[i]
+		switch {
+		case c == '.' || c == '-':
+			if i == start {
+				b.add(mavenItem{kind: mavenInt})
+			} else {
+				b.add(newMercuryItem(isDigit, version[start:i]))
+			}
+			start = i + 1
+			if c == '-' && isDigit {
+				// 1.0-x is 1-x; a digit after the '-' opens a sublist, which
+				// is what tells 1-1 from 1.1.
+				normaliseMercury(b.list(b.top()))
+				if i+1 < len(version) && version[i+1] >= '0' && version[i+1] <= '9' {
+					b.push()
+				}
+			}
+		case c >= '0' && c <= '9':
+			if !isDigit && i > start {
+				b.add(newQualifier(version[start:i], true, mercuryQualifiers, mercuryAliases))
+				start = i
+			}
+			isDigit = true
+		default:
+			if isDigit && i > start {
+				b.add(newMercuryItem(true, version[start:i]))
+				start = i
+			}
+			isDigit = false
+		}
+	}
+	if len(version) > start {
+		b.add(newMercuryItem(isDigit, version[start:]))
+	}
+	for i := len(b.stack) - 1; i >= 0; i-- {
+		normaliseMercury(b.list(b.stack[i]))
+	}
+	return b.root
+}
+
+func normaliseMercury(l *mavenItem) {
+	for len(l.list) > 0 && l.list[len(l.list)-1].isNull() {
+		l.list = l.list[:len(l.list)-1]
+	}
+}
+
+// CompareMercury orders versions the way Artifactory's versions and latest
+// version searches do (Mercury's ComparableVersion): 1.0-SNAPSHOT <
+// 1.0-alpha-1 < 1.0-rc1 < 1.0 < 1.0-sp1, and 1.10 > 1.9.
+func CompareMercury(a, b string) int {
+	ia, ib := parseMercury(a), parseMercury(b)
 	return sign(compareMavenItem(ia, &ib))
 }
 
