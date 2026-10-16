@@ -26,6 +26,9 @@
 #                     signed-url-key adds after the first apply:
 #                     cloud_cdn_key_file, and signed_url_key_added once the
 #                     applied backend bucket holds the key
+#   your address      (azure/cdn) app_ip_ranges, your public IPv4 address,
+#                     the one network its account's public endpoint answers,
+#                     so an artifactweave on your workstation reaches it
 #   force_destroy     true: a lab instance holds test data only
 #
 # The lab's constants reach this file from lab.mk through the environment
@@ -34,7 +37,7 @@
 # declare, so a scenario not yet on the v2 contract takes what it declares.
 
 lab_vars() {
-  local caller partition account app operator
+  local caller partition account app operator address
   case ${1:-} in
   aws)
     caller=$(aws sts get-caller-identity --query Arn --output text) || return 1
@@ -81,6 +84,11 @@ lab_vars() {
     export TF_VAR_subscription_id="$LAB_AZURE_SUBSCRIPTION"
     export TF_VAR_app_principal_id="$app"
     export TF_VAR_additional_principals="{ operator = { principal_id = \"$operator\", principal_type = \"User\" } }"
+    # Run from the scenario's directory (scenario.mk's recipes are).
+    if grep -qs '^variable "app_ip_ranges"' variables.tf; then
+      address=$(curl -fsS --retry 3 https://checkip.amazonaws.com | tr -d '[:space:]') || return 1
+      export TF_VAR_app_ip_ranges="[\"$address\"]"
+    fi
     ;;
   multicloud)
     lab_vars aws && lab_vars gcp && lab_vars azure || return 1

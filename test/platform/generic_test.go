@@ -230,8 +230,7 @@ func redirectFor(t *testing.T, h *harness, path, want string, header http.Header
 
 func redirectToStorage(t *testing.T, h *harness) {
 	loc := redirectLocation(t, h, nil)
-	resp := fetch(t, h, loc, nil)
-	got := drain(t, resp)
+	resp, got := fetchAll(t, h, loc, nil)
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("signed URL: %d", resp.StatusCode)
 	}
@@ -291,6 +290,41 @@ func fetch(t *testing.T, h *harness, u *url.URL, header http.Header) *http.Respo
 		t.Fatalf("GET %s: %v", redact(u), err)
 	}
 	return resp
+}
+
+// fetchAll fetches a storage or edge URL and reads the whole body. A
+// transport error while reading, such as the provider resetting the stream
+// (Azure did once, 40 MiB into run 38906963602), is logged with the
+// provider's request ID and retried once: the signed URL is still valid, a
+// download client retries the same way, and what is under test is the URL
+// artifactweave issued, not the provider's connection.
+func fetchAll(t *testing.T, h *harness, u *url.URL, header http.Header) (*http.Response, []byte) {
+	t.Helper()
+	for attempt := 1; ; attempt++ {
+		resp := fetch(t, h, u, header)
+		b, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err == nil {
+			return resp, b
+		}
+		t.Logf("GET %s: reading the body failed on attempt %d (%s, %d bytes read, %s): %v",
+			redact(u), attempt, resp.Proto, len(b), providerRequestID(resp.Header), err)
+		if attempt == 2 {
+			t.Fatalf("GET %s: %v", redact(u), err)
+		}
+	}
+}
+
+// providerRequestID names a response's request in the provider's own logs.
+func providerRequestID(h http.Header) string {
+	for _, k := range []string{
+		"X-Ms-Request-Id", "X-Azure-Ref", "X-Amz-Request-Id", "X-Amz-Cf-Id", "X-Guploader-Uploadid",
+	} {
+		if v := h.Get(k); v != "" {
+			return k + " " + v
+		}
+	}
+	return "no provider request ID"
 }
 
 func drain(t *testing.T, resp *http.Response) []byte {

@@ -36,10 +36,11 @@ scenario gcp/cdn ../../modules/gcp/storage ../../modules/gcp/cdn
 # shellcheck disable=SC2016 # the line as a ci-vars.sh writes it
 echo 'export TF_VAR_cloud_cdn_key_file="$CLOUD_CDN_KEY_FILE"' >"$t/gcp/cdn/ci-vars.sh"
 scenario azure/single-bucket
+scenario azure/cdn ../../modules/azure/cdn
 scenario multicloud/mirror ../../modules/aws/storage ../../modules/gcp/storage ../../modules/azure/storage
 # The bootstraps live under deploy/ci/terraform and never run in CI.
 mkdir -p "$fixture/deploy/ci/terraform/aws" && : >"$fixture/deploy/ci/terraform/aws/main.tf"
-mkdir -p "$t/modules/aws/storage" "$t/modules/aws/storage-cdn" "$t/modules/gcp/storage" "$t/modules/gcp/cdn" "$t/modules/azure/storage"
+mkdir -p "$t/modules/aws/storage" "$t/modules/aws/storage-cdn" "$t/modules/gcp/storage" "$t/modules/gcp/cdn" "$t/modules/azure/storage" "$t/modules/azure/cdn"
 mkdir -p "$fixture/test/platform"
 cat >"$fixture/test/platform/harness_test.go" <<'EOF'
 // ARTIFACTWEAVE_SCENARIO is <cloud>/<scenario>, for example gcp/single-bucket.
@@ -56,6 +57,9 @@ func init() {
 	scenarioChecks["aws/cdn"] = cdnChecks(cloudFrontSigner)
 	scenarioChecks["gcp/cdn"] = cdnChecks(cloudCDNSigner)
 }
+EOF
+cat >"$fixture/test/platform/frontdoor_test.go" <<'EOF'
+func init() { scenarioChecks["azure/cdn"] = cdnChecks(frontDoorSigner) }
 EOF
 cat >"$fixture/test/platform/ghost_test.go" <<'EOF'
 var gone = "aws/no-such-scenario"
@@ -95,6 +99,10 @@ check 'module tests' '' $p/modules/aws/storage/tests/security.tftest.hcl
 check 'mirror_test.go' $'aws multi-region\ngcp multi-region\nmulticloud mirror' test/platform/mirror_test.go
 check 'replica_test.go' 'aws geo-replicated' test/platform/replica_test.go
 check 'cdn_test.go' $'aws cdn\ngcp cdn' test/platform/cdn_test.go
+check 'test lifecycle only' 'azure cdn test' test/platform/frontdoor_test.go
+check 'test lifecycle through a module' 'azure cdn test' $p/modules/azure/cdn/main.tf
+check 'test lifecycle beside a full one' $'azure cdn test\nazure single-bucket' \
+  $p/azure/cdn/ci-vars.sh $p/azure/single-bucket/main.tf
 check 'Go file naming no scenario' "$singles" test/platform/harness_test.go
 check 'Go file naming only a missing scenario' "$singles" test/platform/ghost_test.go
 check 'deleted Go file' "$singles" test/platform/deleted_test.go
@@ -124,7 +132,7 @@ check 'union, sorted and unique' $'aws multi-region\naws single-bucket\ngcp mult
   $p/aws/single-bucket/main.tf test/platform/mirror_test.go $p/aws/multi-region/main.tf README.md
 
 all=$(PROVE_MATRIX_ROOT=$fixture "$script" --all)
-want=$'aws cdn\naws geo-replicated\naws multi-region\naws single-bucket\nazure single-bucket\ngcp cdn\ngcp multi-region\ngcp single-bucket\nmulticloud mirror'
+want=$'aws cdn\naws geo-replicated\naws multi-region\naws single-bucket\nazure cdn test\nazure single-bucket\ngcp cdn\ngcp multi-region\ngcp single-bucket\nmulticloud mirror'
 if [ "$all" != "$want" ]; then
   printf 'FAIL --all\n  want: %s\n  got:  %s\n' "$(echo "$want" | paste -sd, -)" "$(echo "$all" | paste -sd, -)" >&2
   failed=1

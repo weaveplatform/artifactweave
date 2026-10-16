@@ -23,7 +23,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P2b Cloud blob storage and mirroring | Done (2026-10-13) | GCS and Azure blob backends (epic #21) and mirroring blobs across clouds and regions (epic #22); design in research 18 and decisions 0027 and 0028. The mirror's storage administration (#18) landed after P3's storage endpoints (#48) |
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
 | P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
-| P4b Reference deployments and CDN delivery | In progress | Epics #113 (CDN delivery and download redirect) and #189 (consistent reference deployments, contract v2, done 2026-10-16) done; epic #114 (reference deployments) open for the CDN scenarios and the multicloud mirror; decisions 0029 and 0030 |
+| P4b Reference deployments and CDN delivery | Done (2026-10-16) | Epics #113 (CDN delivery and download redirect), #189 (consistent reference deployments, contract v2) and #114 (reference deployments) done; decisions 0029 and 0030. `single-bucket`, `multi-region`, `geo-replicated` and `cdn` on AWS, GCP and Azure, plus `multicloud/mirror`, each proven on its real cloud; `azure/cdn` proves with the `test` lifecycle alone, for Front Door Premium's hourly fee. The `gcp/cdn` proof settled decision 0029's open fact: Cloud CDN passes the response overrides on a cache fill |
 | P5 Full AQL, searches, build-info | Done (2026-10-16) | Epic #160; decisions 0012 and 0014, research 22. AQL over `items`, `builds` and `build.promotions` with the secondary domains, `$msp` and the `items.delete` and `properties.update` actions, compiled for SQLite and PostgreSQL; the GET searches; build-info publish, append, rename, delete, promotion and retention. The shared AQL cases give identical ordered rows on the reference evaluator and all three stores, and the JFrog CLI's build commands pass. `remote=1` on the versions searches answers from caches until P9 (#213) |
 | P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Not started | **M2** |
@@ -416,14 +416,14 @@ The phase number places it after P4 because its scenarios use P4's access tokens
 Terraform job. It runs beside P5 to P8.
 
 **Tracking.** One GitHub issue per PR:
-- Epic #113, CDN delivery and download redirect:
+- Epic #113, CDN delivery and download redirect, done:
   - the download-redirect fixes: HEAD, conditional requests, counts, mirror health (#117, done);
   - research 19 and decision 0029 (#118);
   - the redirect policy, signing capability and redirect settings (#119);
   - `cdnRedirect` with CloudFront signed URLs and a fake edge (#120);
   - Cloud CDN signed URLs (#121);
   - Azure Front Door with SAS passthrough (#122).
-- Epic #114, reference deployments:
+- Epic #114, reference deployments, done 2026-10-16:
   - research 20 and decision 0030 (#123);
   - static checks and mocked tests for deployment Terraform (#124);
   - the acceptance roots moved to `deploy/platform/terraform` (#125);
@@ -434,8 +434,9 @@ Terraform job. It runs beside P5 to P8.
   - multi-region mirror scenarios (#130);
   - geo-replicated scenarios with native replication (#131);
   - then epic #189, consistent reference deployments (below, done);
-  - then `aws/cdn` (#132), `gcp/cdn` (#133) and `azure/cdn` (#134), on contract v2;
-  - last, the multicloud mirror scenario (#135), on contract v2.
+  - then `aws/cdn` (#132), `gcp/cdn` (#133) and `azure/cdn` (#134), on contract v2, done;
+    `azure/cdn` proves with the `test` lifecycle alone;
+  - the multicloud mirror scenario (#135), on contract v2, done.
 - Epic #189, consistent reference deployments, done 2026-10-16: every scenario written once
   as both the acceptance test and the consumer documentation of its deployment path,
   composing per-cloud modules under a linted contract (decision 0030, contract v2). Every

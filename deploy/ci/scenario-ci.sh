@@ -299,7 +299,12 @@ destroy_one() { # scenario instance
     summary "No resources in the state of \`$CLOUD/$1\` instance \`$2\`; nothing to destroy."
   else
     use_instance "$1" "$2" "$now"
-    terraform -chdir="$dir" destroy -input=false -no-color -auto-approve
+    if ! terraform -chdir="$dir" destroy -input=false -no-color -auto-approve; then
+      # The state stays for the next reap, but a Front Door Premium profile
+      # (azure/cdn) bills by the hour, so it goes now whatever else is left.
+      [ "$CLOUD" != azure ] || azure_delete_front_doors "$2"
+      exit 1
+    fi
     summary "Destroyed \`$CLOUD/$1\` instance \`$2\`."
   fi
   delete_state "$1" "$2"
@@ -655,6 +660,76 @@ gcp_cdn_leftovers() {
   done < <(gcp_cdn_records)
 }
 
+# The CDN scenario azure/cdn adds a Front Door Premium profile, which bills
+# by the hour while it exists: a leaked one costs about $10.80 a day. The
+# profile and its endpoint carry the run's tags, as the storage account does;
+# its origin group, origin, route and rule set are children that go with it,
+# and so does the private endpoint connection it made on the account. With a
+# custom domain, its validation TXT record and CNAME carry the tags too, in
+# the bootstrap's zone, outside the scenarios resource group.
+
+# azure_tagged prints "<id>\t<expires-at>\t<instance>\t<scenario>" for every
+# tagged resource in the scenarios resource group, Front Door profiles first,
+# since deleting a profile deletes its children and, with them, the
+# connection that holds the storage account; a profile's children, its
+# endpoint among them, are left to it.
+azure_tagged() {
+  az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors \
+    --query '[?tags."artifactweave-scenario" != null].[id, tags."expires-at", tags.instance, tags."artifactweave-scenario"]' -o tsv |
+    awk -F'\t' 'tolower($1) ~ /\/providers\/microsoft\.cdn\/profiles\/[^\/]+\// { next }
+      { print (tolower($1) ~ /\/providers\/microsoft\.cdn\/profiles\// ? 0 : 1) "\t" $0 }' |
+    sort -s -k1,1n | cut -f2-
+}
+
+# azure_delete_front_doors deletes every Front Door profile an instance
+# tagged, for a destroy that failed: the profile is the instance's one hourly
+# charge.
+azure_delete_front_doors() { # instance
+  local id
+  while read -r id; do
+    [ -n "$id" ] || continue
+    if az resource delete --ids "$id" --only-show-errors; then
+      summary "**Deleted Front Door profile \`${id##*/}\` of instance \`$1\` directly**, after its destroy failed, so its hourly fee stops."
+    else
+      summary "**Front Door profile \`${id##*/}\` of instance \`$1\` is still running and billed by the hour**; delete it by hand."
+    fi
+  done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --resource-type Microsoft.Cdn/profiles \
+    --only-show-errors --query "[?tags.instance == '$1'].id" -o tsv)
+}
+
+# azure_cdn_records prints "<group>\t<zone>\t<type>\t<name>\t<expires-at>\t<instance>\t<scenario>"
+# for every tagged DNS record set in the zones the deployer can see: a
+# custom domain's validation TXT record and CNAME.
+azure_cdn_records() {
+  local group zone
+  while IFS=$'\t' read -r group zone; do
+    [ -n "$zone" ] || continue
+    az network dns record-set list --resource-group "$group" --zone-name "$zone" --only-show-errors -o json |
+      jq -r --arg g "$group" --arg z "$zone" '.[] | (.metadata // {}) as $m | select($m["artifactweave-scenario"] != null) |
+        [$g, $z, (.type | split("/") | last | ascii_downcase), .name, ($m["expires-at"] // ""), ($m.instance // ""), $m["artifactweave-scenario"]] | @tsv'
+  done < <(az network dns zone list --only-show-errors --query '[].[resourceGroup, name]' -o tsv)
+}
+
+# reap_azure_cdn deletes the tagged DNS records of instances that have no
+# state once their expires-at has passed. It runs in sweep's azure branch,
+# counting failures in reap's failed and reading its live and now.
+reap_azure_cdn() {
+  local group zone type name exp inst scenario
+  while IFS=$'\t' read -r group zone type name exp inst scenario; do
+    [ -n "$name" ] || continue
+    in_scope "$inst" || continue
+    ours "$scenario" || continue
+    if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
+      if az network dns record-set "$type" delete --resource-group "$group" --zone-name "$zone" \
+        --name "$name" --yes --only-show-errors; then
+        summary "Deleted orphaned record \`$name\` ($type in \`$zone\`, instance \`$inst\`, expired $(utc "$exp"))."
+      else
+        failed=$((failed + 1))
+      fi
+    fi
+  done < <(azure_cdn_records)
+}
+
 # in_scope is true when an instance belongs to this reap: every instance,
 # unless REAP_PREFIX narrows it to one run's (a pull request proof reaps only
 # its own, so parallel proofs never race to destroy the same state).
@@ -727,8 +802,11 @@ sweep() { # cloud
           failed=$((failed + 1))
         fi
       fi
-    done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors \
-      --query '[?tags."artifactweave-scenario" != null].[id, tags."expires-at", tags.instance, tags."artifactweave-scenario"]' -o tsv)
+    done < <(azure_tagged)
+    # Front Door's DNS records come from azure/cdn alone; a multicloud reap
+    # leaves them be.
+    [ "$CLOUD" = azure ] || return 0
+    reap_azure_cdn
     ;;
   aws)
     local region
@@ -827,12 +905,25 @@ leftovers() { # cloud
     gcp_cdn_leftovers
     ;;
   azure)
-    while read -r line; do
+    local type
+    while IFS=$'\t' read -r type line; do
       [ -n "$line" ] || continue
-      summary "**Left behind:** resource \`$line\`."
+      if [ "$type" = microsoft.cdn/profiles ]; then
+        summary "**Left behind, billed by the hour:** Front Door profile \`$line\`."
+      else
+        summary "**Left behind:** resource \`$line\`."
+      fi
       left=1
     done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors -o json |
-      jq -r --arg tag "$RUN_TAG-" '.[] | select((.tags.instance // "") | startswith($tag)) | .name')
+      jq -r --arg tag "$RUN_TAG-" '.[] | select((.tags.instance // "") | startswith($tag)) | [(.type | ascii_downcase), .name] | @tsv')
+    # azure/cdn's DNS records, which no other scenario makes.
+    [ "$CLOUD" = azure ] || return 0
+    local group zone name exp inst
+    while IFS=$'\t' read -r group zone type name exp inst _; do
+      [[ $inst == "$RUN_TAG"-* ]] || continue
+      summary "**Left behind:** record \`$name\` ($type in \`$zone\`)."
+      left=1
+    done < <(azure_cdn_records)
     ;;
   aws)
     local exp inst region

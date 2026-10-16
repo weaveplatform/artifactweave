@@ -24,9 +24,12 @@ name: deploy | Platform scenarios
 # label proves nothing. Each proof runs test, then an apply and a destroy that
 # finds only the remote state (as two separate dispatches would), then an
 # instance that has already expired and a reap that removes it, then a check
-# that nothing of the run remains. A dispatch only finds workflows on the
-# default branch, so this is how a change is proven before it merges. Pull
-# requests from forks get no OIDC token and do not run.
+# that nothing of the run remains. A scenario prove-matrix.sh marks "test"
+# (azure/cdn, whose Front Door Premium profile bills by the hour) runs the
+# test, its destroy and the final check only: one instance, not three. A
+# dispatch only finds workflows on the default branch, so this is how a
+# change is proven before it merges. Pull requests from forks get no OIDC
+# token and do not run.
 on:
   workflow_dispatch:
     inputs:
@@ -140,8 +143,8 @@ jobs:
                   deploy/ci/prove-matrix.sh)
               fi
               include=$(jq -Rcn --arg pr "$PR" --arg run "$RUN_ID" '[inputs | select(length > 0) |
-                split(" ") as [$c, $s] | ([$s | splits("-") | .[0:1]] | join("")) as $code |
-                {cloud: $c, scenario: $s, action: "prove", instance: "", ttl: "",
+                split(" ") as [$c, $s, $l] | ([$s | splits("-") | .[0:1]] | join("")) as $code |
+                {cloud: $c, scenario: $s, action: "prove", lifecycle: ($l // "full"), instance: "", ttl: "",
                  run_tag: ("pr" + $pr + "-" + $run + "-" + $code), lock: ("prove-" + $s + "-" + $run),
                  title: ("prove " + $c + "/" + $s)}]' <<<"$pairs")
             fi
@@ -311,7 +314,7 @@ jobs:
       # again to disable before each delete. A fresh session for the second
       # half keeps every later step inside one.
       - name: 'Prove: renew the AWS session'
-        if: matrix.action == 'prove' && (matrix.cloud == 'aws' || matrix.cloud == 'multicloud')
+        if: matrix.action == 'prove' && (matrix.cloud == 'aws' || matrix.cloud == 'multicloud') && matrix.lifecycle != 'test'
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
@@ -320,20 +323,20 @@ jobs:
           mask-aws-account-id: true
 
       - name: 'Prove: apply, as one dispatch would'
-        if: matrix.action == 'prove'
+        if: matrix.action == 'prove' && matrix.lifecycle != 'test'
         env:
           INSTANCE: ${{ matrix.run_tag }}-l
           TTL_MINUTES: '120'
         run: deploy/ci/scenario-ci.sh apply
 
       - name: 'Prove: destroy from the remote state alone, as a later dispatch would'
-        if: matrix.action == 'prove'
+        if: matrix.action == 'prove' && matrix.lifecycle != 'test'
         env:
           INSTANCE: ${{ matrix.run_tag }}-l
         run: deploy/ci/scenario-ci.sh destroy
 
       - name: 'Prove: apply an instance that has already expired'
-        if: matrix.action == 'prove'
+        if: matrix.action == 'prove' && matrix.lifecycle != 'test'
         env:
           INSTANCE: ${{ matrix.run_tag }}-o
           TTL_MINUTES: '-5'
@@ -344,7 +347,7 @@ jobs:
       # tag that begins another's (a mirror's -m, a multi-region's -mr)
       # reaps only its own.
       - name: 'Prove: reap removes it'
-        if: matrix.action == 'prove'
+        if: matrix.action == 'prove' && matrix.lifecycle != 'test'
         env:
           REAP_PREFIX: ${{ matrix.run_tag }}-
         run: deploy/ci/scenario-ci.sh reap

@@ -80,3 +80,38 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "public_network_access" {
+  description = "Whether the account's public endpoint takes requests at all: Enabled (from the networks network_rules allows, or from any network without it) or Disabled, when only private endpoints, such as Front Door's Private Link, reach it."
+  type        = string
+  default     = "Enabled"
+
+  validation {
+    condition     = contains(["Enabled", "Disabled"], var.public_network_access)
+    error_message = "public_network_access must be Enabled or Disabled."
+  }
+}
+
+variable "network_rules" {
+  description = "The only networks the public endpoint takes requests from, when public_network_access is Enabled: public IPv4 addresses or CIDR ranges (ip_rules) and subnet IDs with the Microsoft.Storage service endpoint (subnet_ids). Null takes requests from any network. Azure applies IP rules only to requests from other regions; a client in the account's own region needs a subnet rule."
+  type = object({
+    ip_rules   = optional(list(string), [])
+    subnet_ids = optional(list(string), [])
+  })
+  default = null
+
+  validation {
+    condition     = var.network_rules == null || length(concat(try(var.network_rules.ip_rules, []), try(var.network_rules.subnet_ids, []))) > 0
+    error_message = "network_rules must allow at least one IP rule or subnet; to refuse every public request, set public_network_access to Disabled."
+  }
+
+  # Azure refuses /31 and /32 ranges: a single address is written without
+  # its prefix.
+  validation {
+    condition = var.network_rules == null || alltrue([
+      for r in try(var.network_rules.ip_rules, []) :
+      can(regex("^([0-9]{1,3}\\.){3}[0-9]{1,3}(/([0-9]|[12][0-9]|30))?$", r))
+    ])
+    error_message = "each ip_rules entry must be an IPv4 address, or a CIDR range of /30 or wider."
+  }
+}

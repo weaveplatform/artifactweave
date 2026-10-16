@@ -361,8 +361,7 @@ func overridesOnACacheFill(t *testing.T, h *harness) {
 	if !h.storageHosts[loc.Hostname()] {
 		t.Fatalf("redirected to %s, want the CDN host %v", loc.Hostname(), h.storageHosts)
 	}
-	resp := fetch(t, h, loc, nil)
-	got := drain(t, resp)
+	resp, got := fetchAll(t, h, loc, nil)
 	if resp.StatusCode != http.StatusOK || !bytes.Equal(got, data) {
 		t.Fatalf("the edge served %d with %d bytes, want 200 with the %d deployed",
 			resp.StatusCode, len(got), len(data))

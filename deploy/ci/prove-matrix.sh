@@ -27,6 +27,10 @@
 #   prove-matrix.sh --all   prints every scenario that runs in CI, for the
 #                           prove-all pull request label
 #
+# A scenario proven with the test lifecycle alone carries a third word,
+# "test" ("azure cdn test"): platform-scenarios.yml then skips the later
+# apply, destroy and reap, which would create two more instances.
+#
 # Only scenarios with a ci-vars.sh run in CI. The bootstraps live under
 # deploy/ci/terraform, not beside the scenarios, so a bootstrap change proves
 # nothing here (platform-auth-check.yml covers it).
@@ -101,8 +105,24 @@ users() {
   done
 }
 
+# Proven with the test lifecycle alone (apply, test/platform, destroy and the
+# check that nothing remains): azure/cdn, whose Front Door Premium profile
+# bills by the hour, about $0.45 (the maintainer's cost decision on #134).
+# The other scenarios already prove the full lifecycle on the same driver.
+test_only="azure/cdn"
+
+lifecycle() {
+  local cloud scenario
+  while read -r cloud scenario; do
+    case " $test_only " in
+    *" $cloud/$scenario "*) echo "$cloud $scenario test" ;;
+    *) echo "$cloud $scenario" ;;
+    esac
+  done
+}
+
 if [ "${1:-}" = --all ]; then
-  scenarios | sort -u
+  scenarios | sort -u | lifecycle
   exit 0
 fi
 
@@ -154,4 +174,4 @@ while IFS= read -r file; do
     esac
     ;;
   esac
-done | sort -u
+done | sort -u | lifecycle

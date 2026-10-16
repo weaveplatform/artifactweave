@@ -11,10 +11,12 @@ locals {
 }
 
 # Accepted trivy findings (deploy/check.sh), each with its reason:
-# - AZU-0012: the account takes connections from any network, because
-#   artifactweave and the clients its signed URLs serve have no fixed
+# - AZU-0012: by default the account takes connections from any network,
+#   because artifactweave and the clients its signed URLs serve have no fixed
 #   addresses. Shared Key is off, so every request still needs an Entra ID
-#   token or a user delegation SAS; the cdn scenarios close the endpoint.
+#   token or a user delegation SAS. A caller that serves reads through Front
+#   Door's Private Link (azure/cdn) narrows it with public_network_access and
+#   network_rules.
 # - AZU-0057: no Storage Analytics logs; the Azure activity log records the
 #   management calls.
 # - AZU-0058: replication_type defaults to LRS. A mirror member keeps one
@@ -41,10 +43,23 @@ resource "azurerm_storage_account" "blobs" {
 
   https_traffic_only_enabled      = true
   allow_nested_items_to_be_public = false
+  public_network_access           = var.public_network_access
   # Entra ID only: no account keys, so none can leak. The backend reaches it
   # with Entra ID or a user delegation SAS.
   shared_access_key_enabled       = false
   default_to_oauth_authentication = true
+
+  # Only the networks given reach the public endpoint. Private endpoints,
+  # Front Door's among them, are not subject to these rules.
+  dynamic "network_rules" {
+    for_each = var.network_rules == null ? [] : [var.network_rules]
+    content {
+      default_action             = "Deny"
+      bypass                     = ["AzureServices"]
+      ip_rules                   = network_rules.value.ip_rules
+      virtual_network_subnet_ids = network_rules.value.subnet_ids
+    }
+  }
 
   tags = var.tags
 }

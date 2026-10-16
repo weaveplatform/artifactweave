@@ -10,8 +10,9 @@
 # It reads the scenario's outputs, builds artifactweave, and runs the suite,
 # which starts that binary itself with the rendered blob configuration.
 # Credentials come from the caller's environment. The timeout leaves room for
-# gcp/cdn's wait for its certificate and load balancer, up to 45 minutes,
-# before the checks themselves.
+# the CDN scenarios' waits before the checks themselves: gcp/cdn's for its
+# certificate and load balancer, up to 45 minutes, and azure/cdn's for Front
+# Door's rollout over Private Link, up to 40.
 set -euo pipefail
 
 dir=${1:?usage: platform-tests.sh <terraform-dir> <cloud>/<scenario> <out-dir>}

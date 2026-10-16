@@ -119,6 +119,92 @@ run "an_unreadable_copy_has_no_secondary_host" {
   }
 }
 
+run "the_public_endpoint_takes_any_network_by_default" {
+  command = plan
+
+  assert {
+    condition     = azurerm_storage_account.blobs.public_network_access == "Enabled" && length(azurerm_storage_account.blobs.network_rules) == 0
+    error_message = "by default the account's public endpoint must stay open to every network, as the scenarios before azure/cdn expect"
+  }
+}
+
+run "public_network_access_reaches_the_account" {
+  command = plan
+
+  variables {
+    public_network_access = "Disabled"
+  }
+
+  assert {
+    condition     = azurerm_storage_account.blobs.public_network_access == "Disabled"
+    error_message = "public_network_access must set the account's public endpoint"
+  }
+}
+
+run "network_rules_deny_every_other_network" {
+  command = plan
+
+  variables {
+    network_rules = { ip_rules = ["203.0.113.7", "198.51.100.0/24"], subnet_ids = ["/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/net/providers/Microsoft.Network/virtualNetworks/vnet/subnets/app"] }
+  }
+
+  assert {
+    condition = [for r in azurerm_storage_account.blobs.network_rules : [r.default_action, r.ip_rules, r.virtual_network_subnet_ids]] == [[
+      "Deny",
+      toset(["203.0.113.7", "198.51.100.0/24"]),
+      toset(["/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/net/providers/Microsoft.Network/virtualNetworks/vnet/subnets/app"]),
+    ]]
+    error_message = "network_rules must allow only the addresses and subnets given, and deny the rest"
+  }
+}
+
+run "network_rules_allow_something" {
+  command = plan
+
+  variables {
+    network_rules = {}
+  }
+
+  expect_failures = [var.network_rules]
+}
+
+run "network_rules_take_ipv4_and_wide_ranges_only" {
+  command = plan
+
+  variables {
+    network_rules = { ip_rules = ["203.0.113.7/32"] }
+  }
+
+  expect_failures = [var.network_rules]
+}
+
+run "public_network_access_is_checked" {
+  command = plan
+
+  variables {
+    public_network_access = "SecuredByPerimeter"
+  }
+
+  expect_failures = [var.public_network_access]
+}
+
+run "the_id_output_names_the_account" {
+  command = plan
+
+  override_resource {
+    target          = azurerm_storage_account.blobs
+    override_during = plan
+    values = {
+      id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Storage/storageAccounts/example0a1b2cuks"
+    }
+  }
+
+  assert {
+    condition     = output.id == "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/example-rg/providers/Microsoft.Storage/storageAccounts/example0a1b2cuks"
+    error_message = "id must be the account's resource ID, which Front Door's Private Link targets"
+  }
+}
+
 run "account_name_is_checked" {
   command = plan
 

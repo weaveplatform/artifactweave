@@ -51,6 +51,12 @@ var scenarioChecks = map[string][]check{}
 // Cloud CDN's managed certificate and load balancer (cdn_test.go).
 var scenarioReady = map[string]func(t *testing.T, h *harness){}
 
+// scenarioBeforeStart holds what a scenario must wait for before
+// artifactweave starts, which opens its store: azure/cdn's Private Link
+// approval, its storage firewall admitting the runner, and its edge
+// (frontdoor_test.go).
+var scenarioBeforeStart = map[string]func(t *testing.T, h *harness){}
+
 var errNotTCP = errors.New("listener address is not TCP")
 
 func TestMain(m *testing.M) {
@@ -143,6 +149,9 @@ func start(t *testing.T) *harness {
 			t.Logf("artifactweave stderr:\n%s", tail(h.stderr.String(), 8000))
 		}
 	})
+	if before := scenarioBeforeStart[os.Getenv("ARTIFACTWEAVE_SCENARIO")]; before != nil {
+		before(t, h)
+	}
 	h.launch(t, nil)
 	return h
 }
