@@ -98,7 +98,7 @@ func (g *Registry) challengeTarget(r *http.Request) (realm, scope string) {
 				// The repository path: the name begins with the repository.
 				realm, _, _ = strings.Cut(t.image, "/")
 			}
-			scope = "repository:" + t.image + ":" + scopeActions(r.Method)
+			scope = "repository:" + t.image + ":" + scopeActions(t.kind, r.Method)
 		case t.kind == kindRepoCatalog:
 			realm, scope = t.image, catalogScope
 		case t.kind == KindCatalog:
@@ -124,9 +124,15 @@ func (g *Registry) subdomainLabel(r *http.Request) (string, bool) {
 	return label, ok && label != ""
 }
 
-// scopeActions are the actions a request's method needs, as Docker's
-// registry asks for them: a push reads as well.
-func scopeActions(method string) string {
+// scopeActions are the actions a request needs, as Docker's registry asks
+// for them: a push reads as well. Every step of an upload session needs
+// Deploy, so its status GET and its cancelling DELETE ask for push too; by
+// method alone they would ask for pull or delete, and the token the client
+// fetched would be refused again.
+func scopeActions(kind Kind, method string) string {
+	if kind == KindUploads || kind == KindUpload {
+		return actionPull + "," + actionPush
+	}
 	switch method {
 	case http.MethodGet, http.MethodHead:
 		return actionPull
