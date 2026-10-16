@@ -14,7 +14,8 @@ ARTIFACTWEAVE_AQL_CAPTURE="$out" ARTIFACTWEAVE_ACCEPT_LOCAL=1 GOWORK=off \
 names=(
 	search_recursive search_props_sort search_props_properties
 	search_root_offset_limit search_root_properties download_exclusions
-	download_remote set_props_with_props copy_move_file delete_any
+	download_remote set_props_with_props copy_move_file search_build
+	download_build delete_any
 )
 captured=("$out"/the_query_shapes_the_fixtures_capture-*.aql)
 if [ "${#captured[@]}" -ne "${#names[@]}" ]; then

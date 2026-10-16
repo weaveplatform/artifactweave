@@ -217,6 +217,11 @@ var cliWant = map[string][]string{
 	"delete_any":           {"libs-local/org/acme", "libs-local/org/acme/lib", jar, pom, util},
 	"copy_move_file":       {jar},
 	"set_props_with_props": {jar, util},
+	// jf rt s and jf rt dl with --build and a pattern send one query each:
+	// app/1's artifacts under the pattern (BuildSeeds), matched by name and
+	// number from either of its runs.
+	"search_build":   {jar, pom},
+	"download_build": {jar, pom},
 }
 
 // Cases returns the CLI fixtures followed by the cases for each operator

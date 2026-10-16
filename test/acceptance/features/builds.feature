@@ -2,8 +2,9 @@
 Feature: Build-info
   The Builds API (decision 0014) as the JFrog CLI drives it: an upload that
   records a build, jf rt bp, and jf rt bp --overwrite, which deletes each run
-  of the number before publishing it again (research 22 §3.3); then
-  jf rt bpr, which promotes a build, and jf rt bdi, which discards old runs.
+  of the number before publishing it again (research 22 §3.3); jf rt ba,
+  which appends a published build to the next; then jf rt bpr, which
+  promotes a build, and jf rt bdi, which discards old runs.
 
   Background:
     Given the registry is running
@@ -110,6 +111,29 @@ Feature: Build-info
     Then the command succeeds
     And the files "app.bin" and "out/app.bin" are identical
     And the file "out/other.bin" does not exist
+
+  # jf rt ba reads the appended run's started time and the checksums of its
+  # stored build-info document, then records a module of type "build" that
+  # names it; jf rt bp publishes that module like any other.
+  @jf
+  Scenario: jf rt ba appends a published build to the next one
+    Given the JFrog CLI is available
+    And a file "lib.bin" with content:
+      """
+      library artifact
+      """
+    When I run jf "rt u {dir}/lib.bin generic-local/lib/ --flat --build-name=lib --build-number=4 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bp lib 4 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt ba bundle 1 lib 4 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt bp bundle 1 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/artifactory/api/build/bundle/1" as admin
+    Then the response status is 200
+    And the JSON field "buildInfo.modules.0.type" equals "build"
+    And the JSON field "buildInfo.modules.0.id" equals "lib/4"
 
   # jf rt bpr sends the promotion media type and needs 200; jf rt bdi sends
   # count as a string and needs 204 (research 22 §3.1).

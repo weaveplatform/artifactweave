@@ -151,11 +151,13 @@ func BuildRows(hits []aql.BuildHit) []string {
 }
 
 // pathCases are items queries over BuildSeeds through relation paths. The
-// "cli build" cases are the shapes jfrog-client-go sends for --build
+// "cli build" cases are the other shapes jfrog-client-go sends for --build
 // (artifactory/services/utils/aqlquerybuilder.go: buildClauseItems,
-// createAqlQueryForBuild and createPropsQuery) over these seeds. They are
-// written by hand: make capture-aql captures queries over a tree laid out
-// like Seeds, and a build there would name other runs.
+// createAqlQueryForBuild and createPropsQuery): without a pattern, for
+// dependencies, for checksums only, by properties and for several builds.
+// They are written by hand because the capture scenario runs jf rt s and
+// jf rt dl with a pattern only; those two are the search_build and
+// download_build fixtures.
 func pathCases() []Case {
 	var out []Case
 	q := func(name, query string, want ...string) {
@@ -166,12 +168,6 @@ func pathCases() []Case {
 	include := `.include("name","repo","path","actual_md5","actual_sha1","sha256","size",` +
 		`"type","modified","created","property")`
 	q("cli build artifacts", `items.find({"$or":[`+app1+`]})`+include, jar, pom, cached)
-	// jf 2.126.0's jf rt s --build with a pattern, as the acceptance
-	// scenario in builds.feature captures it.
-	q("cli build artifacts with a pattern",
-		`items.find({"$and":[{"$or":[`+app1+`]},{"$or":[{"$and":[{"repo":"libs-local",`+
-			`"path":{"$match":"*"},"name":{"$match":"*"}}]}]}]})`+include,
-		jar, pom)
 	q("cli build dependencies",
 		`items.find({"$or":[{"$and":[{"dependency.module.build.name":"app",`+
 			`"dependency.module.build.number":"2"}]}]})`+include,
@@ -325,6 +321,31 @@ func BuildCases() []Case {
 	q("promotion and build criteria",
 		`build.promotions.find({"created_by":"admin","build.started":{"$lt":"2026-01-01T00:15"}})`,
 		staged, released)
+	// One case per operator the cases above leave out, on each domain.
+	q("started gte", `builds.find({"started":{"$gte":"2026-01-01T00:30"}})`, tool, rerun)
+	q("number lt", `builds.find({"number":{"$lt":"2"}})`, app1, tool, rerun)
+	q("created lte", `builds.find({"created":{"$lte":"2026-01-01T00:21"}})`, app1, app2)
+	q("explicit eq", `builds.find({"created_by":{"$eq":"bob"}})`, tool)
+	q("and of criteria", `builds.find({"$and":[{"name":"app"},{"number":"1"}]})`, app1, rerun)
+	q("promotion status ne", `build.promotions.find({"status":{"$ne":"staged"}})`, released)
+	q("promotion repo nmatch", `build.promotions.find({"repo":{"$nmatch":"libs-*"}})`, tooled)
+	q("promotion created gte",
+		`build.promotions.find({"created":{"$gte":"2026-01-01T00:55"}})`, released)
+	q("promotion created lte",
+		`build.promotions.find({"created":{"$lte":"2026-01-01T00:50"}})`, staged)
+	q("promotion created last", `build.promotions.find({"created":{"$last":"8minutes"}})`,
+		released)
+	q("promotion created before", `build.promotions.find({"created":{"$before":"8minutes"}})`,
+		staged)
+	q("promotion explicit eq", `build.promotions.find({"created_by":{"$eq":"bob"}})`, tooled)
+	q("promotion alternatives",
+		`build.promotions.find({"$or":[{"status":"released"},{"build.name":"tool"}]})`,
+		released, tooled)
+	q("promotion msp",
+		`build.promotions.find({"$msp":[{"build.@os":"linux"},{"build.property.key":"os"}]})`,
+		staged, released)
+	q("promotion include keeps the rows",
+		`build.promotions.find({"status":"released"}).include("status","comment")`, released)
 	out = append(out, Case{
 		Name: "cap applies to builds", Query: `builds.find()`, Options: aql.Options{Max: 2},
 		Want: []string{app1, app2},

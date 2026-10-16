@@ -24,7 +24,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P3 Repositories, generic artifacts, CLI AQL shape | Done (2026-10-13) | Epic #52, issues #42 to #51. The `jf` round trip and the status-code table pass. The Terraform apply criterion moved to P4 (#69): the provider authenticates only with the Bearer tokens P4 issues, and its fixture validates in CI meanwhile |
 | P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
 | P4b Reference deployments and CDN delivery | In progress | Epic #113 (CDN delivery and download redirect) done; epics #114 (reference deployments) and #189 (consistent reference deployments, contract v2) open; decisions 0029 and 0030 |
-| P5 Full AQL, searches, build-info | Not started | Epic #160; decisions 0012 and 0014, research 22 |
+| P5 Full AQL, searches, build-info | Done (2026-10-16) | Epic #160; decisions 0012 and 0014, research 22. AQL over `items`, `builds` and `build.promotions` with the secondary domains, `$msp` and the `items.delete` and `properties.update` actions, compiled for SQLite and PostgreSQL; the GET searches; build-info publish, append, rename, delete, promotion and retention. The shared AQL cases give identical ordered rows on the reference evaluator and all three stores, and the JFrog CLI's build commands pass. `remote=1` on the versions searches answers from caches until P9 (#213) |
 | P6 Docker/OCI | Not started | |
 | P7 npm, Go, Maven locals | Not started | **M2** |
 | P8 PyPI, NuGet, Helm, Terraform locals | Not started | |
@@ -496,8 +496,8 @@ Decisions: [0012](../research/decisions/0012-search-and-aql.md),
 12. The exit checks: AQL fixtures on both dialects and the JFrog CLI build commands (#171).
 
 **Exit criteria**
-- AQL fixtures (CLI-captured plus hand-written per operator) produce identical ordered output on SQLite and PostgreSQL.
-- `jf rt u --build-name --build-number`, `jf rt bp` and `jf rt build-promote` work.
+- AQL fixtures (CLI-captured plus hand-written per operator) produce identical ordered output on SQLite and PostgreSQL. Met: the cases in `pkg/aql/aqltest` run on the reference evaluator (`pkg/aql/cases_test.go`) and through `storetest` on the in-memory store, SQLite and PostgreSQL, comparing ordered rows (#171). The CLI-captured fixtures come from jf 2.126.0 through `make capture-aql`, now including `jf rt s --build` and `jf rt dl --build`; the hand-written cases cover every operator on `items`, `builds` and `build.promotions`, the relation paths, `$msp`, the include rules, the actions and the result cap.
+- `jf rt u --build-name --build-number`, `jf rt bp` and `jf rt build-promote` work. Met: `builds.feature` (#165, #166, #171) runs them with the real `jf`, with `bp --overwrite`, `s --build`, `dl --build`, `bpr` with copy, status, properties and a move, `bdi`, and `ba` followed by `bp`. The promotion is read back through AQL `build.promotions`.
 
 ## P6: Docker/OCI
 
