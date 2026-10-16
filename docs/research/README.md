@@ -62,8 +62,9 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors and which formats use them, the format framework on main and its gaps, rebuilding indexes from items, derived metadata and the work queue, and what npm, Go, Maven and the P8 formats need from the framework |
 | [25-npm.md](25-npm.md) | npm: registry URLs and scoped names, publish, dist-tags, deprecate and unpublish with `_rev`, packuments, search, ping and whoami, legacy login and `api/npm/auth`, the tarball layout and `npm.*` properties, strict layout and its conversion, `latest`, the 403 on republish, and what `jf npm` sends |
 | [26-go-modules.md](26-go-modules.md) | Go modules: the GOPROXY protocol and how the go command reads it, case encoding, versions and zips, the checksum database probe, what `jf go-publish` and `jf go` send, Artifactory's Go repositories, its `go-default` layout, and what remains inferred |
+| [27-maven.md](27-maven.md) | Maven, Gradle, Ivy and SBT: layouts and coordinates, unique, non-unique and deployer snapshots and `build.timestamp`, when and how `maven-metadata.xml` is written at the snapshot, artifact and plugin levels, uploaded metadata and checksums, release and snapshot policy, POM checks, `maxUniqueSnapshots`, version tokens, `calculateMetadata` and `generatePom` |
 | [glossary.md](glossary.md) | Terms used across the set |
-| [decisions/](decisions/README.md) | Decision records 0001–0035 |
+| [decisions/](decisions/README.md) | Decision records, with their index |
 
 ## Versions at the research baseline
 

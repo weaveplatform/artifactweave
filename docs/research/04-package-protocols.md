@@ -232,15 +232,21 @@ A virtual repository merges member metadata: the union of versions, the newest
 ### Snapshots and layouts
 
 `snapshotVersionBehavior` is `unique` (default since 7.41; the file is renamed to
-`<a>-<v>-<timestamp>-<buildNumber>.<ext>`), `non-unique` (`-SNAPSHOT` is kept and
-overwritten) or `deployer` (whatever the client sent). `maxUniqueSnapshots` of 0 means
-unlimited, the effective minimum is 2, and cleanup runs every five minutes. Gradle, Ivy
-and SBT reuse the handler with their own layouts; custom layouts define the patterns
-listed in [03-repository-configuration-model.md](03-repository-configuration-model.md).
+`<a>-<baseVersion>-<timestamp>-<buildNumber>[-<classifier>].<ext>`), `non-unique`
+(`-SNAPSHOT` is kept and overwritten) or `deployer` (whatever the client sent).
+`maxUniqueSnapshots` of 0 means unlimited. In 6.20 the cleanup runs every five minutes on
+folders quiet for a minute and has no floor; the knowledge base article above is reported
+to give an effective minimum of 2. Gradle, Ivy and SBT reuse the handler with their own
+layouts; custom layouts define the patterns listed in
+[03-repository-configuration-model.md](03-repository-configuration-model.md).
+[Research 27](27-maven.md) has the detail: metadata at each level, snapshot naming, checksum
+and POM checks, version tokens and the two REST operations.
 
 ### Unverified
 
-Nothing in this section is unverified.
+The points in [research 27 section 11](27-maven.md#11-inferred-and-undocumented), among them
+the `maxUniqueSnapshots` floor, the snapshot `<version>` Artifactory 7 writes, the statuses
+of metadata uploads, and whether 7.x checks `.sha256` and `.sha512` uploads.
 
 ## PyPI
 

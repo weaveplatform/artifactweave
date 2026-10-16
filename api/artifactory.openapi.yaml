@@ -6053,7 +6053,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/calculatemavenindex.md
   /api/maven/calculateMetadata/{repoKey}/{folderPath}:
     post:
-      description: 'Regenerates maven-metadata.xml for a folder of a local Maven, Gradle, Ivy or SBT repository: artifact-level metadata (versions, latest, release) and snapshot-level metadata (timestamped builds). Recurses into subfolders unless noneRecursive is true. Artifactweave rewrites metadata automatically on deploy and delete, so this is a repair operation for content that arrived another way. The folder is a path segment inside the URL, so the operation is served by a hand-written handler.'
+      description: 'Regenerates maven-metadata.xml for a folder of a local Maven, Gradle, Ivy or SBT repository: artifact-level metadata (versions, latest, release), snapshot-level metadata (timestamped builds) and plugin-level metadata. Recurses into subfolders unless noneRecursive is true. The calculation is queued and the call answers once it is; a later read of the metadata waits for it. Needs Deploy on the folder. A missing path or a repository that is not local answers 404. Artifactweave rewrites metadata automatically on deploy and delete, so this is a repair operation. The folder is a path segment inside the URL, so the operation is served by a hand-written handler.'
       operationId: calculateMavenMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6081,9 +6081,9 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text acknowledgement naming the folder whose metadata was recalculated.
+                description: Empty.
                 type: string
-          description: Metadata was regenerated for the folder.
+          description: The recalculation was queued for the folder.
         '401':
           content:
             application/json:
@@ -6109,7 +6109,7 @@ paths:
       x-handwritten: true
   /api/maven/generatePom/{repoKey}/{jarFilePath}:
     post:
-      description: Writes a minimal POM next to a JAR that was deployed without one, deriving the coordinates from the repository layout, so Maven clients can resolve the artifact. Local repositories only; an existing POM is left untouched. The JAR path is a path segment inside the URL, so the operation is served by a hand-written handler.
+      description: Writes a POM at the descriptor path of a JAR that was deployed without one, so Maven clients can resolve the artifact. The content is the JAR's own embedded POM for its coordinates (META-INF/maven/<groupId>/<artifactId>/pom.xml) when it has one, otherwise a default POM with the coordinates from the repository layout. Local Maven, Gradle, Ivy and SBT repositories only; an existing POM is left untouched; needs Deploy on the POM path. A missing JAR answers 404. The JAR path is a path segment inside the URL, so the operation is served by a hand-written handler.
       operationId: generateMavenPomFile
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
