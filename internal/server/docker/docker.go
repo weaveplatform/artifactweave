@@ -22,12 +22,17 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/service/registry"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // APIVersionHeader is the header every registry response carries. Docker
@@ -53,6 +58,15 @@ type Options struct {
 	// Fault records an unexpected error for the access log, as the server's
 	// handlers do; nil drops it.
 	Fault func(*http.Request, error)
+	// Blobs is the blob store behind Store. Nil leaves blobs and uploads
+	// unimplemented, for tests of the router alone.
+	Blobs blob.Store
+	// ServeBlob answers a GET of a blob's item in a repository with the
+	// server's download, which applies the download redirect policy
+	// (decision 0029) and counts the download. Nil streams it from Blobs.
+	ServeBlob func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item)
+	// Now supplies the time to upload sessions; nil means time.Now.
+	Now func() time.Time
 }
 
 // Endpoint serves one registry operation for a parsed request.
@@ -66,6 +80,11 @@ type Registry struct {
 	parent    string
 	fault     func(*http.Request, error)
 	endpoints map[endpointKey]Endpoint
+	// blobs, uploads and serveBlob serve blobs; uploads is nil without a
+	// blob store.
+	blobs     blob.Store
+	uploads   *registry.Service
+	serveBlob func(http.ResponseWriter, *http.Request, repo.Config, types.Item)
 }
 
 type endpointKey struct {
@@ -81,8 +100,17 @@ func New(o Options) *Registry {
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)
 	}
+	if o.Store != nil && o.Blobs != nil {
+		g.blobs = o.Blobs
+		g.uploads = &registry.Service{Store: o.Store, Blobs: o.Blobs, Now: o.Now}
+		g.serveBlob = o.ServeBlob
+		if g.serveBlob == nil {
+			g.serveBlob = g.streamBlob
+		}
+	}
 	// Each feature registers its endpoints with one call here.
 	g.registerProbe()
+	g.registerBlobs()
 	return g
 }
 
@@ -276,9 +304,7 @@ func (g *Registry) lookup(ctx context.Context, key string) (repo.Config, bool, e
 // Serves reports whether the registry serves repositories of package type
 // t: docker, and the oci and helmoci types that share its protocol
 // (research 04).
-func Serves(t repo.PackageType) bool {
-	return t == repo.Docker || t == repo.OCI || t == repo.HelmOCI
-}
+func Serves(t repo.PackageType) bool { return layout.Serves(t) }
 
 // notFound answers a path that is no registry operation: 404 UNSUPPORTED
 // (decision 0031).

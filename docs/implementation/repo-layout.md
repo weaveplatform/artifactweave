@@ -48,7 +48,7 @@ internal/
                                # and the hand-written item-path handlers beside the generated ones
     gen/                       # generated strict servers, one package per spec
     apierror/ baseurl/         # error envelopes and the base-URL resolver
-    docker/                    # /v2 routing for the repository-path access method
+    docker/                    # the registry protocol: /v2 routing, blobs and uploads
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator
     sqlite/ postgres/          # dialect packages + migrations/<dialect>/*.sql
@@ -57,7 +57,7 @@ internal/
   format/
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/
   service/                     # one package per domain service; more arrive with their phases
-    gc/ identity/ item/ multipart/ permission/ pkgindex/ roles/ trash/ usage/
+    gc/ identity/ item/ multipart/ permission/ pkgindex/ registry/ roles/ trash/ usage/
   scheduler/                   # Quartz-syntax cron runner for cleanup, replication, GC
   fakeupstream/                # chi fakes of upstream registries with fault modes
   testfault/                   # shared failing fakes for handler tests

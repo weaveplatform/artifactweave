@@ -7,12 +7,14 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
+	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -88,13 +90,18 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err := parts.Sweep(ctx); err != nil {
 		log.Warn("multipart upload staging sweep failed", "error", err)
 	}
+	// Registry upload sessions append to hot-tier blob uploads, and their
+	// finished uploads wait in the item tree until a manifest links them.
+	uploads := &registry.Service{Store: st, Blobs: hot.store}
 	// The cold tier is not collected: nothing writes it until archiving (P16),
 	// which brings the references its collection would have to trust.
 	collector, err := gc.New(st, hot.store, gc.Options{
 		Grace: cfg.GC.GracePeriod,
 		Reapers: map[string]func(context.Context, store.Upload) error{
 			multipart.Backend: parts.Reap,
+			registry.Backend:  uploads.Reap,
 		},
+		Expirers: []func(context.Context, time.Time) (int, error){uploads.ExpireUploads},
 	})
 	if err != nil {
 		return nil, errors.Join(err, st.Close())

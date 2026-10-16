@@ -220,6 +220,43 @@ func TestReapers(t *testing.T) {
 	}
 }
 
+// TestExpirers checks that each expirer is asked for what was last written
+// an upload expiry ago, that what it removed counts as reaped, and that its
+// failure fails the step.
+func TestExpirers(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	var cutoffs []time.Time
+	boom := errors.New("boom")
+	fail := true
+	c, err := gc.New(w.db, w.blobs, gc.Options{
+		Now: w.now, UploadExpiry: 6 * time.Hour,
+		Expirers: []func(context.Context, time.Time) (int, error){
+			func(_ context.Context, before time.Time) (int, error) {
+				cutoffs = append(cutoffs, before)
+				if fail {
+					return 1, boom
+				}
+				return 2, nil
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rep, err := c.Run(ctx); !errors.Is(err, boom) || rep.UploadsReaped != 1 {
+		t.Fatalf("a failing expirer fails the pass: %+v %v", rep, err)
+	}
+	fail = false
+	if rep := run(t, c); rep.UploadsReaped != 2 {
+		t.Fatalf("%+v", rep)
+	}
+	want := w.now().Add(-6 * time.Hour)
+	if len(cutoffs) != 2 || !cutoffs[1].Equal(want) {
+		t.Fatalf("cutoffs %v, want %v", cutoffs, want)
+	}
+}
+
 func TestOrphans(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
