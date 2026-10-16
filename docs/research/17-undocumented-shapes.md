@@ -117,6 +117,28 @@ Sources: <https://github.com/aquasecurity/trivy/discussions/7982>,
 <https://github.com/hashicorp/terraform/issues/31950>,
 <https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories>.
 
+### Base URL behind proxies
+
+| Detail | Finding | Confidence |
+|---|---|---|
+| Artifactory's base URL (OSS 6.20, `HttpUtils.getServletContextUrl`) | `X-JFrog-Override-Base-Url`, then `X-Artifactory-Override-Base-Url`, then the configured `urlBase` (given the request's scheme), then the servlet request's own server name and port. It never reads `X-Forwarded-Host` itself; a forwarded host reaches it only through what the servlet container or the front proxy makes of the request | Confirmed |
+| A forwarded list | for `X-Forwarded-For`, Artifactory takes the first entry, the client's (`HttpUtils.getRemoteClientAddress`: it "might contain multiple entries") | Confirmed |
+| `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port` as lists | no public source shows Artifactory reading them as lists | Guess |
+
+artifactweave's resolver (decision 0002) reads the `X-Forwarded-*` headers itself. Each proxy in a
+chain appends the value it received, so each header can arrive as a comma-separated list
+(`X-Forwarded-Host: art.example.com, ingress.internal:8080`). artifactweave takes each header's
+first entry, the client-facing hop, as Artifactory does for `X-Forwarded-For`, and ignores an
+empty first entry rather than trusting a later, internal one (#249). It reads only the
+`X-Forwarded-*` headers, not RFC 7239's `Forwarded`.
+
+The precedence differs from OSS 6.20, which puts the configured `urlBase` ahead of anything
+the request carries: artifactweave puts the forwarded headers ahead of the configured base URL
+(decision 0002). #249 changes only how a list is read; the order is unchanged.
+
+Sources: `base/common/src/main/java/org/artifactory/util/HttpUtils.java` in
+knottnhupfer/artifactory-oss at `b99e5649bcad` (Artifactory OSS 6.20).
+
 ### Still needs a live capture
 
 Only the Terraform backend sub-paths (relevant only if `terraformbackend` returns) and,

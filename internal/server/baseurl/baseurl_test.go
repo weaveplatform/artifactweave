@@ -79,6 +79,84 @@ func TestResolvePrecedence(t *testing.T) {
 			false,
 			"http://proxy:9000",
 		},
+		{
+			"a proxy chain's hosts take the first, client-facing one",
+			map[string]string{
+				"X-Forwarded-Host":  "a.example, b.internal",
+				"X-Forwarded-Proto": "https, http",
+				"X-Forwarded-Port":  "443, 8080",
+			},
+			"http://cfg",
+			false,
+			"https://a.example",
+		},
+		{
+			"whitespace around a list's entries is trimmed",
+			map[string]string{
+				"X-Forwarded-Host":  "  a.example ,b.internal",
+				"X-Forwarded-Proto": " https ,http",
+				"X-Forwarded-Port":  " 8443 , 80",
+			},
+			"",
+			false,
+			"https://a.example:8443",
+		},
+		{
+			"an empty first host is no host: the configured base url",
+			map[string]string{"X-Forwarded-Host": " , b.internal"},
+			"https://cfg.example.com",
+			false,
+			"https://cfg.example.com",
+		},
+		{
+			"an empty first host and no configuration: the request",
+			map[string]string{"X-Forwarded-Host": ",b.internal"},
+			"",
+			false,
+			"http://origin.test:8081",
+		},
+		{
+			"an IPv6 host with its port, in a list",
+			map[string]string{
+				"X-Forwarded-Host": "[::1]:8443, b.internal",
+				"X-Forwarded-Port": "9000",
+			},
+			"",
+			false,
+			"http://[::1]:8443",
+		},
+		{
+			"an IPv6 host without a port takes the forwarded port",
+			map[string]string{
+				"X-Forwarded-Host":  "[2001:db8::1], b.internal",
+				"X-Forwarded-Proto": "https",
+				"X-Forwarded-Port":  "8443, 80",
+			},
+			"",
+			false,
+			"https://[2001:db8::1]:8443",
+		},
+		{
+			"an unknown forwarded proto falls back to the request's",
+			map[string]string{"X-Forwarded-Host": "proxy", "X-Forwarded-Proto": "gopher"},
+			"",
+			true,
+			"https://proxy",
+		},
+		{
+			"a forwarded proto in capitals",
+			map[string]string{"X-Forwarded-Host": "proxy", "X-Forwarded-Proto": "HTTPS"},
+			"",
+			false,
+			"https://proxy",
+		},
+		{
+			"a forwarded port that is not a number is ignored",
+			map[string]string{"X-Forwarded-Host": "proxy", "X-Forwarded-Port": "eighty"},
+			"",
+			false,
+			"http://proxy",
+		},
 		{"configured base url", nil, "https://cfg.example.com/", false, "https://cfg.example.com"},
 		{"request host http", nil, "", false, "http://origin.test:8081"},
 		{"request host https", nil, "", true, "https://origin.test:8081"},
@@ -119,5 +197,24 @@ func TestMiddlewareAndFrom(t *testing.T) {
 	}
 	if From(context.Background()) != "" {
 		t.Fatal("From on a bare context should be empty")
+	}
+}
+
+func TestForwardedHost(t *testing.T) {
+	for header, want := range map[string]string{
+		"":                       "",
+		"a.example":              "a.example",
+		"a.example, b.internal":  "a.example",
+		" a.example ,b.internal": "a.example",
+		", b.internal":           "",
+		"[::1]:8443, b.internal": "[::1]:8443",
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		if header != "" {
+			r.Header.Set("X-Forwarded-Host", header)
+		}
+		if got := ForwardedHost(r); got != want {
+			t.Errorf("ForwardedHost(%q) = %q, want %q", header, got, want)
+		}
 	}
 }

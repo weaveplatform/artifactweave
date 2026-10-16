@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -31,13 +32,13 @@ func (g *Registry) subdomain(r *http.Request) (repo.Config, bool, error) {
 }
 
 // addressedHost is the host the client named, lower-cased and without its
-// port: the first X-Forwarded-Host value, which a proxy chain appends to,
+// port: the first X-Forwarded-Host entry, which a proxy chain appends to,
 // else Host (decision 0003). The configured base URL is no evidence of it:
 // it names the parent.
 func addressedHost(r *http.Request) string {
-	host := r.Host
-	if v := r.Header.Get("X-Forwarded-Host"); v != "" {
-		host, _, _ = strings.Cut(v, ",")
+	host := baseurl.ForwardedHost(r)
+	if host == "" {
+		host = r.Host
 	}
 	return stripPort(strings.ToLower(strings.TrimSpace(host)))
 }
