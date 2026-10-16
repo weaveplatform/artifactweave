@@ -31,17 +31,17 @@ scenario aws/cdn ../../modules/aws/storage-cdn
 scenario gcp/single-bucket
 scenario gcp/multi-region ../../modules/gcp/storage
 scenario azure/single-bucket
-scenario multicloud/mirror ../../modules/aws/storage ../../modules/gcp/storage
+scenario multicloud/mirror ../../modules/aws/storage ../../modules/gcp/storage ../../modules/azure/storage
 # The bootstraps live under deploy/ci/terraform and never run in CI.
 mkdir -p "$fixture/deploy/ci/terraform/aws" && : >"$fixture/deploy/ci/terraform/aws/main.tf"
-mkdir -p "$t/modules/aws/storage" "$t/modules/aws/storage-cdn" "$t/modules/gcp/storage"
+mkdir -p "$t/modules/aws/storage" "$t/modules/aws/storage-cdn" "$t/modules/gcp/storage" "$t/modules/azure/storage"
 mkdir -p "$fixture/test/platform"
 cat >"$fixture/test/platform/harness_test.go" <<'EOF'
 // ARTIFACTWEAVE_SCENARIO is <cloud>/<scenario>, for example gcp/single-bucket.
 const contentType = "application/json"
 EOF
 cat >"$fixture/test/platform/mirror_test.go" <<'EOF'
-var mirrors = []string{"gcp/multi-region", "aws/multi-region"}
+var mirrors = []string{"gcp/multi-region", "aws/multi-region", "multicloud/mirror"}
 EOF
 cat >"$fixture/test/platform/replica_test.go" <<'EOF'
 func init() { scenarioChecks["aws/geo-replicated"] = nil }
@@ -75,9 +75,10 @@ check 'table test changes' '' $c/prove-matrix_test.sh
 check 'module .tf' $'aws geo-replicated\naws multi-region\nmulticloud mirror' $p/modules/aws/storage/main.tf
 check 'sibling module is not the module' 'aws cdn' $p/modules/aws/storage-cdn/variables.tf
 check 'deleted module .tf' $'gcp multi-region\nmulticloud mirror' $p/modules/gcp/storage/gone.tf
+check 'module only a multicloud scenario sources' 'multicloud mirror' $p/modules/azure/storage/main.tf
 check 'module README' '' $p/modules/aws/storage/README.md
 check 'module tests' '' $p/modules/aws/storage/tests/security.tftest.hcl
-check 'mirror_test.go' $'aws multi-region\ngcp multi-region' test/platform/mirror_test.go
+check 'mirror_test.go' $'aws multi-region\ngcp multi-region\nmulticloud mirror' test/platform/mirror_test.go
 check 'replica_test.go' 'aws geo-replicated' test/platform/replica_test.go
 check 'Go file naming no scenario' "$singles" test/platform/harness_test.go
 check 'Go file naming only a missing scenario' "$singles" test/platform/ghost_test.go
@@ -86,6 +87,9 @@ check 'other test/platform file' "$singles" test/platform/testdata/blob.bin
 check 'scenario .tf' 'aws single-bucket' $p/aws/single-bucket/main.tf
 check 'scenario lock file' 'aws single-bucket' $p/aws/single-bucket/.terraform.lock.hcl
 check 'scenario ci-vars.sh' 'gcp multi-region' $p/gcp/multi-region/ci-vars.sh
+check 'multicloud scenario .tf' 'multicloud mirror' $p/multicloud/mirror/main.tf
+check 'multicloud scenario ci-vars.sh' 'multicloud mirror' $p/multicloud/mirror/ci-vars.sh
+check 'multicloud scenario README' '' $p/multicloud/mirror/README.md
 check 'deleted .tf of a scenario' 'azure single-bucket' $p/azure/single-bucket/moved.tf
 check 'scenario README' '' $p/aws/single-bucket/README.md
 check 'scenario Makefile' '' $p/aws/single-bucket/Makefile
@@ -101,7 +105,7 @@ check 'deleted scenario' '' $p/aws/retired/main.tf
 check 'platform README' '' deploy/platform/README.md
 check 'docs' '' docs/testing/ci.md
 check 'no changes' ''
-check 'union, sorted and unique' $'aws multi-region\naws single-bucket\ngcp multi-region' \
+check 'union, sorted and unique' $'aws multi-region\naws single-bucket\ngcp multi-region\nmulticloud mirror' \
   $p/aws/single-bucket/main.tf test/platform/mirror_test.go $p/aws/multi-region/main.tf README.md
 
 all=$(PROVE_MATRIX_ROOT=$fixture "$script" --all)

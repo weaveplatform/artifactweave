@@ -8,9 +8,10 @@
 #     cloud's single-bucket, the baseline every scenario builds on;
 #   - a test/platform Go file: the scenarios it names as quoted
 #     "<cloud>/<scenario>" literals (mirror_test.go names the multi-region
-#     scenarios, replica_test.go the geo-replicated ones); a file that names
-#     none (harness_test.go, generic_test.go), any other test/platform file
-#     and a deleted one prove every cloud's single-bucket;
+#     scenarios and multicloud/mirror, replica_test.go the geo-replicated
+#     ones); a file that names none (harness_test.go, generic_test.go), any
+#     other test/platform file and a deleted one prove every cloud's
+#     single-bucket;
 #   - a module's top-level .tf (modules/<cloud>/<capability>/*.tf): every
 #     scenario, in any cloud directory, whose Terraform sources exactly that
 #     module;

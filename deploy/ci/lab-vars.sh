@@ -4,7 +4,9 @@
 # source this file in the shell that then runs terraform, so the TF_VAR_*
 # it exports reach that terraform and nothing else:
 #
-#   . deploy/ci/lab-vars.sh aws|gcp|azure
+#   . deploy/ci/lab-vars.sh aws|gcp|azure|multicloud
+#
+# multicloud exports all three clouds' inputs, whose names do not overlap.
 #
 # Each value is the lab's, resolved with the operator's own CLI login:
 #
@@ -51,8 +53,11 @@ lab_vars() {
     export TF_VAR_app_principal_id="$app"
     export TF_VAR_additional_principals="{ operator = { principal_id = \"$operator\", principal_type = \"User\" } }"
     ;;
+  multicloud)
+    lab_vars aws && lab_vars gcp && lab_vars azure || return 1
+    ;;
   *)
-    echo "usage: . lab-vars.sh aws|gcp|azure" >&2
+    echo "usage: . lab-vars.sh aws|gcp|azure|multicloud" >&2
     return 1
     ;;
   esac

@@ -323,6 +323,9 @@ lint_scenario() {
       aws:location | aws:locations | gcp:region | gcp:regions | azure:region | azure:regions)
         v "$r" S4 "variable \"$n\" is not $cloud's word for placement"
         ;;
+      multicloud:region | multicloud:regions | multicloud:location | multicloud:locations)
+        v "$r" S4 "variable \"$n\" names no cloud; a multicloud scenario places with aws_region, gcp_location and azure_location"
+        ;;
       esac
     done <<<"$vars"
     required() { # name [name ...]: one of them is declared, and has no default
@@ -340,11 +343,18 @@ lint_scenario() {
     aws) required region regions && required app_role_arn ;;
     gcp) required location locations && required app_service_account ;;
     azure) required location locations && required app_principal_id ;;
+    # Every cloud-specific input names its cloud, so one root holds all three.
+    multicloud)
+      required aws_region && required gcp_location && required azure_location
+      required app_role_arn && required app_service_account && required app_principal_id
+      ;;
     esac
     case $cloud in
-    gcp) echo "$vars" | awk '$1 == "project_id" && $4 == 0 { ok = 1 } END { exit !ok }' ||
+    gcp | multicloud) echo "$vars" | awk '$1 == "project_id" && $4 == 0 { ok = 1 } END { exit !ok }' ||
       v "$r" S3 "the account scope, variable \"project_id\", must be a required input" ;;
-    azure) echo "$vars" | awk '$1 == "subscription_id" && $4 == 0 { ok = 1 } END { exit !ok }' ||
+    esac
+    case $cloud in
+    azure | multicloud) echo "$vars" | awk '$1 == "subscription_id" && $4 == 0 { ok = 1 } END { exit !ok }' ||
       v "$r" S3 "the account scope, variable \"subscription_id\", must be a required input" ;;
     esac
 
@@ -802,6 +812,95 @@ EOF
     echo 'locals {}' | w "$b/main.tf"
   done
 
+  # The multicloud scenario: one provider and one module call per cloud, each
+  # cloud-specific input named after its cloud.
+  s=$f/deploy/platform/terraform/multicloud/good
+  w "$s/versions.tf" <<'EOF'
+terraform {
+  required_version = ">= 1.9"
+  required_providers {
+    aws = {
+      source = "hashicorp/aws"
+    }
+    google = {
+      source = "hashicorp/google"
+    }
+    azurerm = {
+      source = "hashicorp/azurerm"
+    }
+  }
+}
+
+provider "aws" {
+}
+
+provider "google" {
+}
+
+provider "azurerm" {
+  storage_use_azuread             = true
+  resource_provider_registrations = "none"
+}
+EOF
+  {
+    for n in name aws_region gcp_location azure_location app_role_arn app_service_account app_principal_id \
+      project_id subscription_id; do
+      printf 'variable "%s" {\n  type        = string\n  description = "Required."\n}\n\n' "$n"
+    done
+    printf 'variable "labels" {\n  type        = map(string)\n  description = "Labels."\n  default     = {}\n}\n'
+    printf '\nvariable "force_destroy" {\n  type        = bool\n  description = "Destroy with contents."\n  default     = false\n}\n'
+  } | w "$s/variables.tf"
+  {
+    printf 'resource "random_id" "suffix" {\n  byte_length = 4\n}\n'
+    for cloud in aws gcp azure; do
+      printf '\nmodule "%s" {\n  source = "../../modules/%s/storage"\n  name   = var.name\n}\n' "$cloud" "$cloud"
+    done
+  } | w "$s/main.tf"
+  w "$s/outputs.tf" <<'EOF'
+output "artifactweave_config" {
+  description = "The blob section."
+  value       = "blob: {}"
+}
+
+output "storage_host" {
+  description = "Where signed URLs point."
+  value       = module.aws.host
+}
+EOF
+  w "$s/harness.tf" <<'EOF'
+output "expires_at" {
+  description = "For the test harness: the expires-at label reap reads."
+  value       = lookup(var.labels, "expires-at", "")
+}
+EOF
+  echo '# lock' | w "$s/.terraform.lock.hcl"
+  w "$s/tests/composition.tftest.hcl" <<'EOF'
+mock_provider "aws" {}
+
+run "readme_example" {
+  command = plan
+}
+EOF
+  w "$s/Makefile" <<'EOF'
+# The fixture's own make targets.
+
+include $(shell git rev-parse --show-toplevel)/deploy/ci/scenario.mk
+EOF
+  {
+    echo '# shellcheck shell=bash'
+    # shellcheck disable=SC2016 # the line as written, unexpanded
+    echo 'export TF_VAR_name="${NAME_PREFIX}${INSTANCE}"'
+    for n in aws_region gcp_location azure_location app_role_arn app_service_account app_principal_id \
+      project_id subscription_id; do
+      echo "export TF_VAR_$n=\"\$PLATFORM_X\""
+    done
+    # shellcheck disable=SC2016 # the line as written, unexpanded
+    echo 'export TF_VAR_labels="$SCENARIO_LABELS"'
+    echo 'export TF_VAR_force_destroy=true'
+  } | w "$s/ci-vars.sh"
+  readme "$f/deploy/platform/SCENARIO-TEMPLATE.md" "$s/README.md" "FIX-aws1 FIX-gcp1 FIX-azure1" \
+    "name aws_region gcp_location azure_location app_role_arn app_service_account app_principal_id project_id subscription_id labels force_destroy"
+
   # The app-layer root and its driver.
   a=$f/deploy/artifactweave/terraform/good
   w "$a/versions.tf" <<'EOF'
@@ -830,7 +929,7 @@ EOF
 }
 
 self_test() {
-  local real base good cases failures=0 dir id rule root out result n sc sg sz ma ap
+  local real base good cases failures=0 dir id rule root out result n sc sg sz sm ma ap
   real=$(cd "$here/../.." && pwd)
   base=$(mktemp -d)
   # shellcheck disable=SC2064 # the path is fixed now
@@ -841,6 +940,7 @@ self_test() {
   sc=deploy/platform/terraform/aws/good
   sg=deploy/platform/terraform/gcp/good
   sz=deploy/platform/terraform/azure/good
+  sm=deploy/platform/terraform/multicloud/good
   ma=deploy/platform/terraform/modules/aws/storage
   ap=deploy/artifactweave/terraform/good
 
@@ -868,6 +968,10 @@ self_test() {
   c s4-harness-input S4 $sc "printf 'variable \"scenario_labels\" {\n  type        = string\n  description = \"x\"\n}\n' >>$sc/variables.tf"
   c s4-vocabulary S4 $sg "printf 'variable \"region\" {\n  type        = string\n  description = \"x\"\n}\n' >>$sg/variables.tf"
   c s4-principal S4 $sc "awk '/^variable \"app_role_arn\"/{s=1} s&&/^}/{s=0;next} !s' $sc/variables.tf >$base/t && cp $base/t $sc/variables.tf"
+  c s3-multicloud-scope S3 $sm "awk '/^variable \"subscription_id\"/{print; print \"  default     = \\\"x\\\"\"; next} {print}' $sm/variables.tf >$base/t && cp $base/t $sm/variables.tf"
+  c s4-multicloud-vocabulary S4 $sm "printf 'variable \"location\" {\n  type        = string\n  description = \"x\"\n}\n' >>$sm/variables.tf"
+  c s4-multicloud-placement S4 $sm "awk '/^variable \"azure_location\"/{s=1} s&&/^}/{s=0;next} !s' $sm/variables.tf >$base/t && cp $base/t $sm/variables.tf"
+  c s4-multicloud-principal S4 $sm "awk '/^variable \"app_service_account\"/{s=1} s&&/^}/{s=0;next} !s' $sm/variables.tf >$base/t && cp $base/t $sm/variables.tf"
   c s5-description S5 $sc "sed -i.bak 's#For the test harness: #Reap: #' $sc/harness.tf"
   c s5-place S5 $sc "printf 'output \"mirror_members\" {\n  description = \"x\"\n  value       = 1\n}\n' >>$sc/outputs.tf"
   c s5-missing S5 $sc "printf 'output \"x\" {\n  description = \"x\"\n  value       = 1\n}\n' >$sc/outputs.tf"

@@ -59,7 +59,9 @@ Every action works on a fresh copy of the scenario, with the state at
 `scenarios/<cloud>/<scenario>/<instance>` in the bootstrap's state store, and the scenario's
 `ci-vars.sh` supplies the variables a CI run passes. Every name a run gives its resources
 starts with the driver's `NAME_PREFIX`: `artifactweave-awscn-` on AWS, where the deployer may
-manage only `artifactweave-*` buckets, and `awscn-` on GCP and Azure. How to dispatch it and which scenarios a
+manage only `artifactweave-*` buckets, and `awscn-` on GCP and Azure. A `multicloud` run logs
+in as all three deployers, keeps its state in GCP's store and takes AWS's prefix, and its reap
+sweeps all three clouds for the multicloud scenarios' resources only. How to dispatch it and which scenarios a
 pull request proves are in [`deploy/platform`](../platform/README.md#running-a-scenario-in-ci)
 and [`docs/testing/ci.md`](../../docs/testing/ci.md#platform-scenarios-manual).
 
