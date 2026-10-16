@@ -2,10 +2,11 @@
 # Static checks and mocked tests over every Terraform root under deploy/ and
 # test/terraform, with pinned tools (decision 0030):
 #
-#   check.sh        the prove-matrix table test and the contract lint, then
-#                   fmt, validate, tflint, trivy, terraform test and the
-#                   terraform-docs drift check
+#   check.sh        the prove-matrix and jfrog-providers table tests and the
+#                   contract lint, then fmt, validate, tflint, trivy,
+#                   terraform test and the terraform-docs drift check
 #   check.sh docs   rewrite the terraform-docs sections of the READMEs
+#   check.sh tools  fetch the pinned tools into .tools/ and stop
 #
 # Each tool is fetched once into .tools/ and checked against the SHA-256 in
 # its release's checksum file, so a laptop and CI run the same versions. A
@@ -58,6 +59,8 @@ fail() {
 if [ "$mode" = check ]; then
 	echo "== prove-matrix"
 	"$root/deploy/ci/prove-matrix_test.sh" || fail "prove-matrix.sh chooses the wrong scenarios (deploy/ci/prove-matrix_test.sh)"
+	echo "== jfrog-providers"
+	"$root/deploy/ci/jfrog-providers_test.sh" || fail "jfrog-providers.sh rewrites the pins wrongly (deploy/ci/jfrog-providers_test.sh)"
 	echo "== contract"
 	"$root/deploy/ci/lint-contract.sh" || fail "a Terraform root breaks the reference-deployment contract (deploy/ci/lint-contract.sh)"
 	"$root/deploy/ci/lint-contract.sh" --self-test || fail "the contract lint misjudges its fixtures (deploy/ci/lint-contract.sh --self-test)"
@@ -114,6 +117,8 @@ fetch terraform-docs "$TERRAFORM_DOCS_VERSION" \
 PATH=$tools/tflint-$TFLINT_VERSION:$tools/trivy-$TRIVY_VERSION:$tools/terraform-docs-$TERRAFORM_DOCS_VERSION:$PATH
 export PATH TF_IN_AUTOMATION=1 TF_INPUT=0 TF_PLUGIN_CACHE_DIR=$tools/terraform-plugin-cache
 mkdir -p "$TF_PLUGIN_CACHE_DIR"
+# deploy/ci/jfrog-providers.sh borrows the pinned terraform from here.
+[ "$mode" = tools ] && exit 0
 
 cd "$root"
 roots=$(find deploy test/terraform -name '*.tf' -not -path '*/.terraform/*' -exec dirname {} \; | sort -u)
@@ -145,7 +150,7 @@ if [ "$mode" = docs ]; then
 	exit 0
 fi
 [ "$mode" = check ] || {
-	echo "usage: $0 [check|docs]" >&2
+	echo "usage: $0 [check|docs|tools]" >&2
 	exit 2
 }
 

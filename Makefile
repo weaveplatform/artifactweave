@@ -95,6 +95,10 @@ oci-conformance:
 deploy-check:
 	./deploy/check.sh
 
+## jfrog-providers: move the JFrog Terraform providers deploy/artifactweave pins to their latest releases (MODE=check|update|dry-run, default dry-run)
+jfrog-providers:
+	./deploy/ci/jfrog-providers.sh $(or $(MODE),dry-run)
+
 ## deploy-docs: rewrite the terraform-docs sections of the deploy/ READMEs
 deploy-docs:
 	./deploy/check.sh docs
@@ -213,4 +217,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: jfrog-providers oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

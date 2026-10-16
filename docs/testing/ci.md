@@ -317,11 +317,36 @@ the driver.
 - For each scenario it runs `terraform init -lockfile=readonly` and `terraform validate`.
 
 Each scenario's committed `.terraform.lock.hcl` holds its providers' hashes for linux and
-darwin on amd64 and arm64. To move a provider to a new version:
-1. Update the version in every scenario's `main.tf`.
-2. Update the version and checksums in `run.sh` from the release's `SHA256SUMS`.
-3. Regenerate each lock from a mirror holding the four zips of each provider:
-   `terraform providers lock -fs-mirror=<mirror> -platform=...`.
+darwin on amd64 and arm64.
+
+The providers move automatically. Dependabot cannot move them, because `run.sh` pins their
+release zips by SHA-256, so `deps-refresh.yml`'s `jfrog-providers` job runs
+`deploy/ci/jfrog-providers.sh update` every day. It:
+1. Finds each provider's latest GitHub release.
+2. Downloads its `SHA256SUMS` and checks the detached signature against
+   `deploy/ci/jfrog-terraform-providers.asc`, the key the Terraform registry publishes for
+   the `jfrog` namespace. Its fingerprint, `7F2AD74397A7E25E2D0B082E2FA4D2A520237FA7`, is
+   pinned in the script, so a rotated key fails the run for a person to review.
+3. Moves the version in every reference's `versions.tf`, and the version and the four zip
+   checksums in `run.sh`.
+4. Writes each lock afresh with `terraform providers lock -fs-mirror` from a mirror of the
+   four zips, each checked against the signed sums.
+5. Moves the versions the READMEs name and regenerates their terraform-docs sections.
+6. Runs `run.sh validate` over every reference, so the pins, checksums and locks agree
+   before anything is committed.
+
+A patch or minor update goes up as one PR from the org App on `deps/jfrog-providers`, titled
+`chore(deps): refresh the JFrog Terraform providers to <versions>`. `auto-merge.yml` merges
+it once the gate passes, including the `terraform` apply job and `deploy-check`. A major goes
+up on `deps/jfrog-providers-major`, which `auto-merge.yml` never merges, so a person reviews
+it. The script never moves a pin backwards.
+
+`make jfrog-providers` (`MODE=check|update|dry-run`, default `dry-run`) runs the same
+script locally. `dry-run` updates a copy of the tree and prints the diff;
+`ARTIFACTORY_TARGET` and `PLATFORM_TARGET` name a version instead of the latest release.
+`deploy/ci/jfrog-providers_test.sh`, which `make deploy-check` runs, checks the rewrites and
+the signature check offline. Its signature cases use the real 12.11.14 `SHA256SUMS` and
+signature committed in `deploy/ci/testdata/jfrog-providers`.
 
 `make terraform TERRAFORM_MODE=apply` adds the full run, which the `terraform` CI job runs:
 1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`.
