@@ -122,3 +122,31 @@ run "tags_reach_the_bucket" {
     error_message = "the bucket, the one resource here that takes tags, must carry the tags given"
   }
 }
+
+run "policy_statements_follow_the_modules_own" {
+  command = plan
+
+  variables {
+    policy_statements = [{
+      Sid       = "CDNReadsBlobs"
+      Effect    = "Allow"
+      Principal = { Service = "cloudfront.amazonaws.com" }
+      Action    = "s3:GetObject"
+      Resource  = "arn:aws:s3:::example-0a1b2c3d-euw1/local/sha256/*"
+      Condition = { StringEquals = { "AWS:SourceArn" = "arn:aws:cloudfront::111122223333:distribution/EDFDVBD6EXAMPLE" } }
+    }]
+  }
+
+  assert {
+    condition = (
+      [for s in jsondecode(aws_s3_bucket_policy.blobs.policy).Statement : s.Sid] == ["TLSOnly", "AppObjects", "AppListing", "CDNReadsBlobs"] &&
+      jsondecode(aws_s3_bucket_policy.blobs.policy).Statement[3].Principal == { Service = "cloudfront.amazonaws.com" }
+    )
+    error_message = "a caller's statements must follow the module's own, which they add to and never replace"
+  }
+
+  assert {
+    condition     = output.policy == aws_s3_bucket_policy.blobs.policy
+    error_message = "the policy output must be the bucket policy as applied, for a caller to check what it composed"
+  }
+}

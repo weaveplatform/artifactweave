@@ -17,6 +17,10 @@
 #   operator (azure)  you, as additional_principals.operator: Azure has no
 #                     counterpart to impersonating the app identity, so an
 #                     artifactweave on your workstation runs as you
+#   CloudFront key    (aws/cdn) a key pair made once in the scenario's
+#                     .secrets/cloudfront/ by cloudfront-key.sh, kept across
+#                     applies and make clean: cloudfront_public_key, and
+#                     cloudfront_private_key_file for the local runner
 #   force_destroy     true: a lab instance holds test data only
 #
 # The lab's constants reach this file from lab.mk through the environment
@@ -34,6 +38,13 @@ lab_vars() {
     partition=$(cut -d: -f2 <<<"$caller")
     account=$(cut -d: -f5 <<<"$caller")
     export TF_VAR_app_role_arn="arn:${partition}:iam::${account}:role/artifactweave/artifactweave-conformance"
+    # Run from the scenario's directory (scenario.mk's recipes are).
+    if grep -qs '^variable "cloudfront_public_key"' variables.tf; then
+      "$(dirname "${BASH_SOURCE[0]}")/cloudfront-key.sh" .secrets/cloudfront || return 1
+      TF_VAR_cloudfront_public_key=$(cat .secrets/cloudfront/cloudfront-public-key.pem)
+      export TF_VAR_cloudfront_public_key
+      export TF_VAR_cloudfront_private_key_file="$PWD/.secrets/cloudfront/cloudfront-private-key.pem"
+    fi
     ;;
   gcp)
     : "${LAB_GCP_PROJECT:?lab-vars.sh needs LAB_GCP_PROJECT from lab.mk}"

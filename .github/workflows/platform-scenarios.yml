@@ -62,6 +62,7 @@ on:
       - 'deploy/ci/scenario-ci.sh'
       - 'deploy/ci/platform-tests.sh'
       - 'deploy/ci/prove-matrix.sh'
+      - 'deploy/ci/cloudfront-key.sh'
       # <cloud>/<scenario>/ and modules/<cloud>/<capability>/. The bootstraps
       # live in deploy/ci/terraform, outside this filter; platform-auth-check
       # proves their trust instead.
@@ -167,7 +168,10 @@ jobs:
     if: needs.plan.outputs.include != '[]'
     name: ${{ matrix.title }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    # A CDN proof applies and destroys three CloudFront distributions, each
+    # minutes to deploy and again to disable; a job cut off mid-destroy
+    # leaves its instance to the next reap.
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -196,6 +200,9 @@ jobs:
       PLATFORM_AZURE_STATE_ACCOUNT: ${{ vars.PLATFORM_AZURE_STATE_ACCOUNT }}
       PLATFORM_AWS_REGION: ${{ vars.PLATFORM_AWS_REGION }}
       PLATFORM_AWS_STATE_BUCKET: ${{ vars.PLATFORM_AWS_STATE_BUCKET }}
+      # The bootstrap's zone, where aws/cdn gives each instance a host and
+      # reap finds the records a lost instance left.
+      PLATFORM_AWS_DNS_ZONE_ID: ${{ vars.PLATFORM_AWS_DNS_ZONE_ID }}
       # A secret, so the account ID in the ARN stays out of the public logs.
       # Every scenario's ci-vars.sh makes the deployer the run acts as its app
       # principal (this role on AWS, PLATFORM_GCP_SERVICE_ACCOUNT on GCP, and
@@ -227,6 +234,10 @@ jobs:
 
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
+
+      # test/platform runs jf rt dl through a CDN scenario's edge.
+      - name: JFrog CLI (pinned)
+        uses: ./.github/actions/jfrog-cli
 
       # The same pinned download as the quality gate's terraform job.
       - name: Terraform (pinned)
@@ -291,6 +302,19 @@ jobs:
           INSTANCE: ${{ matrix.run_tag }}-t
         run: deploy/ci/scenario-ci.sh destroy
 
+      # The AWS session lasts an hour, the role's limit, and a proof of a
+      # CDN scenario can outlast it: CloudFront takes minutes to deploy and
+      # again to disable before each delete. A fresh session for the second
+      # half keeps every later step inside one.
+      - name: 'Prove: renew the AWS session'
+        if: matrix.action == 'prove' && (matrix.cloud == 'aws' || matrix.cloud == 'multicloud')
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PLATFORM_AWS_REGION }}
+          role-session-name: platform-scenarios-${{ github.run_id }}
+          mask-aws-account-id: true
+
       - name: 'Prove: apply, as one dispatch would'
         if: matrix.action == 'prove'
         env:
@@ -324,6 +348,16 @@ jobs:
       - name: 'Prove: nothing of this run remains'
         if: matrix.action == 'prove'
         run: deploy/ci/scenario-ci.sh check-clean
+
+      # A failure late in a long proof may come after the session ended.
+      - name: 'Prove: renew the AWS session to clean up'
+        if: failure() && matrix.action == 'prove' && (matrix.cloud == 'aws' || matrix.cloud == 'multicloud')
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.PLATFORM_AWS_REGION }}
+          role-session-name: platform-scenarios-${{ github.run_id }}
+          mask-aws-account-id: true
 
       # A failed proof step must not leave anything billable behind.
       - name: 'Prove: clean up after a failure'

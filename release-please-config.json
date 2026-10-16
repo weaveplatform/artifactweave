@@ -22,11 +22,19 @@
         },
         {
           "type": "generic",
+          "path": "deploy/platform/terraform/modules/aws/cdn/README.md"
+        },
+        {
+          "type": "generic",
           "path": "deploy/platform/terraform/modules/azure/storage/README.md"
         },
         {
           "type": "generic",
           "path": "deploy/platform/terraform/modules/gcp/storage/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/platform/terraform/aws/cdn/README.md"
         },
         {
           "type": "generic",

@@ -43,7 +43,7 @@ type check struct {
 // scenarioChecks holds the checks a scenario adds to the generic ones, keyed
 // by ARTIFACTWEAVE_SCENARIO. Scenarios register theirs from an init function
 // in their own file: the mirror's copies, drain and repair (mirror_test.go),
-// the CDN host and edge refusals (#132 to #134).
+// the cloud's own replica (replica_test.go), the real edge (cdn_test.go).
 var scenarioChecks = map[string][]check{}
 
 var errNotTCP = errors.New("listener address is not TCP")

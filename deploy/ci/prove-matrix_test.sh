@@ -28,6 +28,8 @@ scenario aws/single-bucket
 scenario aws/multi-region ../../modules/aws/storage
 scenario aws/geo-replicated ../../modules/aws/storage ../../modules/aws/replication
 scenario aws/cdn ../../modules/aws/storage-cdn
+# shellcheck disable=SC2016 # the line as a ci-vars.sh writes it
+echo 'export TF_VAR_cloudfront_public_key="$CLOUDFRONT_PUBLIC_KEY"' >"$t/aws/cdn/ci-vars.sh"
 scenario gcp/single-bucket
 scenario gcp/multi-region ../../modules/gcp/storage
 scenario azure/single-bucket
@@ -45,6 +47,9 @@ var mirrors = []string{"gcp/multi-region", "aws/multi-region", "multicloud/mirro
 EOF
 cat >"$fixture/test/platform/replica_test.go" <<'EOF'
 func init() { scenarioChecks["aws/geo-replicated"] = nil }
+EOF
+cat >"$fixture/test/platform/cdn_test.go" <<'EOF'
+func init() { scenarioChecks["aws/cdn"] = cdnChecks(cloudFrontExpired) }
 EOF
 cat >"$fixture/test/platform/ghost_test.go" <<'EOF'
 var gone = "aws/no-such-scenario"
@@ -70,6 +75,7 @@ check 'workflow change' "$singles" .github/workflows/platform-scenarios.yml
 check 'driver change' "$singles" $c/scenario-ci.sh
 check 'shared test step changes' "$singles" $c/platform-tests.sh
 check 'local runner' '' $c/local.sh
+check 'CloudFront key pair' 'aws cdn' $c/cloudfront-key.sh
 check 'this script changes' "$singles" $c/prove-matrix.sh
 check 'table test changes' '' $c/prove-matrix_test.sh
 check 'module .tf' $'aws geo-replicated\naws multi-region\nmulticloud mirror' $p/modules/aws/storage/main.tf
@@ -80,6 +86,7 @@ check 'module README' '' $p/modules/aws/storage/README.md
 check 'module tests' '' $p/modules/aws/storage/tests/security.tftest.hcl
 check 'mirror_test.go' $'aws multi-region\ngcp multi-region\nmulticloud mirror' test/platform/mirror_test.go
 check 'replica_test.go' 'aws geo-replicated' test/platform/replica_test.go
+check 'cdn_test.go' 'aws cdn' test/platform/cdn_test.go
 check 'Go file naming no scenario' "$singles" test/platform/harness_test.go
 check 'Go file naming only a missing scenario' "$singles" test/platform/ghost_test.go
 check 'deleted Go file' "$singles" test/platform/deleted_test.go

@@ -1,0 +1,24 @@
+name: JFrog CLI (pinned)
+description: >-
+  Install the pinned jf binary, checked against its published SHA-256, and
+  export its path as ARTIFACTWEAVE_JF_BIN.
+
+# One pin for every job that runs jf: the acceptance features and the
+# reference deployments' platform tests. A binary rather than
+# jfrog/setup-jfrog-cli, because Dependabot only maintains pins for actions
+# already in use, and the release metadata at releases.jfrog.io publishes
+# the sha256 checked here.
+runs:
+  using: composite
+  steps:
+    - name: Download jf
+      shell: bash
+      env:
+        JF_VERSION: '2.126.0'
+        JF_SHA256: 'fd2725b3a501df99b2c4fa577044d1c8efb7d8a23d6c40b1fe19231eed51929a'
+      run: |
+        curl -fsSL -o "$RUNNER_TEMP/jf" \
+          "https://releases.jfrog.io/artifactory/jfrog-cli/v2-jf/${JF_VERSION}/jfrog-cli-linux-amd64/jf"
+        echo "${JF_SHA256}  $RUNNER_TEMP/jf" | sha256sum -c -
+        chmod +x "$RUNNER_TEMP/jf"
+        echo "ARTIFACTWEAVE_JF_BIN=$RUNNER_TEMP/jf" >> "$GITHUB_ENV"
