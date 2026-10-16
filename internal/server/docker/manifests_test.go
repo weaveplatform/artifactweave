@@ -218,9 +218,6 @@ func TestManifestReadErrors(t *testing.T) {
 		expect(t, w.do(http.MethodGet, base+"v1", "", map[string]string{"Accept": accept}),
 			http.StatusOK, "")
 	}
-	// Delete arrives with the tag and catalog work.
-	expect(t, w.do(http.MethodDelete, base+"v1", "", nil),
-		http.StatusMethodNotAllowed, CodeUnsupported)
 }
 
 // A manifest deployed through the REST API has no type property; its own

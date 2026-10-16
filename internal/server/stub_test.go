@@ -191,6 +191,9 @@ var implemented = map[string]bool{
 	"GET /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}":    true,
 	"PUT /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}":    true,
 	"DELETE /access/api/v1/oidc/{provider_name}/identity_mappings/{mapping_name}": true,
+
+	// The multi-architecture tag delete (#226).
+	"DELETE /artifactory/api/docker/{repoKey}/v2/delete": true,
 }
 
 // TestUnimplementedOperationsAnswer501 proves the generated stubs reach the

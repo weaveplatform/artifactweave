@@ -26,8 +26,9 @@ const (
 	subjectHeader = "OCI-Subject"
 )
 
-// registerManifests registers manifest pushes and pulls (decision 0031)
-// when the registry has a blob store, which holds the manifests' bytes.
+// registerManifests registers manifest pushes, pulls and deletes (decision
+// 0031) when the registry has a blob store, which holds the manifests'
+// bytes.
 func (g *Registry) registerManifests() {
 	if g.uploads == nil {
 		return
@@ -35,6 +36,7 @@ func (g *Registry) registerManifests() {
 	g.handle(KindManifest, http.MethodHead, g.getManifest)
 	g.handle(KindManifest, http.MethodGet, g.getManifest)
 	g.handle(KindManifest, http.MethodPut, g.putManifest)
+	g.handle(KindManifest, http.MethodDelete, g.deleteManifest)
 }
 
 // getManifest serves HEAD and GET of a manifest by tag or by digest, with

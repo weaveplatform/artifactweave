@@ -136,3 +136,16 @@ func GrantsCatalog(r *http.Request) bool {
 		return g.Type == scopeRegistry && g.Name == "catalog" && len(g.Actions) > 0
 	})
 }
+
+// readable reports whether the caller may read path in c, for listings
+// that leave out what the caller cannot read rather than refuse; a request
+// without a principal, as Require allows it, reads everything.
+func readable(r *http.Request, c repo.Config, path string) bool {
+	p, ok := auth.FromContext(r.Context())
+	if !ok || p.Access() == nil {
+		return true
+	}
+	return p.Access().Allows(types.ResourceArtifact, authz.Repo{
+		Key: c.Key, Class: string(c.Class),
+	}, path, types.ActionRead)
+}

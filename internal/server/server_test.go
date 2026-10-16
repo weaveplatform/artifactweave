@@ -304,19 +304,21 @@ func TestStubsAndEnvelopes(t *testing.T) {
 			404,
 			`{"errors":[{"code":"NOT_FOUND","message":"not found: GET /access/api/v9/nothing"}]}`,
 		},
+		// A path that is no registry operation; this router has no store
+		// to resolve a repository in.
 		{
 			"oci 404",
 			"GET",
-			"/v2/nope/manifests/latest",
+			"/v2/nope/nothing",
 			404,
-			`{"errors":[{"code":"NAME_UNKNOWN","message":"repository name not known to registry: nope"}]}`,
+			`{"errors":[{"code":"UNSUPPORTED","message":"not a registry operation: GET /v2/nope/nothing"}]}`,
 		},
 		{
 			"docker api 404",
 			"GET",
-			"/artifactory/api/docker/nope/v2/img/manifests/latest",
+			"/artifactory/api/docker/nope/v2/img/nothing",
 			404,
-			`{"errors":[{"code":"NAME_UNKNOWN","message":"repository name not known to registry: nope"}]}`,
+			`{"errors":[{"code":"UNSUPPORTED","message":"not a registry operation: GET /artifactory/api/docker/nope/v2/img/nothing"}]}`,
 		},
 		{
 			"npm 404",
