@@ -76,6 +76,9 @@ type world struct {
 	// dockerConfig is the scenario's docker configuration, which docker
 	// login and crane write their credentials to.
 	dockerConfig string
+	// goProxy is the GOPROXY the go command uses in this scenario, and
+	// tlsCA the certificate of the scenario's TLS front, if it has one.
+	goProxy, tlsCA string
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -119,6 +122,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerCDN(sc)
 	w.registerCache(sc)
 	w.registerDocker(sc)
+	w.registerClients(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
@@ -460,19 +464,29 @@ func (w *world) serverNeverAnswered(status int, method, path string) error {
 // writeFile writes a scenario file, such as a jf repository template, under
 // the scenario's directory.
 func (w *world) writeFile(name string, content *godog.DocString) error {
-	if w.dir == "" {
-		dir, err := os.MkdirTemp("", "artifactweave-files-")
-		if err != nil {
-			return err
-		}
-		w.t.Cleanup(func() { _ = os.RemoveAll(dir) })
-		w.dir = dir
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
 	}
-	full := filepath.Join(w.dir, name)
+	full := filepath.Join(dir, name)
 	if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
 		return err
 	}
 	return os.WriteFile(full, []byte(content.Content), 0o600)
+}
+
+// filesDir is the scenario's file directory, created on first use and
+// removed after the test.
+func (w *world) filesDir() (string, error) {
+	if w.dir == "" {
+		dir, err := os.MkdirTemp("", "artifactweave-files-")
+		if err != nil {
+			return "", err
+		}
+		w.t.Cleanup(func() { _ = os.RemoveAll(dir) })
+		w.dir = dir
+	}
+	return w.dir, nil
 }
 
 // writeZip writes a zip archive with one entry, for explode and archive
@@ -682,6 +696,8 @@ func (w *world) expand(s string) string {
 		"{host}", strings.TrimPrefix(w.url, "http://"),
 		"{password}", testAdminPassword,
 		"{dir}", w.dir,
+		// npm's _auth for the seeded admin.
+		"{basicauth}", base64.StdEncoding.EncodeToString([]byte("admin:" + testAdminPassword)),
 	}
 	for k, v := range w.vars {
 		pairs = append(pairs, "{"+k+"}", v)

@@ -54,3 +54,21 @@ updates:
     commit-message:
       prefix: "chore"
       include: "scope"
+
+  # The npm and Maven client images the acceptance features run, pinned by
+  # digest. Majors are held: the Node LTS line and Maven 3.9 are the clients
+  # decision 0015 names, so moving either is a deliberate change.
+  - package-ecosystem: "docker"
+    directory: "/test/acceptance/clients"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      acceptance-clients:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "chore"
+      include: "scope"
