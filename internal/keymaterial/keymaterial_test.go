@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"regexp"
 	"strings"
@@ -114,6 +115,38 @@ func TestCheckRSA(t *testing.T) {
 		if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want an invalid error mentioning %q", name, err, c.want)
 		}
+	}
+}
+
+// Legacy PEM encryption checks only the CBC padding, so about 1 wrong
+// passphrase in 256 decrypts without error into DER that does not parse.
+// TestCheckRSA's random IV hit that case once in a few hundred runs; here a
+// fixed IV and a search over passphrases hit it on every run.
+func TestCheckRSAWrongPassphraseWithValidPadding(t *testing.T) {
+	k := rsaKey(t)
+	iv := bytes.NewReader(bytes.Repeat([]byte{7}, 16))
+	//nolint:staticcheck // SA1019: the legacy format the checker must open
+	block, err := x509.EncryptPEMBlock(iv, "RSA PRIVATE KEY",
+		x509.MarshalPKCS1PrivateKey(k), []byte("s3cret"), x509.PEMCipherAES256)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass := ""
+	for i := range 1 << 16 {
+		candidate := fmt.Sprintf("wrong-%d", i)
+		//nolint:staticcheck // SA1019: as above
+		if _, err := x509.DecryptPEMBlock(block, []byte(candidate)); err == nil {
+			pass = candidate
+			break
+		}
+	}
+	if pass == "" {
+		t.Fatal("no wrong passphrase in 65536 passes the padding check")
+	}
+	err = keymaterial.CheckPair(keymaterial.RSA, string(pem.EncodeToMemory(block)),
+		pkixPEM(t, &k.PublicKey), pass)
+	if !errors.Is(err, keymaterial.ErrInvalid) || !strings.Contains(err.Error(), "passphrase") {
+		t.Errorf("%q: %v, want an invalid error mentioning \"passphrase\"", pass, err)
 	}
 }
 
