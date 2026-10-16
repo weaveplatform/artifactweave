@@ -25,24 +25,41 @@ applied through the JFrog Terraform providers.
 
 `multicloud/mirror`, one mirror with a member on each cloud, is planned in #135.
 
-The three `single-bucket` scenarios are also the acceptance environments the real-cloud blob
-conformance tests run against. An operator's `make platform-apply` grants the bootstrap's
-conformance identity; a CI run applies them as the deployer instead (their `ci-vars.sh`).
-Every scenario needs its cloud's bootstrap applied first ([`deploy/ci`](../ci/README.md)).
+Every scenario follows the scenario contract v2 (decision 0030): a short composition of the
+modules below, with every lab value an input, and a README written from
+[`SCENARIO-TEMPLATE.md`](SCENARIO-TEMPLATE.md) whose configuration example a test keeps equal
+to what the scenario renders. Each needs its cloud's bootstrap applied first
+([`deploy/ci`](../ci/README.md)). The three `single-bucket` scenarios are also the acceptance
+environments the real-cloud blob conformance tests run against. The `geo-replicated` READMEs
+cover how the cloud's replica relates to artifactweave and how to fail over.
 
-The `multi-region` scenarios follow the scenario contract v2 (decision 0030): they compose
-the storage modules in [`terraform/modules`](terraform/modules), one private bucket or storage
-account per call with its security invariants tested once in the module's own `tests/`; every
-lab value is an input; and each README, written from
-[`SCENARIO-TEMPLATE.md`](SCENARIO-TEMPLATE.md), shows the configuration its example inputs
-render, which a test keeps true. To use one, copy its directory with `terraform/modules/<cloud>/`
-and its lock file, or source the modules from this repository at a release; the README's
-"Getting the code" has the line. The `single-bucket` and `geo-replicated` scenarios move onto
-the same contract with epic #189 (#184, #185, #186).
+### Modules
 
-Every scenario runs locally the same way, from its own `artifactweave_config` output (below).
-The `geo-replicated` READMEs cover how the cloud's replica relates to artifactweave and how to
-fail over.
+Each capability is written once, as a module in [`terraform/modules`](terraform/modules), and
+its invariants are tested once in the module's own `tests/`. A module holds no provider block
+and calls no other module; its README, written from [`MODULE-TEMPLATE.md`](MODULE-TEMPLATE.md),
+lists each invariant beside the test run that asserts it.
+
+| Module | What it creates | Used by |
+|---|---|---|
+| [`aws/storage`](terraform/modules/aws/storage/README.md) | one private S3 bucket and its bucket policy | `aws/single-bucket`, `aws/multi-region`, `aws/geo-replicated` |
+| [`aws/replication`](terraform/modules/aws/replication/README.md) | S3 replication between two buckets, and the role S3 assumes for it | `aws/geo-replicated` |
+| [`gcp/storage`](terraform/modules/gcp/storage/README.md) | one private Cloud Storage bucket, single, dual or multi-region | `gcp/single-bucket`, `gcp/multi-region`, `gcp/geo-replicated` |
+| [`azure/storage`](terraform/modules/azure/storage/README.md) | one storage account and private container, without Shared Key | `azure/single-bucket`, `azure/multi-region`, `azure/geo-replicated` |
+
+### Using a scenario
+
+Either copy the scenario's directory together with `terraform/modules/<cloud>/` and its
+`.terraform.lock.hcl`, keeping the `../../modules` layout, or keep the scenario's `.tf` files
+and point each `module` block at this repository at a release:
+
+```hcl
+source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/storage?ref=v0.0.0" # x-release-please-version
+```
+
+Each scenario README's "Getting the code" names the modules it needs. A module's path is
+public from the first release, and its inputs only grow. Every scenario runs locally the same
+way, from its own `artifactweave_config` output (below).
 
 ## Running a scenario
 

@@ -1,7 +1,0 @@
-# Roots not yet ported to the reference-deployment contract (decision 0030).
-# deploy/ci/lint-contract.sh reports a listed root's findings as warnings
-# instead of failures. The list only shrinks: port a root, then delete its
-# line here in the same change, and the lint holds it to the contract from
-# then on (docs/testing/ci.md, The reference-deployment contract).
-
-# Scenarios.
