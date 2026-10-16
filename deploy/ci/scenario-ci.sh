@@ -168,6 +168,13 @@ use_instance() { # scenario instance expires-at
 #   PLATFORM_AWS_DNS_ZONE_NAME
 #       the name of the bootstrap's zone, PLATFORM_AWS_DNS_ZONE_ID, for a
 #       scenario that gives its instance a host there
+#   CLOUD_CDN_KEY_FILE
+#       a fresh Cloud CDN signed URL key in <secrets> (cloud-cdn-key.sh),
+#       which apply adds to the backend bucket with gcloud, so it never
+#       reaches a state
+#   PLATFORM_GCP_DNS_NAME
+#       the DNS name of the bootstrap's zone, PLATFORM_GCP_DNS_ZONE, without
+#       its final dot
 scenario_env() { # scenario secrets-dir
   local vars=$here/$CLOUD/$1/ci-vars.sh
   if grep -q CLOUDFRONT_ "$vars"; then
@@ -180,6 +187,37 @@ scenario_env() { # scenario secrets-dir
     PLATFORM_AWS_DNS_ZONE_NAME=$(aws_zone_name)
     export PLATFORM_AWS_DNS_ZONE_NAME
   fi
+  if grep -q CLOUD_CDN_ "$vars"; then
+    "$root/deploy/ci/cloud-cdn-key.sh" make "$2"
+    CLOUD_CDN_KEY_FILE=$2/cloud-cdn-key
+    export CLOUD_CDN_KEY_FILE
+  fi
+  if grep -q PLATFORM_GCP_DNS_NAME "$vars"; then
+    PLATFORM_GCP_DNS_NAME=$(gcp_zone_name)
+    export PLATFORM_GCP_DNS_NAME
+  fi
+}
+
+# gcp_zone_name prints the DNS name of the bootstrap's zone without its final
+# dot. The deployer administers that zone alone, so it can read it but not
+# list the project's zones.
+gcp_zone_name() {
+  : "${PLATFORM_GCP_DNS_ZONE:?PLATFORM_GCP_DNS_ZONE is required}"
+  local name
+  name=$(gcloud dns managed-zones describe "$PLATFORM_GCP_DNS_ZONE" --project "$PLATFORM_GCP_PROJECT" \
+    --format='value(dnsName)')
+  echo "${name%.}"
+}
+
+# add_cloud_cdn_key adds the instance's signed URL key to the backend bucket
+# the first apply made, then applies again with signed_url_key_added, which
+# grants Cloud CDN's fill account the blobs: Google creates that account
+# with a project's first key, so the grant cannot come before it.
+add_cloud_cdn_key() {
+  "$root/deploy/ci/cloud-cdn-key.sh" add "$CLOUD_CDN_KEY_FILE" "$PLATFORM_GCP_PROJECT" \
+    "$(terraform -chdir="$dir" output -raw backend_bucket)" \
+    "$(terraform -chdir="$dir" output -raw signed_url_key_name)"
+  TF_VAR_signed_url_key_added=true terraform -chdir="$dir" apply -input=false -no-color -auto-approve
 }
 
 # aws_zone_name prints the bootstrap zone's name without its final dot.
@@ -217,6 +255,7 @@ apply() {
   local expires=$((now + ttl * 60))
   use_instance "$SCENARIO" "$INSTANCE" "$expires"
   terraform -chdir="$dir" apply -input=false -no-color -auto-approve
+  if grep -q CLOUD_CDN_ "$here/$CLOUD/$SCENARIO/ci-vars.sh"; then add_cloud_cdn_key; fi
   summary "Applied \`$CLOUD/$SCENARIO\` instance \`$INSTANCE\`, expires-at $expires ($(utc "$expires"))."
 }
 
@@ -502,6 +541,120 @@ reap_aws_cdn() {
   done < <(aws_cdn_records)
 }
 
+# The CDN scenario (gcp/cdn) adds Certificate Manager pieces and records to
+# the load balancer's. The certificate, its map, the map's entry and the DNS
+# authorisation take labels, as buckets do, and go once their expires-at has
+# passed; the records are the instance's host, cdn-<instance>, and its
+# authorisation record, _acme-challenge.cdn-<instance>, in the bootstrap's
+# zone. The signed URL keys go with the backend bucket that holds them.
+
+# gcp_cdn_labelled prints "<kind>\t<name>\t<expires-at>\t<instance>" for every
+# Certificate Manager map entry, map, certificate and DNS authorisation a
+# scenario run labelled, in the order they can be deleted; an entry's name
+# is <map>/<entry>.
+gcp_cdn_labelled() {
+  local map
+  while read -r map; do
+    [ -n "$map" ] || continue
+    gcloud certificate-manager maps entries list --map "$map" --project "$PLATFORM_GCP_PROJECT" --format=json |
+      jq -r --arg m "$map" '.[] | select(.labels["artifactweave-scenario"] != null) |
+        ["entry", ($m + "/" + (.name | split("/") | last)), (.labels["expires-at"] // ""), (.labels.instance // "")] | @tsv'
+  done < <(gcloud certificate-manager maps list --project "$PLATFORM_GCP_PROJECT" --format=json |
+    jq -r '.[] | select(.labels["artifactweave-scenario"] != null) | .name | split("/") | last')
+  local kind
+  for kind in maps certificates dns-authorizations; do
+    gcloud certificate-manager "$kind" list --project "$PLATFORM_GCP_PROJECT" --format=json |
+      jq -r --arg k "$kind" '.[] | select(.labels["artifactweave-scenario"] != null) |
+        [($k | rtrimstr("s")), (.name | split("/") | last), (.labels["expires-at"] // ""), (.labels.instance // "")] | @tsv'
+  done
+}
+
+# gcp_cdn_records prints "<instance>\t<name>\t<type>" for every record of an
+# instance's host, cdn-<instance>, and its authorisation record,
+# _acme-challenge.cdn-<instance>, in the bootstrap's zone.
+gcp_cdn_records() {
+  [ -n "${PLATFORM_GCP_DNS_ZONE:-}" ] || return 0
+  gcloud dns record-sets list --zone "$PLATFORM_GCP_DNS_ZONE" --project "$PLATFORM_GCP_PROJECT" --format=json |
+    jq -r '.[] | (.name | sub("^_acme-challenge\\."; "")) as $host | select($host | startswith("cdn-")) |
+      [($host | ltrimstr("cdn-") | split(".")[0]), .name, .type] | @tsv'
+}
+
+gcp_delete_cdn_piece() { # kind name
+  case $1 in
+  entry) gcloud certificate-manager maps entries delete "${2#*/}" --map "${2%%/*}" --project "$PLATFORM_GCP_PROJECT" --quiet ;;
+  map) gcloud certificate-manager maps delete "$2" --project "$PLATFORM_GCP_PROJECT" --quiet ;;
+  certificate) gcloud certificate-manager certificates delete "$2" --project "$PLATFORM_GCP_PROJECT" --quiet ;;
+  dns-authorization) gcloud certificate-manager dns-authorizations delete "$2" --project "$PLATFORM_GCP_PROJECT" --quiet ;;
+  esac
+}
+
+# reap_gcp_cdn deletes the Certificate Manager pieces and records of
+# instances that have no state, after the load balancer's pieces, which use
+# them. An instance's labelled pieces go once its expires-at has passed. An
+# instance with a labelled piece not yet expired, or a load-balancer piece
+# too young to reap (gcp_keep), keeps all of them, its records included,
+# which record no time of their own. It runs in sweep's gcp branch, counting
+# failures in reap's failed and reading its live, gcp_keep and now.
+reap_gcp_cdn() {
+  local keep=" " kind name exp inst type
+  while IFS=$'\t' read -r kind name exp inst; do
+    [ -n "$name" ] || continue
+    in_scope "$inst" || continue
+    # A load-balancer piece too young to reap still uses the map.
+    if [[ $live$keep$gcp_keep == *" $inst "* ]]; then continue; fi
+    if [ -z "$exp" ] || [ "$exp" -gt "$now" ]; then
+      keep+="$inst "
+      continue
+    fi
+    if gcp_delete_cdn_piece "$kind" "$name"; then
+      summary "Deleted orphaned Certificate Manager $kind \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
+    else
+      failed=$((failed + 1))
+      keep+="$inst "
+    fi
+  done < <(gcp_cdn_labelled)
+  while IFS=$'\t' read -r inst name type; do
+    [ -n "$inst" ] || continue
+    in_scope "$inst" || continue
+    if [[ $live$keep$gcp_keep == *" $inst "* ]]; then continue; fi
+    if gcloud dns record-sets delete "$name" --type "$type" --zone "$PLATFORM_GCP_DNS_ZONE" \
+      --project "$PLATFORM_GCP_PROJECT" --quiet; then
+      summary "Deleted orphaned record \`$name\` ($type, instance \`$inst\`)."
+    else
+      failed=$((failed + 1))
+    fi
+  done < <(gcp_cdn_records)
+}
+
+# gcp_cdn_leftovers reports the load balancer's pieces, Certificate Manager
+# pieces and records of the run's instances, setting check_clean's left.
+gcp_cdn_leftovers() {
+  local kind scope name exp inst type
+  for kind in forwarding-rules target-https-proxies target-http-proxies url-maps backend-buckets ssl-certificates ssl-policies addresses; do
+    scope=--global
+    [ "$kind" = backend-buckets ] && scope=
+    while read -r name; do
+      [ -n "$name" ] || continue
+      summary "**Left behind:** $kind \`$name\`."
+      left=1
+    done < <(
+      # shellcheck disable=SC2086 # scope is one flag or nothing
+      gcloud compute "$kind" list $scope --project "$PLATFORM_GCP_PROJECT" \
+        --filter="name~^$NAME_PREFIX$RUN_TAG-" --format='value(name)' 2>/dev/null || true
+    )
+  done
+  while IFS=$'\t' read -r kind name exp inst; do
+    [[ $inst == "$RUN_TAG"-* ]] || continue
+    summary "**Left behind:** Certificate Manager $kind \`$name\`."
+    left=1
+  done < <(gcp_cdn_labelled)
+  while IFS=$'\t' read -r inst name type; do
+    [[ $inst == "$RUN_TAG"-* ]] || continue
+    summary "**Left behind:** record \`$name\` ($type)."
+    left=1
+  done < <(gcp_cdn_records)
+}
+
 # in_scope is true when an instance belongs to this reap: every instance,
 # unless REAP_PREFIX narrows it to one run's (a pull request proof reaps only
 # its own, so parallel proofs never race to destroy the same state).
@@ -533,7 +686,7 @@ sweep() { # cloud
     # and its names lack GCP's prefix.
     [ "$CLOUD" = gcp ] || return 0
     local kind scope
-    for kind in forwarding-rules target-https-proxies target-http-proxies url-maps backend-buckets ssl-certificates addresses; do
+    for kind in forwarding-rules target-https-proxies target-http-proxies url-maps backend-buckets ssl-certificates ssl-policies addresses; do
       scope=--global
       [ "$kind" = backend-buckets ] && scope=
       while IFS=$'\t' read -r name created; do
@@ -543,7 +696,10 @@ sweep() { # cloud
         local owned=
         for l in $live; do [[ $inst == "$l"* ]] && owned=1; done
         [ -z "$owned" ] || continue
-        [ $((now - $(date -d "$created" +%s))) -ge "$orphan_age" ] || continue
+        if [ $((now - $(date -d "$created" +%s))) -lt "$orphan_age" ]; then
+          gcp_keep+="${inst%-*} "
+          continue
+        fi
         # shellcheck disable=SC2086 # scope is one flag or nothing
         if gcloud compute "$kind" delete $scope --project "$PLATFORM_GCP_PROJECT" --quiet "$name"; then
           summary "Deleted orphaned $kind \`$name\`."
@@ -556,6 +712,7 @@ sweep() { # cloud
           --filter="name~^$NAME_PREFIX" --format='value(name,creationTimestamp)' 2>/dev/null || true
       )
     done
+    reap_gcp_cdn
     ;;
   azure)
     local id
@@ -597,7 +754,7 @@ sweep() { # cloud
 }
 
 reap() {
-  local failed=0 reaped=0 live=" " scenario instance json expires resources
+  local failed=0 reaped=0 live=" " gcp_keep=" " scenario instance json expires resources
   while read -r scenario instance; do
     [ -n "$scenario" ] || continue
     in_scope "$instance" || continue
@@ -664,6 +821,10 @@ leftovers() { # cloud
       left=1
     done < <(gcloud storage buckets list --project "$PLATFORM_GCP_PROJECT" --format=json |
       jq -r --arg tag "$RUN_TAG-" '.[] | select((.labels.instance // "") | startswith($tag)) | .name')
+    # gcp/cdn's load-balancer, Certificate Manager and record pieces, which
+    # no other scenario makes.
+    [ "$CLOUD" = gcp ] || return 0
+    gcp_cdn_leftovers
     ;;
   azure)
     while read -r line; do

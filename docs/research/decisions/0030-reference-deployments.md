@@ -51,6 +51,8 @@ deploy/
     local.sh                      the local runner for any applied scenario
     cloudfront-key.sh             the CloudFront key pair a CDN scenario signs with, made
                                   outside Terraform
+    cloud-cdn-key.sh              the Cloud CDN signed URL key gcp/cdn signs with, made
+                                  outside Terraform and added with gcloud
     github-environments.sh        creates the cloud-conformance and cloud-platform environments
     check-account.sh              refuses an AWS run outside the lab account
     check-subscription.sh         refuses an Azure run outside the lab subscription
@@ -109,6 +111,7 @@ test/terraform/run.sh             the app-layer driver: builds a -cover server, 
 | `aws/replication` | S3 cross-region replication from one bucket to another, and its IAM role | `name`, `source_bucket` and `destination_bucket` (`aws/storage` outputs; `source` is reserved in a `module` block), `prefix`, `replicate_deletes` (false), `replication_time_control` (false), `storage_class` ("STANDARD"), `permissions_boundary_arn` (null), `iam_role_path` (null), `tags` ({}) |
 | `gcp/storage` | one private GCS bucket and its grants | `name`, `location`, `data_locations` ([], zero or two), `rpo` (null), `principals` (map of service-account emails), `store_prefix` (`""`), `expiring_prefixes` ({}), `force_destroy` (false), `labels` ({}) |
 | `aws/cdn` | a CloudFront distribution in front of one `aws/storage` bucket: origin access control, the cache policy, the key group and its public keys, and with `domain_name` an ACM certificate in `us-east-1` and alias records | `name`, `origin_bucket` (the storage module's `bucket`, `arn` and `region`), `public_keys` (map of PEM public keys, one to five), `store_prefix` (`""`), `domain_name` (null), `zone_id` (null, set with `domain_name`), `price_class` ("PriceClass_All"), `tags` ({}) |
+| `gcp/cdn` | Cloud CDN in front of one `gcp/storage` bucket: a backend bucket, URL map, SSL policy (TLS 1.2), HTTPS proxy, global address and HTTPS forwarding rule (`EXTERNAL_MANAGED`), a Certificate Manager certificate for `domain_name` with its DNS authorisation and map, with `dns_zone` the authorisation and A records, and with `grant_cdn_fill` Storage Object Viewer on the committed blobs for Cloud CDN's fill account | `name`, `origin_bucket` (the storage module's `bucket`), `domain_name`, `store_prefix` (`""`), `dns_zone` (null), `grant_cdn_fill` (false), `signed_url_cache_max_age_sec` (86400), `labels` ({}) |
 | `azure/storage` | one storage account, its container, lifecycle policy and grants | `account_name`, `resource_group_name`, `location`, `replication_type` ("LRS"), `container` ("artifactweave"), `store_prefix` (`""`), `principals` (map of `{principal_id, principal_type}`, type optional), `expiring_prefixes` ({}), `tags` ({}) |
 
 Every storage module enforces, and tests, the same baseline in its cloud's terms: no public
@@ -133,7 +136,9 @@ the origin access control's bucket-policy statement and the scenario passes it t
 `aws/storage`'s `policy_statements` (S3 allows one policy per bucket), handing the CDN module
 the storage module's outputs one by one, since a reference to the whole storage module would
 wait for the policy that waits for the statement; on GCP the CDN module grants
-`cloud-cdn-fill` read access itself, because IAM members are not authoritative; on Azure
+`cloud-cdn-fill` read access itself, because IAM members are not authoritative, once
+`grant_cdn_fill` says the signed URL key has been added, since Google creates that account
+with a project's first key and the grant fails before it; on Azure
 storage gains `public_network_access_enabled` and the CDN module owns the Private Link
 origin. The multicloud mirror composes all three storage modules, one call each; its inputs
 are under "Multicloud inputs" below.
@@ -222,10 +227,12 @@ placements and the three app identities, and refuses a bare `region` or `locatio
 | `replication_type`, `secondary_location`, `secondary_storage_host` | n/a | n/a | Azure | n/a | `outputs.tf` |
 | `origin_host`: the store's own host, where `X-JFrog-Download-Redirect-To: S3` sends a `downloadRedirect` repository's download | n/a | n/a | n/a | yes | `outputs.tf` |
 | `distribution_id`, `distribution_domain` | n/a | n/a | n/a | AWS | `outputs.tf` |
+| `backend_bucket`, `ip_address`, `dns_records` | n/a | n/a | n/a | GCP | `outputs.tf` |
 | `resource_group` | Azure | Azure | Azure | Azure | `outputs.tf` |
 | `expires_at`: the instance's `expires-at` label, which reap reads from state | yes | yes | yes | yes | `harness.tf` |
 | `mirror_members`: each member's store and host, which `test/platform` reads | n/a | yes, and `multicloud/mirror` | n/a | n/a | `harness.tf` |
 | `service_account`: the app service account, which `make conformance` passes to the real-GCS tests as their signing identity | GCP | n/a | n/a | n/a | `harness.tf` |
+| `signed_url_key_name`: the Cloud CDN key's name, which `scenario-ci.sh` and `lab-vars.sh` hand to `cloud-cdn-key.sh` | n/a | n/a | n/a | GCP | `harness.tf` |
 
 `artifactweave_config` renders the sections of `artifactweave.yaml` the scenario needs:
 `blob` for every scenario, with its store's `cdn` block for the CDN scenarios. Outputs that only echo an
@@ -391,6 +398,13 @@ identity would.
 - The Cloud CDN key is added with `gcloud` after apply, because
   `google_compute_backend_bucket_signed_url_key` stores its `key_value` in state as plain
   text and has no write-only variant. If the provider gains one, the scenario switches to it.
+  `deploy/ci/cloud-cdn-key.sh` makes the key (16 random bytes, base64url) and adds it unless
+  the backend bucket holds it already. `gcp/cdn` therefore applies in two passes: the first
+  creates the backend bucket, the key is added, and the second, with `signed_url_key_added`,
+  grants Cloud CDN's fill account, which Google creates with the project's first key.
+  `scenario-ci.sh`'s `apply` does all three for an instance whose `ci-vars.sh` names
+  `CLOUD_CDN_KEY_FILE`; an operator runs `make apply`, `make signed-url-key` and `make apply`,
+  and `lab-vars.sh` sets `signed_url_key_added` once the applied backend bucket holds the key.
 
 ### DNS
 
@@ -476,6 +490,14 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   host, `cdn-<instance>`, in the bootstrap's zone. An instance with a tagged piece not yet
   expired, or an untagged one younger than two hours, keeps every piece. Only an AWS reap
   deletes these: a multicloud reap shares the name prefix but cannot see `aws/cdn`'s states.
+- For `gcp/cdn`, the load balancer's pieces (forwarding rule, proxy, URL map, backend bucket
+  with its signed URL keys, SSL policy, address) carry the `NAME_PREFIX` and are reaped by
+  name after two hours, as before. After them reap deletes the Certificate Manager map entries,
+  maps, certificates and DNS authorisations, found by their labels, then the instance's records
+  in the bootstrap's zone (`PLATFORM_GCP_DNS_ZONE`), `cdn-<instance>` and its
+  `_acme-challenge` record. An instance with a labelled piece not yet expired, or a load
+  balancer piece younger than two hours, keeps every piece. Only a GCP reap deletes these, and
+  `check-clean` looks for all of them.
 - A dispatch finds only workflows on the default branch, so a pull request runs proofs
   instead, behind the same approval. `prove-matrix.sh` chooses them from the changed paths:
 
@@ -486,6 +508,7 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   | any other `test/platform` file | every cloud's `single-bucket` |
   | the driver, `prove-matrix.sh` or the workflow | every cloud's `single-bucket` |
   | `cloudfront-key.sh` | every scenario whose `ci-vars.sh` takes its key pair |
+  | `cloud-cdn-key.sh` | every scenario whose `ci-vars.sh` takes its key |
   | a scenario's `*.tf`, lock file or `ci-vars.sh` | that scenario |
   | only a README, `Makefile` or `tests/` | nothing |
   | a pull request labelled `prove-all` | every scenario |

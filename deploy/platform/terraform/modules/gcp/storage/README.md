@@ -4,7 +4,9 @@ One private Cloud Storage bucket, with object rights on it for the service accou
 `principals`. [`gcp/single-bucket`](../../../gcp/single-bucket/README.md) calls it once,
 [`gcp/multi-region`](../../../gcp/multi-region/README.md) once per location,
 [`gcp/geo-replicated`](../../../gcp/geo-replicated/README.md) once in a dual or multi-region
-location, with `data_locations` and `rpo` choosing its regions and replication, and
+location, with `data_locations` and `rpo` choosing its regions and replication,
+[`gcp/cdn`](../../../gcp/cdn/README.md) once, behind [`modules/gcp/cdn`](../cdn/README.md), which
+grants Cloud CDN's fill account read access itself, and
 [`multicloud/mirror`](../../../multicloud/mirror/README.md) once, for its GCP mirror member.
 The module holds no provider block, so the caller's `google` provider and project apply
 (decision [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).

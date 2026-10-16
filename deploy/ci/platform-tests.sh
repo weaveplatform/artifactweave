@@ -9,7 +9,9 @@
 #
 # It reads the scenario's outputs, builds artifactweave, and runs the suite,
 # which starts that binary itself with the rendered blob configuration.
-# Credentials come from the caller's environment.
+# Credentials come from the caller's environment. The timeout leaves room for
+# gcp/cdn's wait for its certificate and load balancer, up to 45 minutes,
+# before the checks themselves.
 set -euo pipefail
 
 dir=${1:?usage: platform-tests.sh <terraform-dir> <cloud>/<scenario> <out-dir>}
@@ -30,4 +32,4 @@ cd "$root"
 ARTIFACTWEAVE_SCENARIO="$name" ARTIFACTWEAVE_BIN="$out/artifactweave" \
   ARTIFACTWEAVE_SCENARIO_CONFIG="$out/blob.yaml" ARTIFACTWEAVE_SCENARIO_STORAGE_HOST="$host" \
   ARTIFACTWEAVE_SCENARIO_OUTPUTS="$out/outputs.json" \
-  go test -count=1 -v -timeout 40m ./test/platform/...
+  go test -count=1 -v -timeout 75m ./test/platform/...

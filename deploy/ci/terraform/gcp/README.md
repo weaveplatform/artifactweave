@@ -44,6 +44,10 @@ make migrate-state   # once: moves the state into the bucket just created
 make github-vars     # creates both GitHub environments and sets the repository variables
 ```
 
+The variables include `PLATFORM_GCP_DNS_ZONE`, the zone's managed-zone name, where `gcp/cdn`
+gives each CI instance a host and reap finds the records a lost one left. Run `make
+github-vars` again after a change to `GITHUB_VARS` in this directory's `Makefile`.
+
 Only with `FIRST_RUN=1` does `make init` write a git-ignored `local_override.tf`, replacing
 the GCS backend with local state while the state bucket is missing; it removes it once the
 bucket exists. Without `FIRST_RUN`, a state probe that fails stops the run, so an expired

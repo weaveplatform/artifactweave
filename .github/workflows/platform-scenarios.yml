@@ -63,6 +63,7 @@ on:
       - 'deploy/ci/platform-tests.sh'
       - 'deploy/ci/prove-matrix.sh'
       - 'deploy/ci/cloudfront-key.sh'
+      - 'deploy/ci/cloud-cdn-key.sh'
       # <cloud>/<scenario>/ and modules/<cloud>/<capability>/. The bootstraps
       # live in deploy/ci/terraform, outside this filter; platform-auth-check
       # proves their trust instead.
@@ -195,6 +196,9 @@ jobs:
       PLATFORM_GCP_PROJECT: ${{ vars.PLATFORM_GCP_PROJECT }}
       PLATFORM_GCP_STATE_BUCKET: ${{ vars.PLATFORM_GCP_STATE_BUCKET }}
       PLATFORM_GCP_SERVICE_ACCOUNT: ${{ vars.PLATFORM_GCP_SERVICE_ACCOUNT }}
+      # The bootstrap's zone (its managed zone's name), where gcp/cdn gives
+      # each instance a host and reap finds the records a lost instance left.
+      PLATFORM_GCP_DNS_ZONE: ${{ vars.PLATFORM_GCP_DNS_ZONE }}
       PLATFORM_AZURE_SUBSCRIPTION_ID: ${{ vars.PLATFORM_AZURE_SUBSCRIPTION_ID }}
       PLATFORM_AZURE_RESOURCE_GROUP: ${{ vars.PLATFORM_AZURE_RESOURCE_GROUP }}
       PLATFORM_AZURE_STATE_ACCOUNT: ${{ vars.PLATFORM_AZURE_STATE_ACCOUNT }}
