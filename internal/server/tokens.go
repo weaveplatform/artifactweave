@@ -227,10 +227,19 @@ func onlyUserScope(s types.Scope) bool {
 // legacyScope translates the legacy token scope forms to Access ones:
 // member-of-groups:<g,...> is applied-permissions/groups, api:* the
 // caller's own identity and jfrt@<id>:admin applied-permissions/admin.
+// member-of-groups:* is the user's own identity too: Artifactory
+// authenticates such a token as a copy of the real user, admin flag and
+// direct permissions included (OSS 6.20 AccessTokenAuthenticationProvider,
+// populateGroups), and the JFrog CLI asks for exactly that scope when it
+// swaps a configured user's password for a token (jfrog-cli-core
+// utils/config/tokenrefresh.go). As groups only, an administrator's jf
+// configuration could upload nothing.
 func legacyScope(s string) string {
 	parts := strings.Fields(s)
 	for i, p := range parts {
 		switch {
+		case p == "member-of-groups:*":
+			parts[i] = "applied-permissions/user"
 		case strings.HasPrefix(p, "member-of-groups:"):
 			parts[i] = "applied-permissions/groups:" + strings.TrimPrefix(p, "member-of-groups:")
 		case p == "api:*":

@@ -307,6 +307,7 @@ func TestLegacyTokenRefreshAndEncryptedPassword(t *testing.T) {
 func TestLegacyScope(t *testing.T) {
 	for in, want := range map[string]string{
 		"member-of-groups:readers,ci": "applied-permissions/groups:readers,ci",
+		"member-of-groups:*":          "applied-permissions/user",
 		"api:*":                       "applied-permissions/user",
 		"jfrt@*:admin":                "applied-permissions/admin",
 		"api:* member-of-groups:x":    "applied-permissions/user applied-permissions/groups:x",
@@ -487,5 +488,45 @@ func TestLegacyRefreshWithoutAuthenticator(t *testing.T) {
 		body,
 	); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("legacy refresh without an authenticator: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// The JFrog CLI swaps a configured user's password for a legacy token
+// scoped member-of-groups:*. Artifactory gives such a token the real user's
+// identity, so an administrator's token administers; named groups stay
+// groups only.
+func TestLegacyMemberOfAllGroupsIsTheUser(t *testing.T) {
+	h := statusFixture(t, false)
+	tokenFor := func(scope string) string {
+		t.Helper()
+		rec := do(
+			t,
+			h,
+			http.MethodPost,
+			"/artifactory/api/security/token",
+			formAs(
+				basic("admin", "pw"),
+			),
+			"username=admin&refreshable=true&scope="+url.QueryEscape(scope),
+		)
+		created := decodeObject(t, rec.Body.String())
+		tok, _ := created["access_token"].(string)
+		if rec.Code != http.StatusOK || tok == "" {
+			t.Fatalf("create %s: %d %s", scope, rec.Code, rec.Body)
+		}
+		return tok
+	}
+	create := func(tok, key string) int {
+		return do(t, h, http.MethodPut, "/artifactory/api/repositories/"+key,
+			jsonAs(bearerAuth(tok)), `{"rclass":"local","packageType":"generic"}`).Code
+	}
+	if code := create(tokenFor("member-of-groups:*"), "by-all-groups"); code != http.StatusOK {
+		t.Fatalf("member-of-groups:* for an administrator: %d, want 200", code)
+	}
+	if code := create(
+		tokenFor("member-of-groups:readers"),
+		"by-readers",
+	); code != http.StatusForbidden {
+		t.Fatalf("member-of-groups:readers for an administrator: %d, want 403", code)
 	}
 }
