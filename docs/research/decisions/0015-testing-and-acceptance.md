@@ -40,9 +40,22 @@ cached dependency volumes. The default storage is SQLite with the fs blob store;
 PostgreSQL and MinIO run a `@storage`-tagged subset. Coverage goes to `cover/accept` and
 is merged into the gate. Budget: 15 minutes wall clock per pull request.
 
-**OCI conformance** is its own CI job: start the binary with a Docker repository, clone
-`opencontainers/distribution-spec` at a pinned tag, run its conformance module with
-`OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials, upload `GOCOVERDIR`.
+**OCI conformance** is its own CI job, `OCI conformance`, on `ubuntu-latest`, required by
+the gate, with its `GOCOVERDIR` merged into coverage ([research 23](../23-docker-oci-registry.md)
+section 9):
+- **Suite.** `opencontainers/distribution-spec` `conformance/` at tag `v1.1.1`, pinned by
+  commit and built with Go. Its JUnit and HTML reports are uploaded.
+- **Registry.** The `-cover` binary on SQLite and the fs blob store, with two local `docker`
+  repositories and a user with Read, Deploy and Delete on both, created through the REST API
+  before the run.
+- **Settings.** `OCI_ROOT_URL` is the binary's URL; `OCI_NAMESPACE=<repo>/conformance`;
+  `OCI_CROSSMOUNT_NAMESPACE=<second repo>/conformance`, so mounts cross repositories;
+  `OCI_USERNAME` and `OCI_PASSWORD`, so the token flow runs; `OCI_AUTOMATIC_CROSSMOUNT=0`;
+  `OCI_DELETE_MANIFEST_BEFORE_BLOBS=1`, as blob deletes answer 405
+  ([0031](0031-docker-oci-registry.md)); `OCI_HIDE_SKIPPED_WORKFLOWS=0`.
+- **Categories.** Pull, Push, Content Discovery and Content Management are all on once the
+  registry is complete; until then the categories whose operations exist are on. The job
+  fails on any failed specification, never on a skipped one.
 
 **Terraform scenarios.** `test/terraform/run.sh` applies the app-layer references in
 `deploy/artifactweave/terraform` (decision 0030), which together cover the in-scope
@@ -90,6 +103,7 @@ whose interesting paths are failures.
 - [09-jfrog-cli-compatibility](../09-jfrog-cli-compatibility.md)
 - [08-terraform-providers](../08-terraform-providers.md)
 - `weaveplatform/hostweave@main`, `docs/research/decisions/0018-testing-and-coverage.md`
-- <https://github.com/opencontainers/distribution-spec/tree/main/conformance>
+- <https://github.com/opencontainers/distribution-spec/tree/v1.1.1/conformance>
+- [23-docker-oci-registry](../23-docker-oci-registry.md), section 9
 - <https://github.com/cucumber/godog>
 - <https://github.com/testcontainers/testcontainers-go>

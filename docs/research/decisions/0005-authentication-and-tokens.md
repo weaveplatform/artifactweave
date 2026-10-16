@@ -170,10 +170,39 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   provider's keys cannot be fetched, which is logged at WARN. Management answers 404
   for an unknown provider or mapping, 400 for an invalid body or a name in use.
 
-**Docker token endpoint.** `GET /v2/` without credentials answers `401` with a
-`WWW-Authenticate: Bearer realm=...,service=...` challenge; the realm issues short-lived
-JWTs scoped `repository:<image>:pull,push`. The exact `service` value and `expires_in`
-are captured from a live Artifactory before they are fixed.
+**Docker token endpoint** (values from [research 17](../17-undocumented-shapes.md),
+behaviour from [research 23](../23-docker-oci-registry.md) section 3; routes in
+[0003](0003-repository-model.md), registry behaviour in [0031](0031-docker-oci-registry.md)):
+- **Challenge.** Every 401 from the registry carries
+  `WWW-Authenticate: Bearer realm="<base>/artifactory/api/docker/<repo|null>/v2/token",service="<host[:port]>"`,
+  plus `,scope="repository:<name>:<actions>"` on a repository operation. The host is the
+  one the client addressed, from the base-URL resolver, with any non-default port. The
+  bare `/v2/` probe uses the repository `null`, and under the subdomain option the realm
+  names the subdomain's repository.
+- **Issuing.** `GET` on the realm (per repository, `null`, or `/v2/token`) with Basic
+  credentials (a password, an access token or a reference token) or a Bearer token, or
+  anonymously when anonymous access is on. `POST` answers 405. `account`, `client_id` and
+  `offline_token` are ignored. The body is
+  `{"token","access_token","expires_in","issued_at"}`, with `token` and `access_token`
+  equal.
+- **The token** is a short-lived access token from the token service: the same RS256 key,
+  issuer and subject form as every access token, with the registry grants as its scope,
+  `repository:<name>:<actions>` for each requested scope with only the actions the caller's
+  permissions allow (`pull` needs Read, `push` Deploy, `delete` Delete, `*` all three).
+  Unlike other tokens it is never stored, as Artifactory stores no token below its
+  persistence threshold. Its lifetime is 3600 seconds, or less when the credentials that
+  obtained it expire sooner. It is accepted only on the registry's routes and answers 401
+  anywhere else.
+- **On each registry request** the granted actions for the addressed `<name>` are
+  intersected with the caller's current permissions, so a token for one image never
+  authorizes another and a removed permission applies at once. A disabled or deleted
+  user's token answers 401.
+- **Basic on the registry.** Clients that skip the token flow may send Basic credentials on
+  every request; they are checked as on any other route.
+- **`auth` endpoints.** `GET /artifactory/api/docker/<repo>/v2/auth` and `.../v1/auth`
+  answer the `config.json` entry `{"auth": base64(<user>:<secret>), "email"}`, where the
+  secret is the credential the request authenticated with; an anonymous request answers
+  401. Which secret Artifactory returns for token callers is on the live-capture list.
 
 **Passwords** are hashed with Argon2id. Lock policy and expiration policy follow the
 legacy security API shapes (real JSON booleans and integers, as the Terraform provider
@@ -280,6 +309,10 @@ exist. Reporting the real artifactweave version elsewhere keeps the lie bounded.
 - *Symmetric JWT signing*: fine for one process, but RS256 lets a future UI or edge
   verify without the secret.
 - *Reporting the true artifactweave version*: breaks every client gate.
+- *A separate registry JWT with its own key, or a stored access token for the registry*:
+  a second key to rotate, or a stored record for every `docker pull`, which Artifactory
+  avoids with its persistence threshold. A scoped, unstored access token reuses the
+  signing and verification already in place.
 
 ## Constraints
 
@@ -297,7 +330,9 @@ exist. Reporting the real artifactweave version elsewhere keeps the lie bounded.
 - OIDC: `internal/service/oidc` and `internal/auth/idtoken` tests against a fake issuer
   (`idtokentest`); `oidc.feature`, where the real `jf eot` exchanges a token and
   downloads with it; `deploy/artifactweave/terraform/oidc` in the `terraform` job.
-- Docker token flow in the OCI conformance job.
+- Docker token flow in the OCI conformance job, and `docker login` and `crane auth login`
+  against the binary; tests for scope intersection, refusal across images and routes, and
+  expiry capped by the credentials.
 - A test that the version endpoints report the configured compatibility version and that
   the usage and metrics stubs answer 2xx.
 
