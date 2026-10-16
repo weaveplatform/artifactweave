@@ -3,10 +3,13 @@
 // npm tarball links, Helm chart URLs, the NuGet service index, Terraform
 // download URLs, Docker upload locations and file-info URIs all carry absolute
 // URLs. Behind a reverse proxy the request's own host is wrong, so the resolver
-// follows Artifactory's precedence: the X-JFrog-Override-Base-Url header, then
-// the X-Forwarded-* headers, then the configured base URL, then the request.
-// Every handler reads the result from the context so there is exactly one place
-// that implements the rule (decision 0002).
+// follows Artifactory's precedence (OSS 6.20 HttpUtils.getServletContextUrl,
+// research 17): the X-JFrog-Override-Base-Url header, then the configured base
+// URL, then the X-Forwarded-* headers, then the request. A configured base URL
+// is the operator naming the public URL, so a request header the operator does
+// not control never overrides it (#313). Every handler reads the result from
+// the context so there is exactly one place that implements the rule
+// (decision 0002).
 package baseurl
 
 import (
@@ -28,6 +31,9 @@ func Resolve(r *http.Request, configured string) string {
 	if v := strings.TrimSpace(r.Header.Get(OverrideHeader)); v != "" {
 		return strings.TrimRight(v, "/")
 	}
+	if configured != "" {
+		return strings.TrimRight(configured, "/")
+	}
 	if host := ForwardedHost(r); host != "" {
 		scheme := strings.ToLower(first(r.Header.Get("X-Forwarded-Proto")))
 		if scheme != "http" && scheme != "https" {
@@ -40,9 +46,6 @@ func Resolve(r *http.Request, configured string) string {
 			host = net.JoinHostPort(strings.Trim(host, "[]"), port)
 		}
 		return scheme + "://" + host
-	}
-	if configured != "" {
-		return strings.TrimRight(configured, "/")
 	}
 	return requestScheme(r) + "://" + r.Host
 }

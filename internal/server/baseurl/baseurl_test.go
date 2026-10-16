@@ -34,12 +34,33 @@ func TestResolvePrecedence(t *testing.T) {
 			"https://x.example",
 		},
 		{
-			"forwarded host and proto",
+			"a configured base url wins over every forwarded header",
+			map[string]string{
+				"X-Forwarded-Host":  "evil.example",
+				"X-Forwarded-Proto": "http",
+				"X-Forwarded-Port":  "9999",
+			},
+			"https://art.example.com/",
+			true,
+			"https://art.example.com",
+		},
+		{
+			"the override wins over a configured base url",
+			map[string]string{
+				OverrideHeader:     "https://edge.example.com",
+				"X-Forwarded-Host": "evil.example",
+			},
+			"https://art.example.com",
+			false,
+			"https://edge.example.com",
+		},
+		{
+			"forwarded host and proto, with no configured base url",
 			map[string]string{
 				"X-Forwarded-Host":  "proxy.example.com",
 				"X-Forwarded-Proto": "https",
 			},
-			"http://cfg",
+			"",
 			false,
 			"https://proxy.example.com",
 		},
@@ -86,7 +107,7 @@ func TestResolvePrecedence(t *testing.T) {
 				"X-Forwarded-Proto": "https, http",
 				"X-Forwarded-Port":  "443, 8080",
 			},
-			"http://cfg",
+			"",
 			false,
 			"https://a.example",
 		},
@@ -102,7 +123,7 @@ func TestResolvePrecedence(t *testing.T) {
 			"https://a.example:8443",
 		},
 		{
-			"an empty first host is no host: the configured base url",
+			"an empty first host with a configured base url: the configured one",
 			map[string]string{"X-Forwarded-Host": " , b.internal"},
 			"https://cfg.example.com",
 			false,

@@ -124,6 +124,9 @@ Sources: <https://github.com/aquasecurity/trivy/discussions/7982>,
 | Artifactory's base URL (OSS 6.20, `HttpUtils.getServletContextUrl`) | `X-JFrog-Override-Base-Url`, then `X-Artifactory-Override-Base-Url`, then the configured `urlBase` (given the request's scheme), then the servlet request's own server name and port. It never reads `X-Forwarded-Host` itself; a forwarded host reaches it only through what the servlet container or the front proxy makes of the request | Confirmed |
 | A forwarded list | for `X-Forwarded-For`, Artifactory takes the first entry, the client's (`HttpUtils.getRemoteClientAddress`: it "might contain multiple entries") | Confirmed |
 | `X-Forwarded-Host`, `X-Forwarded-Proto` and `X-Forwarded-Port` as lists | no public source shows Artifactory reading them as lists | Guess |
+| `X-JFrog-Override-Base-Url` | honoured on every request when not blank, with no setting to turn it off: Artifactory returns it with a trailing slash and its own context path (`artifactory`) appended, so the header names the platform root. JFrog's current reverse-proxy guidance has the proxy set it (Reverse Proxy Settings, and the snippet HTTP Settings generates) | Confirmed |
+| `X-Artifactory-Override-Base-Url` | honoured after it, returned as given ("original artifactory request url"), so it names the URL with the context path; JFrog's 4.4.0-era guidance made it mandatory for Docker | Confirmed |
+| The configured `urlBase` | used with the servlet request's scheme put in place of its own when they differ | Confirmed |
 
 artifactweave's resolver (decision 0002) reads the `X-Forwarded-*` headers itself. Each proxy in a
 chain appends the value it received, so each header can arrive as a comma-separated list
@@ -132,12 +135,21 @@ first entry, the client-facing hop, as Artifactory does for `X-Forwarded-For`, a
 empty first entry rather than trusting a later, internal one (#249). It reads only the
 `X-Forwarded-*` headers, not RFC 7239's `Forwarded`.
 
-The precedence differs from OSS 6.20, which puts the configured `urlBase` ahead of anything
-the request carries: artifactweave puts the forwarded headers ahead of the configured base URL
-(decision 0002). #249 changes only how a list is read; the order is unchanged.
+artifactweave follows OSS 6.20's order (#313, decision 0002): `X-JFrog-Override-Base-Url`, then
+the configured `base_url`, then the forwarded headers, then the request. Until #313 it put the
+forwarded headers ahead of the configured base URL, which let any client whose proxy passed on
+its `X-Forwarded-Host` choose the URLs artifactweave hands out, the Docker token realm among
+them. Two differences remain, both recorded in the deviations register: the legacy
+`X-Artifactory-Override-Base-Url` is not honoured (DV-037), and a configured `base_url` is
+used as written rather than with the request's scheme (DV-038). artifactweave's base URL is
+the platform root, as `X-JFrog-Override-Base-Url` names it, so that header needs no context
+path handling.
 
 Sources: `base/common/src/main/java/org/artifactory/util/HttpUtils.java` in
-knottnhupfer/artifactory-oss at `b99e5649bcad` (Artifactory OSS 6.20).
+knottnhupfer/artifactory-oss at `b99e5649bcad` (Artifactory OSS 6.20); JFrog's Reverse Proxy
+Settings, <https://jfrog.com/help/r/jfrog-artifactory-documentation/reverse-proxy-settings>, and
+HTTP Settings, <https://docs.jfrog.com/installation/docs/http-settings>; the 4.4.0 Docker article,
+<https://jfrog.com/help/r/why-does-docker-stop-working-after-upgrading-to-artifactory-4-4-0/why-does-docker-stop-working-after-upgrading-to-artifactory-4.4.0>.
 
 ### Matrix parameter encoding
 
