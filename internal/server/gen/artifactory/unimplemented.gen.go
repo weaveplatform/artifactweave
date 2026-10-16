@@ -318,6 +318,10 @@ func (UnimplementedStrict) FindParentManifestLists(context.Context, FindParentMa
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) PromoteDockerImage(context.Context, PromoteDockerImageRequestObject) (PromoteDockerImageResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) ListDockerTags(context.Context, ListDockerTagsRequestObject) (ListDockerTagsResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }

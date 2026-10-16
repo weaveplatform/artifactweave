@@ -4185,6 +4185,27 @@ type DistributeArtifactRequest struct {
 	TargetRepo string `json:"targetRepo"`
 }
 
+// DockerPromotionRequest Which image to promote, where to, and whether it moves or is copied. The JFrog CLI sends every field, with an empty string for each optional name or tag it was not given, so an empty string means the same as an omitted field.
+type DockerPromotionRequest struct {
+	// Copy Optional within this object. When true the image is copied and the source keeps it; when false it is moved and leaves the source. Defaults to false.
+	Copy *bool `json:"copy,omitempty"`
+
+	// DockerRepository Required within this object. Name of the image in the source repository, including any namespace segments, for example library/nginx.
+	DockerRepository string `json:"dockerRepository"`
+
+	// Tag Optional within this object. Tag to promote. Omitted or empty promotes every tag of the image.
+	Tag *string `json:"tag,omitempty"`
+
+	// TargetDockerRepository Optional within this object. Name the image takes in the target repository. Omitted or empty keeps dockerRepository.
+	TargetDockerRepository *string `json:"targetDockerRepository,omitempty"`
+
+	// TargetRepo Required within this object. Key of the local or federated repository the image is promoted to. It must have the source repository's package type.
+	TargetRepo string `json:"targetRepo"`
+
+	// TargetTag Optional within this object. Tag the image takes in the target repository. Omitted or empty keeps tag.
+	TargetTag *string `json:"targetTag,omitempty"`
+}
+
 // ErrorDetail One entry of the Artifactory error envelope.
 type ErrorDetail struct {
 	// Message Required within this object. Human-readable reason.
@@ -6571,7 +6592,7 @@ type CreateDebianSnapshotParamsAsync int
 
 // ListDockerRepositoriesParams defines parameters for ListDockerRepositories.
 type ListDockerRepositoriesParams struct {
-	// N Optional query parameter. Maximum number of names to return. Omitted returns every name.
+	// N Optional query parameter. Maximum number of names to return. Omitted returns every name. When more names follow, the response carries a Link header to the next page.
 	N *int `form:"n,omitempty" json:"n,omitempty"`
 
 	// Last Optional query parameter. The last image name of the previous page; the response starts after it.
@@ -6589,7 +6610,7 @@ type FindParentManifestListsJSONBody struct {
 
 // ListDockerTagsParams defines parameters for ListDockerTags.
 type ListDockerTagsParams struct {
-	// N Optional query parameter. Maximum number of tags to return. Omitted returns every tag.
+	// N Optional query parameter. Maximum number of tags to return. Omitted returns every tag. When more tags follow, the response carries a Link header to the next page.
 	N *int `form:"n,omitempty" json:"n,omitempty"`
 
 	// Last Optional query parameter. The last tag of the previous page; the response starts after it.
@@ -7645,6 +7666,9 @@ type DistributeArtifactJSONRequestBody = DistributeArtifactRequest
 
 // FindParentManifestListsJSONRequestBody defines body for FindParentManifestLists for application/json ContentType.
 type FindParentManifestListsJSONRequestBody FindParentManifestListsJSONBody
+
+// PromoteDockerImageJSONRequestBody defines body for PromoteDockerImage for application/json ContentType.
+type PromoteDockerImageJSONRequestBody = DockerPromotionRequest
 
 // ExportSystemJSONRequestBody defines body for ExportSystem for application/json ContentType.
 type ExportSystemJSONRequestBody = ExportSettings
@@ -9479,24 +9503,36 @@ type ClientInterface interface {
 
 	// ListDockerRepositories performs a GET /api/docker/{repo-key}/v2/_catalog (the `ListDockerRepositories` operationId) request.
 	//
-	// Lists the image names held in one Docker or OCI repository, in the shape of the Docker registry _catalog extension. The caller needs read permission on the repository. For remote repositories artifactweave lists the cache. Results are sorted and paginated with n and last exactly as the registry API does, so clients can reuse their registry pagination code.
+	// Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties broken by byte order, and paginated with n and last as the tags list is, so clients can reuse their registry pagination code. Needs Read; images the caller cannot read are left out (decision 0031). This operation lists one repository with bare image names; the registry-wide /v2/_catalog lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image> (decision 0003). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 	ListDockerRepositories(ctx context.Context, repoKey DockerRepoKey, params *ListDockerRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FindParentManifestListsWithBody performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 	FindParentManifestListsWithBody(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FindParentManifestLists performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 	FindParentManifestLists(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PromoteDockerImageWithBody performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+	PromoteDockerImageWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PromoteDockerImage performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
+	// Takes a body of the `application/json` content type.
+	//
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+	PromoteDockerImage(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListDockerTags performs a GET /api/docker/{repo-key}/v2/{imageName}/tags/list (the `ListDockerTags` operationId) request.
 	//
-	// Lists the tags of one image in the shape of the registry tags endpoint. Tags that are not valid under the OCI and Docker naming rules are omitted. The caller needs read permission on the repository. Pagination with n and last behaves as in the registry API; the response omits the Link header the registry would add.
+	// Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's tag folders that hold a manifest; digest folders are not tags, which matches the digest-named entries Artifactory leaves out from 7.90.1. Tags are sorted case-insensitively, as the OCI distribution specification requires, with ties broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the response carries a Link header to the next page, as the registry does. An image with stored manifests but no tags answers an empty list, and an unknown image answers 404. Needs Read on the image (decision 0031). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 	ListDockerTags(ctx context.Context, repoKey DockerRepoKey, imageName DockerImageName, params *ListDockerTagsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetExportSystemSettingsExample Export settings example (not supported)
@@ -13792,7 +13828,7 @@ func (c *Client) DistributeArtifact(ctx context.Context, body DistributeArtifact
 
 // ListDockerRepositories performs a GET /api/docker/{repo-key}/v2/_catalog (the `ListDockerRepositories` operationId) request.
 //
-// Lists the image names held in one Docker or OCI repository, in the shape of the Docker registry _catalog extension. The caller needs read permission on the repository. For remote repositories artifactweave lists the cache. Results are sorted and paginated with n and last exactly as the registry API does, so clients can reuse their registry pagination code.
+// Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties broken by byte order, and paginated with n and last as the tags list is, so clients can reuse their registry pagination code. Needs Read; images the caller cannot read are left out (decision 0031). This operation lists one repository with bare image names; the registry-wide /v2/_catalog lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image> (decision 0003). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 func (c *Client) ListDockerRepositories(ctx context.Context, repoKey DockerRepoKey, params *ListDockerRepositoriesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListDockerRepositoriesRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -13808,7 +13844,7 @@ func (c *Client) ListDockerRepositories(ctx context.Context, repoKey DockerRepoK
 // FindParentManifestListsWithBody performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 // with any type of body and a specified content type.
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 func (c *Client) FindParentManifestListsWithBody(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewFindParentManifestListsRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -13824,7 +13860,7 @@ func (c *Client) FindParentManifestListsWithBody(ctx context.Context, repoKey Do
 // FindParentManifestLists performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 func (c *Client) FindParentManifestLists(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewFindParentManifestListsRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -13837,9 +13873,41 @@ func (c *Client) FindParentManifestLists(ctx context.Context, repoKey DockerRepo
 	return c.Client.Do(req)
 }
 
+// PromoteDockerImageWithBody performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
+// with any type of body and a specified content type.
+//
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+func (c *Client) PromoteDockerImageWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteDockerImageRequestWithBody(c.Server, repoKey, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PromoteDockerImage performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
+// Takes a body of the `application/json` content type.
+//
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+func (c *Client) PromoteDockerImage(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPromoteDockerImageRequest(c.Server, repoKey, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListDockerTags performs a GET /api/docker/{repo-key}/v2/{imageName}/tags/list (the `ListDockerTags` operationId) request.
 //
-// Lists the tags of one image in the shape of the registry tags endpoint. Tags that are not valid under the OCI and Docker naming rules are omitted. The caller needs read permission on the repository. Pagination with n and last behaves as in the registry API; the response omits the Link header the registry would add.
+// Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's tag folders that hold a manifest; digest folders are not tags, which matches the digest-named entries Artifactory leaves out from 7.90.1. Tags are sorted case-insensitively, as the OCI distribution specification requires, with ties broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the response carries a Link header to the next page, as the registry does. An image with stored manifests but no tags answers an empty list, and an unknown image answers 404. Needs Read on the image (decision 0031). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 func (c *Client) ListDockerTags(ctx context.Context, repoKey DockerRepoKey, imageName DockerImageName, params *ListDockerTagsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListDockerTagsRequest(c.Server, repoKey, imageName, params)
 	if err != nil {
@@ -23558,6 +23626,53 @@ func NewFindParentManifestListsRequestWithBody(server string, repoKey DockerRepo
 	}
 
 	operationPath := fmt.Sprintf("/api/docker/%s/v2/parentManifests", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPromoteDockerImageRequest calls the generic PromoteDockerImage builder with application/json body
+func NewPromoteDockerImageRequest(server string, repoKey string, body PromoteDockerImageJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPromoteDockerImageRequestWithBody(server, repoKey, "application/json", bodyReader)
+}
+
+// NewPromoteDockerImageRequestWithBody constructs an http.Request for the PromoteDockerImage method, with any body, and a specified content type
+func NewPromoteDockerImageRequestWithBody(server string, repoKey string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repo-key", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/docker/%s/v2/promote", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -35808,7 +35923,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListDockerRepositoriesWithResponse performs a GET /api/docker/{repo-key}/v2/_catalog (the `ListDockerRepositories` operationId) request.
 	//
-	// Lists the image names held in one Docker or OCI repository, in the shape of the Docker registry _catalog extension. The caller needs read permission on the repository. For remote repositories artifactweave lists the cache. Results are sorted and paginated with n and last exactly as the registry API does, so clients can reuse their registry pagination code.
+	// Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties broken by byte order, and paginated with n and last as the tags list is, so clients can reuse their registry pagination code. Needs Read; images the caller cannot read are left out (decision 0031). This operation lists one repository with bare image names; the registry-wide /v2/_catalog lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image> (decision 0003). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	ListDockerRepositoriesWithResponse(ctx context.Context, repoKey DockerRepoKey, params *ListDockerRepositoriesParams, reqEditors ...RequestEditorFn) (*ListDockerRepositoriesResponse, error)
@@ -35816,7 +35931,7 @@ type ClientWithResponsesInterface interface {
 	// FindParentManifestListsWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	FindParentManifestListsWithBodyWithResponse(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error)
@@ -35824,12 +35939,26 @@ type ClientWithResponsesInterface interface {
 	// FindParentManifestListsWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 	FindParentManifestListsWithResponse(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error)
+
+	// PromoteDockerImageWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
+	// with any type of body and a specified content type.
+	//
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+	//
+	// Returns a wrapper object for the known response body format(s).
+	PromoteDockerImageWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error)
+
+	// PromoteDockerImageWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+	PromoteDockerImageWithResponse(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error)
 
 	// ListDockerTagsWithResponse performs a GET /api/docker/{repo-key}/v2/{imageName}/tags/list (the `ListDockerTags` operationId) request.
 	//
-	// Lists the tags of one image in the shape of the registry tags endpoint. Tags that are not valid under the OCI and Docker naming rules are omitted. The caller needs read permission on the repository. Pagination with n and last behaves as in the registry API; the response omits the Link header the registry would add.
+	// Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's tag folders that hold a manifest; digest folders are not tags, which matches the digest-named entries Artifactory leaves out from 7.90.1. Tags are sorted case-insensitively, as the OCI distribution specification requires, with ties broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the response carries a Link header to the next page, as the registry does. An image with stored manifests but no tags answers an empty list, and an unknown image answers 404. Needs Read on the image (decision 0031). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	ListDockerTagsWithResponse(ctx context.Context, repoKey DockerRepoKey, imageName DockerImageName, params *ListDockerTagsParams, reqEditors ...RequestEditorFn) (*ListDockerTagsResponse, error)
@@ -43584,6 +43713,11 @@ func (r DistributeArtifactResponse) ContentType() string {
 	return ""
 }
 
+// ListDockerRepositoriesResponse200Headers the declared response headers of an HTTP 200 response for ListDockerRepositories
+type ListDockerRepositoriesResponse200Headers struct {
+	Link *string
+}
+
 type ListDockerRepositoriesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -43602,6 +43736,8 @@ type ListDockerRepositoriesResponse struct {
 	JSON404 *ArtifactorySearchesApiNotFound
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ArtifactorySearchesApiInternalServerError
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListDockerRepositoriesResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -43766,6 +43902,73 @@ func (r FindParentManifestListsResponse) ContentType() string {
 	return ""
 }
 
+type PromoteDockerImageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ArtifactoryBuildsApiUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PromoteDockerImageResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PromoteDockerImageResponse) GetJSON401() *ArtifactoryBuildsApiUnauthorized {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PromoteDockerImageResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PromoteDockerImageResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r PromoteDockerImageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PromoteDockerImageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PromoteDockerImageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PromoteDockerImageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListDockerTagsResponse200Headers the declared response headers of an HTTP 200 response for ListDockerTags
+type ListDockerTagsResponse200Headers struct {
+	Link *string
+}
+
 type ListDockerTagsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -43787,6 +43990,8 @@ type ListDockerTagsResponse struct {
 	JSON404 *ArtifactorySearchesApiNotFound
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ArtifactorySearchesApiInternalServerError
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *ListDockerTagsResponse200Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -61737,7 +61942,7 @@ func (c *ClientWithResponses) DistributeArtifactWithResponse(ctx context.Context
 
 // ListDockerRepositoriesWithResponse performs a GET /api/docker/{repo-key}/v2/_catalog (the `ListDockerRepositories` operationId) request.
 //
-// Lists the image names held in one Docker or OCI repository, in the shape of the Docker registry _catalog extension. The caller needs read permission on the repository. For remote repositories artifactweave lists the cache. Results are sorted and paginated with n and last exactly as the registry API does, so clients can reuse their registry pagination code.
+// Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties broken by byte order, and paginated with n and last as the tags list is, so clients can reuse their registry pagination code. Needs Read; images the caller cannot read are left out (decision 0031). This operation lists one repository with bare image names; the registry-wide /v2/_catalog lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image> (decision 0003). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) ListDockerRepositoriesWithResponse(ctx context.Context, repoKey DockerRepoKey, params *ListDockerRepositoriesParams, reqEditors ...RequestEditorFn) (*ListDockerRepositoriesResponse, error) {
@@ -61751,7 +61956,7 @@ func (c *ClientWithResponses) ListDockerRepositoriesWithResponse(ctx context.Con
 // FindParentManifestListsWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 // with any type of body and a specified content type.
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) FindParentManifestListsWithBodyWithResponse(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error) {
@@ -61765,7 +61970,7 @@ func (c *ClientWithResponses) FindParentManifestListsWithBodyWithResponse(ctx co
 // FindParentManifestListsWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
 func (c *ClientWithResponses) FindParentManifestListsWithResponse(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error) {
 	rsp, err := c.FindParentManifestLists(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -61774,9 +61979,35 @@ func (c *ClientWithResponses) FindParentManifestListsWithResponse(ctx context.Co
 	return ParseFindParentManifestListsResponse(rsp)
 }
 
+// PromoteDockerImageWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
+// with any type of body and a specified content type.
+//
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) PromoteDockerImageWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error) {
+	rsp, err := c.PromoteDockerImageWithBody(ctx, repoKey, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteDockerImageResponse(rsp)
+}
+
+// PromoteDockerImageWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+func (c *ClientWithResponses) PromoteDockerImageWithResponse(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error) {
+	rsp, err := c.PromoteDockerImage(ctx, repoKey, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePromoteDockerImageResponse(rsp)
+}
+
 // ListDockerTagsWithResponse performs a GET /api/docker/{repo-key}/v2/{imageName}/tags/list (the `ListDockerTags` operationId) request.
 //
-// Lists the tags of one image in the shape of the registry tags endpoint. Tags that are not valid under the OCI and Docker naming rules are omitted. The caller needs read permission on the repository. Pagination with n and last behaves as in the registry API; the response omits the Link header the registry would add.
+// Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's tag folders that hold a manifest; digest folders are not tags, which matches the digest-named entries Artifactory leaves out from 7.90.1. Tags are sorted case-insensitively, as the OCI distribution specification requires, with ties broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the response carries a Link header to the next page, as the registry does. An image with stored manifests but no tags answers an empty list, and an unknown image answers 404. Needs Read on the image (decision 0031). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) ListDockerTagsWithResponse(ctx context.Context, repoKey DockerRepoKey, imageName DockerImageName, params *ListDockerTagsParams, reqEditors ...RequestEditorFn) (*ListDockerTagsResponse, error) {
@@ -70471,6 +70702,9 @@ func ParseListDockerRepositoriesResponse(rsp *http.Response) (*ListDockerReposit
 		}
 		response.JSON404 = &dest
 
+	case rsp.StatusCode == 405:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ArtifactorySearchesApiInternalServerError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -70478,6 +70712,19 @@ func ParseListDockerRepositoriesResponse(rsp *http.Response) (*ListDockerReposit
 		}
 		response.JSON500 = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ListDockerRepositoriesResponse200Headers
+		if values := rsp.Header.Values("Link"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Link", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Link = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
@@ -70556,6 +70803,53 @@ func ParseFindParentManifestListsResponse(rsp *http.Response) (*FindParentManife
 	return response, nil
 }
 
+// ParsePromoteDockerImageResponse parses an HTTP response from a PromoteDockerImageWithResponse call
+func ParsePromoteDockerImageResponse(rsp *http.Response) (*PromoteDockerImageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PromoteDockerImageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ArtifactoryBuildsApiUnauthorized
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListDockerTagsResponse parses an HTTP response from a ListDockerTagsWithResponse call
 func ParseListDockerTagsResponse(rsp *http.Response) (*ListDockerTagsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -70611,6 +70905,9 @@ func ParseListDockerTagsResponse(rsp *http.Response) (*ListDockerTagsResponse, e
 		}
 		response.JSON404 = &dest
 
+	case rsp.StatusCode == 405:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ArtifactorySearchesApiInternalServerError
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -70618,6 +70915,19 @@ func ParseListDockerTagsResponse(rsp *http.Response) (*ListDockerTagsResponse, e
 		}
 		response.JSON500 = &dest
 
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers ListDockerTagsResponse200Headers
+		if values := rsp.Header.Values("Link"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Link", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Link = &value
+		}
+		response.Headers200 = &headers
 	}
 
 	return response, nil
