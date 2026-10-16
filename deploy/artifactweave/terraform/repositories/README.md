@@ -1,7 +1,7 @@
-# repositories: a local generic repository with properties on one file
+# repositories: local repositories, with properties on one file
 
-A local generic repository and a set of properties on one file in it, managed with the
-`jfrog/artifactory` provider. Use it as the starting point for repository configuration kept
+A local generic repository with a set of properties on one file in it, and local npm, Go,
+Maven and Gradle repositories, managed with the `jfrog/artifactory` provider. Use it as the starting point for repository configuration kept
 in Terraform. See [Managing artifactweave with Terraform](../../README.md) for the providers
 and how to authenticate them.
 
@@ -10,6 +10,15 @@ and how to authenticate them.
 - `artifactory_local_generic_repository.this`: the local generic repository `repository_key`.
 - `artifactory_item_properties.this`: `properties` on the file at `item_path` in that
   repository, when `with_properties` is true.
+- `artifactory_local_npm_repository.this` and `artifactory_local_go_repository.this`: local npm
+  and Go modules repositories, `npm_repository_key` and `go_repository_key`, on the
+  `npm-default` and `go-default` layouts.
+- `artifactory_local_maven_repository.this`: a release repository, `maven_repository_key`, on
+  `maven-2-default`: releases accepted, snapshots refused, server-generated checksums, POM
+  consistency checks on.
+- `artifactory_local_gradle_repository.this`: a snapshot repository, `gradle_repository_key`, on
+  `gradle-default`: releases refused, non-unique snapshots with at most five kept per version,
+  client checksums, POM consistency checks suppressed.
 
 ## Prerequisites
 
@@ -21,9 +30,13 @@ and how to authenticate them.
 ## Inputs to set
 
 ```hcl
-url            = "https://artifacts.example.com"
-repository_key = "generic-local"
-item_path      = "fixture.txt"
+url                   = "https://artifacts.example.com"
+repository_key        = "generic-local"
+npm_repository_key    = "npm-local"
+go_repository_key     = "go-local"
+maven_repository_key  = "maven-releases-local"
+gradle_repository_key = "gradle-snapshots-local"
+item_path             = "fixture.txt"
 properties = {
   team = ["platform"]
   tier = ["gold", "silver"]
@@ -45,7 +58,9 @@ curl -fsS -H "Authorization: Bearer $TF_VAR_access_token" -X PUT --data-binary @
 terraform apply                               # the properties
 ```
 
-A second `terraform plan` shows no changes: the provider reads back exactly what it wrote.
+A second `terraform plan` shows no changes: the provider reads back exactly what it wrote,
+including each repository's layout and the Maven and Gradle repositories' release, snapshot,
+checksum and POM settings.
 
 ## Security
 
@@ -56,7 +71,7 @@ manage elsewhere, for example with the [identity](../identity/README.md) referen
 
 ## Teardown
 
-`terraform destroy` removes the properties and the repository, with every file in it,
+`terraform destroy` removes the properties and the repositories, with every file in them,
 including the one you deployed by hand.
 
 ## How this scenario is tested
@@ -65,7 +80,8 @@ The gated `terraform` job runs `test/terraform/run.sh` against a fresh `-cover` 
 (see [docs/testing/ci.md](../../../../docs/testing/ci.md#terraform-scenarios)). It passes
 `repository_key = tf-generic-local` and `item_path = fixture.txt`, applies with
 `with_properties = false`, deploys `fixture.txt`, applies again, requires an empty plan and
-destroys everything.
+destroys everything. The npm, Go, Maven and Gradle repositories keep their default keys, and
+the empty plan is what proves their layouts and the Maven and Gradle settings round-trip.
 
 ## Reference
 
@@ -95,13 +111,21 @@ No modules.
 | ---- | ---- |
 | [artifactory_item_properties.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/item_properties) | resource |
 | [artifactory_local_generic_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_generic_repository) | resource |
+| [artifactory_local_go_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_go_repository) | resource |
+| [artifactory_local_gradle_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_gradle_repository) | resource |
+| [artifactory_local_maven_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_maven_repository) | resource |
+| [artifactory_local_npm_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_npm_repository) | resource |
 
 ### Inputs
 
 | Name | Description | Type | Default | Required |
 | ---- | ----------- | ---- | ------- | :------: |
 | access\_token | Admin access token, sent as a Bearer token. | `string` | n/a | yes |
+| go\_repository\_key | Key of the local Go modules repository. | `string` | `"go-local"` | no |
+| gradle\_repository\_key | Key of the local Gradle snapshot repository. | `string` | `"gradle-snapshots-local"` | no |
 | item\_path | Path, inside the repository, of the file the properties are set on. The file must exist before the properties are applied: the provider cannot deploy content. | `string` | `"fixture.txt"` | no |
+| maven\_repository\_key | Key of the local Maven release repository. | `string` | `"maven-releases-local"` | no |
+| npm\_repository\_key | Key of the local npm repository. | `string` | `"npm-local"` | no |
 | properties | Properties to set on item\_path, each a key with its values. | `map(list(string))` | ```{ "team": [ "platform" ], "tier": [ "gold", "silver" ] }``` | no |
 | repository\_key | Key of the local generic repository. | `string` | `"generic-local"` | no |
 | url | Base URL of artifactweave, without /artifactory, for example https://artifacts.example.com. | `string` | n/a | yes |
@@ -112,5 +136,6 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | item\_path | Path of the file the properties are set on, or null while with\_properties is false. |
+| package\_repository\_keys | Keys of the local npm, Go, Maven and Gradle repositories, by format. |
 | repository\_key | Key of the local generic repository. |
 <!-- END_TF_DOCS -->
