@@ -776,3 +776,33 @@ func TestRegistryTokenFlow(t *testing.T) {
 		t.Fatalf("anonymous token once anonymous access is off: %d %v", rec.Code, rec.Header())
 	}
 }
+
+// The referrers route (#225), on the repository path.
+const getReferrers = "GET /v2/{repo}/{name}/referrers/{digest}"
+
+// registryReferrersStatusRows: the referrers of the manifest the fixture
+// pushed, which nothing refers to, are an empty index; reading them needs
+// Read on the image, which only admin holds on docker-blobs.
+func registryReferrersStatusRows() []statusCase {
+	const base = "/v2/docker-blobs/app/referrers/"
+	of := base + sha256Digest(registryManifest("v1"))
+	return []statusCase{
+		{getReferrers, of, "admin", "", 200},
+		{getReferrers, of + "?artifactType=application/vnd.example.sig", "admin", "", 200},
+		{getReferrers, base + "sha256:totallywrong", "admin", "", 400},
+		{getReferrers, of, "user", "", 403},
+		{getReferrers, of, "anonymous", "", 401},
+		{getReferrers, of, "", "", 401},
+		{getReferrers, of, "expired", "", 401},
+	}
+}
+
+// registryReferrersMatrix: the referrers API needs Read on the image;
+// anonymous is challenged whatever it holds.
+func registryReferrersMatrix() []matrixRow {
+	const base = "/v2/" + dockerA + "/work/app/referrers/"
+	return []matrixRow{
+		row(getReferrers, base+sha256Digest(registryManifest("v1")), "",
+			holds(dockerA, "work/app/", types.ActionRead), 200),
+	}
+}

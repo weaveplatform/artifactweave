@@ -67,6 +67,7 @@ func statusTable() []statusCase {
 		registryStatusRows(),
 		registryBlobStatusRows(),
 		registryManifestStatusRows(),
+		registryReferrersStatusRows(),
 	)
 }
 
@@ -512,6 +513,7 @@ var implementedHandwritten = map[string]bool{
 	prefixToken:   true,
 	registryAuth:  true,
 	legacyAuth:    true,
+	getReferrers:  true,
 }
 
 func descriptorStatusRows() []statusCase {

@@ -77,23 +77,27 @@ func (s *Service) folderState(
 }
 
 // PutManifest stores p's manifest in each of its folders (decision 0031):
-// the exact bytes as manifest.json, with the properties jf and Docker
-// clients read, and the config and layers linked beside it by reference to
-// their stored content, never copied. Every blob must already be in the
-// image (a *BlobsUnknownError otherwise). A folder holding the same
-// manifest is left as it is; one holding another manifest, or anything
-// else, is replaced, all folders in one transaction.
+// the exact bytes as manifest.json, or list.manifest.json for an index or
+// manifest list, with the properties jf and Docker clients read, and an
+// image's config and layers linked beside it by reference to their stored
+// content, never copied. Every blob an image needs, and every manifest an
+// index lists, must already be in the image (a *BlobsUnknownError
+// otherwise); a subject need not be. A folder holding the same manifest is
+// left as it is; one holding another manifest, or anything else, is
+// replaced, all folders in one transaction.
 func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	m := p.Manifest
-	if m.Index() {
-		return fmt.Errorf("%w: image indexes and manifest lists are not stored yet",
-			layout.ErrManifestInvalid)
+	if err := s.childrenPresent(ctx, p.Owner, m.Children()); err != nil {
+		return err
 	}
 	found, err := s.present(ctx, p.Owner, m.Blobs())
 	if err != nil {
 		return err
 	}
-	labels := s.labels(ctx, m)
+	var labels map[string]string
+	if !m.Index() {
+		labels = s.labels(ctx, m)
+	}
 	info, err := s.commitBody(ctx, p.Body, m.Digest)
 	if err != nil {
 		return err
@@ -136,6 +140,31 @@ func (s *Service) present(ctx context.Context, o Owner, digests []string) ([]str
 		return nil, &BlobsUnknownError{Digests: missing}
 	}
 	return found, nil
+}
+
+// childrenPresent checks that each manifest an index lists is stored in o's
+// image, by tag or by digest: clients push the platform manifests first,
+// and jf finds them there (research 23, 5.1). Those missing are a
+// *BlobsUnknownError, MANIFEST_BLOB_UNKNOWN as decision 0031 answers it; a
+// digest under another algorithm cannot be stored here, so it is missing.
+func (s *Service) childrenPresent(ctx context.Context, o Owner, digests []string) error {
+	var missing []string
+	for _, d := range digests {
+		if hex, ok := layout.SHA256Hex(d); ok {
+			_, err := layout.FindManifest(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
+			switch {
+			case err == nil:
+				continue
+			case !errors.Is(err, store.ErrNotFound):
+				return err //nolint:wrapcheck // the layout names itself
+			}
+		}
+		missing = append(missing, d)
+	}
+	if len(missing) > 0 {
+		return &BlobsUnknownError{Digests: missing}
+	}
+	return nil
 }
 
 // labels reads the image's labels from its config blob, which present

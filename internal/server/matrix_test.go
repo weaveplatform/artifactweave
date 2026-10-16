@@ -386,6 +386,7 @@ func matrixTable() []matrixRow {
 		registryMatrix(),
 		registryBlobMatrix(),
 		registryManifestMatrix(),
+		registryReferrersMatrix(),
 	)
 }
 

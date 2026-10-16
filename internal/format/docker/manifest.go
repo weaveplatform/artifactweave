@@ -90,18 +90,24 @@ type Manifest struct {
 	Manifests []Descriptor
 	// Subject is the manifest this one refers to, if any.
 	Subject *Descriptor
+	// ArtifactType and Annotations are the manifest's own, which the
+	// referrers API reports for it.
+	ArtifactType string
+	Annotations  map[string]string
 }
 
 // wire is a manifest's JSON as all four types spell it.
 //
 //nolint:tagliatelle // the OCI image specification's field names
 type wire struct {
-	SchemaVersion *int         `json:"schemaVersion"`
-	MediaType     string       `json:"mediaType"`
-	Config        *Descriptor  `json:"config"`
-	Layers        []Descriptor `json:"layers"`
-	Manifests     []Descriptor `json:"manifests"`
-	Subject       *Descriptor  `json:"subject"`
+	SchemaVersion *int              `json:"schemaVersion"`
+	MediaType     string            `json:"mediaType"`
+	ArtifactType  string            `json:"artifactType"`
+	Config        *Descriptor       `json:"config"`
+	Layers        []Descriptor      `json:"layers"`
+	Manifests     []Descriptor      `json:"manifests"`
+	Subject       *Descriptor       `json:"subject"`
+	Annotations   map[string]string `json:"annotations"`
 }
 
 // Index reports whether the manifest is an image index or manifest list.
@@ -193,6 +199,7 @@ func ParseManifest(contentType string, body []byte, hex string) (Manifest, error
 	m := Manifest{
 		MediaType: t, Digest: hex, Config: w.Config, Layers: w.Layers,
 		Manifests: w.Manifests, Subject: w.Subject,
+		ArtifactType: w.ArtifactType, Annotations: w.Annotations,
 	}
 	if !m.Index() && m.Config == nil {
 		return Manifest{}, fmt.Errorf("%w: an image manifest needs a config", ErrManifestInvalid)
@@ -233,9 +240,10 @@ func (m Manifest) ConfigType() string {
 }
 
 // Properties are the properties of the manifest stored in folder of the
-// image name: the five jf and Docker clients rely on, and a
-// docker.label.<label> for each of the image's labels. A label whose name
-// no property key may carry is left out.
+// image name: the five jf and Docker clients rely on, oci.subject and
+// oci.artifactType for a manifest with a subject, which the referrers API
+// is answered from (DV-036), and a docker.label.<label> for each of the
+// image's labels. A label whose name no property key may carry is left out.
 func Properties(m Manifest, name, folder string, labels map[string]string) types.Properties {
 	p := types.Properties{}
 	p.Set(ManifestProperty, folder)
@@ -243,6 +251,12 @@ func Properties(m Manifest, name, folder string, labels map[string]string) types
 	p.Set(ManifestTypeProperty, m.MediaType)
 	p.Set(RepoNameProperty, name)
 	p.Set(SHA256Property, m.Digest)
+	if m.Subject != nil {
+		p.Set(SubjectProperty, m.Subject.Digest)
+		if t := m.ReferrerType(); t != "" {
+			p.Set(ArtifactTypeProperty, t)
+		}
+	}
 	for k, v := range labels {
 		key := LabelPropertyPrefix + k
 		if types.ValidatePropertyKey(key) == nil {
