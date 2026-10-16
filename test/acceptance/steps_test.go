@@ -746,8 +746,9 @@ func (w *world) awaitExpiry(name string) error {
 }
 
 // runJF runs the JFrog CLI with its arguments expanded (expand).
-// JFROG_CLI_HOME_DIR isolates the CLI's config from the developer's; it
-// lasts for the scenario.
+// JFROG_CLI_HOME_DIR isolates the CLI's config from the developer's, and
+// JFROG_CLI_TEMP_DIR its build-info between commands; both last for the
+// scenario.
 func (w *world) runJF(args string) error {
 	if w.jfHome == "" {
 		home, err := os.MkdirTemp("", "jfrog-home-")
@@ -755,6 +756,9 @@ func (w *world) runJF(args string) error {
 			return err
 		}
 		w.t.Cleanup(func() { _ = os.RemoveAll(home) })
+		if err := os.Mkdir(filepath.Join(home, "tmp"), 0o700); err != nil {
+			return err
+		}
 		w.jfHome = home
 	}
 	home := w.jfHome
@@ -766,6 +770,8 @@ func (w *world) runJF(args string) error {
 	cmd.Env = append(
 		os.Environ(),
 		"JFROG_CLI_HOME_DIR="+home,
+		// Unset, parallel runs on one machine share $TMPDIR/jfrog-<user>/builds.
+		"JFROG_CLI_TEMP_DIR="+filepath.Join(home, "tmp"),
 		"JFROG_CLI_REPORT_USAGE=false",
 		// The CLI's own update check calls GitHub; tests stay offline.
 		"JFROG_CLI_AVOID_NEW_VERSION_WARNING=true",
