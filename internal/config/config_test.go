@@ -141,6 +141,10 @@ search:
     non_admin_scan_factor: 3
   user_query_limit: 50
   limit_anonymous_users_only: false
+work:
+  workers: 8
+  lease: 5m
+  max_attempts: 4
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -191,6 +195,7 @@ search:
 			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
 			UserQueryLimit: 50,
 		},
+		Work: WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -210,10 +215,10 @@ func TestEnvCoversEveryKey(t *testing.T) {
 			env[envName(k)] = "8MiB"
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."),
-			k == "search.user_query_limit":
+			k == "search.user_query_limit", k == "work.workers", k == "work.max_attempts":
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
-			strings.HasSuffix(k, ".ttl"):
+			strings.HasSuffix(k, ".ttl"), k == "work.lease":
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
@@ -233,6 +238,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Download.Redirect.TTL != 45*time.Second ||
 		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
+		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -802,6 +808,30 @@ func TestSearchLimitConfig(t *testing.T) {
 	})
 	if err != nil || got.Search.UserQueryLimit != 0 || !got.Search.LimitAnonymousUsersOnly {
 		t.Fatalf("load: %+v, %v", got.Search, err)
+	}
+}
+
+func TestWorkConfig(t *testing.T) {
+	d := Default().Work
+	if d.Workers != 4 || d.Lease != 2*time.Minute || d.MaxAttempts != 10 {
+		t.Fatalf("defaults: %+v", d)
+	}
+	for _, flags := range []map[string]string{
+		{"work.workers": "0"}, {"work.max_attempts": "0"}, {"work.lease": "500ms"},
+	} {
+		if _, err := Load(LoadOptions{Flags: flags}); !errors.Is(err, ErrInvalidValue) {
+			t.Errorf("%v: %v", flags, err)
+		}
+	}
+	// The flag beats the environment, which beats the file.
+	got, err := Load(LoadOptions{
+		File:  writeFile(t, "work:\n  workers: 2\n  lease: 1m\n"),
+		Env:   envOf(map[string]string{"ARTIFACTWEAVE_WORK_WORKERS": "6"}),
+		Flags: map[string]string{"work.workers": "9"},
+	})
+	if err != nil || got.Work.Workers != 9 || got.Work.Lease != time.Minute ||
+		got.Work.MaxAttempts != 10 {
+		t.Fatalf("load: %+v, %v", got.Work, err)
 	}
 }
 

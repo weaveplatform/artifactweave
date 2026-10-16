@@ -158,6 +158,7 @@ type Store interface {
 	Replications() ReplicationStore
 	Settings() SettingsStore
 	Leases() LeaseStore
+	WorkQueue() WorkQueue
 	Configs() ConfigStore
 
 	Instance() InstanceStore
