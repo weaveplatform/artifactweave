@@ -84,6 +84,11 @@ handler serves them.
   resolution exist ([0007](0007-remote-repositories.md), [0008](0008-virtual-repositories.md)).
   The version probe, the token and the `auth` endpoints work for them, so logging in to a
   virtual repository already works.
+- **Remote and virtual npm and Go repositories** answer their protocol with 501 in the
+  format's own envelope (npm's `{"error":...}`, Go's plain text), naming the class, until
+  P9 and P10 bring upstream fetching and member resolution ([0032](0032-package-format-handlers.md)).
+  Maven is served by the item routes and keeps their behaviour: a remote refuses deploys and
+  a virtual deploys to its default deployment repository.
 
 **Repositories API** (research 02). The behaviour where JFrog leaves room:
 - **Keys:** unique without regard to case, as Artifactory enforces them.

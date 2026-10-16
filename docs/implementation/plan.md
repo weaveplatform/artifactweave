@@ -543,10 +543,60 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 
 ## P7: npm, Go, Maven locals
 
+Decisions: [0003](../research/decisions/0003-repository-model.md),
+[0015](../research/decisions/0015-testing-and-acceptance.md),
+[0018](../research/decisions/0018-package-index.md),
+[0032](../research/decisions/0032-package-format-handlers.md),
+[0033](../research/decisions/0033-persistent-work-queue.md); research
+[24](../research/24-package-format-handlers.md).
+
 **Tasks**
-1. npm: packuments (full and abbreviated), scoped names, publish with attachments and conflict handling, unpublish, deprecate, dist-tags, search, web login and the `done` poll, legacy `adduser`, `ping`, reindex, strict layout conversion.
+1. npm: packuments (full and abbreviated), scoped names, publish with attachments and conflict handling, unpublish, deprecate, dist-tags, search, legacy `adduser`, `ping`, reindex, strict layout conversion. Web login and the `done` poll are deferred to #262.
 2. Go: `@v/list`, `.info`, `.mod`, `.zip`, `@latest`, case encoding, `go-publish` PUTs with matrix params and `X-Checksum-Sha256` in the response.
 3. Maven: layouts for Maven, Gradle, Ivy and SBT; artifact and snapshot-level `maven-metadata.xml`, `snapshotVersionBehavior`, `maxUniqueSnapshots` through the index, `calculateMetadata`, `generatePom`, version tokens `[RELEASE]`/`[INTEGRATION]`/`SNAPSHOT`.
+
+**Tracking.** Epic #261 holds one GitHub issue per PR:
+- **Prework, done (2026-10-16):**
+  1. SHA-512 as a first-class checksum of stored content (#296).
+  2. Persistent work queue for asynchronous derived work (#297).
+- **Research:**
+  1. Research 24 and decision 0032: package format handlers (#263).
+  2. npm research and decision (#264).
+  3. Go modules research and decision (#265).
+  4. Maven, Gradle, Ivy and SBT research and decision (#266).
+- **Groundwork:**
+  1. Format framework v2: hook environment, optional interfaces and format errors (#267).
+  2. Format contract suite and shared helpers (#268).
+  3. Package protocol router kit and per-format test tables (#269).
+  4. Acceptance clients for npm, Go and Maven (#270).
+  5. Terraform: local npm, Go, Maven and Gradle repositories (#271).
+- **Go:**
+  1. Go format handler and package index (#272).
+  2. GOPROXY read endpoints under `/artifactory/api/go/{repo}` (#273).
+  3. `jf go-publish` uploads to Go repositories (#274).
+  4. P7 Go exit checks (#275).
+- **Maven:**
+  1. Maven format handler, coordinates and package index (#276).
+  2. Verify the Gradle, Ivy, SBT and Maven 1 layouts (#277).
+  3. Maven deploy rules: release and snapshot policy, POM checks, metadata and checksum uploads (#278).
+  4. `maven-metadata.xml` at the snapshot, artifact and plugin levels (#279).
+  5. `snapshotVersionBehavior`: unique, non-unique and deployer (#280).
+  6. Version tokens `[RELEASE]`, `[INTEGRATION]` and `SNAPSHOT` download resolution (#281).
+  7. `calculateMetadata` and `generatePom` (#282).
+  8. `maxUniqueSnapshots` (#283).
+  9. P7 Maven exit checks (#284).
+- **npm:**
+  1. npm REST operations in the OpenAPI sources (#285).
+  2. npm format: tarball inspection, canonical paths, properties and the package index (#286).
+  3. npm read path: packuments, version manifests, tarballs, ping and whoami (#287).
+  4. npm publish (#288).
+  5. npm dist-tags and deprecate (#289).
+  6. npm unpublish (#290).
+  7. npm search (#291).
+  8. npm authentication: legacy login, logout and `api/npm/auth` (#292).
+  9. npm reindex and strict-layout conversion (#293).
+  10. P7 npm exit checks (#294).
+- **Exit:** P7 exit checks: npm, Go and Maven with their native clients, M2 (#295).
 
 **Exit criteria**
 - `npm publish/install/dist-tag/unpublish`, `go mod download` plus `jf go-publish`, `mvn deploy` and resolve including snapshots pass in the acceptance containers. **M2.**

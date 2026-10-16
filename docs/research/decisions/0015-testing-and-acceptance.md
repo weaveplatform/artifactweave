@@ -36,7 +36,13 @@ registry with the same fault modes.
 `needs`. godog features in `test/acceptance/features` drive the `-cover` built binary.
 Go-based clients (`jf`, `terraform`, `helm`, `crane`, `oras`, `cosign`) are pinned tool
 binaries, not containers; `maven`, `dotnet`, `node` and `python` run in containers with
-cached dependency volumes. The default storage is SQLite with the fs blob store;
+cached dependency volumes. The `go` command is the runner's own toolchain, the one
+`actions/setup-go` installs from `go.mod`, run with `GOTOOLCHAIN=local` and
+`GOFLAGS=-modcacherw`, so it needs no pin of its own. The client images are pinned by digest
+and kept current by Dependabot. They run with `--network host` and the runner's user, so a
+container reaches the binary on `127.0.0.1`, the base URL inside metadata stays valid, and
+cleanup can delete what they write. For M2, `npm`, `go` and `mvn` gate the job; Gradle runs
+too but does not gate it ([0032](0032-package-format-handlers.md)). The default storage is SQLite with the fs blob store;
 PostgreSQL and MinIO run a `@storage`-tagged subset. Coverage goes to `cover/accept` and
 is merged into the gate. Budget: 15 minutes wall clock per pull request.
 
