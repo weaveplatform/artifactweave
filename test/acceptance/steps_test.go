@@ -73,6 +73,9 @@ type world struct {
 	// closers release what steps started (containers, the edge), after
 	// the server has stopped.
 	closers []func()
+	// dockerConfig is the scenario's docker configuration, which docker
+	// login and crane write their credentials to.
+	dockerConfig string
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's
@@ -115,6 +118,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	})
 	w.registerCDN(sc)
 	w.registerCache(sc)
+	w.registerDocker(sc)
 	sc.Step(`^the registry is running$`, w.start)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
@@ -667,13 +671,15 @@ func (w *world) jfAvailable() error {
 }
 
 // expand replaces {url} with the registry's Artifactory base, {platform}
-// with its platform base, {password} with the seeded admin's, {dir} with the
+// with its platform base, {host} with its host and port as a registry
+// client names it, {password} with the seeded admin's, {dir} with the
 // scenario's file directory and {name} with a value kept from earlier
 // output.
 func (w *world) expand(s string) string {
 	pairs := []string{
 		"{url}", w.url + "/artifactory",
 		"{platform}", w.url,
+		"{host}", strings.TrimPrefix(w.url, "http://"),
 		"{password}", testAdminPassword,
 		"{dir}", w.dir,
 	}

@@ -397,7 +397,7 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | Command | What |
 |---|---|
 | `make gate` | Everything the per-PR jobs run except acceptance |
-| `make accept` | The acceptance job (needs Docker) |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN` and `ARTIFACTWEAVE_CRANE_BIN` name the pinned `jf` and `crane`; their scenarios skip without them, and `docker login` runs on Linux only, where the daemon shares the binary's 127.0.0.1 |
 | `make conformance` | The OCI conformance job (needs Docker and network for the spec clone) |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |

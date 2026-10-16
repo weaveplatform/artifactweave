@@ -182,15 +182,27 @@ func (g *Registry) mount(w http.ResponseWriter, r *http.Request, q Request, o re
 // a subdomain it is an image of the same repository. Under the Artifactory
 // prefix it is either, as the client sees the registry through whichever
 // method the reverse proxy in front of it rewrites from: the repository
-// form is tried first when its first segment names a repository.
+// form is tried first when its first segment names a repository. Each
+// source keeps from as the client wrote it and the realm the request's own
+// is under, which a registry token's grant for it names (Require).
 func (g *Registry) mountSources(r *http.Request, q Request, from string) []Request {
-	same := Request{Repo: q.Repo, Name: from}
+	same := Request{RepoKey: q.RepoKey, Repo: q.Repo, Name: from, base: q.base}
 	var out []Request
 	if q.base != "/v2" {
 		if key, name, ok := strings.Cut(from, "/"); ok {
 			c, found, err := g.lookup(r.Context(), key)
 			if err == nil && found && c.Class != repo.Remote && c.Class != repo.Virtual {
-				out = append(out, Request{Repo: c, Name: name})
+				src := Request{RepoKey: key, Repo: c, Name: name, base: "/v2/" + key}
+				if strings.HasPrefix(q.base, prefix) {
+					src = Request{
+						RepoKey: q.RepoKey,
+						Repo:    c,
+						Name:    name,
+						base:    q.base,
+						scope:   from,
+					}
+				}
+				out = append(out, src)
 			}
 		}
 	}

@@ -73,6 +73,36 @@ type Token struct {
 	Secret string `json:"-"`
 	// Identity is how the subject resolves to a user.
 	Identity TokenIdentity
+	// Registry is set on a registry token alone, which the Docker token
+	// endpoint issues and nothing stores (decision 0005): what it grants.
+	Registry *RegistryAccess `json:"-"`
+}
+
+// Registry token defaults (decision 0005).
+const (
+	// RegistryTokenExpiry is a registry token's lifetime, shortened to the
+	// remaining life of the credential that obtained it.
+	RegistryTokenExpiry = time.Hour
+)
+
+// RegistryAccess is what a registry token grants: the scopes the client
+// asked the token endpoint for, each with only the actions the caller held.
+type RegistryAccess struct {
+	// Realm is the repository key the token endpoint was addressed by, the
+	// <repo> of .../api/docker/<repo>/v2/token or a subdomain's repository;
+	// empty for null and for /v2/token on the repository path, where each
+	// name begins with its repository key.
+	Realm  string          `json:"realm,omitempty"`
+	Grants []RegistryGrant `json:"access"`
+}
+
+// RegistryGrant is one granted scope in the Docker token specification's
+// form: type repository with an image name as the client addresses it and
+// the actions pull, push and delete, or type registry with name catalog.
+type RegistryGrant struct {
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	Actions []string `json:"actions"`
 }
 
 // Expired reports whether the token has expired at now.

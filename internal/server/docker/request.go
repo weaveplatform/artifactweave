@@ -2,6 +2,7 @@ package docker
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
@@ -31,6 +32,10 @@ type Request struct {
 	base string
 	// resolved is set once Repo holds the repository RepoKey names.
 	resolved bool
+	// scope is the image's name as the client wrote it, when base does not
+	// imply it: a mount source under the Artifactory prefix named in the
+	// repository form, <repo>/<image>.
+	scope string
 }
 
 // Path returns the absolute path of an operation on the request's image in
@@ -44,13 +49,21 @@ func (q Request) Path(segments ...string) string {
 // Require answers nil when the caller holds every action in want on path,
 // a path inside the repository. Otherwise it answers what the registry
 // tells a client: UNAUTHORIZED to an anonymous caller, so that it sends
-// credentials, and DENIED to anyone else. A request without a principal
-// reached the handler only on a server built without authentication,
-// which only tests build, and is allowed.
+// credentials, and DENIED to anyone else. A registry token must also
+// grant the actions for the image as this request names it; one that does
+// not gets UNAUTHORIZED, whose challenge (Challenge) names the scope the
+// client then fetches a token for, as Docker's registry answers an
+// insufficient scope. A request without a principal reached the handler
+// only on a server built without authentication, which only tests build,
+// and is allowed.
 func (q Request) Require(r *http.Request, path string, want types.Actions) error {
 	p, ok := auth.FromContext(r.Context())
 	if !ok || p.Access() == nil {
 		return nil
+	}
+	if p.Registry != nil && !q.granted(p.Registry, r.Method, want) {
+		return Errorf(http.StatusUnauthorized, CodeUnauthorized,
+			"the token does not grant this access to %s", q.scopeName())
 	}
 	if p.Access().Allows(types.ResourceArtifact, authz.Repo{
 		Key: q.Repo.Key, Class: string(q.Repo.Class),
@@ -62,4 +75,64 @@ func (q Request) Require(r *http.Request, path string, want types.Actions) error
 	}
 	return Errorf(http.StatusForbidden, CodeDenied,
 		"requested access to %s in %s is denied", q.Name, q.Repo.Key)
+}
+
+// scopeName is the image's name as the client wrote it, the name of its
+// token scope: on the repository path it begins with the repository key.
+func (q Request) scopeName() string {
+	if q.scope != "" {
+		return q.scope
+	}
+	if strings.HasPrefix(q.base, "/v2/") {
+		return q.RepoKey + "/" + q.Name
+	}
+	return q.Name
+}
+
+// granted reports whether a registry token grants every action want needs
+// on the request's image. A grant binds the name as the client wrote it
+// and the realm it was issued under: null names repository-path names,
+// any other realm names that repository's images. Read needs pull,
+// Deploy and Annotate push, and Delete delete on a DELETE but push
+// otherwise: a scope names what the client does, and replacing a tag is
+// part of a push, which Docker asks pull,push for (the permissions still
+// require Delete, DV-035). Manage is never granted.
+func (q Request) granted(a *types.RegistryAccess, method string, want types.Actions) bool {
+	pathMethod := strings.HasPrefix(q.base, "/v2/")
+	if a.Realm == "" && !pathMethod || a.Realm != "" && !strings.EqualFold(a.Realm, q.RepoKey) {
+		return false
+	}
+	need := map[types.Actions]string{
+		types.ActionRead: actionPull, types.ActionWrite: actionPush,
+		types.ActionAnnotate: actionPush, types.ActionDelete: actionPush,
+	}
+	if method == http.MethodDelete {
+		need[types.ActionDelete] = actionDelete
+	}
+	name := q.scopeName()
+	for bit := types.Actions(1); bit != 0 && bit <= want; bit <<= 1 {
+		if want&bit == 0 {
+			continue
+		}
+		action, known := need[bit]
+		if !known || !slices.ContainsFunc(a.Grants, func(g types.RegistryGrant) bool {
+			return g.Type == scopeRepository && strings.EqualFold(g.Name, name) &&
+				(slices.Contains(g.Actions, action) || slices.Contains(g.Actions, actionAll))
+		}) {
+			return false
+		}
+	}
+	return true
+}
+
+// GrantsCatalog reports whether the request's credential may list the
+// catalog: any but a registry token without registry:catalog:*.
+func GrantsCatalog(r *http.Request) bool {
+	p, ok := auth.FromContext(r.Context())
+	if !ok || p.Registry == nil {
+		return true
+	}
+	return slices.ContainsFunc(p.Registry.Grants, func(g types.RegistryGrant) bool {
+		return g.Type == scopeRegistry && g.Name == "catalog" && len(g.Actions) > 0
+	})
 }

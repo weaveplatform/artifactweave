@@ -219,6 +219,57 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 	return out, nil
 }
 
+// RegistryRequest asks for a registry token (decision 0005).
+type RegistryRequest struct {
+	Username string
+	// ExpiresIn is the lifetime; it must be positive, and at most
+	// types.RegistryTokenExpiry.
+	ExpiresIn time.Duration
+	Access    types.RegistryAccess
+}
+
+// IssueRegistry signs a registry token: an access token with the user's
+// applied permissions whose registry claim carries what it grants. Nothing
+// stores it, as Artifactory stores no token below its persistence
+// threshold, so it cannot be listed or revoked; its short life, the
+// grants and the user's current permissions bound it instead (Verify).
+func (s *Service) IssueRegistry(_ context.Context, r RegistryRequest) (Issued, error) {
+	if r.Username == "" || strings.Contains(r.Username, "/") {
+		return Issued{}, fmt.Errorf("%w: a user name is required", ErrInvalidRequest)
+	}
+	if r.ExpiresIn <= 0 || r.ExpiresIn > types.RegistryTokenExpiry {
+		return Issued{}, fmt.Errorf("%w: a registry token lives at most %s",
+			ErrInvalidRequest, types.RegistryTokenExpiry)
+	}
+	now := s.now().Truncate(time.Second)
+	access := r.Access
+	if access.Grants == nil {
+		// An empty list, not null, in the claim, as the Docker token
+		// specification writes it.
+		access.Grants = []types.RegistryGrant{}
+	}
+	rec := types.Token{
+		ID:        newUUID(),
+		Subject:   s.issuer + "/users/" + r.Username,
+		Scope:     types.UserScope(),
+		Audience:  DefaultAudience,
+		IssuedAt:  now,
+		ExpiresAt: now.Add(r.ExpiresIn),
+		Registry:  &access,
+	}
+	s.mu.Lock()
+	keys := s.keys
+	s.mu.Unlock()
+	raw, err := sign(keys.priv, keys.active, claims{
+		Ver: "2", Sub: rec.Subject, Scp: rec.Scope.String(), Aud: rec.Audience, Iss: s.issuer,
+		Iat: now.Unix(), Exp: rec.ExpiresAt.Unix(), Jti: rec.ID, Registry: &access,
+	})
+	if err != nil {
+		return Issued{}, err
+	}
+	return Issued{Record: rec, AccessToken: raw, ExpiresIn: int64(r.ExpiresIn / time.Second)}, nil
+}
+
 // expiresIn resolves a requested lifetime.
 func (s *Service) expiresIn(ctx context.Context, req *time.Duration) (time.Duration, error) {
 	if req != nil {
@@ -261,7 +312,7 @@ func (s *Service) Verify(ctx context.Context, raw string) (types.Token, error) {
 	if rec.Expired(now) {
 		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
 	}
-	if now.Sub(rec.LastUsed) >= touchEvery {
+	if rec.Registry == nil && now.Sub(rec.LastUsed) >= touchEvery {
 		// Best effort: a failed write must not fail the request.
 		_ = s.st.Tokens().Touch(ctx, rec.ID, now)
 	}
@@ -308,6 +359,9 @@ func (s *Service) verifyJWT(
 	if !allowExpired && c.Exp != 0 && !s.now().Before(time.Unix(c.Exp, 0)) {
 		return types.Token{}, fmt.Errorf("%w: expired", auth.ErrInvalidToken)
 	}
+	if c.Registry != nil {
+		return registryRecord(c, allowExpired)
+	}
 	rec, err := s.st.Tokens().Get(ctx, c.Jti)
 	if errors.Is(err, store.ErrNotFound) {
 		return types.Token{}, fmt.Errorf("%w: revoked", auth.ErrInvalidToken)
@@ -319,6 +373,23 @@ func (s *Service) verifyJWT(
 		return types.Token{}, fmt.Errorf("%w: subject", auth.ErrInvalidToken)
 	}
 	return rec, nil
+}
+
+// registryRecord is the record a verified registry token stands for: no
+// store holds one. A registry token never refreshes, and one without an
+// expiry was not issued here.
+func registryRecord(c claims, allowExpired bool) (types.Token, error) {
+	if allowExpired || c.Exp == 0 {
+		return types.Token{}, fmt.Errorf("%w: registry token", auth.ErrInvalidToken)
+	}
+	scope, err := types.ParseScope(c.Scp)
+	if err != nil {
+		return types.Token{}, errMalformed
+	}
+	return types.Token{
+		ID: c.Jti, Subject: c.Sub, Scope: scope, Audience: c.Aud,
+		IssuedAt: time.Unix(c.Iat, 0), ExpiresAt: time.Unix(c.Exp, 0), Registry: c.Registry,
+	}, nil
 }
 
 // publicKey returns the key with kid, reloading once when it is unknown,

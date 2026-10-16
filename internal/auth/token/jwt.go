@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // header is a token's JOSE header. Only RS256 is issued or accepted, so a
@@ -34,6 +36,8 @@ type claims struct {
 	Exp int64  `json:"exp,omitempty"`
 	Iat int64  `json:"iat"`
 	Jti string `json:"jti"`
+	// Registry marks a registry token, which no record backs (IssueRegistry).
+	Registry *types.RegistryAccess `json:"registry,omitempty"`
 }
 
 var b64 = base64.RawURLEncoding

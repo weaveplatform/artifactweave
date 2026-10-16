@@ -73,8 +73,13 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 				if errors.Is(err, auth.ErrPasswordExpired) && ownPasswordChange(r, p.Name) {
 					err = nil
 				}
+				if err == nil && p.Registry != nil && !docker.IsRegistryPath(r.URL.Path) {
+					// A registry token is good for the registry alone
+					// (decision 0005).
+					err = auth.ErrBadCredentials
+				}
 				if err == nil {
-					p, err = authorize(ctx, st, p, false)
+					p, err = authorize(ctx, st, p, p.Anonymous)
 				} else if who, ok := expiredRefresh(ctx, a, r, err); ok {
 					next.ServeHTTP(w, r.WithContext(auth.WithExpiredToken(ctx, who)))
 					return

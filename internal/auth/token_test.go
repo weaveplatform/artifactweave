@@ -5,6 +5,7 @@ import (
 	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -324,5 +325,61 @@ func TestOIDCTokenIdentities(t *testing.T) {
 	if _, err := broken.Token(ctx, "transient-new", ""); err == nil ||
 		errors.Is(err, ErrBadCredentials) {
 		t.Errorf("an unreadable auto-join list is not a credential failure: %v", err)
+	}
+}
+
+// A registry token's principal carries its grants and its expiry. An
+// anonymous one acts as anonymous, and only while anonymous access is on.
+func TestRegistryTokenPrincipal(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	for _, u := range []types.User{{Name: "dev"}, {Name: AnonymousUser}} {
+		if err := db.Users().Create(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exp := time.Now().Add(time.Hour).Truncate(time.Second)
+	access := &types.RegistryAccess{Grants: []types.RegistryGrant{
+		{Type: "repository", Name: "r/app", Actions: []string{"pull"}},
+	}}
+	v := fakeVerifier{
+		"dev": {
+			ID: "j1", Subject: "jfac@x/users/dev", Scope: types.UserScope(),
+			ExpiresAt: exp, Registry: access,
+		},
+		"anon": {
+			ID: "j2", Subject: "jfac@x/users/" + AnonymousUser, Scope: types.UserScope(),
+			ExpiresAt: exp, Registry: access,
+		},
+		// An ordinary token keeps its user, even one named anonymous.
+		"plain": {ID: "j3", Subject: "jfac@x/users/" + AnonymousUser, Scope: types.UserScope()},
+	}
+	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := a.Token(ctx, "dev", "")
+	if err != nil || p.Anonymous || p.Registry != access || !p.TokenExpires.Equal(exp) ||
+		p.TokenID != "j1" {
+		t.Fatalf("dev: %+v, %v", p, err)
+	}
+	if _, err := a.Token(ctx, "anon", ""); !errors.Is(err, ErrBadCredentials) {
+		t.Fatalf("anonymous while off: %v", err)
+	}
+	if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+		t.Fatal(err)
+	}
+	if p, err := a.Token(ctx, "anon", ""); err != nil || !p.Anonymous || p.Name != AnonymousUser {
+		t.Fatalf("anonymous while on: %+v, %v", p, err)
+	}
+	if p, err := a.Token(ctx, "plain", ""); err != nil || p.Anonymous || p.Registry != nil {
+		t.Fatalf("plain: %+v, %v", p, err)
+	}
+	broken, err := NewAuthenticator(db.Users(), failingSettings{db.Settings()}, Options{Tokens: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := broken.Token(ctx, "anon", ""); err == nil || errors.Is(err, ErrBadCredentials) {
+		t.Fatalf("settings failure: %v", err)
 	}
 }
