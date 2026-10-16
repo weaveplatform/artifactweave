@@ -814,6 +814,74 @@ func mergePolicy(p types.PasswordPolicy, b accessgen.PasswordPolicy) types.Passw
 	return p
 }
 
+// GetAccessUserLockPolicy returns the Access view of the state that
+// /artifactory/api/security/userLockPolicy and the password expiration
+// policy also read.
+func (s accessService) GetAccessUserLockPolicy(
+	ctx context.Context,
+	_ accessgen.GetAccessUserLockPolicyRequestObject,
+) (accessgen.GetAccessUserLockPolicyResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, err := svc.AccessLockPolicy(ctx)
+	if err != nil {
+		return nil, s.identityErr(ctx, "read user lock policy", "", err)
+	}
+	return accessgen.GetAccessUserLockPolicy200JSONResponse(lockPolicyDoc(p)), nil
+}
+
+// ConfigureAccessUserLockPolicy replaces the policy. An omitted field is
+// stored as 0 or false, not as its default: Access's request model has plain
+// numbers and booleans, and JFrog documents the consequences (omitting
+// attempts turns locking off).
+func (s accessService) ConfigureAccessUserLockPolicy(
+	ctx context.Context,
+	req accessgen.ConfigureAccessUserLockPolicyRequestObject,
+) (accessgen.ConfigureAccessUserLockPolicyResponseObject, error) {
+	svc, err := s.adminIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.Body == nil {
+		return nil, badRequest("a user lock policy is required")
+	}
+	b := req.Body
+	stored, err := svc.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{
+		Attempts:           derefOr(b.Attempts, 0),
+		PasswordExpiryDays: derefOr(b.PasswordExpiryDays, 0),
+		AccessLockSettings: types.AccessLockSettings{
+			SecondsToUnlock:                derefOr(b.SecondsToUnlock, 0),
+			AdminPasswordExpirable:         derefOr(b.AdminPasswordExpirable, false),
+			MaxLoginDelayIncorrectAttempts: derefOr(b.MaxLoginDelayIncorrectAttempts, 0),
+			MaxLoginDelayMillis:            derefOr(b.MaxLoginDelayMillis, 0),
+			BaseLoginDelayMillis:           derefOr(b.BaseLoginDelayMillis, 0),
+			ClientLoginSuspensionEnabled:   derefOr(b.ClientLoginSuspensionEnabled, false),
+		},
+	})
+	if err != nil {
+		return nil, s.identityErr(ctx, "set user lock policy", "", err)
+	}
+	s.forgetPolicies()
+	return accessgen.ConfigureAccessUserLockPolicy200JSONResponse(lockPolicyDoc(stored)), nil
+}
+
+// lockPolicyDoc sets every field, so a 0 or false is sent rather than
+// omitted.
+func lockPolicyDoc(p identity.AccessLockPolicy) accessgen.UserLockPolicyConfig {
+	return accessgen.UserLockPolicyConfig{
+		Attempts:                       &p.Attempts,
+		SecondsToUnlock:                &p.SecondsToUnlock,
+		PasswordExpiryDays:             &p.PasswordExpiryDays,
+		AdminPasswordExpirable:         &p.AdminPasswordExpirable,
+		MaxLoginDelayIncorrectAttempts: &p.MaxLoginDelayIncorrectAttempts,
+		MaxLoginDelayMillis:            &p.MaxLoginDelayMillis,
+		BaseLoginDelayMillis:           &p.BaseLoginDelayMillis,
+		ClientLoginSuspensionEnabled:   &p.ClientLoginSuspensionEnabled,
+	}
+}
+
 // forgetPolicies makes this instance's next login read the switch and the
 // policies again; other instances follow within the authenticator's cache
 // lifetime.

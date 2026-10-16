@@ -414,6 +414,87 @@ func TestLockout(t *testing.T) {
 	}
 }
 
+// TestAccessLockPolicyIsTheArtifactoryPolicies: the Access user lock policy
+// and the Artifactory lock and expiration policies are one state, so a
+// change through either API reads back through the other, and a lock limit
+// set through Access locks users.
+func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
+	const accessLock = "/access/api/v1/config/security/user_lock_policy"
+	h := statusFixture(t, false)
+	admin := jsonHeaders(basic("admin", "pw"))
+	read := func(path string) string {
+		t.Helper()
+		rec := do(t, h, http.MethodGet, path, basic("admin", "pw"), "")
+		if rec.Code != http.StatusOK {
+			t.Fatalf("GET %s: %d %s", path, rec.Code, rec.Body)
+		}
+		return rec.Body.String()
+	}
+	write := func(path, body string) string {
+		t.Helper()
+		rec := do(t, h, http.MethodPut, path, admin, body)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("PUT %s %s: %d %s", path, body, rec.Code, rec.Body)
+		}
+		return rec.Body.String()
+	}
+	defaults := `{"adminPasswordExpirable":false,"attempts":0,"baseLoginDelayMillis":1000,` +
+		`"clientLoginSuspensionEnabled":true,"maxLoginDelayIncorrectAttempts":2,` +
+		`"maxLoginDelayMillis":60000,"passwordExpiryDays":0,"secondsToUnlock":0}` + "\n"
+	if got := read(accessLock); got != defaults {
+		t.Fatalf("Access defaults: %q", got)
+	}
+
+	// Through Access, read through Artifactory. Omitted fields are stored
+	// as 0 or false, as Access does.
+	sent := `{"attempts":2,"passwordExpiryDays":30,"secondsToUnlock":60}`
+	stored := `{"adminPasswordExpirable":false,"attempts":2,"baseLoginDelayMillis":0,` +
+		`"clientLoginSuspensionEnabled":false,"maxLoginDelayIncorrectAttempts":0,` +
+		`"maxLoginDelayMillis":0,"passwordExpiryDays":30,"secondsToUnlock":60}` + "\n"
+	if got := write(accessLock, sent); got != stored {
+		t.Fatalf("stored: %q", got)
+	}
+	if got := read(secLockPol); got != "{\"enabled\":true,\"loginAttempts\":2}\n" {
+		t.Fatalf("Artifactory lock policy: %q", got)
+	}
+	if got := read(
+		secExpiry,
+	); got != "{\"enabled\":true,\"notifyByEmail\":true,\"passwordMaxAge\":30}\n" {
+		t.Fatalf("Artifactory expiration policy: %q", got)
+	}
+
+	// The limit set through Access locks a user after two failures.
+	probe := func(password string) int {
+		return do(t, h, http.MethodGet, secAPIKey, basic("user", password), "").Code
+	}
+	for range 2 {
+		probe("wrong")
+	}
+	if code := probe("pw"); code != http.StatusUnauthorized {
+		t.Fatalf("the Access limit did not lock: %d", code)
+	}
+
+	// Through Artifactory, read through Access; the other fields stay.
+	write(secLockPol, `{"enabled":true,"loginAttempts":7}`)
+	write(secExpiry, `{"enabled":false,"passwordMaxAge":30}`)
+	if got := read(accessLock); !strings.Contains(got, `"attempts":7,`) ||
+		!strings.Contains(
+			got,
+			`"passwordExpiryDays":0,`,
+		) || !strings.Contains(got, `"secondsToUnlock":60}`) {
+		t.Fatalf("Access after Artifactory writes: %q", got)
+	}
+
+	// attempts 0 turns locking off, unlocks, and keeps the limit.
+	write(accessLock, `{}`)
+	if got := read(secLockPol); got != "{\"enabled\":false,\"loginAttempts\":7}\n" {
+		t.Fatalf("Artifactory after attempts 0: %q", got)
+	}
+	if code := probe("pw"); code != http.StatusNotFound {
+		t.Fatalf("turning locking off left the lock: %d", code)
+	}
+}
+
 // TestPasswordExpiry checks an expired password is refused with its own
 // message, after the password verifies, and unexpiring restores access.
 func TestPasswordExpiry(t *testing.T) {

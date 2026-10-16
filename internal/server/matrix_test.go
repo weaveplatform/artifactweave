@@ -805,6 +805,7 @@ func accessIdentityMatrix() []matrixRow {
 		groups  = "/access/api/v2/groups"
 		basicSw = "/access/api/v1/config/security/authentication/basic_authentication_enabled"
 		policy  = "/access/api/v1/config/security/password_policy"
+		lockPol = "/access/api/v1/config/security/user_lock_policy"
 		newUser = `{"username":"n-{p}","email":"n@example.com","password":"Matrix-pass-1"}`
 	)
 	return []matrixRow{
@@ -851,6 +852,10 @@ func accessIdentityMatrix() []matrixRow {
 		at("PUT "+basicSw, `{"enabled":true}`, administrators, 200),
 		at("PUT "+policy, `{}`, administrators, 204),
 		at("PATCH "+policy, `{}`, administrators, 204),
+		at("GET "+lockPol, "", administrators, 200),
+		// Everything off, as the defaults are, so later principals are
+		// neither locked nor expired.
+		at("PUT "+lockPol, `{}`, administrators, 200),
 	}
 }
 

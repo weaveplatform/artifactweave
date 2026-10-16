@@ -50,6 +50,14 @@ func (UnimplementedStrict) CreatePasswordPolicy(context.Context, CreatePasswordP
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetAccessUserLockPolicy(context.Context, GetAccessUserLockPolicyRequestObject) (GetAccessUserLockPolicyResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ConfigureAccessUserLockPolicy(context.Context, ConfigureAccessUserLockPolicyRequestObject) (ConfigureAccessUserLockPolicyResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) GetTokenDefaultExpiry(context.Context, GetTokenDefaultExpiryRequestObject) (GetTokenDefaultExpiryResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
