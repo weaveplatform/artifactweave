@@ -39,6 +39,9 @@ var implemented = map[string]bool{
 
 	"GET /artifactory/api/v1/uploads/config": true,
 
+	// The reverse proxy read, for the Docker access method (#220).
+	"GET /artifactory/api/system/configuration/webServer": true,
+
 	// The GET searches (#169).
 	"GET /artifactory/api/search/artifact":    true,
 	"GET /artifactory/api/search/badChecksum": true,

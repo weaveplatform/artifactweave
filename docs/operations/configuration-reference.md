@@ -41,7 +41,7 @@ artifactweave has three configuration layers (decision
 | `master_key_previous` | | `ARTIFACTWEAVE_MASTER_KEY_PREVIOUS` | unset | The key being rotated away from, kept until `artifactweave keys rotate` has re-sealed every value (see below) |
 | `bootstrap.admin_password` | | `ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD` | generated | The seeded `admin` password, read on first start only. When unset, a random password is written to `<data_dir>/initial-admin-password` (mode 0600 on Unix) and the log names the file, never the password |
 | `bootstrap.descriptor` | `--bootstrap` (on `serve`) | `ARTIFACTWEAVE_BOOTSTRAP_DESCRIPTOR` | | Descriptor YAML applied once, after the first start's principals; see [Configuration as code](#configuration-as-code) |
-| `docker.subdomain_match` | | | off | Enables the subdomain access method in addition to repository-path routing |
+| `docker.subdomain_match` | | `ARTIFACTWEAVE_DOCKER_SUBDOMAIN_MATCH` | off | Adds the Docker subdomain access method to repository-path routing: a request whose host is `<repo>.<base_url host>`, where `<repo>` is a Docker, OCI or Helm OCI repository, addresses that repository ([reverse proxy](reverse-proxy.md#docker)). Needs `base_url`; the server refuses to start without it |
 | `log.level`, `log.format` | | | `info`, `json` | slog settings |
 | `gc.interval` | | `ARTIFACTWEAVE_GC_INTERVAL` | `4h` | Time between scheduled garbage collection passes, Artifactory's default schedule. `POST /api/system/storage/gc` runs a pass at any time (decision 0010) |
 | `gc.grace_period` | | `ARTIFACTWEAVE_GC_GRACE_PERIOD` | `1h` | How long content stays unreferenced before garbage collection deletes it. It must outlast the slowest upload, because content is written before the reference that keeps it |

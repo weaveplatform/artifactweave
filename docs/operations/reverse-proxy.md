@@ -24,9 +24,23 @@ receive internal addresses.
 ## Docker
 
 The repository-path method is native: `docker push proxy.example.com/<repo>/<image>:<tag>`
-reaches `/v2/<repo>/<image>/...` and needs no rewrite rules. The subdomain method
-(`<repo>.proxy.example.com`) needs wildcard DNS and a certificate SAN and is enabled with
-`docker.subdomain_match`. Port-per-repository is not supported.
+reaches `/v2/<repo>/<image>/...` and needs no rewrite rules. Artifactory's own path,
+`/artifactory/api/docker/<repo>/v2/...`, is served too. Repository keys match without
+regard to case, because Docker clients send references in lower case only; a key a client
+cannot send (upper case aside, a leading `-` or `_`, or a character outside `[a-z0-9._-]`)
+is reachable only through the REST API.
+
+The subdomain method (`docker push docker-local.proxy.example.com/<image>:<tag>`) is
+enabled with `docker.subdomain_match` and needs `base_url`, whose host is the parent:
+the server refuses to start without it. A request whose host (the first
+`X-Forwarded-Host` value, else `Host`) is `<repo>.<base_url host>`, where `<repo>` is a
+Docker, OCI or Helm OCI repository, is for that repository, and `/v2/<image>/...` names
+an image in it. Any other host, the parent included, uses the repository path. Forward
+the original host, and provide wildcard DNS and a certificate for `*.<base_url host>`; a
+repository used this way needs a key that is a valid DNS label.
+`GET /artifactory/api/system/configuration/webServer` then reports
+`dockerReverseProxyMethod` `SUBDOMAIN`, and `REPOPATHPREFIX` otherwise.
+Port-per-repository is not supported.
 
 `GET /artifactory/api/system/configuration/reverseProxy/nginx` returns a snippet
 generated from the stored reverse proxy configuration once P12 lands.

@@ -309,14 +309,14 @@ func TestStubsAndEnvelopes(t *testing.T) {
 			"GET",
 			"/v2/nope/manifests/latest",
 			404,
-			`{"errors":[{"code":"NAME_UNKNOWN","message":"not found: GET /v2/nope/manifests/latest"}]}`,
+			`{"errors":[{"code":"NAME_UNKNOWN","message":"repository name not known to registry: nope"}]}`,
 		},
 		{
 			"docker api 404",
 			"GET",
 			"/artifactory/api/docker/nope/v2/img/manifests/latest",
 			404,
-			`{"errors":[{"code":"NAME_UNKNOWN","message":"not found: GET /artifactory/api/docker/nope/v2/img/manifests/latest"}]}`,
+			`{"errors":[{"code":"NAME_UNKNOWN","message":"repository name not known to registry: nope"}]}`,
 		},
 		{
 			"npm 404",

@@ -11051,7 +11051,7 @@ type ClientInterface interface {
 
 	// GetReverseProxyConfiguration Read the reverse proxy configuration
 	//
-	// Returns the stored reverse proxy settings. Both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+	// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
 	//
 	// Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 	GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -17375,7 +17375,7 @@ func (c *Client) GetReverseProxySnippet(ctx context.Context, reqEditors ...Reque
 
 // GetReverseProxyConfiguration Read the reverse proxy configuration
 //
-// Returns the stored reverse proxy settings. Both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
 //
 // Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 func (c *Client) GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37711,7 +37711,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 	//
-	// Returns the stored reverse proxy settings. Both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+	// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -64940,7 +64940,7 @@ func (c *ClientWithResponses) GetReverseProxySnippetWithResponse(ctx context.Con
 
 // GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 //
-// Returns the stored reverse proxy settings. Both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //

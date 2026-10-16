@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
+	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
@@ -79,6 +80,9 @@ type Config struct {
 	// Search limits what the GET searches return; the zero value limits
 	// nothing.
 	Search SearchLimits
+	// DockerSubdomainMatch turns on the Docker subdomain method
+	// (docker.subdomain_match): <repo>.<BaseURL host>/v2/... addresses repo.
+	DockerSubdomainMatch bool
 }
 
 // Mirrors is what the storage endpoints need from the runtime's blob
@@ -113,6 +117,7 @@ func New(cfg Config) http.Handler {
 		recoverPanic(logger),
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
+		docker.APIVersion,
 		normalizeContentType,
 		collectionSlash,
 	)
@@ -142,6 +147,12 @@ func New(cfg Config) http.Handler {
 	artSvc.registerMultipartRoutes(r)
 	artSvc.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
+	docker.New(docker.Options{
+		Store:          cfg.Store,
+		SubdomainMatch: cfg.DockerSubdomainMatch,
+		BaseURL:        cfg.BaseURL,
+		Fault:          func(r *http.Request, err error) { noteCause(r.Context(), err) },
+	}).Register(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

@@ -9,6 +9,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -55,7 +56,8 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // Artifactory does: a client with a wrong password learns it on its first
 // call. The exception is an expired Bearer access token on refreshRoute
 // (expiredRefresh). Without credentials the request acts as anonymous when
-// anonymous access is on; otherwise only public routes answer. Every
+// anonymous access is on, except on the registry (decision 0031); otherwise
+// only public routes answer. Every
 // principal is then authorised once (auth.Authorize): its permissions are
 // evaluated for the request, and handlers ask that evaluator, through
 // access, every question.
@@ -82,6 +84,14 @@ func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http
 					return
 				}
 				next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(ctx, p)))
+				return
+			}
+			if docker.ChallengesAnonymous(r.URL.Path) {
+				// The registry challenges a request without credentials even
+				// while anonymous access is on: an anonymous client then
+				// fetches an anonymous token and pulls with it, and one with
+				// credentials learns at once to send them (decision 0031).
+				apierror.Write(w, apierror.OCI, auth.ErrUnauthenticated)
 				return
 			}
 			anonymous, err := a.AnonymousAllowed(ctx)
