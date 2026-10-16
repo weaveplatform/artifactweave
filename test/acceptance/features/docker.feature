@@ -307,3 +307,63 @@ Feature: Docker and OCI registry
     Then the response status is 200
     And the JSON field "tags" has 1 entries
     And the JSON field "tags.0" equals "v2"
+
+  Scenario: jf rt docker-promote copies, renames and moves an image
+    Given the JFrog CLI is available
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/docker-prod" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8" as admin with body:
+      """
+      {"architecture":"amd64","os":"linux","config":{"Labels":{"org.example.team":"platform"}}}
+      """
+    Then the response status is 201
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin with body:
+      """
+      hello blob
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/v1" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8","size":89},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f","size":10}]}
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/v2" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8","size":89},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f","size":10}]}
+      """
+    Then the response status is 201
+    When I run jf "rt docker-promote team/app docker-local docker-prod --source-tag=v1 --copy=true --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/v2/docker-prod/team/app/manifests/v1" as admin
+    Then the response status is 200
+    When I GET "/v2/docker-local/team/app/manifests/v1" as admin
+    Then the response status is 200
+    When I run jf "rt docker-promote team/app docker-local docker-prod --source-tag=v1 --target-docker-image=team/web --target-tag=release --copy=true --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/v2/docker-prod/team/web/manifests/release" as admin
+    Then the response status is 200
+    When I run jf "rt s docker-prod/team/web/release/manifest.json --url {url} --user admin --password {password}"
+    Then the command succeeds
+    And the output contains "team/web"
+    When I run jf "rt docker-promote team/app docker-local docker-prod --source-tag=v2 --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/v2/docker-prod/team/app/manifests/v2" as admin
+    Then the response status is 200
+    When I GET "/v2/docker-local/team/app/manifests/v2" as admin
+    Then the response status is 404
+    When I POST "/artifactory/api/docker/docker-prod/v2/parentManifests" as admin with body:
+      """
+      {"dockerRepository":"team/app","tag":"v2"}
+      """
+    Then the response status is 200
+    And the JSON field "parentManifestLists" has 0 entries
