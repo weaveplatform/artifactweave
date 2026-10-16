@@ -75,13 +75,14 @@ var bundled = []Definition{
 		FileIntegrationRevisionRegExp:   anyItegRev,
 	},
 	{
-		// unverified: npm packages are stored as <name>/-/<name>-<version>.tgz
-		// (scoped as @scope/<name>/-/...), which this pattern encodes with the
-		// scope as an optional organisation.
+		// Artifactory 6.20's default descriptor (research 25 section 5). It does
+		// not describe <name>/-/<name>-<version>.tgz, where npm and the JFrog CLI
+		// store tarballs, so the npm format derives that path from package.json
+		// rather than from this layout (decision 0034).
 		Name:                            "npm-default",
-		ArtifactPathPattern:             "([orgPath]/)[module]/-/[module]-[baseRev].[ext]",
-		FolderIntegrationRevisionRegExp: anyItegRev,
-		FileIntegrationRevisionRegExp:   anyItegRev,
+		ArtifactPathPattern:             "[orgPath]/[module]/[module]-[baseRev](-[fileItegRev]).tgz",
+		FolderIntegrationRevisionRegExp: `.*`,
+		FileIntegrationRevisionRegExp:   `.*`,
 	},
 	{
 		// unverified: reproduced from the default descriptor.

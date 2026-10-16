@@ -57,4 +57,5 @@ Status values: Proposed, Accepted, Superseded.
 | 0031 | [Docker and OCI registry protocol and storage layout](0031-docker-oci-registry.md) |
 | 0032 | [Package format handlers](0032-package-format-handlers.md) |
 | 0033 | [Persistent work queue](0033-persistent-work-queue.md) |
+| 0034 | [npm local repositories](0034-npm.md) |
 | 0035 | [Go modules](0035-go-modules.md) |

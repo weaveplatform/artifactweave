@@ -228,19 +228,24 @@ func TestOtherBundledLayouts(t *testing.T) {
 	}{
 		{
 			"npm-default",
-			"@acme/ui/-/ui-1.2.3.tgz",
+			"@acme/ui/ui-1.2.3.tgz",
 			layout.Values{
 				"orgPath": "@acme",
 				"org":     "@acme",
 				"module":  "ui",
 				"baseRev": "1.2.3",
-				"ext":     "tgz",
 			},
 		},
 		{
 			"npm-default",
-			"lodash/-/lodash-4.17.21.tgz",
-			layout.Values{"module": "lodash", "baseRev": "4.17.21", "ext": "tgz"},
+			"acme/ui/ui-1.2.3-rc1.tgz",
+			layout.Values{
+				"orgPath":     "acme",
+				"org":         "acme",
+				"module":      "ui",
+				"baseRev":     "1.2.3",
+				"fileItegRev": "rc1",
+			},
 		},
 		{
 			"go-default",
@@ -356,6 +361,20 @@ func TestOtherBundledLayouts(t *testing.T) {
 	}
 }
 
+// Artifactory's npm-default layout predates the paths npm stores tarballs at,
+// so the npm format must not rely on it to find a package's tarballs.
+func TestNPMDefaultDoesNotMatchNPMPaths(t *testing.T) {
+	l := mustLookup(t, "npm-default")
+	for _, path := range []string{
+		"lodash/-/lodash-4.17.21.tgz",
+		"@acme/ui/-/@acme/ui-1.2.3.tgz",
+	} {
+		if _, err := l.Match(path); !errors.Is(err, layout.ErrNoMatch) {
+			t.Errorf("%s: want ErrNoMatch, got %v", path, err)
+		}
+	}
+}
+
 func TestOptionalGroupNesting(t *testing.T) {
 	l, err := layout.Compile(
 		layout.Definition{
@@ -461,7 +480,7 @@ func TestPrefixes(t *testing.T) {
 			layout.Values{"org": "org.acme", "module": "lib", "baseRev": "2"},
 			[]string{"org.acme/lib/2", "org.acme/lib/ivy-2"},
 		},
-		{"npm-default", layout.Values{"org": "@acme", "module": "ui"}, []string{""}},
+		{"npm-default", layout.Values{"org": "@acme", "module": "ui"}, []string{"@acme/ui/ui-"}},
 	}
 	for _, tt := range tests {
 		if got := mustLookup(t, tt.layout).Prefixes(tt.v); !cmp.Equal(got, tt.want) {

@@ -60,6 +60,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [22-aql-searches-build-info.md](22-aql-searches-build-info.md) | AQL domains, fields, output rules, limits, errors and permissions; remote caches and virtual repositories in queries (#68); the actions; the GET searches; the Builds API, the build-info document, run identity and its storage as an item, and what the JFrog CLI checks |
 | [23-docker-oci-registry.md](23-docker-oci-registry.md) | Docker and OCI registry: the specification's endpoints and error codes, Artifactory's routes and access methods, tokens and permissions, its storage layout and properties, what the JFrog CLI reads, the JFrog Docker operations, tag retention and the conformance suite |
 | [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors and which formats use them, the format framework on main and its gaps, rebuilding indexes from items, derived metadata and the work queue, and what npm, Go, Maven and the P8 formats need from the framework |
+| [25-npm.md](25-npm.md) | npm: registry URLs and scoped names, publish, dist-tags, deprecate and unpublish with `_rev`, packuments, search, ping and whoami, legacy login and `api/npm/auth`, the tarball layout and `npm.*` properties, strict layout and its conversion, `latest`, the 403 on republish, and what `jf npm` sends |
 | [26-go-modules.md](26-go-modules.md) | Go modules: the GOPROXY protocol and how the go command reads it, case encoding, versions and zips, the checksum database probe, what `jf go-publish` and `jf go` send, Artifactory's Go repositories, its `go-default` layout, and what remains inferred |
 | [glossary.md](glossary.md) | Terms used across the set |
 | [decisions/](decisions/README.md) | Decision records 0001–0035 |
@@ -75,6 +76,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | jfrog-client-go | v1.55.0 | source read for paths, headers and status codes |
 | jfrog-cli-core | v2.60.0 | |
 | OCI distribution-spec | v1.1.1 | referrers API; the conformance suite is pinned to this tag. `end-4c`, `end-7b` and `end-14` are on `main` only ([23](23-docker-oci-registry.md)) |
+| npm CLI | v12.2.1 | with npm-profile v13.0.1 and pacote v22.0.0 ([25](25-npm.md)) |
 | Go | 1.27 | module baseline |
 | chi | v5.3.2 | |
 | oapi-codegen | v2.8.0 | OpenAPI 3.0.3 specs |
