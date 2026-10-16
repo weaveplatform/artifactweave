@@ -27,7 +27,11 @@ type BundleStore interface {
 	Update(ctx context.Context, b types.ReleaseBundle) error
 	// ReplaceArtifacts replaces the artifact list of an open bundle;
 	// ErrConflict once the bundle is signed (types.BundleState.Editable).
-	ReplaceArtifacts(ctx context.Context, name, version string, artifacts []types.BundleArtifact) error
+	ReplaceArtifacts(
+		ctx context.Context,
+		name, version string,
+		artifacts []types.BundleArtifact,
+	) error
 	// Delete removes the bundle version with its artifacts, keep mark and
 	// export; the audit trail is kept.
 	Delete(ctx context.Context, name, version string) error
@@ -84,7 +88,11 @@ type DistributionStore interface {
 	Jobs(ctx context.Context, trackerID int64) ([]types.DistributionJob, error)
 	// JobsForPeer returns a peer's jobs in any of statuses (all when empty),
 	// ordered by (tracker, peer).
-	JobsForPeer(ctx context.Context, peer string, statuses []types.JobStatus) ([]types.DistributionJob, error)
+	JobsForPeer(
+		ctx context.Context,
+		peer string,
+		statuses []types.JobStatus,
+	) ([]types.DistributionJob, error)
 }
 
 // ExecutionFilter narrows archive execution listings.
@@ -122,7 +130,11 @@ type ArchiveStore interface {
 	// UpdateExecution replaces an execution.
 	UpdateExecution(ctx context.Context, e types.ArchiveExecution) error
 	// Executions returns matching executions newest first.
-	Executions(ctx context.Context, f ExecutionFilter, p Page) ([]types.ArchiveExecution, string, error)
+	Executions(
+		ctx context.Context,
+		f ExecutionFilter,
+		p Page,
+	) ([]types.ArchiveExecution, string, error)
 
 	// AddItem stores an archived item and returns it with its assigned ID;
 	// ErrInvalid when the item's full path does not split

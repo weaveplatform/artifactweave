@@ -88,7 +88,11 @@ func (ts tokens) Get(ctx context.Context, id string) (types.Token, error) {
 	return out, err
 }
 
-func (ts tokens) ByDigest(ctx context.Context, kind store.DigestKind, d []byte) (types.Token, error) {
+func (ts tokens) ByDigest(
+	ctx context.Context,
+	kind store.DigestKind,
+	d []byte,
+) (types.Token, error) {
 	var out types.Token
 	err := ts.s.do(ctx, func() error {
 		if kind < store.DigestAccess || kind > store.DigestReference {
@@ -107,7 +111,11 @@ func (ts tokens) ByDigest(ctx context.Context, kind store.DigestKind, d []byte) 
 	return out, err
 }
 
-func (ts tokens) List(ctx context.Context, f store.TokenFilter, p store.Page) ([]types.Token, string, error) {
+func (ts tokens) List(
+	ctx context.Context,
+	f store.TokenFilter,
+	p store.Page,
+) ([]types.Token, string, error) {
 	var (
 		out  []types.Token
 		next string
@@ -118,7 +126,12 @@ func (ts tokens) List(ctx context.Context, f store.TokenFilter, p store.Page) ([
 				(f.Purpose == "" || t.Purpose == f.Purpose)
 		}, compareTokens)
 		var err error
-		out, next, err = paginate(rows, p, false, func(t types.Token) []any { return []any{issuedKey(t), t.ID} })
+		out, next, err = paginate(
+			rows,
+			p,
+			false,
+			func(t types.Token) []any { return []any{issuedKey(t), t.ID} },
+		)
 		return err
 	})
 	return out, next, err
@@ -178,7 +191,12 @@ func (ks keys) signing() *table[string, types.SigningKey] {
 }
 
 // getKeyed returns the row at key or ErrNotFound naming what.
-func getKeyed[V any](s *Store, ctx context.Context, t func() *table[string, V], what, key string) (V, error) {
+func getKeyed[V any](
+	s *Store,
+	ctx context.Context,
+	t func() *table[string, V],
+	what, key string,
+) (V, error) {
 	var out V
 	err := s.do(ctx, func() error {
 		var ok bool
@@ -191,7 +209,12 @@ func getKeyed[V any](s *Store, ctx context.Context, t func() *table[string, V], 
 }
 
 // deleteKeyed removes the row at key or returns ErrNotFound naming what.
-func deleteKeyed[V any](s *Store, ctx context.Context, t func() *table[string, V], what, key string) error {
+func deleteKeyed[V any](
+	s *Store,
+	ctx context.Context,
+	t func() *table[string, V],
+	what, key string,
+) error {
 	return s.do(ctx, func() error {
 		if !t().del(key) {
 			return notFound(what, key)
@@ -201,7 +224,12 @@ func deleteKeyed[V any](s *Store, ctx context.Context, t func() *table[string, V
 }
 
 // listKeyed lists every row ordered by key.
-func listKeyed[V any](s *Store, ctx context.Context, t func() *table[string, V], key func(V) string) ([]V, error) {
+func listKeyed[V any](
+	s *Store,
+	ctx context.Context,
+	t func() *table[string, V],
+	key func(V) string,
+) ([]V, error) {
 	var out []V
 	err := s.do(ctx, func() error {
 		out = t().all(nil, compareByKey(key))
@@ -254,7 +282,12 @@ func (ks keys) Certificate(ctx context.Context, alias string) (types.Certificate
 }
 
 func (ks keys) Certificates(ctx context.Context) ([]types.Certificate, error) {
-	return listKeyed(ks.s, ctx, ks.certificates, func(c types.Certificate) string { return c.Alias })
+	return listKeyed(
+		ks.s,
+		ctx,
+		ks.certificates,
+		func(c types.Certificate) string { return c.Alias },
+	)
 }
 
 func (ks keys) DeleteCertificate(ctx context.Context, alias string) error {

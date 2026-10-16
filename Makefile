@@ -34,8 +34,14 @@ init:
 fmt:
 	$(GOLANGCI_LINT) fmt --config .golangci.yml ./...
 
-## lint: golangci-lint over the whole module
-lint:
+## fmt-check: fail when the formatters in .golangci.yml would change anything
+# golangci-lint run does not report golines, so line wrapping drifted unseen
+# until this check; fmt --diff prints each change and exits 1 when there is one.
+fmt-check:
+	$(GOLANGCI_LINT) fmt --config .golangci.yml --diff ./...
+
+## lint: the formatting check, then golangci-lint over the whole module
+lint: fmt-check
 	$(GOLANGCI_LINT) run --config .golangci.yml --new=false --fix=false ./...
 
 ## vet: go vet
@@ -207,4 +213,4 @@ parity-baseline:
 ## gate: everything CI runs, in order
 gate: vet lint test cover vuln build
 
-.PHONY: oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql
+.PHONY: oci-conformance docker bundle oracle-inventory scaffold oracle-fetch parity parity-baseline help init fmt fmt-check lint vet test accept cover vuln build generate verify-generate gate terraform deploy-check deploy-docs capture-aql

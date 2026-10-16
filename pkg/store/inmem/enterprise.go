@@ -76,7 +76,10 @@ func (b bundleStore) putArtifacts(key bundleKey, list []types.BundleArtifact) er
 	for i := range list {
 		list[i].BundleName, list[i].BundleVersion = key.Name, key.Version
 	}
-	slices.SortFunc(list, func(x, y types.BundleArtifact) int { return strings.Compare(x.TargetPath, y.TargetPath) })
+	slices.SortFunc(
+		list,
+		func(x, y types.BundleArtifact) int { return strings.Compare(x.TargetPath, y.TargetPath) },
+	)
 	for i := 1; i < len(list); i++ {
 		if list[i].TargetPath == list[i-1].TargetPath {
 			return conflict("bundle artifact "+key.String(), list[i].TargetPath)
@@ -86,7 +89,11 @@ func (b bundleStore) putArtifacts(key bundleKey, list []types.BundleArtifact) er
 	return nil
 }
 
-func (b bundleStore) Create(ctx context.Context, rb types.ReleaseBundle, list []types.BundleArtifact) error {
+func (b bundleStore) Create(
+	ctx context.Context,
+	rb types.ReleaseBundle,
+	list []types.BundleArtifact,
+) error {
 	return b.s.do(ctx, func() error {
 		key := bundleKey{rb.Name, rb.Version}
 		if b.bundles().has(key) {
@@ -123,7 +130,11 @@ func (b bundleStore) Update(ctx context.Context, rb types.ReleaseBundle) error {
 	})
 }
 
-func (b bundleStore) ReplaceArtifacts(ctx context.Context, name, version string, list []types.BundleArtifact) error {
+func (b bundleStore) ReplaceArtifacts(
+	ctx context.Context,
+	name, version string,
+	list []types.BundleArtifact,
+) error {
 	return b.s.do(ctx, func() error {
 		key := bundleKey{name, version}
 		cur, ok := b.bundles().get(key)
@@ -174,7 +185,10 @@ func (b bundleStore) List(
 	return out, next, err
 }
 
-func (b bundleStore) Artifacts(ctx context.Context, name, version string) ([]types.BundleArtifact, error) {
+func (b bundleStore) Artifacts(
+	ctx context.Context,
+	name, version string,
+) ([]types.BundleArtifact, error) {
 	var out []types.BundleArtifact
 	err := b.s.do(ctx, func() error {
 		key := bundleKey{name, version}
@@ -223,7 +237,10 @@ func (b bundleStore) AddAudit(ctx context.Context, a types.BundleRetentionAudit)
 	})
 }
 
-func (b bundleStore) Audits(ctx context.Context, name string) ([]types.BundleRetentionAudit, error) {
+func (b bundleStore) Audits(
+	ctx context.Context,
+	name string,
+) ([]types.BundleRetentionAudit, error) {
 	var out []types.BundleRetentionAudit
 	err := b.s.do(ctx, func() error {
 		rows := b.audits().all(func(_ int64, v bundleAudit) bool {
@@ -307,7 +324,10 @@ func (d distributionStore) CreateTracker(
 	return out, err
 }
 
-func (d distributionStore) Tracker(ctx context.Context, id int64) (types.DistributionTracker, error) {
+func (d distributionStore) Tracker(
+	ctx context.Context,
+	id int64,
+) (types.DistributionTracker, error) {
 	var out types.DistributionTracker
 	err := d.s.do(ctx, func() error {
 		var ok bool
@@ -329,11 +349,15 @@ func (d distributionStore) UpdateTracker(ctx context.Context, t types.Distributi
 	})
 }
 
-func (d distributionStore) Trackers(ctx context.Context, name, version string) ([]types.DistributionTracker, error) {
+func (d distributionStore) Trackers(
+	ctx context.Context,
+	name, version string,
+) ([]types.DistributionTracker, error) {
 	var out []types.DistributionTracker
 	err := d.s.do(ctx, func() error {
 		out = d.trackers().all(func(_ int64, v types.DistributionTracker) bool {
-			return (name == "" || v.BundleName == name) && (version == "" || v.BundleVersion == version)
+			return (name == "" || v.BundleName == name) &&
+				(version == "" || v.BundleVersion == version)
 		}, func(x, y types.DistributionTracker) int { return cmp.Compare(y.ID, x.ID) })
 		return nil
 	})
@@ -351,16 +375,23 @@ func (d distributionStore) PutJob(ctx context.Context, j types.DistributionJob) 
 }
 
 func compareJobs(x, y types.DistributionJob) int {
-	return cmp.Or(cmp.Compare(x.TrackerID, y.TrackerID), strings.Compare(x.PeerInstanceID, y.PeerInstanceID))
+	return cmp.Or(
+		cmp.Compare(x.TrackerID, y.TrackerID),
+		strings.Compare(x.PeerInstanceID, y.PeerInstanceID),
+	)
 }
 
-func (d distributionStore) Jobs(ctx context.Context, trackerID int64) ([]types.DistributionJob, error) {
+func (d distributionStore) Jobs(
+	ctx context.Context,
+	trackerID int64,
+) ([]types.DistributionJob, error) {
 	var out []types.DistributionJob
 	err := d.s.do(ctx, func() error {
 		if !d.trackers().has(trackerID) {
 			return notFound("distribution tracker", trackerID)
 		}
-		out = d.jobs().all(func(k jobKey, _ types.DistributionJob) bool { return k.Tracker == trackerID }, compareJobs)
+		out = d.jobs().
+			all(func(k jobKey, _ types.DistributionJob) bool { return k.Tracker == trackerID }, compareJobs)
 		return nil
 	})
 	return out, err
@@ -444,7 +475,10 @@ func (a archiveStore) DeletePolicy(ctx context.Context, key string) error {
 	})
 }
 
-func (a archiveStore) Policies(ctx context.Context, family types.ArchiveFamily) ([]types.ArchivePolicy, error) {
+func (a archiveStore) Policies(
+	ctx context.Context,
+	family types.ArchiveFamily,
+) ([]types.ArchivePolicy, error) {
 	var out []types.ArchivePolicy
 	err := a.s.do(ctx, func() error {
 		out = a.policies().all(func(_ string, v types.ArchivePolicy) bool {
@@ -455,7 +489,10 @@ func (a archiveStore) Policies(ctx context.Context, family types.ArchiveFamily) 
 	return out, err
 }
 
-func (a archiveStore) CreateExecution(ctx context.Context, e types.ArchiveExecution) (types.ArchiveExecution, error) {
+func (a archiveStore) CreateExecution(
+	ctx context.Context,
+	e types.ArchiveExecution,
+) (types.ArchiveExecution, error) {
 	var out types.ArchiveExecution
 	err := a.s.do(ctx, func() error {
 		e.ID = a.s.nextID("archive_executions")
@@ -497,10 +534,16 @@ func (a archiveStore) Executions(
 	)
 	err := a.s.do(ctx, func() error {
 		rows := a.executions().all(func(_ int64, v types.ArchiveExecution) bool {
-			return (f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) && (f.Kind == "" || v.Kind == f.Kind)
+			return (f.PolicyKey == "" || v.PolicyKey == f.PolicyKey) &&
+				(f.Kind == "" || v.Kind == f.Kind)
 		}, func(x, y types.ArchiveExecution) int { return cmp.Compare(y.ID, x.ID) })
 		var err error
-		out, next, err = paginate(rows, p, true, func(v types.ArchiveExecution) []any { return []any{v.ID} })
+		out, next, err = paginate(
+			rows,
+			p,
+			true,
+			func(v types.ArchiveExecution) []any { return []any{v.ID} },
+		)
 		return err
 	})
 	return out, next, err
@@ -516,7 +559,10 @@ func archivedLocation(it types.Item) (parent, name string, err error) {
 	return parent, name, nil
 }
 
-func (a archiveStore) AddItem(ctx context.Context, it types.ArchivedItem) (types.ArchivedItem, error) {
+func (a archiveStore) AddItem(
+	ctx context.Context,
+	it types.ArchivedItem,
+) (types.ArchivedItem, error) {
 	var out types.ArchivedItem
 	err := a.s.do(ctx, func() error {
 		if _, _, err := archivedLocation(it.Item); err != nil {
@@ -542,7 +588,10 @@ func (a archiveStore) Item(ctx context.Context, id int64) (types.ArchivedItem, e
 	return out, err
 }
 
-func (a archiveStore) FindItems(ctx context.Context, repoKey, fullPath string) ([]types.ArchivedItem, error) {
+func (a archiveStore) FindItems(
+	ctx context.Context,
+	repoKey, fullPath string,
+) ([]types.ArchivedItem, error) {
 	parent, name, _, err := types.SplitItemPath(fullPath)
 	if err != nil {
 		return nil, fmt.Errorf("find archived items: %w: %w", store.ErrInvalid, err)
@@ -572,7 +621,12 @@ func (a archiveStore) Items(
 				(f.ExecutionID == 0 || v.ExecutionID == f.ExecutionID)
 		}, func(x, y types.ArchivedItem) int { return cmp.Compare(x.ID, y.ID) })
 		var err error
-		out, next, err = paginate(rows, p, false, func(v types.ArchivedItem) []any { return []any{v.ID} })
+		out, next, err = paginate(
+			rows,
+			p,
+			false,
+			func(v types.ArchivedItem) []any { return []any{v.ID} },
+		)
 		return err
 	})
 	return out, next, err
@@ -587,7 +641,11 @@ func (a archiveStore) DeleteItem(ctx context.Context, id int64) error {
 	})
 }
 
-func (a archiveStore) ExpiredItems(ctx context.Context, before time.Time, limit int) ([]types.ArchivedItem, error) {
+func (a archiveStore) ExpiredItems(
+	ctx context.Context,
+	before time.Time,
+	limit int,
+) ([]types.ArchivedItem, error) {
 	// Compared at the stored precision, as the SQL column is.
 	before = before.Truncate(time.Microsecond)
 	var out []types.ArchivedItem
@@ -680,7 +738,8 @@ func (w workerStore) Delete(ctx context.Context, key string) error {
 		owned := func(k workerEntry, _ string) bool { return k.Worker == key }
 		w.state().deleteWhere(owned)
 		w.secrets().deleteWhere(owned)
-		w.executions().deleteWhere(func(_ string, v types.WorkerExecution) bool { return v.WorkerKey == key })
+		w.executions().
+			deleteWhere(func(_ string, v types.WorkerExecution) bool { return v.WorkerKey == key })
 		return nil
 	})
 }
@@ -820,7 +879,8 @@ func (w workerStore) PruneExecutions(ctx context.Context, before time.Time) (int
 	before = before.Truncate(time.Microsecond)
 	var n int64
 	err := w.s.do(ctx, func() error {
-		n = w.executions().deleteWhere(func(_ string, v types.WorkerExecution) bool { return v.Started.Before(before) })
+		n = w.executions().
+			deleteWhere(func(_ string, v types.WorkerExecution) bool { return v.Started.Before(before) })
 		return nil
 	})
 	return n, err
