@@ -3708,11 +3708,11 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributeartifact.md
   /api/docker/{repo-key}/v2/_catalog:
     get:
-      description: Lists the image names held in one Docker or OCI repository, in the shape of the Docker registry _catalog extension. The caller needs read permission on the repository. For remote repositories artifactweave lists the cache. Results are sorted and paginated with n and last exactly as the registry API does, so clients can reuse their registry pagination code.
+      description: Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties broken by byte order, and paginated with n and last as the tags list is, so clients can reuse their registry pagination code. Needs Read; images the caller cannot read are left out (decision 0031). This operation lists one repository with bare image names; the registry-wide /v2/_catalog lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image> (decision 0003). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
       operationId: listDockerRepositories
       parameters:
         - $ref: '#/components/parameters/DockerRepoKey'
-        - description: Optional query parameter. Maximum number of names to return. Omitted returns every name.
+        - description: Optional query parameter. Maximum number of names to return. Omitted returns every name. When more names follow, the response carries a Link header to the next page.
           in: query
           name: n
           schema:
@@ -3738,6 +3738,12 @@ paths:
                       type: string
                     type: array
                 type: object
+          headers:
+            Link:
+              description: Present only when more results follow. Names the next page with rel="next", carrying the same n and, as last, the final entry of this page, in the form the OCI distribution specification gives.
+              schema:
+                description: An RFC 8288 link to the next page, for example <...?n=50&last=v1.2>; rel="next".
+                type: string
           description: The image names, possibly a page of them.
         '400':
           $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
@@ -3747,6 +3753,8 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '405':
+          description: The repository is a remote or virtual repository, which the registry does not serve yet; the body is a registry error with the code UNSUPPORTED.
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
@@ -3754,7 +3762,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockerrepositories.md
   /api/docker/{repo-key}/v2/parentManifests:
     post:
-      description: Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. The caller needs read permission on the repository.
+      description: Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
       operationId: findParentManifestLists
       parameters:
         - $ref: '#/components/parameters/DockerRepoKey'
@@ -3817,14 +3825,65 @@ paths:
       tags:
         - searches
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/findparentmanifestlists.md
+  /api/docker/{repo-key}/v2/promote:
+    post:
+      description: Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+      operationId: promoteDockerImage
+      parameters:
+        - description: Required path parameter. Key of the local or federated Docker, OCI or Helm OCI repository that holds the image.
+          in: path
+          name: repo-key
+          required: true
+          schema:
+            description: Repository key.
+            minLength: 1
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DockerPromotionRequest'
+        description: The image to promote and its destination.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A short confirmation for people; clients do not parse it.
+                type: string
+          description: The image was promoted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was unreadable or lacked targetRepo or dockerRepository, or the source and target are not local or federated repositories of one package type. Errors use the Artifactory envelope, not the registry's, as for every JFrog REST operation under the Docker API path (decision 0031).
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks Read on the source, Deploy on the target, or the Delete that a move or an overwritten target tag needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The source repository, the target repository, the image or the tag does not exist.
+      tags:
+        - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/promotedockerimage.md
   /api/docker/{repo-key}/v2/{imageName}/tags/list:
     get:
-      description: Lists the tags of one image in the shape of the registry tags endpoint. Tags that are not valid under the OCI and Docker naming rules are omitted. The caller needs read permission on the repository. Pagination with n and last behaves as in the registry API; the response omits the Link header the registry would add.
+      description: Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's tag folders that hold a manifest; digest folders are not tags, which matches the digest-named entries Artifactory leaves out from 7.90.1. Tags are sorted case-insensitively, as the OCI distribution specification requires, with ties broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the response carries a Link header to the next page, as the registry does. An image with stored manifests but no tags answers an empty list, and an unknown image answers 404. Needs Read on the image (decision 0031). Errors are registry errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
       operationId: listDockerTags
       parameters:
         - $ref: '#/components/parameters/DockerRepoKey'
         - $ref: '#/components/parameters/DockerImageName'
-        - description: Optional query parameter. Maximum number of tags to return. Omitted returns every tag.
+        - description: Optional query parameter. Maximum number of tags to return. Omitted returns every tag. When more tags follow, the response carries a Link header to the next page.
           in: query
           name: n
           schema:
@@ -3853,6 +3912,12 @@ paths:
                       type: string
                     type: array
                 type: object
+          headers:
+            Link:
+              description: Present only when more results follow. Names the next page with rel="next", carrying the same n and, as last, the final entry of this page, in the form the OCI distribution specification gives.
+              schema:
+                description: An RFC 8288 link to the next page, for example <...?n=50&last=v1.2>; rel="next".
+                type: string
           description: The tags, possibly a page of them.
         '400':
           $ref: '#/components/responses/ArtifactorySearchesApiBadRequest'
@@ -3862,6 +3927,8 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
+        '405':
+          description: The repository is a remote or virtual repository, which the registry does not serve yet; the body is a registry error with the code UNSUPPORTED.
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
@@ -16903,7 +16970,7 @@ components:
         minLength: 1
         type: string
     DockerRepoKey:
-      description: Required path parameter. Key of the Docker or OCI repository to list.
+      description: Required path parameter. Key of the Docker, OCI or Helm OCI repository to list, matched without regard to case because Docker clients send references in lower case only.
       in: path
       name: repo-key
       required: true
@@ -19358,6 +19425,31 @@ components:
       required:
         - targetRepo
         - packagesRepoPaths
+      type: object
+    DockerPromotionRequest:
+      description: Which image to promote, where to, and whether it moves or is copied. The JFrog CLI sends every field, with an empty string for each optional name or tag it was not given, so an empty string means the same as an omitted field.
+      properties:
+        copy:
+          description: Optional within this object. When true the image is copied and the source keeps it; when false it is moved and leaves the source. Defaults to false.
+          type: boolean
+        dockerRepository:
+          description: Required within this object. Name of the image in the source repository, including any namespace segments, for example library/nginx.
+          type: string
+        tag:
+          description: Optional within this object. Tag to promote. Omitted or empty promotes every tag of the image.
+          type: string
+        targetDockerRepository:
+          description: Optional within this object. Name the image takes in the target repository. Omitted or empty keeps dockerRepository.
+          type: string
+        targetRepo:
+          description: Required within this object. Key of the local or federated repository the image is promoted to. It must have the source repository's package type.
+          type: string
+        targetTag:
+          description: Optional within this object. Tag the image takes in the target repository. Omitted or empty keeps tag.
+          type: string
+      required:
+        - targetRepo
+        - dockerRepository
       type: object
     ErrorDetail:
       description: One entry of the Artifactory error envelope.

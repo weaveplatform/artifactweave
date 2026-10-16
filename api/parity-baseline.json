@@ -43,7 +43,6 @@
     "POST /api/jmis/v1/ssl/submit",
     "POST /api/jmis/v1/ssl/validate",
     "POST /api/v1/offline_register",
-    "POST /artifactory/api/docker/{}/v2/promote",
     "POST /bridge-client/api/v1/bridges",
     "POST /bridge-client/api/v1/bridges/{}/reset",
     "POST /bridge-client/api/v1/bridges/{}/restart",

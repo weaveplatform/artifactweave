@@ -1,4 +1,5 @@
-# The Builds API (build-info publish, read, append, promotion, retention, rename, deletion).
+# The Builds API (build-info publish, read, append, promotion, retention, rename, deletion) and Docker
+# image promotion, which JFrog documents in the same family.
 # Structure from JFrog's documented definitions (x-oracle-source); prose is ours.
 components:
   responses:
@@ -467,6 +468,38 @@ components:
         type:
           description: Optional within this object. File type, usually the extension.
           type: string
+      type: object
+    DockerPromotionRequest:
+      description: Which image to promote, where to, and whether it moves or is copied. The JFrog CLI sends every
+        field, with an empty string for each optional name or tag it was not given, so an empty string means the
+        same as an omitted field.
+      properties:
+        copy:
+          description: Optional within this object. When true the image is copied and the source keeps it; when
+            false it is moved and leaves the source. Defaults to false.
+          type: boolean
+        dockerRepository:
+          description: Required within this object. Name of the image in the source repository, including any namespace
+            segments, for example library/nginx.
+          type: string
+        tag:
+          description: Optional within this object. Tag to promote. Omitted or empty promotes every tag of the image.
+          type: string
+        targetDockerRepository:
+          description: Optional within this object. Name the image takes in the target repository. Omitted or empty
+            keeps dockerRepository.
+          type: string
+        targetRepo:
+          description: Required within this object. Key of the local or federated repository the image is promoted
+            to. It must have the source repository's package type.
+          type: string
+        targetTag:
+          description: Optional within this object. Tag the image takes in the target repository. Omitted or empty
+            keeps tag.
+          type: string
+      required:
+      - targetRepo
+      - dockerRepository
       type: object
     Issues:
       description: Issue-tracker information collected for the build.
@@ -1106,3 +1139,64 @@ paths:
       tags:
       - builds
       x-unverified: true
+  /api/docker/{repo-key}/v2/promote:
+    post:
+      description: Promotes a Docker or OCI image from a local or federated repository to another local or federated
+        repository of the same package type, either one tag or every tag of the image, optionally under a new image
+        name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather
+        than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci
+        repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200.
+        Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when
+        the target tag already exists (decision 0031).
+      operationId: promoteDockerImage
+      parameters:
+      - description: Required path parameter. Key of the local or federated Docker, OCI or Helm OCI repository
+          that holds the image.
+        in: path
+        name: repo-key
+        required: true
+        schema:
+          description: Repository key.
+          minLength: 1
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DockerPromotionRequest'
+        description: The image to promote and its destination.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A short confirmation for people; clients do not parse it.
+                type: string
+          description: The image was promoted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body was unreadable or lacked targetRepo or dockerRepository, or the source and target
+            are not local or federated repositories of one package type. Errors use the Artifactory envelope, not the
+            registry's, as for every JFrog REST operation under the Docker API path (decision 0031).
+        '401':
+          $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks Read on the source, Deploy on the target, or the Delete that a move or an
+            overwritten target tag needs.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The source repository, the target repository, the image or the tag does not exist.
+      tags:
+      - builds
+      x-oracle-source: https://docs.jfrog.com/integrations/reference/promotedockerimage.md
