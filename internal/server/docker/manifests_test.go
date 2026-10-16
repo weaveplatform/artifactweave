@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -389,5 +390,62 @@ func TestAccepts(t *testing.T) {
 		if got := accepts(c.accept, oci); got != c.want {
 			t.Errorf("%v: %v", c.accept, got)
 		}
+	}
+}
+
+// A registry token pushes a manifest only with push on the image; a
+// pull-only one is told, by the challenge, to fetch push. Replacing a tag
+// is part of the push the client asked for, so push covers it, while the
+// user must still hold Delete (DV-035).
+func TestManifestPushWithRegistryTokens(t *testing.T) {
+	w := newBlobWorld(t)
+	ctx := context.Background()
+	if err := w.db.Permissions().Create(ctx, types.Permission{
+		Name: "docker",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{
+				"owner":  types.ActionRead | types.ActionWrite | types.ActionDelete,
+				"writer": types.ActionRead | types.ActionWrite,
+			}},
+			Targets: map[string]types.Target{"docker-local": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	w.uploadBlobs("app", imageConfig, "one", "two")
+	tokenAs := func(user string, actions ...string) http.Handler {
+		p, err := auth.Authorize(ctx, authz.Sources{
+			Permissions: w.db.Permissions(), Groups: w.db.Groups(),
+		}, auth.Principal{Name: user, Registry: &types.RegistryAccess{Grants: []types.RegistryGrant{
+			{Type: scopeRepository, Name: "docker-local/app", Actions: actions},
+		}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			w.h.ServeHTTP(rw, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+		})
+	}
+	const v1 = "/v2/docker-local/app/manifests/v1"
+	rec := send(tokenAs("owner", "pull"), http.MethodPut, v1, image("one"), ociManifest)
+	if rec.Code != http.StatusUnauthorized || code(t, rec) != CodeUnauthorized ||
+		!strings.Contains(rec.Header().Get("WWW-Authenticate"),
+			`scope="repository:docker-local/app:pull,push"`) {
+		t.Fatalf("pull-only push: %d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+	push := tokenAs("owner", "pull", "push")
+	expect(t, send(push, http.MethodPut, v1, image("one"), ociManifest), http.StatusCreated, "")
+	expect(
+		t,
+		send(tokenAs("owner", "pull"), http.MethodGet, v1, "", ociManifest),
+		http.StatusOK,
+		"",
+	)
+	// Replacing v1 with push alone: the owner holds Delete.
+	expect(t, send(push, http.MethodPut, v1, image("two"), ociManifest), http.StatusCreated, "")
+	// The writer's push token cannot replace it: the permissions refuse.
+	rec = send(tokenAs("writer", "pull", "push"), http.MethodPut, v1, image("one"), ociManifest)
+	if rec.Code != http.StatusForbidden || code(t, rec) != CodeDenied {
+		t.Fatalf("writer replacing: %d %s", rec.Code, rec.Body)
 	}
 }

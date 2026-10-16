@@ -33,6 +33,10 @@ import (
 const (
 	registryProbe = "GET /v2/"
 	prefixProbe   = "GET /artifactory/api/docker/{repoKey}/v2/"
+	registryToken = "GET /v2/token"
+	prefixToken   = "GET /artifactory/api/docker/{repoKey}/v2/token"
+	registryAuth  = "GET /artifactory/api/docker/{repoKey}/v2/auth"
+	legacyAuth    = "GET /artifactory/api/docker/{repoKey}/v1/auth"
 	webServer     = "GET /artifactory/api/system/configuration/webServer"
 )
 
@@ -268,10 +272,22 @@ func registryStatusRows() []statusCase {
 		{registryProbe, "/v2/libs-local/app/manifests/latest", "admin", "", 404},
 		{registryProbe, "/v2/libs-local/app/manifests/latest", "anonymous", "", 401},
 		// The token endpoint alone lets an anonymous caller through, for
-		// its anonymous token; until #221 it answers that it is not
-		// implemented.
-		{"GET /v2/token", "/v2/token", "anonymous", "", 405},
-		{"GET /v2/token", "/v2/token", "", "", 401},
+		// its anonymous token (#221).
+		{registryToken, "/v2/token", "admin", "", 200},
+		{registryToken, "/v2/token?scope=repository:libs-local/app:pull", "user", "", 200},
+		{registryToken, "/v2/token", "anonymous", "", 200},
+		{registryToken, "/v2/token", "", "", 401},
+		{registryToken, "/v2/token", "forged", "", 401},
+		{prefixToken, "/artifactory/api/docker/null/v2/token", "admin", "", 200},
+		{prefixToken, "/artifactory/api/docker/null/v2/token", "anonymous", "", 200},
+		{prefixToken, "/artifactory/api/docker/null/v2/token", "", "", 401},
+		{"POST /v2/token", "/v2/token", "admin", "", 405},
+		{registryAuth, prefixed + "auth", "admin", "", 200},
+		{registryAuth, prefixed + "auth", "anonymous", "", 401},
+		{registryAuth, prefixed + "auth", "", "", 401},
+		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "admin", "", 200},
+		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "anonymous", "", 401},
+		{legacyAuth, "/artifactory/api/docker/libs-local/v1/auth", "", "", 401},
 		{webServer, "/artifactory/api/system/configuration/webServer", "admin", "", 200},
 		{webServer, "/artifactory/api/system/configuration/webServer", "user", "", 403},
 		{webServer, "/artifactory/api/system/configuration/webServer", "anonymous", "", 401},
@@ -281,11 +297,19 @@ func registryStatusRows() []statusCase {
 
 // registryMatrix: the probe answers any caller with credentials. An
 // anonymous one is challenged even while anonymous access is on, and
-// fetches an anonymous token instead (decision 0031).
+// fetches an anonymous token instead (decision 0031), which any caller may;
+// what a token grants follows from the caller's permissions (#221). The
+// auth endpoints answer the caller's own credential, which anonymous has
+// none of.
 func registryMatrix() []matrixRow {
+	const docker = "/artifactory/api/docker/libs-local/"
 	return []matrixRow{
 		at(registryProbe, "", signedIn, 200),
-		row(prefixProbe, "/artifactory/api/docker/libs-local/v2/", "", signedIn, 200),
+		row(prefixProbe, docker+"v2/", "", signedIn, 200),
+		row(registryToken, "/v2/token?scope=repository:libs-local/app:pull", "", anyone, 200),
+		row(prefixToken, docker+"v2/token?scope=repository:app:push", "", anyone, 200),
+		row(registryAuth, docker+"v2/auth", "", signedIn, 200),
+		row(legacyAuth, docker+"v1/auth", "", signedIn, 200),
 		at(webServer, "", administrators, 200),
 	}
 }
@@ -295,11 +319,15 @@ func registryMatrix() []matrixRow {
 // the 200, and reads the challenge and the OCI envelope from the 401.
 func TestRegistryProbeHeaders(t *testing.T) {
 	h := statusFixture(t, false)
-	for _, path := range []string{"/v2/", "/artifactory/api/docker/any/v2/"} {
+	for path, realm := range map[string]string{
+		"/v2/": "null", "/artifactory/api/docker/any/v2/": "any",
+	} {
 		rec := do(t, h, http.MethodGet, path, nil, "")
+		want := `Bearer realm="http://example.com/artifactory/api/docker/` + realm +
+			`/v2/token",service="example.com"`
 		if rec.Code != http.StatusUnauthorized ||
 			rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" ||
-			rec.Header().Get("WWW-Authenticate") != `Basic realm="Artifactory Realm"` {
+			rec.Header().Get("WWW-Authenticate") != want {
 			t.Fatalf("%s: %d %v", path, rec.Code, rec.Header())
 		}
 		var body struct{ Errors []struct{ Code string } }
@@ -689,5 +717,62 @@ func registryManifestMatrix() []matrixRow {
 			holds(dockerA, "work/app/", write), 201),
 		row(putManifest, base+"v1", manifestBody(registryManifest("other")),
 			holds(dockerA, "work/app/v1/", write|del), 201).alone(),
+	}
+}
+
+// The token flow through the server (#221): a token from the realm opens
+// the registry and nothing else, and an anonymous one works only while
+// anonymous access does.
+func TestRegistryTokenFlow(t *testing.T) {
+	var db store.Store
+	h := statusFixture(t, true, func(c *Config) { db = c.Store })
+	admin := basic("admin", "pw")
+	if rec := do(t, h, http.MethodPut, "/artifactory/api/repositories/docker-local", jsonAs(admin),
+		`{"rclass":"local","packageType":"docker"}`); rec.Code != http.StatusOK {
+		t.Fatalf("create: %d %s", rec.Code, rec.Body)
+	}
+	tokenFor := func(headers map[string]string) string {
+		t.Helper()
+		rec := do(
+			t,
+			h,
+			http.MethodGet,
+			"/v2/token?scope=repository:docker-local/app:pull,push&service=example.com",
+			headers,
+			"",
+		)
+		var body struct {
+			Token     string `json:"token"`
+			ExpiresIn int    `json:"expires_in"`
+		}
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &body) != nil ||
+			body.Token == "" || body.ExpiresIn != 3600 {
+			t.Fatalf("token: %d %s", rec.Code, rec.Body)
+		}
+		return body.Token
+	}
+	tok := tokenFor(admin)
+	for path, want := range map[string]int{
+		"/v2/": http.StatusOK,
+		"/artifactory/api/docker/docker-local/v2/": http.StatusOK,
+		"/artifactory/api/repositories":            http.StatusUnauthorized,
+		"/artifactory/api/system/ping":             http.StatusUnauthorized,
+	} {
+		if rec := do(t, h, http.MethodGet, path, bearerAuth(tok), ""); rec.Code != want {
+			t.Errorf("%s with the registry token: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	anon := tokenFor(nil)
+	if rec := do(t, h, http.MethodGet, "/v2/", bearerAuth(anon), ""); rec.Code != http.StatusOK {
+		t.Fatalf("anonymous token: %d %s", rec.Code, rec.Body)
+	}
+	if err := db.Settings().
+		Put(context.Background(), types.SettingAnonymousAccess, false); err != nil {
+		t.Fatal(err)
+	}
+	rec := do(t, h, http.MethodGet, "/v2/", bearerAuth(anon), "")
+	if rec.Code != http.StatusUnauthorized ||
+		!strings.HasPrefix(rec.Header().Get("WWW-Authenticate"), "Bearer realm=") {
+		t.Fatalf("anonymous token once anonymous access is off: %d %v", rec.Code, rec.Header())
 	}
 }

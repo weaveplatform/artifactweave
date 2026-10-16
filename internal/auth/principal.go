@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
@@ -29,6 +30,13 @@ type Principal struct {
 	// presented; empty for a password or anonymous request. The token API's
 	// "me" resolves to it, and encryptedPassword refuses token callers.
 	TokenID string
+	// TokenExpires is when that token expires; zero for a password, an
+	// anonymous request or a token that never expires. A registry token
+	// obtained with a token lives no longer (decision 0005).
+	TokenExpires time.Time
+	// Registry is what a registry token grants, nil for any other
+	// credential. Such a principal reaches the registry's routes alone.
+	Registry *types.RegistryAccess
 	// PasswordExpired marks a principal whose correct password has expired.
 	// The middleware lets it through only to change its own password.
 	PasswordExpired bool

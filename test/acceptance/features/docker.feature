@@ -2,7 +2,8 @@ Feature: Docker and OCI registry
   The registry protocol on the repository path, /v2/<repo>/<image>, and on
   Artifactory's own prefix, /artifactory/api/docker/<repo>/v2 (decisions 0003
   and 0031). A client probes /v2/ first and reads the version header from
-  the answer, the challenge included.
+  the answer, the challenge included, then fetches a token from the realm
+  the challenge names (decision 0005).
 
   Background:
     Given the registry is running
@@ -11,11 +12,13 @@ Feature: Docker and OCI registry
     When I GET "/v2/"
     Then the response status is 401
     And the response header "Docker-Distribution-API-Version" contains "registry/2.0"
-    And the response header "WWW-Authenticate" contains "Basic"
+    And the response header "WWW-Authenticate" contains "Bearer realm="
+    And the response header "WWW-Authenticate" contains "/artifactory/api/docker/null/v2/token"
     And the JSON field "errors.0.code" equals "UNAUTHORIZED"
     When I GET "/artifactory/api/docker/docker-local/v2/"
     Then the response status is 401
     And the response header "Docker-Distribution-API-Version" contains "registry/2.0"
+    And the response header "WWW-Authenticate" contains "/artifactory/api/docker/docker-local/v2/token"
 
   Scenario: The version probe answers an authenticated client
     When I GET "/v2/" as admin
@@ -143,3 +146,51 @@ Feature: Docker and OCI registry
     Then the command succeeds
     And the output contains "docker-local/team/app/v1/sha256__fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8"
     And the output contains "docker-local/team/app/v1/sha256__e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"
+
+
+  Scenario: A registry token opens the registry and nothing else
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I GET "/v2/docker-local/app/manifests/latest"
+    Then the response status is 401
+    And the response header "WWW-Authenticate" contains "repository:docker-local/app:pull"
+    When I GET "/artifactory/api/docker/null/v2/token?scope=repository:docker-local/app:pull,push" as admin
+    Then the response status is 200
+    And the JSON field "expires_in" equals "3600"
+    And I keep the JSON field "token" of the response as "registry"
+    When I GET "/v2/" with the kept token "registry"
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories" with the kept token "registry"
+    Then the response status is 401
+    When I POST "/v2/token" as admin
+    Then the response status is 405
+    When I GET "/artifactory/api/docker/docker-local/v2/auth" as admin
+    Then the response status is 200
+    And the JSON field "auth" is not empty
+
+  @docker
+  Scenario: docker login against the binary
+    Given the Docker daemon can reach the registry
+    When I run docker login as "admin" with password "{password}"
+    Then the command succeeds
+    And the output contains "Login Succeeded"
+    When I run docker login as "admin" with password "wrong"
+    Then the command fails
+
+  Scenario: crane logs in and fetches a push token
+    Given crane is available
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I run crane "auth login {host} -u admin -p {password}"
+    Then the command succeeds
+    When I run crane "auth token --push {host}/docker-local/app"
+    Then the command succeeds
+    And I keep the JSON field "token" of the output as "crane"
+    When I GET "/v2/" with the kept token "crane"
+    Then the response status is 200

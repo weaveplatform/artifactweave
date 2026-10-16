@@ -67,6 +67,9 @@ type Options struct {
 	ServeBlob func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item)
 	// Now supplies the time to upload sessions; nil means time.Now.
 	Now func() time.Time
+	// Tokens signs registry tokens; nil leaves the token endpoint
+	// unimplemented.
+	Tokens TokenIssuer
 }
 
 // Endpoint serves one registry operation for a parsed request.
@@ -79,6 +82,7 @@ type Registry struct {
 	// when subdomain matching is off.
 	parent    string
 	fault     func(*http.Request, error)
+	tokens    TokenIssuer
 	endpoints map[endpointKey]Endpoint
 	// blobs, uploads and serveBlob serve blobs; uploads is nil without a
 	// blob store.
@@ -95,7 +99,7 @@ type endpointKey struct {
 // New returns the registry with every implemented endpoint registered.
 func New(o Options) *Registry {
 	g := &Registry{
-		store: o.Store, fault: o.Fault, endpoints: map[endpointKey]Endpoint{},
+		store: o.Store, fault: o.Fault, tokens: o.Tokens, endpoints: map[endpointKey]Endpoint{},
 	}
 	if o.SubdomainMatch {
 		g.parent = baseHost(o.BaseURL)
@@ -112,6 +116,8 @@ func New(o Options) *Registry {
 	g.registerProbe()
 	g.registerBlobs()
 	g.registerManifests()
+	g.registerToken()
+	g.registerAuth()
 	return g
 }
 
@@ -132,6 +138,7 @@ func (g *Registry) Register(r chi.Router) {
 	r.HandleFunc("/v2/*", g.serveRoot)
 	r.HandleFunc(prefix+"{repoKey}/v2", g.servePrefix)
 	r.HandleFunc(prefix+"{repoKey}/v2/*", g.servePrefix)
+	r.Get(prefix+"{repoKey}/v1/auth", g.serveV1Auth)
 }
 
 // serveRoot serves /v2/..., by subdomain or by repository path.

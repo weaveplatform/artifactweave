@@ -52,7 +52,10 @@ func newBlobWorld(t *testing.T, tune ...func(*Options)) *blobWorld {
 	for _, f := range tune {
 		f(&o)
 	}
-	w.h = router(New(o))
+	// As the server mounts it: every blob answer, streams included, goes
+	// through the challenge's writer.
+	g := New(o)
+	w.h = g.Challenge(router(g))
 	return w
 }
 
@@ -707,6 +710,99 @@ func TestBlobStoreAndIndexFailures(t *testing.T) {
 			if rec.Code != http.StatusInternalServerError || noted == nil {
 				t.Fatalf("%d %s, noted %v", rec.Code, rec.Body, noted)
 			}
+		})
+	}
+}
+
+// A registry token mounts from a source its grant names as the client
+// wrote from, under the request's realm; without that grant the mount
+// opens a session instead, as for a caller who may not read the source.
+func TestMountWithRegistryTokens(t *testing.T) {
+	w := newBlobWorld(t)
+	ctx := context.Background()
+	for key, a := range map[string]types.Actions{
+		"docker-local": types.ActionRead | types.ActionWrite, "oci-local": types.ActionRead,
+	} {
+		if err := w.db.Permissions().Create(ctx, types.Permission{
+			Name: "tw-" + key,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"tw": a}},
+				Targets: map[string]types.Target{key: {Include: []string{"**"}}},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d := digestOf("tok")
+	w.deploy("oci-local", "base/v1/sha256__"+d[7:], "tok")
+	w.deploy("docker-local", "base/v1/sha256__"+d[7:], "tok")
+	grant := func(name string, actions ...string) types.RegistryGrant {
+		return types.RegistryGrant{Type: "repository", Name: name, Actions: actions}
+	}
+	cases := []struct {
+		name, target, host, realm string
+		grants                    []types.RegistryGrant
+		status                    int
+	}{
+		{
+			"repository path",
+			"/v2/docker-local/a1/blobs/uploads/?from=oci-local/base",
+			"",
+			"",
+			[]types.RegistryGrant{
+				grant("docker-local/a1", "pull", "push"),
+				grant("oci-local/base", "pull"),
+			},
+			201,
+		},
+		{
+			"repository path, no grant on the source",
+			"/v2/docker-local/a2/blobs/uploads/?from=oci-local/base", "", "",
+			[]types.RegistryGrant{grant("docker-local/a2", "pull", "push")},
+			202,
+		},
+		{
+			"prefix, repository form",
+			"/artifactory/api/docker/docker-local/v2/a3/blobs/uploads/?from=oci-local/base", "",
+			"docker-local",
+			[]types.RegistryGrant{grant("a3", "push"), grant("oci-local/base", "pull")},
+			201,
+		},
+		{
+			"prefix, same repository",
+			"/artifactory/api/docker/docker-local/v2/a4/blobs/uploads/?from=base", "",
+			"docker-local",
+			[]types.RegistryGrant{grant("a4", "push"), grant("base", "pull")},
+			201,
+		},
+		{
+			"subdomain", "/v2/a5/blobs/uploads/?from=base", "docker-local.reg.example.com",
+			"docker-local",
+			[]types.RegistryGrant{grant("a5", "push"), grant("base", "pull")},
+			201,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p, err := auth.Authorize(ctx, authz.Sources{
+				Permissions: w.db.Permissions(), Groups: w.db.Groups(),
+			}, auth.Principal{
+				Name: "tw", Registry: &types.RegistryAccess{Realm: c.realm, Grants: c.grants},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			h := http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				w.h.ServeHTTP(rw, r.WithContext(auth.WithPrincipal(r.Context(), p)))
+			})
+			rec := send(
+				h,
+				http.MethodPost,
+				c.target+"&mount="+d,
+				"",
+				map[string]string{"Host": c.host},
+			)
+			expect(t, rec, c.status, "")
 		})
 	}
 }

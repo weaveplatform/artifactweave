@@ -508,6 +508,10 @@ var implementedHandwritten = map[string]bool{
 	headManifest:  true,
 	getManifest:   true,
 	putManifest:   true,
+	registryToken: true,
+	prefixToken:   true,
+	registryAuth:  true,
+	legacyAuth:    true,
 }
 
 func descriptorStatusRows() []statusCase {

@@ -87,6 +87,29 @@ type Config struct {
 	DockerSubdomainMatch bool
 }
 
+// newRegistry is the Docker registry for cfg. A nil token service must not
+// become a non-nil interface, which would leave the token endpoint
+// registered with nothing to sign.
+func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
+	o := docker.Options{
+		Store:          cfg.Store,
+		Blobs:          cfg.Blobs,
+		SubdomainMatch: cfg.DockerSubdomainMatch,
+		BaseURL:        cfg.BaseURL,
+		Fault:          func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		// A layer downloads as any file does: redirected to a signed URL
+		// when the repository says so (decision 0029), and counted.
+		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
+			p, _ := auth.FromContext(r.Context())
+			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
+		},
+	}
+	if cfg.Tokens != nil {
+		o.Tokens = cfg.Tokens
+	}
+	return docker.New(o)
+}
+
 // Mirrors is what the storage endpoints need from the runtime's blob
 // mirrors (#18).
 type Mirrors interface {
@@ -114,12 +137,16 @@ func New(cfg Config) http.Handler {
 		logger = slog.Default()
 	}
 	r := chi.NewRouter()
+	artSvc := artifactoryService{cfg: cfg, signWarn: newThrottle(signWarnEvery)}
+	// The registry exists before the middleware, whose challenge it writes.
+	registry := newRegistry(cfg, artSvc)
 	r.Use(
 		requestID,
 		recoverPanic(logger),
 		accessLog(logger),
 		baseurl.Middleware(cfg.BaseURL),
 		docker.APIVersion,
+		registry.Challenge,
 		normalizeContentType,
 		collectionSlash,
 	)
@@ -129,7 +156,6 @@ func New(cfg Config) http.Handler {
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
 
-	artSvc := artifactoryService{cfg: cfg, signWarn: newThrottle(signWarnEvery)}
 	// One verifier per handler, so providers' keys stay cached between
 	// exchanges.
 	accSvc := accessService{cfg: cfg, idTokens: idtoken.New(idtoken.Options{})}
@@ -149,19 +175,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerMultipartRoutes(r)
 	artSvc.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
-	docker.New(docker.Options{
-		Store:          cfg.Store,
-		Blobs:          cfg.Blobs,
-		SubdomainMatch: cfg.DockerSubdomainMatch,
-		BaseURL:        cfg.BaseURL,
-		Fault:          func(r *http.Request, err error) { noteCause(r.Context(), err) },
-		// A layer downloads as any file does: redirected to a signed URL
-		// when the repository says so (decision 0029), and counted.
-		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
-			p, _ := auth.FromContext(r.Context())
-			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
-		},
-	}).Register(r)
+	registry.Register(r)
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

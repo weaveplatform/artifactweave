@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/oidc"
@@ -54,6 +55,9 @@ type matrixPrincipal struct {
 	// narrowed: a token scope narrower than the user's identity, which must
 	// not become a broader credential (decision 0005: scopes only narrow).
 	narrowed bool
+	// registry: a registry token, which only the registry's routes accept
+	// (decision 0005).
+	registry bool
 	// admin: acts as an administrator.
 	admin  bool
 	grants []matrixGrant
@@ -131,6 +135,9 @@ var matrixPrincipals = []matrixPrincipal{
 		name: "tok-revoked", user: "member", token: true, scope: "applied-permissions/user",
 		bad: true,
 	},
+	// member's registry token, granting nothing (seedMatrixTokens): every
+	// route outside the registry answers it 401.
+	{name: "tok-registry", user: "member", token: true, registry: true, narrowed: true},
 }
 
 // holds reports whether p holds every action in want at path in repo.
@@ -267,6 +274,13 @@ func trashRule(r rule) rule {
 // part signature, which no principal has.
 func uploadToken(matrixPrincipal) int { return http.StatusUnauthorized }
 
+// imageOperation reports whether a registry path is an operation on an
+// image, which a registry token must grant.
+func imageOperation(path string) bool {
+	return slices.ContainsFunc([]string{"/blobs/", "/manifests/", "/tags/list", "/referrers/"},
+		func(op string) bool { return strings.Contains(path, op) })
+}
+
 // matrixRow is one request each principal makes. {p} in its path or body is
 // the principal's name, so state-changing rows touch only what the fixture
 // seeded for that principal, such as its victim user v-{p}; {u} is the
@@ -333,12 +347,21 @@ func published(name string) seeder {
 	}
 }
 
-// want is the status p must get.
+// want is the status p must get. A registry token granting nothing is
+// good for the registry alone, and an image operation there that would
+// have answered it, or refused its user, tells it to fetch a token that
+// grants the operation; one that answers everybody the same, as a blob
+// delete's 405, still does.
 func (r matrixRow) want(p matrixPrincipal) int {
-	if p.bad {
+	path, _, _ := strings.Cut(r.path, "?")
+	if p.bad || p.registry && !docker.IsRegistryPath(path) {
 		return http.StatusUnauthorized
 	}
-	if s := r.who(p); s != 0 {
+	s := r.who(p)
+	if p.registry && imageOperation(path) && (s != 0 || r.ok < 300) {
+		return http.StatusUnauthorized
+	}
+	if s != 0 {
 		return s
 	}
 	return r.ok
@@ -1165,6 +1188,12 @@ func seedMatrixTokens(t *testing.T, db store.Store) (*token.Service, map[string]
 		switch {
 		case p.name == "tok-expired":
 			secrets[p.name] = issue(past, p.user, p.scope).AccessToken
+		case p.registry:
+			issued, err := tokens.IssueRegistry(ctx, token.RegistryRequest{
+				Username: p.user, ExpiresIn: time.Hour,
+			})
+			must(err)
+			secrets[p.name] = issued.AccessToken
 		case p.name == "tok-revoked":
 			revoked := issue(tokens, p.user, p.scope)
 			must(tokens.Revoke(ctx, revoked.Record.ID))
