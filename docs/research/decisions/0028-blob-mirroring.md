@@ -63,6 +63,12 @@ The server refuses to start unless W <= R <= M.
   and signs the route asked for: the object store, or the member's CDN. Each member has its
   own `cdn` block, so a mirror can put a different CDN in front of each cloud. Signing never
   counts against a member's health ([0029](0029-cdn-delivery-and-download-redirect.md)).
+- A member still committing after the quorum does not hold the blob yet. Until it finishes,
+  or repair copies the blob to it, it cannot sign. If it is the only member that signs the
+  route, signing fails with not found and the download streams, as
+  [0029](0029-cdn-delivery-and-download-redirect.md) has it. Signing straight after an
+  upload is certain only when the write quorum cannot be met without a member that signs
+  (#212).
 
 **Health.** Each member has a circuit breaker: consecutive failures open it, and a timed
 re-check half-opens it. An open member is skipped for reads and treated as down for
