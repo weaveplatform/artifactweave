@@ -323,10 +323,22 @@ func manifestMessage(err error) string {
 
 // manifestErr answers what storing a manifest refused: one
 // MANIFEST_BLOB_UNKNOWN for each blob, or each manifest an index lists, that
-// the image does not hold.
+// the image does not hold, and one MANIFEST_INVALID for each descriptor
+// whose size is not the stored content's.
 func (g *Registry) manifestErr(w http.ResponseWriter, r *http.Request, q Request, err error) {
 	var unknown *registry.BlobsUnknownError
+	var sizes *registry.SizeMismatchError
 	switch {
+	case errors.As(err, &sizes):
+		errs := make([]*apierror.Error, 0, len(sizes.Mismatches))
+		for _, m := range sizes.Mismatches {
+			errs = append(errs, &apierror.Error{
+				Code:    CodeManifestInvalid,
+				Message: "descriptor size does not match the stored content",
+				Detail:  map[string]any{"digest": m.Digest, "size": m.Declared, "stored": m.Stored},
+			})
+		}
+		WriteAll(w, http.StatusBadRequest, errs...)
 	case errors.As(err, &unknown):
 		errs := make([]*apierror.Error, 0, len(unknown.Digests))
 		for _, d := range unknown.Digests {

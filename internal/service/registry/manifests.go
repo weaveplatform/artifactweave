@@ -24,6 +24,36 @@ func (e *BlobsUnknownError) Error() string {
 	return "registry: manifest references unknown blobs: " + strings.Join(e.Digests, ", ")
 }
 
+// SizeMismatchError is a manifest whose descriptors give sizes other than
+// the stored content's: MANIFEST_INVALID, once for each. Docker's reference
+// registry checks only that the content exists, but a client trusting the
+// size reads past or stops short of it (the image specification: such
+// content "SHOULD NOT be trusted"), so the push is refused (decision 0031).
+type SizeMismatchError struct {
+	Mismatches []SizeMismatch
+}
+
+// SizeMismatch is one descriptor whose size differs from the stored content.
+type SizeMismatch struct {
+	Digest   string
+	Declared int64
+	Stored   int64
+}
+
+func (e *SizeMismatchError) Error() string {
+	parts := make([]string, 0, len(e.Mismatches))
+	for _, m := range e.Mismatches {
+		parts = append(
+			parts,
+			fmt.Sprintf("%s declares %d bytes, stored %d", m.Digest, m.Declared, m.Stored),
+		)
+	}
+	return "registry: manifest descriptor sizes differ from the stored content: " + strings.Join(
+		parts,
+		", ",
+	)
+}
+
 // Push is a manifest to store in an image.
 type Push struct {
 	Owner
@@ -88,10 +118,10 @@ func (s *Service) folderState(
 // repository's tag limits then apply to the image, all in one transaction.
 func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	m := p.Manifest
-	if err := s.childrenPresent(ctx, p.Owner, m.Children()); err != nil {
+	if err := s.childrenPresent(ctx, p.Owner, m.Manifests); err != nil {
 		return err
 	}
-	found, err := s.present(ctx, p.Owner, m.Blobs())
+	found, err := s.present(ctx, p.Owner, m.BlobDescriptors())
 	if err != nil {
 		return err
 	}
@@ -118,54 +148,78 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	return nil
 }
 
-// present finds each blob digest in o's image and returns the SHA-256s it
-// found, or a *BlobsUnknownError naming those it did not. A digest under
+// present finds each blob in o's image and returns the SHA-256s it found,
+// once each. A digest it did not find is a *BlobsUnknownError; a descriptor
+// whose size is not the found blob's is a *SizeMismatchError, checked from
+// the item already found rather than by reading content. A digest under
 // another algorithm cannot be stored here, so it is never found.
-func (s *Service) present(ctx context.Context, o Owner, digests []string) ([]string, error) {
+func (s *Service) present(
+	ctx context.Context,
+	o Owner,
+	descs []layout.Descriptor,
+) ([]string, error) {
+	return s.sized(descs, func(hex string) (types.Item, error) {
+		return layout.FindBlob(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
+	})
+}
+
+// childrenPresent checks that each manifest an index lists is stored in o's
+// image, by tag or by digest, at the size the index gives: clients push the
+// platform manifests first, and jf finds them there (research 23, 5.1).
+// Those missing are a *BlobsUnknownError, MANIFEST_BLOB_UNKNOWN as decision
+// 0031 answers it; a digest under another algorithm cannot be stored here,
+// so it is missing.
+func (s *Service) childrenPresent(ctx context.Context, o Owner, descs []layout.Descriptor) error {
+	_, err := s.sized(descs, func(hex string) (types.Item, error) {
+		return layout.FindManifest(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
+	})
+	return err
+}
+
+// sized looks each descriptor's content up once with find and returns the
+// SHA-256s found, in order: missing content is a *BlobsUnknownError, which
+// wins over sizes, and a found item of another size a *SizeMismatchError.
+func (s *Service) sized(
+	descs []layout.Descriptor,
+	find func(hex string) (types.Item, error),
+) ([]string, error) {
 	var found, missing []string
-	for _, d := range digests {
-		hex, ok := layout.SHA256Hex(d)
-		if ok {
-			_, err := layout.FindBlob(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
+	var mismatched []SizeMismatch
+	sizes := map[string]int64{}
+	reported := map[SizeMismatch]bool{}
+	for _, d := range descs {
+		stored, seen := sizes[d.Digest]
+		if !seen {
+			hex, ok := layout.SHA256Hex(d.Digest)
+			it, err := types.Item{}, store.ErrNotFound
+			if ok {
+				it, err = find(hex)
+			}
 			switch {
 			case err == nil:
 				found = append(found, hex)
-				continue
-			case !errors.Is(err, store.ErrNotFound):
+				stored = it.Size
+			case errors.Is(err, store.ErrNotFound):
+				missing = append(missing, d.Digest)
+				stored = -1
+			default:
 				return nil, err //nolint:wrapcheck // the layout names itself
 			}
+			sizes[d.Digest] = stored
 		}
-		missing = append(missing, d)
+		mm := SizeMismatch{Digest: d.Digest, Declared: d.Size, Stored: stored}
+		if stored >= 0 && d.Size != stored && !reported[mm] {
+			reported[mm] = true
+			mismatched = append(mismatched, mm)
+		}
 	}
 	if len(missing) > 0 {
 		return nil, &BlobsUnknownError{Digests: missing}
 	}
+	if len(mismatched) > 0 {
+		return nil, &SizeMismatchError{Mismatches: mismatched}
+	}
 	return found, nil
-}
-
-// childrenPresent checks that each manifest an index lists is stored in o's
-// image, by tag or by digest: clients push the platform manifests first,
-// and jf finds them there (research 23, 5.1). Those missing are a
-// *BlobsUnknownError, MANIFEST_BLOB_UNKNOWN as decision 0031 answers it; a
-// digest under another algorithm cannot be stored here, so it is missing.
-func (s *Service) childrenPresent(ctx context.Context, o Owner, digests []string) error {
-	var missing []string
-	for _, d := range digests {
-		if hex, ok := layout.SHA256Hex(d); ok {
-			_, err := layout.FindManifest(ctx, s.Store.Items(), o.Repo.Key, o.Name, hex)
-			switch {
-			case err == nil:
-				continue
-			case !errors.Is(err, store.ErrNotFound):
-				return err //nolint:wrapcheck // the layout names itself
-			}
-		}
-		missing = append(missing, d)
-	}
-	if len(missing) > 0 {
-		return &BlobsUnknownError{Digests: missing}
-	}
-	return nil
 }
 
 // labels reads the image's labels from its config blob, which present

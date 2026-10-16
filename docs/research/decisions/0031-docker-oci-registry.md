@@ -121,8 +121,15 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
 - **Validation.** The body must parse, and a `mediaType` in it must equal `Content-Type`.
   Every referenced blob (config and layers) must be in the image, and every child of an
   index must be a manifest in the image, or the answer is 400 `MANIFEST_BLOB_UNKNOWN`, one
-  error per missing digest. Layers of the non-distributable and foreign media types are not
-  required to be present. A `subject` that names no manifest is accepted. Manifests up to
+  error per missing digest. Each of those descriptors' `size` must equal the stored
+  content's size, read from the stored item rather than the content, or the answer is 400
+  `MANIFEST_INVALID`, one error per descriptor, with the digest, the declared size and the
+  stored size as detail; missing content is reported first. This is stricter than the
+  reference registry, which checks presence only: the image specification says content
+  whose length differs from `size` should not be trusted, so the registry refuses to store
+  a manifest that would mislead every client reading it (research 23, section 1.2; whether
+  Artifactory refuses it too is on the live-capture list). Layers of the non-distributable
+  and foreign media types are not required to be present. A `subject` that names no manifest is accepted. Manifests up to
   4 MiB are accepted; a larger one answers 413 with `SIZE_INVALID`. An image manifest's
   labels are read from its config blob.
 - **Where a manifest lives.** The stored file holds the exact bytes the client sent.

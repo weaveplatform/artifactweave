@@ -130,18 +130,26 @@ func (m Manifest) File() string {
 func (m Manifest) Blobs() []string {
 	var out []string
 	seen := map[string]bool{}
-	add := func(d Descriptor) {
+	for _, d := range m.BlobDescriptors() {
 		if !seen[d.Digest] {
 			seen[d.Digest] = true
 			out = append(out, d.Digest)
 		}
 	}
+	return out
+}
+
+// BlobDescriptors are the descriptors behind Blobs: the config and every
+// layer the registry must hold, in order and with any repeats, so that each
+// descriptor's size can be checked against the stored content.
+func (m Manifest) BlobDescriptors() []Descriptor {
+	var out []Descriptor
 	if m.Config != nil {
-		add(*m.Config)
+		out = append(out, *m.Config)
 	}
 	for _, l := range m.Layers {
 		if !elsewhere(l.MediaType) {
-			add(l)
+			out = append(out, l)
 		}
 	}
 	return out
