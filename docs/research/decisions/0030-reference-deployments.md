@@ -130,8 +130,8 @@ the origin access control's bucket-policy statement and the scenario passes it t
 `aws/storage` (S3 allows one policy per bucket); on GCP the CDN module grants
 `cloud-cdn-fill` read access itself, because IAM members are not authoritative; on Azure
 storage gains `public_network_access_enabled` and the CDN module owns the Private Link
-origin. The multicloud mirror prefixes every cloud-specific input with its cloud
-(`aws_region`, `gcp_location`, `azure_location`).
+origin. The multicloud mirror composes all three storage modules, one call each; its inputs
+are under "Multicloud inputs" below.
 
 ### The scenario contract
 
@@ -174,6 +174,24 @@ mirror, whose first entry is the instance's own zone.
 | Roles the scenario creates | `permissions_boundary_arn` (null), `iam_role_path` (null) | n/a | n/a | no |
 | Mirror quorum | `write_quorum` (1) | `write_quorum` (1) | `write_quorum` (1) | mirror only |
 
+**Multicloud inputs.** A root under `multicloud/` holds all three clouds, so every input that
+belongs to one cloud names it, and the rest keep the names above:
+
+| Concept | Multicloud input | Required |
+|---|---|---|
+| Account scope | `project_id`, `subscription_id`; AWS from credentials | yes |
+| Placement, one store per cloud | `aws_region`, `gcp_location`, `azure_location` | yes |
+| The identity artifactweave uses on each cloud | `app_role_arn`, `app_service_account`, `app_principal_id` | yes |
+| The cloud artifactweave runs in: its member is `blob.mirror.zone` and leads the members | `home_cloud` (`aws`, `gcp` or `azure`) | yes |
+| Tags or labels | `labels`, applied as AWS and Azure tags and as GCP labels, so GCP's label rules apply to all of them | no ({}) |
+| Mirror quorum | `write_quorum` (2): every acknowledged upload is on two providers | no |
+
+`name`, `store_prefix`, `expiring_prefixes`, `force_destroy` (the S3 and GCS buckets),
+`additional_principals`, `resource_group_name` and `container` (Azure) keep their meanings.
+Each store's `zone` names its cloud (`aws-eu-west-2`, `gcp-europe-west2`, `azure-uksouth`), so
+no two members share one. The linter (S3, S4) requires both account scopes, the three
+placements and the three app identities, and refuses a bare `region` or `location`.
+
 - `write_quorum` is validated against the number of members.
 - The app principal is the identity a consumer's artifactweave runtime uses: an instance
   profile or workload role, a workload identity service account, a managed identity. A
@@ -199,7 +217,7 @@ mirror, whose first entry is the instance's own zone.
 | `replication_type`, `secondary_location`, `secondary_storage_host` | n/a | n/a | Azure | `outputs.tf` |
 | `resource_group` | Azure | Azure | Azure | `outputs.tf` |
 | `expires_at`: the instance's `expires-at` label, which reap reads from state | yes | yes | yes | `harness.tf` |
-| `mirror_members`: each member's store and host, which `test/platform` reads | n/a | yes | n/a | `harness.tf` |
+| `mirror_members`: each member's store and host, which `test/platform` reads | n/a | yes, and `multicloud/mirror` | n/a | `harness.tf` |
 | `service_account`: the app service account, which `make conformance` passes to the real-GCS tests as their signing identity | GCP | n/a | n/a | `harness.tf` |
 
 `artifactweave_config` renders the sections of `artifactweave.yaml` the scenario needs:
@@ -235,7 +253,8 @@ therefore reaches those stores alone, through the `single-bucket` Makefiles'
   characters with the random suffix and any region code.
 - CI's name prefix is one `NAME_PREFIX` in `scenario-ci.sh`: `artifactweave-awscn-` on AWS,
   because the deployer may manage only `artifactweave-*` buckets, and `awscn-` on GCP and
-  Azure, because reap finds unlabelled GCP load-balancer resources by that prefix.
+  Azure, because reap finds unlabelled GCP load-balancer resources by that prefix. A
+  multicloud scenario has an S3 bucket, so it takes AWS's.
 
 **Documentation.**
 - Every scenario README follows `deploy/platform/SCENARIO-TEMPLATE.md`: what it deploys,
@@ -340,6 +359,7 @@ identity would.
   Storage, and S3 with `use_lockfile`.
 - Scenario state for CI runs lives at `scenarios/<cloud>/<scenario>/<instance>` in that
   store, so an `apply` dispatch and a later `destroy` dispatch find the same state. A
+  multicloud scenario's lives in the GCP bootstrap's store, under `scenarios/multicloud/`. A
   scenario root has no backend of its own: the driver writes one into its working copy, and
   a consumer chooses their own.
 - A bootstrap starts on local state, because its backend does not exist yet, and moves its
@@ -434,6 +454,11 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   buckets with their regions and reads each one's tags there, because a scenario may span
   regions and the tagging API answers for one region at a time. An orphaned versioned bucket
   is emptied of its versions and delete markers before reap deletes it.
+- A multicloud run (the workflow's `cloud` is `multicloud`) logs in to all three clouds in its
+  one job, which the single `cloud-platform` environment allows. Its reap sweeps all three
+  clouds, but only for resources whose `artifactweave-scenario` label names a multicloud
+  scenario; a single cloud's reap leaves those alone, so each instance has one reap that owns
+  it.
 - A dispatch finds only workflows on the default branch, so a pull request runs proofs
   instead, behind the same approval. `prove-matrix.sh` chooses them from the changed paths:
 
@@ -452,7 +477,9 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   the run remains. A scenario with a large fixed hourly cost may prove with `test` alone,
   recorded in its README. Each proof has its own run tag and concurrency group, and its
   `reap` is limited to that tag (`REAP_PREFIX`), so proofs on one cloud run in parallel
-  without racing for each other's state. Pull requests from forks get no OIDC token and do
+  without racing for each other's state. A proof's instances are `<run tag>-<step>`, and
+  both the reap and the final check match the tag up to that hyphen, because one scenario's
+  initials can begin another's (`mirror`'s `m`, `multi-region`'s `mr`). Pull requests from forks get no OIDC token and do
   not run.
 - `test/platform` is a Go suite of `_test.go` files only, gated on `ARTIFACTWEAVE_SCENARIO`
   like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not

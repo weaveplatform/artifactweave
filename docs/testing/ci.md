@@ -190,7 +190,7 @@ shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`
   API's checksums, a `HEAD` answered by the registry, a `downloadRedirect` 302 to the
   scenario's `storage_host` whose signed URL serves the file and a range of it, and the
   same URL refused without its signature. Scenarios add their own checks in
-  `test/platform`: the `multi-region` mirrors show a copy on each member, the redirect
+  `test/platform`: the `multi-region` mirrors and `multicloud/mirror` show a copy on each member, the redirect
   preferring the member in the instance's zone, uploads and reads with that member drained
   (artifactweave restarted with its `write_enabled` off), and repair copying back to it once
   re-enabled. Every output reaches the checks through `ARTIFACTWEAVE_SCENARIO_OUTPUTS`. The
@@ -204,6 +204,11 @@ shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`
   buckets are found by listing the deployer's `artifactweave-` buckets with their regions and
   reading each one's tags there, because a scenario can span regions and the tagging API
   answers for one region only. A versioned bucket is emptied of its versions first.
+- `cloud` may be `multicloud`, for `multicloud/mirror`: the job logs in to GCP, Azure and AWS
+  as their deployers, the state lives in GCP's state bucket under `scenarios/multicloud/`, and
+  names take AWS's `artifactweave-awscn-` prefix. Its `reap` and `check-clean` look on all
+  three clouds; its `reap` deletes only resources labelled with a multicloud scenario, which
+  a single cloud's `reap` skips.
 - The `geo-replicated` scenarios add checks that look past artifactweave at the cloud's own
   copy: S3's replication status and the replica object, the GCS bucket's real dual-region
   placement, and the Azure secondary endpoint serving the blob through artifactweave's SAS.
@@ -219,7 +224,7 @@ chooses from the changed paths:
 | Changed path | Proves |
 |---|---|
 | The workflow, `scenario-ci.sh`, `platform-tests.sh` or `prove-matrix.sh` | Every cloud's `single-bucket` |
-| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios, `replica_test.go` the `geo-replicated` ones |
+| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios and `multicloud/mirror`, `replica_test.go` the `geo-replicated` ones |
 | A `test/platform` Go file that names none (`harness_test.go`, `generic_test.go`), any other `test/platform` file, or a deleted one | Every cloud's `single-bucket` |
 | A module's top-level `.tf` (`modules/<cloud>/<capability>/*.tf`) | Every scenario, in any cloud directory, whose Terraform sources exactly that module |
 | A scenario's top-level `.tf`, `.terraform.lock.hcl` or `ci-vars.sh` | That scenario |
@@ -238,7 +243,8 @@ fails if any state, bucket or resource of the run remains. A failed step trigger
 clean-up step that destroys the run's instances. Each proof has its own run tag (the pull
 request, the run and the scenario's initials) and its own concurrency group, so proofs run in
 parallel; its `reap` takes `REAP_PREFIX` and its `check-clean` the run tag, so neither touches
-another proof's instances.
+another proof's instances. Both match the tag up to the hyphen before the step, because one
+scenario's initials can begin another's (`mirror`'s `m`, `multi-region`'s `mr`).
 
 ## Terraform scenarios
 

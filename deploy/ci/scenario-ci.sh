@@ -14,18 +14,19 @@
 #                               resources that outlived their state; with
 #                               REAP_PREFIX, only instances starting with it
 #   scenario-ci.sh check-clean  fail if any state or labelled resource of an
-#                               instance starting with RUN_TAG remains
+#                               instance named RUN_TAG-<step> remains
 #
-# Environment: CLOUD (gcp, azure or aws), SCENARIO,
+# Environment: CLOUD (gcp, azure, aws or multicloud), SCENARIO,
 # INSTANCE, TTL_MINUTES, RUN_TAG and REAP_PREFIX as the action needs them, and the
 # PLATFORM_* repository variables the bootstraps set.
 #
 # Each instance's state lives at scenarios/<cloud>/<scenario>/<instance> in
-# the bootstrap's state store, and every action works on a fresh copy of the
-# scenario directory with a generated backend: nothing carries over between
-# invocations except that state, so a destroy finds what an earlier, separate
-# apply left, exactly as a later dispatch does. The scenario's ci-vars.sh
-# supplies the Terraform variables a CI run passes.
+# the bootstrap's state store (a multicloud instance's in GCP's), and every
+# action works on a fresh copy of the scenario directory with a generated
+# backend: nothing carries over between invocations except that state, so a
+# destroy finds what an earlier, separate apply left, exactly as a later
+# dispatch does. The scenario's ci-vars.sh supplies the Terraform variables a
+# CI run passes.
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)
@@ -49,7 +50,12 @@ utc() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -r "$1" +%Y-
 # scenario's ci-vars.sh sets TF_VAR_name="${NAME_PREFIX}${INSTANCE}". On AWS
 # it is artifactweave-awscn-, because the deployer may manage only
 # artifactweave-* buckets; elsewhere awscn-, by which reap finds the
-# unlabelled GCP load-balancer pieces.
+# unlabelled GCP load-balancer pieces. A multicloud scenario has an S3 bucket
+# too, so it takes AWS's.
+#
+# STORE is the cloud whose bootstrap holds the state. A multicloud
+# scenario's lives in GCP's state bucket, and its resources are found on all
+# three clouds (CLOUDS).
 case $CLOUD in
 gcp)
   : "${PLATFORM_GCP_STATE_BUCKET:?}" "${PLATFORM_GCP_PROJECT:?}"
@@ -63,11 +69,34 @@ aws)
   : "${PLATFORM_AWS_STATE_BUCKET:?}" "${PLATFORM_AWS_REGION:?}"
   NAME_PREFIX=artifactweave-awscn-
   ;;
+multicloud)
+  : "${PLATFORM_GCP_STATE_BUCKET:?}" "${PLATFORM_GCP_PROJECT:?}" \
+    "${PLATFORM_AZURE_RESOURCE_GROUP:?}" "${PLATFORM_AWS_REGION:?}"
+  NAME_PREFIX=artifactweave-awscn-
+  ;;
 *)
   echo "unknown cloud: $CLOUD" >&2
   exit 1
   ;;
 esac
+STORE=$CLOUD
+CLOUDS=$CLOUD
+if [ "$CLOUD" = multicloud ]; then
+  STORE=gcp
+  CLOUDS="gcp azure aws"
+fi
+
+# multicloud lists the scenarios under multicloud/, each with a space either
+# side. Their resources sit on every cloud, so a multicloud reap sweeps them
+# and a single cloud's reap leaves them alone (ours).
+multicloud=" "
+for d in "$here"/multicloud/*/; do
+  [ -d "$d" ] && multicloud+="$(basename "$d") "
+done
+
+ours() { # scenario label
+  if [ "$CLOUD" = multicloud ]; then [[ $multicloud == *" $1 "* ]]; else [[ $multicloud != *" $1 "* ]]; fi
+}
 
 # Scenario and instance names reach bucket names, labels and state keys.
 check_names() { # scenario instance
@@ -103,7 +132,7 @@ use_instance() { # scenario instance expires-at
   rm -rf "$dir/.terraform" "$dir"/terraform.tfstate* "$dir/.local"
   local key
   key=$(state_key "$scenario" "$instance")
-  case $CLOUD in
+  case $STORE in
   gcp)
     printf 'terraform {\n  backend "gcs" {}\n}\n' >"$dir/ci_backend.tf"
     terraform -chdir="$dir" init -input=false -no-color \
@@ -129,7 +158,7 @@ use_instance() { # scenario instance expires-at
 delete_state() { # scenario instance
   local key
   key=$(state_key "$1" "$2")
-  case $CLOUD in
+  case $STORE in
   gcp) gcloud storage rm --quiet "gs://$PLATFORM_GCP_STATE_BUCKET/$key/default.tfstate" 2>/dev/null || true ;;
   azure)
     az storage blob delete --account-name "$PLATFORM_AZURE_STATE_ACCOUNT" --container-name tfstate \
@@ -204,10 +233,10 @@ destroy_one() { # scenario instance
 
 # states prints "<scenario> <instance>" for every scenario state of CLOUD.
 states() {
-  case $CLOUD in
+  case $STORE in
   gcp)
-    { gcloud storage ls "gs://$PLATFORM_GCP_STATE_BUCKET/scenarios/gcp/**" 2>/dev/null || true; } |
-      sed -n "s#^gs://$PLATFORM_GCP_STATE_BUCKET/scenarios/gcp/\([^/]*\)/\([^/]*\)/default\.tfstate\$#\1 \2#p"
+    { gcloud storage ls "gs://$PLATFORM_GCP_STATE_BUCKET/scenarios/$CLOUD/**" 2>/dev/null || true; } |
+      sed -n "s#^gs://$PLATFORM_GCP_STATE_BUCKET/scenarios/$CLOUD/\([^/]*\)/\([^/]*\)/default\.tfstate\$#\1 \2#p"
     ;;
   azure)
     az storage blob list --account-name "$PLATFORM_AZURE_STATE_ACCOUNT" --container-name tfstate \
@@ -226,7 +255,7 @@ states() {
 state_json() { # scenario instance
   local key
   key=$(state_key "$1" "$2")
-  case $CLOUD in
+  case $STORE in
   gcp) gcloud storage cat "gs://$PLATFORM_GCP_STATE_BUCKET/$key/default.tfstate" ;;
   azure)
     local tmp
@@ -240,8 +269,9 @@ state_json() { # scenario instance
   esac
 }
 
-# aws_tagged_buckets prints "<bucket>\t<expires-at>\t<instance>\t<region>"
-# for every bucket a scenario run tagged, in any region: a scenario may span several
+# aws_tagged_buckets prints
+# "<bucket>\t<expires-at>\t<instance>\t<region>\t<scenario>" for every bucket
+# a scenario run tagged, in any region: a scenario may span several
 # (multi-region), and the tagging API only sees the region it is asked in.
 # It lists the deployer's artifactweave- buckets with their regions and reads
 # each one's tags there.
@@ -257,7 +287,7 @@ aws_tagged_buckets() {
     tags=$(aws s3api get-bucket-tagging --bucket "$name" --region "$region" --output json 2>/dev/null) || continue
     jq -r --arg n "$name" --arg r "$region" '(.TagSet | from_entries) as $t |
       select($t["artifactweave-scenario"] != null) |
-      [$n, ($t["expires-at"] // ""), ($t.instance // ""), $r] | @tsv' <<<"$tags"
+      [$n, ($t["expires-at"] // ""), ($t.instance // ""), $r, $t["artifactweave-scenario"]] | @tsv' <<<"$tags"
   done < <(aws s3api list-buckets --prefix artifactweave- --query 'Buckets[].[Name, BucketRegion]' --output text)
 }
 
@@ -280,6 +310,90 @@ aws_delete_bucket() { # bucket region
 # unless REAP_PREFIX narrows it to one run's (a pull request proof reaps only
 # its own, so parallel proofs never race to destroy the same state).
 in_scope() { [ -z "${REAP_PREFIX:-}" ] || [[ $1 == "$REAP_PREFIX"* ]]; }
+
+# sweep deletes what outlived its state on one cloud: labelled resources once
+# expired, prefixed (unlabelled) ones once old enough, never a live
+# instance's, and only those of scenarios this reap owns (ours). It reads
+# reap's live and counts into its failed.
+sweep() { # cloud
+  local name inst exp created scenario
+  case $1 in
+  gcp)
+    while IFS=$'\t' read -r name exp inst scenario; do
+      [ -n "$name" ] || continue
+      in_scope "$inst" || continue
+      ours "$scenario" || continue
+      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
+        if gcloud storage rm -r --quiet "gs://$name"; then
+          summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
+        else
+          failed=$((failed + 1))
+        fi
+      fi
+    done < <(gcloud storage buckets list --project "$PLATFORM_GCP_PROJECT" --format=json |
+      jq -r '.[] | select(.labels["artifactweave-scenario"] != null) | [.name, (.labels["expires-at"] // ""), (.labels.instance // ""), .labels["artifactweave-scenario"]] | @tsv')
+    # Load-balancer pieces take no labels; delete them in dependency order.
+    # Only GCP's own scenarios make them: a multicloud scenario makes none,
+    # and its names lack GCP's prefix.
+    [ "$CLOUD" = gcp ] || return 0
+    local kind scope
+    for kind in forwarding-rules target-https-proxies target-http-proxies url-maps backend-buckets ssl-certificates addresses; do
+      scope=--global
+      [ "$kind" = backend-buckets ] && scope=
+      while IFS=$'\t' read -r name created; do
+        [ -n "$name" ] || continue
+        inst=${name#"$NAME_PREFIX"}
+        in_scope "$inst" || continue
+        local owned=
+        for l in $live; do [[ $inst == "$l"* ]] && owned=1; done
+        [ -z "$owned" ] || continue
+        [ $((now - $(date -d "$created" +%s))) -ge "$orphan_age" ] || continue
+        # shellcheck disable=SC2086 # scope is one flag or nothing
+        if gcloud compute "$kind" delete $scope --project "$PLATFORM_GCP_PROJECT" --quiet "$name"; then
+          summary "Deleted orphaned $kind \`$name\`."
+        else
+          failed=$((failed + 1))
+        fi
+      done < <(
+        # shellcheck disable=SC2086
+        gcloud compute "$kind" list $scope --project "$PLATFORM_GCP_PROJECT" \
+          --filter="name~^$NAME_PREFIX" --format='value(name,creationTimestamp)' 2>/dev/null || true
+      )
+    done
+    ;;
+  azure)
+    local id
+    while IFS=$'\t' read -r id exp inst scenario; do
+      [ -n "$id" ] || continue
+      in_scope "$inst" || continue
+      ours "$scenario" || continue
+      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
+        if az resource delete --ids "$id" --only-show-errors; then
+          summary "Deleted orphaned resource \`${id##*/}\` (instance \`$inst\`, expired $(utc "$exp"))."
+        else
+          failed=$((failed + 1))
+        fi
+      fi
+    done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors \
+      --query '[?tags."artifactweave-scenario" != null].[id, tags."expires-at", tags.instance, tags."artifactweave-scenario"]' -o tsv)
+    ;;
+  aws)
+    local region
+    while IFS=$'\t' read -r name exp inst region scenario; do
+      [ -n "$name" ] || continue
+      in_scope "$inst" || continue
+      ours "$scenario" || continue
+      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
+        if aws_delete_bucket "$name" "$region"; then
+          summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
+        else
+          failed=$((failed + 1))
+        fi
+      fi
+    done < <(aws_tagged_buckets)
+    ;;
+  esac
+}
 
 reap() {
   local failed=0 reaped=0 live=" " scenario instance json expires resources
@@ -308,103 +422,47 @@ reap() {
     fi
   done < <(states)
 
-  # Resources that outlived their state: labelled ones once expired,
-  # prefixed (unlabelled) ones once old enough, never a live instance's.
-  local name inst exp created
-  case $CLOUD in
-  gcp)
-    while IFS=$'\t' read -r name exp inst; do
-      [ -n "$name" ] || continue
-      in_scope "$inst" || continue
-      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
-        if gcloud storage rm -r --quiet "gs://$name"; then
-          summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
-        else
-          failed=$((failed + 1))
-        fi
-      fi
-    done < <(gcloud storage buckets list --project "$PLATFORM_GCP_PROJECT" --format=json |
-      jq -r '.[] | select(.labels["artifactweave-scenario"] != null) | [.name, (.labels["expires-at"] // ""), (.labels.instance // "")] | @tsv')
-    # Load-balancer pieces take no labels; delete them in dependency order.
-    local kind scope
-    for kind in forwarding-rules target-https-proxies target-http-proxies url-maps backend-buckets ssl-certificates addresses; do
-      scope=--global
-      [ "$kind" = backend-buckets ] && scope=
-      while IFS=$'\t' read -r name created; do
-        [ -n "$name" ] || continue
-        inst=${name#"$NAME_PREFIX"}
-        in_scope "$inst" || continue
-        local owned=
-        for l in $live; do [[ $inst == "$l"* ]] && owned=1; done
-        [ -z "$owned" ] || continue
-        [ $((now - $(date -d "$created" +%s))) -ge "$orphan_age" ] || continue
-        # shellcheck disable=SC2086 # scope is one flag or nothing
-        if gcloud compute "$kind" delete $scope --project "$PLATFORM_GCP_PROJECT" --quiet "$name"; then
-          summary "Deleted orphaned $kind \`$name\`."
-        else
-          failed=$((failed + 1))
-        fi
-      done < <(
-        # shellcheck disable=SC2086
-        gcloud compute "$kind" list $scope --project "$PLATFORM_GCP_PROJECT" \
-          --filter="name~^$NAME_PREFIX" --format='value(name,creationTimestamp)' 2>/dev/null || true
-      )
-    done
-    ;;
-  azure)
-    local id
-    while IFS=$'\t' read -r id exp inst; do
-      [ -n "$id" ] || continue
-      in_scope "$inst" || continue
-      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
-        if az resource delete --ids "$id" --only-show-errors; then
-          summary "Deleted orphaned resource \`${id##*/}\` (instance \`$inst\`, expired $(utc "$exp"))."
-        else
-          failed=$((failed + 1))
-        fi
-      fi
-    done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors \
-      --query '[?tags."artifactweave-scenario" != null].[id, tags."expires-at", tags.instance]' -o tsv)
-    ;;
-  aws)
-    local region
-    while IFS=$'\t' read -r name exp inst region; do
-      [ -n "$name" ] || continue
-      in_scope "$inst" || continue
-      if [[ $live != *" $inst "* ]] && [ -n "$exp" ] && [ "$exp" -le "$now" ]; then
-        if aws_delete_bucket "$name" "$region"; then
-          summary "Deleted orphaned bucket \`$name\` (instance \`$inst\`, expired $(utc "$exp"))."
-        else
-          failed=$((failed + 1))
-        fi
-      fi
-    done < <(aws_tagged_buckets)
-    ;;
-  esac
+  # Then what outlived its state, on every cloud the scenarios use.
+  local c
+  for c in $CLOUDS; do sweep "$c"; done
 
   summary "Reap of \`$CLOUD\`${REAP_PREFIX:+ (instances starting \`$REAP_PREFIX\`)}: $reaped expired instance(s) destroyed, $failed failure(s); live:${live% }."
   [ "$failed" = 0 ]
 }
 
-# check_clean fails if anything of an instance starting with RUN_TAG remains:
-# a state, a labelled bucket or resource.
+# check_clean fails if anything of an instance of the run remains: a state, a
+# labelled bucket or resource. A proof names its instances RUN_TAG-<step>,
+# and the hyphen keeps one proof's tag from matching another's that it
+# begins (a mirror's ...-m and a multi-region's ...-mr in the same run).
 check_clean() {
   : "${RUN_TAG:?RUN_TAG is required}"
-  local left=0 scenario instance line
+  local left=0 scenario instance
   while read -r scenario instance; do
-    if [[ $instance == "$RUN_TAG"* ]]; then
+    if [[ $instance == "$RUN_TAG"-* ]]; then
       summary "**Left behind:** the state of \`$CLOUD/$scenario\` instance \`$instance\`."
       left=1
     fi
   done < <(states)
-  case $CLOUD in
+  local c
+  for c in $CLOUDS; do leftovers "$c"; done
+  if [ "$left" = 0 ]; then
+    summary "Nothing of run \`$RUN_TAG\` remains in \`$CLOUD\`."
+  fi
+  [ "$left" = 0 ]
+}
+
+# leftovers reports the labelled buckets or resources of the run's instances
+# on one cloud, setting check_clean's left.
+leftovers() { # cloud
+  local line
+  case $1 in
   gcp)
     while read -r line; do
       [ -n "$line" ] || continue
       summary "**Left behind:** bucket \`$line\`."
       left=1
     done < <(gcloud storage buckets list --project "$PLATFORM_GCP_PROJECT" --format=json |
-      jq -r --arg tag "$RUN_TAG" '.[] | select((.labels.instance // "") | startswith($tag)) | .name')
+      jq -r --arg tag "$RUN_TAG-" '.[] | select((.labels.instance // "") | startswith($tag)) | .name')
     ;;
   azure)
     while read -r line; do
@@ -412,22 +470,18 @@ check_clean() {
       summary "**Left behind:** resource \`$line\`."
       left=1
     done < <(az resource list --resource-group "$PLATFORM_AZURE_RESOURCE_GROUP" --only-show-errors -o json |
-      jq -r --arg tag "$RUN_TAG" '.[] | select((.tags.instance // "") | startswith($tag)) | .name')
+      jq -r --arg tag "$RUN_TAG-" '.[] | select((.tags.instance // "") | startswith($tag)) | .name')
     ;;
   aws)
     local exp inst region
-    while IFS=$'\t' read -r line exp inst region; do
+    while IFS=$'\t' read -r line exp inst region _; do
       [ -n "$line" ] || continue
-      [[ $inst == "$RUN_TAG"* ]] || continue
+      [[ $inst == "$RUN_TAG"-* ]] || continue
       summary "**Left behind:** bucket \`$line\` ($region)."
       left=1
     done < <(aws_tagged_buckets)
     ;;
   esac
-  if [ "$left" = 0 ]; then
-    summary "Nothing of run \`$RUN_TAG\` remains in \`$CLOUD\`."
-  fi
-  [ "$left" = 0 ]
 }
 
 case $action in

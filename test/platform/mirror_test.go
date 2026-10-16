@@ -7,18 +7,22 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 )
 
 // The multi-region scenarios run artifactweave's mirror over two regional
-// stores (decision 0028). After the generic checks they show, on the real
-// clouds, that every member holds a copy, that reads prefer the member in
-// this instance's zone, that a drained member stops taking copies while
-// reads go on, and that repair brings it back up to the redundancy.
+// stores, and multicloud/mirror over one store on each of three clouds
+// (decision 0028). After the generic checks they show, on the real clouds,
+// that every member holds a copy, that reads prefer the member in this
+// instance's zone, that a drained member stops taking copies while reads go
+// on from the others, and that repair brings it back up to the redundancy.
 func init() {
-	for _, s := range []string{"gcp/multi-region", "azure/multi-region", "aws/multi-region"} {
+	for _, s := range []string{
+		"gcp/multi-region", "azure/multi-region", "aws/multi-region", "multicloud/mirror",
+	} {
 		scenarioChecks[s] = []check{
 			{"every member holds the blob", everyMemberHolds},
 			{"redirect prefers the member in this instance's zone", zoneFirst},
@@ -31,7 +35,7 @@ func init() {
 const drainedPath = "scenario/drained.bin"
 
 // drainedFile is deployed while the zone's member is drained, so it starts
-// with a copy on the other member only.
+// with copies on the other members only.
 var drainedFile payload
 
 // mirrorStatus is the part of GET /api/storageinfo's blobMirrors the checks
@@ -125,11 +129,13 @@ func waitFor(t *testing.T, h *harness, what string, ok func(mirrorStatus) bool) 
 	}
 }
 
+// mustMembers returns the mirror's members, this instance's zone first: two
+// regions for multi-region, three clouds for multicloud/mirror.
 func mustMembers(t *testing.T, h *harness) []mirrorMember {
 	t.Helper()
 	ms := h.members(t)
-	if len(ms) != 2 {
-		t.Fatalf("the scenario's mirror_members output lists %d members, want 2", len(ms))
+	if len(ms) < 2 {
+		t.Fatalf("the scenario's mirror_members output lists %d members, want at least 2", len(ms))
 	}
 	return ms
 }
@@ -137,13 +143,28 @@ func mustMembers(t *testing.T, h *harness) []mirrorMember {
 func everyMemberHolds(t *testing.T, h *harness) {
 	ms := mustMembers(t, h)
 	st := waitFor(t, h, "a copy on every member", func(st mirrorStatus) bool {
-		return st.UnderReplicated == 0 && st.Present[ms[0].Store] >= 1 &&
-			st.Present[ms[1].Store] >= 1
+		for _, m := range ms {
+			if st.Present[m.Store] < 1 {
+				return false
+			}
+		}
+		return st.UnderReplicated == 0
 	})
 	t.Logf("present copies %v", st.Present)
 }
 
-// zoneFirst: with both copies in place, the redirect signs on the member in
+// holder returns the member a signed URL points into, or nil when it points
+// at none of them.
+func holder(ms []mirrorMember, loc *url.URL) *mirrorMember {
+	for i := range ms {
+		if strings.HasPrefix(loc.Host+loc.Path, ms[i].SignedURLPrefix) {
+			return &ms[i]
+		}
+	}
+	return nil
+}
+
+// zoneFirst: with every copy in place, the redirect signs on the member in
 // this instance's zone (blob.mirror.zone), the first in read order.
 func zoneFirst(t *testing.T, h *harness) {
 	ms := mustMembers(t, h)
@@ -159,18 +180,21 @@ func zoneFirst(t *testing.T, h *harness) {
 }
 
 // drainedMember restarts artifactweave with the zone's member drained
-// (write_enabled false): a new upload succeeds on the other member alone,
-// every file still reads, and the new file's redirect signs on the member
-// that holds it.
+// (write_enabled false): a new upload succeeds on the other members alone,
+// every file still reads, and the new file's redirect signs on another
+// member that holds it, which for multicloud/mirror is another provider's.
 func drainedMember(t *testing.T, h *harness) {
 	ms := mustMembers(t, h)
 	h.restart(t, "ARTIFACTWEAVE_BLOB_STORES_"+strings.ToUpper(ms[0].Store)+"_WRITE_ENABLED=false")
-	if st := storageStatus(t, h); st.WriteEnabled[ms[0].Store] || !st.WriteEnabled[ms[1].Store] {
-		t.Fatalf(
-			"after the restart write_enabled is %v, want only %s drained",
-			st.WriteEnabled,
-			ms[0].Store,
-		)
+	st := storageStatus(t, h)
+	for i, m := range ms {
+		if st.WriteEnabled[m.Store] != (i > 0) {
+			t.Fatalf(
+				"after the restart write_enabled is %v, want only %s drained",
+				st.WriteEnabled,
+				ms[0].Store,
+			)
+		}
 	}
 
 	drainedFile.data = make([]byte, 6<<20)
@@ -207,11 +231,13 @@ func drainedMember(t *testing.T, h *harness) {
 		)
 	}
 
-	// The new file is only on the other member, and its redirect says so.
+	// The new file is only on the other members, and its redirect says so:
+	// which of them signs depends on their observed latency.
 	loc := redirectFor(t, h, drainedPath, drainedFile.sha256, nil)
-	if !strings.HasPrefix(loc.Host+loc.Path, ms[1].SignedURLPrefix) {
-		t.Fatalf("redirected to %s, want the %s member that holds the file (%s)",
-			redact(loc), ms[1].Zone, ms[1].SignedURLPrefix)
+	m := holder(ms, loc)
+	if m == nil || m.Store == ms[0].Store {
+		t.Fatalf("redirected to %s, want a member other than the drained %s, which lacks the file",
+			redact(loc), ms[0].Store)
 	}
 	resp = fetch(t, h, loc, nil)
 	if got := drain(
@@ -219,10 +245,10 @@ func drainedMember(t *testing.T, h *harness) {
 		resp,
 	); resp.StatusCode != http.StatusOK ||
 		!bytes.Equal(got, drainedFile.data) {
-		t.Fatalf("signed URL on %s: %d, %d bytes", ms[1].Store, resp.StatusCode, len(got))
+		t.Fatalf("signed URL on %s: %d, %d bytes", m.Store, resp.StatusCode, len(got))
 	}
 
-	st := storageStatus(t, h)
+	st = storageStatus(t, h)
 	if st.Present[ms[0].Store] != 1 {
 		t.Errorf(
 			"the drained %s holds %d copies, want 1: it must take no new copy",
@@ -238,9 +264,9 @@ func drainedMember(t *testing.T, h *harness) {
 	)
 }
 
-// repairBackfills restarts artifactweave with both members writable: repair
-// copies the file that only the other member holds back to the zone's
-// member, after which its redirect signs there again.
+// repairBackfills restarts artifactweave with every member writable: repair
+// copies the file the zone's member missed back to it, after which its
+// redirect signs there again.
 func repairBackfills(t *testing.T, h *harness) {
 	ms := mustMembers(t, h)
 	h.restart(t)

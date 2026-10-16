@@ -20,10 +20,11 @@
 #
 # The cloud is the name of the scenario's parent directory. It picks the guard
 # every target that touches the cloud runs first (check-account.sh on AWS,
-# check-subscription.sh on Azure, none on GCP) and the inputs lab-vars.sh
-# adds to the Makefile's for plan, apply and destroy: the account scope, the
-# bootstrap's conformance identity as the app principal, and force_destroy.
-# The lab's values come from lab.mk.
+# check-subscription.sh on Azure, none on GCP, both for multicloud) and the
+# inputs lab-vars.sh adds to the Makefile's for plan, apply and destroy: the
+# account scope, the bootstrap's conformance identity as the app principal,
+# and force_destroy, for each cloud a multicloud scenario spans. The lab's
+# values come from lab.mk.
 #
 # ROOT comes from git rather than a relative path, so a scenario works at any
 # depth.
@@ -45,14 +46,14 @@ COMMIT ?= $(shell git -C $(ROOT) rev-parse HEAD 2>/dev/null)
 export VERSION COMMIT
 
 CLOUD := $(notdir $(patsubst %/,%,$(dir $(CURDIR))))
-PORT ?= $(if $(filter gcp,$(CLOUD)),8081,$(if $(filter azure,$(CLOUD)),8082,8083))
+PORT ?= $(if $(filter gcp,$(CLOUD)),8081,$(if $(filter azure,$(CLOUD)),8082,$(if $(filter multicloud,$(CLOUD)),8084,8083)))
 LOCAL := CLOUD=$(CLOUD) PORT=$(PORT) TERRAFORM=$(TERRAFORM) $(ROOT)/deploy/ci/local.sh
 
 include $(ROOT)/deploy/ci/lab.mk
 # lab-vars.sh reads these from the environment.
 export LAB_GCP_PROJECT LAB_AZURE_SUBSCRIPTION LAB_AZURE_BOOTSTRAP_RG
 
-GUARD := $(if $(filter aws,$(CLOUD)),check-account,$(if $(filter azure,$(CLOUD)),check-subscription))
+GUARD := $(if $(filter aws,$(CLOUD)),check-account,$(if $(filter azure,$(CLOUD)),check-subscription,$(if $(filter multicloud,$(CLOUD)),check-account check-subscription)))
 # Sourced in the recipe line that runs terraform, so its exports reach it.
 LAB_VARS = . $(ROOT)/deploy/ci/lab-vars.sh $(CLOUD) &&
 
@@ -62,11 +63,11 @@ LAB_VARS = . $(ROOT)/deploy/ci/lab-vars.sh $(CLOUD) &&
 help:
 	@grep -hE '^## ' $(MAKEFILE_LIST) | sed 's/^## //' | column -t -s ':'
 
-## check-account: (aws) refuse unless the AWS CLI is signed in to the account holding the lab's zone
+## check-account: (aws, multicloud) refuse unless the AWS CLI is signed in to the account holding the lab's zone
 check-account:
 	@$(ROOT)/deploy/ci/check-account.sh $(LAB_AWS_ZONE_ID) $(LAB_AWS_ZONE_NAME)
 
-## check-subscription: (azure) refuse unless az's active subscription and tenant are the lab's
+## check-subscription: (azure, multicloud) refuse unless az's active subscription and tenant are the lab's
 check-subscription:
 	@$(ROOT)/deploy/ci/check-subscription.sh $(LAB_AZURE_SUBSCRIPTION)
 

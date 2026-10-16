@@ -31,9 +31,9 @@ on:
   workflow_dispatch:
     inputs:
       cloud:
-        description: 'Cloud whose bootstrap trust and state store to use'
+        description: 'Cloud whose bootstrap trust and state store to use; multicloud logs in to all three and keeps its state in GCP''s store'
         type: choice
-        options: [gcp, azure, aws]
+        options: [gcp, azure, aws, multicloud]
         required: true
       scenario:
         description: 'Scenario directory under deploy/platform/terraform/<cloud>'
@@ -102,6 +102,9 @@ jobs:
       # A pull request proves what prove-matrix.sh chooses; each proof gets
       # its own run tag (the scenario's initials appended), so its reap and
       # check-clean see only its own instances and proofs run in parallel.
+      # Its concurrency group names the run too: GitHub cancels a waiting job
+      # when a newer one joins its group, so a group shared across runs let
+      # one pull request's proof, waiting for approval, cancel another's.
       - name: Build the matrix
         id: matrix
         shell: bash
@@ -137,7 +140,7 @@ jobs:
               include=$(jq -Rcn --arg pr "$PR" --arg run "$RUN_ID" '[inputs | select(length > 0) |
                 split(" ") as [$c, $s] | ([$s | splits("-") | .[0:1]] | join("")) as $code |
                 {cloud: $c, scenario: $s, action: "prove", instance: "", ttl: "",
-                 run_tag: ("pr" + $pr + "-" + $run + "-" + $code), lock: ("prove-" + $s),
+                 run_tag: ("pr" + $pr + "-" + $run + "-" + $code), lock: ("prove-" + $s + "-" + $run),
                  title: ("prove " + $c + "/" + $s)}]' <<<"$pairs")
             fi
           else
@@ -237,15 +240,17 @@ jobs:
           unzip -q -d "$RUNNER_TEMP/terraform" "$RUNNER_TEMP/terraform.zip"
           echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
 
+      # A multicloud scenario has a store on every cloud, so its job logs in
+      # to all three; each cloud trusts this one environment's subject.
       - name: Authenticate to Google Cloud as the deployer
-        if: matrix.cloud == 'gcp'
+        if: matrix.cloud == 'gcp' || matrix.cloud == 'multicloud'
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.PLATFORM_GCP_WIF_PROVIDER }}
           service_account: ${{ vars.PLATFORM_GCP_SERVICE_ACCOUNT }}
 
       - name: Authenticate to Azure as the deployer
-        if: matrix.cloud == 'azure'
+        if: matrix.cloud == 'azure' || matrix.cloud == 'multicloud'
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
         with:
           client-id: ${{ vars.PLATFORM_AZURE_CLIENT_ID }}
@@ -255,7 +260,7 @@ jobs:
       # Terraform, the S3 backend, the CLI and artifactweave's AWS SDK chain
       # all read the session this step exports (an hour, the role's limit).
       - name: Authenticate to AWS as the deployer
-        if: matrix.cloud == 'aws'
+        if: matrix.cloud == 'aws' || matrix.cloud == 'multicloud'
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.PLATFORM_AWS_ROLE_ARN }}
@@ -307,11 +312,13 @@ jobs:
         run: deploy/ci/scenario-ci.sh apply
 
       # Only this proof's instances: proofs of other scenarios on the same
-      # cloud run alongside and keep theirs.
+      # cloud run alongside and keep theirs. The hyphen ends the tag, so a
+      # tag that begins another's (a mirror's -m, a multi-region's -mr)
+      # reaps only its own.
       - name: 'Prove: reap removes it'
         if: matrix.action == 'prove'
         env:
-          REAP_PREFIX: ${{ matrix.run_tag }}
+          REAP_PREFIX: ${{ matrix.run_tag }}-
         run: deploy/ci/scenario-ci.sh reap
 
       - name: 'Prove: nothing of this run remains'

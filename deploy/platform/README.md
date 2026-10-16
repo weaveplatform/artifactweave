@@ -23,7 +23,9 @@ applied through the JFrog Terraform providers.
 | `geo-replicated`: one store with the cloud's own replication | [available](terraform/aws/geo-replicated/README.md) | [available](terraform/gcp/geo-replicated/README.md) | [available](terraform/azure/geo-replicated/README.md) |
 | `cdn`: a store behind CloudFront, Cloud CDN or Front Door | planned (#132) | planned (#133) | planned (#134) |
 
-`multicloud/mirror`, one mirror with a member on each cloud, is planned in #135.
+[`multicloud/mirror`](terraform/multicloud/mirror/README.md) puts one mirror member on each
+cloud: an S3 bucket, a Cloud Storage bucket and an Azure storage account, so no one provider's
+outage, or leaving it, loses a blob or stops uploads.
 
 Every scenario follows the scenario contract v2 (decision 0030): a short composition of the
 modules below, with every lab value an input, and a README written from
@@ -106,7 +108,12 @@ gh workflow run platform-scenarios.yml -f cloud=gcp -f scenario=single-bucket -f
 gh workflow run platform-scenarios.yml -f cloud=azure -f action=apply -f instance=explore1 -f ttl_minutes=120
 gh workflow run platform-scenarios.yml -f cloud=azure -f action=destroy -f instance=explore1
 gh workflow run platform-scenarios.yml -f cloud=gcp -f action=reap
+gh workflow run platform-scenarios.yml -f cloud=multicloud -f scenario=mirror -f action=test
 ```
+
+`multicloud` logs in to all three clouds as their deployers in one job and keeps the instance's
+state in GCP's state bucket; its `reap` sweeps all three clouds for the multicloud scenarios'
+resources, which a single cloud's `reap` leaves alone.
 
 | Action | Does |
 |---|---|

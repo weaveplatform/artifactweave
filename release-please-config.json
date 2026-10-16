@@ -63,6 +63,10 @@
         {
           "type": "generic",
           "path": "deploy/platform/terraform/gcp/single-bucket/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/platform/terraform/multicloud/mirror/README.md"
         }
       ]
     }
