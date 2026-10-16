@@ -18,10 +18,19 @@ func TestGenericKeepsNoIndex(t *testing.T) {
 	if err := h.Deleting(ctx, nil, repo.Config{}, types.Item{}); err != nil {
 		t.Fatal(err)
 	}
+	if err := h.Deleted(
+		ctx,
+		nil,
+		repo.Config{},
+		[]types.Item{{Path: "a/b", Name: "c"}},
+	); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Docker, OCI and Helm OCI repositories share the image format, which
-// the manifest push goes through.
+// the manifest push goes through. A file outside any image touches no
+// index, so a nil store is never reached.
 func TestImagesHaveTheirFormat(t *testing.T) {
 	ctx := context.Background()
 	for _, pt := range []repo.PackageType{repo.Docker, repo.OCI, repo.HelmOCI} {
@@ -33,6 +42,9 @@ func TestImagesHaveTheirFormat(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := h.Deleting(ctx, nil, repo.Config{}, types.Item{}); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.Deleted(ctx, nil, repo.Config{}, []types.Item{{Name: "x"}}); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -298,10 +298,11 @@ operations it tests, so turning one on is a one-line change:
 |---|---|---|
 | Pull | `OCI_TEST_PULL` | #224, with blobs (#222) and manifests (#223) |
 | Push | `OCI_TEST_PUSH` | #224, with blobs (#222) and manifests (#223) |
-| Content Discovery | `OCI_TEST_CONTENT_DISCOVERY` | whichever of #225 (referrers) and #226 (tags list) lands second |
-| Content Management | `OCI_TEST_CONTENT_MANAGEMENT` | #226 (deletes); the suite needs Push and Content Discovery for it |
+| Content Discovery | `OCI_TEST_CONTENT_DISCOVERY` | #227, once #225 (referrers) and #226 (tags list) had both landed |
+| Content Management | `OCI_TEST_CONTENT_MANAGEMENT` | #227, once #226 (deletes) had landed; the suite needs Push and Content Discovery for it |
 
-`make oci-conformance OCI_TEST_CONTENT_DISCOVERY=1` runs a category before it is switched on.
+All four are on: 73 specifications pass and 6 are skipped by design. Setting a variable to 0,
+for example `make oci-conformance OCI_TEST_CONTENT_MANAGEMENT=0`, runs without that category.
 
 ## Terraform scenarios
 

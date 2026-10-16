@@ -447,12 +447,13 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 	items := s.Store.Items()
 	hooks := format.For(t.From.Repo.PackageType)
 	var versions []types.PackageVersion
-	var folders []types.Item
+	var folders, files []types.Item
 	for _, st := range steps {
 		if st.src.Folder {
 			folders = append(folders, st.src)
 			continue
 		}
+		files = append(files, st.src)
 		if err := hooks.Deleting(ctx, s.Store, t.From.Repo, st.src); err != nil {
 			return err //nolint:wrapcheck // the format's own error
 		}
@@ -486,7 +487,13 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 			return fmt.Errorf("item: delete %s: %w", f.FullPath(), err)
 		}
 	}
-	return pkgindex.Prune(ctx, s.Store, versions) //nolint:wrapcheck // pkgindex wraps its own
+	if err := pkgindex.Prune(ctx, s.Store, versions); err != nil {
+		return err //nolint:wrapcheck // pkgindex wraps its own
+	}
+	if err := hooks.Deleted(ctx, s.Store, t.From.Repo, files); err != nil {
+		return err //nolint:wrapcheck // the format's own error
+	}
+	return nil
 }
 
 // join joins repository-relative paths, either of which may be empty.

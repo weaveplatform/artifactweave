@@ -84,7 +84,8 @@ func (s *Service) folderState(
 // index lists, must already be in the image (a *BlobsUnknownError
 // otherwise); a subject need not be. A folder holding the same manifest is
 // left as it is; one holding another manifest, or anything else, is
-// replaced, all folders in one transaction.
+// replaced, keeping a tag's previous manifest under Tag Retention. The
+// repository's tag limits then apply to the image, all in one transaction.
 func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	m := p.Manifest
 	if err := s.childrenPresent(ctx, p.Owner, m.Children()); err != nil {
@@ -109,7 +110,7 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 				return err
 			}
 		}
-		return nil
+		return s.retain(ctx, items, p)
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours
@@ -210,8 +211,8 @@ func (s *Service) putFolder(
 	case same:
 		return nil
 	case exists:
-		if _, err := items.Purge(ctx, item.Target{Repo: p.Repo, Path: dir}); err != nil {
-			return fmt.Errorf("registry: replace %s: %w", dir, err)
+		if err := s.replace(ctx, items, p, folder); err != nil {
+			return err
 		}
 	}
 	_, err = items.DeployCommitted(ctx, item.Deploy{
