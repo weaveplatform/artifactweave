@@ -118,6 +118,7 @@ func New(o Options) *Registry {
 	g.registerManifests()
 	g.registerToken()
 	g.registerAuth()
+	g.registerReferrers()
 	return g
 }
 

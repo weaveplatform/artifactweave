@@ -271,23 +271,6 @@ func TestOverwrite(t *testing.T) {
 	})
 }
 
-// Indexes and manifest lists are refused until they are stored with their
-// platform manifests.
-func TestIndexesNotStoredYet(t *testing.T) {
-	w := newWorld(t, inmem.New())
-	body := `{"schemaVersion":2,"manifests":[]}`
-	m, err := layout.ParseManifest(layout.MediaTypeOCIIndex, []byte(body), sum(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = w.svc.PutManifest(context.Background(), registry.Push{
-		Owner: w.owner("app"), Manifest: m, Body: []byte(body), Folders: []string{"v1"},
-	})
-	if !errors.Is(err, layout.ErrManifestInvalid) {
-		t.Fatalf("err = %v", err)
-	}
-}
-
 // Content garbage collection removed after the push found it is unknown,
 // and nothing is stored; a config that cannot be read only loses its
 // labels.

@@ -20,8 +20,11 @@ import (
 )
 
 // tagHeader names, once per tag, the tags a push by digest stored with
-// ?tag= (end-7b).
-const tagHeader = "OCI-Tag"
+// ?tag= (end-7b); subjectHeader the subject of a manifest pushed with one.
+const (
+	tagHeader     = "OCI-Tag"
+	subjectHeader = "OCI-Subject"
+)
 
 // registerManifests registers manifest pushes and pulls (decision 0031)
 // when the registry has a blob store, which holds the manifests' bytes.
@@ -165,9 +168,10 @@ var manifestTypes = []string{
 	layout.MediaTypeDockerManifest, layout.MediaTypeDockerList,
 }
 
-// putManifest serves PUT of a manifest by tag or by digest, with ?tag= for
-// more tags on a push by digest (end-7b). It answers 201 with the
-// manifest's digest and location.
+// putManifest serves PUT of an image manifest, image index or manifest
+// list by tag or by digest, with ?tag= for more tags on a push by digest
+// (end-7b). It answers 201 with the manifest's digest and location, and
+// its subject when it has one.
 func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request) {
 	if err := q.Require(r, q.Name+"/", types.ActionWrite); err != nil {
 		Write(w, err)
@@ -226,6 +230,11 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 	h := w.Header()
 	h.Set("Location", location(r, q, "manifests", "sha256:"+hexSum))
 	h.Set(contentDigestHeader, "sha256:"+hexSum)
+	if m.Subject != nil {
+		// Tells the client the registry tracks referrers itself, so it
+		// keeps no referrers tag of its own (end-7, Artifactory 7.90.1).
+		h.Set(subjectHeader, m.Subject.Digest)
+	}
 	for _, t := range tags {
 		h.Add(tagHeader, t)
 	}
@@ -310,7 +319,8 @@ func manifestMessage(err error) string {
 }
 
 // manifestErr answers what storing a manifest refused: one
-// MANIFEST_BLOB_UNKNOWN for each blob the image does not hold.
+// MANIFEST_BLOB_UNKNOWN for each blob, or each manifest an index lists, that
+// the image does not hold.
 func (g *Registry) manifestErr(w http.ResponseWriter, r *http.Request, q Request, err error) {
 	var unknown *registry.BlobsUnknownError
 	switch {

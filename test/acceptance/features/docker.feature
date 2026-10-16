@@ -194,3 +194,66 @@ Feature: Docker and OCI registry
     And I keep the JSON field "token" of the output as "crane"
     When I GET "/v2/" with the kept token "crane"
     Then the response status is 200
+
+  Scenario: A multi-architecture image and its signature
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:d6f56bc20064075ce319ac2e6fcef5de9ea21773b0a8a4398c4405222971f9c0" as admin with body:
+      """
+      {"architecture":"arm64","os":"linux"}
+      """
+    Then the response status is 201
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin with body:
+      """
+      hello blob
+      """
+    Then the response status is 201
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a" as admin with body:
+      """
+      {}
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:d6f56bc20064075ce319ac2e6fcef5de9ea21773b0a8a4398c4405222971f9c0","size":37},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f","size":10}]}
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.index.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/multi" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d","size":399,"platform":{"architecture":"arm64","os":"linux"}}]}
+      """
+    Then the response status is 201
+    And the response header "Docker-Content-Digest" contains "sha256:fee8ebdf520089c0e85b9a2c792c6181c7e2440b1b7ae178f6d2c36a5afd035c"
+    When the next request has header "Accept" "application/vnd.oci.image.index.v1+json"
+    And I GET "/v2/docker-local/team/app/manifests/multi" as admin
+    Then the response status is 200
+    And the response header "Content-Type" contains "application/vnd.oci.image.index.v1+json"
+    And the JSON field "manifests.0.platform.architecture" equals "arm64"
+    When I GET "/v2/docker-local/team/app/manifests/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d" as admin
+    Then the response status is 200
+    And the JSON field "config.digest" equals "sha256:d6f56bc20064075ce319ac2e6fcef5de9ea21773b0a8a4398c4405222971f9c0"
+    When I GET "/artifactory/api/storage/docker-local/team/app/multi/list.manifest.json" as admin
+    Then the response status is 200
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/sha256:22d26dd7f5f0802e86de103510b816796739580901e8585e66b20c185be0f69b" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","artifactType":"application/vnd.example.signature","config":{"mediaType":"application/vnd.oci.empty.v1+json","digest":"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","size":2},"layers":[{"mediaType":"application/vnd.oci.empty.v1+json","digest":"sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a","size":2}],"subject":{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d","size":399},"annotations":{"signer":"ci"}}
+      """
+    Then the response status is 201
+    And the response header "OCI-Subject" contains "sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"
+    When I GET "/v2/docker-local/team/app/referrers/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d" as admin
+    Then the response status is 200
+    And the response header "Content-Type" contains "application/vnd.oci.image.index.v1+json"
+    And the JSON field "manifests.0.digest" equals "sha256:22d26dd7f5f0802e86de103510b816796739580901e8585e66b20c185be0f69b"
+    And the JSON field "manifests.0.artifactType" equals "application/vnd.example.signature"
+    And the JSON field "manifests.0.annotations.signer" equals "ci"
+    And the JSON field "manifests" has 1 entries
+    When I GET "/v2/docker-local/team/app/referrers/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d?artifactType=application/vnd.example.sbom" as admin
+    Then the response status is 200
+    And the response header "OCI-Filters-Applied" contains "artifactType"
+    And the JSON field "manifests" has 0 entries

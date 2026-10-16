@@ -118,7 +118,7 @@ func TestManifestPushErrors(t *testing.T) {
 	schema1 := map[string]string{
 		"Content-Type": "application/vnd.docker.distribution.manifest.v1+prettyjws",
 	}
-	index := `{"schemaVersion":2,"mediaType":"` + layout.MediaTypeOCIIndex + `","manifests":[]}`
+	unknownChild := index(layout.MediaTypeOCIIndex, image("absent"))
 	huge := strings.Repeat(" ", layout.MaxManifestSize+1)
 	const base = "/v2/docker-local/app/manifests/"
 	for name, c := range map[string]struct {
@@ -127,20 +127,20 @@ func TestManifestPushErrors(t *testing.T) {
 		status    int
 		code      string
 	}{
-		"unknown blob":       {"v1", image("absent"), ociManifest, 400, CodeManifestBlobUnknown},
-		"wrong media type":   {"v1", body, map[string]string{"Content-Type": "text/plain"}, 400, CodeManifestInvalid},
-		"schema 1":           {"v1", body, schema1, 400, CodeManifestInvalid},
-		"not JSON":           {"v1", "nope", ociManifest, 400, CodeManifestInvalid},
-		"index":              {"v1", index, map[string]string{"Content-Type": layout.MediaTypeOCIIndex}, 400, CodeManifestInvalid},
-		"too large":          {"v1", huge, ociManifest, 413, CodeSizeInvalid},
-		"invalid tag":        {"-v1", body, ociManifest, 400, CodeManifestInvalid},
-		"uploads tag":        {"_uploads", body, ociManifest, 400, CodeTagInvalid},
-		"digest folder tag":  {"sha256__" + d[7:], body, ociManifest, 400, CodeTagInvalid},
-		"invalid digest":     {"sha256:totallywrong", body, ociManifest, 400, CodeManifestInvalid},
-		"other algorithm":    {"sha512:" + strings.Repeat("a", 128), body, ociManifest, 400, CodeDigestInvalid},
-		"digest mismatch":    {digestOf("other"), body, ociManifest, 400, CodeDigestInvalid},
-		"invalid extra tag":  {d + "?tag=-x", body, ociManifest, 400, CodeManifestInvalid},
-		"reserved extra tag": {d + "?tag=_uploads", body, ociManifest, 400, CodeTagInvalid},
+		"unknown blob":         {"v1", image("absent"), ociManifest, 400, CodeManifestBlobUnknown},
+		"wrong media type":     {"v1", body, map[string]string{"Content-Type": "text/plain"}, 400, CodeManifestInvalid},
+		"schema 1":             {"v1", body, schema1, 400, CodeManifestInvalid},
+		"not JSON":             {"v1", "nope", ociManifest, 400, CodeManifestInvalid},
+		"index of the unknown": {"v1", unknownChild, ociIndex, 400, CodeManifestBlobUnknown},
+		"too large":            {"v1", huge, ociManifest, 413, CodeSizeInvalid},
+		"invalid tag":          {"-v1", body, ociManifest, 400, CodeManifestInvalid},
+		"uploads tag":          {"_uploads", body, ociManifest, 400, CodeTagInvalid},
+		"digest folder tag":    {"sha256__" + d[7:], body, ociManifest, 400, CodeTagInvalid},
+		"invalid digest":       {"sha256:totallywrong", body, ociManifest, 400, CodeManifestInvalid},
+		"other algorithm":      {"sha512:" + strings.Repeat("a", 128), body, ociManifest, 400, CodeDigestInvalid},
+		"digest mismatch":      {digestOf("other"), body, ociManifest, 400, CodeDigestInvalid},
+		"invalid extra tag":    {d + "?tag=-x", body, ociManifest, 400, CodeManifestInvalid},
+		"reserved extra tag":   {d + "?tag=_uploads", body, ociManifest, 400, CodeTagInvalid},
 	} {
 		t.Run(name, func(t *testing.T) {
 			w := newBlobWorld(t)
