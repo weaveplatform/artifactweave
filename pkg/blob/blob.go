@@ -1,8 +1,9 @@
 // Package blob is the content-addressed binary store behind every repository
 // (decision record 0004). Blobs are keyed by their lowercase hex SHA-256; the
-// SHA-1 and MD5 that Artifactory clients also send are computed during the
-// upload and returned by Commit so the caller can record them in the item
-// index, which is where checksum deploy and checksum search look them up.
+// SHA-512, SHA-1 and MD5 that package clients also use are computed in the
+// same pass during the upload and returned by Commit so the caller can record
+// them in the item index, which is where checksum deploy, checksum search and
+// checksum files read them.
 //
 // Uploads are sessions rather than single calls because two clients need to
 // append across HTTP requests: Docker chunked uploads (PATCH then PUT) and the
@@ -22,6 +23,7 @@ import (
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum clients send, not a security primitive
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding"
 	"encoding/hex"
 	"errors"
@@ -52,10 +54,11 @@ var (
 )
 
 // Digests are lowercase hex checksums. In Commit's want argument an empty
-// field means "not declared"; in a returned Info an empty SHA1 or MD5 means
-// the backend does not keep it (the item index does).
+// field means "not declared"; in a returned Info an empty SHA512, SHA1 or MD5
+// means the backend does not keep it (the item index does).
 type Digests struct {
 	SHA256 string
+	SHA512 string
 	SHA1   string
 	MD5    string
 }
@@ -75,7 +78,7 @@ type Store interface {
 	ResumeUpload(ctx context.Context, id string) (Upload, error)
 	// Open returns the content for random access, so HTTP handlers can serve
 	// ranges with http.ServeContent. The caller closes it. Info carries Size
-	// and Digests.SHA256; SHA1 and MD5 may be empty.
+	// and Digests.SHA256; SHA512, SHA1 and MD5 may be empty.
 	Open(ctx context.Context, sha256 string) (io.ReadSeekCloser, Info, error)
 	// Stat returns a blob's Info without opening it.
 	Stat(ctx context.Context, sha256 string) (Info, error)
@@ -203,6 +206,7 @@ func ResolveOptions(opts ...UploadOption) (UploadOptions, error) {
 
 var (
 	sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	sha512Pattern = regexp.MustCompile(`^[0-9a-f]{128}$`)
 	sha1Pattern   = regexp.MustCompile(`^[0-9a-f]{40}$`)
 	md5Pattern    = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	uploadPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
@@ -225,6 +229,9 @@ func ValidateDigests(d Digests) error {
 			return err
 		}
 	}
+	if d.SHA512 != "" && !sha512Pattern.MatchString(d.SHA512) {
+		return fmt.Errorf("%w: sha512 %q", ErrInvalidDigest, d.SHA512)
+	}
 	if d.SHA1 != "" && !sha1Pattern.MatchString(d.SHA1) {
 		return fmt.Errorf("%w: sha1 %q", ErrInvalidDigest, d.SHA1)
 	}
@@ -238,10 +245,11 @@ func ValidateDigests(d Digests) error {
 // Backends use upload IDs in file and object names.
 func ValidUploadID(id string) bool { return uploadPattern.MatchString(id) }
 
-// Hasher computes all three digests in one pass and can save and restore its
+// Hasher computes all four digests in one pass and can save and restore its
 // state, so a resumed upload continues hashing instead of re-reading data.
 type Hasher struct {
 	sha256 hash.Hash
+	sha512 hash.Hash
 	sha1   hash.Hash
 	md5    hash.Hash
 }
@@ -250,6 +258,7 @@ type Hasher struct {
 func NewHasher() *Hasher {
 	return &Hasher{
 		sha256: sha256.New(),
+		sha512: sha512.New(),
 		sha1:   sha1.New(), //nolint:gosec // wire checksum
 		md5:    md5.New(),  //nolint:gosec // wire checksum
 	}
@@ -258,6 +267,7 @@ func NewHasher() *Hasher {
 // Write feeds p to every digest. It never fails.
 func (h *Hasher) Write(p []byte) (int, error) {
 	_, _ = h.sha256.Write(p)
+	_, _ = h.sha512.Write(p)
 	_, _ = h.sha1.Write(p)
 	_, _ = h.md5.Write(p)
 	return len(p), nil
@@ -267,6 +277,7 @@ func (h *Hasher) Write(p []byte) (int, error) {
 func (h *Hasher) Sum() Digests {
 	return Digests{
 		SHA256: hex.EncodeToString(h.sha256.Sum(nil)),
+		SHA512: hex.EncodeToString(h.sha512.Sum(nil)),
 		SHA1:   hex.EncodeToString(h.sha1.Sum(nil)),
 		MD5:    hex.EncodeToString(h.md5.Sum(nil)),
 	}
@@ -275,10 +286,10 @@ func (h *Hasher) Sum() Digests {
 // ErrHasherState reports a saved hasher state that cannot be restored.
 var ErrHasherState = errors.New("blob: invalid hasher state")
 
-// MarshalBinary saves the state of all three digests.
+// MarshalBinary saves the state of all four digests.
 func (h *Hasher) MarshalBinary() ([]byte, error) {
 	var out []byte
-	for _, d := range []hash.Hash{h.sha256, h.sha1, h.md5} {
+	for _, d := range []hash.Hash{h.sha256, h.sha512, h.sha1, h.md5} {
 		// The standard library digests all implement BinaryMarshaler; the
 		// assertion cannot fail for the types NewHasher creates.
 		b, err := d.(encoding.BinaryMarshaler).MarshalBinary()
@@ -294,7 +305,7 @@ func (h *Hasher) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary restores a state saved by MarshalBinary.
 func (h *Hasher) UnmarshalBinary(b []byte) error {
 	fresh := NewHasher()
-	for _, d := range []hash.Hash{fresh.sha256, fresh.sha1, fresh.md5} {
+	for _, d := range []hash.Hash{fresh.sha256, fresh.sha512, fresh.sha1, fresh.md5} {
 		if len(b) < 2 {
 			return ErrHasherState
 		}
@@ -319,6 +330,7 @@ func (h *Hasher) UnmarshalBinary(b []byte) error {
 func Verify(want, got Digests) error {
 	pairs := []struct{ name, want, got string }{
 		{"sha256", want.SHA256, got.SHA256},
+		{"sha512", want.SHA512, got.SHA512},
 		{"sha1", want.SHA1, got.SHA1},
 		{"md5", want.MD5, got.MD5},
 	}

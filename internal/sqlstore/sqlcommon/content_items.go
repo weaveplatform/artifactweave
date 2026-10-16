@@ -23,7 +23,8 @@ const (
 
 var itemWriteCols = []string{
 	"repo_key", "cached", "path", "name", "depth", "type", "size",
-	"sha256", "sha1", "md5", "original_sha256", "original_sha1", "original_md5", "mime_type",
+	"sha256", "sha512", "sha1", "md5",
+	"original_sha256", "original_sha512", "original_sha1", "original_md5", "mime_type",
 	"created_at", "created_by", "modified_at", "modified_by", "updated_at", "remote_url",
 }
 
@@ -36,8 +37,8 @@ func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 		created, modified, updated sql.NullInt64
 	)
 	err := row.Scan(&it.ID, &it.RepoKey, &it.Cached, &it.Path, &it.Name, &it.Depth, &typ, &it.Size,
-		&it.Actual.SHA256, &it.Actual.SHA1, &it.Actual.MD5,
-		&it.Original.SHA256, &it.Original.SHA1, &it.Original.MD5, &it.MimeType,
+		&it.Actual.SHA256, &it.Actual.SHA512, &it.Actual.SHA1, &it.Actual.MD5,
+		&it.Original.SHA256, &it.Original.SHA512, &it.Original.SHA1, &it.Original.MD5, &it.MimeType,
 		&created, &it.CreatedBy, &modified, &it.ModifiedBy, &updated, &it.RemoteURL)
 	it.Folder = typ == typeFolder
 	it.Created, it.Modified, it.Updated = fromMicros(
@@ -210,9 +211,11 @@ func (i items) Put(ctx context.Context, it types.Item) (types.Item, error) {
 		typ,
 		it.Size,
 		it.Actual.SHA256,
+		it.Actual.SHA512,
 		it.Actual.SHA1,
 		it.Actual.MD5,
 		it.Original.SHA256,
+		it.Original.SHA512,
 		it.Original.SHA1,
 		it.Original.MD5,
 		it.MimeType,

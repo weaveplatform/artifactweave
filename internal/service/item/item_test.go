@@ -5,6 +5,7 @@ import (
 	"crypto/md5"  //nolint:gosec // MD5 is a wire checksum here
 	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum here
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"slices"
@@ -51,12 +52,12 @@ func newWorld(t *testing.T) *world {
 func sums(body string) types.Checksums {
 	s1 := sha1.Sum([]byte(body)) //nolint:gosec // wire checksum
 	s2 := sha256.Sum256([]byte(body))
+	s5 := sha512.Sum512([]byte(body))
 	m := md5.Sum([]byte(body)) //nolint:gosec // wire checksum
 	return types.Checksums{
-		SHA1: hex.EncodeToString(
-			s1[:],
-		),
 		SHA256: hex.EncodeToString(s2[:]),
+		SHA512: hex.EncodeToString(s5[:]),
+		SHA1:   hex.EncodeToString(s1[:]),
 		MD5:    hex.EncodeToString(m[:]),
 	}
 }
@@ -529,19 +530,21 @@ func TestTrashSettingUnreadable(t *testing.T) {
 func TestSidecarAndMimeType(t *testing.T) {
 	for p, want := range map[string][2]string{
 		"a/b.jar.sha1": {"a/b.jar", "sha1"}, "b.sha256": {"b", "sha256"}, "c.md5": {"c", "md5"},
+		"d.tgz.sha512": {"d.tgz", "sha512"},
 	} {
 		base, alg, ok := Sidecar(p)
 		if !ok || base != want[0] || string(alg) != want[1] {
 			t.Errorf("Sidecar(%q) = %q %q %v", p, base, alg, ok)
 		}
 	}
-	for _, p := range []string{"file.jar", ".sha1", "dir/.md5", "x.sha512"} {
+	for _, p := range []string{"file.jar", ".sha1", "dir/.md5", "dir/.sha512", "x.sha384"} {
 		if _, _, ok := Sidecar(p); ok {
 			t.Errorf("Sidecar(%q) matched", p)
 		}
 	}
 	c := sums("x")
-	if SHA1.Of(c) != c.SHA1 || SHA256.Of(c) != c.SHA256 || MD5.Of(c) != c.MD5 {
+	if SHA1.Of(c) != c.SHA1 || SHA256.Of(c) != c.SHA256 || SHA512.Of(c) != c.SHA512 ||
+		MD5.Of(c) != c.MD5 {
 		t.Fatal("Algorithm.Of")
 	}
 	if MimeType("A.JAR") != "application/java-archive" ||

@@ -21,7 +21,7 @@ type blobIndex struct {
 	table string
 }
 
-const blobCols = "sha256, sha1, md5, size, created_at, ref_count, state, deleted_at"
+const blobCols = "sha256, sha512, sha1, md5, size, created_at, ref_count, state, deleted_at"
 
 func scanBlob(row interface{ Scan(...any) error }) (types.Blob, error) {
 	var (
@@ -31,6 +31,7 @@ func scanBlob(row interface{ Scan(...any) error }) (types.Blob, error) {
 	)
 	if err := row.Scan(
 		&b.Checksums.SHA256,
+		&b.Checksums.SHA512,
 		&b.Checksums.SHA1,
 		&b.Checksums.MD5,
 		&b.Size,
@@ -56,7 +57,8 @@ func (b blobIndex) insertRow(
 ) error {
 	_, err := b.s.exec(ctx, "insert "+b.table,
 		InsertIgnore(b.table, strings.Split(blobCols, ", "), []string{"sha256"}),
-		blob.Checksums.SHA256, blob.Checksums.SHA1, blob.Checksums.MD5, blob.Size,
+		blob.Checksums.SHA256, blob.Checksums.SHA512, blob.Checksums.SHA1, blob.Checksums.MD5,
+		blob.Size,
 		micros(blob.Created), 0, string(state), micros(deleted))
 	return err
 }
@@ -93,11 +95,12 @@ func (b blobIndex) Ref(ctx context.Context, blob types.Blob, n int64) (types.Blo
 			// filled in; deleted_at stays, telling the caller to check the
 			// content is there.
 			q = "UPDATE " + b.table + " SET state = ?, ref_count = ?, created_at = ?," +
+				" sha512 = CASE WHEN sha512 = '' THEN ? ELSE sha512 END," +
 				" sha1 = CASE WHEN sha1 = '' THEN ? ELSE sha1 END," +
 				" md5 = CASE WHEN md5 = '' THEN ? ELSE md5 END WHERE sha256 = ?"
 			args = []any{
 				string(types.BlobLive), n, micros(blob.Created),
-				blob.Checksums.SHA1, blob.Checksums.MD5, sha,
+				blob.Checksums.SHA512, blob.Checksums.SHA1, blob.Checksums.MD5, sha,
 			}
 		}
 		if _, err := b.s.exec(ctx, "ref "+b.table, q, args...); err != nil {
@@ -118,7 +121,8 @@ func sameContent(stored, b types.Blob) bool {
 		return false
 	}
 	differ := func(x, y string) bool { return x != "" && y != "" && !strings.EqualFold(x, y) }
-	return !differ(stored.Checksums.SHA1, b.Checksums.SHA1) &&
+	return !differ(stored.Checksums.SHA512, b.Checksums.SHA512) &&
+		!differ(stored.Checksums.SHA1, b.Checksums.SHA1) &&
 		!differ(stored.Checksums.MD5, b.Checksums.MD5)
 }
 

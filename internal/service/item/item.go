@@ -87,13 +87,14 @@ type Deploy struct {
 func ParseChecksums(c types.Checksums) (types.Checksums, error) {
 	out := types.Checksums{
 		SHA256: strings.ToLower(strings.TrimSpace(c.SHA256)),
+		SHA512: strings.ToLower(strings.TrimSpace(c.SHA512)),
 		SHA1:   strings.ToLower(strings.TrimSpace(c.SHA1)),
 		MD5:    strings.ToLower(strings.TrimSpace(c.MD5)),
 	}
 	for _, f := range []struct {
 		v    string
 		size int
-	}{{out.SHA256, 64}, {out.SHA1, 40}, {out.MD5, 32}} {
+	}{{out.SHA256, 64}, {out.SHA512, 128}, {out.SHA1, 40}, {out.MD5, 32}} {
 		if f.v == "" {
 			continue
 		}
@@ -135,7 +136,12 @@ func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
 	}
 	var want blob.Digests
 	if clientPolicy(d.Repo) {
-		want = blob.Digests{SHA256: declared.SHA256, SHA1: declared.SHA1, MD5: declared.MD5}
+		want = blob.Digests{
+			SHA256: declared.SHA256,
+			SHA512: declared.SHA512,
+			SHA1:   declared.SHA1,
+			MD5:    declared.MD5,
+		}
 	}
 	info, err := u.Commit(ctx, want)
 	if errors.Is(err, blob.ErrDigestMismatch) {
@@ -169,9 +175,7 @@ func (s *Service) storeCommitted(
 	info blob.Info,
 	declared types.Checksums,
 ) (types.Item, error) {
-	actual := types.Checksums{
-		SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
-	}
+	actual := digestsOf(info)
 	stored, err := s.storeFile(ctx, d, actual, info.Size, declared)
 	if errors.Is(err, store.ErrDeleting) {
 		s.finishCollection(ctx, actual.SHA256)
@@ -212,6 +216,7 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 	}
 	for _, pair := range [][2]string{
 		{declared.SHA256, b.Checksums.SHA256},
+		{declared.SHA512, b.Checksums.SHA512},
 		{declared.SHA1, b.Checksums.SHA1},
 		{declared.MD5, b.Checksums.MD5},
 	} {
@@ -395,18 +400,18 @@ func (s *Service) ensureFolders(
 // Algorithm names a checksum sidecar's digest.
 type Algorithm string
 
-// Sidecar algorithms, by file extension. SHA-512 is not recorded, so its
-// sidecar is not served.
+// Sidecar algorithms, by file extension.
 const (
-	SHA1   Algorithm = "sha1"
 	SHA256 Algorithm = "sha256"
+	SHA512 Algorithm = "sha512"
+	SHA1   Algorithm = "sha1"
 	MD5    Algorithm = "md5"
 )
 
 // Sidecar splits a checksum sidecar path ("a/b.jar.sha1") into the
 // artifact's path and the algorithm; ok is false for any other path.
 func Sidecar(p string) (artifact string, a Algorithm, ok bool) {
-	for _, alg := range []Algorithm{SHA1, SHA256, MD5} {
+	for _, alg := range []Algorithm{SHA256, SHA512, SHA1, MD5} {
 		if base, found := strings.CutSuffix(p, "."+string(alg)); found && base != "" &&
 			!strings.HasSuffix(base, "/") {
 			return base, alg, true
@@ -422,6 +427,8 @@ func (a Algorithm) Of(c types.Checksums) string {
 		return c.SHA1
 	case SHA256:
 		return c.SHA256
+	case SHA512:
+		return c.SHA512
 	default:
 		return c.MD5
 	}
@@ -433,6 +440,8 @@ func (a Algorithm) set(c *types.Checksums, v string) {
 		c.SHA1 = v
 	case SHA256:
 		c.SHA256 = v
+	case SHA512:
+		c.SHA512 = v
 	default:
 		c.MD5 = v
 	}

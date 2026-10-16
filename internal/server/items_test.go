@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha1" //nolint:gosec // SHA-1 is a wire checksum here
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -163,6 +164,11 @@ func sha256Hex(s string) string {
 	return hex.EncodeToString(b[:])
 }
 
+func sha512Hex(s string) string {
+	b := sha512.Sum512([]byte(s))
+	return hex.EncodeToString(b[:])
+}
+
 func wantStatus(t *testing.T, rec *httptest.ResponseRecorder, want int) {
 	t.Helper()
 	if rec.Code != want {
@@ -311,7 +317,9 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/x.bin", "admin", "x"), http.StatusCreated)
 
 	// Sidecars are served from metadata and never stored.
-	for ext, want := range map[string]string{".sha1": sha1Hex("x"), ".sha256": sha256Hex("x")} {
+	for ext, want := range map[string]string{
+		".sha1": sha1Hex("x"), ".sha256": sha256Hex("x"), ".sha512": sha512Hex("x"),
+	} {
 		rec := w.do("GET", "/artifactory/libs-local/x.bin"+ext, "admin", "")
 		if rec.Code != 200 || rec.Body.String() != want {
 			t.Fatalf("%s: %d %q", ext, rec.Code, rec.Body)
@@ -326,11 +334,6 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 		rec.Body.Len() != 0 {
 		t.Fatalf("HEAD sidecar %d %q", rec.Code, rec.Body)
 	}
-	wantStatus(
-		t,
-		w.do("GET", "/artifactory/libs-local/x.bin.sha512", "admin", ""),
-		http.StatusNotFound,
-	)
 	wantStatus(
 		t,
 		w.do("GET", "/artifactory/libs-local/none.sha1", "admin", ""),
@@ -353,6 +356,20 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 	wantStatus(
 		t,
 		w.do("PUT", "/artifactory/libs-local/x.bin.md5", "admin", strings.Repeat("2", 32)),
+		http.StatusConflict,
+	)
+	// SHA-512 files, which Gradle uploads, are checked like the others.
+	wantStatus(
+		t,
+		w.do("PUT", "/artifactory/libs-local/x.bin.sha512", "admin", sha512Hex("x")),
+		http.StatusCreated,
+	)
+	if it := w.item("libs-local", false, "x.bin"); it.Original.SHA512 != sha512Hex("x") {
+		t.Fatalf("sha512 sidecar not recorded: %+v", it)
+	}
+	wantStatus(
+		t,
+		w.do("PUT", "/artifactory/libs-local/x.bin.sha512", "admin", strings.Repeat("3", 128)),
 		http.StatusConflict,
 	)
 	// Without its file, a sidecar name is an ordinary file.

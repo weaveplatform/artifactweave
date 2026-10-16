@@ -3,6 +3,7 @@
 -- +up
 CREATE TABLE cold_blobs (
     sha256     TEXT PRIMARY KEY,
+    sha512     TEXT NOT NULL DEFAULT '',
     sha1       TEXT NOT NULL DEFAULT '',
     md5        TEXT NOT NULL DEFAULT '',
     size       BIGINT NOT NULL,
@@ -39,6 +40,7 @@ CREATE TABLE bundle_artifacts (
     target_path    TEXT NOT NULL,
     source_path    TEXT NOT NULL DEFAULT '',
     sha256         TEXT NOT NULL DEFAULT '',
+    sha512         TEXT NOT NULL DEFAULT '',
     sha1           TEXT NOT NULL DEFAULT '',
     md5            TEXT NOT NULL DEFAULT '',
     size           BIGINT NOT NULL DEFAULT 0,
@@ -151,6 +153,7 @@ CREATE TABLE archived_items (
     name             TEXT NOT NULL,
     depth            INTEGER NOT NULL DEFAULT 0,
     sha256           TEXT NOT NULL DEFAULT '',
+    sha512           TEXT NOT NULL DEFAULT '',
     sha1             TEXT NOT NULL DEFAULT '',
     md5              TEXT NOT NULL DEFAULT '',
     size             BIGINT NOT NULL DEFAULT 0,

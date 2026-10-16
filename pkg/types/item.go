@@ -27,6 +27,7 @@ const CacheSuffix = "-cache"
 // Checksums are hex digests of an item's content.
 type Checksums struct {
 	SHA256 string `json:"sha256,omitempty"`
+	SHA512 string `json:"sha512,omitempty"`
 	SHA1   string `json:"sha1,omitempty"`
 	MD5    string `json:"md5,omitempty"`
 }
@@ -204,8 +205,8 @@ func (t TrashEntry) Expired(now time.Time, retention time.Duration) bool {
 // Blob is the index record of one stored content blob. Items reference blobs
 // by SHA256; Refs counts those references (and those of trash entries and
 // bundle artifacts) so garbage collection removes a blob only when nothing
-// can serve it again. SHA1 and MD5 are recorded so checksum deploy and the
-// checksum searches resolve without reading content.
+// can serve it again. SHA512, SHA1 and MD5 are recorded so checksum deploy,
+// the checksum searches and checksum files resolve without reading content.
 type Blob struct {
 	Checksums Checksums
 	Size      int64

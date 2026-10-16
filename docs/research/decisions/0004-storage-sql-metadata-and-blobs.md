@@ -28,12 +28,17 @@ migrations per dialect. An in-memory store exists for unit tests.
 
 **Item canonical form.** The items table stores `repo_key`, `path` (the parent directory,
 `.` for the root), `name`, `depth`, `type`, `cached`, `size`, `mime_type`, timestamps and
-actors, `actual_md5`, `actual_sha1`, `actual_sha256`, `original_md5`, `original_sha1`.
+actors, `actual_md5`, `actual_sha1`, `actual_sha256`, `original_md5`, `original_sha1`. The
+item table also keeps `sha512` and `original_sha512` (below), which AQL does not name.
 The storage API layer prefixes `/` on `path` and joins `path` and `name`; AQL reads the
 columns as they are. Properties are an entity-attribute-value table keyed by item.
 
-**Blobs.** `pkg/blob` is a content-addressed store keyed by sha256 with sha1 and md5
-recorded in the item index so checksum deploy and checksum search work from the database.
+**Blobs.** `pkg/blob` is a content-addressed store keyed by sha256. Every upload computes
+four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three are recorded
+in the blob and item index, so checksum deploy, checksum search and checksum files work
+from the database. SHA-1 and MD5 are looked up by checksum deploy and the checksum
+searches, so they are indexed. SHA-512 is never a lookup key, because whatever holds one
+also holds the SHA-256, so it is stored but not indexed.
 Backends: `fs` (temp-then-rename into a two-level hex tree), `s3` (aws-sdk-go-v2,
 multipart upload for large objects, no rename), and `gcs` and `azure` as decided in
 [0027](0027-cloud-blob-backends.md) (compose of temporary parts; staged blocks). The
@@ -52,6 +57,8 @@ contract:
 - `Delete`, `Exists`, `Stat`.
 
 **Checksum sidecars.** `.sha1`, `.md5`, `.sha256` and `.sha512` files are never stored.
+Artifactory's file info names only `sha1`, `md5` and `sha256`, so SHA-512 reaches clients
+as a `.sha512` file and nowhere else in the REST API.
 GET and HEAD serve them from item metadata. PUT validates the client value against the
 artifact per the repository's `checksumPolicyType`: `client-checksums` rejects a mismatch
 and records the client value as `original_*`; `server-generated-checksums` records and
@@ -70,8 +77,10 @@ store-backed upload sessions) is a later decision.
 ## Rationale
 
 Matching hostweave keeps the pattern, the contract suite habits and the reviewers shared.
-sha256 content addressing with sha1 and md5 indexed gives every client what it asks for:
-the JFrog CLI sends all three on upload, Maven wants sha1 and md5, Docker wants sha256.
+sha256 content addressing with sha512, sha1 and md5 recorded gives every client what it
+asks for: the JFrog CLI sends sha1, sha256 and md5 on upload, Maven wants sha1 and md5,
+Docker wants sha256, npm's `dist.integrity` is a SHA-512, Gradle uploads `.sha512` files
+and Maven Resolver 2 can verify them, and NuGet (P8) uses `.nupkg.sha512`.
 An explicit upload-session contract is the only way Docker chunked uploads, S3 multipart
 and the CLI's multipart protocol can share one implementation.
 The CLI's multipart protocol (#70) stages out-of-order parts locally and appends them to
@@ -80,6 +89,10 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
 **Alternatives considered:**
 - *sha1-keyed filestore like Artifactory*: sha1 is deprecated for integrity and sha256 is
   what Docker and the CLI check; indexing all three costs one table.
+- *SHA-3 as well*: no package client and no Artifactory API asks for it, so it would
+  cost CPU on every upload for a digest nothing reads (maintainer decision, 2026-10-16).
+  The checksum set is defined in one place (`pkg/blob.Hasher` and `types.Checksums`), so
+  adding an algorithm later is a small change if an ecosystem needs one.
 - *Storing sidecar files as items*: simpler, but then a sidecar can disagree with its
   artifact and `badChecksum` has nothing to compare.
 - *MySQL as a third dialect*: deferred; nothing in scope needs it.

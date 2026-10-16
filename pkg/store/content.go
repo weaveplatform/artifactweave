@@ -103,7 +103,7 @@ type ItemStore interface {
 	Delete(ctx context.Context, repoKey string, cached bool, fullPath string) (DeleteResult, error)
 	// FindByChecksum lists files whose actual checksum matches the
 	// strongest digest set in c (sha256, then sha1, then md5), ordered by
-	// ID.
+	// ID. SHA512 is not a lookup key: whatever holds one holds the sha256.
 	FindByChecksum(ctx context.Context, c types.Checksums, p Page) ([]types.Item, string, error)
 	// Usage returns content totals per repository and cache, ordered by
 	// (repository, cached).
@@ -157,7 +157,8 @@ type BlobIndex interface {
 	// Get returns the row for sha256, in whatever state.
 	Get(ctx context.Context, sha256 string) (types.Blob, error)
 	// Find returns the live blob matching the strongest digest set in c
-	// (sha256, then sha1, then md5).
+	// (sha256, then sha1, then md5). SHA512 is not a lookup key, as for
+	// FindByChecksum.
 	Find(ctx context.Context, c types.Checksums) (types.Blob, error)
 	// Unreferenced lists live blobs with no references, ordered by sha256.
 	Unreferenced(ctx context.Context, p Page) ([]types.Blob, string, error)

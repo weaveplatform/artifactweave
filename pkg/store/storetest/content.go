@@ -192,7 +192,7 @@ func fileItem(repoKey, full string, i int) types.Item {
 		Name:     full,
 		Size:     b.Size,
 		Actual:   b.Checksums,
-		Original: types.Checksums{SHA1: b.Checksums.SHA1},
+		Original: types.Checksums{SHA512: b.Checksums.SHA512, SHA1: b.Checksums.SHA1},
 		MimeType: "application/java-archive",
 		Created: at(
 			i,

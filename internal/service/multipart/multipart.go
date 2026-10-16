@@ -547,7 +547,8 @@ func (s *Service) assemble(ctx context.Context, u *store.Upload, ss *session) (s
 	// unreferenced blob, kept for the collector's grace period.
 	_, err = s.Store.Blobs().Ref(ctx, types.Blob{
 		Checksums: types.Checksums{
-			SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
+			SHA256: info.Digests.SHA256, SHA512: info.Digests.SHA512,
+			SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
 		},
 		Size: info.Size, Created: s.now(),
 	}, 0)
