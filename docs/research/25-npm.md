@@ -171,3 +171,9 @@ Each item below is on #216 for the live comparison in P19:
 11. Whether `GET /-/ping` needs authentication.
 12. Whether `/-/npm/v1/tokens` and `/-/npm/v1/user` exist.
 13. How many search terms a local repository accepts.
+14. Whether the scoped `auth/<scope>` takes the scope with or without its `@`, which npm
+    repositories it accepts, and what it answers for a repository that is not npm or does not
+    exist.
+15. What `api/npm/auth` answers an anonymous caller, and what migrate, resume and reindex
+    answer for a repository that is not npm local, a missing one, and a resume with nothing
+    to resume.

@@ -462,6 +462,14 @@ func (UnimplementedStrict) ReindexMetadataServer(context.Context, ReindexMetadat
 	return nil, apierror.ErrNotImplemented
 }
 
+func (UnimplementedStrict) GetNpmAuth(context.Context, GetNpmAuthRequestObject) (GetNpmAuthResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) GetNpmScopeAuth(context.Context, GetNpmScopeAuthRequestObject) (GetNpmScopeAuthResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
 func (UnimplementedStrict) CalculateNpmRepositoryMetadata(context.Context, CalculateNpmRepositoryMetadataRequestObject) (CalculateNpmRepositoryMetadataResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
@@ -1111,6 +1119,14 @@ func (UnimplementedStrict) GetOpenMetricsForArtifactory(context.Context, GetOpen
 }
 
 func (UnimplementedStrict) GetArtifactoryApplicationMetrics(context.Context, GetArtifactoryApplicationMetricsRequestObject) (GetArtifactoryApplicationMetricsResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) MigrateNpmRepositoryToStrictLayout(context.Context, MigrateNpmRepositoryToStrictLayoutRequestObject) (MigrateNpmRepositoryToStrictLayoutResponseObject, error) {
+	return nil, apierror.ErrNotImplemented
+}
+
+func (UnimplementedStrict) ResumeNpmRepositoryMigration(context.Context, ResumeNpmRepositoryMigrationRequestObject) (ResumeNpmRepositoryMigrationResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 

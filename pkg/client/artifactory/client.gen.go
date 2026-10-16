@@ -9873,9 +9873,19 @@ type ClientInterface interface {
 	// Corresponds with POST /api/metadata_server/reindex (the `ReindexMetadataServer` operationId).
 	ReindexMetadataServer(ctx context.Context, params *ReindexMetadataServerParams, body ReindexMetadataServerJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetNpmAuth performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
+	//
+	// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent), always-auth = true and email (the user's email address); a caller with a Bearer token gets _authToken with that token. Needs an authenticated caller. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	GetNpmAuth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetNpmScopeAuth performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
+	//
+	// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth, always-auth and email for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	GetNpmScopeAuth(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CalculateNpmRepositoryMetadata performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the packuments and dist-tags of a local npm repository from the tarballs it holds, including the .npm metadata cache that install clients read. Local repositories only; remote and virtual repositories derive their metadata on demand. The rebuild runs in the background.
+	// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 	CalculateNpmRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
@@ -11545,6 +11555,16 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/metrics/application (the `GetArtifactoryApplicationMetrics` operationId).
 	GetArtifactoryApplicationMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MigrateNpmRepositoryToStrictLayout performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
+	//
+	// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	MigrateNpmRepositoryToStrictLayout(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResumeNpmRepositoryMigration performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
+	//
+	// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	ResumeNpmRepositoryMigration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSystemLiveness Liveness probe
 	//
@@ -14696,9 +14716,39 @@ func (c *Client) ReindexMetadataServer(ctx context.Context, params *ReindexMetad
 	return c.Client.Do(req)
 }
 
+// GetNpmAuth performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
+//
+// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent), always-auth = true and email (the user's email address); a caller with a Bearer token gets _authToken with that token. Needs an authenticated caller. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+func (c *Client) GetNpmAuth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNpmAuthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetNpmScopeAuth performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
+//
+// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth, always-auth and email for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+func (c *Client) GetNpmScopeAuth(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetNpmScopeAuthRequest(c.Server, repoKey, scope)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CalculateNpmRepositoryMetadata performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 //
-// Rebuilds the packuments and dist-tags of a local npm repository from the tarballs it holds, including the .npm metadata cache that install clients read. Local repositories only; remote and virtual repositories derive their metadata on demand. The rebuild runs in the background.
+// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 func (c *Client) CalculateNpmRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateNpmRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -18512,6 +18562,36 @@ func (c *Client) GetOpenMetricsForArtifactory(ctx context.Context, reqEditors ..
 // Corresponds with GET /api/v1/metrics/application (the `GetArtifactoryApplicationMetrics` operationId).
 func (c *Client) GetArtifactoryApplicationMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetArtifactoryApplicationMetricsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// MigrateNpmRepositoryToStrictLayout performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
+//
+// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+func (c *Client) MigrateNpmRepositoryToStrictLayout(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMigrateNpmRepositoryToStrictLayoutRequest(c.Server, repoKey)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResumeNpmRepositoryMigration performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
+//
+// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+func (c *Client) ResumeNpmRepositoryMigration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResumeNpmRepositoryMigrationRequest(c.Server, repoKey)
 	if err != nil {
 		return nil, err
 	}
@@ -25267,6 +25347,74 @@ func NewReindexMetadataServerRequestWithBody(server string, params *ReindexMetad
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetNpmAuthRequest constructs an http.Request for the GetNpmAuth method
+func NewGetNpmAuthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/npm/auth")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetNpmScopeAuthRequest constructs an http.Request for the GetNpmScopeAuth method
+func NewGetNpmScopeAuthRequest(server string, repoKey string, scope string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "scope", scope, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/npm/%s/auth/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -32613,6 +32761,74 @@ func NewGetArtifactoryApplicationMetricsRequest(server string) (*http.Request, e
 	return req, nil
 }
 
+// NewMigrateNpmRepositoryToStrictLayoutRequest constructs an http.Request for the MigrateNpmRepositoryToStrictLayout method
+func NewMigrateNpmRepositoryToStrictLayoutRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/migrations/npm/repositories/%s/migrate", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewResumeNpmRepositoryMigrationRequest constructs an http.Request for the ResumeNpmRepositoryMigration method
+func NewResumeNpmRepositoryMigrationRequest(server string, repoKey string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "repoKey", repoKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/migrations/npm/repositories/%s/resume", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetSystemLivenessRequest constructs an http.Request for the GetSystemLiveness method
 func NewGetSystemLivenessRequest(server string) (*http.Request, error) {
 	var err error
@@ -36253,9 +36469,23 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/metadata_server/reindex (the `ReindexMetadataServer` operationId).
 	ReindexMetadataServerWithResponse(ctx context.Context, params *ReindexMetadataServerParams, body ReindexMetadataServerJSONRequestBody, reqEditors ...RequestEditorFn) (*ReindexMetadataServerResponse, error)
 
+	// GetNpmAuthWithResponse performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
+	//
+	// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent), always-auth = true and email (the user's email address); a caller with a Bearer token gets _authToken with that token. Needs an authenticated caller. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetNpmAuthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNpmAuthResponse, error)
+
+	// GetNpmScopeAuthWithResponse performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
+	//
+	// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth, always-auth and email for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	GetNpmScopeAuthWithResponse(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*GetNpmScopeAuthResponse, error)
+
 	// CalculateNpmRepositoryMetadataWithResponse performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the packuments and dist-tags of a local npm repository from the tarballs it holds, including the .npm metadata cache that install clients read. Local repositories only; remote and virtual repositories derive their metadata on demand. The rebuild runs in the background.
+	// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateNpmRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNpmRepositoryMetadataResponse, error)
@@ -38177,6 +38407,20 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/metrics/application (the `GetArtifactoryApplicationMetrics` operationId).
 	GetArtifactoryApplicationMetricsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetArtifactoryApplicationMetricsResponse, error)
+
+	// MigrateNpmRepositoryToStrictLayoutWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
+	//
+	// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	MigrateNpmRepositoryToStrictLayoutWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MigrateNpmRepositoryToStrictLayoutResponse, error)
+
+	// ResumeNpmRepositoryMigrationWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
+	//
+	// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	ResumeNpmRepositoryMigrationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ResumeNpmRepositoryMigrationResponse, error)
 
 	// GetSystemLivenessWithResponse Liveness probe
 	//
@@ -46621,15 +46865,134 @@ func (r ReindexMetadataServerResponse) ContentType() string {
 	return ""
 }
 
-type CalculateNpmRepositoryMetadataResponse struct {
+type GetNpmAuthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
-	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *ErrorResponse
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ErrorResponse
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetNpmAuthResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetNpmAuthResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNpmAuthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNpmAuthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNpmAuthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNpmAuthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetNpmScopeAuthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetNpmScopeAuthResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetNpmScopeAuthResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetNpmScopeAuthResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetNpmScopeAuthResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetNpmScopeAuthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetNpmScopeAuthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetNpmScopeAuthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetNpmScopeAuthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CalculateNpmRepositoryMetadataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r CalculateNpmRepositoryMetadataResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -46640,6 +47003,11 @@ func (r CalculateNpmRepositoryMetadataResponse) GetJSON401() *ErrorResponse {
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r CalculateNpmRepositoryMetadataResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r CalculateNpmRepositoryMetadataResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -57272,6 +57640,144 @@ func (r GetArtifactoryApplicationMetricsResponse) ContentType() string {
 	return ""
 }
 
+type MigrateNpmRepositoryToStrictLayoutResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r MigrateNpmRepositoryToStrictLayoutResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r MigrateNpmRepositoryToStrictLayoutResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r MigrateNpmRepositoryToStrictLayoutResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r MigrateNpmRepositoryToStrictLayoutResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r MigrateNpmRepositoryToStrictLayoutResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r MigrateNpmRepositoryToStrictLayoutResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r MigrateNpmRepositoryToStrictLayoutResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MigrateNpmRepositoryToStrictLayoutResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r MigrateNpmRepositoryToStrictLayoutResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResumeNpmRepositoryMigrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ErrorResponse
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ResumeNpmRepositoryMigrationResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ResumeNpmRepositoryMigrationResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ResumeNpmRepositoryMigrationResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r ResumeNpmRepositoryMigrationResponse) GetJSON404() *ErrorResponse {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r ResumeNpmRepositoryMigrationResponse) GetJSON500() *ErrorResponse {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r ResumeNpmRepositoryMigrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResumeNpmRepositoryMigrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResumeNpmRepositoryMigrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResumeNpmRepositoryMigrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetSystemLivenessResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -62464,9 +62970,35 @@ func (c *ClientWithResponses) ReindexMetadataServerWithResponse(ctx context.Cont
 	return ParseReindexMetadataServerResponse(rsp)
 }
 
+// GetNpmAuthWithResponse performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
+//
+// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent), always-auth = true and email (the user's email address); a caller with a Bearer token gets _authToken with that token. Needs an authenticated caller. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetNpmAuthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNpmAuthResponse, error) {
+	rsp, err := c.GetNpmAuth(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNpmAuthResponse(rsp)
+}
+
+// GetNpmScopeAuthWithResponse performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
+//
+// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth, always-auth and email for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) GetNpmScopeAuthWithResponse(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*GetNpmScopeAuthResponse, error) {
+	rsp, err := c.GetNpmScopeAuth(ctx, repoKey, scope, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetNpmScopeAuthResponse(rsp)
+}
+
 // CalculateNpmRepositoryMetadataWithResponse performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 //
-// Rebuilds the packuments and dist-tags of a local npm repository from the tarballs it holds, including the .npm metadata cache that install clients read. Local repositories only; remote and virtual repositories derive their metadata on demand. The rebuild runs in the background.
+// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateNpmRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNpmRepositoryMetadataResponse, error) {
@@ -65687,6 +66219,32 @@ func (c *ClientWithResponses) GetArtifactoryApplicationMetricsWithResponse(ctx c
 		return nil, err
 	}
 	return ParseGetArtifactoryApplicationMetricsResponse(rsp)
+}
+
+// MigrateNpmRepositoryToStrictLayoutWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
+//
+// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) MigrateNpmRepositoryToStrictLayoutWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MigrateNpmRepositoryToStrictLayoutResponse, error) {
+	rsp, err := c.MigrateNpmRepositoryToStrictLayout(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMigrateNpmRepositoryToStrictLayoutResponse(rsp)
+}
+
+// ResumeNpmRepositoryMigrationWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
+//
+// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+//
+// Returns a wrapper object for the known response body format(s).
+func (c *ClientWithResponses) ResumeNpmRepositoryMigrationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ResumeNpmRepositoryMigrationResponse, error) {
+	rsp, err := c.ResumeNpmRepositoryMigration(ctx, repoKey, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResumeNpmRepositoryMigrationResponse(rsp)
 }
 
 // GetSystemLivenessWithResponse Liveness probe
@@ -72652,6 +73210,86 @@ func ParseReindexMetadataServerResponse(rsp *http.Response) (*ReindexMetadataSer
 	return response, nil
 }
 
+// ParseGetNpmAuthResponse parses an HTTP response from a GetNpmAuthWithResponse call
+func ParseGetNpmAuthResponse(rsp *http.Response) (*GetNpmAuthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNpmAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetNpmScopeAuthResponse parses an HTTP response from a GetNpmScopeAuthWithResponse call
+func ParseGetNpmScopeAuthResponse(rsp *http.Response) (*GetNpmScopeAuthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetNpmScopeAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseCalculateNpmRepositoryMetadataResponse parses an HTTP response from a CalculateNpmRepositoryMetadataWithResponse call
 func ParseCalculateNpmRepositoryMetadataResponse(rsp *http.Response) (*CalculateNpmRepositoryMetadataResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -72666,6 +73304,13 @@ func ParseCalculateNpmRepositoryMetadataResponse(rsp *http.Response) (*Calculate
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -72679,6 +73324,13 @@ func ParseCalculateNpmRepositoryMetadataResponse(rsp *http.Response) (*Calculate
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ErrorResponse
@@ -80727,6 +81379,120 @@ func ParseGetArtifactoryApplicationMetricsResponse(rsp *http.Response) (*GetArti
 	response := &GetArtifactoryApplicationMetricsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseMigrateNpmRepositoryToStrictLayoutResponse parses an HTTP response from a MigrateNpmRepositoryToStrictLayoutWithResponse call
+func ParseMigrateNpmRepositoryToStrictLayoutResponse(rsp *http.Response) (*MigrateNpmRepositoryToStrictLayoutResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MigrateNpmRepositoryToStrictLayoutResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 202:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResumeNpmRepositoryMigrationResponse parses an HTTP response from a ResumeNpmRepositoryMigrationWithResponse call
+func ParseResumeNpmRepositoryMigrationResponse(rsp *http.Response) (*ResumeNpmRepositoryMigrationResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResumeNpmRepositoryMigrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 202:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil
