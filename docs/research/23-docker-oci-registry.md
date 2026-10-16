@@ -327,6 +327,11 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   blob, and `PUT /api/storage` properties (`build.name`, `build.number`, `build.timestamp`)
   on every layer. Paths tried: `<image>/<tag>/*`, then without the first segment, then
   under `library/`, then the digest folder.
+- **[S] The repository key comes from a header.** After the docker client finishes, `jf docker push` and
+  `jf docker pull` send `HEAD <registry>/v2/<image>/manifests/<tag>` with the server's credentials and read
+  the repository key from the `X-Artifactory-Docker-Registry` response header; without it they fail with
+  "couldn't find 'X-Artifactory-Docker-Registry' header" (jfrog-cli-artifactory `4a0f3827cfa0`,
+  `artifactory/commands/ocicontainer/image.go`, `GetRemoteRepo`). The P6 exit checks (#229) found this.
 - **[S] `jf rt build-docker-create`** records an image pushed by another tool (kaniko,
   buildx) from a file of `<image>:<tag>@sha256:<digest>` lines, by the same search.
 - **[S] `jf rt docker-promote`** sends `POST api/docker/<source>/v2/promote` with
