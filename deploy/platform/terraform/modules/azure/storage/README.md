@@ -4,7 +4,9 @@ One storage account and private container, without Shared Key, with Storage Blob
 Contributor for the principals in `principals`. [`azure/single-bucket`](../../../azure/single-bucket/README.md)
 calls it once, [`azure/multi-region`](../../../azure/multi-region/README.md) once per location,
 [`azure/geo-replicated`](../../../azure/geo-replicated/README.md) once with a
-`replication_type` that keeps Azure's own copies in the paired region, and
+`replication_type` that keeps Azure's own copies in the paired region,
+[`azure/cdn`](../../../azure/cdn/README.md) once, with its public endpoint narrowed to
+artifactweave's networks or off and Front Door reaching it over Private Link, and
 [`multicloud/mirror`](../../../multicloud/mirror/README.md) once, for its Azure mirror member.
 The module holds no provider block, so the caller's `azurerm` provider and subscription apply
 (decision [0030](../../../../../../docs/research/decisions/0030-reference-deployments.md)).
@@ -12,7 +14,8 @@ The module holds no provider block, so the caller's `azurerm` provider and subsc
 ## What it creates
 
 - `azurerm_storage_account.blobs`: a StorageV2 account, tagged with `tags`, replicated as
-  `replication_type` says.
+  `replication_type` says, whose public endpoint answers as `public_network_access` and
+  `network_rules` say.
 - `azurerm_storage_container.blobs`: the private container artifactweave writes to.
 - `azurerm_storage_management_policy.cleanup`: the expiry backstops below.
 - `azurerm_role_assignment.app`: Storage Blob Data Contributor on the account for each of
@@ -43,6 +46,10 @@ The module holds no provider block, so the caller's `azurerm` provider and subsc
   `replication_type` keeps a readable copy (RAGRS, RAGZRS), and null otherwise
   (`tests/inputs.tftest.hcl`, runs `a_readable_copy_has_a_secondary_host` and
   `an_unreadable_copy_has_no_secondary_host`).
+- The public endpoint answers any network by default; `public_network_access` turns it off,
+  and `network_rules` limits it to the addresses and subnets given (`tests/inputs.tftest.hcl`,
+  runs `the_public_endpoint_takes_any_network_by_default`,
+  `public_network_access_reaches_the_account` and `network_rules_deny_every_other_network`).
 - `store_prefix` is normalised as the backend does: no leading slash, one trailing slash
   (`tests/inputs.tftest.hcl`, runs `store_prefix_gains_a_trailing_slash` and
   `store_prefix_loses_a_leading_slash`).
@@ -51,7 +58,7 @@ The module holds no provider block, so the caller's `azurerm` provider and subsc
 
 | ID | Resource | Why |
 |---|---|---|
-| AZU-0012 | `azurerm_storage_account.blobs` | The account takes connections from any network, because artifactweave and the clients its signed URLs serve have no fixed addresses; with Shared Key off, every request still needs an Entra ID token or a user delegation SAS. |
+| AZU-0012 | `azurerm_storage_account.blobs` | By default the account takes connections from any network, because artifactweave and the clients its signed URLs serve have no fixed addresses; with Shared Key off, every request still needs an Entra ID token or a user delegation SAS. A caller behind Front Door's Private Link narrows it with `public_network_access` and `network_rules`. |
 | AZU-0057 | `azurerm_storage_account.blobs` | No Storage Analytics logs: the activity log records the management calls. |
 | AZU-0058 | `azurerm_storage_account.blobs` | `replication_type` defaults to LRS: a mirror member keeps one region's copy and the mirror the others; a caller that wants Azure's geo-replication asks for it. |
 | AZU-0060 | `azurerm_storage_account.blobs` | Microsoft-managed keys; a customer-managed key would add a Key Vault and its access policies to manage. |
@@ -112,7 +119,9 @@ No modules.
 | container | Blob container artifactweave writes to (blob.azure.container). | `string` | `"artifactweave"` | no |
 | expiring\_prefixes | Further blob prefixes, from the container's root, whose blobs expire after the given number of days, for example { "scratch/" = 1 }. | `map(number)` | `{}` | no |
 | location | Region of the account, for example uksouth. | `string` | n/a | yes |
+| network\_rules | The only networks the public endpoint takes requests from, when public\_network\_access is Enabled: public IPv4 addresses or CIDR ranges (ip\_rules) and subnet IDs with the Microsoft.Storage service endpoint (subnet\_ids). Null takes requests from any network. Azure applies IP rules only to requests from other regions; a client in the account's own region needs a subnet rule. | ```object({ ip_rules = optional(list(string), []) subnet_ids = optional(list(string), []) })``` | `null` | no |
 | principals | Principals that get Storage Blob Data Contributor on the account, by a static name (app, operator), so the plan does not wait for their object IDs. principal\_type (User, Group or ServicePrincipal) is optional; naming it spares Azure a directory lookup, which a newly created identity may not answer yet. | ```map(object({ principal_id = string principal_type = optional(string) }))``` | n/a | yes |
+| public\_network\_access | Whether the account's public endpoint takes requests at all: Enabled (from the networks network\_rules allows, or from any network without it) or Disabled, when only private endpoints, such as Front Door's Private Link, reach it. | `string` | `"Enabled"` | no |
 | replication\_type | How Azure keeps copies of the account's data: LRS or ZRS within the region, GRS, RAGRS, GZRS or RAGZRS in its paired region too. | `string` | `"LRS"` | no |
 | resource\_group\_name | Resource group to create the account in. | `string` | n/a | yes |
 | store\_prefix | Blob prefix artifactweave writes under in the container (blob.azure.prefix), normalised as the backend does: no leading slash, one trailing slash. Its \_uploads/ blobs expire after two days. | `string` | `""` | no |
@@ -125,6 +134,8 @@ No modules.
 | account | The storage account's name, for blob.azure.account. |
 | container | The container's name, for blob.azure.container. |
 | host | The account's blob endpoint host, where its signed URLs point. |
+| id | The storage account's resource ID, which a Front Door origin's Private Link targets. |
+| network\_access | Who reaches the account's public endpoint: public is Enabled or Disabled, and with Enabled, ip\_rules and subnet\_ids list the only networks it answers, or are empty when it answers any. |
 | secondary\_host | The blob endpoint host of Azure's read-only copy in the paired region (<account>-secondary), which a user delegation SAS minted for the account also reads, when replication\_type is RAGRS or RAGZRS; null otherwise, since a GRS or GZRS copy can be read only after a failover. |
 | signed\_url\_prefix | What a signed URL for a blob in this container starts with after the scheme. |
 <!-- END_TF_DOCS -->

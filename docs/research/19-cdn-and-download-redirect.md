@@ -17,6 +17,7 @@ Each fact carries its basis:
 | **doc** | Documented by the vendor, at the cited page |
 | **src** | Seen in source code, at the cited path and commit |
 | **inf** | Inferred from the cited facts; not stated anywhere |
+| **run** | Observed against the real service, in the cited real-cloud run |
 
 ## 1. Artifactory
 
@@ -149,7 +150,7 @@ Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0):
 | A key name is 1 to 63 characters, `[a-z]([-a-z0-9]*[a-z0-9])?` (RFC 1035); the key value is 128 bits, RFC 4648 base64url | doc | [gce-signedurlkey] |
 | A backend bucket's cache key leaves out protocol and host, and "By default, only query parameters that are known to Cloud Storage are included"; an include list can add parameters, and "Cloud CDN doesn't support excluding query parameters from a cache key to a backend bucket" | doc | [gcdn-caching], [gcdn-cache-keys] |
 | Cloud Storage's `response-content-disposition` and `response-content-type` override those headers "for authenticated GET requests" | doc | [gcs-xml-headers] |
-| Whether Cloud CDN forwards the override parameters to a backend bucket on a cache fill, and counts them among the parameters "known to Cloud Storage", is not stated. Both are likely, because the cache fill is an authenticated read by `cloud-cdn-fill` and the parameters are Cloud Storage's own | inf | [gcdn-signed], [gcdn-caching], [gcs-xml-headers] |
+| Cloud CDN forwards both override parameters to the backend bucket on a cache fill, which Google does not document: a fresh fill for a signed URL carrying them returned `Content-Disposition: attachment; filename="fill-check.json"` and `Content-Type: application/json` (2026-10-16). `gcp/cdn` keys its cache on both explicitly, so whether they count among the parameters "known to Cloud Storage" no longer matters | run | [gcp-cdn-proof], [gcdn-caching], [gcs-xml-headers] |
 | A Cloud CDN backend bucket sits behind a global external Application Load Balancer, which needs a certificate for HTTPS | doc | [gcdn-signed], [glb-pricing] |
 
 ### 3.3 Azure Front Door
@@ -165,6 +166,7 @@ Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0):
 | With no `Cache-Control` from the origin, "by default Front Door randomly determines a cache duration between one and three days"; a rules-engine cache override can replace it ("Override always", "Override if origin missing") | doc | [afd-caching] |
 | "Front Door might be able to serve data from the cache even if the cached data has expired or if the origin is returning error responses" | doc | [afd-caching] |
 | Only GET is cached; files are fetched from the origin in 8 MB chunks, which needs correct range support at the origin | doc | [afd-caching] |
+| For some minutes after a Premium profile with a Private Link origin first answers, a download of more than 8 MiB can be served for its first 8 MiB and then reset (HTTP/2 `INTERNAL_ERROR`) while the edge fetches the next chunk; the same download passes once a few more minutes have gone by. The account itself answers every range and validator request correctly throughout (`206`, consistent `Last-Modified` and ETag on an LRS account, with `If-Range`, `If-Unmodified-Since` and `If-Match`). Most likely Front Door's configuration still spreading to where chunks are fetched | run | [azure-cdn-proofs] |
 | A service or user delegation SAS can override the response's `Cache-Control` (`rscc`), `Content-Disposition` (`rscd`), `Content-Encoding` (`rsce`), `Content-Language` (`rscl`) and `Content-Type` (`rsct`); the overrides are part of the signed string | doc | [service-sas] |
 | SAS start and expiry are explicit (`st`, `se`), so a signer that fixes both gets the same URL for the same blob and key | inf | [service-sas] |
 | Microsoft's Premium reference deployment with Private Link exists for Bicep, ARM and Terraform | doc | [afd-storage] |
@@ -258,6 +260,8 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 - [gcdn-cache-keys]: https://docs.cloud.google.com/cdn/docs/using-cache-keys
 - [gce-signedurlkey]: https://docs.cloud.google.com/compute/docs/reference/rest/v1/backendBuckets/addSignedUrlKey
 - [gcs-xml-headers]: https://docs.cloud.google.com/storage/docs/xml-api/reference-headers
+- [azure-cdn-proofs]: https://github.com/weaveplatform/artifactweave/actions/runs/38925440868 (the `azure/cdn` proofs of #258, 2026-10-16: runs 38906963602 and 38916559470 failed at 8 MiB, 38925440868 passed a few minutes later with the account's range and validator answers logged)
+- [gcp-cdn-proof]: https://github.com/weaveplatform/artifactweave/actions/runs/38897773729 (the `gcp/cdn` proof of #257, `test/platform`'s cache-fill check, 2026-10-16)
 - [gcdn-pricing]: https://cloud.google.com/cdn/pricing
 - [glb-pricing]: https://cloud.google.com/load-balancing/pricing
 

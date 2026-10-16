@@ -21,7 +21,7 @@ applied through the JFrog Terraform providers.
 | `single-bucket`: one private bucket or container | [available](terraform/aws/single-bucket/README.md) | [available](terraform/gcp/single-bucket/README.md) | [available](terraform/azure/single-bucket/README.md) |
 | `multi-region`: regional stores as artifactweave mirror members | [available](terraform/aws/multi-region/README.md) | [available](terraform/gcp/multi-region/README.md) | [available](terraform/azure/multi-region/README.md) |
 | `geo-replicated`: one store with the cloud's own replication | [available](terraform/aws/geo-replicated/README.md) | [available](terraform/gcp/geo-replicated/README.md) | [available](terraform/azure/geo-replicated/README.md) |
-| `cdn`: a store behind CloudFront, Cloud CDN or Front Door | [available](terraform/aws/cdn/README.md) | [available](terraform/gcp/cdn/README.md) | planned (#134) |
+| `cdn`: a store behind CloudFront, Cloud CDN or Front Door | [available](terraform/aws/cdn/README.md) | [available](terraform/gcp/cdn/README.md) | [available](terraform/azure/cdn/README.md) |
 
 [`multicloud/mirror`](terraform/multicloud/mirror/README.md) puts one mirror member on each
 cloud: an S3 bucket, a Cloud Storage bucket and an Azure storage account, so no one provider's
@@ -49,7 +49,8 @@ lists each invariant beside the test run that asserts it.
 | [`aws/cdn`](terraform/modules/aws/cdn/README.md) | a CloudFront distribution in front of one bucket, serving only URLs artifactweave signs | `aws/cdn` |
 | [`gcp/storage`](terraform/modules/gcp/storage/README.md) | one private Cloud Storage bucket, single, dual or multi-region | `gcp/single-bucket`, `gcp/multi-region`, `gcp/geo-replicated`, `gcp/cdn`, `multicloud/mirror` |
 | [`gcp/cdn`](terraform/modules/gcp/cdn/README.md) | Cloud CDN on a global load balancer in front of one bucket, with a managed certificate, readable by Cloud CDN's fill account alone | `gcp/cdn` |
-| [`azure/storage`](terraform/modules/azure/storage/README.md) | one storage account and private container, without Shared Key | `azure/single-bucket`, `azure/multi-region`, `azure/geo-replicated`, `multicloud/mirror` |
+| [`azure/storage`](terraform/modules/azure/storage/README.md) | one storage account and private container, without Shared Key, its public endpoint open, narrowed or off | `azure/single-bucket`, `azure/multi-region`, `azure/geo-replicated`, `azure/cdn`, `multicloud/mirror` |
+| [`azure/cdn`](terraform/modules/azure/cdn/README.md) | a Front Door Premium profile in front of one account, reached over Private Link, caching each signed URL for at most the TTL | `azure/cdn` |
 
 ### Using a scenario
 
@@ -143,7 +144,9 @@ lives in the S3 state bucket and buckets are found by their tags in whichever re
 are; reap empties a versioned bucket (geo-replicated's) of its versions before deleting it,
 and disables and deletes a CloudFront distribution (`aws/cdn`'s) with the pieces it used. On
 GCP, reap deletes a load balancer's pieces by name and `gcp/cdn`'s certificate pieces by their
-labels, then its records.
+labels, then its records. On Azure, reap deletes a Front Door profile (`azure/cdn`'s) before
+anything else, and a destroy that fails deletes it anyway, because a Premium profile bills by
+the hour; `azure/cdn` also proves with `test` alone, one profile per proof.
 
 ## Checks
 

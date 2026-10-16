@@ -224,11 +224,13 @@ keeps its meaning.
   filename. AWS does not document whether signature parameters enter a policy that keys on
   every query string.
 - **Cloud CDN overrides:** Cloud Storage honours `response-content-disposition` and
-  `response-content-type` on authenticated reads, and a backend bucket's default cache key
-  keeps Cloud Storage's own query parameters, but Google does not state that Cloud CDN
-  passes them on a cache fill (research 19 §3.2). The reference deployment checks it. If
-  they are dropped, the stored object's headers are served; package clients name files
-  from the request, not the header.
+  `response-content-type` on authenticated reads, but Google does not document that Cloud
+  CDN passes them on a cache fill. The `gcp/cdn` proof settled it on 2026-10-16 (run
+  38897773729, research 19 §3.2): a fresh fill returned the requested `Content-Disposition`
+  and `Content-Type`. The behaviour is undocumented, so `test/platform` checks it on every
+  `gcp/cdn` proof, and the scenario keys its cache on both parameters explicitly. Were
+  Google to drop them, the stored object's headers would be served; package clients name
+  files from the request, not the header.
 - **Cloud CDN does not block unsigned requests.** A bucket that stays public, or "private
   bucket access", makes every blob public through the CDN.
 - **Temporary credentials** end a storage URL's validity when the session ends, so the TTL

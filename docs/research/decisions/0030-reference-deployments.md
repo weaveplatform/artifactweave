@@ -112,7 +112,8 @@ test/terraform/run.sh             the app-layer driver: builds a -cover server, 
 | `gcp/storage` | one private GCS bucket and its grants | `name`, `location`, `data_locations` ([], zero or two), `rpo` (null), `principals` (map of service-account emails), `store_prefix` (`""`), `expiring_prefixes` ({}), `force_destroy` (false), `labels` ({}) |
 | `aws/cdn` | a CloudFront distribution in front of one `aws/storage` bucket: origin access control, the cache policy, the key group and its public keys, and with `domain_name` an ACM certificate in `us-east-1` and alias records | `name`, `origin_bucket` (the storage module's `bucket`, `arn` and `region`), `public_keys` (map of PEM public keys, one to five), `store_prefix` (`""`), `domain_name` (null), `zone_id` (null, set with `domain_name`), `price_class` ("PriceClass_All"), `tags` ({}) |
 | `gcp/cdn` | Cloud CDN in front of one `gcp/storage` bucket: a backend bucket, URL map, SSL policy (TLS 1.2), HTTPS proxy, global address and HTTPS forwarding rule (`EXTERNAL_MANAGED`), a Certificate Manager certificate for `domain_name` with its DNS authorisation and map, with `dns_zone` the authorisation and A records, and with `grant_cdn_fill` Storage Object Viewer on the committed blobs for Cloud CDN's fill account | `name`, `origin_bucket` (the storage module's `bucket`), `domain_name`, `store_prefix` (`""`), `dns_zone` (null), `grant_cdn_fill` (false), `signed_url_cache_max_age_sec` (86400), `labels` ({}) |
-| `azure/storage` | one storage account, its container, lifecycle policy and grants | `account_name`, `resource_group_name`, `location`, `replication_type` ("LRS"), `container` ("artifactweave"), `store_prefix` (`""`), `principals` (map of `{principal_id, principal_type}`, type optional), `expiring_prefixes` ({}), `tags` ({}) |
+| `azure/storage` | one storage account, its container, lifecycle policy and grants | `account_name`, `resource_group_name`, `location`, `replication_type` ("LRS"), `container` ("artifactweave"), `store_prefix` (`""`), `principals` (map of `{principal_id, principal_type}`, type optional), `expiring_prefixes` ({}), `public_network_access` ("Enabled"), `network_rules` (null, or `{ip_rules, subnet_ids}`), `tags` ({}) |
+| `azure/cdn` | a Front Door Premium profile in front of one `azure/storage` account, reached over Private Link: the endpoint, origin group and origin, a rule that caps edge copies at the TTL, the route, and with `domain_name` a custom domain with a managed certificate and its records | `name`, `resource_group_name`, `origin` (the storage module's `id` and `host`, and the account's location), `container` ("artifactweave"), `store_prefix` (`""`), `private_link_location` (null: the account's), `max_cache_age_minutes` (5), `domain_name` (null), `dns_zone_id` (null, set with `domain_name`), `tags` ({}) |
 
 Every storage module enforces, and tests, the same baseline in its cloud's terms: no public
 access; TLS only; encryption at rest; uniform, identity-based access (S3 bucket owner
@@ -138,9 +139,12 @@ the storage module's outputs one by one, since a reference to the whole storage 
 wait for the policy that waits for the statement; on GCP the CDN module grants
 `cloud-cdn-fill` read access itself, because IAM members are not authoritative, once
 `grant_cdn_fill` says the signed URL key has been added, since Google creates that account
-with a project's first key and the grant fails before it; on Azure
-storage gains `public_network_access_enabled` and the CDN module owns the Private Link
-origin. The multicloud mirror composes all three storage modules, one call each; its inputs
+with a project's first key and the grant fails before it; on Azure storage gains
+`public_network_access` and `network_rules`, so the account answers only artifactweave's
+networks or none, and the CDN module owns the Private Link origin. Front Door's private
+endpoint connection waits for the account owner's approval, which the azurerm provider cannot
+give: `azure/cdn`'s README gives the `az` commands, and `test/platform` runs them before
+artifactweave starts. The multicloud mirror composes all three storage modules, one call each; its inputs
 are under "Multicloud inputs" below.
 
 ### The scenario contract
@@ -227,6 +231,7 @@ placements and the three app identities, and refuses a bare `region` or `locatio
 | `replication_type`, `secondary_location`, `secondary_storage_host` | n/a | n/a | Azure | n/a | `outputs.tf` |
 | `origin_host`: the store's own host, where `X-JFrog-Download-Redirect-To: S3` sends a `downloadRedirect` repository's download | n/a | n/a | n/a | yes | `outputs.tf` |
 | `distribution_id`, `distribution_domain` | n/a | n/a | n/a | AWS | `outputs.tf` |
+| `storage_account_id`, `front_door_profile`, `front_door_endpoint_host`, `private_link_request_message`: what approving Front Door's Private Link and the console need | n/a | n/a | n/a | Azure | `outputs.tf` |
 | `backend_bucket`, `ip_address`, `dns_records` | n/a | n/a | n/a | GCP | `outputs.tf` |
 | `resource_group` | Azure | Azure | Azure | Azure | `outputs.tf` |
 | `expires_at`: the instance's `expires-at` label, which reap reads from state | yes | yes | yes | yes | `harness.tf` |
@@ -235,7 +240,8 @@ placements and the three app identities, and refuses a bare `region` or `locatio
 | `signed_url_key_name`: the Cloud CDN key's name, which `scenario-ci.sh` and `lab-vars.sh` hand to `cloud-cdn-key.sh` | n/a | n/a | n/a | GCP | `harness.tf` |
 
 `artifactweave_config` renders the sections of `artifactweave.yaml` the scenario needs:
-`blob` for every scenario, with its store's `cdn` block for the CDN scenarios. Outputs that only echo an
+`blob` for every scenario, with its store's `cdn` block for the CDN scenarios, and `download`
+for `azure/cdn`, whose edge cache cap must match `download.redirect.ttl`. Outputs that only echo an
 input (`store_prefix`, the app principal, the account scope) are not outputs, except in
 `harness.tf` where the harness reads one.
 
@@ -498,6 +504,13 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
   `_acme-challenge` record. An instance with a labelled piece not yet expired, or a load
   balancer piece younger than two hours, keeps every piece. Only a GCP reap deletes these, and
   `check-clean` looks for all of them.
+- For `azure/cdn`, the Front Door profile and endpoint carry the run's tags, as the account
+  does. Reap deletes profiles before anything else and leaves a profile's children to it,
+  since deleting the profile deletes them and the private endpoint connection on the account;
+  with a custom domain, the tagged TXT and CNAME records in the zones the deployer sees go
+  too, in an Azure reap only. A destroy that fails deletes the instance's profiles directly
+  before it reports the failure, because a Premium profile bills by the hour, and
+  `check-clean` names any profile left as billed by the hour.
 - A dispatch finds only workflows on the default branch, so a pull request runs proofs
   instead, behind the same approval. `prove-matrix.sh` chooses them from the changed paths:
 
@@ -515,15 +528,23 @@ the maintainer's approval. It runs on `workflow_dispatch`, with inputs `cloud`, 
 
   Each proof runs `test`, an `apply` followed by a `destroy` from the remote state alone, an
   instance applied already expired and a `reap` that removes it, then a check that nothing of
-  the run remains. A scenario with a large fixed hourly cost may prove with `test` alone,
-  recorded in its README. Each proof has its own run tag and concurrency group, and its
+  the run remains. A scenario with a large fixed hourly cost proves with `test` alone, its
+  destroy and the final check: `prove-matrix.sh` lists it (`test_only`, today `azure/cdn`) and
+  marks its line `test`, the workflow skips the later steps, and its README says so. For the
+  same cost, the shared CDN checks in `cdn_test.go` name only `aws/cdn` and `gcp/cdn`: a change
+  to them does not prove `azure/cdn`, which is proven again only when its own files change
+  (its Terraform, `ci-vars.sh`, its modules or `frontdoor_test.go`) or under `prove-all`. Each proof has its own run tag and concurrency group, and its
   `reap` is limited to that tag (`REAP_PREFIX`), so proofs on one cloud run in parallel
   without racing for each other's state. A proof's instances are `<run tag>-<step>`, and
   both the reap and the final check match the tag up to that hyphen, because one scenario's
   initials can begin another's (`mirror`'s `m`, `multi-region`'s `mr`). Pull requests from forks get no OIDC token and do
   not run.
 - `test/platform` is a Go suite of `_test.go` files only, gated on `ARTIFACTWEAVE_SCENARIO`
-  like the real-cloud blob tests. Scenario runs are evidence that a deployment works, not
+  like the real-cloud blob tests. A scenario registers the checks it adds to the generic ones
+  (`scenarioChecks`), what it waits for after artifactweave starts and before any check
+  (`scenarioReady`: `gcp/cdn`'s certificate and load balancer), and what it waits for before
+  artifactweave starts and opens its store (`scenarioBeforeStart`: `azure/cdn` approves Front
+  Door's Private Link and waits for the storage firewall and the edge). Scenario runs are evidence that a deployment works, not
   coverage: they upload no coverage profiles and the gate never waits for them.
 
 ### Make targets

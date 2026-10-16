@@ -211,13 +211,18 @@ shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`
   these to AWS's. For `gcp/cdn`, a GCP `reap` deletes the load balancer's pieces by name, the
   SSL policy among them, then the Certificate Manager map entries, maps, certificates and DNS
   authorisations by their labels, then the instance's records in `PLATFORM_GCP_DNS_ZONE`;
-  `check-clean` looks for all of them too.
+  `check-clean` looks for all of them too. For `azure/cdn`, an Azure `reap` deletes Front Door
+  profiles before anything else in the scenarios resource group and leaves a profile's
+  children, its endpoint among them, to it; with a custom domain, it also deletes the tagged
+  TXT and CNAME records in the zones the deployer sees. A destroy that fails deletes the
+  instance's Front Door profiles directly before it reports the failure, and `check-clean`
+  names any profile left as billed by the hour.
 - `cloud` may be `multicloud`, for `multicloud/mirror`: the job logs in to GCP, Azure and AWS
   as their deployers, the state lives in GCP's state bucket under `scenarios/multicloud/`, and
   names take AWS's `artifactweave-awscn-` prefix. Its `reap` and `check-clean` look on all
   three clouds; its `reap` deletes only resources labelled with a multicloud scenario, which
   a single cloud's `reap` skips.
-- The `cdn` scenarios run with a host of their own, `cdn-<instance>` in the bootstrap's zone,
+- `aws/cdn` and `gcp/cdn` run with a host of their own, `cdn-<instance>` in the bootstrap's zone,
   and a key `scenario-ci.sh` generates for each instance, outside Terraform: a CloudFront key
   pair through `deploy/ci/cloudfront-key.sh` for `aws/cdn`, and a Cloud CDN signed URL key
   through `deploy/ci/cloud-cdn-key.sh` for `gcp/cdn`, which `apply` adds to the backend bucket
@@ -231,6 +236,18 @@ shows how to dispatch each. Every action goes through `deploy/ci/scenario-ci.sh`
   checks that Cloud CDN passes both response overrides to the bucket on a cache fill, which
   Google does not document. The AWS session lasts an hour, so the job renews it before a
   proof's second half and before a clean-up after a failure.
+- `azure/cdn` puts a storage account behind a Front Door Premium profile, which bills each
+  started hour it exists (about $0.45), so its proof runs `test` alone, its destroy and
+  `check-clean`: `prove-matrix.sh` marks it `test` and the workflow skips the later apply,
+  destroy and reap. The endpoint's own `*.azurefd.net` host serves, and the account answers
+  the runner's address alone. Before artifactweave starts, `frontdoor_test.go` approves Front
+  Door's private endpoint connection, which the azurerm provider cannot, and waits for the
+  storage firewall and for the edge to reach the account, up to 40 minutes. It runs
+  `cdn_test.go`'s checks with a SAS signer, then shows that an edge copy stops being served
+  once its SAS and the route's cache cap have passed, and that with the account's public
+  endpoint off, a SAS on the account is refused while the edge still serves over Private
+  Link. For the same cost, a change to `cdn_test.go` proves `aws/cdn` and `gcp/cdn` but not
+  `azure/cdn`, which is proven again only when its own files change or under `prove-all`.
 - The `geo-replicated` scenarios add checks that look past artifactweave at the cloud's own
   copy: S3's replication status and the replica object, the GCS bucket's real dual-region
   placement, and the Azure secondary endpoint serving the blob through artifactweave's SAS.
@@ -248,7 +265,7 @@ chooses from the changed paths:
 | The workflow, `scenario-ci.sh`, `platform-tests.sh` or `prove-matrix.sh` | Every cloud's `single-bucket` |
 | `cloudfront-key.sh` | Every scenario whose `ci-vars.sh` takes its key pair (`CLOUDFRONT_*`): `aws/cdn` |
 | `cloud-cdn-key.sh` | Every scenario whose `ci-vars.sh` takes its key (`CLOUD_CDN_*`): `gcp/cdn` |
-| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios and `multicloud/mirror`, `replica_test.go` the `geo-replicated` ones, `cdn_test.go` the `cdn` ones |
+| A `test/platform` Go file | The scenarios it names as quoted `"<cloud>/<scenario>"` literals: `mirror_test.go` the `multi-region` scenarios and `multicloud/mirror`, `replica_test.go` the `geo-replicated` ones, `cdn_test.go` `aws/cdn` and `gcp/cdn`, `frontdoor_test.go` `azure/cdn` |
 | A `test/platform` Go file that names none (`harness_test.go`, `generic_test.go`), any other `test/platform` file, or a deleted one | Every cloud's `single-bucket` |
 | A module's top-level `.tf` (`modules/<cloud>/<capability>/*.tf`) | Every scenario, in any cloud directory, whose Terraform sources exactly that module |
 | A scenario's top-level `.tf`, `.terraform.lock.hcl` or `ci-vars.sh` | That scenario |
@@ -263,8 +280,9 @@ runs in CI; `make deploy-check` runs it first.
 
 Each proof runs `test`; an `apply`, then a `destroy` that has only the remote state; an
 instance applied already expired, then a `reap` that removes it; then `check-clean`, which
-fails if any state, bucket or resource of the run remains. A failed step triggers a
-clean-up step that destroys the run's instances. Each proof has its own run tag (the pull
+fails if any state, bucket or resource of the run remains. A scenario `prove-matrix.sh`
+marks `test` (`azure/cdn`) skips the middle two, so it creates one instance, not three. A
+failed step triggers a clean-up step that destroys the run's instances. Each proof has its own run tag (the pull
 request, the run and the scenario's initials) and its own concurrency group, so proofs run in
 parallel; its `reap` takes `REAP_PREFIX` and its `check-clean` the run tag, so neither touches
 another proof's instances. Both match the tag up to the hyphen before the step, because one
