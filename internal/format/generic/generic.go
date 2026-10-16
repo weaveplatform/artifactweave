@@ -18,3 +18,6 @@ func (Handler) Deployed(context.Context, store.Store, repo.Config, types.Item) e
 
 // Deleting does nothing.
 func (Handler) Deleting(context.Context, store.Store, repo.Config, types.Item) error { return nil }
+
+// Deleted does nothing.
+func (Handler) Deleted(context.Context, store.Store, repo.Config, []types.Item) error { return nil }

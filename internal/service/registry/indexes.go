@@ -115,6 +115,7 @@ func (s *Service) UnreferencedPlatforms(
 		if !ok || kept[d] {
 			continue
 		}
+		kept[d] = true // a list naming a platform twice names it once
 		dir := o.Name + "/" + layout.DigestFolder(hex)
 		if _, err := items.Get(ctx, o.Repo.Key, false, dir); errors.Is(err, store.ErrNotFound) {
 			continue

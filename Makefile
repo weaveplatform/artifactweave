@@ -69,12 +69,12 @@ else
 	./test/terraform/run.sh $(or $(TERRAFORM_MODE),validate) $(TERRAFORM_SCENARIOS)
 endif
 
-# The OCI conformance categories (decision 0015). Each P6 ticket switches its
-# own on here when its operations land; docs/testing/ci.md lists which.
+# The OCI conformance categories (decision 0015), all on since #227; each was
+# switched on as its operations landed, and docs/testing/ci.md lists when.
 OCI_TEST_PULL ?= 1
 OCI_TEST_PUSH ?= 1
-OCI_TEST_CONTENT_DISCOVERY ?= 0
-OCI_TEST_CONTENT_MANAGEMENT ?= 0
+OCI_TEST_CONTENT_DISCOVERY ?= 1
+OCI_TEST_CONTENT_MANAGEMENT ?= 1
 
 ## oci-conformance: the OCI distribution-spec conformance suite against one -cover server (coverage to cover/oci, reports to oci-report/)
 oci-conformance:

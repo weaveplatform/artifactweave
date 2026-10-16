@@ -15,13 +15,19 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// Handler is one package type's hooks. Both run inside the transaction that
+// Handler is one package type's hooks. All run inside the transaction that
 // changes the item, so an error rolls the change back.
 type Handler interface {
 	// Deployed runs after a file was stored at it (new or overwritten).
 	Deployed(ctx context.Context, st store.Store, c repo.Config, it types.Item) error
 	// Deleting runs for each file before it is removed from the tree.
 	Deleting(ctx context.Context, st store.Store, c repo.Config, it types.Item) error
+	// Deleted runs once after a delete or a move removed items from the tree
+	// and the item service pruned the versions left without files. A format
+	// whose versions or packages depend on more than their own files (a
+	// Docker tag exists while its folder holds a manifest) corrects the
+	// index here.
+	Deleted(ctx context.Context, st store.Store, c repo.Config, removed []types.Item) error
 }
 
 // For returns the handler of a package type. A type is generic until its

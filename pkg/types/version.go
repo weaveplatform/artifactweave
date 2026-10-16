@@ -26,8 +26,9 @@ type StringComparator func(a, b string) int
 func (f StringComparator) Compare(a, b PackageVersion) int { return f(a.Version, b.Version) }
 
 // CreatedOrder orders by creation time, then by version string so the order
-// is total. Docker and OCI tags carry no ordering of their own; Artifactory
-// sorts them by manifest timestamp.
+// is total. Docker, OCI and Helm OCI tags carry no ordering of their own;
+// Artifactory sorts them by manifest timestamp, which Max Unique Tags
+// removes the oldest of.
 type CreatedOrder struct{}
 
 // Compare orders by Created, falling back to the tag name.
@@ -44,13 +45,13 @@ func (CreatedOrder) Compare(a, b PackageVersion) int {
 // layout-based version search applies to any layout with a [baseRev] token.
 func ComparatorFor(t repo.PackageType) VersionComparator {
 	switch t {
-	case repo.NPM, repo.Go, repo.Helm, repo.HelmOCI, repo.Terraform:
+	case repo.NPM, repo.Go, repo.Helm, repo.Terraform:
 		return StringComparator(CompareSemver)
 	case repo.PyPI:
 		return StringComparator(ComparePEP440)
 	case repo.NuGet:
 		return StringComparator(CompareNuGet)
-	case repo.Docker, repo.OCI:
+	case repo.Docker, repo.OCI, repo.HelmOCI:
 		return CreatedOrder{}
 	default:
 		return StringComparator(CompareMaven)

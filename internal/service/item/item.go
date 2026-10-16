@@ -567,6 +567,9 @@ func (s *Service) remove(
 		if err := pkgindex.Prune(ctx, s.Store, versions); err != nil {
 			return err //nolint:wrapcheck // pkgindex wraps its own
 		}
+		if err := hooks.Deleted(ctx, s.Store, t.Repo, removed); err != nil {
+			return err //nolint:wrapcheck // the format's own error
+		}
 		if trash {
 			return nil
 		}
