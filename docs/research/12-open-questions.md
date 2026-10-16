@@ -39,7 +39,7 @@ frozen, and the captured request and response are checked in as fixtures.
 |---|---|---|
 | Docker token challenge | **Resolved 2026-10-13** from public captures: realm `<base>/artifactory/api/docker/<repo|null>/v2/token`, `service` = addressed host with port, token by `GET` only, `{token, expires_in: 3600}` ([17](17-undocumented-shapes.md)) | nothing |
 | npm web login | **Resolved 2026-10-13:** npm's own client contract (`loginUrl`, `doneUrl`, 202 with `Retry-After`, 200 `{token}`); Artifactory's URLs are opaque to npm ([17](17-undocumented-shapes.md)) | nothing |
-| npm token endpoints | whether `/-/npm/v1/tokens`, `/-/npm/v1/user`, `GET /api/npm/auth` and `/api/npm/<repo>/auth/<scope>` exist on a current server | P7 |
+| npm token endpoints | `GET /api/npm/auth` **resolved 2026-10-16:** the JFrog CLI calls it and writes the 200 body into `.npmrc`; decision [0034](decisions/0034-npm.md) fixes the body it answers ([25](25-npm.md) section 4). Still open: whether `/-/npm/v1/tokens` and `/-/npm/v1/user` exist on a current server, and the bodies of `api/npm/auth` and `/api/npm/<repo>/auth/<scope>` (#216) | P19 |
 | PEP 658 metadata | **Resolved 2026-10-13:** no evidence Artifactory serves it; artifactweave implements it anyway, with HTTP Range ([17](17-undocumented-shapes.md)) | nothing |
 | PyPI local storage layout | **Resolved 2026-10-13:** undocumented and inconsistent in public examples; artifactweave stores `<normalized-name>/<version>/<file>` and indexes by properties and file name, so clients are unaffected ([17](17-undocumented-shapes.md)) | nothing |
 | AQL `$rf` | **Resolved 2026-10-13:** the CLI never sends it and no documentation mentions it; artifactweave answers 400 ([17](17-undocumented-shapes.md)) | nothing |

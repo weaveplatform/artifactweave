@@ -110,13 +110,13 @@ The registry is rooted at `<base>/api/npm/<repo>/`.
 |---|---|
 | `GET /<pkg>`, `GET /@scope%2fname` | The packument. Scoped names arrive with an encoded slash. With `Accept: application/vnd.npm.install-v1+json` the abbreviated form is returned (`name`, `modified`, `dist-tags`, `versions` with `dist.tarball`, `shasum`, `integrity`, `fileCount`, `unpackedSize`, `deprecated`, `hasInstallScript`); the full form adds `_id`, `_rev`, `time`, `users`, `readme`, `maintainers`, `author`, `repository`, `license`. `dist.tarball` must point at the serving repository. |
 | `GET /<pkg>/<version or dist-tag>` | One version manifest. |
-| `GET /<pkg>/-/<pkg>-<ver>.tgz`, `GET /@scope/name/-/name-<ver>.tgz` | The tarball; also the storage layout. |
-| `PUT /<pkg>` | Publish: `{_id,name,description,dist-tags,versions{v:{..dist{tarball,shasum,integrity}}},access,_attachments{"<name>-<ver>.tgz":{content_type,data:<base64>,length}}}`. On 409 the client fetches the packument with `?write=true` and retries; an existing version is `EPUBLISHCONFLICT`. |
-| `PUT /<pkg>/-rev/<rev>`, `DELETE /<pkg>/-/<tarball>/-rev/<rev>`, `DELETE /<pkg>/-rev/<rev>` | Unpublish steps. Deprecation is a `PUT` with `deprecated` set. |
+| `GET /<pkg>/-/<pkg>-<ver>.tgz`, `GET /@scope/name/-/@scope/name-<ver>.tgz` | The tarball; also the storage layout. A scoped tarball's file name keeps the scope ([research 25](25-npm.md) section 2.1). |
+| `PUT /<pkg>` | Publish: `{_id,name,description,dist-tags,versions{v:{..dist{tarball,shasum,integrity}}},access,_attachments{"<name>-<ver>.tgz":{content_type,data:<base64>,length}}}`. One `PUT`, never retried. npm 11 and later read the packument first and refuse an existing version themselves unless `--force` is given; Artifactory answers a republish with 403 ([research 25](25-npm.md) section 2.1). |
+| `PUT /<pkg>/-rev/<rev>`, `DELETE /<pkg>/-/<pkg>-<ver>.tgz/-rev/<rev>`, `DELETE /<pkg>/-rev/<rev>` | Unpublish steps, each after a `GET /<pkg>?write=true` for `_rev`. Deprecation is a `PUT /<pkg>` of the whole packument with `deprecated` set and no `_rev` ([research 25](25-npm.md) section 2.2). |
 | `GET`, `PUT`, `DELETE /-/package/<pkg>/dist-tags[/<tag>]` | Distribution tags; the `PUT` body is a JSON string. A virtual repository merges `latest` by member order. |
 | `GET /-/v1/search?text=&size=&from=&quality=&popularity=&maintenance=`, legacy `GET /-/all` | Search. |
-| `PUT /-/user/org.couchdb.user:<user>` | Legacy login (`--auth-type=legacy`): `{name,password,email,type:"user"}` to `{ok,token}`. |
-| `POST /-/v1/login`, `GET /-/v1/done/<session>` | Web login, the documented current flow: the first returns `{loginUrl,doneUrl}`, the second answers 202 until a token is issued, then `{token}`. |
+| `PUT /-/user/org.couchdb.user:<user>` | Legacy login (`--auth-type=legacy`, or the fallback when web login answers 4xx or 500): `{_id,name,password,type:"user",roles,date}` to a body carrying `token` ([research 25](25-npm.md) section 4). |
+| `POST /-/v1/login`, `GET /-/v1/done/<session>` | Web login, the documented current flow: the first returns `{loginUrl,doneUrl}`, the second answers 202 until a token is issued, then `{token}`. Deferred to #262. |
 | `GET /-/ping` | `npm ping`. |
 | `POST /-/npm/v1/security/advisories/bulk`, `POST /-/npm/v1/security/audits/quick`, `POST /-/npm/v1/security/audits` | `npm audit`; served only by a virtual repository that aggregates a remote supporting audit, forwarded to `artifactory.npm.default.audit.provider`. |
 | `GET /-/npm/v1/keys` | `npm audit signatures` (7.83.1+, ECDSA key pairs). |
@@ -125,8 +125,10 @@ Request headers to tolerate: `Npm-Scope`, `Npm-In-CI`, `npm-auth-type`, `npm-ses
 
 ### Storage and layout
 
-Tarballs live at `<name>/-/<name>-<ver>.tgz` or `@scope/<name>/-/<name>-<ver>.tgz` (the
-`npm-default` layout). Repository-level "enforce strict layout", on by default for new
+Tarballs live at `<name>/-/<name>-<ver>.tgz` or `@scope/<name>/-/@scope/<name>-<ver>.tgz`.
+These are npm's own paths, not Artifactory's `npm-default` layout, which is
+`[orgPath]/[module]/[module]-[baseRev](-[fileItegRev]).tgz` ([research 25](25-npm.md)
+section 5). Repository-level "enforce strict layout", on by default for new
 local repositories, moves packages to that layout in a background conversion; only the
 global `artifactory.npm.enforce.path` property rejects other paths. Metadata caches live
 under `.npm/<repo>/<pkg>`, so include patterns must allow `.npm/**` and `.npm/keys.json`.
@@ -135,9 +137,13 @@ under `.npm/<repo>/<pkg>`, so include patterns must allow `.npm/**` and `.npm/ke
 
 - `GET/POST /-/npm/v1/tokens`, `DELETE /-/npm/v1/tokens/token/<id>`, `GET /-/npm/v1/user`
   *(unverified; documented for npmjs only)*.
-- `GET <base>/api/npm/auth` and `GET <base>/api/npm/<repo>/auth/<scope>` returning
-  `.npmrc` lines *(unverified; absent from the current pages)*.
-- The exact bodies of the web-login `POST /-/v1/login` and `GET /-/v1/done` exchange.
+- `GET <base>/api/npm/auth` exists: the JFrog CLI calls it when its configuration holds no
+  access token, and writes the 200 body into `.npmrc` as it stands
+  ([research 25](25-npm.md) section 4). Its body, and the scoped
+  `GET <base>/api/npm/<repo>/auth/<scope>`, remain *(unverified; absent from the current
+  pages)*.
+- The exact bodies of the web-login `POST /-/v1/login` and `GET /-/v1/done` exchange, for
+  #262.
 
 ## Go modules
 

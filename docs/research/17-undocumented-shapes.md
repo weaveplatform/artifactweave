@@ -52,17 +52,22 @@ Sources: <https://github.com/moby/moby/issues/38662>,
 The client contract is npm's own (`npm-profile`, `webAuth` and `webAuthCheckLogin`):
 `POST <registry>/-/v1/login` with `{}` must return absolute `loginUrl` and `doneUrl`;
 polling `doneUrl` gets 202 with `Retry-After` (a missing or non-numeric header makes
-the client poll immediately) until 200 with `token`; any other status fails. npm 9 and
-later refuse registries without web login unless `--auth-type=legacy` is passed.
-Confirmed. JFrog documents web login against `<base>/artifactory/api/npm/<repo>/` since
+the client poll immediately) until 200 with `token`; any other status fails. Confirmed.
+When the `POST` answers 4xx or 500, npm 12 raises `ENYI` and falls back to legacy login
+(`PUT /-/user/org.couchdb.user:<user>`), so a registry without web login still works
+without `--auth-type=legacy` ([research 25](25-npm.md) section 4; this corrects an earlier
+claim that npm 9 and later refuse such registries). JFrog documents web login against `<base>/artifactory/api/npm/<repo>/` since
 7.52 (confirmed); the URLs Artifactory returns are not captured and do not matter, since
 npm treats them as opaque.
 
-artifactweave: `POST .../-/v1/login` opens a two-minute session and returns a
-`loginUrl` to a small approval page and `doneUrl = <base>/artifactory/api/npm/<repo>/-/v1/done?sessionId=<id>`;
-the done URL answers 202 with `Retry-After: 5` while pending, 200 `{token, username}`
-once approved (single use) and 401 after expiry. With the page disabled the start call
-answers 404 so npm falls back to legacy login.
+artifactweave: web login is deferred to #262, and until then `POST .../-/v1/login`
+answers 404, so npm falls back to legacy login (decision
+[0034](decisions/0034-npm.md#login-and-tokens)). The design #262 starts from:
+`POST .../-/v1/login` opens a two-minute session and returns a `loginUrl` to a small
+approval page and `doneUrl = <base>/artifactory/api/npm/<repo>/-/v1/done?sessionId=<id>`;
+the done URL answers 202 with `Retry-After: 5` while pending, 200 `{token, username}` once
+approved (single use) and 401 after expiry. With the page disabled the start call answers
+404, as before #262.
 
 Sources: <https://github.com/npm/npm-profile/blob/main/lib/index.js>,
 <https://marmelab.com/blog/2022/12/22/how-to-implement-web-login-in-a-private-npm-registry.html>,
