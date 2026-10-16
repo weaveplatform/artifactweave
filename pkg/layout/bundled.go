@@ -91,7 +91,9 @@ var bundled = []Definition{
 		FileIntegrationRevisionRegExp:   anyItegRev,
 	},
 	{
-		// unverified: encodes the GOPROXY storage layout <module>/@v/<version>.<ext>.
+		// Deliberately not Artifactory 6.20's [orgPath]/[module]/@v/v[refs].zip:
+		// its parser drops the unknown [refs] token, so that layout matches no
+		// module file (decision 0035, DV-040). Unverified against 7.x (#216).
 		Name:                            "go-default",
 		ArtifactPathPattern:             "[orgPath]/[module]/@v/[baseRev].[ext]",
 		FolderIntegrationRevisionRegExp: anyItegRev,

@@ -169,7 +169,7 @@ any error.
 `jf go-publish` performs `PUT <base>/api/go/<repo>/<module>/@v/<ver>.zip;go.version=<ver>[;prop=val]`,
 then `.mod`, then `.info`, expecting 201 and reading `X-Checksum-Sha256` from the response;
 it sends the checksum headers. The storage layout is therefore
-`<module>/@v/<ver>.{zip,mod,info}`.
+`<module>/@v/<ver>.{zip,mod,info}` *(inferred; [research 26](26-go-modules.md) section 4.2)*.
 
 ### Remote and virtual
 
@@ -181,8 +181,11 @@ Artifactory builds archives from tags (out of scope initially). The virtual foll
 
 ### Unverified
 
-Nothing in this section is unverified; the GOPROXY protocol is fully specified and the
-JFrog paths are confirmed by the CLI source.
+The GOPROXY protocol is fully specified and the deploy paths are confirmed by the CLI
+source, but Artifactory's Go handler is closed source. How it stores a version, what it
+lists and answers for incomplete or republished versions, its errors and its `go-default`
+layout are inferred: [research 26](26-go-modules.md) section 6 lists them, and they are on
+the live-capture list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 
 ## Maven, Gradle, Ivy and SBT
 

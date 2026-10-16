@@ -60,8 +60,9 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | [22-aql-searches-build-info.md](22-aql-searches-build-info.md) | AQL domains, fields, output rules, limits, errors and permissions; remote caches and virtual repositories in queries (#68); the actions; the GET searches; the Builds API, the build-info document, run identity and its storage as an item, and what the JFrog CLI checks |
 | [23-docker-oci-registry.md](23-docker-oci-registry.md) | Docker and OCI registry: the specification's endpoints and error codes, Artifactory's routes and access methods, tokens and permissions, its storage layout and properties, what the JFrog CLI reads, the JFrog Docker operations, tag retention and the conformance suite |
 | [24-package-format-handlers.md](24-package-format-handlers.md) | Package format handlers: Artifactory's storage interceptors and which formats use them, the format framework on main and its gaps, rebuilding indexes from items, derived metadata and the work queue, and what npm, Go, Maven and the P8 formats need from the framework |
+| [26-go-modules.md](26-go-modules.md) | Go modules: the GOPROXY protocol and how the go command reads it, case encoding, versions and zips, the checksum database probe, what `jf go-publish` and `jf go` send, Artifactory's Go repositories, its `go-default` layout, and what remains inferred |
 | [glossary.md](glossary.md) | Terms used across the set |
-| [decisions/](decisions/README.md) | Decision records 0001–0033 |
+| [decisions/](decisions/README.md) | Decision records 0001–0035 |
 
 ## Versions at the research baseline
 
