@@ -59,12 +59,21 @@ take their codes from that table, not from convention.
 **Base URL resolver.** Embedded absolute URLs (npm `dist.tarball`, Helm `urls`, NuGet
 `@id`, Terraform `download_url`, Docker `Location` and `WWW-Authenticate` realm,
 file-info `uri` and `downloadUri`, repository `url`) come from one resolver in
-`internal/server/baseurl` with Artifactory's precedence: `X-JFrog-Override-Base-Url`,
-then `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`, then the configured
-`urlBase`, then the request. A middleware puts the resolved base into the request context.
-Each `X-Forwarded-*` header can be a comma-separated list, one entry per proxy; the resolver
-takes the first entry, the client-facing hop, ignores an empty first entry, and accepts only
-`http` or `https` as the forwarded scheme and a number as the forwarded port (#249, research 17).
+`internal/server/baseurl` with Artifactory's precedence (OSS 6.20
+`HttpUtils.getServletContextUrl`, research 17): `X-JFrog-Override-Base-Url`, then the
+configured `base_url` (Artifactory's `urlBase`), then `X-Forwarded-Proto`, `X-Forwarded-Host`
+and `X-Forwarded-Port`, then the request. A configured `base_url` is the operator naming the
+public URL, so no header the operator does not control overrides it; before #313 the forwarded
+headers came first, which let a client that could set `X-Forwarded-Host` choose the Docker
+token realm other clients send credentials to. A middleware puts the resolved base into the
+request context. Each `X-Forwarded-*` header can be a comma-separated list, one entry per
+proxy; the resolver takes the first entry, the client-facing hop, ignores an empty first
+entry, and accepts only `http` or `https` as the forwarded scheme and a number as the
+forwarded port (#249, research 17). The Docker subdomain method still reads the host the
+client addressed (the first `X-Forwarded-Host` entry, else `Host`) to pick the repository,
+but the URLs it answers with take their host from the resolved base URL. The legacy
+`X-Artifactory-Override-Base-Url` is not honoured (DV-037), and a configured `base_url` is
+used as written rather than with the request's scheme (DV-038).
 
 **Wire models and the linter.** JFrog's JSON mixes camelCase, snake_case and kebab-case,
 sometimes inside one struct, so per-package case rules cannot express it. The wire models

@@ -529,8 +529,14 @@ func TestAbsoluteLocations(t *testing.T) {
 			"https://reg.example.com/artifactory/api/docker/docker-local/v2/app/blobs/uploads/",
 		},
 		"subdomain": {
+			"/v2/app/blobs/uploads/", "docker-local.reg.example.com",
+			"https://docker-local.reg.example.com/v2/app/blobs/uploads/",
+		},
+		// The configured base URL decides host and port (#313): a port the
+		// client typed that the base URL does not name is not echoed back.
+		"subdomain, another port": {
 			"/v2/app/blobs/uploads/", "docker-local.reg.example.com:5000",
-			"https://docker-local.reg.example.com:5000/v2/app/blobs/uploads/",
+			"https://docker-local.reg.example.com/v2/app/blobs/uploads/",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -540,8 +546,30 @@ func TestAbsoluteLocations(t *testing.T) {
 			}
 		})
 	}
+	// A base URL with a port gives the subdomain that port.
+	rec := send(
+		baseurl.Middleware("https://reg.example.com:5000")(w.h),
+		http.MethodPost,
+		"/v2/app/blobs/uploads/",
+		"",
+		map[string]string{"Host": "docker-local.reg.example.com:5000"},
+	)
+	if got := rec.Header().Get("Location"); !strings.HasPrefix(
+		got, "https://docker-local.reg.example.com:5000/v2/app/blobs/uploads/",
+	) {
+		t.Fatalf("Location %q", got)
+	}
+	// A forwarded host never moves a Location off the configured base URL.
+	rec = send(h, http.MethodPost, "/v2/docker-local/app/blobs/uploads/", "", map[string]string{
+		"X-Forwarded-Host": "evil.example", "X-Forwarded-Proto": "http",
+	})
+	if got := rec.Header().Get("Location"); !strings.HasPrefix(
+		got, "https://reg.example.com/v2/docker-local/app/blobs/uploads/",
+	) {
+		t.Fatalf("Location %q", got)
+	}
 	// Behind a proxy the forwarded host names the subdomain.
-	rec := send(baseurl.Middleware("https://reg.example.com")(w.h), http.MethodPost,
+	rec = send(baseurl.Middleware("https://reg.example.com")(w.h), http.MethodPost,
 		"/v2/app/blobs/uploads/", "", map[string]string{
 			"Host": "internal:8081", "X-Forwarded-Host": "docker-local.reg.example.com, proxy",
 			"X-Forwarded-Proto": "https",

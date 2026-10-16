@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -369,26 +370,25 @@ func uploadRange(size int64) string {
 
 // location is the absolute URL of an operation on q's image in the form
 // the client addressed (decision 0031). The base URL resolver names the
-// host of every method but the subdomain, whose host is the repository's:
-// the configured base URL is its parent, so the host the client named is
-// kept with the resolved scheme. Without a resolved base URL, as in tests
-// of the router alone, the path is relative, which clients accept too.
+// host of every method but the subdomain, whose /v2 sits at the root of the
+// repository's own host: <repo>.<the base URL's host>, unless the base URL
+// already names it, as an X-JFrog-Override-Base-Url built from the
+// subdomain's server name does. The host always comes from the resolved
+// base URL, never from a header the request carries, so a configured
+// base_url decides it (#313). Without a resolved base URL, as in tests of
+// the router alone, the path is relative, which clients accept too.
 func location(r *http.Request, q Request, segments ...string) string {
 	p := q.Path(segments...)
 	base := baseurl.From(r.Context())
-	if scheme, _, ok := strings.Cut(base, "://"); ok && q.base == "/v2" {
-		return scheme + "://" + namedHost(r) + p
+	u, err := url.Parse(base)
+	if err != nil || u.Host == "" || q.base != "/v2" {
+		return base + p
 	}
-	return base + p
-}
-
-// namedHost is the host the client named, port included: the first
-// X-Forwarded-Host entry, else Host.
-func namedHost(r *http.Request) string {
-	if host := baseurl.ForwardedHost(r); host != "" {
-		return host
+	host := u.Host
+	if !strings.HasPrefix(strings.ToLower(u.Hostname()), strings.ToLower(q.RepoKey)+".") {
+		host = q.RepoKey + "." + host
 	}
-	return r.Host
+	return u.Scheme + "://" + host + p
 }
 
 // owner is the session owner of a request: its repository, its image and
