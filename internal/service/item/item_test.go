@@ -292,6 +292,39 @@ func TestDeployByChecksum(t *testing.T) {
 	}
 }
 
+func TestDeployCommitted(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	c := sums("committed")
+	u, err := w.svc.Blobs.BeginUpload(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := u.Append(ctx, strings.NewReader("committed")); err != nil {
+		t.Fatal(err)
+	}
+	info, err := u.Commit(ctx, blob.Digests{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	it, err := w.svc.DeployCommitted(ctx, Deploy{
+		Target:   Target{Repo: w.loc, Path: "img/_uploads/x"},
+		Declared: types.Checksums{SHA256: c.SHA256}, By: "carol",
+	}, info)
+	if err != nil || it.Actual != c || it.Original != (types.Checksums{SHA256: c.SHA256}) ||
+		it.Size != int64(len("committed")) || it.CreatedBy != "carol" {
+		t.Fatalf("%+v %v", it, err)
+	}
+	if w.refs(c.SHA256) != 1 {
+		t.Fatal("content not referenced once")
+	}
+	if _, err := w.svc.DeployCommitted(ctx, Deploy{
+		Target: Target{Repo: w.loc, Path: "y"}, Declared: types.Checksums{SHA256: "zz"},
+	}, info); !errors.Is(err, ErrBadChecksum) {
+		t.Fatalf("malformed declared checksum: %v", err)
+	}
+}
+
 func TestMakeFolder(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()

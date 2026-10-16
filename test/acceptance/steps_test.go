@@ -11,6 +11,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -121,8 +122,9 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^I GET "([^"]*)" with the kept token "([^"]*)"$`, w.getWithToken)
 	sc.Step(`^the response status is not (\d+)$`, w.statusIsNot)
 	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, w.headerContains)
+	sc.Step(`^I keep the path of the response header "([^"]*)" as "([^"]*)"$`, w.keepHeaderPath)
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
-	sc.Step(`^I (PUT|POST) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
+	sc.Step(`^I (PUT|POST|PATCH) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
 	sc.Step(`^I create the RSA key pair "([^"]*)" with alias "([^"]*)" as admin$`, w.createKeyPair)
 	sc.Step(`^I add a generated client certificate "([^"]*)" as admin$`, w.addCertificate)
@@ -281,7 +283,7 @@ func (w *world) post(path string, body *godog.DocString) error {
 }
 
 func (w *world) sendAsAdmin(method, path string, body *godog.DocString) error {
-	return w.send(method, path, w.expand(body.Content), func(r *http.Request) {
+	return w.send(method, w.expand(path), w.expand(body.Content), func(r *http.Request) {
 		r.SetBasicAuth("admin", testAdminPassword)
 	})
 }
@@ -306,7 +308,7 @@ func (w *world) deleteAsAdmin(path string) error {
 }
 
 func (w *world) sendEmptyAsAdmin(method, path string) error {
-	return w.send(method, path, "", func(r *http.Request) {
+	return w.send(method, w.expand(path), "", func(r *http.Request) {
 		r.SetBasicAuth("admin", testAdminPassword)
 	})
 }
@@ -813,6 +815,21 @@ func freePort() (int, error) {
 		return 0, errors.New("listener address is not TCP")
 	}
 	return addr.Port, nil
+}
+
+// keepHeaderPath keeps the path and query of a URL the last response
+// carried in a header, such as a registry upload's Location, for {name}
+// in a later request's path.
+func (w *world) keepHeaderPath(header, name string) error {
+	u, err := url.Parse(w.header.Get(header))
+	if err != nil || u.Path == "" {
+		return fmt.Errorf("header %s is no URL: %q", header, w.header.Get(header))
+	}
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars[name] = u.RequestURI()
+	return nil
 }
 
 // keepOutputField keeps a string field of the JSON object in the last

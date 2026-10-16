@@ -145,6 +145,30 @@ func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
 		_ = u.Abort(context.WithoutCancel(ctx))
 		return types.Item{}, fmt.Errorf("item: commit upload: %w", err)
 	}
+	return s.storeCommitted(ctx, d, info, declared)
+}
+
+// DeployCommitted stores the item for content the caller already committed
+// to the blob store, the second half of Deploy. A registry upload commits
+// in a later request than it began, so it cannot hand Deploy a body.
+func (s *Service) DeployCommitted(
+	ctx context.Context,
+	d Deploy,
+	info blob.Info,
+) (types.Item, error) {
+	declared, err := ParseChecksums(d.Declared)
+	if err != nil {
+		return types.Item{}, err
+	}
+	return s.storeCommitted(ctx, d, info, declared)
+}
+
+func (s *Service) storeCommitted(
+	ctx context.Context,
+	d Deploy,
+	info blob.Info,
+	declared types.Checksums,
+) (types.Item, error) {
 	actual := types.Checksums{
 		SHA256: info.Digests.SHA256, SHA1: info.Digests.SHA1, MD5: info.Digests.MD5,
 	}

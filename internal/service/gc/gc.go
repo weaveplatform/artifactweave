@@ -81,6 +81,11 @@ type Options struct {
 	// on local disk as well as a blob upload. Sessions of a backend with no
 	// reaper are blob store uploads.
 	Reapers map[string]func(context.Context, store.Upload) error
+	// Expirers remove finished uploads nothing took in time: the registry's
+	// <image>/_uploads files, which a manifest push links from (decision
+	// 0031). Each removes what was last written before the cutoff it is
+	// given, the upload expiry ago, and returns how many it removed.
+	Expirers []func(ctx context.Context, before time.Time) (int, error)
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
 }
@@ -94,6 +99,7 @@ type Collector struct {
 	grace        time.Duration
 	uploadExpiry time.Duration
 	reapers      map[string]func(context.Context, store.Upload) error
+	expirers     []func(context.Context, time.Time) (int, error)
 	now          func() time.Time
 	holder       string
 
@@ -119,6 +125,7 @@ func New(st store.Store, blobs blob.Store, o Options) (*Collector, error) {
 		grace:        cmp.Or(o.Grace, DefaultGrace),
 		uploadExpiry: cmp.Or(o.UploadExpiry, DefaultUploadExpiry),
 		reapers:      o.Reapers,
+		expirers:     o.Expirers,
 		now:          o.Now, holder: "storage-gc-" + id,
 		orphans: map[string]time.Time{},
 	}, nil
@@ -183,12 +190,20 @@ func (c *Collector) purgeTrash(ctx context.Context, rep *Report) error {
 	return err //nolint:wrapcheck // the trash service wraps its own
 }
 
-// reapUploads aborts upload sessions untouched for the upload expiry. A
-// session of another blob store (the cold tier, or a mirror member whose
-// mirror session is gone) is unknown here; only its row is dropped, and the
-// object store's own lifecycle rule removes what it left.
+// reapUploads aborts upload sessions untouched for the upload expiry, and
+// has the expirers remove finished uploads as old. A session of another
+// blob store (the cold tier, or a mirror member whose mirror session is
+// gone) is unknown here; only its row is dropped, and the object store's
+// own lifecycle rule removes what it left.
 func (c *Collector) reapUploads(ctx context.Context, rep *Report) error {
 	before := c.now().Add(-c.uploadExpiry)
+	for _, expire := range c.expirers {
+		n, err := expire(ctx, before)
+		rep.UploadsReaped += n
+		if err != nil {
+			return fmt.Errorf("gc: expire uploads: %w", err)
+		}
+	}
 	for {
 		stale, err := c.store.Uploads().Stale(ctx, before, batch)
 		if err != nil {

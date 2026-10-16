@@ -75,11 +75,14 @@ var matrixPrincipals = []matrixPrincipal{
 	{name: "nobody", user: "nobody"},
 	// Grants on artifactory-build-info are the build resource's (#165).
 	{name: "reader", user: "reader", grants: []matrixGrant{
-		{"libs-local", "", types.ActionRead}, {types.BuildInfoRepository, "", types.ActionRead},
+		{"libs-local", "", types.ActionRead},
+		{types.BuildInfoRepository, "", types.ActionRead},
+		{dockerA, "", types.ActionRead},
 	}},
 	{name: "writer", user: "writer", grants: []matrixGrant{
 		{"libs-local", "work/", rwd},
 		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
+		{dockerA, "work/", rwd},
 	}},
 	// member holds A and every build through its group, and reads B through
 	// a direct grant.
@@ -91,6 +94,7 @@ var matrixPrincipals = []matrixPrincipal{
 		},
 		{"libs-b", "", types.ActionRead},
 		{types.BuildInfoRepository, "", rwd},
+		{dockerA, "", rawd},
 	}},
 	// The seeded Any Remote permission: anonymous reads and deploys to
 	// remote repositories while anonymous access is on.
@@ -112,7 +116,7 @@ var matrixPrincipals = []matrixPrincipal{
 	{
 		name: "tok-groups", user: "member", token: true, scope: "applied-permissions/groups:team",
 		narrowed: true, grants: []matrixGrant{
-			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd},
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
 		},
 	},
 	// admin's token scoped to A: every action there, but no admin endpoint.
@@ -357,6 +361,7 @@ func matrixTable() []matrixRow {
 		buildMatrix(),
 		searchMatrix(),
 		registryMatrix(),
+		registryBlobMatrix(),
 	)
 }
 
@@ -915,6 +920,9 @@ type matrixFixture struct {
 	// secrets holds each token principal's Bearer token, and under
 	// "v-"+p an access token of v-{p}.
 	secrets map[string]string
+	// uploads holds, by principal name, a registry upload session its user
+	// opened, a row's {upload}.
+	uploads map[string]string
 }
 
 // call makes r's request as p, with anonymous access on or off as p needs.
@@ -924,7 +932,10 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	if err := f.db.Settings().Put(ctx, types.SettingAnonymousAccess, p.anonymousOn); err != nil {
 		t.Fatal(err)
 	}
-	fill := strings.NewReplacer("{p}", p.name, "{u}", p.user, "{token}", f.secrets["v-"+p.name])
+	fill := strings.NewReplacer(
+		"{p}", p.name, "{u}", p.user, "{token}", f.secrets["v-"+p.name],
+		"{upload}", f.uploads[p.name],
+	)
 	headers := map[string]string{}
 	switch {
 	case p.token:
@@ -1005,6 +1016,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	for _, p := range names {
 		repos = append(repos, repo.Config{Key: "r-" + p, Class: repo.Local})
 	}
+	repos = append(repos, matrixRegistryRepos()...)
 	for _, c := range repos {
 		must(db.Repos().Create(ctx, *repo.Defaults(&c)))
 	}
@@ -1033,6 +1045,16 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	for _, p := range names {
 		grant("perm-"+p, users("v-"+p, types.ActionRead), "perm-local", "**")
 	}
+	// The registry's repositories have permission targets of their own, so
+	// the grants above stay as they are.
+	grant("matrix-docker-reader", users("reader", types.ActionRead), dockerA, "**")
+	grant("matrix-docker-writer", users("writer", rwd), dockerA, "work/**")
+	grant(
+		"matrix-docker-team",
+		types.Grants{Groups: map[string]types.Actions{"team": rawd}},
+		dockerA,
+		"**",
+	)
 	buildGrant := func(name string, g types.Grants) {
 		must(db.Permissions().Create(ctx, types.Permission{
 			Name: name,
@@ -1049,7 +1071,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 
 	blobs, err := fs.New(t.TempDir())
 	must(err)
-	f := &matrixFixture{db: db, items: &item.Service{Store: db, Blobs: blobs}}
+	f := &matrixFixture{
+		db: db, items: &item.Service{Store: db, Blobs: blobs}, uploads: map[string]string{},
+	}
 	f.deploy(t, "libs-local", "work/get.txt", []byte("matrix"))
 	f.deploy(t, "libs-local", "fixture/get.txt", []byte("matrix"))
 	f.deploy(
@@ -1059,6 +1083,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		zipBytes(t, map[string]string{"inner.txt": "inner"}),
 	)
 	f.deploy(t, "libs-b", "b/get.txt", []byte("matrix"))
+	seedMatrixRegistry(t, f)
 	k := testKeys()
 	rs := roles.Service{Store: db}
 	for _, p := range names {

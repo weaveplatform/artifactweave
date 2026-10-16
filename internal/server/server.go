@@ -28,7 +28,9 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 // Config is what the router needs from the application configuration.
@@ -149,9 +151,16 @@ func New(cfg Config) http.Handler {
 	artSvc.registerSearchRoutes(r)
 	docker.New(docker.Options{
 		Store:          cfg.Store,
+		Blobs:          cfg.Blobs,
 		SubdomainMatch: cfg.DockerSubdomainMatch,
 		BaseURL:        cfg.BaseURL,
 		Fault:          func(r *http.Request, err error) { noteCause(r.Context(), err) },
+		// A layer downloads as any file does: redirected to a signed URL
+		// when the repository says so (decision 0029), and counted.
+		ServeBlob: func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item) {
+			p, _ := auth.FromContext(r.Context())
+			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
+		},
 	}).Register(r)
 
 	// Products artifactweave does not implement. 501 names the product;

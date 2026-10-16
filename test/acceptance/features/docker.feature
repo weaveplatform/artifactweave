@@ -52,3 +52,52 @@ Feature: Docker and OCI registry
     Then the response status is 405
     And the JSON field "errors.0.code" equals "UNSUPPORTED"
     And the response body contains "remote repository"
+
+  Scenario: A blob uploads whole and in chunks and pulls back
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin with body:
+      """
+      hello blob
+      """
+    Then the response status is 201
+    And the response header "Location" contains "/v2/docker-local/team/app/blobs/sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"
+    And the response header "Docker-Content-Digest" contains "sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f"
+    When I HEAD "/v2/docker-local/team/app/blobs/sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin
+    Then the response status is 200
+    And the response header "Content-Length" contains "10"
+    When I GET "/v2/docker-local/team/app/blobs/sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin
+    Then the response status is 200
+    And the response body is "hello blob"
+    When I POST "/v2/docker-local/team/app/blobs/uploads/" as admin
+    Then the response status is 202
+    And the response header "Range" contains "0-0"
+    And I keep the path of the response header "Location" as "upload"
+    When the next request has header "Content-Range" "0-5"
+    And I PATCH "{upload}" as admin with body:
+      """
+      chunk-
+      """
+    Then the response status is 202
+    And the response header "Range" contains "0-5"
+    When the next request has header "Content-Range" "2-4"
+    And I PATCH "{upload}" as admin with body:
+      """
+      two
+      """
+    Then the response status is 416
+    And the JSON field "errors.0.code" equals "BLOB_UPLOAD_INVALID"
+    When I PUT "{upload}?digest=sha256:c089183495a5984e2c76941009c89d4e8f881c799c4beb102aec7d515cb32ed2" as admin with body:
+      """
+      two
+      """
+    Then the response status is 201
+    When I GET "/artifactory/api/docker/docker-local/v2/team/app/blobs/sha256:c089183495a5984e2c76941009c89d4e8f881c799c4beb102aec7d515cb32ed2" as admin
+    Then the response status is 200
+    And the response body is "chunk-two"
+    When I GET "/artifactory/api/storage/docker-local/team/app/_uploads/sha256__c089183495a5984e2c76941009c89d4e8f881c799c4beb102aec7d515cb32ed2" as admin
+    Then the response status is 200
+    And the JSON field "checksums.sha256" equals "c089183495a5984e2c76941009c89d4e8f881c799c4beb102aec7d515cb32ed2"

@@ -65,6 +65,7 @@ func statusTable() []statusCase {
 		buildStatusRows(),
 		searchStatusRows(),
 		registryStatusRows(),
+		registryBlobStatusRows(),
 	)
 }
 
@@ -180,6 +181,7 @@ func newStatusFixture(
 		t.Fatal(err)
 	}
 	tokens, secrets := seedTokens(t, db)
+	seedRegistryStatus(t, db, blobs, secrets)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
 		Hash: testHash, Tokens: tokens,
 	})
@@ -459,7 +461,7 @@ func TestStatusTable(t *testing.T) {
 				body = form
 			}
 		}
-		rec := do(t, h, c.method(), c.path, headers, body)
+		rec := do(t, h, c.method(), fill.Replace(c.path), headers, body)
 		if rec.Code != c.want {
 			t.Errorf("%s %s as %q: status %d, want %d: %s",
 				c.method(), c.path, c.as, rec.Code, c.want, rec.Body)
@@ -497,6 +499,14 @@ var implementedHandwritten = map[string]bool{
 	"GET /artifactory/api/versions/{repo}/{path}":            true,
 	registryProbe: true,
 	prefixProbe:   true,
+	headBlob:      true,
+	getBlob:       true,
+	deleteBlob:    true,
+	startUpload:   true,
+	appendUpload:  true,
+	finishUpload:  true,
+	uploadStatus:  true,
+	cancelUpload:  true,
 }
 
 func descriptorStatusRows() []statusCase {
