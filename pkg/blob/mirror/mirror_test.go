@@ -76,11 +76,15 @@ func TestContractOnFilesystemsAndFake(t *testing.T) {
 			ms = append(ms, Member{Name: fmt.Sprintf("disk%d", i), Store: st, WriteEnabled: true})
 		}
 		ms = append(ms, Member{Name: "cloud", Store: presigner{newFake()}, WriteEnabled: true})
-		s, _ := newMirror(t, ms, nil)
-		// The member left after the quorum commits in the background. It
-		// must finish before the temp dirs are removed (cleanups run last
-		// registered first): Windows cannot remove a directory that a
-		// straggler is still renaming a blob into.
+		// Every member is in the write quorum. The cloud fake is the only one
+		// that signs, and the contract signs straight after Put: with a
+		// quorum of two disks the cloud could still be committing, holding
+		// no copy to sign (#212, TestSignBeforeTheSigningMemberCommits).
+		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = len(ms) })
+		// Anything the mirror still runs in the background must finish
+		// before the temp dirs are removed (cleanups run last registered
+		// first): Windows cannot remove a directory that a straggler is
+		// still renaming a blob into.
 		t.Cleanup(func() { _ = s.WaitIdle(context.Background()) })
 		return s
 	}, contractOptions)
@@ -513,6 +517,41 @@ func TestDeleteWithMemberDown(t *testing.T) {
 	if ok, _ := s.Exists(ctx, sha); !ok {
 		t.Fatal("re-uploaded blob is missing")
 	}
+}
+
+// TestSignBeforeTheSigningMemberCommits: a signing member still committing
+// after the quorum holds no copy yet, so the mirror cannot sign until it
+// finishes, and a redirected download streams meanwhile (decision 0029).
+// Signing straight after Put is certain only when the write quorum cannot be
+// met without a member that signs.
+func TestSignBeforeTheSigningMemberCommits(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		f := newFake()
+		ms := []Member{
+			{Name: "plain", Store: newFake(), WriteEnabled: true},
+			{Name: "signer", Store: presigner{f}, WriteEnabled: true},
+		}
+		storage := blob.SignOptions{TTL: time.Minute}
+		s, _ := newMirror(t, ms, func(o *Options) { o.WriteQuorum = 1 })
+		f.slow("commit", 10*time.Second)
+		info := put(t, s, blobtest.Content(15, 10))
+		sha := info.Digests.SHA256
+		if _, err := s.SignURL(ctx, sha, storage); !errors.Is(err, blob.ErrNotFound) {
+			t.Fatalf("sign while the only signer is still committing: %v", err)
+		}
+		time.Sleep(11 * time.Second)
+		synctest.Wait()
+		if url, err := s.SignURL(ctx, sha, storage); err != nil || url != "fake://"+sha {
+			t.Fatalf("sign once the signer holds the blob: %q %v", url, err)
+		}
+
+		s, _ = newMirror(t, ms, func(o *Options) { o.WriteQuorum = 2 })
+		info = put(t, s, blobtest.Content(16, 10))
+		if _, err := s.SignURL(ctx, info.Digests.SHA256, storage); err != nil {
+			t.Fatalf("sign after a put whose quorum included the signer: %v", err)
+		}
+	})
 }
 
 func TestSign(t *testing.T) {
