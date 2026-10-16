@@ -263,7 +263,7 @@ func (w *world) getAsAdmin(path string) error {
 func (w *world) getAs(path, user, password string) error {
 	return w.send(
 		http.MethodGet,
-		path,
+		w.expand(path),
 		"",
 		func(r *http.Request) { r.SetBasicAuth(user, password) },
 	)
@@ -785,6 +785,11 @@ func (w *world) runJF(args string) error {
 		"JFROG_CLI_AVOID_NEW_VERSION_WARNING=true",
 		"CI=true",
 	)
+	if w.dockerConfig != "" {
+		// jf docker push and pull run the docker client, which reads the
+		// scenario's docker login from here.
+		cmd.Env = append(cmd.Env, "DOCKER_CONFIG="+w.dockerConfig)
+	}
 	out, err := cmd.CombinedOutput()
 	w.body = out
 	w.lastRC = 0

@@ -199,19 +199,11 @@ jobs:
       - name: JFrog CLI (pinned)
         uses: ./.github/actions/jfrog-cli
 
-      # crane for the registry's token flow, a pinned go-containerregistry
-      # release checked against the sha256 its checksums.txt publishes. The
-      # runner's own docker covers docker login.
-      - name: crane (pinned)
-        env:
-          CRANE_VERSION: 'v0.22.1'
-          CRANE_SHA256: '0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0'
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/crane.tar.gz" \
-            "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz"
-          echo "${CRANE_SHA256}  $RUNNER_TEMP/crane.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/crane.tar.gz" -C "$RUNNER_TEMP" crane
-          echo "ARTIFACTWEAVE_CRANE_BIN=$RUNNER_TEMP/crane" >> "$GITHUB_ENV"
+      # crane, oras and cosign for the registry features, each a pinned
+      # release checked against its published sha256. The runner's own
+      # docker covers docker login, push and pull.
+      - name: Registry clients (pinned)
+        uses: ./.github/actions/registry-clients
 
       - name: Acceptance features (coverage-instrumented binary)
         run: make accept

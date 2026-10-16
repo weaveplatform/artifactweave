@@ -1,7 +1,12 @@
 package acceptance
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"errors"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -11,15 +16,27 @@ import (
 )
 
 // The registry's real clients (decision 0015): the runner's docker, whose
-// daemon must reach the binary on 127.0.0.1, and crane, a pinned tool
-// binary named by ARTIFACTWEAVE_CRANE_BIN. Both keep their credentials in
-// the scenario's own docker configuration, never the developer's.
+// daemon must reach the binary on 127.0.0.1, and crane, oras and cosign,
+// pinned tool binaries named by ARTIFACTWEAVE_{CRANE,ORAS,COSIGN}_BIN. All
+// keep their credentials in the scenario's own docker configuration, never
+// the developer's.
+
+// registryTools maps each pinned tool to the variable naming its binary.
+var registryTools = map[string]string{
+	"crane":  "ARTIFACTWEAVE_CRANE_BIN",
+	"oras":   "ARTIFACTWEAVE_ORAS_BIN",
+	"cosign": "ARTIFACTWEAVE_COSIGN_BIN",
+}
 
 func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^the Docker daemon can reach the registry$`, w.dockerReachable)
 	sc.Step(`^I run docker login as "([^"]*)" with password "([^"]*)"$`, w.dockerLogin)
-	sc.Step(`^crane is available$`, w.craneAvailable)
-	sc.Step(`^I run crane "([^"]*)"$`, w.runCrane)
+	sc.Step(`^I run docker "([^"]*)"$`, w.runDocker)
+	sc.Step(`^(crane|oras|cosign) is available$`, w.toolAvailable)
+	sc.Step(`^I run (crane|oras|cosign) "([^"]*)"$`, w.runTool)
+	sc.Step(`^I keep the output as "([^"]*)"$`, w.keepOutput)
+	sc.Step(`^a layer "([^"]*)" holding "([^"]*)" with content "([^"]*)"$`, w.writeLayer)
+	sc.Step(`^a file "([^"]*)" with expanded content:$`, w.writeExpandedFile)
 }
 
 // dockerReachable skips the scenario unless a Docker daemon runs on this
@@ -44,22 +61,57 @@ func (w *world) dockerLogin(user, password string) error {
 	return w.runClient(cmd)
 }
 
-func (w *world) craneAvailable() error {
-	if os.Getenv("ARTIFACTWEAVE_CRANE_BIN") == "" {
+// runDocker runs the docker client against the scenario's configuration,
+// in the scenario's file directory, so a build context can be a relative
+// path.
+func (w *world) runDocker(args string) error {
+	dir, err := w.dockerConfigDir()
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command(
+		"docker",
+		append([]string{"--config", dir}, strings.Fields(w.expand(args))...)...)
+	cmd.Dir = w.dir
+	return w.runClient(cmd)
+}
+
+// toolAvailable skips the scenario unless the tool's pinned binary is
+// named, so the features pass locally without the downloads CI performs.
+func (w *world) toolAvailable(tool string) error {
+	if os.Getenv(registryTools[tool]) == "" {
 		return godog.ErrSkip
 	}
 	return nil
 }
 
-// runCrane runs crane with its arguments expanded (expand).
-func (w *world) runCrane(args string) error {
+// runTool runs a pinned tool with its arguments expanded (expand), in the
+// scenario's file directory. DOCKER_CONFIG gives crane, oras and cosign the
+// scenario's credentials; cosign's key pair has an empty password, and
+// COSIGN_YES answers its confirmation prompts.
+func (w *world) runTool(tool, args string) error {
 	dir, err := w.dockerConfigDir()
 	if err != nil {
 		return err
 	}
-	cmd := exec.Command(os.Getenv("ARTIFACTWEAVE_CRANE_BIN"), strings.Fields(w.expand(args))...)
-	cmd.Env = append(os.Environ(), "DOCKER_CONFIG="+dir)
+	cmd := exec.Command(os.Getenv(registryTools[tool]), strings.Fields(w.expand(args))...)
+	cmd.Dir = w.dir
+	cmd.Env = append(os.Environ(), "DOCKER_CONFIG="+dir, "COSIGN_PASSWORD=", "COSIGN_YES=true")
 	return w.runClient(cmd)
+}
+
+// keepOutput keeps the last command's output, trimmed, for {name} in later
+// steps: a digest crane printed, for example.
+func (w *world) keepOutput(name string) error {
+	v := strings.TrimSpace(string(w.body))
+	if v == "" || strings.ContainsAny(v, "\n ") {
+		return fmt.Errorf("want one word of output to keep, got:\n%s", w.body)
+	}
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars[name] = v
+	return nil
 }
 
 // runClient runs a client, keeping its output and exit code for the
@@ -86,4 +138,34 @@ func (w *world) dockerConfigDir() (string, error) {
 		w.dockerConfig = dir
 	}
 	return w.dockerConfig, nil
+}
+
+// writeLayer writes a gzipped tar holding one file, a layer crane can
+// append to build an image without pulling a base from the network.
+func (w *world) writeLayer(name, entry, content string) error {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	if err := tw.WriteHeader(&tar.Header{
+		Name: entry, Mode: 0o644, Size: int64(len(content)), Typeflag: tar.TypeReg,
+	}); err != nil {
+		return err
+	}
+	if _, err := io.WriteString(tw, content); err != nil {
+		return err
+	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	if err := gz.Close(); err != nil {
+		return err
+	}
+	return w.writeFile(name, &godog.DocString{Content: buf.String()})
+}
+
+// writeExpandedFile writes a scenario file with {host}, {digest} and the
+// other placeholders expanded, such as the image file
+// jf rt build-docker-create reads.
+func (w *world) writeExpandedFile(name string, content *godog.DocString) error {
+	return w.writeFile(name, &godog.DocString{Content: w.expand(content.Content)})
 }

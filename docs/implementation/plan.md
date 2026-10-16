@@ -25,7 +25,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P4 Identity and authorization | Done (2026-10-14) | **M1**. Epic #86. Access tokens, the native permission evaluator, the legacy security and Access v2 identity APIs, roles, environments, key pairs and the permission APIs, checked by the route and principal matrix (#84), the JFrog CLI identity commands and the Terraform identity scenario (#85). OIDC token exchange (#83) stays in the milestone outside P4's criteria; the Docker token endpoint is P6 task 2 |
 | P4b Reference deployments and CDN delivery | In progress | Epics #113 (CDN delivery and download redirect) and #189 (consistent reference deployments, contract v2, done 2026-10-16) done; epic #114 (reference deployments) open for the CDN scenarios and the multicloud mirror; decisions 0029 and 0030 |
 | P5 Full AQL, searches, build-info | Done (2026-10-16) | Epic #160; decisions 0012 and 0014, research 22. AQL over `items`, `builds` and `build.promotions` with the secondary domains, `$msp` and the `items.delete` and `properties.update` actions, compiled for SQLite and PostgreSQL; the GET searches; build-info publish, append, rename, delete, promotion and retention. The shared AQL cases give identical ordered rows on the reference evaluator and all three stores, and the JFrog CLI's build commands pass. `remote=1` on the versions searches answers from caches until P9 (#213) |
-| P6 Docker/OCI | Not started | |
+| P6 Docker/OCI | Done (2026-10-16) | Epic #217; research 23 and decision 0031. Repository-path routing on `/v2` and Artifactory's prefix with the subdomain option; the Bearer challenge and short-lived registry tokens (#221, #248); blobs with resumable uploads and cross-repository mount; manifests in Artifactory's storage layout; manifest lists and indexes with `subject` and the referrers API; tags, catalogs and deletes; Docker tags in the package index with tag retention; promote and parent manifest lists. The OCI distribution-spec v1.1.1 suite passes all four categories (73 pass, 6 skipped by design, decision 0031), and `docker`, `crane`, `oras`, `cosign`, `jf docker push/pull`, `jf rt build-docker-create` and `jf rt docker-promote` round-trip in acceptance (#229). With P7, milestone M2 |
 | P7 npm, Go, Maven locals | Not started | **M2** |
 | P8 PyPI, NuGet, Helm, Terraform locals | Not started | |
 | P9 Remote repositories | Not started | |
@@ -520,7 +520,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 4. Artifactory storage layout (`manifest.json`, `list.manifest.json`, `sha256__` layers, digest folders, the manifest properties, labels as properties) and tag retention through the package index.
 5. The `conformance` CI job.
 
-**Tracking.** Epic #217 holds one GitHub issue per PR:
+**Tracking.** Epic #217 holds one GitHub issue per PR, all done (2026-10-16):
 1. Research 23 and decision amendments for Docker and OCI (#218).
 2. Docker REST operations in the OpenAPI sources: promote and the listings (#219).
 3. Registry routing: `/v2`, `/artifactory/api/docker/{repo}/v2` and the subdomain option (#220).
@@ -533,6 +533,7 @@ Decisions: [0003](../research/decisions/0003-repository-model.md),
 10. Docker tags in the package index and tag retention (#227).
 11. Docker promote and parent manifest lists (#228).
 12. P6 exit checks: `docker`, `crane`, `oras`, `cosign` and `jf rt docker-promote` (#229).
+13. Registry tokens for OIDC-exchanged users that are not stored (#248).
 
 **Exit criteria**
 - OCI conformance suite green for push, pull, discovery and management.
