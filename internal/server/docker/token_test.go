@@ -384,6 +384,16 @@ func TestChallenge(t *testing.T) {
 				`scope="repository:app:pull,push"`,
 		},
 		{
+			"upload status", "GET", "/v2/docker-local/app/blobs/uploads/abc", "",
+			realm + `docker-local/v2/token",service="reg.example.com",` +
+				`scope="repository:docker-local/app:pull,push"`,
+		},
+		{
+			"upload cancel", "DELETE", "/v2/docker-local/app/blobs/uploads/abc", "",
+			realm + `docker-local/v2/token",service="reg.example.com",` +
+				`scope="repository:docker-local/app:pull,push"`,
+		},
+		{
 			"subdomain probe", "GET", "/v2/", "docker-local.reg.example.com",
 			realm + `docker-local/v2/token",service="reg.example.com"`,
 		},
