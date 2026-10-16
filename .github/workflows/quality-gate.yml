@@ -271,6 +271,55 @@ jobs:
           include-hidden-files: true
           retention-days: 7
 
+  # The OCI distribution-spec conformance suite (decision 0015), the external
+  # test for every registry endpoint. test/oci/run.sh builds the suite at its
+  # pinned commit, starts one -cover artifactweave on SQLite and the fs blob
+  # store, and runs the categories the Makefile switches on; a failed
+  # specification fails the job, a skipped one never does. The server's
+  # coverage joins the merged gate, and the suite's JUnit and HTML reports are
+  # uploaded whatever the result.
+  oci-conformance:
+    name: 'OCI conformance'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
+        with:
+          egress-policy: audit
+
+      - name: Check Out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Download Go modules
+        uses: ./.github/actions/go-mod-download
+
+      - name: Conformance suite against the coverage-instrumented binary
+        run: make oci-conformance
+
+      - name: Upload the suite's reports
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: oci-conformance-report
+          path: oci-report
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload OCI conformance coverage
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cover-oci
+          path: cover/oci
+          include-hidden-files: true
+          retention-days: 7
+
   # Static checks and mocked tests over every Terraform root in deploy/ and
   # test/terraform (decision 0030): fmt, validate, tflint, trivy, terraform
   # test against mocked providers, and the terraform-docs drift check. The
@@ -357,9 +406,9 @@ jobs:
   coverage:
     name: 'Coverage gate (≥95% total, ≥90% per package)'
     # The download pattern cover-* picks up the unit directories from every OS,
-    # the acceptance directory and the Terraform run, so one merge enforces the
-    # gate over all.
-    needs: [unit, acceptance, terraform]
+    # the acceptance directory, the Terraform run and the OCI conformance run,
+    # so one merge enforces the gate over all.
+    needs: [unit, acceptance, terraform, oci-conformance]
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
@@ -392,7 +441,7 @@ jobs:
   gate:
     name: 'Quality gate'
     if: always()
-    needs: [unit, lint, vuln, build, acceptance, coverage, parity, terraform, deploy-terraform]
+    needs: [unit, lint, vuln, build, acceptance, coverage, parity, terraform, oci-conformance, deploy-terraform]
     runs-on: ubuntu-latest
     steps:
       - name: Every gate job passed

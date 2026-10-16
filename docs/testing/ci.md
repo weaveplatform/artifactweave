@@ -23,13 +23,13 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 |---|---|---|---|
 | `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries and container-backed Maven, .NET, Node and Python clients; uploads `cover-accept` |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
-| `conformance` | `ubuntu-latest` | P6 | Starts the `-cover` binary with a `docker-local` repo, clones `opencontainers/distribution-spec` at a pinned tag and runs its conformance module with `OCI_ROOT_URL`, `OCI_NAMESPACE=<repo>/<image>` and credentials; uploads `cover-conformance` |
+| `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity and oidc. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
 | `deploy-terraform` | `ubuntu-latest` | P4b | `make deploy-check`: the `prove-matrix` table test and the reference-deployment contract lint, then over every Terraform root in `deploy/` and `test/terraform`: `terraform fmt -check`, `terraform validate`, tflint with the aws, google and azurerm rulesets, `trivy config`, `terraform test` against mocked providers, and the terraform-docs drift check (#124, decision 0030). Needs no cloud credentials |
 | `acceptance-peers` | `ubuntu-latest` | P13 | Starts two or three `-cover` instances on separate ports and data directories, pairs them, and runs the `@peers` godog features: federated repository convergence, partition and full sync (P13), Access Federation and topology (P14), release bundle distribution to an edge (P15). Kept apart from `acceptance` so the per-PR budget holds; uploads `cover-accept-peers` and joins the coverage and gate `needs` |
 | `e2e` (nightly) | `ubuntu-latest` | P9 | `-tags e2e` acceptance against real upstream registries |
 
-`acceptance`, `acceptance-peers`, `conformance` and `terraform` are listed in the coverage job's `needs`
+`acceptance`, `acceptance-peers`, `oci-conformance` and `terraform` are listed in the coverage job's `needs`
 and in the `gate` job's `needs`, so the merged coverage includes them and a failure blocks merge.
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
@@ -270,6 +270,39 @@ parallel; its `reap` takes `REAP_PREFIX` and its `check-clean` the run tag, so n
 another proof's instances. Both match the tag up to the hyphen before the step, because one
 scenario's initials can begin another's (`mirror`'s `m`, `multi-region`'s `mr`).
 
+## OCI conformance
+
+The `OCI conformance` job runs the OCI distribution-spec conformance suite against the
+registry (decision 0015, research 23 section 9). `test/oci/run.sh`, which
+`make oci-conformance` calls, fetches `opencontainers/distribution-spec` by the commit tag
+`v1.1.1` points to and builds `conformance/` with its own `go.mod`; this module never imports
+it. The build is cached in `.tools/` per commit. The script then starts one `-cover` binary,
+creates the `oci-conformance` and `oci-mount` local `docker` repositories and a `conformance`
+user with Read, Deploy and Delete on both, and runs the suite with:
+
+- `OCI_NAMESPACE=oci-conformance/conformance` and
+  `OCI_CROSSMOUNT_NAMESPACE=oci-mount/conformance`, so mounts cross repositories;
+- `OCI_USERNAME` and `OCI_PASSWORD`, so the suite authenticates as that user;
+- `OCI_AUTOMATIC_CROSSMOUNT=0`, as a mount without `from` opens an upload session;
+- `OCI_DELETE_MANIFEST_BEFORE_BLOBS=1`, as blob deletes answer 405 (decision 0031);
+- `OCI_HIDE_SKIPPED_WORKFLOWS=0`, so the report shows every workflow.
+
+A failed specification fails the job; a skipped one never does. The suite skips some
+specifications by design, for example the 201-without-`from` mount when automatic cross-mount
+is off, and the 202 follow-up when a mount succeeds with 201.
+
+Each category is one variable at the top of the `Makefile`, switched on by the ticket whose
+operations it tests, so turning one on is a one-line change:
+
+| Category | Variable | Switched on by |
+|---|---|---|
+| Pull | `OCI_TEST_PULL` | #224, with blobs (#222) and manifests (#223) |
+| Push | `OCI_TEST_PUSH` | #224, with blobs (#222) and manifests (#223) |
+| Content Discovery | `OCI_TEST_CONTENT_DISCOVERY` | whichever of #225 (referrers) and #226 (tags list) lands second |
+| Content Management | `OCI_TEST_CONTENT_MANAGEMENT` | #226 (deletes); the suite needs Push and Content Discovery for it |
+
+`make oci-conformance OCI_TEST_CONTENT_DISCOVERY=1` runs a category before it is switched on.
+
 ## Terraform scenarios
 
 `make terraform` runs `test/terraform/run.sh` over `TERRAFORM_SCENARIOS`: the repositories,
@@ -408,7 +441,7 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 |---|---|
 | `make gate` | Everything the per-PR jobs run except acceptance |
 | `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN` and `ARTIFACTWEAVE_CRANE_BIN` name the pinned `jf` and `crane`; their scenarios skip without them, and `docker login` runs on Linux only, where the daemon shares the binary's 127.0.0.1 |
-| `make conformance` | The OCI conformance job (needs Docker and network for the spec clone) |
+| `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |
 | `make deploy-check` | The deploy-terraform job (fetches pinned tools into `.tools/`; set `GITHUB_TOKEN` if tflint hits GitHub's rate limit) |
