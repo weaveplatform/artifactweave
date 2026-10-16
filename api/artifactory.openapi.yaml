@@ -6375,9 +6375,91 @@ paths:
         - handwritten
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/moveitem.md
+  /api/npm/auth:
+    get:
+      description: 'Returns .npmrc lines that authenticate npm to this server with the caller''s own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent), always-auth = true and email (the user''s email address); a caller with a Bearer token gets _authToken with that token. Needs an authenticated caller. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.'
+      operationId: getNpmAuth
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: .npmrc lines, one key = value setting per line.
+                type: string
+          description: The .npmrc lines for the caller.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory error envelope.
+      tags:
+        - specific
+      x-unverified: true
+  /api/npm/{repoKey}/auth/{scope}:
+    get:
+      description: 'Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository''s registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth, always-auth and email for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog documents neither the operation nor its body: the lines follow decision 0034 and stay unverified until compared with a live Artifactory.'
+      operationId: getNpmScopeAuth
+      parameters:
+        - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
+          in: path
+          name: repoKey
+          required: true
+          schema:
+            description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
+            type: string
+        - description: Required path parameter. The npm scope the lines configure, without its leading @.
+          in: path
+          name: scope
+          required: true
+          schema:
+            description: The npm scope, without its leading @.
+            minLength: 1
+            type: string
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: .npmrc lines, one setting per line, the first mapping the scope to the registry.
+                type: string
+          description: The .npmrc lines for the scope and the caller.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not an npm repository; the body carries the Artifactory error envelope.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has that key; the body carries the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory error envelope.
+      tags:
+        - specific
+      x-unverified: true
   /api/npm/{repoKey}/reindex:
     post:
-      description: Rebuilds the packuments and dist-tags of a local npm repository from the tarballs it holds, including the .npm metadata cache that install clients read. Local repositories only; remote and virtual repositories derive their metadata on demand. The rebuild runs in the background.
+      description: Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
       operationId: calculateNpmRepositoryMetadata
       parameters:
         - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
@@ -6392,9 +6474,15 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text acknowledgement that the npm metadata rebuild was scheduled.
+                description: Plain-text acknowledgement that the npm index rebuild was queued.
                 type: string
-          description: The npm metadata rebuild was queued.
+          description: The npm index rebuild was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not an npm local repository; the body carries the Artifactory error envelope.
         '401':
           content:
             application/json:
@@ -6407,6 +6495,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks the permission this operation needs; the body carries the Artifactory error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has that key; the body carries the Artifactory error envelope.
         '500':
           content:
             application/json:
@@ -13706,6 +13800,102 @@ paths:
       tags:
         - storage
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getartifactoryapplicationmetrics.md
+  /api/v1/migrations/npm/repositories/{repoKey}/migrate:
+    post:
+      description: 'Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository''s key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.'
+      operationId: migrateNpmRepositoryToStrictLayout
+      parameters:
+        - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
+          in: path
+          name: repoKey
+          required: true
+          schema:
+            description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
+            type: string
+      responses:
+        '202':
+          description: The conversion was queued.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not an npm local repository; the body carries the Artifactory error envelope.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has that key; the body carries the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory error envelope.
+      tags:
+        - specific
+      x-unverified: true
+  /api/v1/migrations/npm/repositories/{repoKey}/resume:
+    post:
+      description: 'Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.'
+      operationId: resumeNpmRepositoryMigration
+      parameters:
+        - description: Required path parameter. Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
+          in: path
+          name: repoKey
+          required: true
+          schema:
+            description: Key of the repository to act on. The repository's package type must match this operation's ecosystem; a mismatch is rejected with 400.
+            type: string
+      responses:
+        '202':
+          description: The failed conversion was queued again.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not an npm local repository, or it has no failed conversion to resume; the body carries the Artifactory error envelope.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks the permission this operation needs; the body carries the Artifactory error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No repository has that key; the body carries the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory error envelope.
+      tags:
+        - specific
+      x-unverified: true
   /api/v1/service_trust/pairing/{usecase}:
     delete:
       description: Removes the trust relationship with one peer for the use case and deletes its stored keys. Federations that use the peer stop syncing with it. With `force=true` the local trust is removed even when the peer cannot be told. Administrators only.
