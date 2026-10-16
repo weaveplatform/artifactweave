@@ -117,7 +117,8 @@ func parsePrivateKey(data []byte, passphrase string) (crypto.Signer, error) {
 		//nolint:staticcheck // SA1019: legacy encrypted PEM is still what
 		// OpenSSL writes for a passphrase-protected PKCS#1 key, and the
 		// standard library has no other way to open it.
-		if x509.IsEncryptedPEMBlock(block) {
+		encrypted := x509.IsEncryptedPEMBlock(block)
+		if encrypted {
 			var err error
 			//nolint:staticcheck // SA1019: as above
 			if der, err = x509.DecryptPEMBlock(block, []byte(passphrase)); err != nil {
@@ -126,6 +127,12 @@ func parsePrivateKey(data []byte, passphrase string) (crypto.Signer, error) {
 		}
 		key, err := parsePrivateDER(block.Type, der)
 		if err != nil {
+			// Legacy PEM encryption has no integrity check: about 1 wrong
+			// passphrase in 256 passes the padding check and decrypts to
+			// garbage. An unsupported key type (ErrInvalid) still says so.
+			if encrypted && !errors.Is(err, ErrInvalid) {
+				return nil, invalid("the passphrase does not unlock the private key")
+			}
 			return nil, invalid("the private key does not parse: %v", err)
 		}
 		return key, nil
