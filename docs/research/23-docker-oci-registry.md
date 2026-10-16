@@ -24,7 +24,10 @@ Sources:
   `9727462` for what was added after that release.
 - **The conformance suite** in the same repository, `conformance/` at tag `v1.1.1`.
 - **The reference registry** `distribution/distribution` v3.0.0 (`678b095af9c9`),
-  `registry/api/errcode/register.go`, for the status each error code is sent with.
+  `registry/api/errcode/register.go`, for the status each error code is sent with, and
+  `registry/storage/{ocimanifesthandler,schema2manifesthandler,manifestlisthandler}.go` for
+  what a manifest push checks.
+- **The OCI Image Specification** v1.1.1 (`descriptor.md` at `de7a13cc5ce0`).
 - **JFrog's documentation:** `docker-repositories` and `additional-docker-information` under
   `https://docs.jfrog.com/artifactory/docs/` (read with `.md` appended), and
   `https://docs.jfrog.com/integrations/reference/promotedockerimage.md`.
@@ -101,6 +104,15 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   manifests are unknown is refused with `MANIFEST_BLOB_UNKNOWN`, except that a `subject`
   naming a manifest that does not exist must be accepted. When the manifest has a
   `mediaType`, clients set `Content-Type` to it.
+- **[D] Descriptor sizes.** A descriptor's `size` is required and gives "the size, in
+  bytes, of the raw content"; "if the length of the retrieved content does not match the
+  specified length, the content SHOULD NOT be trusted" (image specification,
+  `descriptor.md`). The distribution specification asks nothing of sizes at a push; a
+  manifest that fails a registry's checks is `MANIFEST_INVALID` (code-6), and
+  `SIZE_INVALID` (code-10) is for an upload whose length is wrong.
+- **[S] The reference registry checks presence only.** Its OCI, schema-2 and manifest-list
+  handlers `Stat` each descriptor's digest and never compare the descriptor's size with
+  the stored content.
 - **[D] Subject and referrers.** A registry with the referrers API answers a push carrying
   `subject` with `OCI-Subject: <subject digest>`. The referrers response is an image index
   (`application/vnd.oci.image.index.v1+json`), never 404 once supported, and empty when
@@ -407,6 +419,8 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
     repository of another package type.
 11. Which secret the `auth` endpoints put in the `config.json` entry for a caller who
     authenticated with a token.
+12. Whether a manifest whose descriptor `size` differs from the stored blob or manifest is
+    refused, and with which code (section 1.2).
 
 ## 11. Versions at the research baseline
 

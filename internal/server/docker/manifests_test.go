@@ -179,6 +179,40 @@ func TestEveryUnknownBlobIsNamed(t *testing.T) {
 	}
 }
 
+// A descriptor whose size is not the stored content's is MANIFEST_INVALID,
+// with the digest, the size the manifest gives and the stored size as
+// detail.
+func TestDescriptorSizeMismatch(t *testing.T) {
+	w := newBlobWorld(t)
+	w.uploadBlobs("app", imageConfig, "layer")
+	body := strings.Replace(
+		image("layer"),
+		digestOf("layer")+`","size":5`,
+		digestOf("layer")+`","size":6`,
+		1,
+	)
+	rec := w.do(http.MethodPut, "/v2/docker-local/app/manifests/v1", body, ociManifest)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
+	}
+	var got struct {
+		Errors []struct {
+			Code   string
+			Detail map[string]any
+		}
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []struct {
+		Code   string
+		Detail map[string]any
+	}{{CodeManifestInvalid, map[string]any{"digest": digestOf("layer"), "size": 6.0, "stored": 5.0}}}
+	if diff := cmp.Diff(want, got.Errors); diff != "" {
+		t.Fatal(diff)
+	}
+}
+
 // A body of unknown length is cut at the limit while it is read, and one
 // that cannot be read is refused.
 func TestManifestBodyLimits(t *testing.T) {
