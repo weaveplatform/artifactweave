@@ -36,6 +36,20 @@ tree remains the source of truth; a reindex rebuilds the index from it.
   takes its retained versions with it.
 - **Reads:** the tags list and the catalogs read the index, not the folder tree.
 
+**npm, Go and Maven** (P7) maintain the index through the format hooks of decision
+[0032](0032-package-format-handlers.md), on every write path including restore from the
+trash can and items cached from a remote. Each format's decision sets its package, version,
+files and order: npm (#264), Go modules (#265), and Maven with Gradle, Ivy and SBT (#266).
+For all of them:
+- **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment)
+  is a cache of what the version's items, content and properties say. A reindex rebuilds
+  it, and nothing is kept there that the items do not carry.
+- **Download statistics:** a download served through the item path records the version's
+  last download (`RecordVersionDownload`), as it records the item's.
+- **Derived metadata and retention** that would contend in the write transaction run from
+  the persistent work queue ([0033](0033-persistent-work-queue.md)): Maven metadata and
+  `maxUniqueSnapshots`.
+
 ## Rationale
 
 Without a shared index each format would grow its own path-globbing version logic and
@@ -58,6 +72,8 @@ rebuilt keeps the item tree authoritative.
 - Reindex rebuild equivalence test.
 - Docker: tag order after overwrites, `maxUniqueTags` and `dockerTagRetention` after a push,
   and a multi-architecture tag removed as one unit.
+- npm, Go and Maven: the shared format contract suite (`internal/format/formattest`, #268)
+  on the in-memory, SQLite and PostgreSQL stores.
 
 ## References
 
