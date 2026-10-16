@@ -21,7 +21,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 
 | Job | Runner | Added in | What |
 |---|---|---|---|
-| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries and container-backed Maven, .NET, Node and Python clients; uploads `cover-accept` |
+| `acceptance` | `ubuntu-latest` | P0 | Builds `artifactweave` with `-cover`, runs godog features with pinned `jf`, `terraform`, `helm`, `crane`, `oras`, `cosign` binaries, the runner's `docker` and `go`, and the npm and Maven clients in containers pinned by digest (from P7; see [Package clients](#package-clients-in-acceptance); .NET and Python follow with their phases); uploads `cover-accept` |
 | `parity` | `ubuntu-latest` | P0 | Restores or fetches the gitignored `.specoracle` cache of JFrog's published OpenAPI blocks and runs `TestSpecParity` against `api/parity-baseline.json`. Required since P1 (in the gate's `needs`): the baseline lists only out-of-scope products. docs.jfrog.com is contacted only on a cache miss |
 | `oci-conformance` (`OCI conformance`) | `ubuntu-latest` | P6 | Builds `opencontainers/distribution-spec`'s conformance suite at the commit of tag `v1.1.1`, starts one `-cover` binary on SQLite and the fs blob store with two local `docker` repositories and a user with Read, Deploy and Delete on both, and runs the categories switched on in the Makefile; see [OCI conformance](#oci-conformance). Uploads the JUnit and HTML reports as `oci-conformance-report` and the coverage as `cover-oci` |
 | `terraform` | `ubuntu-latest` | P3 | Installs the pinned `jfrog/artifactory` and `jfrog/platform` providers from a filesystem mirror of their release zips (checked against the release SHA-256s and the committed lock files) and validates each scenario in `deploy/artifactweave/terraform`: repositories, identity and oidc. Then it starts one `-cover` binary, mints an admin access token, and for each scenario applies, requires an empty `terraform plan` and destroys (`make terraform TERRAFORM_MODE=apply`, from P4, #69, #85 and #83); uploads `cover-terraform` |
@@ -47,6 +47,38 @@ The cross-cloud blob mirror scenario (`TestCrossCloud` in `pkg/blob/mirror`) is 
 those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
 unit job and skips on macOS and Windows; the emulator images are pinned in
 `pkg/containertest`.
+
+## Package clients in acceptance
+
+P7's clients (#270) run in the `acceptance` job.
+
+- **npm and Maven** run from `node` (Node 24 LTS, npm 11) and `maven` (Maven 3.9 on
+  Temurin 21) images, pinned by digest in `test/acceptance/clients/*.Dockerfile` and
+  moved by Dependabot's `docker` entry. Majors are held, because the Node LTS line and
+  Maven 3.9 are the versions decision 0015 names. The job builds both images in the
+  background while it sets up and compiles the `-cover` binary, and the scenarios wait
+  for them. Each runs with `--network host` and the runner's user, so it reaches the
+  binary on 127.0.0.1 and its files can be removed afterwards.
+- **Maven's plugins** come from `~/.m2/repository`, restored by `actions/cache` and keyed
+  on the fixture POMs that pin every plugin version. The scenarios deploy with
+  `package deploy:deploy`, never `install`, and resolve into a fresh local repository
+  that chains to the cache, so an artifact under test is never served from the cache.
+- **Go** is the runner's toolchain, with `GOTOOLCHAIN=local`, no checksum database and
+  every cache under the scenario's directory. The go command sends credentials only over
+  HTTPS, and the binary serves plain HTTP, so the `@go` scenarios put a TLS-terminating
+  reverse proxy in front of the binary. go trusts it through `SSL_CERT_FILE`, which macOS
+  and Windows honour from Go 1.27, so these scenarios also run locally on macOS.
+
+**Added time: about a minute.**
+
+| Run | Job | `make accept` |
+|---|---|---|
+| Cold Maven cache (run 38943154688) | 274 s | 235 s |
+| Warm Maven cache (run 38944697563) | 271 s | 229 s |
+| The last four runs on `main`, before these clients | 192 to 245 s | 157 to 201 s |
+
+The image builds overlap setup and the binary's compile, so the cost is the three
+scenarios themselves. The cache saves little, because the plugins are about 16 MB.
 
 ## Transient infrastructure failures
 
@@ -466,7 +498,7 @@ Run it whenever the pinned `jf` changes, then check that the expected rows in
 | Command | What |
 |---|---|
 | `make gate` | Everything the per-PR jobs run except acceptance |
-| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN` and `ARTIFACTWEAVE_COSIGN_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras` and `cosign` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1 |
+| `make accept` | The acceptance job (needs Docker). `ARTIFACTWEAVE_JF_BIN`, `ARTIFACTWEAVE_CRANE_BIN`, `ARTIFACTWEAVE_ORAS_BIN` and `ARTIFACTWEAVE_COSIGN_BIN` name the pinned `jf` (`.github/actions/jfrog-cli`) and `crane`, `oras` and `cosign` (`.github/actions/registry-clients`); their scenarios skip without them, and the `docker` scenarios run on Linux only, where the daemon shares the binary's 127.0.0.1. `ARTIFACTWEAVE_NODE_IMAGE` and `ARTIFACTWEAVE_MAVEN_IMAGE` name the npm and Maven images built from `test/acceptance/clients`, and their scenarios skip without them or off Linux. `ARTIFACTWEAVE_MAVEN_REPO` moves the Maven repository they mount from `~/.m2/repository`. The `@go` scenarios need only `go` on `PATH` |
 | `make oci-conformance` | The OCI conformance job (needs network the first time, to fetch and build the suite into `.tools/`); reports in `oci-report/` |
 | `make generate` | Regenerate servers and clients; CI fails on drift |
 | `make terraform TERRAFORM_MODE=apply` | The terraform job (needs `terraform`; without the mode it only validates) |

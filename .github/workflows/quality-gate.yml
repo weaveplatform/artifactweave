@@ -188,6 +188,19 @@ jobs:
         with:
           persist-credentials: false
 
+      # The npm and Maven client images (test/acceptance/clients), built in
+      # the background while the job sets up and make accept compiles the
+      # -cover binary. Their scenarios wait for the images, and the log is
+      # printed if the job fails.
+      - name: Client images (background)
+        run: |
+          {
+            docker build -t artifactweave-accept-node \
+              -f test/acceptance/clients/node.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-maven \
+              -f test/acceptance/clients/maven.Dockerfile test/acceptance/clients
+          } > "$RUNNER_TEMP/client-images.log" 2>&1 &
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
@@ -195,6 +208,15 @@ jobs:
 
       - name: Download Go modules
         uses: ./.github/actions/go-mod-download
+
+      # Maven's plugins for the Maven scenarios, which mount this directory
+      # and never install their own artifacts into it. The key is the
+      # fixture POMs, which pin every plugin version.
+      - name: Maven plugin cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.m2/repository
+          key: maven-plugins-${{ hashFiles('test/acceptance/testdata/maven/**/pom.xml') }}
 
       - name: JFrog CLI (pinned)
         uses: ./.github/actions/jfrog-cli
@@ -206,7 +228,14 @@ jobs:
         uses: ./.github/actions/registry-clients
 
       - name: Acceptance features (coverage-instrumented binary)
+        env:
+          ARTIFACTWEAVE_NODE_IMAGE: artifactweave-accept-node
+          ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
         run: make accept
+
+      - name: Client image build log
+        if: failure()
+        run: cat "$RUNNER_TEMP/client-images.log"
 
       - name: Upload acceptance coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
