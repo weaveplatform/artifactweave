@@ -22,6 +22,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -804,5 +805,265 @@ func registryReferrersMatrix() []matrixRow {
 	return []matrixRow{
 		row(getReferrers, base+sha256Digest(registryManifest("v1")), "",
 			holds(dockerA, "work/app/", types.ActionRead), 200),
+	}
+}
+
+// The tags list, catalog and delete routes (#226) on the repository path,
+// the JFrog catalog and tags list the registry serves under the prefix,
+// and the JFrog multi-architecture tag delete.
+const (
+	tagsRoute       = "GET /v2/{repo}/{name}/tags/list"
+	catalogRoute    = "GET /v2/_catalog"
+	repoCatalog     = "GET /v2/{repo}/_catalog"
+	delManifest     = "DELETE " + manifestRoute
+	jfrogCatalog    = "GET /artifactory/api/docker/{repo-key}/v2/_catalog"
+	jfrogTags       = "GET /artifactory/api/docker/{repo-key}/v2/{imageName}/tags/list"
+	multiArchDelete = "DELETE /artifactory/api/docker/{repoKey}/v2/delete"
+)
+
+// seedRegistryDeletes pushes the tags the status rows delete to
+// docker-blobs' image app, each with a manifest of its own.
+func seedRegistryDeletes(t *testing.T, db store.Store, blobs blob.Store) {
+	t.Helper()
+	c, err := db.Repos().Get(context.Background(), "docker-blobs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tag := range []string{"del-tag", "del-digest", "del-multi"} {
+		pushImage(t, db, blobs, c, "app", tag, registryManifest(tag))
+	}
+}
+
+// registryListingStatusRows: listings and deletes in docker-blobs, where
+// only admin holds anything. A catalog leaves out what the caller cannot
+// read rather than refusing; anonymous is challenged on every registry
+// path. The multi-architecture delete is a JFrog REST operation and
+// answers as one.
+func registryListingStatusRows() []statusCase {
+	const (
+		tags     = "/v2/docker-blobs/app/tags/list"
+		base     = "/v2/docker-blobs/app/manifests/"
+		prefixed = "/artifactory/api/docker/docker-blobs/v2/"
+		multi    = prefixed + "delete"
+		body     = `{"dockerRepository":"app","tag":"del-multi"}`
+	)
+	return []statusCase{
+		{tagsRoute, tags, "admin", "", 200},
+		{tagsRoute, tags + "?n=0", "admin", "", 200},
+		{tagsRoute, "/v2/docker-blobs/none/tags/list", "admin", "", 404},
+		{tagsRoute, "/v2/libs-local/app/tags/list", "admin", "", 404},
+		{tagsRoute, tags, "user", "", 403},
+		{tagsRoute, tags, "anonymous", "", 401},
+		{tagsRoute, tags, "", "", 401},
+		{catalogRoute, "/v2/_catalog", "admin", "", 200},
+		{catalogRoute, "/v2/_catalog?n=1", "admin", "", 200},
+		{catalogRoute, "/v2/_catalog", "user", "", 200},
+		{catalogRoute, "/v2/_catalog", "anonymous", "", 401},
+		{catalogRoute, "/v2/_catalog", "", "", 401},
+		{repoCatalog, "/v2/docker-blobs/_catalog", "admin", "", 200},
+		{repoCatalog, "/v2/libs-local/_catalog", "admin", "", 404},
+		{repoCatalog, "/v2/docker-blobs/_catalog", "user", "", 200},
+		{repoCatalog, "/v2/docker-blobs/_catalog", "anonymous", "", 401},
+		{jfrogCatalog, prefixed + "_catalog", "admin", "", 200},
+		{jfrogCatalog, "/artifactory/api/docker/nope/v2/_catalog", "admin", "", 404},
+		{jfrogCatalog, prefixed + "_catalog", "user", "", 200},
+		{jfrogCatalog, prefixed + "_catalog", "", "", 401},
+		{jfrogTags, prefixed + "app/tags/list", "admin", "", 200},
+		{jfrogTags, prefixed + "app/tags/list", "user", "", 403},
+		{jfrogTags, prefixed + "app/tags/list", "anonymous", "", 401},
+		{delManifest, base + "del-tag", "user", "", 403},
+		{delManifest, base + "del-tag", "anonymous", "", 401},
+		{delManifest, base + "del-tag", "", "", 401},
+		{delManifest, base + "del-tag", "admin", "", 202},
+		{delManifest, base + "del-tag", "admin", "", 404},
+		{delManifest, base + sha256Digest(registryManifest("del-digest")), "admin", "", 202},
+		{delManifest, base + sha256Digest(registryManifest("del-digest")), "admin", "", 404},
+		{delManifest, base + "sha256:totallywrong", "admin", "", 404},
+		{delManifest, base + "_uploads", "admin", "", 404},
+		{multiArchDelete, multi, "user", body, 403},
+		{multiArchDelete, multi, "anonymous", body, 401},
+		{multiArchDelete, multi, "", body, 401},
+		{multiArchDelete, multi, "admin", `{"dockerRepository":"app"}`, 400},
+		{multiArchDelete, multi, "admin", `{"dockerRepository":"App","tag":"x"}`, 400},
+		{multiArchDelete, multi, "admin", `{"dockerRepository":"app","tag":"-x"}`, 400},
+		{multiArchDelete, "/artifactory/api/docker/nope/v2/delete", "admin", body, 404},
+		{multiArchDelete, "/artifactory/api/docker/libs-local/v2/delete", "admin", body, 404},
+		{multiArchDelete, multi, "admin", body, 200},
+		{multiArchDelete, multi, "admin", body, 404},
+	}
+}
+
+// taggedFor pushes registryManifest("v1") to docker-a's image work/app as
+// the tag t-<p>, the principal's own, for a row that deletes it.
+func taggedFor(t *testing.T, f *matrixFixture, p string) {
+	t.Helper()
+	c, err := f.db.Repos().Get(context.Background(), dockerA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pushImage(t, f.db, f.items.Blobs, c, "work/app", "t-"+p, registryManifest("v1"))
+}
+
+// registryListingMatrix: a tags list needs Read on the image and a delete
+// Delete; a catalog answers any caller with credentials, leaving out what
+// it cannot read. Anonymous is challenged on every registry path, and
+// refused the multi-architecture delete as any JFrog operation refuses it.
+// A digest delete removes every principal's tag of it, so each principal
+// has a fixture of its own.
+func registryListingMatrix() []matrixRow {
+	const (
+		tags     = "/v2/" + dockerA + "/work/app/tags/list"
+		base     = "/v2/" + dockerA + "/work/app/manifests/"
+		prefixed = "/artifactory/api/docker/" + dockerA + "/v2/"
+	)
+	read, del := types.ActionRead, types.ActionDelete
+	return []matrixRow{
+		row(tagsRoute, tags, "", holds(dockerA, "work/app/", read), 200),
+		at(catalogRoute, "", signedIn, 200),
+		row(repoCatalog, "/v2/"+dockerA+"/_catalog", "", signedIn, 200),
+		row(jfrogCatalog, prefixed+"_catalog", "", signedIn, 200),
+		row(jfrogTags, prefixed+"work/app/tags/list", "", holds(dockerA, "work/app/", read), 200),
+		row(delManifest, base+"t-{p}", "", holds(dockerA, "work/app/", del), 202).
+			seeding(taggedFor),
+		row(delManifest, base+sha256Digest(registryManifest("v1")), "",
+			holds(dockerA, "work/app/", del), 202).alone(),
+		row(multiArchDelete, prefixed+"delete", `{"dockerRepository":"work/app","tag":"t-{p}"}`,
+			holds(dockerA, "work/app/", del), 200).seeding(taggedFor),
+	}
+}
+
+// A tags list and catalog answer in the registry's form: the tags of the
+// image as the client named it, a page with a Link, and the images of
+// every repository as <repo>/<image>.
+func TestRegistryListings(t *testing.T) {
+	h := statusFixture(t, false)
+	admin := basic("admin", "pw")
+	rec := do(t, h, http.MethodGet, "/v2/docker-blobs/app/tags/list?n=1", admin, "")
+	if rec.Code != http.StatusOK ||
+		rec.Header().
+			Get("Link") !=
+			`</v2/docker-blobs/app/tags/list?last=del-digest&n=1>; rel="next"` {
+		t.Fatalf("%d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+	if diff := cmp.Diff(
+		decode(t, `{"name":"docker-blobs/app","tags":["del-digest"]}`),
+		decode(t, rec.Body.String()),
+	); diff != "" {
+		t.Fatal(diff)
+	}
+	for path, want := range map[string]string{
+		"/v2/_catalog": `{"repositories":["docker-blobs/app"]}`,
+		"/artifactory/api/docker/docker-blobs/v2/_catalog": `{"repositories":["app"]}`,
+	} {
+		rec := do(t, h, http.MethodGet, path, admin, "")
+		if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
+			t.Errorf("%s: %s", path, diff)
+		}
+		if rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" {
+			t.Errorf("%s: %v", path, rec.Header())
+		}
+	}
+}
+
+// The multi-architecture delete resolves its repository as the registry
+// does, refuses remote and virtual repositories, and answers in the
+// Artifactory envelope with a sentence on success.
+func TestMultiArchDelete(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	repos := map[string]repo.Config{}
+	for _, c := range []repo.Config{
+		{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker},
+		{
+			Key: "docker-remote", Class: repo.Remote, PackageType: repo.Docker,
+			URL: "https://registry.example",
+		},
+		{
+			Key: "docker-virtual", Class: repo.Virtual, PackageType: repo.Docker,
+			Repositories: []string{"docker-local"},
+		},
+	} {
+		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		repos[c.Key] = c
+	}
+	c, err := w.db.Repos().Get(ctx, "docker-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&item.Service{Store: w.db, Blobs: w.blobs}).Deploy(ctx, item.Deploy{
+		Target: item.Target{Repo: c, Path: "app/v0/sha256__" + registryLayer[7:]},
+		Body:   strings.NewReader("registry layer"),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	pushImage(t, w.db, w.blobs, c, "app", "multi", registryManifest("multi"))
+	const body = `{"dockerRepository":"app","tag":"multi"}`
+	rec := w.do(http.MethodDelete, "/artifactory/api/docker/DOCKER-LOCAL/v2/delete", "admin", body,
+		"Content-Type", "application/json")
+	if rec.Code != http.StatusOK ||
+		rec.Body.String() != "Deleted tag 'multi' of image 'app' in 'docker-local'." ||
+		!strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") ||
+		rec.Header().Get(docker.APIVersionHeader) != "" {
+		t.Fatalf("%d %v %q", rec.Code, rec.Header(), rec.Body)
+	}
+	if rec := w.do(http.MethodGet, "/v2/docker-local/app/manifests/multi", "admin", ""); rec.Code !=
+		http.StatusNotFound {
+		t.Fatalf("still there: %d", rec.Code)
+	}
+	for key, want := range map[string]string{
+		"docker-remote":  `{"errors":[{"status":405,"message":"docker-remote is a remote repository, which the registry does not serve yet"}]}`,
+		"docker-virtual": `{"errors":[{"status":405,"message":"docker-virtual is a virtual repository, which the registry does not serve yet"}]}`,
+		"libs-local":     `{"errors":[{"status":404,"message":"Repository 'libs-local' does not exist"}]}`,
+	} {
+		rec := w.do(http.MethodDelete, "/artifactory/api/docker/"+key+"/v2/delete", "admin", body,
+			"Content-Type", "application/json")
+		if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
+			t.Errorf("%s: %d %s", key, rec.Code, diff)
+		}
+	}
+	// A reserved name never reaches the folder it names.
+	rec = w.do(http.MethodDelete, "/artifactory/api/docker/docker-local/v2/delete", "admin",
+		`{"dockerRepository":"app","tag":"_uploads"}`, "Content-Type", "application/json")
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("_uploads: %d %s", rec.Code, rec.Body)
+	}
+	w.item("docker-local", false, "app/_uploads")
+}
+
+// failingGetStore fails reading any item.
+type failingGetStore struct{ store.Store }
+
+func (s failingGetStore) Items() store.ItemStore { return failingGets{s.Store.Items()} }
+
+type failingGets struct{ store.ItemStore }
+
+func (failingGets) Get(context.Context, string, bool, string) (types.Item, error) {
+	return types.Item{}, errBoom
+}
+
+func TestMultiArchDeleteStoreFailures(t *testing.T) {
+	const body = `{"dockerRepository":"app","tag":"v1"}`
+	for name, tune := range map[string]func(*Config){
+		"repository": func(c *Config) {
+			c.Store = faultyStore{Store: c.Store.(*inmem.Store), fail: map[string]bool{"get": true}}
+		},
+		"items": func(c *Config) { c.Store = failingGetStore{c.Store} },
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := newItemWorld(t, false, tune)
+			if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&repo.Config{
+				Key: "docker-local", Class: repo.Local, PackageType: repo.Docker,
+			})); err != nil {
+				t.Fatal(err)
+			}
+			rec := w.do(http.MethodDelete, "/artifactory/api/docker/docker-local/v2/delete",
+				"admin", body, "Content-Type", "application/json")
+			if rec.Code != http.StatusInternalServerError ||
+				strings.Contains(rec.Body.String(), "boom") {
+				t.Fatalf("%d %s", rec.Code, rec.Body)
+			}
+		})
 	}
 }

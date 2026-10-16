@@ -621,6 +621,95 @@ paths:
       - specific
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createdebiansnapshot.md
       x-tier: stub
+  /api/docker/{repoKey}/v2/delete:
+    delete:
+      description: Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory
+        added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the
+        platform manifests no other tag or index of the image references; manifests and layers another tag
+        still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is
+        removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the
+        trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under
+        the Docker API path. JFrog documents the operation in its release notes only, so it has no oracle
+        definition.
+      operationId: deleteDockerTag
+      parameters:
+      - description: Required path parameter. Key of the Docker, OCI or Helm OCI repository, matched without
+          regard to case because Docker clients send references in lower case only.
+        in: path
+        name: repoKey
+        required: true
+        schema:
+          description: A repository key.
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              description: Names the tag to delete.
+              properties:
+                dockerRepository:
+                  description: Required within this object. The image name inside the repository, for example
+                    team/app.
+                  type: string
+                tag:
+                  description: Required within this object. The tag to delete.
+                  type: string
+              required:
+              - dockerRepository
+              - tag
+              type: object
+        description: The image and the tag to delete.
+        required: true
+      responses:
+        '200':
+          content:
+            text/plain:
+              schema:
+                description: A sentence naming the tag that was deleted.
+                type: string
+          description: The tag was deleted.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The body lacks the image or the tag, or names one that is not valid; the body carries the
+            Artifactory error envelope.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: Credentials were missing or rejected; the body carries the Artifactory error envelope.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller lacks Delete on the image; the body carries the Artifactory error envelope.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is not a Docker, OCI or Helm OCI repository, or the image holds no such tag;
+            the body carries the Artifactory error envelope.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is a remote or virtual repository, which the registry does not serve yet; the
+            body carries the Artifactory error envelope.
+        '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The server failed while processing the request; the body carries the Artifactory error
+            envelope.
+      tags:
+      - specific
   /api/gems/{repoKey}/reindex:
     post:
       description: 'Not supported: artifactweave answers 501 for the RubyGems ecosystem. The operation

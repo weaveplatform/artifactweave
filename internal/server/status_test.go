@@ -68,6 +68,7 @@ func statusTable() []statusCase {
 		registryBlobStatusRows(),
 		registryManifestStatusRows(),
 		registryReferrersStatusRows(),
+		registryListingStatusRows(),
 	)
 }
 
@@ -185,6 +186,7 @@ func newStatusFixture(
 	tokens, secrets := seedTokens(t, db)
 	seedRegistryStatus(t, db, blobs, secrets)
 	seedRegistryManifests(t, db, blobs)
+	seedRegistryDeletes(t, db, blobs)
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
 		Hash: testHash, Tokens: tokens,
 	})
@@ -514,6 +516,12 @@ var implementedHandwritten = map[string]bool{
 	registryAuth:  true,
 	legacyAuth:    true,
 	getReferrers:  true,
+	tagsRoute:     true,
+	catalogRoute:  true,
+	repoCatalog:   true,
+	delManifest:   true,
+	jfrogCatalog:  true,
+	jfrogTags:     true,
 }
 
 func descriptorStatusRows() []statusCase {

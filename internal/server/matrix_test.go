@@ -274,11 +274,14 @@ func trashRule(r rule) rule {
 // part signature, which no principal has.
 func uploadToken(matrixPrincipal) int { return http.StatusUnauthorized }
 
-// imageOperation reports whether a registry path is an operation on an
-// image, which a registry token must grant.
+// imageOperation reports whether a registry path is an operation a
+// registry token must grant: one on an image, or a catalog, which needs
+// registry:catalog:*.
 func imageOperation(path string) bool {
-	return slices.ContainsFunc([]string{"/blobs/", "/manifests/", "/tags/list", "/referrers/"},
-		func(op string) bool { return strings.Contains(path, op) })
+	return slices.ContainsFunc(
+		[]string{"/blobs/", "/manifests/", "/tags/list", "/referrers/", "/_catalog"},
+		func(op string) bool { return strings.Contains(path, op) },
+	)
 }
 
 // matrixRow is one request each principal makes. {p} in its path or body is
@@ -387,6 +390,7 @@ func matrixTable() []matrixRow {
 		registryBlobMatrix(),
 		registryManifestMatrix(),
 		registryReferrersMatrix(),
+		registryListingMatrix(),
 	)
 }
 

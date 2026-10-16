@@ -487,6 +487,8 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
       - searches
+      - handwritten
+      x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockerrepositories.md
   /api/docker/{repo-key}/v2/parentManifests:
     post:
@@ -623,6 +625,8 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
       - searches
+      - handwritten
+      x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockertags.md
   /api/search/aql:
     post:

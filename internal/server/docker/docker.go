@@ -119,6 +119,7 @@ func New(o Options) *Registry {
 	g.registerToken()
 	g.registerAuth()
 	g.registerReferrers()
+	g.registerListings()
 	return g
 }
 
@@ -130,16 +131,21 @@ func (g *Registry) handle(k Kind, method string, ep Endpoint) {
 
 // Register mounts the registry on r for every method, so that the
 // registry answers 405 itself, in its own envelope. Under the Artifactory
-// prefix chi prefers the generated JFrog operations' literal and parameter
-// segments (GET _catalog, POST parentManifests, GET <image>/tags/list for a
-// one-segment image) to these catch-alls, so those keep their generated
-// handlers until the registry serves them (decision 0003).
+// prefix chi prefers the generated JFrog operations' literal segments
+// (POST parentManifests, POST promote, DELETE delete) to these catch-alls,
+// so those keep their generated handlers (decision 0003). The JFrog
+// catalog and tags list are the registry's own operations, marked
+// x-handwritten in the specification; they are registered under the
+// patterns the specification gives them as well, so that the server's
+// stubs for unimplemented hand-written operations never claim them.
 func (g *Registry) Register(r chi.Router) {
 	r.HandleFunc("/v2", g.serveRoot)
 	r.HandleFunc("/v2/*", g.serveRoot)
 	r.HandleFunc(prefix+"{repoKey}/v2", g.servePrefix)
 	r.HandleFunc(prefix+"{repoKey}/v2/*", g.servePrefix)
 	r.Get(prefix+"{repoKey}/v1/auth", g.serveV1Auth)
+	r.HandleFunc(prefix+"{repo-key}/v2/_catalog", g.servePrefix)
+	r.HandleFunc(prefix+"{repo-key}/v2/{imageName}/tags/list", g.servePrefix)
 }
 
 // serveRoot serves /v2/..., by subdomain or by repository path.
@@ -260,6 +266,13 @@ var methods = map[Kind][]string{
 // remote and virtual repositories answer 405 UNSUPPORTED naming their
 // class until upstream fetching (P9) and member resolution (P10) exist.
 func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
+	if !q.resolved && g.store == nil {
+		// A router built without a store, as the server's routing tests
+		// build it, answers like an unimplemented operation, as the
+		// server's own handlers do without one.
+		return Errorf(http.StatusNotImplemented, CodeUnsupported,
+			"%s is not available without a store", q.Kind)
+	}
 	if !q.resolved {
 		c, found, err := g.lookup(ctx, q.RepoKey)
 		if err != nil {
@@ -281,19 +294,24 @@ func (g *Registry) resolveInto(ctx context.Context, q *Request) error {
 	}
 }
 
-// lookup finds the Docker, OCI or Helm OCI repository key names, compared
-// without regard to case: keys are unique that way, and Docker clients
-// send references in lower case only (decision 0003). found is false for
-// a missing repository and for one of another package type.
+// lookup is Lookup in the registry's store.
 func (g *Registry) lookup(ctx context.Context, key string) (repo.Config, bool, error) {
 	if g.store == nil || key == "" {
 		return repo.Config{}, false, nil
 	}
-	c, err := g.store.Repos().Get(ctx, key)
+	return Lookup(ctx, g.store, key)
+}
+
+// Lookup finds the Docker, OCI or Helm OCI repository key names in st,
+// compared without regard to case: keys are unique that way, and Docker
+// clients send references in lower case only (decision 0003). found is
+// false for a missing repository and for one of another package type.
+func Lookup(ctx context.Context, st store.Store, key string) (repo.Config, bool, error) {
+	c, err := st.Repos().Get(ctx, key)
 	if errors.Is(err, store.ErrNotFound) {
 		// The exact key failed; a case-insensitive match needs the list.
 		var all []repo.Config
-		if all, err = g.store.Repos().List(ctx, store.RepoFilter{}); err == nil {
+		if all, err = st.Repos().List(ctx, store.RepoFilter{}); err == nil {
 			i := slices.IndexFunc(
 				all,
 				func(c repo.Config) bool { return strings.EqualFold(c.Key, key) },

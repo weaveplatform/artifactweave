@@ -310,10 +310,6 @@ func (UnimplementedStrict) DistributeArtifact(context.Context, DistributeArtifac
 	return nil, apierror.ErrNotImplemented
 }
 
-func (UnimplementedStrict) ListDockerRepositories(context.Context, ListDockerRepositoriesRequestObject) (ListDockerRepositoriesResponseObject, error) {
-	return nil, apierror.ErrNotImplemented
-}
-
 func (UnimplementedStrict) FindParentManifestLists(context.Context, FindParentManifestListsRequestObject) (FindParentManifestListsResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
@@ -322,7 +318,7 @@ func (UnimplementedStrict) PromoteDockerImage(context.Context, PromoteDockerImag
 	return nil, apierror.ErrNotImplemented
 }
 
-func (UnimplementedStrict) ListDockerTags(context.Context, ListDockerTagsRequestObject) (ListDockerTagsResponseObject, error) {
+func (UnimplementedStrict) DeleteDockerTag(context.Context, DeleteDockerTagRequestObject) (DeleteDockerTagResponseObject, error) {
 	return nil, apierror.ErrNotImplemented
 }
 

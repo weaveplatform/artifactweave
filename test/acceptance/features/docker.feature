@@ -257,3 +257,53 @@ Feature: Docker and OCI registry
     Then the response status is 200
     And the response header "OCI-Filters-Applied" contains "artifactType"
     And the JSON field "manifests" has 0 entries
+
+  Scenario: Tags list, catalogs and manifest deletes
+    When I PUT "/artifactory/api/repositories/docker-local" as admin with body:
+      """
+      {"rclass":"local","packageType":"docker"}
+      """
+    Then the response status is 200
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8" as admin with body:
+      """
+      {"architecture":"amd64","os":"linux","config":{"Labels":{"org.example.team":"platform"}}}
+      """
+    Then the response status is 201
+    When I POST "/v2/docker-local/team/app/blobs/uploads/?digest=sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f" as admin with body:
+      """
+      hello blob
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/v1" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8","size":89},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f","size":10}]}
+      """
+    Then the response status is 201
+    When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
+    And I PUT "/v2/docker-local/team/app/manifests/v2" as admin with body:
+      """
+      {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"sha256:fb5dd9fcad531a9110d9bc07268019760d607378a0dd81ed14d403719c4180a8","size":89},"layers":[{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip","digest":"sha256:e997afd18e5f6be004fc193aed2c90291e68ab2c7599a62538c935b7fca6ab0f","size":10}]}
+      """
+    Then the response status is 201
+    When I GET "/v2/docker-local/team/app/tags/list?n=1" as admin
+    Then the response status is 200
+    And the JSON field "name" equals "docker-local/team/app"
+    And the JSON field "tags" has 1 entries
+    And the JSON field "tags.0" equals "v1"
+    And the response header "Link" contains "last=v1"
+    When I GET "/v2/_catalog" as admin
+    Then the response status is 200
+    And the JSON field "repositories.0" equals "docker-local/team/app"
+    When I GET "/artifactory/api/docker/docker-local/v2/_catalog" as admin
+    Then the response status is 200
+    And the JSON field "repositories.0" equals "team/app"
+    When I DELETE "/v2/docker-local/team/app/manifests/v1" as admin
+    Then the response status is 202
+    When I GET "/v2/docker-local/team/app/manifests/v1" as admin
+    Then the response status is 404
+    And the JSON field "errors.0.code" equals "MANIFEST_UNKNOWN"
+    When I GET "/artifactory/api/docker/docker-local/v2/team/app/tags/list" as admin
+    Then the response status is 200
+    And the JSON field "tags" has 1 entries
+    And the JSON field "tags.0" equals "v2"

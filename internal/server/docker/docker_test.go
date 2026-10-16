@@ -598,9 +598,10 @@ func TestRoutingErrors(t *testing.T) {
 			message: "GET manifests is not implemented by artifactweave yet",
 		},
 		{
-			name: "catalog not implemented yet", method: "GET", target: "/v2/_catalog",
+			name: "referrers not implemented yet", method: "GET",
+			target: "/v2/docker-local/app/referrers/" + digestOf("subject"),
 			status: 405, code: CodeUnsupported,
-			message: "GET the catalog is not implemented by artifactweave yet",
+			message: "GET the referrers API is not implemented by artifactweave yet",
 		},
 		{
 			name:    "undefined method",
@@ -739,12 +740,22 @@ func TestProbe(t *testing.T) {
 	}
 }
 
-// Without a store nothing resolves: the server's own tests build routers
-// without one.
+// Without a store nothing resolves, and an operation on a repository
+// answers as unimplemented, as the server's handlers do: the server's own
+// tests build routers without one.
 func TestNoStore(t *testing.T) {
-	rec := serve(t, router(New(Options{})), http.MethodGet, "/v2/r/app/manifests/x", nil)
-	if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), CodeNameUnknown) {
-		t.Fatalf("%d %s", rec.Code, rec.Body)
+	h := router(New(Options{}))
+	for _, target := range []string{
+		"/v2/r/app/manifests/x",
+		"/v2/r/_catalog",
+		"/artifactory/api/docker/r/v2/_catalog",
+		"/artifactory/api/docker/r/v2/app/tags/list",
+	} {
+		rec := serve(t, h, http.MethodGet, target, nil)
+		if rec.Code != http.StatusNotImplemented ||
+			!strings.Contains(rec.Body.String(), CodeUnsupported) {
+			t.Fatalf("%s: %d %s", target, rec.Code, rec.Body)
+		}
 	}
 }
 
