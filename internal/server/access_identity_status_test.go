@@ -34,6 +34,9 @@ func accessIdentityStatusRows() []statusCase {
 		bPut     = "PUT " + basicSw
 		pPut     = "PUT " + policy
 		pPatch   = "PATCH " + policy
+		lockPol  = "/access/api/v1/config/security/user_lock_policy"
+		lGet     = "GET " + lockPol
+		lPut     = "PUT " + lockPol
 		newUser  = `{"username":"v2-user","email":"v2@example.com","password":"V2-pass-1"}`
 	)
 	return []statusCase{
@@ -124,5 +127,14 @@ func accessIdentityStatusRows() []statusCase {
 		{pPut, policy, "user", `{}`, 403},
 		{pPatch, policy, "admin", `{}`, 204},
 		{pPatch, policy, "user", `{}`, 403},
+		{lGet, lockPol, "admin", "", 200},
+		{lGet, lockPol, "user", "", 403},
+		{lGet, lockPol, "", "", 401},
+		{lPut, lockPol, "admin", `{}`, 200},
+		{lPut, lockPol, "admin", `{"attempts":101}`, 400},
+		{lPut, lockPol, "admin", `{"secondsToUnlock":-1}`, 400},
+		{lPut, lockPol, "admin", `{"passwordExpiryDays":-1}`, 400},
+		{lPut, lockPol, "user", `{}`, 403},
+		{lPut, lockPol, "", `{}`, 401},
 	}
 }

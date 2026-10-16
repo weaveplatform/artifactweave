@@ -113,6 +113,14 @@ func (s faultySettings) Put(ctx context.Context, key string, v any) error {
 	return s.SettingsStore.Put(ctx, key, v) //nolint:wrapcheck // test double
 }
 
+// Get fails one key's read, named as "settings.get:<key>".
+func (s faultySettings) Get(ctx context.Context, key string, v any) error {
+	if s.f.failing("settings.get:" + key) {
+		return errBoom
+	}
+	return s.SettingsStore.Get(ctx, key, v) //nolint:wrapcheck // test double
+}
+
 func TestStoreFailures(t *testing.T) {
 	ctx := context.Background()
 	_, db := newService(t)
@@ -197,5 +205,48 @@ func TestStoreFailures(t *testing.T) {
 	f.fail = "users.get"
 	if err := s.DeleteUser(ctx, "boss"); !errors.Is(err, errBoom) {
 		t.Errorf("delete with a failing read: %v", err)
+	}
+}
+
+// TestAccessLockPolicyStoreFailures: each of the three settings the Access
+// lock policy spans fails its read and its write with the store's error.
+func TestAccessLockPolicyStoreFailures(t *testing.T) {
+	ctx := context.Background()
+	_, db := newService(t)
+	f := &faulty{Store: db}
+	s := &identity.Service{Store: f, Hash: cheap}
+	for _, key := range []string{
+		types.SettingUserLockPolicy,
+		types.SettingPasswordExpirationPolicy,
+		types.SettingAccessLockSettings,
+	} {
+		f.fail = "settings.get:" + key
+		if _, err := s.AccessLockPolicy(ctx); !errors.Is(err, errBoom) {
+			t.Errorf("read with %s failing: %v", key, err)
+		}
+	}
+	for _, key := range []string{types.SettingUserLockPolicy, types.SettingPasswordExpirationPolicy} {
+		f.fail = "settings.get:" + key
+		if _, err := s.SetAccessLockPolicy(
+			ctx,
+			identity.AccessLockPolicy{},
+		); !errors.Is(
+			err,
+			errBoom,
+		) {
+			t.Errorf("write with %s unreadable: %v", key, err)
+		}
+	}
+	for _, op := range []string{"settings.put", "users.unlock"} {
+		f.fail = op
+		if _, err := s.SetAccessLockPolicy(
+			ctx,
+			identity.AccessLockPolicy{},
+		); !errors.Is(
+			err,
+			errBoom,
+		) {
+			t.Errorf("write with %s failing: %v", op, err)
+		}
 	}
 }

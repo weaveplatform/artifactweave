@@ -622,6 +622,99 @@ func (s *Service) SetExpirationPolicy(
 	return p, nil
 }
 
+// AccessLockPolicy is the Access user lock policy: one document over the
+// lock policy, the password expiration policy and the AccessLockSettings, so
+// the Access and Artifactory APIs read and write the same state.
+type AccessLockPolicy struct {
+	// Attempts is the lock limit while locking is on, and 0 while it is off.
+	Attempts int
+	// PasswordExpiryDays is the maximum password age while expiry is on,
+	// and 0 while it is off.
+	PasswordExpiryDays int
+	types.AccessLockSettings
+}
+
+// AccessLockPolicy returns the Access view of the policies, mapped as JFrog
+// documents: enabled with loginAttempts is attempts, disabled is 0.
+func (s *Service) AccessLockPolicy(ctx context.Context) (AccessLockPolicy, error) {
+	settings := s.Store.Settings()
+	lock, err := auth.LockPolicy(ctx, settings)
+	if err != nil {
+		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
+	}
+	expiry, err := auth.ExpirationPolicy(ctx, settings)
+	if err != nil {
+		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
+	}
+	p := AccessLockPolicy{AccessLockSettings: types.DefaultAccessLockSettings()}
+	if err := settings.Get(
+		ctx,
+		types.SettingAccessLockSettings,
+		&p.AccessLockSettings,
+	); err != nil &&
+		!errors.Is(err, store.ErrNotFound) {
+		return p, fmt.Errorf("identity: access lock settings: %w", err)
+	}
+	if lock.Enabled {
+		p.Attempts = lock.LoginAttempts
+	}
+	if expiry.Enabled {
+		p.PasswordExpiryDays = expiry.MaxAgeDays
+	}
+	return p, nil
+}
+
+// SetAccessLockPolicy stores p and returns it. A 0 turns locking or expiry
+// off but keeps the stored limit or age, which the Artifactory API goes on
+// reporting beside enabled false. Turning locking off clears every lock, as
+// SetLockPolicy does.
+func (s *Service) SetAccessLockPolicy(
+	ctx context.Context,
+	p AccessLockPolicy,
+) (AccessLockPolicy, error) {
+	switch {
+	case p.Attempts < 0 || p.Attempts > 100:
+		return p, invalid("attempts must be from 0 through 100")
+	case p.SecondsToUnlock < 0:
+		return p, invalid("secondsToUnlock must not be negative")
+	case p.PasswordExpiryDays < 0:
+		return p, invalid("passwordExpiryDays must not be negative")
+	}
+	return p, s.tx(ctx, func(ctx context.Context) error {
+		settings := s.Store.Settings()
+		lock, err := auth.LockPolicy(ctx, settings)
+		if err != nil {
+			return err //nolint:wrapcheck // already wrapped
+		}
+		expiry, err := auth.ExpirationPolicy(ctx, settings)
+		if err != nil {
+			return err //nolint:wrapcheck // already wrapped
+		}
+		if lock.Enabled = p.Attempts > 0; lock.Enabled {
+			lock.LoginAttempts = p.Attempts
+		}
+		if expiry.Enabled = p.PasswordExpiryDays > 0; expiry.Enabled {
+			expiry.MaxAgeDays = p.PasswordExpiryDays
+		}
+		for _, w := range []struct {
+			key string
+			v   any
+		}{
+			{types.SettingUserLockPolicy, lock},
+			{types.SettingPasswordExpirationPolicy, expiry},
+			{types.SettingAccessLockSettings, p.AccessLockSettings},
+		} {
+			if err := settings.Put(ctx, w.key, w.v); err != nil {
+				return err //nolint:wrapcheck // a store error
+			}
+		}
+		if !lock.Enabled {
+			return s.Store.Users().Unlock(ctx) //nolint:wrapcheck // a store error
+		}
+		return nil
+	})
+}
+
 // --- Helpers -----------------------------------------------------------------
 
 func set[T any](dst *T, v *T) {

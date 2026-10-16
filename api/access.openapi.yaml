@@ -360,6 +360,72 @@ paths:
       tags:
         - config
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpasswordpolicy.md
+  /api/v1/config/security/user_lock_policy:
+    get:
+      description: Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+      operationId: getAccessUserLockPolicy
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLockPolicyConfig'
+          description: The current policy.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Get the user lock policy
+      tags:
+        - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/getaccessuserlockpolicy.md
+    put:
+      description: Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+      operationId: configureAccessUserLockPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLockPolicyConfig'
+        description: The complete new policy.
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserLockPolicyConfig'
+          description: The policy as stored.
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: attempts is outside 0 through 100, or secondsToUnlock or passwordExpiryDays is negative.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: No valid credentials.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The caller is not a platform admin.
+      summary: Replace the user lock policy
+      tags:
+        - config
+      x-oracle-source: https://docs.jfrog.com/administration/reference/configureaccessuserlockpolicy.md
   /api/v1/config/token/default_expiry:
     get:
       description: Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in. Requires a platform admin.
@@ -8661,6 +8727,40 @@ components:
           type: array
       required:
         - users
+      type: object
+    UserLockPolicyConfig:
+      description: The Access user lock policy. One document over the same settings as the Artifactory user lock policy and password expiration policy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned only, so artifactweave does not yet unlock users after secondsToUnlock, delay logins, or exempt administrators from password expiry.
+      properties:
+        adminPasswordExpirable:
+          description: Optional within this object. Whether password expiry also applies to administrators. Stored and returned only. Default false.
+          type: boolean
+        attempts:
+          description: Optional within this object. Failed logins before a user is locked, from 0 through 100. 0 turns locking off and unlocks every locked user; the Artifactory policy then reports enabled false and keeps its previous loginAttempts. Default 0.
+          maximum: 100
+          minimum: 0
+          type: integer
+        baseLoginDelayMillis:
+          description: Optional within this object. Base delay, in milliseconds, for temporary login suspension after failed logins. Stored and returned only. Default 1000.
+          format: int64
+          type: integer
+        clientLoginSuspensionEnabled:
+          description: Optional within this object. Whether Basic logins check temporary login suspension. Stored and returned only. Default true.
+          type: boolean
+        maxLoginDelayIncorrectAttempts:
+          description: Optional within this object. Failed logins allowed before temporary login suspension starts. Stored and returned only. Default 2.
+          type: integer
+        maxLoginDelayMillis:
+          description: Optional within this object. Upper bound, in milliseconds, on the temporary login suspension delay. Stored and returned only. Default 60000.
+          format: int64
+          type: integer
+        passwordExpiryDays:
+          description: Optional within this object. Days after which an internal user's password expires; 0 means passwords do not expire. The Artifactory password expiration policy reads it as enabled with passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
+          minimum: 0
+          type: integer
+        secondsToUnlock:
+          description: Optional within this object. Seconds after which a locked user may sign in again; 0 keeps the user locked until an administrator unlocks them. Stored and returned only. Default 0.
+          minimum: 0
+          type: integer
       type: object
     UserUpdateRequest:
       description: Fields of a user that may change. Every field is optional; omitted fields keep their value.

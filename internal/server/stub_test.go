@@ -160,6 +160,8 @@ var implemented = map[string]bool{
 	"PUT /access/api/v1/config/security/authentication/basic_authentication_enabled": true,
 	"PUT /access/api/v1/config/security/password_policy":                             true,
 	"PATCH /access/api/v1/config/security/password_policy":                           true,
+	"GET /access/api/v1/config/security/user_lock_policy":                            true,
+	"PUT /access/api/v1/config/security/user_lock_policy":                            true,
 
 	// The Builds API (#165), with promotion and retention (#166).
 	"GET /artifactory/api/build":                                                       true,

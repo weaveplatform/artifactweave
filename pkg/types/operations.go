@@ -201,6 +201,10 @@ const (
 	// SettingBootstrapDescriptor marks that bootstrap.descriptor was
 	// applied, so it is applied once.
 	SettingBootstrapDescriptor = "bootstrap.descriptor_applied"
+	// SettingAccessLockSettings holds AccessLockSettings, the Access user
+	// lock policy's fields that the lock and expiration policies have no
+	// place for.
+	SettingAccessLockSettings = "security.access_lock_settings"
 )
 
 // UserLockPolicy locks an account after repeated failed logins.
@@ -235,6 +239,30 @@ type PasswordPolicy struct {
 // The documented rule that a password cannot match the username has no
 // field and always applies.
 func DefaultPasswordPolicy() PasswordPolicy { return PasswordPolicy{Length: 4, NotMatchOld: true} }
+
+// AccessLockSettings are the Access user lock policy's fields beyond the
+// lock limit (UserLockPolicy) and the password expiry
+// (PasswordExpirationPolicy). They are stored and returned but not yet
+// enforced, as the Access OpenAPI source says field by field.
+type AccessLockSettings struct {
+	SecondsToUnlock                int   `json:"seconds_to_unlock"`
+	AdminPasswordExpirable         bool  `json:"admin_password_expirable"`
+	MaxLoginDelayIncorrectAttempts int   `json:"max_login_delay_incorrect_attempts"`
+	MaxLoginDelayMillis            int64 `json:"max_login_delay_millis"`
+	BaseLoginDelayMillis           int64 `json:"base_login_delay_millis"`
+	ClientLoginSuspensionEnabled   bool  `json:"client_login_suspension_enabled"`
+}
+
+// DefaultAccessLockSettings is in force while none is stored: Access's
+// server defaults (docs.jfrog.com, getAccessUserLockPolicy).
+func DefaultAccessLockSettings() AccessLockSettings {
+	return AccessLockSettings{
+		MaxLoginDelayIncorrectAttempts: 2,
+		MaxLoginDelayMillis:            60000,
+		BaseLoginDelayMillis:           1000,
+		ClientLoginSuspensionEnabled:   true,
+	}
+}
 
 // TrashcanSettings control the trash can.
 type TrashcanSettings struct {

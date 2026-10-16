@@ -2121,6 +2121,33 @@ type UserListResponse struct {
 	} `json:"users"`
 }
 
+// UserLockPolicyConfig The Access user lock policy. One document over the same settings as the Artifactory user lock policy and password expiration policy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned only, so artifactweave does not yet unlock users after secondsToUnlock, delay logins, or exempt administrators from password expiry.
+type UserLockPolicyConfig struct {
+	// AdminPasswordExpirable Optional within this object. Whether password expiry also applies to administrators. Stored and returned only. Default false.
+	AdminPasswordExpirable *bool `json:"adminPasswordExpirable,omitempty"`
+
+	// Attempts Optional within this object. Failed logins before a user is locked, from 0 through 100. 0 turns locking off and unlocks every locked user; the Artifactory policy then reports enabled false and keeps its previous loginAttempts. Default 0.
+	Attempts *int `json:"attempts,omitempty"`
+
+	// BaseLoginDelayMillis Optional within this object. Base delay, in milliseconds, for temporary login suspension after failed logins. Stored and returned only. Default 1000.
+	BaseLoginDelayMillis *int64 `json:"baseLoginDelayMillis,omitempty"`
+
+	// ClientLoginSuspensionEnabled Optional within this object. Whether Basic logins check temporary login suspension. Stored and returned only. Default true.
+	ClientLoginSuspensionEnabled *bool `json:"clientLoginSuspensionEnabled,omitempty"`
+
+	// MaxLoginDelayIncorrectAttempts Optional within this object. Failed logins allowed before temporary login suspension starts. Stored and returned only. Default 2.
+	MaxLoginDelayIncorrectAttempts *int `json:"maxLoginDelayIncorrectAttempts,omitempty"`
+
+	// MaxLoginDelayMillis Optional within this object. Upper bound, in milliseconds, on the temporary login suspension delay. Stored and returned only. Default 60000.
+	MaxLoginDelayMillis *int64 `json:"maxLoginDelayMillis,omitempty"`
+
+	// PasswordExpiryDays Optional within this object. Days after which an internal user's password expires; 0 means passwords do not expire. The Artifactory password expiration policy reads it as enabled with passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
+	PasswordExpiryDays *int `json:"passwordExpiryDays,omitempty"`
+
+	// SecondsToUnlock Optional within this object. Seconds after which a locked user may sign in again; 0 keeps the user locked until an administrator unlocks them. Stored and returned only. Default 0.
+	SecondsToUnlock *int `json:"secondsToUnlock,omitempty"`
+}
+
 // UserUpdateRequest Fields of a user that may change. Every field is optional; omitted fields keep their value.
 type UserUpdateRequest struct {
 	// Admin Optional within this object. Platform admin flag.
@@ -2491,6 +2518,9 @@ type UpdatePasswordPolicyJSONRequestBody = PasswordPolicy
 
 // CreatePasswordPolicyJSONRequestBody defines body for CreatePasswordPolicy for application/json ContentType.
 type CreatePasswordPolicyJSONRequestBody = PasswordPolicy
+
+// ConfigureAccessUserLockPolicyJSONRequestBody defines body for ConfigureAccessUserLockPolicy for application/json ContentType.
+type ConfigureAccessUserLockPolicyJSONRequestBody = UserLockPolicyConfig
 
 // SetTokenDefaultExpiryJSONRequestBody defines body for SetTokenDefaultExpiry for application/json ContentType.
 type SetTokenDefaultExpiryJSONRequestBody SetTokenDefaultExpiryJSONBody
@@ -3039,6 +3069,31 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/config/security/password_policy (the `CreatePasswordPolicy` operationId).
 	CreatePasswordPolicy(ctx context.Context, body CreatePasswordPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAccessUserLockPolicy Get the user lock policy
+	//
+	// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+	//
+	// Corresponds with GET /api/v1/config/security/user_lock_policy (the `GetAccessUserLockPolicy` operationId).
+	GetAccessUserLockPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ConfigureAccessUserLockPolicyWithBody Replace the user lock policy
+	//
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+	ConfigureAccessUserLockPolicyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ConfigureAccessUserLockPolicy Replace the user lock policy
+	//
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+	ConfigureAccessUserLockPolicy(ctx context.Context, body ConfigureAccessUserLockPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTokenDefaultExpiry Get the default token lifetime
 	//
@@ -4860,6 +4915,61 @@ func (c *Client) CreatePasswordPolicyWithBody(ctx context.Context, contentType s
 // Corresponds with PUT /api/v1/config/security/password_policy (the `CreatePasswordPolicy` operationId).
 func (c *Client) CreatePasswordPolicy(ctx context.Context, body CreatePasswordPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreatePasswordPolicyRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAccessUserLockPolicy Get the user lock policy
+//
+// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+//
+// Corresponds with GET /api/v1/config/security/user_lock_policy (the `GetAccessUserLockPolicy` operationId).
+func (c *Client) GetAccessUserLockPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAccessUserLockPolicyRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ConfigureAccessUserLockPolicyWithBody Replace the user lock policy
+//
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+func (c *Client) ConfigureAccessUserLockPolicyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewConfigureAccessUserLockPolicyRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ConfigureAccessUserLockPolicy Replace the user lock policy
+//
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+func (c *Client) ConfigureAccessUserLockPolicy(ctx context.Context, body ConfigureAccessUserLockPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewConfigureAccessUserLockPolicyRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -8739,6 +8849,73 @@ func NewCreatePasswordPolicyRequestWithBody(server string, contentType string, b
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/config/security/password_policy")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAccessUserLockPolicyRequest constructs an http.Request for the GetAccessUserLockPolicy method
+func NewGetAccessUserLockPolicyRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/config/security/user_lock_policy")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewConfigureAccessUserLockPolicyRequest calls the generic ConfigureAccessUserLockPolicy builder with application/json body
+func NewConfigureAccessUserLockPolicyRequest(server string, body ConfigureAccessUserLockPolicyJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewConfigureAccessUserLockPolicyRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewConfigureAccessUserLockPolicyRequestWithBody constructs an http.Request for the ConfigureAccessUserLockPolicy method, with any body, and a specified content type
+func NewConfigureAccessUserLockPolicyRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/config/security/user_lock_policy")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -14897,6 +15074,33 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/config/security/password_policy (the `CreatePasswordPolicy` operationId).
 	CreatePasswordPolicyWithResponse(ctx context.Context, body CreatePasswordPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePasswordPolicyResponse, error)
 
+	// GetAccessUserLockPolicyWithResponse Get the user lock policy
+	//
+	// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/config/security/user_lock_policy (the `GetAccessUserLockPolicy` operationId).
+	GetAccessUserLockPolicyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAccessUserLockPolicyResponse, error)
+
+	// ConfigureAccessUserLockPolicyWithBodyWithResponse Replace the user lock policy
+	//
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+	ConfigureAccessUserLockPolicyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfigureAccessUserLockPolicyResponse, error)
+
+	// ConfigureAccessUserLockPolicyWithResponse Replace the user lock policy
+	//
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+	ConfigureAccessUserLockPolicyWithResponse(ctx context.Context, body ConfigureAccessUserLockPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfigureAccessUserLockPolicyResponse, error)
+
 	// GetTokenDefaultExpiryWithResponse Get the default token lifetime
 	//
 	// Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in. Requires a platform admin.
@@ -17178,6 +17382,123 @@ func (r CreatePasswordPolicyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreatePasswordPolicyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAccessUserLockPolicyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UserLockPolicyConfig
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAccessUserLockPolicyResponse) GetJSON200() *UserLockPolicyConfig {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAccessUserLockPolicyResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetAccessUserLockPolicyResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAccessUserLockPolicyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAccessUserLockPolicyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAccessUserLockPolicyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAccessUserLockPolicyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ConfigureAccessUserLockPolicyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *UserLockPolicyConfig
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *ErrorResponse
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *ErrorResponse
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ConfigureAccessUserLockPolicyResponse) GetJSON200() *UserLockPolicyConfig {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r ConfigureAccessUserLockPolicyResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r ConfigureAccessUserLockPolicyResponse) GetJSON401() *ErrorResponse {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r ConfigureAccessUserLockPolicyResponse) GetJSON403() *ErrorResponse {
+	return r.JSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r ConfigureAccessUserLockPolicyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ConfigureAccessUserLockPolicyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ConfigureAccessUserLockPolicyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ConfigureAccessUserLockPolicyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -26091,6 +26412,51 @@ func (c *ClientWithResponses) CreatePasswordPolicyWithResponse(ctx context.Conte
 	return ParseCreatePasswordPolicyResponse(rsp)
 }
 
+// GetAccessUserLockPolicyWithResponse Get the user lock policy
+//
+// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/config/security/user_lock_policy (the `GetAccessUserLockPolicy` operationId).
+func (c *ClientWithResponses) GetAccessUserLockPolicyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAccessUserLockPolicyResponse, error) {
+	rsp, err := c.GetAccessUserLockPolicy(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAccessUserLockPolicyResponse(rsp)
+}
+
+// ConfigureAccessUserLockPolicyWithBodyWithResponse Replace the user lock policy
+//
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+func (c *ClientWithResponses) ConfigureAccessUserLockPolicyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfigureAccessUserLockPolicyResponse, error) {
+	rsp, err := c.ConfigureAccessUserLockPolicyWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfigureAccessUserLockPolicyResponse(rsp)
+}
+
+// ConfigureAccessUserLockPolicyWithResponse Replace the user lock policy
+//
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/config/security/user_lock_policy (the `ConfigureAccessUserLockPolicy` operationId).
+func (c *ClientWithResponses) ConfigureAccessUserLockPolicyWithResponse(ctx context.Context, body ConfigureAccessUserLockPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfigureAccessUserLockPolicyResponse, error) {
+	rsp, err := c.ConfigureAccessUserLockPolicy(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseConfigureAccessUserLockPolicyResponse(rsp)
+}
+
 // GetTokenDefaultExpiryWithResponse Get the default token lifetime
 //
 // Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in. Requires a platform admin.
@@ -29403,6 +29769,93 @@ func ParseCreatePasswordPolicyResponse(rsp *http.Response) (*CreatePasswordPolic
 	switch {
 	case rsp.StatusCode == 204:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAccessUserLockPolicyResponse parses an HTTP response from a GetAccessUserLockPolicyWithResponse call
+func ParseGetAccessUserLockPolicyResponse(rsp *http.Response) (*GetAccessUserLockPolicyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAccessUserLockPolicyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UserLockPolicyConfig
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseConfigureAccessUserLockPolicyResponse parses an HTTP response from a ConfigureAccessUserLockPolicyWithResponse call
+func ParseConfigureAccessUserLockPolicyResponse(rsp *http.Response) (*ConfigureAccessUserLockPolicyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ConfigureAccessUserLockPolicyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest UserLockPolicyConfig
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest ErrorResponse

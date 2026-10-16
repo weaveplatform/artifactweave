@@ -356,6 +356,62 @@ func TestPolicies(t *testing.T) {
 	wantInvalid(t, "a zero age", err)
 }
 
+// TestAccessLockPolicy: the Access policy reads and writes the lock and
+// expiration policies, keeps their limits while it turns them off, and
+// stores the rest beside them.
+func TestAccessLockPolicy(t *testing.T) {
+	ctx := context.Background()
+	s, db := newService(t)
+	got, err := s.AccessLockPolicy(ctx)
+	if err != nil ||
+		got != (identity.AccessLockPolicy{AccessLockSettings: types.DefaultAccessLockSettings()}) {
+		t.Fatalf("defaults: %+v %v", got, err)
+	}
+	want := identity.AccessLockPolicy{
+		Attempts:           3,
+		PasswordExpiryDays: 30,
+		AccessLockSettings: types.AccessLockSettings{
+			SecondsToUnlock:        60,
+			AdminPasswordExpirable: true,
+		},
+	}
+	if stored, err := s.SetAccessLockPolicy(ctx, want); err != nil || stored != want {
+		t.Fatalf("set: %+v %v", stored, err)
+	}
+	if got, _ := s.AccessLockPolicy(ctx); got != want {
+		t.Fatalf("read back: %+v", got)
+	}
+	lock, _ := s.LockPolicy(ctx)
+	expiry, _ := s.ExpirationPolicy(ctx)
+	if !lock.Enabled || lock.LoginAttempts != 3 || !expiry.Enabled || expiry.MaxAgeDays != 30 {
+		t.Fatalf("the Artifactory policies: %+v %+v", lock, expiry)
+	}
+	// 0 turns both off, keeps their limits, and unlocks everyone.
+	if _, err := db.Users().RecordFailedLogin(ctx, auth.AdminUser, 1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.SetAccessLockPolicy(ctx, identity.AccessLockPolicy{}); err != nil {
+		t.Fatal(err)
+	}
+	lock, _ = s.LockPolicy(ctx)
+	expiry, _ = s.ExpirationPolicy(ctx)
+	if lock.Enabled || lock.LoginAttempts != 3 || expiry.Enabled || expiry.MaxAgeDays != 30 {
+		t.Fatalf("turned off: %+v %+v", lock, expiry)
+	}
+	if locked, _ := s.Locked(ctx); len(locked) != 0 {
+		t.Fatalf("turning locking off kept locks: %v", locked)
+	}
+	for name, p := range map[string]identity.AccessLockPolicy{
+		"negative attempts": {Attempts: -1},
+		"too many attempts": {Attempts: 101},
+		"negative unlock":   {AccessLockSettings: types.AccessLockSettings{SecondsToUnlock: -1}},
+		"negative expiry":   {PasswordExpiryDays: -1},
+	} {
+		_, err := s.SetAccessLockPolicy(ctx, p)
+		wantInvalid(t, name, err)
+	}
+}
+
 // TestEncryptedPasswordFollowsThePassword: setting or expiring a password
 // revokes that user's encrypted password and nothing else.
 func TestEncryptedPasswordFollowsThePassword(t *testing.T) {
