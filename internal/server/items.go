@@ -101,7 +101,10 @@ func parseEscapedItemPath(escaped string) (itemRequest, error) {
 }
 
 // addMatrix parses "k=v1,v2;k2+=v3". Commas separate values unless escaped
-// with a backslash, as in the properties API.
+// with a backslash, as in the properties API. A value is form-decoded, so "+"
+// is a space: the JFrog CLI escapes values with url.QueryEscape, and
+// Artifactory decodes them with URLDecoder (research 17). Keys keep "+",
+// whose trailing use marks a mandatory property.
 func (req *itemRequest) addMatrix(params string) error {
 	for _, p := range strings.Split(params, ";") {
 		if p == "" {
@@ -119,7 +122,7 @@ func (req *itemRequest) addMatrix(params string) error {
 		if err := types.ValidatePropertyKey(k); err != nil {
 			return badRequest("invalid property key %q", k)
 		}
-		v, err = url.PathUnescape(v)
+		v, err = url.QueryUnescape(v)
 		if err != nil {
 			return badRequest("malformed matrix parameter %q", p)
 		}

@@ -139,6 +139,24 @@ the request carries: artifactweave puts the forwarded headers ahead of the confi
 Sources: `base/common/src/main/java/org/artifactory/util/HttpUtils.java` in
 knottnhupfer/artifactory-oss at `b99e5649bcad` (Artifactory OSS 6.20).
 
+### Matrix parameter encoding
+
+The JFrog CLI builds the matrix parameters of an upload (`jf rt u --props`, `--build-name`,
+`--build-number`, `jf go-publish`) with jfrog-client-go's `Properties.ToEncodedString`, which
+escapes each key and value with Go's `url.QueryEscape`. A space therefore travels as `+`
+and a literal `+` as `%2B`; a comma inside a value is backslash-escaped before encoding, and
+the comma between values is sent as `%2C` (confirmed).
+
+Artifactory decodes each matrix *value* with `java.net.URLDecoder.decode(value, "UTF-8")`
+in `ArtifactoryRequestBase.processMatrixParams`, which turns `+` into a space and `%2B`
+into `+`; the key is not decoded (confirmed, OSS 6.20). The request path itself keeps a
+literal `+` (`path.replace("+", "%2B")` before decoding). An unencoded `+` in a matrix value
+is therefore a space on Artifactory too. artifactweave decodes values the same way (#260);
+a key keeps a trailing `+` as the mandatory-property marker (`k+=v`).
+
+Sources: <https://github.com/jfrog/jfrog-client-go/blob/master/artifactory/services/utils/properties.go>,
+<https://github.com/knottnhupfer/artifactory-oss/blob/master/base/api/src/main/java/org/artifactory/api/request/ArtifactoryRequestBase.java>.
+
 ### Still needs a live capture
 
 Only the Terraform backend sub-paths (relevant only if `terraformbackend` returns) and,
