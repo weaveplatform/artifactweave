@@ -5,12 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/aql"
-	"github.com/weaveplatform/artifactweave/pkg/layout"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -161,8 +161,25 @@ func TestSearchGavcSpecific(t *testing.T) {
 	}
 }
 
+// wantNotFound checks a 404 carries Artifactory's message.
+func wantNotFound(t *testing.T, rec *httptest.ResponseRecorder, message string) {
+	t.Helper()
+	wantStatus(t, rec, http.StatusNotFound)
+	var body struct {
+		Errors []struct{ Message string } `json:"errors"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil ||
+		len(body.Errors) != 1 || body.Errors[0].Message != message {
+		t.Fatalf("404 body %s, want %q", rec.Body, message)
+	}
+}
+
 func TestSearchVersions(t *testing.T) {
 	w := mavenWorld(t, false)
+	// A release candidate and a non-unique snapshot of one base version,
+	// which Mercury order puts the other way round from Maven's.
+	w.put("/artifactory/libs-local/org/acme/mix/1.0-rc1/mix-1.0-rc1.jar", "rc")
+	w.put("/artifactory/libs-local/org/acme/mix/1.0-SNAPSHOT/mix-1.0-SNAPSHOT.jar", "snapshot")
 	const q = "/artifactory/api/search/versions?"
 	versions := func(query, as string) string {
 		t.Helper()
@@ -176,15 +193,24 @@ func TestSearchVersions(t *testing.T) {
 		}
 		return strings.Join(out, " ")
 	}
-	// Distinct module versions, newest first in Maven order.
+	// Distinct module versions, newest first in Mercury order.
 	if got := versions(
 		"g=org.acme&a=lib&repos=libs-local",
 		"admin",
 	); got != "2.0-SNAPSHOT* 1.10 1.1 1.0" {
 		t.Fatalf("versions %q", got)
 	}
+	if got := versions("a=mix", "admin"); got != "1.0-rc1 1.0-SNAPSHOT*" {
+		t.Fatalf("mercury %q", got)
+	}
+	// A pattern filters them; a module version lists its integration
+	// versions by file version.
 	if got := versions("a=lib&v=1.*&repos=libs-local&remote=1", "admin"); got != "1.10 1.1 1.0" {
 		t.Fatalf("filtered %q", got)
+	}
+	if got := versions("a=lib&v=2.0-SNAPSHOT", "admin"); got !=
+		"2.0-20260101.120000-10* 2.0-20260101.120000-2* 2.0-20260101.120000-1*" {
+		t.Fatalf("integration %q", got)
 	}
 	// A virtual key searches its members.
 	if got := versions("a=lib&repos=virt", "admin"); got != "3.0 2.0-SNAPSHOT* 1.10 1.1 1.0 0.9" {
@@ -193,9 +219,14 @@ func TestSearchVersions(t *testing.T) {
 	if got := versions("a=lib", "deployer"); got != "2.0-SNAPSHOT* 1.10 1.1 1.0" {
 		t.Fatalf("deployer %q", got)
 	}
-	if got := versions("a=none", "admin"); got != "" {
-		t.Fatalf("none %q", got)
+	// A pattern matching none of the versions there are lists nothing; no
+	// versions at all is a 404, a release asked for as a module version
+	// included, since it has no integration versions.
+	if got := versions("a=lib&v=9.*", "admin"); got != "" {
+		t.Fatalf("no match %q", got)
 	}
+	wantNotFound(t, w.do("GET", q+"a=none", "admin", ""), noVersions)
+	wantNotFound(t, w.do("GET", q+"a=lib&v=1.0", "admin", ""), noVersions)
 	vendor := w.do("GET", q+"a=lib", "admin", "", "Accept", mediaVersionsSearch)
 	if ct := vendor.Header().Get("Content-Type"); ct != mediaVersionsSearch {
 		t.Fatalf("vendor content type %q", ct)
@@ -207,6 +238,11 @@ func TestSearchVersions(t *testing.T) {
 
 func TestSearchLatestVersion(t *testing.T) {
 	w := mavenWorld(t, true)
+	// mix has a release candidate and a non-unique snapshot of 1.0; snap has
+	// only a unique snapshot.
+	w.put("/artifactory/libs-local/org/acme/mix/1.0-rc1/mix-1.0-rc1.jar", "rc")
+	w.put("/artifactory/libs-local/org/acme/mix/1.0-SNAPSHOT/mix-1.0-SNAPSHOT.jar", "snapshot")
+	w.put("/artifactory/libs-local/org/acme/snap/1.0-SNAPSHOT/snap-1.0-20260101.120000-1.jar", "s")
 	const q = "/artifactory/api/search/latestVersion?"
 	latest := func(query, as string, want string) {
 		t.Helper()
@@ -216,48 +252,33 @@ func TestSearchLatestVersion(t *testing.T) {
 			t.Fatalf("%s: %s %q, want %q", query, ct, rec.Body, want)
 		}
 	}
-	// The highest release in Maven order; snapshots are not releases.
+	// The newest release in Mercury order; snapshots are not releases.
 	latest("g=org.acme&a=lib&repos=libs-local", "admin", "1.10")
-	latest("a=lib&v=1.0&repos=libs-local", "admin", "1.0")
+	latest("a=mix", "admin", "1.0-rc1")
+	// A pattern takes the newest version of either kind it matches, by file
+	// version, so *-SNAPSHOT matches a non-unique snapshot but no unique one.
 	latest("a=lib&v=1.?", "admin", "1.5")
 	latest("a=lib&v=1.?&repos=libs-local", "admin", "1.1")
-	// An integration version asks for the highest unique snapshot of it.
+	latest("a=lib&v=2.*&repos=libs-local", "admin", "2.0-20260101.120000-10")
+	latest("a=mix&v=*-SNAPSHOT", "admin", "1.0-SNAPSHOT")
+	// A module version asks for its newest integration version.
 	latest("a=lib&v=2.0-SNAPSHOT", "admin", "2.0-20260101.120000-10")
-	latest("a=lib&v=*-SNAPSHOT&remote=0", "admin", "2.0-20260101.120000-10")
+	latest("a=mix&v=1.0-SNAPSHOT&remote=0", "admin", "1.0-SNAPSHOT")
 	latest("a=lib&repos=virt", "admin", "3.0")
 	latest("g=org.acme&a=lib", "deployer", "1.10")
 	// Anonymous reads only up's cache.
 	latest("a=lib", "", "0.9")
 
-	wantStatus(t, w.do("GET", q+"a=other&v=2.0-SNAPSHOT", "admin", ""), http.StatusNotFound)
-	wantStatus(t, w.do("GET", q+"a=none", "admin", ""), http.StatusNotFound)
-	wantStatus(t, w.do("GET", q+"a=lib&repos=flat-local", "admin", ""), http.StatusNotFound)
+	// Each way of finding nothing has Artifactory's message.
+	wantNotFound(t, w.do("GET", q+"a=none", "admin", ""), noVersions)
+	wantNotFound(t, w.do("GET", q+"a=lib&repos=flat-local", "admin", ""), noVersions)
+	wantNotFound(t, w.do("GET", q+"a=other&v=2.0-SNAPSHOT", "admin", ""), noVersions)
+	wantNotFound(t, w.do("GET", q+"a=lib&v=1.0", "admin", ""), noVersions)
+	wantNotFound(t, w.do("GET", q+"a=snap", "admin", ""), noLatestRelease)
+	wantNotFound(t, w.do("GET", q+"a=lib&v=*-SNAPSHOT", "admin", ""), noLatestIntegration)
+	wantNotFound(t, w.do("GET", q+"a=lib&v=9.*", "admin", ""), noLatestIntegration)
 	wantStatus(t, w.do("GET", q, "admin", ""), http.StatusBadRequest)
 	wantStatus(t, w.do("GET", q+"a=lib&remote=9", "admin", ""), http.StatusBadRequest)
-}
-
-func TestIntegrationVersion(t *testing.T) {
-	for _, tc := range []struct {
-		layout, v string
-		want      bool
-	}{
-		{"maven-2-default", "1.0-SNAPSHOT", true},
-		{"maven-2-default", "1.*-SNAPSHOT", true},
-		{"maven-2-default", "1.0", false},
-		{"maven-2-default", "1.0-beta", false},
-		{"ivy-default", "1.0-20260101120000", true},
-		// A layout without a folder integration revision uses the file's.
-		{"nuget-default", "1.0-rc1", true},
-		{"simple-default", "1.0-SNAPSHOT", false},
-	} {
-		l, err := layout.Lookup(tc.layout)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got := integrationVersion(l, tc.v); got != tc.want {
-			t.Errorf("%s %s: %v", tc.layout, tc.v, got)
-		}
-	}
 }
 
 func TestUnder(t *testing.T) {

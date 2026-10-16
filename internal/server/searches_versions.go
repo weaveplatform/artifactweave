@@ -29,10 +29,11 @@ func (s artifactoryService) registerSearchRoutes(r chi.Router) {
 }
 
 // latestVersionByProperties answers GET /api/versions/{repo}/{path}: the
-// highest value of the version property, in Maven order, among the files
-// under path in repo that carry every other query parameter as a property,
-// and with listFiles=1 the files that carry it, by download URL. It needs a
-// named user, and only files the caller may read count.
+// highest value of the version property, in the Mercury order the versions
+// searches use, among the files under path in repo that carry every other
+// query parameter as a property, and with listFiles=1 the files that carry
+// it, by download URL. It needs a named user, and only files the caller may
+// read count.
 func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	r, err := s.newSearch(ctx, true)
@@ -86,7 +87,7 @@ func (s artifactoryService) latestVersionByProperties(w http.ResponseWriter, req
 	best := ""
 	for _, h := range hits {
 		for _, v := range h.Properties[versionProperty] {
-			if best == "" || types.CompareMaven(v, best) > 0 {
+			if best == "" || types.CompareMercury(v, best) > 0 {
 				best = v
 			}
 		}

@@ -104,14 +104,25 @@ Feature: GET searches
     And the JSON field "results" has 3 entries
     And the JSON field "results.0.version" equals "2.0-SNAPSHOT"
     And the JSON field "results.0.integration" equals "true"
+    When I GET "/artifactory/api/search/versions?g=org.acme&a=lib&v=2.0-SNAPSHOT" as admin
+    Then the response status is 200
+    And the JSON field "results" has 1 entries
+    And the JSON field "results.0.version" equals "2.0-20260101.120000-1"
+    When I GET "/artifactory/api/search/versions?g=org.acme&a=none" as admin
+    Then the response status is 404
+    And the response body contains "Unable to find artifact versions"
     When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=lib" as admin
     Then the response status is 200
     And the response header "Content-Type" contains "text/plain"
     And the response body is "1.1"
     When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=lib&v=2.0-SNAPSHOT" as admin
     Then the response body is "2.0-20260101.120000-1"
+    When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=lib&v=*-SNAPSHOT" as admin
+    Then the response status is 404
+    And the response body contains "Latest integration version not found"
     When I GET "/artifactory/api/search/latestVersion?g=org.acme&a=none" as admin
     Then the response status is 404
+    And the response body contains "Unable to find artifact versions"
     When I GET "/artifactory/api/versions/maven-local/org/acme?listFiles=1" as admin
     Then the response status is 200
     And the JSON field "version" equals "1.1"
@@ -149,6 +160,64 @@ Feature: GET searches
       {"buildName": "app", "buildNumber": "8"}
       """
     Then the response status is 404
+    And the response body contains "Could not find any build artifacts for build 'app' number '8'"
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "app", "buildNumber": "7", "mappings": [{"input": "other/.+"}]}
+      """
+    Then the response status is 404
+    And the response body contains "Could not find any build artifacts for build 'app' number '7'"
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "app", "buildNumber": "LATEST", "buildStatus": "Released"}
+      """
+    Then the response status is 400
+    And the response body contains "Cannot search with both build number and build status parameters"
+    When I POST "/artifactory/api/search/buildArtifacts" with body:
+      """
+      {"buildName": "app", "buildNumber": "7"}
+      """
+    Then the response status is 401
+
+  Scenario: The build artifacts search finds a run by the status of its latest promotion
+    Given I PUT "/artifactory/generic-local/rel/r.bin;build.name=rel-app;build.number=1" as admin with body:
+      """
+      released build
+      """
+    And I PUT "/artifactory/api/build" as admin with body:
+      """
+      {"name": "rel-app", "number": "1", "started": "2026-10-15T09:30:00.000+0000",
+       "modules": [{"id": "m",
+         "artifacts": [{"name": "r.bin", "sha1": "1b3f4d79eba3783e2ac720022ee2586cafd62df9"}]}]}
+      """
+    And I PUT "/artifactory/api/build" as admin with body:
+      """
+      {"name": "rel-app", "number": "2", "started": "2026-10-16T09:30:00.000+0000"}
+      """
+    When I POST "/artifactory/api/build/promote/rel-app/1" as admin with body:
+      """
+      {"status": "Released", "comment": "ship it"}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "rel-app", "buildStatus": "Released"}
+      """
+    Then the response status is 200
+    And the JSON field "results" has 1 entries
+    And the response body contains "/artifactory/generic-local/rel/r.bin"
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "rel-app", "buildStatus": "Staged"}
+      """
+    Then the response status is 404
+    And the response body contains "Could not find any build artifacts for build 'rel-app' status 'Staged'"
+    When I POST "/artifactory/api/search/buildArtifacts" as admin with body:
+      """
+      {"buildName": "rel-app", "buildNumber": "1", "buildStatus": "Released"}
+      """
+    Then the response status is 400
+    And the response body contains "Cannot search with both build number and build status parameters"
 
   @jf
   Scenario: jf skills search --prop finds a skill through the property search

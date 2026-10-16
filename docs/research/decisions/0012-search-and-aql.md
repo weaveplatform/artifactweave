@@ -158,10 +158,11 @@ and stays the first thing the parser must pass:
 **GET searches.** The GET search endpoints build AQL internally, run it through the item
 store's search, and render their documented response shapes (research 22 §2), including
 `X-Result-Detail`.
-- **Callers.** Quick, property, checksum, bad checksum, GAVC, versions, latest version,
-  dependency and build artifacts search allow anonymous callers, as JFrog's page for each
-  says. Creation, dates, usage, pattern and latest version by properties search need a
-  named user and answer an anonymous caller 401. Results are what the caller may read,
+- **Callers.** Quick, property, checksum, bad checksum, GAVC, versions, latest version and
+  dependency search allow anonymous callers, as JFrog's page for each says. Creation, dates,
+  usage, pattern, latest version by properties and build artifacts search need a named user
+  and answer an anonymous caller 401; build artifacts search does so although its page says
+  "can be anonymous", because Artifactory's handler refuses an unauthenticated caller. Results are what the caller may read,
   filtered as AQL's are, so a caller who may read nothing gets no results rather than a 403.
 - **`repos`.** A remote's key and its `-cache` key both search the cache, and results
   report the cache key. Quick, creation, dates, usage and pattern search ignore a virtual
@@ -203,23 +204,35 @@ custom layouts follow one rule.
     members. Each entry has `downloadUri` under the first key in `repos` that reaches the file,
     else under the file's own key, with `ext`, `version` and a `classifier` only when there is
     one. `X-Result-Detail` is ignored.
-- **Versions** needs `g` or `a`. It answers each module version once, with whether it is an
-  integration version, newest first in Maven order. `v` filters them by pattern, so an
-  integration pattern keeps only integration versions. `repos` takes virtual keys.
-- **Latest version** needs `g` or `a` and answers `text/plain`.
-  - Without `v` it is the highest release, in Maven order.
-  - A `v` that names an integration version under a file's layout asks for the highest file
-    version among that layout's integration files whose version matches `v`. A `v` names one
-    when, after one of its hyphens, comes text the layout's folder integration revision
-    expression accepts in full, or its file one in a layout without a folder one:
-    `1.0-SNAPSHOT` under Maven.
-  - Any other `v` filters the releases. Nothing found is a 404, `Unable to find artifact
-    versions`.
+- **Versions and latest version** both answer from one list, as Artifactory's handlers
+  (`ArtifactVersionsSearchResource`, `ArtifactLatestVersionSearchResource`) both read its
+  search add-on's `getArtifactVersions`. Both need `g` or `a`, and `repos` takes virtual keys.
+  - **The list** is the module's versions, each once, newest first in Mercury order
+    (`types.CompareMercury`), the order of Artifactory's `MavenVersionComparator`. It ranks
+    `1.0-SNAPSHOT` < `1.0-alpha-1` < `1.0-rc1` < `1.0` < `1.0-sp1`; Maven's own
+    `ComparableVersion`, which `types.CompareMaven` follows, puts SNAPSHOT above `rc`.
+  - **`v` without `*` or `?`** is a module version, and the list holds only its integration
+    versions, by file version: `v=1.0-SNAPSHOT` lists `1.0-20260101.120000-1` and its
+    siblings, and a release such as `v=1.0` lists nothing. The add-on's documentation says `v`
+    "relates to integration versions only", and JFrog's pages and examples agree.
+  - **Otherwise** every version counts. Versions lists an integration version by module
+    version, so a folder of unique snapshots is one `1.0-SNAPSHOT`; latest version lists it by
+    file version. A `v` with wildcards is applied to the list afterwards, as the handlers'
+    `PathMatcher` filter is.
+  - An empty list is a 404, `Unable to find artifact versions`, from both.
+- **Versions** answers the list, filtered by a wildcard `v`, with whether each entry is an
+  integration version. A wildcard matching nothing answers an empty list.
+- **Latest version** answers `text/plain`, the first entry of the list that fits:
+  - without `v`, the first release, else 404 `Latest release version not found`;
+  - with a wildcard `v`, the first entry of either kind it matches, else 404 `Latest
+    integration version not found`, the handler's message even when it wanted a release;
+  - with any other `v`, the first integration entry, else the same 404.
 - **`remote=1`** is accepted and answered from local repositories and caches, as `remote=0`
   is, until remote repositories proxy their upstream (P9). Any other value is a 400.
 
 **Latest version by properties.** `GET /api/versions/{repo}/{path}` answers the highest value
-of the lowercase `version` property, in Maven order, among the files the caller may read in
+of the lowercase `version` property, in the versions searches' Mercury order, among the files
+the caller may read in
 `repo` under the folder `path`.
 - `_any` stands for every local repository and cache, or every path. A remote key stands for
   its cache and a virtual key for its members.
@@ -234,11 +247,16 @@ of the lowercase `version` property, in Maven order, among the files the caller 
   400. It answers one `uri` under `/api/build` per build number with a run the caller may
   read whose dependencies include that SHA-1, in the order the runs were published, with
   `?project=` for another project's build.
-- **Build artifacts search** reads the default project's builds.
-  - The run is the most recently started run of `buildNumber`, or of the build for `LATEST`,
-    whose latest promotion has exactly the `buildStatus` given, among the runs the caller may
-    read. No such run is a 404; when the caller may read none of the runs that qualify, it is
-    the build-info API's refusal.
+- **Build artifacts search** reads the default project's builds, and follows Artifactory's
+  `BuildArtifactsSearchResource` (OSS 6.20).
+  - The body is checked before the caller, with Artifactory's messages: a blank `buildName`
+    is a 400 `Cannot search without build name.`; neither `buildNumber` nor `buildStatus` is
+    a 400 `Cannot search without build number or build status.`; both is a 400 naming both.
+    Blank means empty or white space only. Then an anonymous caller is a 401.
+  - The run is the most recently started run of `buildNumber`, or of the build for `LATEST`;
+    or, given `buildStatus` instead, the most recently started run whose latest promotion
+    has exactly that status; among the runs the caller may read. When the caller may read
+    none of the runs that qualify, it is the build-info API's refusal.
   - The files are found as a promotion finds them, as in Artifactory (research 22 §3.6):
     for each artifact, of the items in `repos` that hold its checksums and carry the run's
     `build.name` and `build.number`, the one with its name, else the first. In `repos` a
@@ -247,7 +265,9 @@ of the lowercase `version` property, in Maven order, among the files the caller 
     whose whole path matches any `input`, an RE2 expression; an empty `input` is ignored and
     an invalid one is a 400. `GET /api/builds/buildArtifacts/...` still matches by checksum
     alone, since the JFrog CLI ranks its matches itself.
-  - A run whose filters leave nothing answers 200 with no results.
+  - Finding no file, whether no run qualifies or its filters leave nothing, is a 404
+    `Could not find any build artifacts for build '<name>'`, followed by ` number '<n>'` or,
+    without a number, ` status '<s>'`.
 
 ## Rationale
 
@@ -272,13 +292,24 @@ describes: the search works for any layout with the tokens it needs. Narrowing b
 rendered start of a path keeps the dialects' only job to a `$match`, which the parity
 fixtures already cover, and leaves the regular expressions of custom tokens to Go.
 
-**The folder version for GAVC and versions** groups a unique snapshot's files under the
-`1.0-SNAPSHOT` a Maven user asks for; latest version's file version is what JFrog's
-integration example returns.
+**Following Artifactory's code for versions, latest version and build artifacts** (#214,
+#215): where JFrog's pages and the handlers in Artifactory's open-source edition disagree,
+clients were written against the server, so the handlers win. The handlers name the
+comparator, the 404 messages, which `v` takes which branch, and the build artifacts checks;
+what the closed add-on does inside `getArtifactVersions` is read from its documentation
+comment, JFrog's examples and a JFrog knowledge-base capture. That capture shows
+`latestVersion?v=*SNAPSHOT*` answering 404 `Latest integration version not found` for unique
+snapshots and `1.0-SNAPSHOT` for a non-unique one, which only file versions explain, and
+`v=1.0-SNAPSHOT` answering `1.0-20220406.094243-3`.
 
-**Build artifacts answering 200 with no results** for an existing run matches the build
-artifacts endpoint and the other searches. JFrog documents no 404 for it; the spec adds one
-for a run that does not exist.
+**The folder version for GAVC and versions** groups a unique snapshot's files under the
+`1.0-SNAPSHOT` a Maven user asks for. JFrog's versions example lists `1.0-SNAPSHOT` that way;
+nothing shows the add-on listing unique snapshots one by one without `v`.
+
+**Mercury order** is what `MavenVersionComparator` wraps
+(`VersionComparators.getVersionComparator("mercury")`), the only version comparator in
+Artifactory's open-source code, and the one `ArtifactVersionsResult` sorts with. JFrog's
+versions example, which lists `1.0-SNAPSHOT` above `1.0`, contradicts it, as it does Maven.
 
 **The default result cap** protects the server's memory from an unbounded query, and is the
 value JFrog SaaS uses. Self-managed Artifactory has no default cap, so this is a deviation
@@ -300,6 +331,11 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
   layouts, which JFrog says the searches support.
 - *Answering `remote=1` 501 until P9:* would refuse a request whose local answer is still
   correct for what is cached.
+- *Maven's `ComparableVersion` order for the versions searches:* what Maven itself resolves
+  with, but not what Artifactory answers when a snapshot and a pre-release of one base
+  version coexist.
+- *Build artifacts search allowing anonymous callers, and answering 200 with no results:*
+  what JFrog's page implies, but not what Artifactory's handler does.
 
 ## Constraints
 
@@ -311,9 +347,11 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
   locations, which is to verify against a live Artifactory.
-- `remote=1` does not consult the upstream until P9.
-- JFrog's versions example lists `1.0-SNAPSHOT` above `1.0`; Maven order, used here, puts it
-  below. Both, and latest version's 404 wording, are to verify against a live Artifactory.
+- `remote=1` does not consult the upstream until P9 (#213).
+- The handlers read are Artifactory 6.20's (`github.com/knottnhupfer/artifactory-oss`,
+  `b99e5649bcad`), and how the closed add-on narrows by `v`, and whether it lists unique
+  snapshots by module version without `v`, is inferred. Both are to verify against a live
+  Artifactory (#216).
 
 ## Verification
 
@@ -336,6 +374,9 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - GET search endpoint response-shape tests, against Maven, Ivy and broken layouts and
   published builds, with shared fixtures for the layout prefix and the version property
   query shapes run in memory and on SQLite and PostgreSQL.
+- Table tests of Mercury order against Mercury's `ComparableVersion` rules, and search tests
+  where a release candidate and a snapshot of one base version coexist; a test for each 404
+  message and each build artifacts check.
 
 ## References
 

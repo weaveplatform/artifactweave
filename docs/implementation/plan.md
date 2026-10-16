@@ -493,7 +493,9 @@ Decisions: [0012](../research/decisions/0012-search-and-aql.md),
 9. GET searches: quick, property, checksum, bad checksum, usage, dates, creation and pattern (#169).
 10. GET searches: GAVC, versions, latest version, latest by properties, dependency and build artifacts (#170).
 11. A remote repository's key matching its cached items in AQL (#68).
-12. The exit checks: AQL fixtures on both dialects and the JFrog CLI build commands (#171).
+12. The versions searches ordered as Artifactory orders them, in Mercury order (#214).
+13. The versions, latest version and build artifacts searches answering as Artifactory's do (#215).
+14. The exit checks: AQL fixtures on both dialects and the JFrog CLI build commands (#171).
 
 **Exit criteria**
 - AQL fixtures (CLI-captured plus hand-written per operator) produce identical ordered output on SQLite and PostgreSQL.

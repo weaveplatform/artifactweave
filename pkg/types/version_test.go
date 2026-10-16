@@ -125,6 +125,52 @@ func TestCompareMaven(t *testing.T) {
 	})
 }
 
+// TestCompareMercury follows Mercury's ComparableVersion, which Artifactory's
+// versions searches sort with (#214): snapshot ranks below every other
+// qualifier, release is no alias, and a '-' opens a sublist only between
+// digits.
+func TestCompareMercury(t *testing.T) {
+	checkAscending(t, "mercury", types.CompareMercury, []string{
+		"1.0-SNAPSHOT", "1.0-alpha-1", "1.0-alpha-2", "1.0-beta-1", "1.0-milestone-1",
+		"1.0-rc1", "1.0-cr2", "1.0", "1.0-sp1", "1.0-release", "1.0-xyz", "1.0-1",
+		"1.0-20260101.120000-1", "1.0-20260101.120000-2", "1.0-20260101.120000-10",
+		"1.0.1", "1.1", "1.9", "1.10", "1.10.1", "2.0", "20240101.0.0",
+		"99999999999999999999",
+	})
+	checkEqual(t, "mercury", types.CompareMercury, [][2]string{
+		{"1", "1.0"},
+		{"1", "1.0.0"},
+		{"1", "1-ga"},
+		{"1", "1.0-final"},
+		{"1", "1-0"},
+		{"1-cr1", "1-rc1"},
+		{"1-a1", "1-alpha1"},
+		{"1-b1", "1-beta-1"},
+		{"1-m1", "1-milestone.1"},
+		{"1..1", "1.0.1"},
+		{"1.01", "1.1"},
+		{"1.0-alpha-1", "1.0-alpha.1"},
+		{"1.0-SNAPSHOT", "1-snapshot"},
+	})
+	// Where Mercury and Maven's ComparableVersion part ways.
+	for _, tc := range []struct {
+		a, b           string
+		mercury, maven int
+	}{
+		{"1.0-SNAPSHOT", "1.0-rc1", -1, 1},
+		{"1.0-SNAPSHOT", "1.0-alpha-1", -1, 1},
+		{"1.0-release", "1.0", 1, 0},
+		{"1.0-alpha-1", "1.0-alpha.1", 0, -1},
+	} {
+		if got := types.CompareMercury(tc.a, tc.b); got != tc.mercury {
+			t.Errorf("mercury %q vs %q = %d, want %d", tc.a, tc.b, got, tc.mercury)
+		}
+		if got := types.CompareMaven(tc.a, tc.b); got != tc.maven {
+			t.Errorf("maven %q vs %q = %d, want %d", tc.a, tc.b, got, tc.maven)
+		}
+	}
+}
+
 func TestComparatorForAndSorting(t *testing.T) {
 	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	cases := []struct {

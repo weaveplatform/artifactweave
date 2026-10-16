@@ -2,12 +2,14 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -80,23 +82,39 @@ func (s artifactoryService) SearchDependency(
 
 // SearchBuildArtifacts answers the build artifacts search: the download
 // URLs of the files a run of the default project produced, the run chosen
-// as build.Service.Find chooses and the files as a promotion finds them
+// by number (or LATEST) or else by the status of its latest promotion, as
+// build.Service.Find chooses it, and the files as a promotion finds them
 // (build.Service.SearchArtifacts), in the repositories in repos, narrowed to
-// the paths any mapping matches in full.
+// the paths any mapping matches in full. It checks the body before the
+// caller, needs a named user, and answers 404 whenever it finds no file, as
+// Artifactory's BuildArtifactsSearchResource does.
 func (s artifactoryService) SearchBuildArtifacts(
 	ctx context.Context,
 	req artgen.SearchBuildArtifactsRequestObject,
 ) (artgen.SearchBuildArtifactsResponseObject, error) {
-	r, err := s.newSearch(ctx, false)
-	if err != nil {
-		return nil, err
-	}
 	body := req.JSONBody
 	if body == nil {
 		body = req.ApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody
 	}
-	if body == nil || body.BuildName == "" || body.BuildNumber == "" {
-		return nil, badRequest("buildName and buildNumber are required")
+	if body == nil {
+		body = &artgen.SearchBuildArtifactsJSONRequestBody{}
+	}
+	number, status := blank(deref(body.BuildNumber)), blank(deref(body.BuildStatus))
+	switch {
+	case blank(body.BuildName) == "":
+		return nil, badRequest("Cannot search without build name.")
+	case number == "" && status == "":
+		return nil, badRequest("Cannot search without build number or build status.")
+	case number != "" && status != "":
+		return nil, badRequest(
+			"Cannot search with both build number and build status parameters, " +
+				"please omit build number if your are looking for latest build by status " +
+				"or omit build status to search for specific build version.",
+		)
+	}
+	r, err := s.newSearch(ctx, true)
+	if err != nil {
+		return nil, err
 	}
 	var mappings []*regexp.Regexp
 	for _, m := range deref(body.Mappings) {
@@ -113,10 +131,15 @@ func (s artifactoryService) SearchBuildArtifacts(
 	if refs := r.refsOf(deref(body.Repos)); refs != nil {
 		in = func(it types.Item) bool { return refs[aql.RepoRef{Key: it.RepoKey, Cached: it.Cached}] }
 	}
+	missing := noBuildArtifacts(body.BuildName, number, status)
+	which := number
+	if which == "" {
+		which = build.Latest
+	}
 	svc, a := &build.Service{Store: r.st, Blobs: s.cfg.Blobs}, buildAccess{r.acc}
-	b, err := svc.Find(ctx, "", body.BuildName, body.BuildNumber, deref(body.BuildStatus), a)
+	b, err := svc.Find(ctx, "", body.BuildName, which, status, a)
 	if err != nil {
-		return nil, s.buildError(ctx, r.p, "", noRun(body.BuildName, body.BuildNumber), err)
+		return nil, s.buildError(ctx, r.p, "", missing, err)
 	}
 	items, err := svc.SearchArtifacts(ctx, b, in, a)
 	if err != nil {
@@ -140,7 +163,32 @@ func (s artifactoryService) SearchBuildArtifacts(
 			break
 		}
 	}
+	if len(entries) == 0 {
+		return nil, apierror.New(http.StatusNotFound, missing)
+	}
 	return answer(ctx, mediaBuildArtifactsSearch, results(entries)), nil
+}
+
+// blank is s, or empty when s is only white space, which Artifactory's
+// isBlank treats as missing.
+func blank(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return ""
+	}
+	return s
+}
+
+// noBuildArtifacts is Artifactory's message for a build artifacts search
+// that finds no file, naming the number asked for or else the status.
+func noBuildArtifacts(name, number, status string) string {
+	msg := fmt.Sprintf("Could not find any build artifacts for build '%s'", name)
+	switch {
+	case number != "":
+		msg += fmt.Sprintf(" number '%s'", number)
+	case status != "":
+		msg += fmt.Sprintf(" status '%s'", status)
+	}
+	return msg
 }
 
 // refsOf is the stored locations the repository keys stand for, as a repo

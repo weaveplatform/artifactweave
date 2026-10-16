@@ -3,9 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	pathpkg "path"
+	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/build"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -32,6 +35,31 @@ func seedBuild(t *testing.T, db store.Store, blobs blob.Store, name string) {
 	svc := build.Service{Store: db, Blobs: blobs}
 	if _, err := svc.Publish(
 		context.Background(), "", []byte(buildDoc(name, "1", testStarted)), "admin", allowBuilds{},
+	); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// seedBuildArtifact publishes run 1 of name, started at testStarted, which
+// produced libs-local's file at path, deployed carrying the run's build
+// properties: a run the build artifacts search finds a file of.
+func seedBuildArtifact(t *testing.T, db store.Store, blobs blob.Store, name, path string) {
+	t.Helper()
+	ctx := context.Background()
+	libs, err := db.Repos().Get(ctx, "libs-local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
+		Target: item.Target{Repo: libs, Path: path}, Body: strings.NewReader(name),
+		Properties: types.Properties{"build.name": {name}, "build.number": {"1"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	doc := fmt.Sprintf(`{"name":%q,"number":"1","started":%q,"modules":[{"id":"m",`+
+		`"artifacts":[{"name":%q,"sha1":%q}]}]}`, name, testStarted, pathpkg.Base(path), sha1Hex(name))
+	if _, err := (&build.Service{Store: db, Blobs: blobs}).Publish(
+		ctx, "", []byte(doc), "admin", allowBuilds{},
 	); err != nil {
 		t.Fatal(err)
 	}

@@ -3194,10 +3194,10 @@ type ArtifactorySearchesApiBuildArtifactsRequest struct {
 	// BuildName Required within this object. Name of the build as published with jf rt build-publish.
 	BuildName string `json:"buildName"`
 
-	// BuildNumber Required within this object. Build number, or LATEST for the most recently started run of the build. A number with several runs selects its most recently started run.
-	BuildNumber string `json:"buildNumber"`
+	// BuildNumber Optional within this object. Build number, or LATEST for the most recently started run of the build. A number with several runs selects its most recently started run. Give either buildNumber or buildStatus, not both.
+	BuildNumber *string `json:"buildNumber,omitempty"`
 
-	// BuildStatus Optional within this object. Selects only runs whose latest promotion has exactly this status, for example Released; with LATEST, the most recently started such run. Omitted ignores promotions.
+	// BuildStatus Optional within this object. Selects the most recently started run whose latest promotion has exactly this status, for example Released. Give either buildNumber or buildStatus, not both.
 	BuildStatus *string `json:"buildStatus,omitempty"`
 
 	// Mappings Optional within this object. Regular expressions, any of which a file's path must match to be returned. Omitted or empty returns every artifact of the build.
@@ -7089,7 +7089,7 @@ type SearchLatestVersionParams struct {
 	// A Optional query parameter. Module name (Maven artifact id). At least one of g and a is required.
 	A *string `form:"a,omitempty" json:"a,omitempty"`
 
-	// V Optional query parameter. A version pattern; an integration pattern such as 1.0-SNAPSHOT switches the search to integration versions. * and ? wildcards are allowed.
+	// V Optional query parameter. A version pattern with * or ? wildcards, matched against every version; or a module version such as 1.0-SNAPSHOT, whose latest integration version is returned.
 	V *string `form:"v,omitempty" json:"v,omitempty"`
 
 	// Remote Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
@@ -7182,7 +7182,7 @@ type SearchVersionsParams struct {
 	// A Optional query parameter. Module name (Maven artifact id). At least one of g and a is required.
 	A *string `form:"a,omitempty" json:"a,omitempty"`
 
-	// V Optional query parameter. Version pattern; an integration pattern restricts the result to integration versions. * and ? wildcards are allowed.
+	// V Optional query parameter. A version pattern with * or ? wildcards, which filters the versions; or a module version such as 1.0-SNAPSHOT, whose integration versions are listed.
 	V *string `form:"v,omitempty" json:"v,omitempty"`
 
 	// Remote Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
@@ -10358,19 +10358,19 @@ type ClientInterface interface {
 	// SearchBuildArtifactsWithBody performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 	SearchBuildArtifactsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchBuildArtifacts performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 	SearchBuildArtifacts(ctx context.Context, body SearchBuildArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.search.BuildArtifactsRequest+json` content type.
 	//
-	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 	SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody(ctx context.Context, body SearchBuildArtifactsApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchChecksum performs a GET /api/search/checksum (the `SearchChecksum` operationId) request.
@@ -10400,7 +10400,7 @@ type ClientInterface interface {
 
 	// SearchLatestVersion performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 	//
-	// Returns the highest version of a module as plain text, using the repository layout to extract versions and Maven version ordering to compare them. Without v the highest release is returned; with an integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 when nothing matches. Anonymous callers may search when anonymous access is enabled.
+	// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 	SearchLatestVersion(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchLicense performs a GET /api/search/license (the `SearchLicense` operationId) request.
@@ -10425,7 +10425,7 @@ type ClientInterface interface {
 
 	// SearchVersions performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 	//
-	// Lists every version of a module found through the repository layout, newest first. Without v both release and integration versions are returned; v filters them by pattern, so an integration pattern returns only integration versions. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Anonymous callers may search when anonymous access is enabled.
+	// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 	SearchVersions(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeApiKey Revoke the caller's API key
@@ -15866,7 +15866,7 @@ func (c *Client) SearchBadChecksum(ctx context.Context, params *SearchBadChecksu
 // SearchBuildArtifactsWithBody performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request,
 // with any type of body and a specified content type.
 //
-// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 func (c *Client) SearchBuildArtifactsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchBuildArtifactsRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -15882,7 +15882,7 @@ func (c *Client) SearchBuildArtifactsWithBody(ctx context.Context, contentType s
 // SearchBuildArtifacts performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 func (c *Client) SearchBuildArtifacts(ctx context.Context, body SearchBuildArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchBuildArtifactsRequest(c.Server, body)
 	if err != nil {
@@ -15898,7 +15898,7 @@ func (c *Client) SearchBuildArtifacts(ctx context.Context, body SearchBuildArtif
 // SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory.search.BuildArtifactsRequest+json` content type.
 //
-// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 func (c *Client) SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody(ctx context.Context, body SearchBuildArtifactsApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchBuildArtifactsRequestWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody(c.Server, body)
 	if err != nil {
@@ -15988,7 +15988,7 @@ func (c *Client) SearchGavc(ctx context.Context, params *SearchGavcParams, reqEd
 
 // SearchLatestVersion performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 //
-// Returns the highest version of a module as plain text, using the repository layout to extract versions and Maven version ordering to compare them. Without v the highest release is returned; with an integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 when nothing matches. Anonymous callers may search when anonymous access is enabled.
+// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 func (c *Client) SearchLatestVersion(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchLatestVersionRequest(c.Server, params)
 	if err != nil {
@@ -16063,7 +16063,7 @@ func (c *Client) SearchUsage(ctx context.Context, params *SearchUsageParams, req
 
 // SearchVersions performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 //
-// Lists every version of a module found through the repository layout, newest first. Without v both release and integration versions are returned; v filters them by pattern, so an integration pattern returns only integration versions. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Anonymous callers may search when anonymous access is enabled.
+// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 func (c *Client) SearchVersions(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchVersionsRequest(c.Server, params)
 	if err != nil {
@@ -36833,7 +36833,7 @@ type ClientWithResponsesInterface interface {
 	// SearchBuildArtifactsWithBodyWithResponse performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchBuildArtifactsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchBuildArtifactsResponse, error)
@@ -36841,13 +36841,13 @@ type ClientWithResponsesInterface interface {
 	// SearchBuildArtifactsWithResponse performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 	SearchBuildArtifactsWithResponse(ctx context.Context, body SearchBuildArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchBuildArtifactsResponse, error)
 
 	// SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBodyWithResponse performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.search.BuildArtifactsRequest+json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+	// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 	SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBodyWithResponse(ctx context.Context, body SearchBuildArtifactsApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchBuildArtifactsResponse, error)
 
 	// SearchChecksumWithResponse performs a GET /api/search/checksum (the `SearchChecksum` operationId) request.
@@ -36887,7 +36887,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchLatestVersionWithResponse performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 	//
-	// Returns the highest version of a module as plain text, using the repository layout to extract versions and Maven version ordering to compare them. Without v the highest release is returned; with an integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 when nothing matches. Anonymous callers may search when anonymous access is enabled.
+	// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchLatestVersionWithResponse(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*SearchLatestVersionResponse, error)
@@ -36922,7 +36922,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchVersionsWithResponse performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 	//
-	// Lists every version of a module found through the repository layout, newest first. Without v both release and integration versions are returned; v filters them by pattern, so an integration pattern returns only integration versions. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Anonymous callers may search when anonymous access is enabled.
+	// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchVersionsWithResponse(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*SearchVersionsResponse, error)
@@ -51184,6 +51184,8 @@ type SearchVersionsResponse struct {
 	JSON401 *ArtifactorySearchesApiUnauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ArtifactorySearchesApiForbidden
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *ArtifactorySearchesApiNotFound
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *ArtifactorySearchesApiInternalServerError
 }
@@ -51211,6 +51213,11 @@ func (r SearchVersionsResponse) GetJSON401() *ArtifactorySearchesApiUnauthorized
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
 func (r SearchVersionsResponse) GetJSON403() *ArtifactorySearchesApiForbidden {
 	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r SearchVersionsResponse) GetJSON404() *ArtifactorySearchesApiNotFound {
+	return r.JSON404
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -63475,7 +63482,7 @@ func (c *ClientWithResponses) SearchBadChecksumWithResponse(ctx context.Context,
 // SearchBuildArtifactsWithBodyWithResponse performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request,
 // with any type of body and a specified content type.
 //
-// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchBuildArtifactsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SearchBuildArtifactsResponse, error) {
@@ -63489,7 +63496,7 @@ func (c *ClientWithResponses) SearchBuildArtifactsWithBodyWithResponse(ctx conte
 // SearchBuildArtifactsWithResponse performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 func (c *ClientWithResponses) SearchBuildArtifactsWithResponse(ctx context.Context, body SearchBuildArtifactsJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchBuildArtifactsResponse, error) {
 	rsp, err := c.SearchBuildArtifacts(ctx, body, reqEditors...)
 	if err != nil {
@@ -63501,7 +63508,7 @@ func (c *ClientWithResponses) SearchBuildArtifactsWithResponse(ctx context.Conte
 // SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBodyWithResponse performs a POST /api/search/buildArtifacts (the `SearchBuildArtifacts` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory.search.BuildArtifactsRequest+json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and number, optionally by the status of its latest promotion; repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Anonymous callers may search when anonymous access is enabled and they may read the build.
+// Lists the artifacts a build run produced, in module and artifact order. Each artifact is the file, among those holding its checksums and carrying the run's build.name and build.number properties, with its name, else the first found, as a promotion finds it; files the caller may not read are left out. The run is selected by name and either its number (or LATEST) or the status of its latest promotion; giving neither or both is a 400. repos limits where files are found and mappings narrows them. Only builds of the default project are searched. Requires a named user, so anonymous callers get 401. Returns 404 when no file is found, whether the run is missing or the filters leave nothing.
 func (c *ClientWithResponses) SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBodyWithResponse(ctx context.Context, body SearchBuildArtifactsApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*SearchBuildArtifactsResponse, error) {
 	rsp, err := c.SearchBuildArtifactsWithApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONBody(ctx, body, reqEditors...)
 	if err != nil {
@@ -63577,7 +63584,7 @@ func (c *ClientWithResponses) SearchGavcWithResponse(ctx context.Context, params
 
 // SearchLatestVersionWithResponse performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 //
-// Returns the highest version of a module as plain text, using the repository layout to extract versions and Maven version ordering to compare them. Without v the highest release is returned; with an integration version such as 1.0-SNAPSHOT the highest matching integration version is returned. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 when nothing matches. Anonymous callers may search when anonymous access is enabled.
+// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchLatestVersionWithResponse(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*SearchLatestVersionResponse, error) {
@@ -63642,7 +63649,7 @@ func (c *ClientWithResponses) SearchUsageWithResponse(ctx context.Context, param
 
 // SearchVersionsWithResponse performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 //
-// Lists every version of a module found through the repository layout, newest first. Without v both release and integration versions are returned; v filters them by pattern, so an integration pattern returns only integration versions. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Anonymous callers may search when anonymous access is enabled.
+// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchVersionsWithResponse(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*SearchVersionsResponse, error) {
@@ -76169,6 +76176,13 @@ func ParseSearchVersionsResponse(rsp *http.Response) (*SearchVersionsResponse, e
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest ArtifactorySearchesApiNotFound
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest ArtifactorySearchesApiInternalServerError
