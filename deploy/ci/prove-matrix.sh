@@ -6,8 +6,9 @@
 #   - the workflow, deploy/ci/scenario-ci.sh, deploy/ci/platform-tests.sh
 #     (the test step both CI and local.sh verify run) or this script: every
 #     cloud's single-bucket, the baseline every scenario builds on;
-#   - deploy/ci/cloudfront-key.sh: the scenarios whose ci-vars.sh takes the
-#     key pair it makes (CLOUDFRONT_*), aws/cdn;
+#   - deploy/ci/cloudfront-key.sh or deploy/ci/cloud-cdn-key.sh: the
+#     scenarios whose ci-vars.sh takes the key it makes (CLOUDFRONT_*,
+#     aws/cdn; CLOUD_CDN_*, gcp/cdn);
 #   - a test/platform Go file: the scenarios it names as quoted
 #     "<cloud>/<scenario>" literals (mirror_test.go names the multi-region
 #     scenarios and multicloud/mirror, replica_test.go the geo-replicated
@@ -60,11 +61,12 @@ scenarios() {
   done
 }
 
-# key_users prints the scenarios whose ci-vars.sh takes the CloudFront key
-# pair scenario-ci.sh makes with cloudfront-key.sh.
-key_users() {
+# key_users prints the scenarios whose ci-vars.sh names the variables a key
+# script's key reaches it by: CLOUDFRONT_ for cloudfront-key.sh's key pair,
+# CLOUD_CDN_ for cloud-cdn-key.sh's signed URL key.
+key_users() { # variable prefix
   scenarios | while read -r cloud scenario; do
-    if grep -qs CLOUDFRONT_ "$root/$here/$cloud/$scenario/ci-vars.sh"; then echo "$cloud $scenario"; fi
+    if grep -qs "$1" "$root/$here/$cloud/$scenario/ci-vars.sh"; then echo "$cloud $scenario"; fi
   done
 }
 
@@ -112,7 +114,10 @@ while IFS= read -r file; do
     single_buckets
     ;;
   "$ci/cloudfront-key.sh")
-    key_users
+    key_users CLOUDFRONT_
+    ;;
+  "$ci/cloud-cdn-key.sh")
+    key_users CLOUD_CDN_
     ;;
   test/platform/*.go)
     if [ -n "$(named "$root/$file")" ]; then

@@ -3,7 +3,12 @@ package platform
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/sha1"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -27,12 +32,18 @@ import (
 // edge can show: that cdnRedirect alone redirects, that the S3 header still
 // reaches the bucket, that the edge keys its cache on the filename, that it
 // refuses a URL whose signature is valid but expired, and that the JFrog CLI's
-// split download works across it.
+// split download works across it. Cloud CDN comes up after apply returns, so
+// gcp/cdn first waits for it, and checks one thing Google does not document:
+// that the response overrides reach the bucket on a cache fill.
 
 const cdnRepo = "platform-cdn"
 
 func init() {
 	scenarioChecks["aws/cdn"] = cdnChecks(cloudFrontSigner)
+	scenarioChecks["gcp/cdn"] = append([]check{
+		{"Cloud CDN passes both response overrides on a cache fill", overridesOnACacheFill},
+	}, cdnChecks(cloudCDNSigner)...)
+	scenarioReady["gcp/cdn"] = waitForCloudCDN
 }
 
 // edgeSigner signs a URL for objectKey on the scenario's CDN as if at now,
@@ -191,6 +202,191 @@ func cloudFrontSigner(t *testing.T, h *harness, objectKey string, now time.Time)
 		t.Fatal(err)
 	}
 	return u
+}
+
+// cloudCDNSigner signs with the key in the scenario's blob.gcs.cdn.cloud_cdn,
+// as artifactweave does.
+func cloudCDNSigner(t *testing.T, h *harness, objectKey string, now time.Time) *url.URL {
+	t.Helper()
+	var c struct {
+		Blob struct {
+			GCS struct {
+				CDN struct {
+					CloudCDN struct {
+						Domain     string `yaml:"domain"`
+						KeyName    string `yaml:"key_name"`
+						KeyFile    string `yaml:"key_file"`
+						PathPrefix string `yaml:"path_prefix"`
+					} `yaml:"cloud_cdn"`
+				} `yaml:"cdn"`
+			} `yaml:"gcs"`
+		} `yaml:"blob"`
+	}
+	readConfig(t, h, &c)
+	cc := c.Blob.GCS.CDN.CloudCDN
+	key, err := os.ReadFile(cc.KeyFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := cdn.NewCloudCDN(cdn.CloudCDNConfig{
+		Domain: cc.Domain, KeyName: cc.KeyName, Key: key, PathPrefix: cc.PathPrefix,
+		Now: func() time.Time { return now },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := signer.Sign(objectKey, cdn.Request{TTL: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u
+}
+
+// cloudCDNWait bounds waitForCloudCDN: Google issues the certificate once
+// its authorisation record resolves, commonly within 10 to 30 minutes, the
+// load balancer takes minutes more to answer on its address, and the fill
+// account's grant a few more to reach the bucket. platform-tests.sh's
+// timeout leaves room for it.
+const cloudCDNWait = 45 * time.Minute
+
+// readyRepo holds the blob waitForCloudCDN fetches through the edge.
+const readyRepo = "platform-cdn-ready"
+
+// waitForCloudCDN deploys a blob of its own and waits until the edge serves
+// it from a URL artifactweave signs, which needs all of the above: before
+// then, the request fails, or the bucket refuses it while the grant is on
+// its way. Cloud CDN does not cache a 403, so the wait sees the grant
+// arrive. The blob is not the generic checks' payload, whose first fetch
+// through the edge is theirs to make.
+func waitForCloudCDN(t *testing.T, h *harness) {
+	t.Helper()
+	createRepository(t, h, map[string]any{
+		"key": readyRepo, "rclass": "local", "packageType": "generic", "downloadRedirect": true,
+	})
+	data := make([]byte, 2<<20) // above download.redirect.min_size
+	if _, err := rand.Read(data); err != nil {
+		t.Fatal(err)
+	}
+	deployData(t, h, readyRepo, "ready.bin", data)
+	started := time.Now()
+	last := ""
+	for {
+		why, ready := probeCloudCDN(
+			t,
+			h,
+			redirectIn(t, h, readyRepo, "ready.bin", nil),
+			data[:1024],
+		)
+		if ready {
+			t.Logf("Cloud CDN served the blob after %s", time.Since(started).Round(time.Second))
+			return
+		}
+		if why != last {
+			t.Logf(
+				"after %s, the edge is not ready: %s",
+				time.Since(started).Round(time.Second),
+				why,
+			)
+			last = why
+		}
+		if time.Since(started) > cloudCDNWait {
+			t.Fatalf("Cloud CDN was not ready within %s; last: %s", cloudCDNWait, why)
+		}
+		time.Sleep(20 * time.Second)
+	}
+}
+
+// probeCloudCDN reads the first KiB of a blob through the edge and reports
+// what came back, without the URL, whose query is a credential.
+func probeCloudCDN(t *testing.T, h *harness, u *url.URL, want []byte) (why string, ready bool) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", len(want)-1))
+	resp, err := h.plain.Do(req)
+	if err != nil {
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			err = ue.Err
+		}
+		return err.Error(), false
+	}
+	body := drain(t, resp)
+	if resp.StatusCode == http.StatusPartialContent && bytes.Equal(body, want) {
+		return "", true
+	}
+	return fmt.Sprintf("%d %s", resp.StatusCode, tail(strings.TrimSpace(string(body)), 200)), false
+}
+
+// deployData deploys data to repo/p with its checksums.
+func deployData(t *testing.T, h *harness, repo, p string, data []byte) {
+	t.Helper()
+	s256, s1 := sha256.Sum256(data), sha1.Sum(data)
+	resp, err := h.do(t, http.MethodPut, "/artifactory/"+repo+"/"+p, data, http.Header{
+		"X-Checksum-Sha256": {hex.EncodeToString(s256[:])},
+		"X-Checksum-Sha1":   {hex.EncodeToString(s1[:])},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b := drain(t, resp); resp.StatusCode != http.StatusCreated {
+		t.Fatalf("deploy %s/%s: %d %s", repo, p, resp.StatusCode, b)
+	}
+}
+
+// overridesOnACacheFill settles what Google does not document (research 19,
+// section 3.2): whether Cloud CDN passes response-content-disposition and
+// response-content-type to the bucket when it fills its cache. New content
+// is a blob no one has fetched, so its first download through the edge is a
+// fill, and a .json name asks for a media type the stored object does not
+// have. If Cloud CDN drops them, decision 0029's fallback applies: the
+// stored object's headers are served, and package clients name files from
+// the request.
+func overridesOnACacheFill(t *testing.T, h *harness) {
+	data := make([]byte, 2<<20) // above download.redirect.min_size
+	if _, err := rand.Read(data); err != nil {
+		t.Fatal(err)
+	}
+	name := "scenario/fill-check.json"
+	deployData(t, h, redirectRepo, name, data)
+	loc := redirectIn(t, h, redirectRepo, name, nil)
+	if !h.storageHosts[loc.Hostname()] {
+		t.Fatalf("redirected to %s, want the CDN host %v", loc.Hostname(), h.storageHosts)
+	}
+	resp := fetch(t, h, loc, nil)
+	got := drain(t, resp)
+	if resp.StatusCode != http.StatusOK || !bytes.Equal(got, data) {
+		t.Fatalf("the edge served %d with %d bytes, want 200 with the %d deployed",
+			resp.StatusCode, len(got), len(data))
+	}
+	disposition, mediaType := resp.Header.Get(
+		"Content-Disposition",
+	), resp.Header.Get(
+		"Content-Type",
+	)
+	t.Logf("cache fill: Content-Disposition %q, Content-Type %q, Age %q",
+		disposition, mediaType, resp.Header.Get("Age"))
+	if !strings.Contains(disposition, path.Base(name)) {
+		t.Errorf(
+			"Cloud CDN dropped response-content-disposition on a cache fill: Content-Disposition %q, want %s",
+			disposition,
+			path.Base(name),
+		)
+	}
+	if mediaType != "application/json" {
+		t.Errorf(
+			"Cloud CDN dropped response-content-type on a cache fill: Content-Type %q, want application/json",
+			mediaType,
+		)
+	}
 }
 
 func readConfig(t *testing.T, h *harness, into any) {

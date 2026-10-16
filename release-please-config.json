@@ -34,7 +34,15 @@
         },
         {
           "type": "generic",
+          "path": "deploy/platform/terraform/modules/gcp/cdn/README.md"
+        },
+        {
+          "type": "generic",
           "path": "deploy/platform/terraform/aws/cdn/README.md"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/platform/terraform/gcp/cdn/README.md"
         },
         {
           "type": "generic",

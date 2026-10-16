@@ -46,6 +46,11 @@ type check struct {
 // the cloud's own replica (replica_test.go), the real edge (cdn_test.go).
 var scenarioChecks = map[string][]check{}
 
+// scenarioReady holds what a scenario must wait for before any check, keyed
+// like scenarioChecks: an edge that comes up after apply returns, such as
+// Cloud CDN's managed certificate and load balancer (cdn_test.go).
+var scenarioReady = map[string]func(t *testing.T, h *harness){}
+
 var errNotTCP = errors.New("listener address is not TCP")
 
 func TestMain(m *testing.M) {
@@ -63,6 +68,9 @@ func TestMain(m *testing.M) {
 func TestScenario(t *testing.T) {
 	scenario := os.Getenv("ARTIFACTWEAVE_SCENARIO")
 	h := start(t)
+	if ready := scenarioReady[scenario]; ready != nil {
+		ready(t, h)
+	}
 	checks := append(genericChecks(), scenarioChecks[scenario]...)
 	for _, c := range checks {
 		if !t.Run(c.name, func(t *testing.T) { c.run(t, h) }) {

@@ -11,7 +11,8 @@ GITHUB_VARS := \
   PLATFORM_GCP_SERVICE_ACCOUNT=deployer_service_account \
   PLATFORM_GCP_WIF_PROVIDER=workload_identity_provider \
   PLATFORM_GCP_PROJECT=project_id \
-  PLATFORM_GCP_STATE_BUCKET=state_bucket
+  PLATFORM_GCP_STATE_BUCKET=state_bucket \
+  PLATFORM_GCP_DNS_ZONE=dns_zone
 
 .PHONY: undelete-pool
 

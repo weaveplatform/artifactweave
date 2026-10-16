@@ -21,6 +21,11 @@
 #                     .secrets/cloudfront/ by cloudfront-key.sh, kept across
 #                     applies and make clean: cloudfront_public_key, and
 #                     cloudfront_private_key_file for the local runner
+#   Cloud CDN key     (gcp/cdn) a signed URL key made once in the scenario's
+#                     .secrets/cloud-cdn/ by cloud-cdn-key.sh, which make
+#                     signed-url-key adds after the first apply:
+#                     cloud_cdn_key_file, and signed_url_key_added once the
+#                     applied backend bucket holds the key
 #   force_destroy     true: a lab instance holds test data only
 #
 # The lab's constants reach this file from lab.mk through the environment
@@ -50,6 +55,19 @@ lab_vars() {
     : "${LAB_GCP_PROJECT:?lab-vars.sh needs LAB_GCP_PROJECT from lab.mk}"
     export TF_VAR_project_id="$LAB_GCP_PROJECT"
     export TF_VAR_app_service_account="artifactweave-conformance@$LAB_GCP_PROJECT.iam.gserviceaccount.com"
+    # Run from the scenario's directory (scenario.mk's recipes are).
+    if grep -qs '^variable "cloud_cdn_key_file"' variables.tf; then
+      local keys backend name
+      keys=$(dirname "${BASH_SOURCE[0]}")/cloud-cdn-key.sh
+      "$keys" make .secrets/cloud-cdn || return 1
+      export TF_VAR_cloud_cdn_key_file="$PWD/.secrets/cloud-cdn/cloud-cdn-key"
+      # The fill account's grant follows the key (gcp/cdn's README).
+      if backend=$(terraform output -raw backend_bucket 2>/dev/null) &&
+        name=$(terraform output -raw signed_url_key_name 2>/dev/null) &&
+        "$keys" has "$LAB_GCP_PROJECT" "$backend" "$name" 2>/dev/null; then
+        export TF_VAR_signed_url_key_added=true
+      fi
+    fi
     ;;
   azure)
     : "${LAB_AZURE_SUBSCRIPTION:?lab-vars.sh needs LAB_AZURE_SUBSCRIPTION from lab.mk}"

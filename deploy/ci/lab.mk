@@ -5,8 +5,11 @@
 # Terraform still defaults some of them until each scenario moves to the v2
 # contract, which takes them as inputs instead.
 
-# GCP: the project every gcp root and bootstrap uses.
+# GCP: the project every gcp root and bootstrap uses, and the bootstrap's
+# Cloud DNS zone, by its managed zone's name and its DNS name.
 LAB_GCP_PROJECT ?= project-0c0b2d7a-9ad7-4221-9a8
+LAB_GCP_DNS_ZONE ?= gcp-artifact-weaveplatform-run
+LAB_GCP_DNS_NAME ?= gcp.artifact.weaveplatform.run.
 
 # Azure: the subscription every azure root uses, refused by
 # check-subscription.sh unless the CLI is on it, and the bootstrap's own
