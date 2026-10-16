@@ -19,7 +19,10 @@ use this precedence, matching Artifactory:
 4. The request's own scheme and host
 
 Set `base_url` or forward the `X-Forwarded-*` headers; otherwise clients behind the proxy
-receive internal addresses.
+receive internal addresses. Behind a chain of proxies, such as a load balancer in front of an
+ingress, each header can arrive as a comma-separated list, one entry per proxy. artifactweave
+uses each header's first entry, the client-facing one, so the outermost proxy must set the
+headers and inner proxies must append to them or pass them through, never replace them.
 
 ## Docker
 

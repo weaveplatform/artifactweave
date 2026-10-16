@@ -11,6 +11,7 @@ package baseurl
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -27,18 +28,16 @@ func Resolve(r *http.Request, configured string) string {
 	if v := strings.TrimSpace(r.Header.Get(OverrideHeader)); v != "" {
 		return strings.TrimRight(v, "/")
 	}
-	if host := r.Header.Get("X-Forwarded-Host"); host != "" {
-		scheme := r.Header.Get("X-Forwarded-Proto")
-		if scheme == "" {
+	if host := ForwardedHost(r); host != "" {
+		scheme := strings.ToLower(first(r.Header.Get("X-Forwarded-Proto")))
+		if scheme != "http" && scheme != "https" {
 			scheme = requestScheme(r)
 		}
 		// A forwarded port is only meaningful when the host carries none; proxies
 		// that put the port in X-Forwarded-Host must not get it twice.
-		if port := r.Header.Get(
-			"X-Forwarded-Port",
-		); port != "" && !strings.Contains(host, ":") &&
+		if port := first(r.Header.Get("X-Forwarded-Port")); isPort(port) && !hasPort(host) &&
 			!isDefaultPort(scheme, port) {
-			host += ":" + port
+			host = net.JoinHostPort(strings.Trim(host, "[]"), port)
 		}
 		return scheme + "://" + host
 	}
@@ -46,6 +45,32 @@ func Resolve(r *http.Request, configured string) string {
 		return strings.TrimRight(configured, "/")
 	}
 	return requestScheme(r) + "://" + r.Host
+}
+
+// ForwardedHost is the host the client addressed as the outermost proxy saw
+// it: the first entry of X-Forwarded-Host, or "" when there is none. Each
+// proxy in a chain appends the host it received, so the first entry is the
+// client-facing one and later entries are internal (research 17). An empty
+// first entry names no host, so it is ignored rather than trusting a later,
+// internal one.
+func ForwardedHost(r *http.Request) string {
+	return first(r.Header.Get("X-Forwarded-Host"))
+}
+
+// first is the first comma-separated entry of a forwarded header, trimmed.
+func first(v string) string {
+	entry, _, _ := strings.Cut(v, ",")
+	return strings.TrimSpace(entry)
+}
+
+// hasPort reports whether host ends in a port, bracketed IPv6 included.
+func hasPort(host string) bool {
+	_, port, err := net.SplitHostPort(host)
+	return err == nil && port != ""
+}
+
+func isPort(s string) bool {
+	return s != "" && len(s) <= 5 && strings.Trim(s, "0123456789") == ""
 }
 
 // Middleware stores the resolved base URL in the request context.

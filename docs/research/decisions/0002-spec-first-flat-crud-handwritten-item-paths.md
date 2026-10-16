@@ -62,6 +62,9 @@ file-info `uri` and `downloadUri`, repository `url`) come from one resolver in
 `internal/server/baseurl` with Artifactory's precedence: `X-JFrog-Override-Base-Url`,
 then `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port`, then the configured
 `urlBase`, then the request. A middleware puts the resolved base into the request context.
+Each `X-Forwarded-*` header can be a comma-separated list, one entry per proxy; the resolver
+takes the first entry, the client-facing hop, ignores an empty first entry, and accepts only
+`http` or `https` as the forwarded scheme and a number as the forwarded port (#249, research 17).
 
 **Wire models and the linter.** JFrog's JSON mixes camelCase, snake_case and kebab-case,
 sometimes inside one struct, so per-package case rules cannot express it. The wire models

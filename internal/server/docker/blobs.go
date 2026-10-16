@@ -383,11 +383,10 @@ func location(r *http.Request, q Request, segments ...string) string {
 }
 
 // namedHost is the host the client named, port included: the first
-// X-Forwarded-Host value, else Host.
+// X-Forwarded-Host entry, else Host.
 func namedHost(r *http.Request) string {
-	if v := r.Header.Get("X-Forwarded-Host"); v != "" {
-		host, _, _ := strings.Cut(v, ",")
-		return strings.TrimSpace(host)
+	if host := baseurl.ForwardedHost(r); host != "" {
+		return host
 	}
 	return r.Host
 }
