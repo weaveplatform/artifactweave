@@ -55,3 +55,4 @@ Status values: Proposed, Accepted, Superseded.
 | 0029 | [CDN delivery and download redirect](0029-cdn-delivery-and-download-redirect.md) |
 | 0030 | [Reference deployments and platform testing](0030-reference-deployments.md) |
 | 0031 | [Docker and OCI registry protocol and storage layout](0031-docker-oci-registry.md) |
+| 0033 | [Persistent work queue](0033-persistent-work-queue.md) |

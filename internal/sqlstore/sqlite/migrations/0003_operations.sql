@@ -1,7 +1,7 @@
 -- Operations: projects with their roles, environments, members and
 -- repository assignments; webhooks and deliveries; cleanup policies and
--- runs; replications; settings; leases; configuration documents
--- (research 15 section 4).
+-- runs; replications; settings; leases; the work queue; configuration
+-- documents (research 15 section 4).
 -- +up
 CREATE TABLE projects (
     key                 TEXT PRIMARY KEY,
@@ -163,6 +163,29 @@ CREATE TABLE leases (
     expires_at  BIGINT NOT NULL
 );
 
+-- The persistent work queue (decision 0033): one row per kind and key, so
+-- work asked for again for a key while it waits coalesces into one run.
+-- generation fences a worker whose lease ran out; dirty_since marks work
+-- asked for during a run, which then runs once more.
+CREATE TABLE work_items (
+    kind        TEXT NOT NULL,
+    key         TEXT NOT NULL,
+    payload     TEXT,
+    state       TEXT NOT NULL,
+    attempts    INTEGER NOT NULL DEFAULT 0,
+    generation  BIGINT NOT NULL DEFAULT 0,
+    not_before  BIGINT NOT NULL,
+    leased_by   TEXT NOT NULL DEFAULT '',
+    lease_until BIGINT,
+    dirty_since BIGINT,
+    last_error  TEXT NOT NULL DEFAULT '',
+    enqueued_at BIGINT NOT NULL,
+    updated_at  BIGINT NOT NULL,
+    PRIMARY KEY (kind, key)
+);
+CREATE INDEX work_items_pending ON work_items (state, not_before);
+CREATE INDEX work_items_leased ON work_items (state, lease_until);
+
 -- One table for every configuration document kind (types.ConfigKind); the
 -- secrets removed from a document are sealed in config_secrets.
 CREATE TABLE config_documents (
@@ -184,6 +207,7 @@ CREATE TABLE config_secrets (
 -- +down
 DROP TABLE config_secrets;
 DROP TABLE config_documents;
+DROP TABLE work_items;
 DROP TABLE leases;
 DROP TABLE settings;
 DROP TABLE replication_runs;

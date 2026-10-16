@@ -27,6 +27,7 @@ func Run(t *testing.T, newStore Factory) {
 	runContent(t, newStore)
 	runIdentity(t, newStore)
 	runOperations(t, newStore)
+	runWork(t, newStore)
 	runPeers(t, newStore)
 	runEnterprise(t, newStore)
 	runBuilds(t, newStore)

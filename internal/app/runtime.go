@@ -16,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/internal/sqlstore/sqlcommon"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
@@ -27,7 +28,8 @@ import (
 var repairEvery = mirror.DefaultRepairInterval
 
 // runtime is what serve holds open: the metadata store, the blob tiers, the
-// garbage collector, and the background loops (mirror repair and GC).
+// garbage collector, the work queue, and the background loops (mirror
+// repair, GC and the work queue's workers).
 type runtime struct {
 	store            store.Store
 	auth             *auth.Authenticator
@@ -37,10 +39,12 @@ type runtime struct {
 	location         usage.Location
 	gc               *gc.Collector
 	multipart        *multipart.Service
-	mirrors          []*mirror.Store
-	admin            *mirrorAdmin
-	stopLoops        context.CancelFunc
-	loops            sync.WaitGroup
+	// work runs derived work after the changes that need it (decision 0033).
+	work      *work.Queue
+	mirrors   []*mirror.Store
+	admin     *mirrorAdmin
+	stopLoops context.CancelFunc
+	loops     sync.WaitGroup
 }
 
 // openRuntime opens the store (applying pending migrations), builds both
@@ -106,6 +110,15 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	if err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
+	queue, err := work.New(st, work.Options{
+		Workers:     cfg.Work.Workers,
+		Lease:       cfg.Work.Lease,
+		MaxAttempts: cfg.Work.MaxAttempts,
+		Log:         log,
+	})
+	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
 	// The loops outlive startup's context and stop only through close, after
 	// the HTTP server has drained.
 	lctx, stop := context.WithCancel(context.WithoutCancel(ctx))
@@ -119,6 +132,7 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		location:   hotTier.location(),
 		gc:         collector,
 		multipart:  parts,
+		work:       queue,
 		stopLoops:  stop,
 	}
 	for _, t := range []struct {
@@ -138,6 +152,9 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		rt.loops.Go(func() { _ = t.m.RunRepair(lctx, repairEvery, trigger) })
 	}
 	rt.loops.Go(func() { _ = collector.Loop(lctx, cfg.GC.Interval, logGC(log)) })
+	// Stopping hands back the leases of runs it cuts short, so another node
+	// or the next start picks them up at once.
+	rt.loops.Go(func() { _ = queue.Run(lctx) })
 	return rt, nil
 }
 

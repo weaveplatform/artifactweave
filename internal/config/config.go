@@ -54,6 +54,10 @@ const (
 	DefaultAQLScanFactor = 1
 	// DefaultUserQueryLimit is artifactory.search.userQueryLimit's default.
 	DefaultUserQueryLimit = 1000
+	// The persistent work queue's defaults (decision 0033).
+	DefaultWorkWorkers     = 4
+	DefaultWorkLease       = 2 * time.Minute
+	DefaultWorkMaxAttempts = 10
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -79,6 +83,19 @@ type Config struct {
 	GC                GCConfig        `yaml:"gc"`
 	Download          DownloadConfig  `yaml:"download"`
 	Search            SearchConfig    `yaml:"search"`
+	Work              WorkConfig      `yaml:"work"`
+}
+
+// WorkConfig sizes the persistent work queue (decision 0033), which runs
+// derived work such as package metadata after the change that needs it.
+type WorkConfig struct {
+	// Workers is how many work items run at once on this node.
+	Workers int `yaml:"workers"`
+	// Lease is how long a run holds its item before another node may take
+	// it over; a running item's lease is renewed every half lease.
+	Lease time.Duration `yaml:"lease"`
+	// MaxAttempts is how many runs an item gets before it is parked.
+	MaxAttempts int `yaml:"max_attempts"`
 }
 
 // SearchConfig holds the search limits.
@@ -207,6 +224,11 @@ func Default() Config {
 			},
 			UserQueryLimit: DefaultUserQueryLimit, LimitAnonymousUsersOnly: true,
 		},
+		Work: WorkConfig{
+			Workers:     DefaultWorkWorkers,
+			Lease:       DefaultWorkLease,
+			MaxAttempts: DefaultWorkMaxAttempts,
+		},
 	}
 }
 
@@ -274,6 +296,7 @@ var keys = append(append([]string{
 	"download.redirect.min_size", "download.redirect.ttl",
 	"search.aql.max_results", "search.aql.non_admin_scan_factor",
 	"search.user_query_limit", "search.limit_anonymous_users_only",
+	"work.workers", "work.lease", "work.max_attempts",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -336,6 +359,12 @@ func set(cfg *Config, key, value string) error {
 		return setInt(&cfg.Search.UserQueryLimit, key, value)
 	case "search.limit_anonymous_users_only":
 		return setBool(&cfg.Search.LimitAnonymousUsersOnly, key, value)
+	case "work.workers":
+		return setInt(&cfg.Work.Workers, key, value)
+	case "work.lease":
+		return setDuration(&cfg.Work.Lease, key, value)
+	case "work.max_attempts":
+		return setInt(&cfg.Work.MaxAttempts, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -430,6 +459,18 @@ func (c Config) Validate() error {
 	if c.Search.UserQueryLimit < 0 {
 		errs = append(errs, fmt.Errorf("%w: search.user_query_limit %d must not be negative",
 			ErrInvalidValue, c.Search.UserQueryLimit))
+	}
+	if c.Work.Workers < 1 || c.Work.MaxAttempts < 1 {
+		errs = append(
+			errs,
+			fmt.Errorf("%w: work.workers %d and work.max_attempts %d must be at least 1",
+				ErrInvalidValue, c.Work.Workers, c.Work.MaxAttempts),
+		)
+	}
+	// Renewing every half lease must leave a heartbeat time to land.
+	if c.Work.Lease < time.Second {
+		errs = append(errs, fmt.Errorf("%w: work.lease %s must be at least 1s",
+			ErrInvalidValue, c.Work.Lease))
 	}
 	return errors.Join(errs...)
 }

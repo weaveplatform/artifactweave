@@ -58,6 +58,7 @@ internal/
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/
   service/                     # one package per domain service; more arrive with their phases
     gc/ identity/ item/ multipart/ permission/ pkgindex/ registry/ roles/ trash/ usage/
+    work/                      # the persistent work queue's worker pool (decision 0033)
   scheduler/                   # Quartz-syntax cron runner for cleanup, replication, GC
   fakeupstream/                # chi fakes of upstream registries with fault modes
   testfault/                   # shared failing fakes for handler tests
