@@ -11,7 +11,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
-| `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS and Azure; see [Real-cloud conformance](#real-cloud-conformance-manual) |
+| `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
 
@@ -70,7 +70,7 @@ cloud credentials and is started from the Actions tab (**Run workflow**, target 
 writes under `conformance/<random>/` and deletes that prefix when it ends. The step
 summary lists the `PROBE` lines that answer the open questions in
 [research 18 §4](../research/18-cloud-blob-storage.md#4-open-questions-for-a-real-cloud-check).
-A run whose variables or secrets are missing fails rather than skipping. Both jobs run
+A run whose variables or secrets are missing fails rather than skipping. All three jobs run
 in the `cloud-conformance` environment, because the clouds trust that environment's
 subject and nothing else (see [Cloud trust and environments](#cloud-trust-and-environments)).
 

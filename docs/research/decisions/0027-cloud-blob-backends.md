@@ -170,9 +170,11 @@ the SDK wiring on Linux CI.
 **Azure.**
 - **SDK API version:** the SDK sends API version 2026-12-06 and cannot be pinned lower.
   The emulator needs `--skipApiVersionCheck`.
-- **Unverified on real Azure:** two contradictions in Microsoft's documentation (the Put
-  Block From URL range limit, and Shared Key authorisation of a same-account Copy Blob
-  From URL source) are settled only by a real-cloud run.
+- **Contradictions in Microsoft's documentation:** real-cloud runs settled the Put Block
+  From URL range limit at 4,000 MiB ([research 18](../18-cloud-blob-storage.md) section 4).
+  Shared Key authorisation of a same-account Copy Blob From URL source stays unverified,
+  because the accounts allow no Shared Key; it is moot, since the backend always
+  authorises a copy source explicitly.
 - **Accounts without Shared Key:** an account that disallows Shared Key needs Entra ID for
   both the copy source and presigning.
 - **Dependency weight:** the azblob `container` package pulls in `apache/arrow-go`.

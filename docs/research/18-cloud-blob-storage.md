@@ -30,7 +30,8 @@ Source abbreviations:
 | **MS:x** | https://learn.microsoft.com/en-us/rest/api/storageservices/x |
 
 **[probe]** marks a behaviour observed by running the SDK against the emulator on
-2026-10-13.
+2026-10-13. **[cloud]** marks one observed against a real account by the
+`cloud-conformance` probes (section 4), with the dates of the runs.
 
 ## 1. Google Cloud Storage
 
@@ -56,9 +57,12 @@ The SDK's own experimental parallel upload uses the compose pattern. It writes p
 temporary prefix (GCS-SDK/pcu.go:271-290,509-575,36-37).
 
 Composite objects carry a CRC32C but **no MD5**, and their ETag is not an MD5
-([composite-objects]). The docs say compose "ignores any CRC32C value you provide". The
-SDK says the compose is "rejected" on a mismatch (GCS-SDK/copy.go:168-173). Compare the
-CRC32C client-side, as the SDK's parallel upload does (pcu.go:579-582). Nothing in the SDK's
+([composite-objects]). The docs say compose "ignores any CRC32C value you provide"; the
+SDK says the compose is "rejected" on a mismatch (GCS-SDK/copy.go:168-173). **[cloud]** The
+docs are right: compose accepts a wrong CRC32C (2026-10-13 and 2026-10-16, section 4), so
+the CRC32C must be compared client-side, as the SDK's parallel upload does
+(pcu.go:579-582). **[cloud]** A stale source generation answers 404 `notFound`, not 412,
+and a destination that must not exist answers 412 `conditionNotMet`. Nothing in the SDK's
 read path relies on MD5; the HTTP reader validates CRC32C on full reads only
 (GCS-SDK/http_client.go:1484-1515,1675-1688).
 
@@ -180,8 +184,8 @@ staged under a temporary name must be copied server-side.
 | Option | Behaviour | Verdict |
 |---|---|---|
 | Copy Blob (`StartCopyFromURL`) | asynchronous and best-effort; for block blobs it "creates a committed blob of zero length before returning", visible while pending; a failed copy leaves an empty blob; a second copy to the destination gets 409 ([MS:copy-blob]); **[probe]** Azurite always completes it synchronously, so tests never see the pending state | rejected: a zero-length placeholder breaks content-addressed `Exists` |
-| Copy Blob From URL (`CopyFromURL`) | synchronous, source ≤ 256 MiB ([MS:copy-blob-from-url]); the page contradicts itself on whether Shared Key authorises a same-account source | usable below 256 MiB once verified on real Azure |
-| Put Block From URL (`StageBlockFromURL`) ranges into the final name, then one commit | synchronous per range; the final blob stays invisible until the atomic commit; the source must be public, carry a SAS, or be authorised with `x-ms-copy-source-authorization: Bearer` (version 2020-10-02 and later); Shared Key on the destination does not authorise the source ([MS:put-block-from-url]); maximum range per call is stated as both 100 MiB and 4,000 MiB on the same page; **[probe]** Azurite 3.37.0 returns `403 CannotVerifyCopySource` without a source SAS and succeeds with one | **chosen**: ranges of up to 4,000 MiB (the limit the real service enforces, §4) in parallel with `SourceIfMatch` on the temporary blob's ETag |
+| Copy Blob From URL (`CopyFromURL`) | synchronous, source ≤ 256 MiB ([MS:copy-blob-from-url]); the page contradicts itself on whether Shared Key authorises a same-account source, which our accounts (no Shared Key) cannot test (section 4, question 2) | usable below 256 MiB once verified on real Azure |
+| Put Block From URL (`StageBlockFromURL`) ranges into the final name, then one commit | synchronous per range; the final blob stays invisible until the atomic commit; the source must be public, carry a SAS, or be authorised with `x-ms-copy-source-authorization: Bearer` (version 2020-10-02 and later); Shared Key on the destination does not authorise the source ([MS:put-block-from-url]); maximum range per call is stated as both 100 MiB and 4,000 MiB on the same page; **[cloud]** 4,000 MiB is accepted and 4,001 MiB refused with `CannotVerifyCopySource` (2026-10-13 and 2026-10-16); **[probe]** Azurite 3.37.0 returns `403 CannotVerifyCopySource` without a source SAS and succeeds with one | **chosen**: ranges of up to 4,000 MiB (the limit the real service enforces, §4) in parallel with `SourceIfMatch` on the temporary blob's ETag |
 | Pointer blob or metadata | no copy, but doubles round trips on every read and needs its own garbage collection | rejected |
 | Hierarchical-namespace rename (`x-ms-rename-source`) | atomic, but needs the azdatalake SDK and a DFS endpoint ([path-create]) | possible later fast path |
 
@@ -198,6 +202,7 @@ A declared digest avoids the copy entirely: stage on the final name and commit w
   - Use `IfNoneMatch: azcore.ETagAny`.
   - **[probe]** Azurite answers an existing name with `409 BlobAlreadyExists`; the generic documentation says 412 ([conditional headers]). Treat both as "exists".
   - **[probe]** Azurite also answers 409 for a name holding only uncommitted blocks.
+  - **[cloud]** Real Azure accepts that write and stores the blob (2026-10-13 and 2026-10-16, section 4).
 - **Ranged reads:**
   - `DownloadStream` with `HTTPRange{Offset, Count}`, where Count 0 means "to the end" (AZB/blob/client.go:514; models.go:78-81).
   - `NewRetryReader` re-reads with `If-Match` on the first ETag (blob/retry_reader.go:30-55).
@@ -340,6 +345,25 @@ None of these replicates across clouds.
 3. **Azure:** whether Put Blob with `If-None-Match: *` succeeds on a name that holds only uncommitted blocks. Azurite returns 409.
 4. **GCS:** compose behaviour with a mismatched CRC32C, and with source generation preconditions.
 5. **GCS:** whether federated Workload Identity principals without a service account can sign URLs.
+6. **S3:** whether a conditional write (`If-None-Match: *`) onto an existing key is refused with 412 by PutObject, CopyObject and CompleteMultipartUpload.
+7. **S3:** which checksum an object written with the SDK's defaults carries, and of which type.
+8. **S3:** whether a URL presigned for GET is refused for HEAD. The JFrog CLI sends a HEAD before a split download and follows redirects (research [19](19-cdn-and-download-redirect.md) section 2).
+
+Questions 6 to 8 are S3's. They live here because the same workflow asks them; the S3
+backend itself predates this report.
+
+Status after the runs below:
+
+| Question | Status |
+|---|---|
+| 1 | Answered: 4,000 MiB |
+| 2 | Open by design: the accounts allow no Shared Key, and the backend never relies on it |
+| 3 | Answered: real Azure accepts the write |
+| 4 | Answered: a wrong CRC32C is ignored; a stale source generation is 404; an existing destination is 412 |
+| 5 | Answered for a federated principal that acts as a service account; a federated principal that acts as none is still untested |
+| 6 | Answered: 412 on all three |
+| 7 | Answered: a full-object CRC32 |
+| 8 | Answered: HEAD is refused with 403 |
 
 The opt-in `cloud-conformance.yml` workflow (issue #12, see
 [CI](../testing/ci.md#real-cloud-conformance-manual)) runs the blob contract against real
@@ -352,12 +376,16 @@ accounts and logs one `PROBE` line per question:
 | 3 | `azure.put_blob_if_none_match_over_uncommitted` |
 | 4 | `gcs.compose.wrong_crc32c`, `gcs.compose.stale_source_generation`, `gcs.compose.destination_exists` |
 | 5 | `gcs.signed_url` |
+| 6 | `s3.put.if_none_match_existing`, `s3.copy.if_none_match_existing`, `s3.complete_multipart.if_none_match_existing` |
+| 7 | `s3.default_checksum` |
+| 8 | `s3.presigned_get` |
 
 The backends do not depend on the answers:
 - The Azure backend copied in 100 MiB ranges; it now uses 4,000 MiB, the verified limit.
 - It always authorises copy sources explicitly, with a service SAS or an Entra bearer token.
 - It treats `BlobAlreadyExists` and `ConditionNotMet` alike on a must-not-exist write.
 - The GCS backend checks the composed size and CRC32C itself.
+- The S3 backend checks for an existing content key with HeadObject before it writes, and never presigns HEAD.
 
 The answers record the real behaviour and show whether those defensive choices can be
 relaxed.
@@ -400,6 +428,39 @@ mode) found a bug: the copy source carried the SAS twice, and every copy into pl
 with `CannotVerifyCopySource`. It's fixed in `sourceURL`. A deploy without a declared
 digest stages into a temporary blob and copies it into place, so the 40 MiB smoke blob was
 committed as one block copied by a single range.
+
+### Confirmed in CI (2026-10-16)
+
+After the reference-deployment rework (epic #189), `cloud-conformance.yml` ran once per
+cloud against a freshly applied `single-bucket` scenario, each destroyed afterwards. The
+blob contract passed on all three. Unlike the operator runs above, each job authenticated
+as CI does, through OpenID Connect with no stored secret: on GCP, Workload Identity
+Federation acting as the conformance service account (`google-github-actions/auth` with
+`workload_identity_provider` and `service_account`); on Azure, `azure/login` as the
+data-plane managed identity; on AWS, the assumed data-plane role.
+
+| Cloud | Run | Probe results |
+|---|---|---|
+| GCS | [38891476745](https://github.com/weaveplatform/artifactweave/actions/runs/38891476745) | `compose.wrong_crc32c rejected=false`; `compose.stale_source_generation rejected=true` (404 `notFound`); `compose.destination_exists precondition_failed=true` (412 `conditionNotMet`); `signed_url ok=true`; `compose.md5_present=false component_count=2` |
+| Azure | [38892778296](https://github.com/weaveplatform/artifactweave/actions/runs/38892778296) | `put_block_from_url` accepted at 100, 101, 256 (1.3 s), 1,024 (4.3 s) and 4,000 MiB (16.5 s), refused at 4,001 MiB with `CannotVerifyCopySource`; `put_blob_if_none_match_over_uncommitted accepted=true`; `copy_from_url.shared_key_source_without_sas skipped=true` (the account allows no Shared Key) |
+| S3 | [38892387927](https://github.com/weaveplatform/artifactweave/actions/runs/38892387927) | see the S3 answers below |
+
+The GCS and Azure answers match those of 2026-10-13. What the GCS signing probe proves is
+narrower than question 5 as asked: a job federated through Workload Identity Federation
+that acts as a service account signs V4 URLs through IAM `signBlob` as that account, as
+the 2026-10-13 consequence predicted for CI. A federated principal that acts as no
+service account was not tested and still cannot sign.
+
+### S3 answers (2026-10-16)
+
+From `TestRealS3Probes` (`pkg/blob/s3/real_test.go`) in run 38892387927, against the
+`aws/single-bucket` conformance bucket:
+
+| Question | Answer | Consequence |
+|---|---|---|
+| 6: conditional writes onto an existing key | PutObject, CopyObject and CompleteMultipartUpload with `If-None-Match: *` all answer 412 `PreconditionFailed` | S3 enforces must-not-exist itself, as GCS and Azure do. The backend's HeadObject check before a write is safe because keys are content addresses; a conditional write could replace it and close the window between the check and the write |
+| 7: default checksum | `FULL_OBJECT` CRC32; no CRC64NVME | Informational: the contract computes its own SHA-256 |
+| 8: a URL presigned for GET, used for HEAD | HEAD answers 403, GET answers 200 | Confirms the inference in research [19](19-cdn-and-download-redirect.md) section 2 for S3: HEAD and conditional requests on a redirecting repository are answered locally and never redirected, as decision [0029](decisions/0029-cdn-delivery-and-download-redirect.md) requires |
 
 ## Sources
 
