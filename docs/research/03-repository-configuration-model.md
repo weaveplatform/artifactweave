@@ -50,7 +50,7 @@ API; see [12-open-questions.md](12-open-questions.md).
 |---|---|---|
 | `checksumPolicyType` (local, federated) | `client-checksums`, `server-generated-checksums` | `client-checksums` |
 | `remoteRepoChecksumPolicyType` | `generate-if-absent`, `fail`, `ignore-and-generate`, `pass-thru` | `generate-if-absent` |
-| `snapshotVersionBehavior` | `unique`, `non-unique`, `deployer` | `unique` (since 7.41) |
+| `snapshotVersionBehavior` | `unique`, `non-unique`, `deployer` | `unique` (since 7.41; in 6.20 the descriptor already defaulted to `unique` and the REST model to `non-unique`, [research 27](27-maven.md#10-corrections-to-research-03-and-04)) |
 | `pomRepositoryReferencesCleanupPolicy` (virtual) | `discard_active_reference`, `discard_any_reference`, `nothing` | `discard_active_reference` |
 | `dockerApiVersion` | `V2` (`V1` is legacy and still listed in the YAML form) | `V2` |
 | `terraformType` | `MODULE`, `PROVIDER` in the documentation; the Terraform provider sends lower-case `module` and `provider` | none |
@@ -120,9 +120,9 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
 |---|---|---|
 | `checksumPolicyType` | `client-checksums` | |
 | `handleReleases`, `handleSnapshots` | `true` | Maven family. |
-| `maxUniqueSnapshots` | `0` | 0 means unlimited; the effective minimum is 2. |
+| `maxUniqueSnapshots` | `0` | 0 means unlimited. JFrog's knowledge base is reported to give an effective minimum of 2; 6.20's cleanup has no floor ([research 27](27-maven.md#7-maxuniquesnapshots)). |
 | `snapshotVersionBehavior` | `unique` | |
-| `suppressPomConsistencyChecks` | `false` | |
+| `suppressPomConsistencyChecks` | `false` for `maven`; `true` for `gradle`, `ivy` and `sbt` | As the Terraform provider and the UI set them; 6.20's descriptor defaults to `true` and its REST model to `false` ([research 27](27-maven.md#6-pom-consistency-checks)). |
 | `maxUniqueTags` | `0` | Docker; 0 means unlimited. |
 | `dockerTagRetention` | `1` | Docker; number of tags kept per image when `maxUniqueTags` applies. |
 | `dockerApiVersion` | `V2` | |

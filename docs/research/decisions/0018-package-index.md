@@ -16,7 +16,8 @@ The store keeps a `packages`, `versions` and `version_files` index. Each format 
 maintains it on write, delete, move, copy and reindex, recording the package name, the
 version string, the parsed version for ordering, timestamps, download statistics and the
 files that make up the version. Each package type registers a comparator: semantic
-versioning for npm, Go, Helm and Terraform; Maven version ordering; PEP 440 for PyPI;
+versioning for npm, Go, Helm and Terraform; Artifactory's Mercury ordering for Maven,
+Gradle, Ivy and SBT ([0036](0036-maven.md)); PEP 440 for PyPI;
 NuGet SemVer2; manifest timestamps for Docker tags.
 
 Retention, search and the registration and version endpoints read the index. The item
@@ -39,8 +40,8 @@ tree remains the source of truth; a reindex rebuilds the index from it.
 **npm, Go and Maven** (P7) maintain the index through the format hooks of decision
 [0032](0032-package-format-handlers.md), on every write path including restore from the
 trash can and items cached from a remote. Each format's decision sets its package, version,
-files and order: npm (#264), Go modules ([0035](0035-go-modules.md)), and Maven with
-Gradle, Ivy and SBT (#266). For all of them:
+files and order: npm ([0034](0034-npm.md)), Go modules ([0035](0035-go-modules.md)), and
+Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)). For all of them:
 - **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment)
   is a cache of what the version's items, content and properties say. A reindex rebuilds
   it, and nothing is kept there that the items do not carry.

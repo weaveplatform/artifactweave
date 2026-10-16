@@ -59,3 +59,4 @@ Status values: Proposed, Accepted, Superseded.
 | 0033 | [Persistent work queue](0033-persistent-work-queue.md) |
 | 0034 | [npm local repositories](0034-npm.md) |
 | 0035 | [Go modules](0035-go-modules.md) |
+| 0036 | [Maven, Gradle, Ivy and SBT](0036-maven.md) |
