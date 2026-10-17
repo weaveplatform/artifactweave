@@ -111,7 +111,13 @@ func (h Handler) Admit(
 	case old.Folder || old.Actual.SHA256 == w.Checksums.SHA256:
 		return w, nil
 	}
-	return w, format.Reject(http.StatusConflict,
+	return w, Republished(f)
+}
+
+// Republished is the refusal of different content over f, a stored .zip or
+// .mod, whichever API carried it.
+func Republished(f File) *format.Rejection {
+	return format.Reject(http.StatusConflict,
 		"Version %s of module %s already has a different .%s; delete the version to replace it.",
 		f.Version, f.Module, f.Ext)
 }

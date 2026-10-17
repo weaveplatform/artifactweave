@@ -32,6 +32,7 @@ func Protocol() pkgroute.Protocol {
 			reads := reads{k: k}
 			r.Get("/*", reads.serve)
 			r.Head("/*", reads.serve)
+			r.Put("/*", publisher{k}.publish)
 			// A path that names no Go operation answers 404 to every
 			// method, and only one that does answers 405 to a method no
 			// route serves.

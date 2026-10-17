@@ -50,6 +50,9 @@ type Options struct {
 	// ItemError turns an item service error into the *apierror.Error the
 	// item routes answer with, so a format's Rejection keeps its status.
 	ItemError func(ctx context.Context, op string, err error) error
+	// Created answers 201 to a deploy that stored it, with the item routes'
+	// deploy body. Nil answers 201 with no body.
+	Created func(w http.ResponseWriter, r *http.Request, it types.Item)
 	// Fault records an unexpected error for the access log; nil drops it.
 	Fault func(*http.Request, error)
 }
@@ -387,12 +390,63 @@ func (k *Kit) Store(
 	return it, nil
 }
 
+// StoreOnce is Store for a file that never changes once stored, such as a
+// Go module version's .zip or .mod (decision 0035). The caller needs Write
+// on path and never Delete, since nothing is replaced: the same content
+// again only merges props into the stored file's properties, and other
+// content is not written but refused with what differs returns for the
+// stored file. Only the body's digest tells the two apart, so the body is
+// committed to the blob store before the stored file is read; content left
+// unreferenced is collected as an orphan.
+func (k *Kit) StoreOnce(
+	r *http.Request,
+	path string,
+	body io.Reader,
+	props types.Properties,
+	declared types.Checksums,
+	differs func(stored types.Item) error,
+) (types.Item, error) {
+	ctx := r.Context()
+	c := RequestFrom(r).Repo
+	if !can(r, c, path, types.ActionWrite) {
+		return types.Item{}, refusal(r)
+	}
+	p, _ := auth.FromContext(ctx)
+	d := item.Deploy{
+		Target: item.Target{Repo: c, Path: path}, Body: body, Declared: declared,
+		Properties: props, By: p.Name,
+	}
+	svc := k.o.Items()
+	info, err := svc.Upload(ctx, d)
+	if err != nil {
+		return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+	}
+	stored, err := k.o.Store.Items().Get(ctx, c.Key, false, path)
+	switch {
+	case errors.Is(err, store.ErrNotFound) || err == nil && stored.Folder:
+		// The item service refuses a file over a folder, as on any deploy.
+		it, err := svc.DeployCommitted(ctx, d, info)
+		if err != nil {
+			return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+		}
+		return it, nil
+	case err != nil:
+		return types.Item{}, fmt.Errorf("get item %s/%s: %w", c.Key, path, err)
+	case stored.Actual.SHA256 != info.Digests.SHA256:
+		return types.Item{}, k.o.ItemError(ctx, "deploy", differs(stored))
+	}
+	if len(props) > 0 {
+		if err := svc.Annotate(ctx, c, stored, props, nil); err != nil {
+			return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+		}
+	}
+	return stored, nil
+}
+
 // Deploy answers a PUT whose body is the file to store at path, with the
 // matrix parameters props and the checksums its X-Checksum headers declare
-// (DeclaredChecksums): 201 with the stored file's X-Checksum-Sha1, -Sha256
-// and -Md5 headers and no body, which is what jf go-publish checks
-// (research 26 section 3.1), or the refusal. It reports whether the file
-// was stored.
+// (DeclaredChecksums), through Store: Created's answer, or the refusal.
+// It reports whether the file was stored.
 func (k *Kit) Deploy(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -404,7 +458,19 @@ func (k *Kit) Deploy(
 		k.Error(w, r, err)
 		return types.Item{}, false
 	}
-	SetChecksums(w.Header(), it.Actual)
-	w.WriteHeader(http.StatusCreated)
+	k.Created(w, r, it)
 	return it, true
+}
+
+// Created answers a deploy that stored it: 201 with its X-Checksum-Sha1,
+// -Sha256 and -Md5 headers, which jf go-publish reads (research 26 section
+// 3.1), and the item routes' deploy body when the server gives one
+// (Options.Created).
+func (k *Kit) Created(w http.ResponseWriter, r *http.Request, it types.Item) {
+	SetChecksums(w.Header(), it.Actual)
+	if k.o.Created != nil {
+		k.o.Created(w, r, it)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
 }
