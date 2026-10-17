@@ -71,6 +71,7 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | Component | Version | Note |
 |---|---|---|
 | JFrog Artifactory docs | 7.x, read 2026-10-12 | definitions embedded per page on docs.jfrog.com |
+| Artifactory target | 7.161.32 self-managed (SaaS 7.174.0), the latest on 2026-10-17 | see [Target version and sources](#target-version-and-sources) |
 | `jfrog/artifactory` Terraform provider | v12.11.14 (2026-09-11) | |
 | `jfrog/platform` Terraform provider | v2.2.11 (2026-08-25) | |
 | `jfrog/project` Terraform provider | v1.9.9 (2026-08-24) | |
@@ -83,6 +84,36 @@ shim, stub or ignore, and names what could not be verified from public sources.
 | oapi-codegen | v2.8.0 | OpenAPI 3.0.3 specs |
 | testcontainers-go | v0.44.0 | Linux jobs only |
 | golangci-lint | v2.14.0 | |
+
+## Target version and sources
+
+artifactweave targets the latest self-hosted Artifactory 7.x release, as listed in the
+[Artifactory release notes](https://docs.jfrog.com/releases/docs/artifactory-release-notes)
+(maintainer decision, 2026-10-17). On that date it was 7.161.32 (self-managed; SaaS is at
+7.174.0). Research and implementation use these sources, in this order:
+
+1. **JFrog's current documentation and OpenAPI definitions** ([01](01-jfrog-api-landscape.md)).
+2. **The Artifactory 7.x release notes**
+   ([self-managed](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases),
+   [SaaS](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), for every
+   behaviour that changed after 6.x.
+3. **The Artifactory OSS 6.20 source** (`knottnhupfer/artifactory-oss` at `b99e5649bcad`),
+   only for what the first two leave out. Artifactory 7.x is closed source, and 6.20 (2020)
+   is the last release whose source was published.
+
+**Rules for 6.20 claims.**
+- A claim taken from 6.20 says that the 7.x documentation and release notes were checked
+  for the same behaviour.
+- When 7.x documents the behaviour differently, 7.x wins.
+- A 6.20 claim nothing confirms for 7.x stays **[I]** and is listed on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+
+**Recording what was checked.** Each research document and decision record states the
+release it was last checked against, as `Checked against: Artifactory 7.161.32`. P19 reads
+the release notes onwards from there.
+
+**P19** brings everything up to the latest 7.x release current when it runs
+([plan](../implementation/plan.md#p19-live-artifactory-comparison-and-tidy-up)).
 
 ## Conventions
 
