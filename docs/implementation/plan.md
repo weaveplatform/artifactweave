@@ -38,7 +38,7 @@ Updated as phases land. "Done" means the exit criteria hold, the gate (95% merge
 | P16 Cold storage archive and retention | Not started | |
 | P17 Workers | Not started | **M4** |
 | P18 Hardening and release | Not started | v0.1.0-rc |
-| P19 Live Artifactory comparison and tidy-up | Not started | After P18. One comparison against a JFrog trial instance for everything earlier phases could only infer (#216) |
+| P19 Live Artifactory comparison and tidy-up | Not started | After P18. Brings artifactweave up to the latest Artifactory 7.x release: one comparison against a JFrog trial of that release for everything earlier phases could only infer (#216) |
 
 ## Milestones
 
@@ -780,18 +780,32 @@ Artifactory runs once, here, against a JFrog trial instance, rather than as capt
 way. Until then every phase labels what it can only infer, as [I] in the research documents and
 as entries in the [deviations register](deviations.md), and adds each such item to #216.
 
+**Target: the latest Artifactory 7.x release** (decided on 2026-10-17). P19 brings artifactweave
+up to the newest self-hosted 7.x release current when P19 runs, as listed in the
+[Artifactory release notes](https://docs.jfrog.com/releases/docs/artifactory-release-notes),
+and not to the release the research started from. Every claim sourced from the Artifactory
+OSS 6.20 code is confirmed or corrected against it
+([research sources](../research/README.md#target-version-and-sources)).
+
 **Tracking.** Milestone "P19 Live Artifactory comparison and tidy-up", starting with #216.
 
 **Tasks**
-1. Stand up a JFrog trial instance and a capture harness that records requests and responses
-   for the JFrog CLI, the Terraform providers and the native clients of every format.
-2. Capture every item listed on #216, every [I] fact in the research documents, and every
-   deviation whose Artifactory side is unconfirmed.
-3. Replace inferred fixtures with captured ones. Each divergence becomes a fix, or a deviation
+1. Read the 7.x release notes from the release each research document was last checked
+   against up to the trial's release. Add every behaviour change in an area artifactweave
+   implements to the capture list, as a fix, or as a deviation.
+2. Stand up a JFrog trial instance of that release and a capture harness that records requests
+   and responses for the JFrog CLI, the Terraform providers and the native clients of every
+   format. Each fixture records the release it was captured from.
+3. Capture every item listed on #216, every [I] fact in the research documents, every claim
+   sourced from the 6.20 code, and every deviation whose Artifactory side is unconfirmed.
+4. Replace inferred fixtures with captured ones. Each divergence becomes a fix, or a deviation
    recorded with the captured evidence.
-4. Settle the decisions that rest on inferences, amending them in place.
+5. Settle the decisions that rest on inferences, amending them in place, and update each
+   document's `Checked against` release.
 
 **Exit criteria**
 - Every item on #216 is either matched by a captured fixture or recorded as a deviation with
   evidence; no [I] fact remains where a capture could settle it.
+- Every research document and decision is checked against the trial's release, and no claim
+  rests on the 6.20 source alone where the trial could settle it.
 
