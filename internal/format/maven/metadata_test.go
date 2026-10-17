@@ -588,8 +588,9 @@ func TestPluginMetadataOnEveryWrite(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	g, dir := "com.acme.plugins", "com/acme/plugins/"
 	pom := dir + "maven-foo-plugin/1.0/maven-foo-plugin-1.0.pom"
-	w.deploy(pom, nil, pomOf(g, "maven-foo-plugin", "1.0", "maven-plugin", "Foo"))
-	// Marked behind the format's back, as an import might leave it.
+	// Deployed as a jar, which #278 does not mark, then marked behind the
+	// format's back, as an import might leave it.
+	w.deploy(pom, nil, pomOf(g, "maven-foo-plugin", "1.0", "jar", "Foo"))
 	it, err := w.db.Items().Get(w.ctx, w.c.Key, false, pom)
 	if err != nil {
 		t.Fatal(err)
