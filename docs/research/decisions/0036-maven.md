@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 27 section 13](../27-maven.md#13-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 P7 serves Maven local repositories to `mvn` and `jf mvn`, and Gradle, Ivy and SBT
@@ -195,6 +197,19 @@ acceptance, and Gradle's run does not gate M2 (decision
 - **`suppressPomConsistencyChecks` per type.** The Terraform provider and Artifactory's UI
   both default Gradle, Ivy and SBT to suppressed and Maven to checked, so a repository
   created either way matches. What a REST create without the field gets on 7.x is on #216.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32. The 7.x documentation and release notes add four points
+([research 27 section 13](../27-maven.md#13-artifactory-7x-check)):
+- **POM parsing** accepts a POM that starts with an empty line, holds UTF-8 non-breaking
+  spaces or declares ISO-8859-1 (7.125.4, SaaS 7.110.5). A failed check answers 409 ([#278](https://github.com/weaveplatform/artifactweave/issues/278)).
+- **Version tokens** resolve on 7.x in remote caches and virtual repositories as well as local
+  ones, and a path cannot mix `[RELEASE]` with `[INTEGRATION]`. P7 resolves in local
+  repositories ([#281](https://github.com/weaveplatform/artifactweave/issues/281)); P9 and P10 extend it.
+- **`calculateMetadata`** answers 403 on 7.x to a caller without the permission it needs, so
+  DV-052 now differs from 7.x only in which permission that is.
+- **`maxUniqueSnapshots` of 0** turns the cleanup off (SaaS 7.164.0).
 
 ## Constraints
 

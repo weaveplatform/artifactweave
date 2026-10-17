@@ -2,6 +2,8 @@
 
 Research baseline: **2026-10-16**.
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#6-artifactory-7x-check) records it.
+
 Phase P7 adds npm, Go and Maven local repositories at once, and P8 adds PyPI, NuGet, Helm and
 Terraform. Each format reacts to what is deployed: it indexes packages and versions, writes
 derived files such as `maven-metadata.xml`, refuses what its layout forbids, and answers its
@@ -114,3 +116,29 @@ rule for every format **[S, from the decisions]**:
 | 5.6 | Whether Docker tag lists, referrers and the catalog of a blacked-out repository answer 404 or list nothing; artifactweave still lists them | [I] |
 | 5.7 | Whether the storage API's file list (`?list`) leaves out items the patterns reject, and how it treats a virtual repository's blacked-out member; it is built by the closed REST addon, and artifactweave refuses only a blacked-out repository named directly | [I] |
 | 5.8 | Whether 7.x's storage API item info still describes items of a blacked-out repository and excluded paths, as 6.20's `ArtifactResource.prepareStorageInfoResponse` does | [I] |
+
+## 6. Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation.
+
+**Unconfirmed for 7.x:** the storage-interceptor contract (section 1) is 6.20's internal code;
+the 7.x documentation and release notes describe no equivalent. Facts 1.1 to 1.5 are
+unconfirmed for 7.x. The framework (decision 0032) depends on what formats do, not on how
+Artifactory wires it.
+
+**What 7.x adds to the open points of section 5:**
+- **5.2 and the search APIs.** AQL filters items a repository's patterns reject for non-admins
+  from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "so AQL results align with repository access rules and other search
+  methods". That points to the search APIs filtering them as well, as artifactweave does
+  (DV-058), but no note says so outright.
+- **5.4.** No 7.x page or note describes a download from a blacked-out repository, so it stays
+  open.
+- **npm.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) refuses copy and move into `.npm/` (research 25 section 5).
+- **Maven.** 7.x accepts more POMs, with a leading blank line, non-breaking spaces or
+  ISO-8859-1 (research 27 section 6).
+
+These are format rules, not framework ones.
+
+The rest of section 5 stays on [#216](https://github.com/weaveplatform/artifactweave/issues/216).

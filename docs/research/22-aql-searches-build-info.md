@@ -2,6 +2,8 @@
 
 Research baseline: **2026-10-15**.
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#6-artifactory-7x-check) records it.
+
 Phase P5 completes Artifactory Query Language, serves the GET search endpoints and adds
 build-info. Decision [0012](decisions/0012-search-and-aql.md) covers search and AQL, and
 decision [0014](decisions/0014-build-info.md) covers build-info. This report collects what
@@ -417,3 +419,50 @@ does for each.
 | jfrog-cli-core | `b47892ded3a0` |
 | Artifactory open source edition (mirror) | 6.20.0, `b99e5649bcad` |
 | jfrog/build-info (Java) | `4f0d5407279e` |
+
+## 6. Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The pages read again are [artifactory-query-language](https://docs.jfrog.com/artifactory/docs/artifactory-query-language.md),
+[aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md), [aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md), [aql-query-execution](https://docs.jfrog.com/artifactory/docs/aql-query-execution.md),
+[aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md), [aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md), [searchaql](https://docs.jfrog.com/artifactory/reference/searchaql.md) and the
+search references.
+
+**Confirmed for 7.x:** the AQL rules of section 1 were taken from these pages and stand:
+- the query size limit, 6,000 characters, from [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed);
+- `scan-factor`, from 7.133.0, and `.limit()` read before permission filtering;
+- the 408 timeout;
+- throttling with 429, from 7.84, off by default from 7.84.16;
+- the SaaS result cap.
+
+Two 7.x changes back the repository-pattern rule:
+- AQL results honour include and exclude patterns for non-admins from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "so AQL
+  results align with repository access rules and other search methods";
+- concurrency limits apply globally and per user from the same release.
+
+The search APIs' rate limiting ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and the bad checksum search's 10,000 cap
+([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)) are in decision 0012.
+
+**Changed or added in 7.x (build-info):**
+- **Duplicate entries.** From 7.90.15 self-managed and 7.98.5 SaaS,
+  `artifactory.build.block.duplicate.entries` (default `true`) fails a build-info publish that
+  has duplicate entries ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), RTDEV-47671).
+- **Same-checksum dependencies.** Promotion promotes every dependency, even when several share
+  a SHA ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
+- **Folder entries.** Build-info entries that name a folder are ignored rather than failing
+  ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+- **Failed searches.** A failed build-info search by artifact answers 400, not 500
+  ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+- **Empty statuses.** A publish with an empty `statuses` section is accepted ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
+
+artifactweave refuses no duplicate entry today, and the other points are untested: [#353](https://github.com/weaveplatform/artifactweave/issues/353).
+
+**Unconfirmed for 7.x:** the **[S]** claims from Artifactory 6.20, which stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+- the domain joins (section 1.1);
+- the pre-scope build drop;
+- the versions, latest version and build artifacts handlers (section 2);
+- promotion and retention (section 3).
+
+The **[S]** claims from the JFrog CLI and build-info-go describe current clients and need no
+7.x check.

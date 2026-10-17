@@ -1,5 +1,7 @@
 # Package protocols
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#artifactory-7x-check) records it.
+
 Research baseline: 2026-10-12. This document records, for each of the eight ecosystems
 the registry serves, the client-facing protocol Artifactory implements: the upstream
 specification, the URL layout under `/artifactory`, how clients authenticate, where
@@ -442,3 +444,40 @@ blocks. The package type is cut from version 1; see
 ### Unverified, capture against a live Artifactory
 
 - The paths Artifactory uses for the `tfe.v2` service *(unverified; undocumented)*.
+
+## Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation.
+
+**The P6 and P7 protocols** were checked claim by claim in their own reports:
+- Docker and OCI: [research 23 section 12](23-docker-oci-registry.md#12-artifactory-7x-check);
+- npm: [research 25 section 11](25-npm.md#11-artifactory-7x-check);
+- Go: [research 26 section 8](26-go-modules.md#8-artifactory-7x-check);
+- Maven: [research 27 section 13](27-maven.md#13-artifactory-7x-check).
+
+What they found that changes this report:
+- Docker sets `docker.os` and `docker.architecture` (7.125.4).
+- npm's `api/npm/auth` dropped `always-auth` and `email` (7.161.26), and copy and move into
+  `.npm/` are refused (7.146.7).
+- Maven accepts more POMs (7.125.4, SaaS 7.110.5), and its tokens resolve in remote caches and
+  virtual repositories too.
+
+**The P8 protocols** (PyPI, NuGet, Helm, Terraform) were checked against the release notes
+only. P8's research must confirm them claim by claim. The notes change or add:
+- **NuGet:**
+  - Enforce Layout, which opens the `PackageBaseAddress` service and normalises versions
+    ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
+  - a newer handler, opt-in on self-managed and default on SaaS ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed));
+  - `repository-signatures` for remote v3 repositories, and a migration tool to the new
+    normalisation ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+- **PyPI:**
+  - the Simple JSON API, opt-in through `Accept` ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
+  - `Range` on downloads and `uv` support ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed));
+  - a negative cache for local simple-index lookups ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+- **Helm:** faster `index.yaml` generation ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)), with no protocol change.
+- **Terraform:** remote repositories refuse external URLs not on an allow list, a breaking
+  change ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+
+**Unconfirmed for 7.x:** the items under each "Unverified" heading, which stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216).

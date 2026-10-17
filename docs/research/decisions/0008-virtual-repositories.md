@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 25 section 11](../25-npm.md#11-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 A virtual repository aggregates local, remote and other virtual repositories under one
@@ -43,6 +45,20 @@ behaving as it does today.
 **Alternatives considered:**
 - *Resolving members in parallel and taking the first response*: faster, but changes
   which member wins and breaks `priorityResolution` semantics.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32 as a plan for P10. The 7.x notes add inputs for P10:
+- **Projects.** A virtual repository may include repositories not assigned or shared to its
+  project ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
+- **npm dist-tags.** Custom dist-tags resolve to the first member that has the tag, unless
+  `artifactory.npm.merge.latest.dist.tag.base.strategy.enabled` is set (from 7.75.3,
+  [research 25](../25-npm.md#7-latest)).
+- **npm metadata cache.** npm virtual repositories default to a two-hour metadata retrieval
+  cache on SaaS ([SaaS 7.165.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71650-saas)).
+- **Version tokens** resolve in virtual repositories ([research 27](../27-maven.md#13-artifactory-7x-check)).
+- **Docker pushes.** A Docker push through a virtual repository answers 404, not 403, when a
+  tag existence check meets members the caller cannot read ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), RTDEV-81046).
 
 ## Constraints
 

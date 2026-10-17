@@ -2,6 +2,8 @@
 
 Status: Accepted
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 24 section 6](../24-package-format-handlers.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 npm, Go and Maven (P7), then PyPI, NuGet, Helm and Terraform (P8), each react to what is
@@ -199,6 +201,16 @@ Artifactory keeps format behaviour the same whichever API wrote the item.
   contention and SQLite's single writer.
 - *Reading content inside the transaction:* a large tarball would hold every other writer;
   hence `Inspect` before it.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32
+([research 24 section 6](../24-package-format-handlers.md#6-artifactory-7x-check)).
+- **The hooks and the generic deploy policy** are artifactweave's design, and 6.20's
+  interceptors only informed them.
+- **The download policy** (amended for #328) still rests on 6.20 alone and stays on #216.
+- **The search filter.** DV-058 hides pattern-rejected items from search results as AQL does,
+  and 7.146.7 moved AQL to that rule for non-admins.
 
 ## Constraints
 

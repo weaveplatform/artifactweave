@@ -2,6 +2,8 @@
 
 Research baseline: **2026-10-16**.
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#8-artifactory-7x-check) records it.
+
 Phase P7 serves Go modules from local `go` repositories. [Research 04](04-package-protocols.md)
 sketched the GOPROXY protocol and said nothing in it was unverified. Planning on 2026-10-16
 found otherwise: Artifactory's Go support is closed source, JFrog documents only how to
@@ -305,3 +307,34 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
 | jfrog-client-go | `0646d7b50f9a` |
 | jfrog-cli | `eb1d5eb7ca97` |
 | Artifactory OSS | 6.20 (`knottnhupfer/artifactory-oss` `b99e5649bcad`) |
+
+## 8. Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The Go pages read are [go-modules](https://docs.jfrog.com/artifactory/docs/go-modules.md) and [jf-go](https://docs.jfrog.com/artifactory/docs/jf-go.md).
+
+**Confirmed for 7.x** (go-modules):
+- The go command cannot deploy, and `jf gp` publishes.
+- Go modules resolve only from local or virtual repositories, and a remote serves through a
+  virtual repository.
+- Artifactory proxies `sum.golang.org`, switched by `artifactory.go.sumdb.enabled` and
+  `artifactory.go.sumdb.url.override`.
+
+**Changed or added in 7.x:** every Go note from 7.84 to 7.161 concerns remote repositories and
+their VCS providers (P9). They are:
+- GitHub, GitHub Enterprise Server ([7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)) and GitHub Enterprise Cloud
+  ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed));
+- GitLab subgroups ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed), [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed));
+- Bitbucket tags with slashes ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed));
+- major versions v2 and above through a virtual repository ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)), and
+  `+incompatible` submodules ([7.146.12](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714612-self-managed));
+- `.zip` checksums for Go 1.24's vendor folder aligned between the registry and the proxy
+  ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed));
+- include and exclude patterns honoured for a remote's `.info` files ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
+
+None changes what a local repository stores or answers.
+
+**Unconfirmed for 7.x:** Artifactory's Go handler was closed source before 7, so the 6.20 mirror
+holds nothing for this report beyond the shared repository code. Every **[I]** above stays on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216).
