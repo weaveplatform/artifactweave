@@ -182,8 +182,27 @@ func TestComparatorForAndSorting(t *testing.T) {
 		{repo.Go, pv("v1.10.0", "v1.9.0"), []string{"v1.9.0", "v1.10.0"}},
 		{repo.PyPI, pv("1.0", "1.0rc1", "1.0.post1"), []string{"1.0rc1", "1.0", "1.0.post1"}},
 		{repo.NuGet, pv("1.0.0", "1.0.0-beta"), []string{"1.0.0-beta", "1.0.0"}},
-		{repo.Maven, pv("1.0", "1.0-SNAPSHOT"), []string{"1.0-SNAPSHOT", "1.0"}},
+		// The Maven family orders by Mercury, which ranks a snapshot below
+		// every qualifier (decision 0036); other types keep Maven's
+		// ComparableVersion, which puts it just below the release.
+		{
+			repo.Maven,
+			pv("1.0", "1.0-alpha-1", "1.0-SNAPSHOT"),
+			[]string{"1.0-SNAPSHOT", "1.0-alpha-1", "1.0"},
+		},
+		{
+			repo.Gradle,
+			pv("1.0", "1.0-alpha-1", "1.0-SNAPSHOT"),
+			[]string{"1.0-SNAPSHOT", "1.0-alpha-1", "1.0"},
+		},
+		{repo.Ivy, pv("1.0-rc1", "1.0-SNAPSHOT"), []string{"1.0-SNAPSHOT", "1.0-rc1"}},
+		{repo.SBT, pv("1.10", "1.9-SNAPSHOT"), []string{"1.9-SNAPSHOT", "1.10"}},
 		{repo.Generic, pv("1.10", "1.9"), []string{"1.9", "1.10"}},
+		{
+			repo.Generic,
+			pv("1.0", "1.0-alpha-1", "1.0-SNAPSHOT"),
+			[]string{"1.0-alpha-1", "1.0-SNAPSHOT", "1.0"},
+		},
 		{repo.Docker, []types.PackageVersion{
 			{Version: "latest", Created: t0.Add(time.Hour)},
 			{Version: "b", Created: t0},
