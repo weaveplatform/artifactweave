@@ -1,11 +1,9 @@
 package server
 
 import (
-	"cmp"
 	"context"
 	"errors"
 	"net/http"
-	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -39,33 +37,6 @@ func (r searchResponse) VisitSearchVersionsResponse(w http.ResponseWriter) error
 	return r.write(w)
 }
 
-// coordinates are what a layout reads from one file's path.
-type coordinates struct {
-	org, module, baseRev, folderItegRev, fileItegRev, classifier, ext string
-}
-
-// version is the module version a file belongs to: the base revision with
-// the folder's integration revision, or the file's when the folder has
-// none, as in 1.0-SNAPSHOT.
-func (c coordinates) version() string {
-	return withRev(c.baseRev, cmp.Or(c.folderItegRev, c.fileItegRev))
-}
-
-// fileVersion is the file's own version: the base revision with the file's
-// integration revision, as in 1.0-20260101.120000-1.
-func (c coordinates) fileVersion() string {
-	return withRev(c.baseRev, cmp.Or(c.fileItegRev, c.folderItegRev))
-}
-
-func (c coordinates) integration() bool { return c.folderItegRev != "" || c.fileItegRev != "" }
-
-func withRev(base, rev string) string {
-	if rev == "" {
-		return base
-	}
-	return base + "-" + rev
-}
-
 // layoutScope is what a layout search reads: the layout of each repository
 // it may find files in, by stored key, and the criteria that narrow to them.
 type layoutScope struct {
@@ -76,7 +47,7 @@ type layoutScope struct {
 // layoutHit is a file a layout search found, with its coordinates.
 type layoutHit struct {
 	aql.Hit
-	coordinates
+	layout.Coordinates
 }
 
 // layoutScope resolves the repositories scope covers (nil for every one) to
@@ -184,26 +155,12 @@ func under(prefixes ...string) aql.Node {
 // read returns the coordinates the layout of it's repository reads from
 // its path; ok is false when there is no such layout or the path does not
 // fit it.
-func (ls layoutScope) read(it types.Item) (coordinates, bool) {
+func (ls layoutScope) read(it types.Item) (layout.Coordinates, bool) {
 	l := ls.layouts[it.RepoKey]
 	if l == nil {
-		return coordinates{}, false
+		return layout.Coordinates{}, false
 	}
-	v, err := l.Match(it.FullPath())
-	if err != nil {
-		return coordinates{}, false
-	}
-	c := coordinates{
-		org: v[layout.TokenOrg], module: v[layout.TokenModule], baseRev: v[layout.TokenBaseRev],
-		folderItegRev: v[layout.TokenFolderItegRev], fileItegRev: v[layout.TokenFileItegRev],
-		classifier: v[layout.TokenClassifier], ext: v[layout.TokenExt],
-	}
-	// A descriptor pattern spells its extension as a literal, as the Maven
-	// layout's .pom does, so the name's is the file's.
-	if c.ext == "" {
-		c.ext = strings.TrimPrefix(path.Ext(it.Name), ".")
-	}
-	return c, c.module != "" && c.baseRev != ""
+	return l.Read(it.FullPath())
 }
 
 // find runs a layout search: the files in scope whose coordinates keep
@@ -213,7 +170,7 @@ func (ls layoutScope) find(
 	r *searchRun,
 	include []string,
 	want int,
-	keep func(coordinates) bool,
+	keep func(layout.Coordinates) bool,
 ) ([]layoutHit, error) {
 	if len(ls.layouts) == 0 {
 		return nil, nil
@@ -289,9 +246,9 @@ func (s artifactoryService) SearchGavc(
 	if specific {
 		d = resultDetail{}
 	}
-	found, err := ls.find(ctx, r, d.include(), r.userLimit(), func(co coordinates) bool {
-		return matches(g, co.org) && matches(a, co.module) && matches(v, co.version()) &&
-			matches(c, co.classifier)
+	found, err := ls.find(ctx, r, d.include(), r.userLimit(), func(co layout.Coordinates) bool {
+		return matches(g, co.Org) && matches(a, co.Module) && matches(v, co.Version()) &&
+			matches(c, co.Classifier)
 	})
 	if err != nil {
 		return nil, err
@@ -316,10 +273,10 @@ func (s artifactoryService) SearchGavc(
 		}
 		e := map[string]any{
 			"downloadUri": downloadURI(ctx, key, f.Item.FullPath()),
-			"ext":         f.ext, "version": f.version(),
+			"ext":         f.Ext, "version": f.Version(),
 		}
-		if f.classifier != "" {
-			e["classifier"] = f.classifier
+		if f.Classifier != "" {
+			e["classifier"] = f.Classifier
 		}
 		entries = append(entries, e)
 	}
@@ -395,9 +352,9 @@ func moduleVersions(
 ) ([]versionEntry, error) {
 	exact := v != "" && !hasWildcard(v)
 	gp, ap := wildcard(g), wildcard(a)
-	found, err := ls.find(ctx, r, nil, r.capped(0), func(co coordinates) bool {
-		return matches(gp, co.org) && matches(ap, co.module) &&
-			(!exact || co.integration() && co.version() == v)
+	found, err := ls.find(ctx, r, nil, r.capped(0), func(co layout.Coordinates) bool {
+		return matches(gp, co.Org) && matches(ap, co.Module) &&
+			(!exact || co.Integration() && co.Version() == v)
 	})
 	if err != nil {
 		return nil, err
@@ -405,13 +362,13 @@ func moduleVersions(
 	var out []versionEntry
 	seen := map[string]bool{}
 	for _, f := range found {
-		ver := f.version()
-		if f.integration() && (files || exact) {
-			ver = f.fileVersion()
+		ver := f.Version()
+		if f.Integration() && (files || exact) {
+			ver = f.FileVersion()
 		}
 		if !seen[ver] {
 			seen[ver] = true
-			out = append(out, versionEntry{ver, f.integration()})
+			out = append(out, versionEntry{ver, f.Integration()})
 		}
 	}
 	slices.SortStableFunc(

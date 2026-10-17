@@ -3,7 +3,6 @@ package item
 import (
 	"archive/tar"
 	"archive/zip"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"errors"
@@ -12,9 +11,9 @@ import (
 	"os"
 	"path"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -40,7 +39,7 @@ var (
 
 // ErrBadArchive is an upload that is not a usable archive: an unknown or
 // corrupt format, an entry escaping its folder, or limits exceeded (400).
-var ErrBadArchive = errors.New("item: unusable archive")
+var ErrBadArchive = archive.ErrUnusable
 
 // ErrOverwriteDenied is an explode that would replace existing files the
 // caller may not delete (403).
@@ -50,168 +49,18 @@ var ErrOverwriteDenied = errors.New("item: no permission to overwrite")
 var errFound = errors.New("item: archive entry found")
 
 // ArchiveKind is an archive container format.
-type ArchiveKind int
+type ArchiveKind = archive.Kind
 
 // Archive kinds; NotArchive is a file none of them.
 const (
-	NotArchive ArchiveKind = iota
-	Zip
-	Tar
-	TarGz
+	NotArchive = archive.None
+	Zip        = archive.Zip
+	Tar        = archive.Tar
+	TarGz      = archive.TarGz
 )
 
 // ParseArchiveKind reads an archiveType parameter (zip, tar, tar.gz, tgz).
-func ParseArchiveKind(s string) (ArchiveKind, bool) {
-	switch strings.ToLower(s) {
-	case "zip":
-		return Zip, true
-	case "tar":
-		return Tar, true
-	case "tar.gz", "tgz":
-		return TarGz, true
-	}
-	return NotArchive, false
-}
-
-// ContentType is the media type of an archive of the kind.
-func (k ArchiveKind) ContentType() string {
-	switch k {
-	case Zip:
-		return "application/zip"
-	case Tar:
-		return "application/x-tar"
-	default:
-		return "application/x-gzip"
-	}
-}
-
-// Ext is the file extension of an archive of the kind.
-func (k ArchiveKind) Ext() string {
-	switch k {
-	case Zip:
-		return ".zip"
-	case Tar:
-		return ".tar"
-	default:
-		return ".tar.gz"
-	}
-}
-
-// sniffArchive tells the format from the content's first bytes, falling
-// back to the name for what has no signature to read.
-func sniffArchive(head []byte, name string) ArchiveKind {
-	switch {
-	case bytes.HasPrefix(head, []byte("PK\x03\x04")), bytes.HasPrefix(head, []byte("PK\x05\x06")):
-		return Zip
-	case bytes.HasPrefix(head, []byte{0x1f, 0x8b}):
-		return TarGz
-	case len(head) >= 262 && string(head[257:262]) == "ustar":
-		return Tar
-	}
-	lower := strings.ToLower(name)
-	for _, ext := range []string{".zip", ".jar", ".war", ".ear", ".aar", ".nupkg", ".whl"} {
-		if strings.HasSuffix(lower, ext) {
-			return Zip
-		}
-	}
-	switch {
-	case strings.HasSuffix(lower, ".tar"):
-		return Tar
-	case strings.HasSuffix(lower, ".tar.gz"), strings.HasSuffix(lower, ".tgz"):
-		return TarGz
-	}
-	return NotArchive
-}
-
-// archiveEntry is one entry as an archive lists it.
-type archiveEntry struct {
-	name string
-	dir  bool
-	// regular is a plain file; links and devices are skipped.
-	regular bool
-	size    int64
-	open    func() (io.Reader, error)
-}
-
-// walkArchive calls fn for every entry of the archive in ra, in archive
-// order. A tar entry's reader is only valid until fn returns.
-func walkArchive(ra io.ReaderAt, size int64, kind ArchiveKind, fn func(archiveEntry) error) error {
-	switch kind {
-	case Zip:
-		zr, err := zip.NewReader(ra, size)
-		if err != nil {
-			return fmt.Errorf("%w: %w", ErrBadArchive, err)
-		}
-		for _, f := range zr.File {
-			e := archiveEntry{
-				name: f.Name, dir: f.FileInfo().IsDir(), regular: f.Mode().IsRegular(),
-				size: int64(min(f.UncompressedSize64, 1<<62)), //nolint:gosec // capped
-				open: func() (io.Reader, error) { return f.Open() },
-			}
-			if err := fn(e); err != nil {
-				return err
-			}
-		}
-		return nil
-	case Tar, TarGz:
-		var r io.Reader = io.NewSectionReader(ra, 0, size)
-		if kind == TarGz {
-			gz, err := gzip.NewReader(r)
-			if err != nil {
-				return fmt.Errorf("%w: %w", ErrBadArchive, err)
-			}
-			defer func() { _ = gz.Close() }()
-			r = gz
-		}
-		tr := tar.NewReader(r)
-		for {
-			h, err := tr.Next()
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
-			if err != nil {
-				return fmt.Errorf("%w: %w", ErrBadArchive, err)
-			}
-			e := archiveEntry{
-				name: h.Name, dir: h.Typeflag == tar.TypeDir,
-				regular: h.Typeflag == tar.TypeReg, size: h.Size,
-				open: func() (io.Reader, error) { return tr, nil },
-			}
-			if err := fn(e); err != nil {
-				return err
-			}
-		}
-	}
-	return fmt.Errorf("%w: not a zip, tar or tar.gz archive", ErrBadArchive)
-}
-
-// entryPath cleans an entry name into a relative path, refusing names that
-// would leave the folder the archive is exploded into: absolute paths,
-// drive letters and ".." segments. Backslashes count as separators, as
-// Windows tools write them.
-func entryPath(name string) (string, error) {
-	n := strings.ReplaceAll(name, "\\", "/")
-	if strings.HasPrefix(n, "/") || (len(n) > 1 && n[1] == ':') {
-		return "", fmt.Errorf("%w: the entry %q is an absolute path", ErrBadArchive, name)
-	}
-	for _, seg := range strings.Split(n, "/") {
-		if seg == ".." {
-			return "", fmt.Errorf(
-				"%w: the entry %q leaves the archive's folder",
-				ErrBadArchive,
-				name,
-			)
-		}
-	}
-	n = strings.Trim(path.Clean("/"+n), "/")
-	if n == "" || n == "." {
-		return "", nil
-	}
-	if _, _, _, err := types.SplitItemPath(n); err != nil {
-		return "", fmt.Errorf("%w: the entry %q is not a valid path", ErrBadArchive, name)
-	}
-	return n, nil
-}
+func ParseArchiveKind(s string) (ArchiveKind, bool) { return archive.ParseKind(s) }
 
 // Explode is a deploy whose body is an archive: its entries are deployed
 // into the folder of Path, and the archive itself is not stored.
@@ -246,9 +95,7 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 		return types.Item{}, err
 	}
 	defer func() { _ = f.Close(); _ = os.Remove(f.Name()) }()
-	head := make([]byte, 512)
-	n, _ := f.ReadAt(head, 0)
-	kind := sniffArchive(head[:n], d.Path)
+	kind := archive.KindOf(f, d.Path)
 	dir := path.Dir(strings.Trim(d.Path, "/"))
 	if dir == "." {
 		dir = ""
@@ -339,24 +186,24 @@ func (s *Service) validateEntries(
 	var folders []string
 	var entries int
 	var total int64
-	err := walkArchive(f, size, kind, func(e archiveEntry) error {
+	err := archive.Walk(f, size, kind, func(e archive.Entry) error {
 		entries++
 		if entries > maxExplodeEntries {
 			return fmt.Errorf("%w: more than %d entries", ErrBadArchive, maxExplodeEntries)
 		}
-		rel, err := entryPath(e.name)
+		rel, err := archive.Clean(e.Name)
 		if err != nil || rel == "" {
-			return err
+			return err //nolint:wrapcheck // archive's own ErrUnusable
 		}
 		target := join(dir, rel)
-		if e.dir {
+		if e.Dir {
 			folders = append(folders, target)
 			return nil
 		}
-		if !e.regular {
+		if !e.Regular {
 			return nil
 		}
-		total += max(e.size, 0)
+		total += max(e.Size, 0)
 		if total > maxExplodeBytes {
 			return fmt.Errorf("%w: the entries exceed %d bytes", ErrBadArchive, maxExplodeBytes)
 		}
@@ -371,7 +218,7 @@ func (s *Service) validateEntries(
 		}
 		return nil
 	})
-	return folders, err
+	return folders, err //nolint:wrapcheck // archive's ErrUnusable or ours from the walk
 }
 
 // uploadEntries stores the content of every file entry in the blob store,
@@ -386,14 +233,14 @@ func (s *Service) uploadEntries(
 ) ([]explodeFile, error) {
 	var files []explodeFile
 	budget := maxExplodeBytes
-	err := walkArchive(f, size, kind, func(e archiveEntry) error {
-		rel, err := entryPath(e.name)
-		if err != nil || rel == "" || e.dir || !e.regular {
-			return err
+	err := archive.Walk(f, size, kind, func(e archive.Entry) error {
+		rel, err := archive.Clean(e.Name)
+		if err != nil || rel == "" || e.Dir || !e.Regular {
+			return err //nolint:wrapcheck // archive's own ErrUnusable
 		}
-		r, err := e.open()
+		r, err := e.Open()
 		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.name, err)
+			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.Name, err)
 		}
 		lr := &io.LimitedReader{R: r, N: budget + 1}
 		u, err := s.Blobs.BeginUpload(ctx)
@@ -402,7 +249,7 @@ func (s *Service) uploadEntries(
 		}
 		if _, err := u.Append(ctx, lr); err != nil {
 			_ = u.Abort(context.WithoutCancel(ctx))
-			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.name, err)
+			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.Name, err)
 		}
 		if lr.N == 0 {
 			_ = u.Abort(context.WithoutCancel(ctx))
@@ -417,7 +264,7 @@ func (s *Service) uploadEntries(
 		files = append(files, explodeFile{path: join(dir, rel), info: info})
 		return nil
 	})
-	return files, err
+	return files, err //nolint:wrapcheck // archive's ErrUnusable or ours from the walk
 }
 
 // spool copies body to a temporary file, refusing more than MaxExplodeBytes,
@@ -461,23 +308,6 @@ func digestsOf(info blob.Info) types.Checksums {
 	return types.Checksums{SHA256: d.SHA256, SHA512: d.SHA512, SHA1: d.SHA1, MD5: d.MD5}
 }
 
-// readerAt gives random access over a blob reader for zip, which reads its
-// central directory from the end. Reads are serialised because they share
-// one seek position.
-type readerAt struct {
-	mu sync.Mutex
-	rs io.ReadSeeker
-}
-
-func (r *readerAt) ReadAt(p []byte, off int64) (int, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, err := r.rs.Seek(off, io.SeekStart); err != nil {
-		return 0, err //nolint:wrapcheck // io.ReaderAt contract
-	}
-	return io.ReadFull(r.rs, p) //nolint:wrapcheck // io.ReaderAt contract
-}
-
 // ArchiveEntry finds the entry at entry inside the archive file it and
 // calls serve with its size and content. ErrNotFound when the file is not an
 // archive or has no such entry.
@@ -487,7 +317,7 @@ func (s *Service) ArchiveEntry(
 	entry string,
 	serve func(size int64, r io.Reader) error,
 ) error {
-	want, err := entryPath(entry)
+	want, err := archive.Clean(entry)
 	if err != nil || want == "" {
 		return ErrNotFound
 	}
@@ -496,29 +326,24 @@ func (s *Service) ArchiveEntry(
 		return fmt.Errorf("item: open %s: %w", it.FullPath(), err)
 	}
 	defer func() { _ = content.Close() }()
-	var ra io.ReaderAt = &readerAt{rs: content}
-	if direct, ok := content.(io.ReaderAt); ok {
-		ra = direct
-	}
-	head := make([]byte, 512)
-	n, _ := ra.ReadAt(head, 0)
-	kind := sniffArchive(head[:n], it.Name)
+	ra := archive.ReaderAt(content)
+	kind := archive.KindOf(ra, it.Name)
 	if kind == NotArchive {
 		return ErrNotFound
 	}
-	err = walkArchive(ra, info.Size, kind, func(e archiveEntry) error {
-		name, err := entryPath(e.name)
-		if err != nil || name != want || e.dir || !e.regular {
+	err = archive.Walk(ra, info.Size, kind, func(e archive.Entry) error {
+		name, err := archive.Clean(e.Name)
+		if err != nil || name != want || e.Dir || !e.Regular {
 			return nil //nolint:nilerr // an unusable entry is just not the one
 		}
-		r, err := e.open()
+		r, err := e.Open()
 		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.name, err)
+			return fmt.Errorf("%w: %s: %w", ErrBadArchive, e.Name, err)
 		}
 		if c, ok := r.(io.Closer); ok {
 			defer func() { _ = c.Close() }()
 		}
-		if err := serve(e.size, r); err != nil {
+		if err := serve(e.Size, r); err != nil {
 			return err
 		}
 		return errFound
@@ -529,7 +354,7 @@ func (s *Service) ArchiveEntry(
 	case err == nil, errors.Is(err, ErrBadArchive):
 		return ErrNotFound
 	}
-	return err
+	return err //nolint:wrapcheck // serve's own error
 }
 
 // ArchiveFiles writes files to w as one archive of kind, each named by its

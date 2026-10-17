@@ -292,3 +292,54 @@ func TestThrottle(t *testing.T) {
 		t.Fatal("a nil throttle holds nothing back")
 	}
 }
+
+// A counted download of a package's file records its version's last
+// download too, streamed or redirected (decision 0018).
+func TestDownloadRecordsTheVersion(t *testing.T) {
+	ctx := context.Background()
+	w := newItemWorld(t, false)
+	for _, c := range []repo.Config{
+		{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker},
+		{
+			Key: "docker-redirect", Class: repo.Local, PackageType: repo.Docker,
+			DownloadRedirect: repo.Flex(true),
+		},
+	} {
+		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, key := range []string{"docker-local", "docker-redirect"} {
+		for _, f := range []string{"manifest.json", "sha256__layer"} {
+			wantStatus(t, w.do("PUT", "/artifactory/"+key+"/app/1.0/"+f, "admin", f),
+				http.StatusCreated)
+		}
+		lastDownload := func() time.Time {
+			t.Helper()
+			p, err := w.db.Packages().Find(ctx, key, "app")
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, err := w.db.Packages().Version(ctx, p.ID, "1.0")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return v.LastDownloaded
+		}
+		w.do("GET", "/artifactory/"+key+"/app/1.0/sha256__layer?skipUpdateStats=true", "admin", "")
+		if !lastDownload().IsZero() {
+			t.Fatalf("%s: an uncounted download was recorded", key)
+		}
+		if rec := w.do(
+			"GET",
+			"/artifactory/"+key+"/app/1.0/sha256__layer",
+			"admin",
+			"",
+		); rec.Code >= 400 {
+			t.Fatalf("%s: GET %d", key, rec.Code)
+		}
+		if lastDownload().IsZero() {
+			t.Fatalf("%s: the version's download was not recorded", key)
+		}
+	}
+}
