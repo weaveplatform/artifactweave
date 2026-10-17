@@ -35,12 +35,11 @@ func Serves(t repo.PackageType) bool {
 	return false
 }
 
-// Handler is the Maven format. Its deploy policy, snapshot naming, POM
-// checks and derived metadata come with #278 to #283; until then it admits
-// writes as every format does and keeps the package index.
+// Handler is the Maven format: its deploy rules (admit.go), its download
+// policy (policy.go) and the package index. Snapshot naming and derived
+// metadata come with #279 to #283.
 type Handler struct {
-	// The generic format admits writes under every package type's deploy
-	// policy.
+	// The generic format's hooks, which Admit's own checks replace.
 	generic.Handler
 }
 
@@ -58,7 +57,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if !ok {
 		return nil
 	}
-	return syncVersion(ctx, env.Store, c, r, it.Cached, co)
+	return syncVersion(ctx, env, c, r, it.Cached, co)
 }
 
 // Deleting runs before a file is removed. The item service drops the file's
@@ -90,7 +89,7 @@ func (Handler) Deleted(
 	}
 	// In key order, so the index changes the same way on every store.
 	for _, k := range slices.Sorted(maps.Keys(touched)) {
-		if err := syncVersion(ctx, env.Store, c, r, cached, touched[k]); err != nil {
+		if err := syncVersion(ctx, env, c, r, cached, touched[k]); err != nil {
 			return err
 		}
 	}
@@ -104,7 +103,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	if err != nil {
 		return err
 	}
-	return reindex(ctx, env.Store, c, r)
+	return reindex(ctx, env, c, r)
 }
 
 // Classify reports maven-metadata.xml as derived, since #279 writes it

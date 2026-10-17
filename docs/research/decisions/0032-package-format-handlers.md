@@ -61,6 +61,17 @@ properties.
 maps it to that status, in the envelope of the surface the request arrived on. Formats still
 never import `internal/server`.
 
+**Writes taken without being made** (amended 2026-10-17, #278). Artifactory answers some
+uploads of what it computes itself with a success status and stores nothing: Maven's
+snapshot-level `maven-metadata.xml` (202) and every metadata checksum (200). `Admit` returns
+`format.Accepted{Status}` for those, on a deploy or a checksum upload only; the HTTP layer
+answers the status with an empty body, and an exploded archive leaves the entry out. A
+format that implements `format.SidecarOwner` takes every upload named as a checksum sidecar
+as a checksum of its file, so `Admit` sees an `OpChecksum` (with the sidecar's declared
+length in `Write.Size`) even when the file is missing, and a missing file answers 404 "Target
+file to set checksum on doesn't exist", as in Artifactory. Elsewhere a sidecar name without
+its file is still stored as a file of its own.
+
 **Generic deploy policy.** `includesPattern`, `excludesPattern` and `blackedOut` are checked
 for every package type through `Admit`, on the generic handler that every format embeds.
 

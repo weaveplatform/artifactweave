@@ -371,6 +371,60 @@ func TestRecordChecksumIsAdmitted(t *testing.T) {
 	}
 }
 
+// A sidecar's declared length reaches Admit, a format may take the upload
+// without recording it, and a refusal for the file carries Artifactory's
+// message beside its sentinel.
+func TestRecordSidecarAnswers(t *testing.T) {
+	ctx := context.Background()
+	w, r := recording(t)
+	w.must("f.txt", "content")
+	if _, err := w.svc.MakeFolder(ctx, Target{Repo: w.loc, Path: "dir"}, nil, "a"); err != nil {
+		t.Fatal(err)
+	}
+	if w.svc.OwnsSidecars(w.loc) {
+		t.Fatal("a format without SidecarOwner owns its sidecars")
+	}
+	r.reset()
+	if _, err := w.svc.RecordSidecar(ctx, Target{Repo: w.loc, Path: "f.txt"}, SHA1,
+		sums("content").SHA1, 41); err != nil || r.writes[0].Size != 41 {
+		t.Fatalf("size %+v %v", r.writes, err)
+	}
+	var side *SidecarError
+	for _, tc := range []struct {
+		path, value string
+		sentinel    error
+		msg         string
+	}{
+		{
+			"none", sums("x").SHA1, store.ErrNotFound,
+			"Target file to set checksum on doesn't exist: libs:none",
+		},
+		{
+			"dir", sums("x").SHA1, ErrConflict,
+			"Checksum only supported for files (but found folder): libs:dir",
+		},
+		{
+			"f.txt", strings.ToUpper(sums("x").SHA1), ErrChecksumMismatch,
+			"Checksum error for 'f.txt.sha1': received '" + strings.ToUpper(sums("x").SHA1) +
+				"' but actual is '" + sums("content").SHA1 + "'",
+		},
+	} {
+		_, err := w.svc.RecordSidecar(ctx, Target{Repo: w.loc, Path: tc.path}, SHA1, tc.value, 40)
+		if !errors.As(err, &side) || !errors.Is(err, tc.sentinel) || err.Error() != tc.msg {
+			t.Errorf("%s: %v", tc.path, err)
+		}
+	}
+	r.admit = func(wr format.Write) (format.Write, error) {
+		return wr, &format.Accepted{Status: http.StatusOK}
+	}
+	var accepted *format.Accepted
+	if _, err := w.svc.RecordSidecar(ctx, Target{Repo: w.loc, Path: "none"}, SHA1, "junk",
+		4); !errors.As(err, &accepted) || accepted.Status != http.StatusOK ||
+		err.Error() != "format: accepted with status 200 and not stored" {
+		t.Fatalf("accepted: %v", err)
+	}
+}
+
 // A copy or move asks the target's format about each file while planning,
 // lands it, sets its properties, and only then runs Deployed and announces
 // them; a move also tells the source's format what left.

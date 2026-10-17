@@ -374,8 +374,8 @@ highest in version order, whatever the upload order.
   | 6.20 REST model (`LocalRepositoryConfigurationImpl`) | `false` |
   | Terraform provider | `false` for `maven`; `true` for `gradle`, `ivy` and `sbt` (`framework.go`, `PackageTypesLikeGradle` with `NewJavaLocalRepositoryResource(packageType, true)`) |
 
-  artifactweave sets `false` for every type (`pkg/repo/defaults.go`, `localDefaults` and
-  `remoteDefaults`).
+  At the research baseline artifactweave set `false` for every type (`pkg/repo/defaults.go`,
+  `localDefaults` and `remoteDefaults`); #278 sets the provider's per-type defaults.
 
 ## 7. maxUniqueSnapshots
 

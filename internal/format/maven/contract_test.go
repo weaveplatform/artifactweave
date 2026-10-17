@@ -13,10 +13,20 @@ func file(p string, n int) formattest.File {
 	return formattest.File{Path: p, Body: fmt.Appendf(nil, "%s #%d", p, n)}
 }
 
+// pomFile is a POM of org.example:p at version v that the POM checks
+// accept at path.
+func pomFile(path, p, v string) formattest.File {
+	return formattest.File{Path: path, Body: fmt.Appendf(nil,
+		`<project xmlns="http://maven.apache.org/POM/4.0.0"><modelVersion>4.0.0</modelVersion>`+
+			`<groupId>org.example</groupId><artifactId>%s</artifactId><version>%s</version>`+
+			`<name>%s library</name></project>`, p, v, p)}
+}
+
 // In a Maven repository the suite's 1.0 is a release with a classifier, and
 // its 2.0 a snapshot: a unique build, whose files belong to 2.0-SNAPSHOT,
-// beside the snapshot folder's maven-metadata.xml, which belongs to no
-// version.
+// beside the artifact's maven-metadata.xml, which belongs to no version.
+// (The client's snapshot-level metadata is dropped with 202, so it is no
+// file to deploy.)
 func TestContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Maven,
@@ -26,7 +36,7 @@ func TestContract(t *testing.T) {
 				return formattest.Version{
 					Package: "org.example:" + p, Version: v,
 					Files: []formattest.File{
-						file(dir+"1.0/"+p+"-1.0.pom", 0),
+						pomFile(dir+"1.0/"+p+"-1.0.pom", p, "1.0"),
 						file(dir+"1.0/"+p+"-1.0.jar", n),
 						file(dir+"1.0/"+p+"-1.0-sources.jar", 0),
 					},
@@ -37,8 +47,8 @@ func TestContract(t *testing.T) {
 				Package: "org.example:" + p, Version: "2.0-SNAPSHOT",
 				Files: []formattest.File{
 					file(build+".jar", n),
-					file(build+".pom", 0),
-					file(dir+"2.0-SNAPSHOT/maven-metadata.xml", n),
+					pomFile(build+".pom", p, "2.0-SNAPSHOT"),
+					file(dir+"maven-metadata.xml", n),
 				},
 				Linked: []string{build + ".jar", build + ".pom"},
 			}

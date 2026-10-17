@@ -36,7 +36,10 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
 
 **Deploys** (`Admit`, inside the upload's transaction):
 - **Release and snapshot policy.** `handleReleases` and `handleSnapshots` refuse with 409 and
-  Artifactory's message, on deploy and on download (research 27 section 5).
+  Artifactory's message, on deploy and on download (research 27 section 5). A deploy checks
+  it between the blacked-out check and the patterns, as Artifactory does; a download checks
+  it in `Resolve`, after `generic.CheckDownload`, so a path the patterns also refuse answers
+  their 404 rather than 409.
 - **Unique snapshots.** A `-SNAPSHOT` file name becomes
   `<baseRev>-<yyyyMMdd.HHmmss>-<buildNumber>` in UTC, and the response reports the stored
   path. The build number is assigned at upload from the package index, never from metadata
@@ -57,12 +60,13 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   with `maven-plugin` packaging gets `artifactory.maven.mavenPlugin=true`.
 - **Defaults.** `suppressPomConsistencyChecks` defaults to `false` for `maven` and `true` for
   `gradle`, `ivy` and `sbt`, as the Terraform provider and Artifactory's UI do.
-  `pkg/repo/defaults.go` sets `false` for every type today and changes with #278.
+  `pkg/repo/defaults.go` sets them so, locally and remotely (#278).
 
 **Uploaded metadata and checksums:**
-- **Snapshot level.** Under `unique` and `non-unique`, a PUT of `maven-metadata.xml` in a
-  snapshot folder is read and dropped with 202, as in Artifactory. Under `deployer` it is
-  stored, and that folder never gets derived metadata.
+- **Snapshot level.** Under `unique` and `non-unique`, in a repository with the Maven
+  layout, a PUT of `maven-metadata.xml` in a snapshot folder is read and dropped with 202, as
+  in Artifactory (`uploadFile` checks it only under `isMavenRepo`). Under `deployer`, or
+  another layout, it is stored, and that folder never gets derived metadata.
 - **Artifact level** (the client's `groupId/artifactId/maven-metadata.xml`). The PUT is stored
   with 201 and queues the package's metadata in the same transaction. The run replaces the
   file with derived metadata whenever the package has a version with a POM, so a read always
@@ -176,6 +180,9 @@ acceptance, and Gradle's run does not gate M2 (decision
 - **`maxUniqueSnapshots`** keeps its pending folders in memory in Artifactory, so a restart
   forgets them until the next deploy to that folder. The queue persists them, and its
   coalescing replaces the 60-second quiet period (DV-053).
+- **POM reading.** The check reads only the coordinates it compares, where Artifactory's
+  strict Maven reader also refuses elements outside the POM model; a POM a newer model or a
+  tool extends is still a POM to every client (DV-060).
 - **`suppressPomConsistencyChecks` per type.** The Terraform provider and Artifactory's UI
   both default Gradle, Ivy and SBT to suppressed and Maven to checked, so a repository
   created either way matches. What a REST create without the field gets on 7.x is on #216.
@@ -186,6 +193,11 @@ acceptance, and Gradle's run does not gate M2 (decision
   #216). The snapshot `<version>`, the client's artifact-level PUT, the metadata upload
   statuses, the `maxUniqueSnapshots` floor, `generatePom` and the `calculateMetadata`
   permission are the ones that would change this decision.
+- The deploy rules (#278) were checked against Artifactory 7.161.32: the current local
+  repository docs and the 7.x release notes confirm the policy on deploys, the POM check's
+  409 and the checksum policy's 409, and change none of them. The download side of the
+  policy, the messages, the metadata and checksum upload answers and the strict POM reader
+  come from 6.20 only and are on #216.
 - Without the 60-second quiet period, a limit of 1 removes the previous build as soon as the
   first file of the next one is stored.
 - Remote and virtual Maven repositories, including metadata merging, are P9 and P10
@@ -212,4 +224,4 @@ acceptance, and Gradle's run does not gate M2 (decision
 - Artifactory OSS 6.20, `knottnhupfer/artifactory-oss` at `b99e5649bcad`
 - Maven repository metadata model,
   <https://maven.apache.org/ref/3-LATEST/maven-repository-metadata/repository-metadata.html>
-- [Deviations register](../../implementation/deviations.md): DV-050 to DV-054
+- [Deviations register](../../implementation/deviations.md): DV-050 to DV-054, DV-060

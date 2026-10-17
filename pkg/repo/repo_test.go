@@ -609,6 +609,29 @@ func TestDefaultLayout(t *testing.T) {
 	}
 }
 
+// suppressPomConsistencyChecks defaults on for Gradle, Ivy and SBT and off
+// for Maven and the rest, locally and remotely, as the Terraform provider
+// sets it; a value given is kept.
+func TestSuppressPomChecksDefault(t *testing.T) {
+	for _, class := range []repo.Class{repo.Local, repo.Remote, repo.Federated} {
+		for pt, want := range map[repo.PackageType]bool{
+			repo.Maven: false, repo.Gradle: true, repo.Ivy: true, repo.SBT: true, repo.Generic: false,
+		} {
+			c := repo.Defaults(&repo.Config{Class: class, PackageType: pt})
+			if got := *c.SuppressPomConsistencyChecks; got != want {
+				t.Errorf("%s %s: %v", class, pt, got)
+			}
+		}
+	}
+	c := repo.Defaults(&repo.Config{
+		Class: repo.Local, PackageType: repo.Gradle,
+		SuppressPomConsistencyChecks: ptr(false),
+	})
+	if *c.SuppressPomConsistencyChecks {
+		t.Error("an explicit false was replaced")
+	}
+}
+
 func TestMarshalOmitsUnsetAndNested(t *testing.T) {
 	cfg := repo.Config{
 		Key:   "r",

@@ -505,40 +505,81 @@ func (a Algorithm) set(c *types.Checksums, v string) {
 	}
 }
 
-// RecordChecksum handles a checksum sidecar upload for the file at t.Path,
-// once the format admits it: the client's value is recorded as the file's
-// original checksum, and under the client-checksums policy it must equal
-// the content's (decision 0004).
+// SidecarError is a checksum sidecar upload refused for its file, with
+// Artifactory's answer (UploadServiceImpl.validatePathAndUploadChecksum):
+// Err is store.ErrNotFound for a missing file, ErrConflict for a folder and
+// ErrChecksumMismatch for a value the client-checksums policy refuses.
+type SidecarError struct {
+	Err     error
+	Message string
+}
+
+func (e *SidecarError) Error() string { return e.Message }
+
+func (e *SidecarError) Unwrap() error { return e.Err }
+
+// OwnsSidecars reports whether c's format takes every upload named as a
+// checksum sidecar as one, even without its file (format.SidecarOwner).
+func (s *Service) OwnsSidecars(c repo.Config) bool {
+	_, ok := s.format(c.PackageType).(format.SidecarOwner)
+	return ok
+}
+
+// RecordChecksum is RecordSidecar for a sidecar whose length is unknown.
 func (s *Service) RecordChecksum(
 	ctx context.Context,
 	t Target,
 	a Algorithm,
 	value string,
 ) (types.Item, error) {
-	var declared types.Checksums
-	a.set(&declared, value)
-	declared, err := ParseChecksums(declared)
-	if err != nil {
-		return types.Item{}, err
-	}
-	value = a.Of(declared)
+	return s.RecordSidecar(ctx, t, a, value, -1)
+}
+
+// RecordSidecar handles a checksum sidecar upload of size bytes (-1 when
+// the client declared none) for the file at t.Path, once the format admits
+// it: the client's value is recorded as the file's original checksum, and
+// under the client-checksums policy it must equal the content's (decision
+// 0004).
+func (s *Service) RecordSidecar(
+	ctx context.Context,
+	t Target,
+	a Algorithm,
+	value string,
+	size int64,
+) (types.Item, error) {
+	received := value
 	var stored types.Item
-	err = s.Store.Tx(ctx, func(ctx context.Context) error {
+	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		// The format answers first, as Artifactory refuses an oversized
+		// sidecar and drops metadata checksums before reading the value.
 		w, err := admit(ctx, s.format(t.Repo.PackageType), s.env(), t.Repo, format.Write{
-			Op: format.OpChecksum, Path: strings.Trim(t.Path, "/"), Cached: t.Cached,
+			Op: format.OpChecksum, Path: strings.Trim(t.Path, "/"), Cached: t.Cached, Size: size,
 		})
 		if err != nil {
 			return err
 		}
+		var declared types.Checksums
+		a.set(&declared, value)
+		if declared, err = ParseChecksums(declared); err != nil {
+			return err
+		}
+		value := a.Of(declared)
 		it, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, w.Path)
+		if errors.Is(err, store.ErrNotFound) {
+			return &SidecarError{Err: err, Message: fmt.Sprintf(
+				"Target file to set checksum on doesn't exist: %s:%s", t.Repo.Key, w.Path)}
+		}
 		if err != nil {
 			return fmt.Errorf("item: get %s: %w", w.Path, err)
 		}
 		if it.Folder {
-			return fmt.Errorf("%w: %s is a folder", ErrConflict, w.Path)
+			return &SidecarError{Err: ErrConflict, Message: fmt.Sprintf(
+				"Checksum only supported for files (but found folder): %s:%s", t.Repo.Key, w.Path)}
 		}
-		if value != a.Of(it.Actual) && clientPolicy(t.Repo) {
-			return ErrChecksumMismatch
+		if actual := a.Of(it.Actual); value != actual && clientPolicy(t.Repo) {
+			return &SidecarError{Err: ErrChecksumMismatch, Message: fmt.Sprintf(
+				"Checksum error for '%s.%s': received '%s' but actual is '%s'",
+				strings.Trim(t.Path, "/"), a, received, actual)}
 		}
 		a.set(&it.Original, value)
 		if stored, err = s.Store.Items().Put(ctx, it); err != nil {
