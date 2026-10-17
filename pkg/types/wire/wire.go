@@ -113,6 +113,8 @@ type LegacyGroup struct {
 
 // AccessUser is /access/api/v2/users/{username}. EffectiveAdmin, Realm,
 // Status and LastLoggedIn are server-owned; Password is write-only.
+// LastLoggedIn is always present and null for a user who never logged in,
+// as Artifactory answers since 7.98.7.
 type AccessUser struct {
 	Username                 string   `json:"username"`
 	Email                    string   `json:"email,omitempty"`
@@ -130,7 +132,7 @@ type AccessUser struct {
 	ManageWebhook            *bool    `json:"manage_webhook,omitempty"`
 	PlatformAuditor          *bool    `json:"platform_auditor,omitempty"`
 	EffectiveAdmin           *bool    `json:"effective_admin,omitempty"`
-	LastLoggedIn             string   `json:"last_logged_in,omitempty"`
+	LastLoggedIn             *string  `json:"last_logged_in"`
 	Realm                    string   `json:"realm,omitempty"`
 	Status                   string   `json:"status,omitempty"`
 }

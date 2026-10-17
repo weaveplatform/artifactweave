@@ -39,6 +39,16 @@ func parseWireTime(s string) (time.Time, error) {
 	return t.UTC(), nil
 }
 
+// nullableWireTime is an Access v2 time: nil, which encodes as null, for
+// the zero time.
+func nullableWireTime(t time.Time) *string {
+	if t.IsZero() {
+		return nil
+	}
+	s := t.UTC().Format(time.RFC3339Nano)
+	return &s
+}
+
 func formatWireTime(t time.Time, layout string) string {
 	if t.IsZero() {
 		return ""
@@ -141,9 +151,12 @@ func UserToLegacy(u User) wire.LegacyUser {
 
 // UserFromAccess reads an Access v2 user document.
 func UserFromAccess(w wire.AccessUser) (User, error) {
-	last, err := parseWireTime(w.LastLoggedIn)
-	if err != nil {
-		return User{}, err
+	var last time.Time
+	if w.LastLoggedIn != nil {
+		var err error
+		if last, err = parseWireTime(*w.LastLoggedIn); err != nil {
+			return User{}, err
+		}
 	}
 	status, err := parseStatus(w.Status)
 	if err != nil {
@@ -192,7 +205,7 @@ func UserToAccess(u User, effectiveAdmin bool) wire.AccessUser {
 		ManageWebhook:            ptr(u.Roles.ManageWebhook),
 		PlatformAuditor:          ptr(u.Roles.PlatformAuditor),
 		EffectiveAdmin:           ptr(effectiveAdmin),
-		LastLoggedIn:             formatWireTime(u.LastLoggedIn, time.RFC3339Nano),
+		LastLoggedIn:             nullableWireTime(u.LastLoggedIn),
 		Realm:                    u.Realm,
 		Status:                   string(u.Status),
 	}

@@ -156,8 +156,8 @@ Create body: `{username,password,email,groups[],admin,profile_updatable,internal
 `internal_password_disabled` is true. Details add `effective_admin`, `last_logged_in`,
 `realm` (`internal`), `status` (lower-case `invited | enabled | disabled | locked`).
 `last_logged_in` is `null` for a user who never logged in, where it was
-`1970-01-01T00:00:00.000Z` before 7.98.7 ([7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)); artifactweave leaves the field
-out ([#350](https://github.com/weaveplatform/artifactweave/issues/350)). Access answers
+`1970-01-01T00:00:00.000Z` before 7.98.7 ([7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)); artifactweave answers
+`null` too ([#350](https://github.com/weaveplatform/artifactweave/issues/350)). Access answers
 compact JSON from 7.117.5 ([7.117.5 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)) and is served only at `/access` from 7.90.5,
 no longer at `/artifactory/api/access` ([7.90.5 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)); artifactweave does both. From SaaS 7.164.0
 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71640-saas)), a non-admin with a scoped token may read user, group and permission

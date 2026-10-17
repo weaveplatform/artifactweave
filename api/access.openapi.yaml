@@ -8642,8 +8642,9 @@ components:
           description: Required within this object. Whether password login is disabled.
           type: boolean
         last_logged_in:
-          description: Optional within this object. Server-owned. RFC 3339 time of the last successful authentication; absent when the user has never logged in.
+          description: Required within this object. Server-owned. RFC 3339 time of the last successful authentication; null when the user has never logged in, as Artifactory answers since 7.98.7.
           format: date-time
+          nullable: true
           type: string
         manage_webhook:
           description: Optional within this object. Webhook management right.
@@ -8690,6 +8691,7 @@ components:
         - email
         - groups
         - internal_password_disabled
+        - last_logged_in
         - profile_updatable
         - realm
         - status

@@ -1,6 +1,7 @@
 package types_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -112,8 +113,9 @@ func TestUserAccessRoundTrip(t *testing.T) {
 	if diff := cmp.Diff(in, out); diff != "" {
 		t.Errorf("round trip (-in +out):\n%s", diff)
 	}
+	bad := "x"
 	if _, err := types.UserFromAccess(
-		wire.AccessUser{LastLoggedIn: "x"},
+		wire.AccessUser{LastLoggedIn: &bad},
 	); !errors.Is(
 		err,
 		types.ErrInvalidTimestamp,
@@ -179,5 +181,29 @@ func TestEffectiveAdmin(t *testing.T) {
 		if got := types.EffectiveAdmin(c.u, groups); got != c.want {
 			t.Errorf("%+v = %v", c.u, got)
 		}
+	}
+}
+
+// A user who never logged in carries "last_logged_in": null in the Access v2
+// shape, as Artifactory answers since 7.98.7, and reads back as never.
+func TestUserAccessNeverLoggedIn(t *testing.T) {
+	w := types.UserToAccess(types.User{Name: "bob", Status: types.UserEnabled}, false)
+	if w.LastLoggedIn != nil {
+		t.Fatalf("last_logged_in: %q", *w.LastLoggedIn)
+	}
+	raw, err := json.Marshal(w)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	if v, ok := doc["last_logged_in"]; !ok || v != nil {
+		t.Errorf("last_logged_in in %s", raw)
+	}
+	u, err := types.UserFromAccess(w)
+	if err != nil || !u.LastLoggedIn.IsZero() {
+		t.Errorf("read back: %v %v", u.LastLoggedIn, err)
 	}
 }

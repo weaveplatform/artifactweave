@@ -2060,8 +2060,8 @@ type UserDetails struct {
 	// InternalPasswordDisabled Required within this object. Whether password login is disabled.
 	InternalPasswordDisabled bool `json:"internal_password_disabled"`
 
-	// LastLoggedIn Optional within this object. Server-owned. RFC 3339 time of the last successful authentication; absent when the user has never logged in.
-	LastLoggedIn *time.Time `json:"last_logged_in,omitempty"`
+	// LastLoggedIn Required within this object. Server-owned. RFC 3339 time of the last successful authentication; null when the user has never logged in, as Artifactory answers since 7.98.7.
+	LastLoggedIn *time.Time `json:"last_logged_in"`
 
 	// ManageWebhook Optional within this object. Webhook management right.
 	ManageWebhook *bool `json:"manage_webhook,omitempty"`
