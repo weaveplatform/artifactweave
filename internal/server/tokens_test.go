@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -528,5 +530,70 @@ func TestLegacyMemberOfAllGroupsIsTheUser(t *testing.T) {
 		"by-readers",
 	); code != http.StatusForbidden {
 		t.Fatalf("member-of-groups:readers for an administrator: %d, want 403", code)
+	}
+}
+
+// TestTokenListScopeFilter: the scope parameter (Artifactory 7.133.3) keeps
+// the tokens whose whole scope, or one of its space-separated scopes, is the
+// string; a scope no token has lists nothing, and no parameter lists every
+// token. A token issued with a reference token is listed like any other.
+func TestTokenListScopeFilter(t *testing.T) {
+	h := statusFixture(t, false)
+	mint := func(body string) string {
+		t.Helper()
+		id, _ := mintAdmin(t, h, body)["token_id"].(string)
+		return id
+	}
+	group := mint(`{"scope":"applied-permissions/groups:readers","expires_in":86400}`)
+	both := mint(
+		`{"scope":"applied-permissions/groups:readers system:metrics:r","expires_in":86400}`,
+	)
+	user := mint(`{"username":"svc","scope":"applied-permissions/user","expires_in":86400,` +
+		`"include_reference_token":true}`)
+	list := func(scope string) []string {
+		t.Helper()
+		path := "/access/api/v1/tokens"
+		if scope != "" {
+			path += "?scope=" + url.QueryEscape(scope)
+		}
+		rec := do(t, h, http.MethodGet, path, basic("admin", "pw"), "")
+		var page struct {
+			Tokens []struct {
+				ID string `json:"token_id"`
+			} `json:"tokens"`
+		}
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &page) != nil {
+			t.Fatalf("list %q: %d %s", scope, rec.Code, rec.Body)
+		}
+		ids := make([]string, 0, len(page.Tokens))
+		for _, tk := range page.Tokens {
+			ids = append(ids, tk.ID)
+		}
+		return ids
+	}
+	has := func(ids []string, want ...string) bool {
+		for _, w := range want {
+			if !slices.Contains(ids, w) {
+				return false
+			}
+		}
+		return true
+	}
+	if got := list("applied-permissions/groups:readers"); len(got) != 2 || !has(got, group, both) {
+		t.Errorf("group scope: %v", got)
+	}
+	if got := list("applied-permissions/groups:readers system:metrics:r"); len(got) != 1 ||
+		!has(got, both) {
+		t.Errorf("whole scope: %v", got)
+	}
+	users := list("applied-permissions/user")
+	if !has(users, user) || has(users, group) || has(users, both) {
+		t.Errorf("user scope: %v", users)
+	}
+	if got := list("applied-permissions/groups:writers"); len(got) != 0 {
+		t.Errorf("unknown scope: %v", got)
+	}
+	if got := list(""); !has(got, group, both, user) {
+		t.Errorf("no filter: %v", got)
 	}
 }

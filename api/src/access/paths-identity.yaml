@@ -1563,8 +1563,17 @@ paths:
   /api/v1/tokens:
     get:
       description: A platform admin sees every token; any other caller sees only tokens whose subject is their own
-        user. Expired tokens are omitted. The token values themselves are never returned, only their metadata.
+        user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token
+        issued with a reference token is listed like any other.
       operationId: getTokens
+      parameters:
+      - description: Optional query parameter. Keeps only the tokens with this scope, as Artifactory 7.133.3 added
+          it. A token matches when its whole scope, or one of its space-separated scopes, is exactly this string, such
+          as applied-permissions/groups:readers. A scope no token has gives an empty list.
+        in: query
+        name: scope
+        schema:
+          type: string
       responses:
         '200':
           content:
