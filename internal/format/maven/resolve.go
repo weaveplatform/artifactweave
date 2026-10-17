@@ -23,7 +23,7 @@ const (
 	tokenIntegration = "[INTEGRATION]"
 )
 
-// Resolve rewrites a GET or HEAD that asks for the latest of something
+// resolveTokens rewrites a GET or HEAD that asks for the latest of something
 // (JFrog's Retrieve Artifact, research 27 section 8, decision 0036), in a
 // local repository or a remote repository's cache, the repositories JFrog
 // documents; a virtual repository resolves in each member it searches.
@@ -38,13 +38,20 @@ const (
 // request's matrix parameters. Candidates are the files themselves, never
 // maven-metadata.xml, so a resolution does not wait on the metadata the work
 // queue writes (#279). A path that resolves to nothing is looked up as it is.
-func (Handler) Resolve(
+func resolveTokens(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
 	d format.Download,
 ) (string, error) {
 	if c.Class == repo.Virtual || (c.Class == repo.Remote) != d.Cached {
+		return d.Path, nil
+	}
+	// Most downloads name no token and no non-unique snapshot: they skip
+	// reading the layout, so the release and snapshot policy alone decides
+	// whether one does.
+	if !IsNonUniqueSnapshot(d.Path) &&
+		!strings.Contains(d.Path, tokenRelease) && !strings.Contains(d.Path, tokenIntegration) {
 		return d.Path, nil
 	}
 	r, err := readerOf(ctx, env, c)

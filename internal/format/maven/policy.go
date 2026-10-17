@@ -9,26 +9,32 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
-// Resolve refuses a download the repository's release and snapshot policy
-// refuses, as Artifactory's assertValidPath does for downloads and deploys
-// alike; the path is looked up as asked.
+// Resolve resolves a download's version tokens and non-unique snapshot name
+// (resolveTokens), then refuses the resolved path when the repository's
+// release and snapshot policy does, as Artifactory's assertValidPath does
+// for downloads and deploys alike. The policy reads the resolved path: a
+// [RELEASE] that names a release is a release download.
 func (Handler) Resolve(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
 	d format.Download,
 ) (string, error) {
+	p, err := resolveTokens(ctx, env, c, d)
+	if err != nil {
+		return "", err
+	}
 	if handles(c.HandleReleases) && handles(c.HandleSnapshots) {
-		return d.Path, nil
+		return p, nil
 	}
 	r, err := readerOf(ctx, env, c)
 	if err != nil {
 		return "", err
 	}
-	if err := checkPolicy(c, r, d.Path); err != nil {
+	if err := checkPolicy(c, r, p); err != nil {
 		return "", err
 	}
-	return d.Path, nil
+	return p, nil
 }
 
 // checkPolicy refuses a file of a snapshot in a repository that does not

@@ -77,7 +77,6 @@ func TestResolveMaven(t *testing.T) {
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.100000-2.pom",
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar",
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.090000-1-sources.jar",
-		dir+"1.0-SNAPSHOT/maven-metadata.xml",
 		dir+"2.0-SNAPSHOT/app-2.0.jar",
 		dir+"2.0-SNAPSHOT/app-2.0-20261017.090000-1.jar",
 		"com/acme/other/3.0/other-3.0.jar",
@@ -253,6 +252,9 @@ func TestResolveSnapshotBehaviours(t *testing.T) {
 func TestResolveGradle(t *testing.T) {
 	w := newWorld(t, func(c *repo.Config) {
 		c.PackageType, c.RepoLayoutRef = repo.Gradle, "gradle-default"
+		// Gradle's default (pkg/repo/defaults.go): the fixture's POM sits
+		// in a Gradle path, which the POM checks would refuse.
+		c.SuppressPomConsistencyChecks = on()
 	})
 	dir := "org.acme/lib/"
 	w.deployWith(
