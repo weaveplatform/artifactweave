@@ -233,7 +233,9 @@ the [deviations register](../../implementation/deviations.md).
 - A version whose deploy stopped between PUTs stays invisible until its missing file is
   deployed or the version is deleted.
 - Remote and virtual Go repositories answer 501 until P9 and P10; the sumdb proxy and
-  VCS-backed remotes are v1 cuts (research 10).
+  VCS-backed remotes are v1 cuts (research 10). Artifactory 7.x deploys through a virtual
+  Go repository to its default deployment repository (JFrog's Go Modules page), so a
+  `PUT` to one is among what P10 adds.
 - What Artifactory stores and answers in R26 section 6 is inferred and on the live-capture
   list (#216) for P19.
 

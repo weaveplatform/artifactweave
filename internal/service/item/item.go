@@ -123,9 +123,22 @@ func clientPolicy(c repo.Config) bool {
 
 // Deploy streams d.Body into the blob store and stores the item.
 func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
-	declared, err := ParseChecksums(d.Declared)
+	info, err := s.Upload(ctx, d)
 	if err != nil {
 		return types.Item{}, err
+	}
+	return s.DeployCommitted(ctx, d, info)
+}
+
+// Upload streams d.Body into the blob store and commits it under the
+// repository's checksum policy, as Deploy does, but stores no item, for a
+// caller that must see the content's digests before deciding what to
+// store: DeployCommitted then stores it. Content no item comes to
+// reference is collected as an orphan.
+func (s *Service) Upload(ctx context.Context, d Deploy) (blob.Info, error) {
+	declared, err := ParseChecksums(d.Declared)
+	if err != nil {
+		return blob.Info{}, err
 	}
 	// A declared SHA-256 that the repository enforces lets the object stores
 	// write the content key directly: S3 and Azure then skip the copy out of
@@ -137,11 +150,11 @@ func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
 	}
 	u, err := s.Blobs.BeginUpload(ctx, opts...)
 	if err != nil {
-		return types.Item{}, fmt.Errorf("item: begin upload: %w", err)
+		return blob.Info{}, fmt.Errorf("item: begin upload: %w", err)
 	}
 	if _, err := u.Append(ctx, d.Body); err != nil {
 		_ = u.Abort(context.WithoutCancel(ctx))
-		return types.Item{}, fmt.Errorf("item: upload: %w", err)
+		return blob.Info{}, fmt.Errorf("item: upload: %w", err)
 	}
 	var want blob.Digests
 	if clientPolicy(d.Repo) {
@@ -154,13 +167,13 @@ func (s *Service) Deploy(ctx context.Context, d Deploy) (types.Item, error) {
 	}
 	info, err := u.Commit(ctx, want)
 	if errors.Is(err, blob.ErrDigestMismatch) {
-		return types.Item{}, ErrChecksumMismatch
+		return blob.Info{}, ErrChecksumMismatch
 	}
 	if err != nil {
 		_ = u.Abort(context.WithoutCancel(ctx))
-		return types.Item{}, fmt.Errorf("item: commit upload: %w", err)
+		return blob.Info{}, fmt.Errorf("item: commit upload: %w", err)
 	}
-	return s.storeCommitted(ctx, d, info, declared)
+	return info, nil
 }
 
 // DeployCommitted stores the item for content the caller already committed

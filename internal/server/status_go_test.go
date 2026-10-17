@@ -33,6 +33,9 @@ const (
 	// authentication. It is no route the guards hold to the matrix, which
 	// answers credentials that do not verify 401 everywhere.
 	goSumDB = "GET " + goBase + "{repoKey}/sumdb/*"
+	// goPut is jf go-publish's deploy of a version's .zip, .mod or .info
+	// (#274).
+	goPut = "PUT " + goBase + "{repoKey}/{module}/@v/{version}.{ext}"
 )
 
 // goModule is the module the fixtures seed in go-local: v1.0.0 with its
@@ -71,13 +74,13 @@ var goStatusPart = statusPart{
 	handwritten: map[string]bool{
 		goList: true, goListHead: true, goInfo: true, goInfoHead: true, goMod: true,
 		goModHead: true, goZip: true, goZipHead: true, goLatest: true, goLatestHead: true,
-		goLatestInfo: true,
+		goLatestInfo: true, goPut: true,
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
 		t.Helper()
 		seedGoModule(t, &item.Service{Store: db, Blobs: blobs}, db)
 	},
-	rows: goStatusRows,
+	rows: func() []statusCase { return append(goStatusRows(), goPublishStatusRows()...) },
 }
 
 func goStatusRows() []statusCase {
@@ -153,5 +156,34 @@ func goStatusRows() []statusCase {
 		{goSumDB, sumdb, "admin", "", 404},
 		{goSumDB, sumdb, "forged", "", 404},
 		{goSumDB, goBase + "missing/sumdb/sum.golang.org/lookup/x@v1.0.0", "", "", 404},
+	}
+}
+
+// goPublishStatusRows are the deploy's rows, in order: the rows after the
+// first act on the version it stores.
+func goPublishStatusRows() []statusCase {
+	const (
+		module = "example.com/status"
+		v      = goBase + "go-local/" + module + "/@v/v1.0.0"
+		other  = module + "/@v/v1.0.0.zip"
+	)
+	return []statusCase{
+		{goPut, v + ".zip;go.version=v1.0.0", "admin", "zip", 201},
+		// The same content again, as a re-run of jf go-publish sends it.
+		{goPut, v + ".zip", "admin", "zip", 201},
+		{goPut, v + ".zip", "admin", "other zip", 409},
+		{goPut, v + ".info", "admin", `{"Version":"v1.0.0"}`, 201},
+		{goPut, v + ".info", "admin", `{"Version":"v2.0.0"}`, 400},
+		{goPut, v + ".mod", "user", "module example.com/status", 403},
+		{goPut, v + ".mod", "anonymous", "module example.com/status", 401},
+		{goPut, v + ".mod", "", "module example.com/status", 401},
+		{goPut, goBase + "go-local/" + module + "/@v/1.0.0.zip", "admin", "zip", 400},
+		{goPut, goBase + "go-local/" + module + "/@v/list", "admin", "", 405},
+		{goPut, goBase + "go-local/" + module + "/go.mod", "admin", "", 404},
+		{goPut, goBase + "missing/" + other, "admin", "zip", 404},
+		{goPut, goBase + "libs-local/" + other, "admin", "zip", 404},
+		// Remote and virtual Go repositories are P9's and P10's.
+		{goPut, goBase + "go-remote/" + other, "admin", "zip", 501},
+		{goPut, goBase + "go-virtual/" + other, "admin", "zip", 501},
 	}
 }
