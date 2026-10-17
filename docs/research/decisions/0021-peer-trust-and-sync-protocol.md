@@ -47,9 +47,10 @@ Access endpoint; `federated-repo/*` for two-way and `federated-repo/r` for recei
 federated repository trust on the Artifactory endpoint, as 7.x documents them and
 `api/src/artifactory/paths-admin.yaml` specifies) plus artifactweave's own:
 `distribution` and `access-federation`. One peer relationship can carry several use cases.
-JFrog use cases with no artifactweave counterpart answer 404: `mission-control` and
-`bridge`, and `artifactory-cold` and `artifactory-cold/<namespace>` because cold storage
-is a blob tier rather than a paired instance ([0024](0024-cold-storage-tier.md),
+JFrog's `mission-control` and `bridge` use cases are accepted for compatibility and answer
+501, as `api/src/access/paths-identity.yaml` specifies: artifactweave has no counterpart.
+`artifactory-cold` and `artifactory-cold/<namespace>` answer 404 as unknown use cases,
+because cold storage is a blob tier rather than a paired instance ([0024](0024-cold-storage-tier.md),
 [pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)).
 
 **Transport.** Peer traffic is HTTPS on the normal listener under the
