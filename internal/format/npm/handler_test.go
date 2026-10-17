@@ -367,6 +367,20 @@ func TestReindex(t *testing.T) {
 	}
 }
 
+// Only a local repository has tarballs to reindex.
+func TestReindexLocalOnly(t *testing.T) {
+	w := newWorld(t)
+	for _, class := range []repo.Class{repo.Remote, repo.Virtual} {
+		err := npm.Handler{}.Reindex(w.ctx, format.Env{Store: w.st}, repo.Config{
+			Key: "npm-" + string(class), Class: class, PackageType: repo.NPM,
+		})
+		var refused *format.Rejection
+		if !errors.As(err, &refused) || refused.Status != http.StatusBadRequest {
+			t.Errorf("%s: %v", class, err)
+		}
+	}
+}
+
 // Content a tarball's item names but the blob store no longer holds is a
 // failure, whether a reindex or a restore meets it.
 func TestMissingContent(t *testing.T) {
