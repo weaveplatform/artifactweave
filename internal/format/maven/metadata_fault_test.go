@@ -153,6 +153,7 @@ func TestWorkFailures(t *testing.T) {
 		{name: "plugin POM", kind: maven.KindPlugins, key: plugins, blobs: true},
 		{name: "plugin stored", kind: maven.KindPlugins, key: plugins, fail: "Get"},
 		{name: "plugin derive", kind: maven.KindPlugins, key: plugins, derive: true},
+		{name: "package's plugins", kind: maven.KindMetadata, key: "maven-local/com.acme.plugins:p-plugin", blobs: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := newMetaWorld(t, nil)

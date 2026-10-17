@@ -218,8 +218,10 @@ func Versions(
 
 // writePackageMetadata rebuilds package name's maven-metadata.xml files in
 // c from the package index: the artifact-level file in the package's
-// folder, and each snapshot folder's. A file with nothing left to describe
-// is removed (#279), except an artifact-level file a client uploaded.
+// folder, each snapshot folder's, and its group's plugin metadata, which
+// Artifactory has recalculated on every deploy and delete since 7.10.1. A
+// file with nothing left to describe is removed (#279), except an
+// artifact-level file a client uploaded.
 func writePackageMetadata(
 	ctx context.Context,
 	env format.Env,
@@ -248,7 +250,10 @@ func writePackageMetadata(
 			return err
 		}
 	}
-	return writeSnapshotLevel(ctx, env, c, dir, g, a, files, now)
+	if err := writeSnapshotLevel(ctx, env, c, dir, g, a, files, now); err != nil {
+		return err
+	}
+	return writePluginMetadata(ctx, env, c, r, g)
 }
 
 // packageDir is the folder c's layout keeps package g:a's version folders

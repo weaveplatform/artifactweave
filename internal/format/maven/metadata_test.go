@@ -580,3 +580,49 @@ func TestPluginWorkQueued(t *testing.T) {
 		t.Errorf("queued %v", got)
 	}
 }
+
+// Every deploy and delete in a group recalculates its plugin metadata, as
+// Artifactory has since 7.10.1: a package's metadata run rebuilds its
+// group's plugins, and a marked POM's redeploy queues them for its readers.
+func TestPluginMetadataOnEveryWrite(t *testing.T) {
+	w := newMetaWorld(t, nil)
+	g, dir := "com.acme.plugins", "com/acme/plugins/"
+	pom := dir + "maven-foo-plugin/1.0/maven-foo-plugin-1.0.pom"
+	w.deploy(pom, nil, pomOf(g, "maven-foo-plugin", "1.0", "maven-plugin", "Foo"))
+	// Marked behind the format's back, as an import might leave it.
+	it, err := w.db.Items().Get(w.ctx, w.c.Key, false, pom)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.Items().PatchProperties(w.ctx, it.ID,
+		types.Properties{maven.PluginProperty: {"true"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := w.queued(); got[maven.KindPlugins] != 0 {
+		t.Fatalf("queued %v", got)
+	}
+	// Any write to the group's packages brings the plugin in.
+	w.deploy(dir+"lib/1.0/lib-1.0.jar", nil)
+	if _, _, ok := w.get(dir + "lib/maven-metadata.xml"); ok {
+		t.Fatal("a package without a POM got metadata")
+	}
+	if body, _, _ := w.get(
+		dir + "maven-metadata.xml",
+	); !strings.Contains(
+		body,
+		"<name>Foo</name>",
+	) {
+		t.Fatalf("after a write to the group:\n%s", body)
+	}
+	// A marked POM redeployed without its mark in the request is read
+	// fresh by the next read of the group's metadata.
+	w.deploy(pom, nil, pomOf(g, "maven-foo-plugin", "1.0", "maven-plugin", "Foo Two"))
+	if body, _, _ := w.get(
+		dir + "maven-metadata.xml",
+	); !strings.Contains(
+		body,
+		"<name>Foo Two</name>",
+	) {
+		t.Errorf("after the redeploy:\n%s", body)
+	}
+}

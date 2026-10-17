@@ -5,3 +5,5 @@
 * text=auto
 
 *.json text eol=lf
+# Golden XML, such as Maven metadata, is compared byte for byte on every OS.
+*.xml text eol=lf

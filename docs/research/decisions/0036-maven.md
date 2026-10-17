@@ -89,8 +89,8 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
 
 **Derived work, through the work queue** (as agreed, decisions 0032 and 0033):
 - **Kinds.** Three, each keyed by repository:
-  - a package's metadata, keyed by `groupId:artifactId`: its artifact-level file and the
-    file of each snapshot folder;
+  - a package's metadata, keyed by `groupId:artifactId`: its artifact-level file, the file
+    of each snapshot folder, and its group's plugin metadata;
   - a group's plugin metadata, keyed by `groupId`;
   - a package's `maxUniqueSnapshots` cleanup, keyed by `groupId:artifactId`.
 - **Enqueueing.** The format's hooks call `Env.Enqueue` inside the write's or delete's own
@@ -102,10 +102,13 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   do not re-enter the hooks and the files carry server checksums. They remove through
   `Underive`. A derived file records `_system_` as its creator and modifier, which is how a run
   tells it from a client's artifact-level file (#279).
-- **Plugin metadata** is queued when a POM gains or loses `artifactory.maven.mavenPlugin`, on
-  a deploy, a property change, a copy, move or restore, and when a marked POM is deleted.
-  Artifactory 7.10 calculates it on every deploy and delete; the result is the same, since it
-  depends only on the marked POMs (#279).
+- **Plugin metadata** is recalculated on every deploy and delete, as Artifactory has done since
+  7.10.1 ("Improved Maven Plugin Metadata Calculation", [self-managed release
+  notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)): a package's
+  metadata run rebuilds its group's plugin metadata too. A group's own item, keyed by
+  `groupId`, is queued when a POM marked `artifactory.maven.mavenPlugin` is deployed or
+  deleted, or a POM gains or loses the mark, so a read of the group's metadata waits for it
+  (#279).
 - **Reads.** A GET or HEAD of a `maven-metadata.xml`, or of its sidecar, whose package or
   group has pending work calls `EnsureFresh` first, so a client never reads stale metadata.
   A parked item answers 500 in the error envelope.

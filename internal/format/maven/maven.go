@@ -46,7 +46,9 @@ type Handler struct {
 
 // Deployed indexes a file stored in a version: the version is synced with
 // the tree, so its date and files are what a reindex would read. It queues
-// the package's metadata.
+// the package's metadata, whose run rebuilds the group's plugin metadata
+// too, and a plugin POM queues its group's plugin metadata of its own, which
+// a read of that file waits for.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -61,14 +63,26 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 			return err
 		}
 	}
-	return queueWrite(ctx, env, c, it.Cached, it.FullPath(), co, ok)
+	if err := queueWrite(ctx, env, c, it.Cached, it.FullPath(), co, ok); err != nil {
+		return err
+	}
+	return queueMarked(ctx, env, c, it)
 }
 
 // Deleting runs before a file is removed. The item service drops the file's
 // version link with it; Deleted settles the rest. A plugin POM, whose mark
 // goes with it, queues its group's plugin metadata here.
 func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
-	if it.Folder || !IsPom(it.Name) || !queued(c, it.Cached) {
+	if it.Folder {
+		return nil
+	}
+	return queueMarked(ctx, env, c, it)
+}
+
+// queueMarked queues the plugin metadata of the group of a POM marked as a
+// plugin.
+func queueMarked(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+	if !IsPom(it.Name) || !queued(c, it.Cached) {
 		return nil
 	}
 	props, err := env.Store.Items().Properties(ctx, it.ID)
