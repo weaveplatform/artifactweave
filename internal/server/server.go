@@ -8,6 +8,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/go-chi/chi/v5"
 
@@ -24,6 +25,7 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/internal/server/golang"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -103,7 +105,7 @@ type Config struct {
 // protocols are the package protocols with routers of their own, mounted
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
-var protocols = []func() pkgroute.Protocol{}
+var protocols = []func() pkgroute.Protocol{golang.Protocol}
 
 // newRegistry is the Docker registry for cfg. A nil token service must not
 // become a non-nil interface, which would leave the token endpoint
@@ -168,8 +170,17 @@ func New(cfg Config) http.Handler {
 		normalizeContentType,
 		collectionSlash,
 	)
+	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
+	for _, p := range protocols {
+		mounted = append(mounted, p())
+	}
+	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {
-		r.Use(authenticate(cfg.Auth, cfg.Store))
+		r.Use(authenticate(cfg.Auth, cfg.Store, func(escaped string) bool {
+			return slices.ContainsFunc(mounted, func(p pkgroute.Protocol) bool {
+				return p.IsAbsent(escaped)
+			})
+		}))
 	}
 	r.NotFound(notFound)
 	r.MethodNotAllowed(methodNotAllowed)
@@ -194,10 +205,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
 	registry.Register(r)
-	for _, p := range protocols {
-		pkgroute.Mount(r, artSvc.protocolOptions(), p())
-	}
-	for _, p := range cfg.Protocols {
+	for _, p := range mounted {
 		pkgroute.Mount(r, artSvc.protocolOptions(), p)
 	}
 
