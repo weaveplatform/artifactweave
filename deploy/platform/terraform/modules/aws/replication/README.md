@@ -59,7 +59,7 @@ else can use the git source, which names the current release.
 
 ```hcl
 module "replication" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/replication?ref=v0.0.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/replication?ref=v0.1.0" # x-release-please-version
 
   name               = "artifactweave-example-repl"
   source_bucket      = module.primary
