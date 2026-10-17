@@ -75,10 +75,13 @@ then every Go read of it answers 404, and its files stay reachable through the i
 
 `PUT .../<module>/@v/<version>.<ext>[;key=value...]` deploys one file.
 
-- **Checks**, each answering 400 with the reason. The first two are the **path checks**:
+- **Checks**, each answering 400 with the reason. The first three are the **path checks**:
   - `<ext>` is `zip`, `mod` or `info`;
   - `module.Check(module, version)` passes and the version equals
     `module.CanonicalVersion(version)`;
+  - a `+incompatible` version is v2 or later. The go command refuses one below v2, which
+    `module.Check` accepts, and on a module path without a `/vN` suffix `v1.0.0` and
+    `v1.0.0+incompatible` would be two versions the package index orders as one;
   - a `.info` is a JSON object of at most 64 KiB whose `Version` equals the path's version,
     and whose `Time`, when present, is RFC 3339.
 

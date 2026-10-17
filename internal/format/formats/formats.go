@@ -7,6 +7,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -17,6 +18,7 @@ var handlers = []struct {
 	handler format.Handler
 }{
 	{docker.Serves, docker.Handler{}},
+	{golang.Serves, golang.Handler{}},
 }
 
 // For returns the format of a package type. A type is generic until its
