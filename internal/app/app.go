@@ -107,6 +107,7 @@ func serve(
 				LimitInternalUsers: !cfg.Search.LimitAnonymousUsersOnly,
 			},
 			DockerSubdomainMatch: cfg.Docker.SubdomainMatch,
+			Work:                 rt.work,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
 		BaseContext:       func(net.Listener) context.Context { return reqCtx },

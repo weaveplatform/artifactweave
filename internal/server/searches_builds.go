@@ -136,7 +136,7 @@ func (s artifactoryService) SearchBuildArtifacts(
 	if which == "" {
 		which = build.Latest
 	}
-	svc, a := &build.Service{Store: r.st, Blobs: s.cfg.Blobs}, buildAccess{r.acc}
+	svc, a := s.builds(r.st), buildAccess{r.acc}
 	b, err := svc.Find(ctx, "", body.BuildName, which, status, a)
 	if err != nil {
 		return nil, s.buildError(ctx, r.p, "", missing, err)

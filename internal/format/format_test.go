@@ -2,50 +2,40 @@ package format
 
 import (
 	"context"
+	"errors"
+	"net/http"
 	"testing"
 
-	"github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-func TestGenericKeepsNoIndex(t *testing.T) {
-	h := For(repo.Generic)
-	ctx := context.Background()
-	if err := h.Deployed(ctx, nil, repo.Config{}, types.Item{}); err != nil {
-		t.Fatal(err)
+// hooks has the required hooks alone.
+type hooks struct{}
+
+func (hooks) Deployed(context.Context, Env, repo.Config, types.Item) error  { return nil }
+func (hooks) Deleting(context.Context, Env, repo.Config, types.Item) error  { return nil }
+func (hooks) Deleted(context.Context, Env, repo.Config, []types.Item) error { return nil }
+
+// derived classifies everything as derived.
+type derived struct{ hooks }
+
+func (derived) Classify(repo.Config, string) Class { return ClassDerived }
+
+func TestClassOf(t *testing.T) {
+	if got := ClassOf(hooks{}, repo.Config{}, "a"); got != ClassUnique {
+		t.Errorf("a format without a classifier: %v", got)
 	}
-	if err := h.Deleting(ctx, nil, repo.Config{}, types.Item{}); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.Deleted(
-		ctx,
-		nil,
-		repo.Config{},
-		[]types.Item{{Path: "a/b", Name: "c"}},
-	); err != nil {
-		t.Fatal(err)
+	if got := ClassOf(derived{}, repo.Config{}, "a"); got != ClassDerived {
+		t.Errorf("a classifier: %v", got)
 	}
 }
 
-// Docker, OCI and Helm OCI repositories share the image format, which
-// the manifest push goes through. A file outside any image touches no
-// index, so a nil store is never reached.
-func TestImagesHaveTheirFormat(t *testing.T) {
-	ctx := context.Background()
-	for _, pt := range []repo.PackageType{repo.Docker, repo.OCI, repo.HelmOCI} {
-		h := For(pt)
-		if _, ok := h.(docker.Handler); !ok {
-			t.Fatalf("%s: %T", pt, h)
-		}
-		if err := h.Deployed(ctx, nil, repo.Config{}, types.Item{}); err != nil {
-			t.Fatal(err)
-		}
-		if err := h.Deleting(ctx, nil, repo.Config{}, types.Item{}); err != nil {
-			t.Fatal(err)
-		}
-		if err := h.Deleted(ctx, nil, repo.Config{}, []types.Item{{Name: "x"}}); err != nil {
-			t.Fatal(err)
-		}
+func TestReject(t *testing.T) {
+	var err error = Reject(http.StatusConflict, "the repository '%s' refuses %s", "libs", "x")
+	var r *Rejection
+	if !errors.As(err, &r) || r.Status != http.StatusConflict ||
+		err.Error() != "the repository 'libs' refuses x" {
+		t.Fatalf("rejection %#v", err)
 	}
 }

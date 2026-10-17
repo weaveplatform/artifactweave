@@ -53,7 +53,7 @@ func (s artifactoryService) buildCaller(
 		return nil, auth.Principal{}, buildAccess{}, err
 	}
 	p, a, err := s.itemCaller(ctx, st)
-	return &build.Service{Store: st, Blobs: s.cfg.Blobs}, p, buildAccess{a}, err
+	return s.builds(st), p, buildAccess{a}, err
 }
 
 // buildError maps the build service's errors onto statuses; missing is the

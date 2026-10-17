@@ -337,14 +337,14 @@ func (a affected) sync(ctx context.Context, st store.Store, c repo.Config) error
 	return nil
 }
 
-// Reindex brings the package index of the local image repository c back in
+// reindex brings the package index of the local image repository c back in
 // line with its item tree, which stays the source of truth (decision 0018):
 // packages and versions the tree no longer backs go, every image holding a
 // manifest is a package and every tag folder a version with exactly its
 // folder's files. Records the tree still backs keep their dates and
 // download statistics, so after the hooks' own maintenance nothing
 // changes; an image indexed afresh is dated by its earliest manifest.
-func Reindex(ctx context.Context, st store.Store, c repo.Config) error {
+func reindex(ctx context.Context, st store.Store, c repo.Config) error {
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
 			aql.RepoSet{Refs: []aql.RepoRef{{Key: c.Key}}},

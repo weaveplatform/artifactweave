@@ -2,9 +2,11 @@ package docker
 
 import (
 	"context"
+	"path"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
-	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -14,14 +16,19 @@ import (
 // manifest, tagged or not, and each tag folder holding a manifest is a
 // version whose files are the folder's items, ordered by the tag's last
 // push. Digest folders and _uploads are no versions.
-type Handler struct{}
+type Handler struct {
+	// The generic format admits writes under every package type's deploy
+	// policy.
+	generic.Handler
+}
 
 // Deployed indexes a file stored in an image. A manifest in a tag folder
 // makes the folder a version and links every file already in it, which
 // covers copies, moves and restores that land the manifest after its
 // blobs; another file joins its folder's version once the folder is a tag.
 // A manifest in a digest folder keeps its image a package.
-func (Handler) Deployed(ctx context.Context, st store.Store, c repo.Config, it types.Item) error {
+func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+	st := env.Store
 	name, folder, ok := imageFolder(it)
 	switch {
 	case !ok || folder == UploadsFolder:
@@ -44,7 +51,7 @@ func (Handler) Deployed(ctx context.Context, st store.Store, c repo.Config, it t
 
 // Deleting runs before a file of an image is removed. The item service
 // drops the file's version link with it; Deleted settles the rest.
-func (Handler) Deleting(context.Context, store.Store, repo.Config, types.Item) error { return nil }
+func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
 
 // Deleted brings the index back in line with the tree after files of
 // images were removed: a tag folder left without a manifest is no longer a
@@ -53,7 +60,7 @@ func (Handler) Deleting(context.Context, store.Store, repo.Config, types.Item) e
 // pruning of empty versions cannot know.
 func (Handler) Deleted(
 	ctx context.Context,
-	st store.Store,
+	env format.Env,
 	c repo.Config,
 	removed []types.Item,
 ) error {
@@ -61,5 +68,22 @@ func (Handler) Deleted(
 	for _, it := range removed {
 		a.add(it)
 	}
-	return a.sync(ctx, st, c)
+	return a.sync(ctx, env.Store, c)
+}
+
+// Reindex rebuilds the image index of the repository from its tree, in one
+// transaction.
+func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return reindex(ctx, env.Store, c)
+}
+
+// Classify reports a tag folder's manifests as metadata, since a push moves
+// the tag to other content under the same path, and every other file,
+// digest-addressed or a layer, as unique.
+func (Handler) Classify(_ repo.Config, p string) format.Class {
+	_, folder, ok := imageFolder(types.Item{Path: path.Dir(p), Name: path.Base(p)})
+	if ok && isManifest(path.Base(p)) && !IsDigestFolder(folder) {
+		return format.ClassMetadata
+	}
+	return format.ClassUnique
 }

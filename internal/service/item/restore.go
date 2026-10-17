@@ -13,13 +13,14 @@ import (
 )
 
 // Restore recreates a trashed item at t.Path with its recorded content,
-// times and properties, creating missing parent folders. Call it inside a
-// transaction that also removes the trash entry: a trashed file still holds
-// its blob reference, which the restored item takes over, so no reference is
-// taken here. A file it replaces releases its own reference, as an overwrite
-// by deploy does; a folder already at the path keeps its content and gains
-// the recorded properties. A folder in the way of a file, or a file in the
-// way of a folder, is ErrConflict.
+// times and properties, creating missing parent folders, and runs the
+// format's hooks as a deploy does. Call it inside a transaction that also
+// removes the trash entry: a trashed file still holds its blob reference,
+// which the restored item takes over, so no reference is taken here. A file
+// it replaces releases its own reference, as an overwrite by deploy does; a
+// folder already at the path keeps its content and gains the recorded
+// properties. A folder in the way of a file, or a file in the way of a
+// folder, is ErrConflict.
 func (s *Service) Restore(
 	ctx context.Context,
 	t Target,
@@ -46,8 +47,8 @@ func (s *Service) Restore(
 		// A folder recreated since the delete keeps its content and its own
 		// properties; the recorded ones are added.
 		if len(rec.Properties) > 0 {
-			if err := items.PatchProperties(ctx, old.ID, rec.Properties, nil); err != nil {
-				return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
+			if err := s.Annotate(ctx, t.Repo, old, rec.Properties, nil); err != nil {
+				return types.Item{}, err
 			}
 		}
 		return old, nil
@@ -66,11 +67,15 @@ func (s *Service) Restore(
 	if err := items.SetProperties(ctx, stored.ID, rec.Properties); err != nil {
 		return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 	}
-	if stored.Folder {
-		return stored, nil
+	hooks, env := s.format(t.Repo.PackageType), s.env()
+	if !stored.Folder {
+		if err := hooks.Deployed(ctx, env, t.Repo, stored); err != nil {
+			return types.Item{}, err //nolint:wrapcheck // the format's own error
+		}
 	}
-	if err := format.For(t.Repo.PackageType).Deployed(ctx, s.Store, t.Repo, stored); err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the format's own error
+	if err := s.annotated(ctx, hooks, env, t.Repo, stored,
+		format.Annotation{Set: rec.Properties}); err != nil {
+		return types.Item{}, err
 	}
 	return stored, nil
 }

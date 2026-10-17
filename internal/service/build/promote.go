@@ -369,9 +369,11 @@ func (pr *promoter) relocate(ctx context.Context, files []located) ([]located, e
 	return landed, nil
 }
 
-// tag sets the promotion's properties on files. A file the caller may not
-// annotate is a warning, as in Artifactory; a dry run only checks.
+// tag sets the promotion's properties on files, through the item service so
+// their formats' Annotated hooks run. A file the caller may not annotate is
+// a warning, as in Artifactory; a dry run only checks.
 func (pr *promoter) tag(ctx context.Context, files []located) error {
+	items := pr.s.items()
 	for _, f := range files {
 		full := f.it.FullPath()
 		if !pr.a.Item(f.repo, full, types.ActionAnnotate) {
@@ -389,7 +391,7 @@ func (pr *promoter) tag(ctx context.Context, files []located) error {
 		if err != nil {
 			return fmt.Errorf("build: get %s: %w", full, err)
 		}
-		if err := pr.s.Store.Items().PatchProperties(ctx, it.ID, pr.p.Properties, nil); err != nil {
+		if err := items.Annotate(ctx, f.repo, it, pr.p.Properties, nil); err != nil {
 			return fmt.Errorf("build: properties of %s: %w", full, err)
 		}
 	}

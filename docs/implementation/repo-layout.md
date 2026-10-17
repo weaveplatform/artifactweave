@@ -54,7 +54,8 @@ internal/
     sqlite/ postgres/          # dialect packages + migrations/<dialect>/*.sql
   crypt/                       # keyring, sealed columns, key rotation
   remote/                      # upstream fetcher, cache policy, negative cache, singleflight
-  format/
+  format/                      # the format contract: hooks, Env, optional interfaces, Rejection
+    formats/                   # picks the format of a package type
     generic/ docker/ npm/ golang/ maven/ pypi/ nuget/ helm/ terraform/
   service/                     # one package per domain service; more arrive with their phases
     gc/ identity/ item/ multipart/ permission/ pkgindex/ registry/ roles/ trash/ usage/

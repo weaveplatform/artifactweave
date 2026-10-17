@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
@@ -344,7 +345,7 @@ func TestReindexRebuildsTheSameIndex(t *testing.T) {
 		if len(before) != 2 || len(before["app"].Tags) != 2 {
 			t.Fatalf("index %+v", before)
 		}
-		if err := layout.Reindex(ctx, w.db, w.docker); err != nil {
+		if err := (layout.Handler{}).Reindex(ctx, format.Env{Store: w.db}, w.docker); err != nil {
 			t.Fatal(err)
 		}
 		if diff := cmp.Diff(before, w.index(w.docker)); diff != "" {
@@ -382,7 +383,7 @@ func TestReindexRebuildsTheSameIndex(t *testing.T) {
 		if err := w.db.Packages().Delete(ctx, team.ID); err != nil {
 			t.Fatal(err)
 		}
-		if err := layout.Reindex(ctx, w.db, w.docker); err != nil {
+		if err := (layout.Handler{}).Reindex(ctx, format.Env{Store: w.db}, w.docker); err != nil {
 			t.Fatal(err)
 		}
 		if diff := cmp.Diff(before, w.index(w.docker)); diff != "" {
@@ -400,7 +401,7 @@ func TestReindexRebuildsTheSameIndex(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if err := layout.Reindex(ctx, w.db, w.docker); err != nil {
+		if err := (layout.Handler{}).Reindex(ctx, format.Env{Store: w.db}, w.docker); err != nil {
 			t.Fatal(err)
 		}
 		want := before
@@ -414,7 +415,7 @@ func TestReindexRebuildsTheSameIndex(t *testing.T) {
 		// A tree without images leaves no index.
 		w.remove(c, w.docker, "app")
 		w.remove(c, w.docker, "team")
-		if err := layout.Reindex(ctx, w.db, w.docker); err != nil {
+		if err := (layout.Handler{}).Reindex(ctx, format.Env{Store: w.db}, w.docker); err != nil {
 			t.Fatal(err)
 		}
 		if got := w.index(w.docker); len(got) != 0 {

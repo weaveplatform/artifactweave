@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
@@ -347,8 +348,19 @@ func notFound(w http.ResponseWriter, r *http.Request) {
 		"not a registry operation: %s %s", r.Method, r.URL.Path))
 }
 
-// writeErr writes err, noting an unexpected one for the access log.
+// writeErr writes err, noting an unexpected one for the access log. A
+// format's Rejection, such as a push to a blacked-out repository, keeps its
+// status and message under the registry code a client reads for it.
 func (g *Registry) writeErr(w http.ResponseWriter, r *http.Request, err error) {
+	var refused *format.Rejection
+	if errors.As(err, &refused) {
+		code := CodeDenied
+		if refused.Status == http.StatusNotFound {
+			code = CodeNameUnknown
+		}
+		Write(w, Errorf(refused.Status, code, "%s", refused.Message))
+		return
+	}
 	var typed *apierror.Error
 	if !errors.As(err, &typed) && g.fault != nil {
 		g.fault(r, err)

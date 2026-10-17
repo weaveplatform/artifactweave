@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
@@ -237,7 +236,7 @@ func (a access) rows(
 	hits []aql.Hit,
 	want types.Actions,
 ) []aql.Hit {
-	patterns := map[string]repoPatterns{}
+	patterns := map[string]authz.RepoPatterns{}
 	out := hits[:0]
 	for _, h := range hits {
 		c, ok := configs[h.Item.RepoKey]
@@ -246,60 +245,16 @@ func (a access) rows(
 		}
 		pat, ok := patterns[c.Key]
 		if !ok {
-			pat = patternsOf(c)
+			pat = authz.PatternsOf(c)
 			patterns[c.Key] = pat
 		}
 		full := h.Item.FullPath()
-		if pat.accepts(full, h.Item.Folder) && a.item(c, full, h.Item.Folder, types.ActionRead) &&
+		if pat.Accepts(full, h.Item.Folder) && a.item(c, full, h.Item.Folder, types.ActionRead) &&
 			(want == 0 || a.file(c, full, want)) {
 			out = append(out, h)
 		}
 	}
 	return out
-}
-
-// repoPatterns are a repository's include and exclude patterns: Ant
-// patterns, comma-separated in the configuration.
-type repoPatterns struct {
-	include, exclude []authz.Pattern
-}
-
-func patternsOf(c repo.Config) repoPatterns {
-	include := compilePatterns(c.IncludesPattern)
-	if len(include) == 0 {
-		include = []authz.Pattern{authz.CompilePattern(repo.DefaultIncludesPattern)}
-	}
-	return repoPatterns{include: include, exclude: compilePatterns(c.ExcludesPattern)}
-}
-
-func compilePatterns(s *string) []authz.Pattern {
-	if s == nil {
-		return nil
-	}
-	var out []authz.Pattern
-	for _, p := range strings.Split(*s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, authz.CompilePattern(p))
-		}
-	}
-	return out
-}
-
-// accepts reports whether the patterns admit path. A folder is admitted
-// when an include could match something below it, so the folders leading to
-// included files stay visible.
-func (p repoPatterns) accepts(path string, folder bool) bool {
-	for _, x := range p.exclude {
-		if x.Match(path) {
-			return false
-		}
-	}
-	for _, in := range p.include {
-		if in.Match(path) || (folder && in.MatchBelow(path)) {
-			return true
-		}
-	}
-	return false
 }
 
 // virtualRepos fills each hit with the virtual repositories, sorted, whose

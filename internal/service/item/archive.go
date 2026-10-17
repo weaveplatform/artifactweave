@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -222,10 +223,12 @@ type Explode struct {
 	CanOverwrite bool
 }
 
-// explodeFile is a validated entry to deploy.
+// explodeFile is a validated entry to deploy, with the environment of its
+// hooks once the format inspected it.
 type explodeFile struct {
 	path string
 	info blob.Info
+	env  format.Env
 }
 
 // Explode deploys the entries of the archive in d.Body and returns the
@@ -258,11 +261,28 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 	if err != nil {
 		return types.Item{}, err
 	}
+	// Every entry is inspected before any is written, so an atomic explode
+	// holds its transaction for the writes alone.
+	for i, fl := range files {
+		e := d.Deploy
+		e.Path = fl.path
+		if files[i].env, err = s.inspected(ctx, e, digestsOf(fl.info), fl.info.Size); err != nil {
+			return types.Item{}, err
+		}
+	}
 	now := s.now()
 	write := func(ctx context.Context, fl explodeFile) error {
 		e := d.Deploy
 		e.Path = fl.path
-		_, err := s.putFile(ctx, e, digestsOf(fl.info), fl.info.Size, types.Checksums{}, now)
+		_, err := s.putFile(
+			ctx,
+			fl.env,
+			e,
+			digestsOf(fl.info),
+			fl.info.Size,
+			types.Checksums{},
+			now,
+		)
 		return err
 	}
 	if d.Atomic {

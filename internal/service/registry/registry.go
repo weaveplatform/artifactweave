@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -50,6 +51,10 @@ type Service struct {
 	Blobs blob.Store
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
+	// Formats and Work reach the item service's format hooks (decision
+	// 0032); nil means formats.For and the store's queue.
+	Formats func(repo.PackageType) format.Handler
+	Work    item.Enqueuer
 
 	// locks serialise one session's requests in this process, striped by
 	// session id so the set stays bounded however many uploads run. Two
@@ -84,7 +89,9 @@ func (s *Service) now() time.Time {
 }
 
 func (s *Service) items() *item.Service {
-	return &item.Service{Store: s.Store, Blobs: s.Blobs, Now: s.Now}
+	return &item.Service{
+		Store: s.Store, Blobs: s.Blobs, Now: s.Now, Formats: s.Formats, Work: s.Work,
+	}
 }
 
 // lock takes the stripe of session id's lock.
