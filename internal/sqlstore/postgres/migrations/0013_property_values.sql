@@ -1,6 +1,6 @@
 -- Property values the B-tree entry limit (2704 bytes) cannot hold. The stores
--- keep values up to types.PropertyValueMax, 4000 UTF-16 code units or up to
--- 12 KB of UTF-8, but the keys of item_properties and build_properties held
+-- keep values up to types.PropertyValueMax, 2400 UTF-16 code units or up to
+-- 7 KB of UTF-8, but the keys of item_properties and build_properties held
 -- the whole value, so a longer one failed to write.
 --
 -- Uniqueness moves to md5(value): an index expression must be IMMUTABLE, and

@@ -150,6 +150,10 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 		return auth.ErrForbidden
 	case errors.Is(err, types.ErrInvalidItemPath):
 		return apierror.New(http.StatusBadRequest, err.Error())
+	case errors.Is(err, types.ErrPropertyKeyTooLong):
+		// The routes refuse long keys themselves; this answers for any
+		// write that reaches a store with one.
+		return apierror.New(http.StatusBadRequest, types.ErrPropertyKeyTooLong.Error())
 	case errors.Is(err, store.ErrNotFound):
 		return itemNotFound()
 	}

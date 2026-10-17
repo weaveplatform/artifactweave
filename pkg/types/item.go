@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"unicode/utf16"
+	"unicode/utf8"
 )
 
 // ErrInvalidItemPath reports a repository path that cannot name an item.
@@ -121,24 +122,50 @@ func ResolveRepoKey(key string) (stored string, cached bool) {
 type Properties map[string][]string
 
 // ValidatePropertyKey refuses keys that the ";key=value" matrix syntax and
-// the "?properties=k=v|k2=v2" query syntax could not carry unambiguously.
+// the "?properties=k=v|k2=v2" query syntax could not carry unambiguously,
+// and keys CheckPropertyKeyLength refuses.
 func ValidatePropertyKey(key string) error {
 	if key == "" || strings.ContainsAny(key, "=;,|/\\\"") ||
 		strings.ContainsFunc(key, isSpaceOrControl) {
 		return fmt.Errorf("%w: %q", ErrInvalidPropertyKey, key)
 	}
-	return nil
+	return CheckPropertyKeyLength(key)
 }
 
 func isSpaceOrControl(r rune) bool { return r <= ' ' || r == 0x7f }
 
+// PropertyKeyMax is the longest property key, in characters: the limit
+// JFrog's 7.x documentation gives ("JFrog Properties"), and the width of
+// Artifactory's VARCHAR(255) key columns. Artifactory checks nothing before
+// its database refuses a longer key (RTFACT-21394); artifactweave answers
+// 400 (DV-059).
+const PropertyKeyMax = 255
+
+// ErrPropertyKeyTooLong reports a key longer than PropertyKeyMax. It wraps
+// ErrInvalidPropertyKey.
+var ErrPropertyKeyTooLong = fmt.Errorf("%w: longer than %d characters",
+	ErrInvalidPropertyKey, PropertyKeyMax)
+
+// CheckPropertyKeyLength returns ErrPropertyKeyTooLong for a key longer
+// than PropertyKeyMax characters. The stores check it too: on PostgreSQL a
+// key is indexed whole beside a value's prefix, and a much longer key would
+// not fit a B-tree entry.
+func CheckPropertyKeyLength(key string) error {
+	if utf8.RuneCountInString(key) > PropertyKeyMax {
+		return ErrPropertyKeyTooLong
+	}
+	return nil
+}
+
 // PropertyValueMax and BuildPropertyValueMax are the longest property values
-// the stores keep, in UTF-16 code units, which is how Artifactory 6.20's Java
-// counts them (PROP_VALUE_MAX_SIZE in PropertiesDao, and in BuildsDao and
-// BuildModulesDao). Artifactory cuts a longer value on write rather than
-// refusing it, and so do the stores.
+// the stores keep, in UTF-16 code units, as Artifactory's Java counts them.
+// JFrog's 7.x documentation limits property values to 2400 characters ("JFrog
+// Properties"); build and module properties keep 6.20's 2048 (BuildsDao and
+// BuildModulesDao), which the documentation does not cover. Artifactory 6.20
+// cuts a longer value on write rather than refusing it (PropertiesDao), and
+// so do the stores.
 const (
-	PropertyValueMax      = 4000
+	PropertyValueMax      = 2400
 	BuildPropertyValueMax = 2048
 )
 

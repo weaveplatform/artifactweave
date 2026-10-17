@@ -114,22 +114,3 @@ func cleanBuildProperties(props types.Properties) types.Properties {
 	}
 	return out
 }
-
-// CleanProperties is how the stores keep properties, one row per value:
-// keys without values dropped, each value cut to limit
-// (types.TruncatePropertyValue), and the values sorted and unique, so two
-// values that differ only past the limit become one.
-func CleanProperties(props types.Properties, limit int) types.Properties {
-	out := types.Properties{}
-	for k, values := range props {
-		if len(values) == 0 {
-			continue
-		}
-		cut := make([]string, len(values))
-		for i, v := range values {
-			cut[i] = types.TruncatePropertyValue(v, limit)
-		}
-		out.Set(k, cut...)
-	}
-	return out
-}

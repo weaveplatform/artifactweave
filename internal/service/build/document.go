@@ -86,12 +86,20 @@ func Parse(projectKey string, raw []byte) (types.Build, error) {
 	if err != nil {
 		return types.Build{}, err
 	}
+	props, err := properties(d.Properties)
+	if err != nil {
+		return types.Build{}, err
+	}
 	b := types.Build{
 		ProjectKey: projectKey, Name: d.Name, Number: d.Number, Started: started, URL: d.URL,
-		Properties: properties(d.Properties), Document: raw,
+		Properties: props, Document: raw,
 	}
 	for _, m := range d.Modules {
-		bm := types.BuildModule{ID: m.ID, Type: m.Type, Properties: properties(m.Properties)}
+		props, err := properties(m.Properties)
+		if err != nil {
+			return types.Build{}, fmt.Errorf("%w (module %q)", err, m.ID)
+		}
+		bm := types.BuildModule{ID: m.ID, Type: m.Type, Properties: props}
 		for _, f := range m.Artifacts {
 			bm.Artifacts = append(bm.Artifacts, f.build())
 		}
@@ -112,10 +120,14 @@ func (f file) build() types.BuildFile {
 
 // properties converts a document's properties to the store's: a string is
 // its value, null is no value, and anything else is kept as its JSON text,
-// so a number keeps the digits the client sent.
-func properties(in map[string]json.RawMessage) types.Properties {
+// so a number keeps the digits the client sent. A key longer than
+// types.PropertyKeyMax is ErrInvalid.
+func properties(in map[string]json.RawMessage) (types.Properties, error) {
 	out := types.Properties{}
 	for k, raw := range in {
+		if err := types.CheckPropertyKeyLength(k); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalid, err)
+		}
 		var s string
 		switch {
 		case bytes.Equal(raw, []byte("null")):
@@ -125,7 +137,7 @@ func properties(in map[string]json.RawMessage) types.Properties {
 			out.Add(k, string(raw))
 		}
 	}
-	return out
+	return out, nil
 }
 
 // setFields returns the JSON object raw with the top-level fields in set

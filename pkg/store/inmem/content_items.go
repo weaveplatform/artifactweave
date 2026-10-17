@@ -319,6 +319,9 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 }
 
 func (i items) SetProperties(ctx context.Context, id int64, props types.Properties) error {
+	if err := store.CheckPropertyKeys(props); err != nil {
+		return fmt.Errorf("properties of item %d: %w", id, err)
+	}
 	return i.s.do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err
@@ -334,6 +337,9 @@ func (i items) PatchProperties(
 	set types.Properties,
 	remove []string,
 ) error {
+	if err := store.CheckPropertyKeys(set); err != nil {
+		return fmt.Errorf("properties of item %d: %w", id, err)
+	}
 	return i.s.do(ctx, func() error {
 		if err := i.requireItem(id); err != nil {
 			return err

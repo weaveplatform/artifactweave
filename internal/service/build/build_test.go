@@ -151,6 +151,7 @@ func runPath(name, number, started string) string {
 }
 
 func TestParse(t *testing.T) {
+	longKey := strings.Repeat("k", types.PropertyKeyMax+1)
 	for _, tc := range []struct{ doc, want string }{
 		{`{`, "not valid JSON"},
 		{`[]`, "not valid JSON"},
@@ -159,6 +160,12 @@ func TestParse(t *testing.T) {
 		{`{"name":"a","started":"` + started0 + `"}`, "has no number"},
 		{`{"name":"a","number":"1"}`, "has no started"},
 		{`{"name":"a","number":"1","started":"2026-10-15"}`, "layout"},
+		{
+			`{"name":"a","number":"1","started":"` + started0 + `","properties":{"` + longKey + `":"v"}}`,
+			"longer than 255 characters",
+		},
+		{`{"name":"a","number":"1","started":"` + started0 + `","modules":[{"id":"m",` +
+			`"properties":{"` + longKey + `":"v"}}]}`, `(module "m")`},
 	} {
 		if _, err := Parse("", []byte(tc.doc)); !errors.Is(err, ErrInvalid) ||
 			!strings.Contains(err.Error(), tc.want) {
