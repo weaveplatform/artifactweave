@@ -490,6 +490,9 @@ func (i items) setKeys(ctx context.Context, id int64, props types.Properties) er
 }
 
 func (i items) SetProperties(ctx context.Context, id int64, props types.Properties) error {
+	if err := store.CheckPropertyKeys(props); err != nil {
+		return fmt.Errorf("properties of item %d: %w", id, err)
+	}
 	return i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
@@ -508,6 +511,9 @@ func (i items) PatchProperties(
 	set types.Properties,
 	remove []string,
 ) error {
+	if err := store.CheckPropertyKeys(set); err != nil {
+		return fmt.Errorf("properties of item %d: %w", id, err)
+	}
 	return i.s.Tx(ctx, func(ctx context.Context) error {
 		if err := i.requireItem(ctx, id); err != nil {
 			return err

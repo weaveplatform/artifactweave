@@ -90,6 +90,19 @@ func TestProperties(t *testing.T) {
 			t.Errorf("%q: %v", bad, err)
 		}
 	}
+	// The key limit counts characters: "é" is two bytes.
+	if err := types.ValidatePropertyKey(strings.Repeat("é", types.PropertyKeyMax)); err != nil {
+		t.Error(err)
+	}
+	if err := types.ValidatePropertyKey(
+		strings.Repeat("é", types.PropertyKeyMax+1),
+	); !errors.Is(
+		err,
+		types.ErrPropertyKeyTooLong,
+	) ||
+		!errors.Is(err, types.ErrInvalidPropertyKey) {
+		t.Errorf("a long key: %v", err)
+	}
 }
 
 func TestTruncatePropertyValue(t *testing.T) {

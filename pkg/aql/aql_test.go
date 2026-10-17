@@ -734,6 +734,8 @@ func TestParseActionErrors(t *testing.T) {
 		`properties.update({"$or":["a"]}).keys("a").newValue("v")`:             ErrSyntax,
 		`properties.update({"$not":[]}).keys("a").newValue("v")`:               ErrSyntax,
 		`properties.update({"item.size":"big"}).keys("a").newValue("v")`:       ErrSyntax,
+		`properties.update().keys("` + strings.Repeat("k", types.PropertyKeyMax+1) +
+			`").newValue("v")`: ErrInvalid,
 	} {
 		if _, err := Parse(src); !errors.Is(err, want) {
 			t.Errorf("Parse(%s) = %v, want %v", src, err, want)

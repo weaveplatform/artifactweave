@@ -744,7 +744,7 @@ func parseProperties(s string) (types.Properties, error) {
 		kv := splitUnescaped(p, "=")
 		key := unescapeBackslashes(kv[0])
 		if err := types.ValidatePropertyKey(key); err != nil {
-			return nil, badRequest("invalid property key %q", key)
+			return nil, badRequest("%v", err)
 		}
 		if len(kv) < 2 {
 			return nil, badRequest("property %q has no value", key)
@@ -800,7 +800,7 @@ func parseMetadataPatch(r *http.Request) (propertyEdit, error) {
 	edit := propertyEdit{set: types.Properties{}}
 	for key, raw := range body.Props {
 		if err := types.ValidatePropertyKey(key); err != nil {
-			return propertyEdit{}, badRequest("invalid property key %q", key)
+			return propertyEdit{}, badRequest("%v", err)
 		}
 		var one string
 		var many []string

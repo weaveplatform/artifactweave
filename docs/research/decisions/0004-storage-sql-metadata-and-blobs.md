@@ -33,13 +33,18 @@ item table also keeps `sha512` and `original_sha512` (below), which AQL does not
 The storage API layer prefixes `/` on `path` and joins `path` and `name`; AQL reads the
 columns as they are. Properties are an entity-attribute-value table keyed by item.
 
-**Property values.** A property value is kept to 4000 UTF-16 code units, and a build or
-module property value to 2048, the limits of Artifactory 6.20 (`PROP_VALUE_MAX_SIZE` in
-`PropertiesDao`, `BuildsDao` and `BuildModulesDao`). Like Artifactory, the stores cut a
-longer value on write rather than refusing it, but never inside a surrogate pair. On
-PostgreSQL no index holds a whole value, because a B-tree entry is at most 2704 bytes: the
-property tables are unique on `md5(value)`, and value lookups use an index on the first 255
+**Property keys and values.** JFrog's documentation limits property keys to 255 characters
+and values to 2400 ("JFrog Properties"). A value is kept to 2400 UTF-16 code units, and a
+build or module property value to 2048, the limit of Artifactory 6.20's `BuildsDao` and
+`BuildModulesDao`, which neither the documentation nor the 7.x release notes cover. As 6.20
+does (`PropertiesDao`), the stores cut a longer value on write rather than refusing it, but
+never inside a surrogate pair; whether 7.x still cuts is unconfirmed (#216). A key longer than 255
+characters is refused with 400 on every route that sets properties, and the stores refuse
+it too ([DV-059](../../implementation/deviations.md#api-behaviour), #340). On PostgreSQL no
+index holds a whole value, because a B-tree entry is at most 2704 bytes: the property
+tables are unique on `md5(value)`, and value lookups use an index on the first 255
 characters, which AQL narrows on before it compares whole values (migration 0013, #338).
+The property limits were checked against Artifactory 7.161.32 (2026-10-17).
 
 **Blobs.** `pkg/blob` is a content-addressed store keyed by sha256. Every upload computes
 four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three are recorded
@@ -104,10 +109,9 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
 - *Storing sidecar files as items*: simpler, but then a sidecar can disagree with its
   artifact and `badChecksum` has nothing to compare.
 - *MySQL as a third dialect*: deferred; nothing in scope needs it.
-- *Artifactory's PostgreSQL limit on property values*: Artifactory cuts them to 2400
-  characters there (`db.postgres.property.value.max.size`), because its indexes hold
-  whole values. With only a prefix indexed, every store keeps 4000, so a value reads back
-  the same whichever database holds it ([DV-059](../../implementation/deviations.md#data-model)).
+- *Keeping 4000 characters of a value*: Artifactory 6.20 keeps 4000 on most databases and
+  2400 on PostgreSQL (`db.postgres.property.value.max.size`), but 7.x documents 2400, so
+  every store keeps 2400 and a value reads back the same whichever database holds it.
 - *bun, ent, gorm*: heavier abstractions and harder to test to 95%.
 
 ## Constraints

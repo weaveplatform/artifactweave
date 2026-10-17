@@ -397,6 +397,11 @@ func (s artifactoryService) PromoteBuild(
 		return refusePromotion(fmt.Sprintf(
 			"The value of property '%s' must be a string or an array of strings", bad)), nil
 	}
+	for k := range props {
+		if err := types.CheckPropertyKeyLength(k); err != nil {
+			return refusePromotion(err.Error()), nil
+		}
+	}
 	artifacts, failFast := true, true
 	if body.Artifacts != nil {
 		artifacts = *body.Artifacts

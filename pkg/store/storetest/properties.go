@@ -3,6 +3,7 @@ package storetest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"math/rand/v2"
 	"slices"
 	"strings"
@@ -22,7 +23,7 @@ func testLongPropertyValues(t *testing.T, st store.Store) {
 	ctx := context.Background()
 	s := st.Items()
 	base := LongText(types.PropertyValueMax - 1)
-	// v1 and v2 share their first 3999 characters, far past any indexed
+	// v1 and v2 share every character but their last, far past any indexed
 	// prefix. v3 leaves base early with "!", which sorts below every
 	// character LongText uses, so v3 < v1 < v2.
 	v1 := base + "a"
@@ -135,6 +136,74 @@ func LongText(n int) string {
 	var b strings.Builder
 	for range n {
 		b.WriteRune(runes[rng.IntN(len(runes))])
+	}
+	return b.String()
+}
+
+// testLongPropertyKeys stores keys of types.PropertyKeyMax characters and
+// refuses longer ones with ErrInvalid, writing nothing. The characters are
+// four bytes of UTF-8 each, and the value beside them is as long as a value
+// may be, which is the most a PostgreSQL index entry over a key and a
+// value's prefix has to hold.
+func testLongPropertyKeys(t *testing.T, st store.Store) {
+	ctx := context.Background()
+	s := st.Items()
+	key := wideText(types.PropertyKeyMax)
+	long := wideText(types.PropertyKeyMax + 1)
+	value := wideText(types.PropertyValueMax / 2)
+	props := get[types.Properties](t)
+	tooLong := func(what string, err error) {
+		t.Helper()
+		if !errors.Is(err, store.ErrInvalid) || !errors.Is(err, types.ErrPropertyKeyTooLong) {
+			t.Fatalf("%s: err = %v, want ErrInvalid and ErrPropertyKeyTooLong", what, err)
+		}
+	}
+
+	it := get[types.Item](t)(s.Put(ctx, fileItem("r", "keys.txt", 1)))
+	want := types.Properties{key: {value}}
+	must(t, s.SetProperties(ctx, it.ID, want))
+	same(t, "a key at the limit", want, props(s.Properties(ctx, it.ID)))
+	tooLong(
+		"SetProperties",
+		s.SetProperties(ctx, it.ID, types.Properties{"ok": {"1"}, long: {"1"}}),
+	)
+	tooLong(
+		"PatchProperties",
+		s.PatchProperties(ctx, it.ID, types.Properties{long: {"1"}}, []string{key}),
+	)
+	same(t, "after the refused writes", want, props(s.Properties(ctx, it.ID)))
+
+	bs := st.Builds()
+	b := fxBuild("", "keys", "1", 0)
+	b.Properties = types.Properties{long: {"v"}}
+	_, err := bs.Put(ctx, b)
+	tooLong("Put with a build property", err)
+	b.Properties = types.Properties{key: {"v"}}
+	b.Modules[0].Properties = types.Properties{long: {"v"}}
+	_, err = bs.Put(ctx, b)
+	tooLong("Put with a module property", err)
+	_, err = bs.Latest(ctx, "", "keys")
+	wantErr(t, err, store.ErrNotFound)
+	moduleValue := wideText(types.BuildPropertyValueMax / 2)
+	b.Modules[0].Properties = types.Properties{key: {moduleValue}}
+	run := get[types.Build](t)(bs.Put(ctx, b))
+	got := get[types.Build](t)(bs.ByID(ctx, run.ID))
+	same(t, "build properties", types.Properties{key: {"v"}}, got.Properties)
+	same(t, "module properties", types.Properties{key: {moduleValue}}, got.Modules[0].Properties)
+	changed := got
+	changed.Properties = types.Properties{long: {"v"}}
+	tooLong("Replace", bs.Replace(ctx, changed))
+	same(t, "after the refused Replace", types.Properties{key: {"v"}},
+		get[types.Build](t)(bs.ByID(ctx, run.ID)).Properties)
+}
+
+// wideText returns n random characters of four bytes of UTF-8 each (emoji,
+// so two UTF-16 code units each), the same on every call.
+func wideText(n int) string {
+	rng := rand.New(rand.NewPCG(3, 4)) //nolint:gosec // test data, not a secret
+	var b strings.Builder
+	for range n {
+		b.WriteRune(rune(0x1F600 + rng.IntN(80)))
 	}
 	return b.String()
 }

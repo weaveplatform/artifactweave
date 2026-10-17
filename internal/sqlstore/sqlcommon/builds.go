@@ -50,6 +50,9 @@ func validBuild(b types.Build) error {
 		return fmt.Errorf("build %q number %q: name, number and started are required: %w",
 			b.Name, b.Number, store.ErrInvalid)
 	}
+	if err := store.CheckBuildPropertyKeys(b); err != nil {
+		return fmt.Errorf("build %q number %q: %w", b.Name, b.Number, err)
+	}
 	return nil
 }
 
@@ -277,6 +280,9 @@ func (b buildStore) Put(ctx context.Context, run types.Build) (types.Build, erro
 }
 
 func (b buildStore) Replace(ctx context.Context, run types.Build) error {
+	if err := store.CheckBuildPropertyKeys(run); err != nil {
+		return fmt.Errorf("build run %d: %w", run.ID, err)
+	}
 	run = store.NormaliseBuild(run)
 	return b.s.Tx(ctx, func(ctx context.Context) error {
 		op := fmt.Sprintf("replace build run %d", run.ID)

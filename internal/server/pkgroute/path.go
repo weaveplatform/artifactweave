@@ -87,7 +87,7 @@ func (p *Path) addMatrix(params string) error {
 			k, mandatory = base, true
 		}
 		if err := types.ValidatePropertyKey(k); err != nil {
-			return badRequest("invalid property key %q", k)
+			return badRequest("%v", err)
 		}
 		v, err = url.QueryUnescape(v)
 		if err != nil {
