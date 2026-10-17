@@ -163,6 +163,12 @@ type Download struct {
 	// Path is the requested repository-relative path.
 	Path   string
 	Cached bool
+	// Matrix holds the request's matrix parameters, which the file served
+	// must match.
+	Matrix types.Matrix
+	// Readable reports whether the caller may read a file of the
+	// repository; nil reads every file.
+	Readable func(fullPath string) bool
 }
 
 // Resolver is a format whose downloads may name a file other than the one

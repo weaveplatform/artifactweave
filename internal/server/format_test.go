@@ -22,6 +22,7 @@ type followingFormat struct {
 	annotated   []string // "path set-keys -removed-keys"
 	annotateErr error
 	resolveErr  error
+	resolved    format.Download
 	reindexed   []string
 	reindexErr  error
 }
@@ -52,6 +53,7 @@ func (f *followingFormat) Resolve(
 	_ repo.Config,
 	d format.Download,
 ) (string, error) {
+	f.resolved = d
 	if f.resolveErr != nil {
 		return "", f.resolveErr
 	}
@@ -188,6 +190,31 @@ func TestDownloadsResolveThroughTheFormat(t *testing.T) {
 	}
 	wantStatus(t, w.do("GET", "/artifactory/api/storage/libs-local/latest.txt", "admin", ""),
 		http.StatusNotFound)
+
+	// The format sees the request's matrix parameters, and which files the
+	// caller may read; what it names is then read as the caller.
+	wantStatus(t, w.do("GET", "/artifactory/libs-local/latest.txt;tier+=gold", "admin", ""),
+		http.StatusNotFound)
+	if m := f.resolved.Matrix; !m.Props.Has("tier", "gold") || !m.Mandatory["tier"] {
+		t.Errorf("matrix %+v", m)
+	}
+	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+		Name: "latest-only",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionRead}},
+			Targets: map[string]types.Target{"libs-local": {Include: []string{"latest.txt"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(
+		t,
+		w.do("GET", "/artifactory/libs-local/latest.txt", "user", ""),
+		http.StatusForbidden,
+	)
+	if r := f.resolved.Readable; r == nil || !r("latest.txt") || r("a/f.txt") {
+		t.Error("the caller's reads are not the format's")
+	}
 
 	f.resolveErr = format.Reject(http.StatusConflict, "no release yet")
 	rec = w.do("GET", "/artifactory/libs-local/latest.txt", "admin", "")

@@ -57,3 +57,98 @@ func TestRead(t *testing.T) {
 		t.Errorf("file version %q", c.FileVersion())
 	}
 }
+
+// A request path with a version token reads as Artifactory reads it: under
+// the plain layout gradle-default's lazy base revision takes in
+// -[INTEGRATION]; with the tokens it is the integration revision.
+func TestVersionTokens(t *testing.T) {
+	tests := []struct {
+		layout, path string
+		plain, tok   layout.Coordinates
+	}{
+		{
+			layout: "gradle-default",
+			path:   "org.acme/lib/1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].jar",
+			plain: layout.Coordinates{
+				Org:     "org.acme",
+				Module:  "lib",
+				BaseRev: "1.0-[INTEGRATION]",
+				Ext:     "jar",
+			},
+			tok: layout.Coordinates{
+				Org: "org.acme", Module: "lib", BaseRev: "1.0",
+				FolderItegRev: "[INTEGRATION]", FileItegRev: "[INTEGRATION]", Ext: "jar",
+			},
+		},
+		{
+			layout: "maven-2-default",
+			path:   "org/acme/lib/[RELEASE]/lib-[RELEASE]-sources.jar",
+			plain: layout.Coordinates{
+				Org:        "org.acme",
+				Module:     "lib",
+				BaseRev:    "[RELEASE]",
+				Classifier: "sources",
+				Ext:        "jar",
+			},
+			tok: layout.Coordinates{
+				Org:        "org.acme",
+				Module:     "lib",
+				BaseRev:    "[RELEASE]",
+				Classifier: "sources",
+				Ext:        "jar",
+			},
+		},
+		{
+			// An empty integration revision expression is Artifactory's
+			// permissive one, with the tokens beside it.
+			layout: "empty-revisions",
+			path:   "acme/lib/1.0-[INTEGRATION]/lib-1.0-[INTEGRATION].jar",
+			plain: layout.Coordinates{
+				Org:           "acme",
+				Module:        "lib",
+				BaseRev:       "1.0",
+				FolderItegRev: "[INTEGRATION]",
+				FileItegRev:   "[INTEGRATION]",
+				Ext:           "jar",
+			},
+			tok: layout.Coordinates{
+				Org:           "acme",
+				Module:        "lib",
+				BaseRev:       "1.0",
+				FolderItegRev: "[INTEGRATION]",
+				FileItegRev:   "[INTEGRATION]",
+				Ext:           "jar",
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.layout, func(t *testing.T) {
+			var l *layout.Layout
+			if tc.layout == "empty-revisions" {
+				var err error
+				l, err = layout.Compile(layout.Definition{
+					Name:                "empty-revisions",
+					ArtifactPathPattern: "[org]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev]).[ext]",
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				l = mustLookup(t, tc.layout)
+			}
+			if got, ok := l.Read(tc.path); !ok || got != tc.plain {
+				t.Errorf("plain read %+v, %v; want %+v", got, ok, tc.plain)
+			}
+			tl, err := l.VersionTokens()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, ok := tl.Read(tc.path); !ok || got != tc.tok {
+				t.Errorf("token read %+v, %v; want %+v", got, ok, tc.tok)
+			}
+			if tl.Definition() != l.Definition() {
+				t.Errorf("definition %+v, want the layout's own", tl.Definition())
+			}
+		})
+	}
+}

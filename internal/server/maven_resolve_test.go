@@ -1,0 +1,67 @@
+package server
+
+import (
+	"context"
+	"net/http"
+	"testing"
+
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+)
+
+// GET and HEAD of a version token or a -SNAPSHOT name serve the file the
+// Maven format resolves, with its checksums, through a virtual repository
+// too, and filtered by matrix parameters; the storage API reads the path as
+// given.
+func TestMavenDownloadsResolveVersions(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	for _, c := range []repo.Config{
+		{Key: "mvn-local", Class: repo.Local, PackageType: repo.Maven},
+		{Key: "mvn", Class: repo.Virtual, PackageType: repo.Maven, Repositories: []string{"mvn-local"}},
+	} {
+		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	dir := "/artifactory/mvn-local/com/acme/app/"
+	for path, body := range map[string]string{
+		"1.9/app-1.9.jar;tier=gold":                        "jar 1.9",
+		"1.10/app-1.10.jar;tier=silver":                    "jar 1.10",
+		"1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar":       "build 1",
+		"1.0-SNAPSHOT/app-1.0-20261017.100000-2.jar":       "build 2",
+		"1.0-SNAPSHOT/app-1.0-20261017.090000-1-tests.jar": "tests 1",
+	} {
+		wantStatus(t, w.do("PUT", dir+path, "admin", body), http.StatusCreated)
+	}
+	for _, tc := range []struct {
+		method, path, want string
+	}{
+		{"GET", dir + "[RELEASE]/app-[RELEASE].jar", "jar 1.10"},
+		{"GET", dir + "[RELEASE]/app-[RELEASE].jar;tier=gold", "jar 1.9"},
+		{"GET", "/artifactory/mvn/com/acme/app/[RELEASE]/app-[RELEASE].jar", "jar 1.10"},
+		{"GET", dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar", "build 2"},
+		{"GET", dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT-tests.jar", "tests 1"},
+		{"GET", dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar.sha1", sha1Hex("build 2")},
+		{"HEAD", dir + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar", ""},
+	} {
+		rec := w.do(tc.method, tc.path, "reader", "")
+		wantStatus(t, rec, http.StatusOK)
+		if rec.Body.String() != tc.want {
+			t.Errorf("%s %s: %q, want %q", tc.method, tc.path, rec.Body, tc.want)
+		}
+		if tc.method == "HEAD" && rec.Header().Get("X-Checksum-Sha1") != sha1Hex("build 2") {
+			t.Errorf("HEAD checksum %q", rec.Header().Get("X-Checksum-Sha1"))
+		}
+	}
+	wantStatus(t, w.do("GET", dir+"[RELEASE]/app-[RELEASE].war", "reader", ""), http.StatusNotFound)
+	wantStatus(
+		t,
+		w.do(
+			"GET",
+			"/artifactory/api/storage/mvn-local/com/acme/app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar",
+			"reader",
+			"",
+		),
+		http.StatusNotFound,
+	)
+}

@@ -60,6 +60,11 @@ type itemRequest struct {
 	mandatory map[string]bool
 }
 
+// matrix returns the request's matrix parameters as a download matches them.
+func (r itemRequest) matrix() types.Matrix {
+	return types.Matrix{Props: r.props, Mandatory: r.mandatory}
+}
+
 // parseItemPath splits /artifactory/{repoKey}/{path} into the key, the path
 // and the matrix parameters (";key=value" after any segment). It works on
 // the escaped path, so an encoded ";" or "/" in a name stays part of it.
@@ -441,7 +446,7 @@ type found struct {
 
 // resolver rewrites a download's path in a repository that holds items,
 // as its format resolves it (item.Service.Resolve).
-type resolver func(ctx context.Context, c repo.Config, cached bool, p string) (string, error)
+type resolver func(ctx context.Context, c repo.Config, d format.Download) (string, error)
 
 // download is what a download applies on its way to an item, and the
 // storage API, which describes the path as given, does not: Artifactory's
@@ -450,6 +455,7 @@ type resolver func(ctx context.Context, c repo.Config, cached bool, p string) (s
 type download struct {
 	path    string
 	folder  bool
+	matrix  types.Matrix
 	resolve resolver
 }
 
@@ -457,14 +463,15 @@ type download struct {
 // archive entry ("<archive>!/<entry>") off the archive's path
 // (ArtifactoryRequestBase.zipResourcePath), and RepoBase.accepts checks a
 // checksum sidecar as the file it describes. folder is whether the request
-// ended in a slash.
-func newDownload(p string, folder bool, resolve resolver) *download {
+// ended in a slash; m are its matrix parameters, which a resolution filters
+// by as the download filters what it serves.
+func newDownload(p string, folder bool, m types.Matrix, resolve resolver) *download {
 	if archive, _, ok := strings.Cut(p, "!/"); ok {
 		p, folder = archive, false
 	} else if artifact, _, ok := item.Sidecar(p); ok {
 		p, folder = artifact, false
 	}
-	return &download{path: p, folder: folder, resolve: resolve}
+	return &download{path: p, folder: folder, matrix: m, resolve: resolve}
 }
 
 // lookup finds the item at p for a download from c: a local repository's
@@ -497,7 +504,14 @@ func lookup(
 		cached = cached || c.Class == repo.Remote
 		if dl != nil && dl.resolve != nil {
 			var err error
-			if p, err = dl.resolve(ctx, c, cached, p); err != nil {
+			if p, err = dl.resolve(ctx, c, format.Download{
+				Path:   p,
+				Cached: cached,
+				Matrix: dl.matrix,
+				Readable: func(fullPath string) bool {
+					return acc.file(c, fullPath, types.ActionRead)
+				},
+			}); err != nil {
 				return found{}, err
 			}
 		}
@@ -564,7 +578,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, denied(p))
 		return
 	}
-	dl := newDownload(req.path, req.folder, s.items(st).Resolve)
+	dl := newDownload(req.path, req.folder, req.matrix(), s.items(st).Resolve)
 	if req.path == "" {
 		if err := generic.CheckDownload(c, "", true); err != nil {
 			writeErr(w, r, s.itemError(ctx, "download check", err))
@@ -622,9 +636,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	s.serveFile(w, r, st, f, p)
 }
 
-// matchesMatrix applies download matrix parameters: a key the item carries
-// must have one of the requested values; a mandatory key ("key+=v") must be
-// carried. Keys the item lacks do not stop a non-mandatory match.
+// matchesMatrix applies download matrix parameters (types.Matrix.Matches).
 func matchesMatrix(
 	ctx context.Context,
 	st store.Store,
@@ -638,30 +650,7 @@ func matchesMatrix(
 	if err != nil {
 		return false, fmt.Errorf("properties of %s: %w", it.FullPath(), err)
 	}
-	for k, want := range req.props {
-		have, ok := props[k]
-		if !ok {
-			if req.mandatory[k] {
-				return false, nil
-			}
-			continue
-		}
-		if !anyIn(want, have) {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func anyIn(want, have []string) bool {
-	for _, w := range want {
-		for _, h := range have {
-			if w == h {
-				return true
-			}
-		}
-	}
-	return false
+	return req.matrix().Matches(props), nil
 }
 
 // getSidecar serves "<file>.sha256", ".sha512", ".sha1" and ".md5" from the file's

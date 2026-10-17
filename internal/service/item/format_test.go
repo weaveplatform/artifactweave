@@ -678,10 +678,15 @@ func TestResolveAndReindex(t *testing.T) {
 		}
 		return fmt.Sprintf("/real/%s/%v", d.Path, d.Cached), nil
 	}
-	if got, err := w.svc.Resolve(ctx, w.loc, true, "x"); err != nil || got != "real/x/true" {
+	if got, err := w.svc.Resolve(
+		ctx,
+		w.loc,
+		format.Download{Path: "x", Cached: true},
+	); err != nil ||
+		got != "real/x/true" {
 		t.Fatalf("resolve %q, %v", got, err)
 	}
-	if _, err := w.svc.Resolve(ctx, w.loc, false, "bad"); err == nil {
+	if _, err := w.svc.Resolve(ctx, w.loc, format.Download{Path: "bad"}); err == nil {
 		t.Fatal("an unresolvable path resolved")
 	}
 	// A reindex manages its own transactions.
@@ -691,7 +696,12 @@ func TestResolveAndReindex(t *testing.T) {
 	}
 
 	w.svc.Formats = nil
-	if got, err := w.svc.Resolve(ctx, w.loc, false, "as/is"); err != nil || got != "as/is" {
+	if got, err := w.svc.Resolve(
+		ctx,
+		w.loc,
+		format.Download{Path: "as/is"},
+	); err != nil ||
+		got != "as/is" {
 		t.Fatalf("generic resolve %q, %v", got, err)
 	}
 	if err := w.svc.Reindex(ctx, w.loc); !errors.Is(err, ErrNoReindex) {

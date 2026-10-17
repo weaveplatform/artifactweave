@@ -117,10 +117,19 @@ oldest build's files are deleted through the item service and empty folders prun
 queues the package's metadata again. The cleanup state lives in the queue, so it survives a
 restart, and it runs when the queue reaches it rather than on a five-minute timer.
 
-**Version tokens** (`Resolve`, GET and HEAD in local repositories, #281): `[RELEASE]`,
-`[INTEGRATION]` and `-SNAPSHOT` resolve with Artifactory's rules (research 27 section 8),
-reading the package index and filtered by the request's matrix properties. Under the Maven
-layout `[INTEGRATION]` is left as it is, as in Artifactory.
+**Version tokens** (`Resolve`, GET and HEAD, #281; checked against Artifactory 7.161.32):
+`[RELEASE]`, `[INTEGRATION]` and `-SNAPSHOT` resolve in local repositories and remote
+repositories' caches, and in a virtual repository through its members, the repositories
+JFrog's Retrieve Artifact documents (research 27 section 8). A candidate has the path's
+coordinates and matches the request's matrix parameters, and resolution reads the files,
+never `maven-metadata.xml`.
+- **Under the Maven layout,** a `-SNAPSHOT` name resolves to its folder's newest unique build
+  and `[RELEASE]` to the highest release in the Mercury order, with Artifactory 6.20's rules,
+  which 7.x documents no differently. `[INTEGRATION]` is left as it is.
+- **Under any other layout,** `[RELEASE]` and `[INTEGRATION]` resolve to the alphabetically
+  last release, or integration revision of the path's base revision, as the 7.x
+  documentation says. Artifactory 6.20's code ordered them by the Mercury order and by
+  creation date; 7.x wins (research README), and #216 asks which a live 7.x does.
 
 **`calculateMetadata`** (`POST /api/maven/calculateMetadata/{repoKey}/{folderPath}`):
 - 404 "Could not find path '...'" for a missing path; 404 "Unable to find local repository

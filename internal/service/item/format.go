@@ -201,19 +201,14 @@ func (s *Service) Annotate(
 	return nil
 }
 
-// Resolve returns the path a download of path from c, a repository that is
-// not virtual, reads: the format's resolution of it, or path itself.
-func (s *Service) Resolve(
-	ctx context.Context,
-	c repo.Config,
-	cached bool,
-	path string,
-) (string, error) {
+// Resolve returns the path a download d from c, a repository that is not
+// virtual, reads: the format's resolution of it, or d.Path itself.
+func (s *Service) Resolve(ctx context.Context, c repo.Config, d format.Download) (string, error) {
 	r, ok := s.format(c.PackageType).(format.Resolver)
 	if !ok {
-		return path, nil
+		return d.Path, nil
 	}
-	out, err := r.Resolve(ctx, s.env(), c, format.Download{Path: path, Cached: cached})
+	out, err := r.Resolve(ctx, s.env(), c, d)
 	if err != nil {
 		return "", err //nolint:wrapcheck // the format's own error
 	}
