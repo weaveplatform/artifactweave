@@ -1,5 +1,7 @@
 # 07: Webhooks, retention policies and projects
 
+Checked against: Artifactory 7.161.32
+
 Three platform features that GitOps users manage through Terraform and that artifactweave
 implements in full: event subscriptions (`/event/api/v1`), package cleanup policies
 (`/artifactory/api/cleanup`) and projects (`/access/api/v1/projects`). Each section records
@@ -20,11 +22,11 @@ Auth: platform admin, project admin (limited to the domains `artifact`, `artifac
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| GET | `/event/api/v1/subscriptions` | 200 | array of subscriptions, secrets redacted |
+| GET | `/event/api/v1/subscriptions` | 200 | array of subscriptions, secrets redacted. From SaaS 7.172.1 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)) both GET endpoints return an empty `secret` and a boolean `secret_configured`; not yet in self-managed 7.161.32 |
 | POST | `/event/api/v1/subscriptions` | **201** | |
 | GET | `/event/api/v1/subscriptions/{key}` | 200 | |
 | PUT | `/event/api/v1/subscriptions/{key}` | **204** | `project_key` is immutable; custom-webhook secrets: omit keeps, a value rotates, `""` wipes, an absent name removes |
-| DELETE | `/event/api/v1/subscriptions/{key}` | 204 | *(status unverified; the page is not in the index)* |
+| DELETE | `/event/api/v1/subscriptions/{key}` | 204 | the [reference page](https://docs.jfrog.com/integrations/reference/deletewebhooksubscription) documents 204, 401, 403 and 404 |
 | POST | `/event/api/v1/subscriptions/test` | 200 | body is a create body; scope `:x` |
 | GET | `/event/api/v1/troubleshooting?subscription&target&start&end&count` | 200 | streams when only `start` is given |
 
@@ -79,7 +81,11 @@ Signing: the `X-JFrog-Event-Auth` request header carries the raw secret when
 `use_secret_for_signing` is false and the hex HMAC-SHA256 of the body when it is true. This
 comes from JFrog's guide text; no reference page in the index documents the header
 *(unverified)*, so a real delivery is captured before the format is fixed
-(see [12-open-questions.md](12-open-questions.md)).
+(see [12-open-questions.md](12-open-questions.md)). The current webhook pages still do not
+document it: **[I]**, unconfirmed for 7.x. From 7.161.15, artifact event payloads carry a
+`user_context` naming the user or token that caused the event ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)); the
+[event types](https://docs.jfrog.com/integrations/docs/webhook-event-types) page does not
+show its shape yet (**[I]**).
 
 ## Package cleanup policies (`/artifactory/api/cleanup`, Artifactory ≥7.98.2)
 
@@ -127,6 +133,12 @@ types accepted by the provider: alpine, ansible, cargo, chef, cocoapods, compose
 conda, debian, docker, gems, generic, go, gradle, helm, helmoci, huggingfaceml,
 machinelearning, maven, npm, nuget, oci, puppet, pypi, sbt, swift, terraform,
 terraformbackend, yum. `itemType` is `package | build | releaseBundle`.
+
+Later additions in the release notes: version patterns (7.125.7, SaaS 7.127.0), lifecycle
+stages and optional path patterns (SaaS 7.147.1, self-managed 7.161.15), and time, property
+and version conditions combined in one policy (SaaS 7.161.5, self-managed 7.161.15)
+([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). The published create-policy definition has no path-pattern field
+yet, so its name is **[I]**.
 
 Run status enum: `IN_PROGRESS`, `IN_PROGRESS_WITH_ERRORS`, `COMPLETED`,
 `COMPLETED_WITH_ERRORS`, `STOPPED`, `STOPPING`, `FAILED`, `PENDING_WARM`, `PARTIAL_WARMED`,

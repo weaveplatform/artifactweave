@@ -1,5 +1,7 @@
 # 06: System API and the configuration descriptor
 
+Checked against: Artifactory 7.161.32
+
 The system endpoints every client touches (ping, version, health, telemetry), the inputs to
 the version-string decision, and the Artifactory configuration descriptor in its YAML and
 XML forms. The YAML descriptor is the configuration-as-code format artifactweave accepts on
@@ -47,7 +49,7 @@ Items marked *(unverified)* have no primary-source confirmation.
 | GET | `/access/api/v1/system/ping` | anonymous | 200 | `OK` |
 | GET | `/access/api/v1/system/version` | anonymous | 200 | `{"name":"<version>","version":"<version>"}`; the `jfrog/platform` provider parses `name` as the Access version |
 | GET | `/router/api/v1/system/health` | anonymous | 200 / 503 | `{"router":{"state":"HEALTHY"},"services":[{"service_id":"jfrt@...","state":"HEALTHY"}]}`; 503 when any service is unhealthy (source is a jfrog.com help article, not a reference page) |
-| GET | `/router/api/v1/system/ping` | anonymous | 200 | only in the third-party mirror *(unverified)* |
+| GET | `/router/api/v1/system/ping` | anonymous | 200 | only in the third-party mirror; no 7.x page documents it: **[I]**, unconfirmed for 7.x |
 | POST | `/artifactory/api/system/usage` | any | 200 / 202 | undocumented usage ping sent by the Terraform providers at configure time and by `jf` on servers ≥6.9.0; accepted and ignored |
 | POST | `/jfconnect/api/v1/backoffice/metrics/log` | any | 200 / 201 | sent by every `jf` command when the server reports ≥7.102; failures are only debug-logged; accepted and ignored |
 | GET / POST | `/artifactory/api/import/system` | admin | 200 | `{importPath,includeMetadata,verbose,failOnError,failIfEmpty}`; deferred |
@@ -220,6 +222,11 @@ security:
   `artifactory_*` configuration resources can read back what they wrote.
 - Secrets inside a descriptor may be given as `${ENV_VAR}` references, resolved at apply
   time and never written back.
+- The security descriptor (`GET/POST /api/system/security`, the security configuration as
+  raw XML) is not served. JFrog deprecated it as of 1 July 2026 in favour of the security
+  REST APIs and the Access bootstrap YAML ([7.146.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)).
+- `GET /artifactory/api/system/locks` and `/locks/local`, new in 7.161.15 for PostgreSQL
+  with native locks ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)), are not served.
 
 Primary URLs: https://docs.jfrog.com/administration/reference/jfrog-platform-artifactory-system-api/llms.txt,
 https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt,

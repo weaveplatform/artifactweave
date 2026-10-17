@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 JFrog projects group repositories, members and roles under a key that prefixes resource

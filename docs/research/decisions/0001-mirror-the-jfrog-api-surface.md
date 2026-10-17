@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 artifactweave replaces JFrog Artifactory for teams that want one self-hosted place to

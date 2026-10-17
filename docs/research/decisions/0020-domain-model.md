@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 The product contract is wire compatibility with Artifactory ([0001](0001-mirror-the-jfrog-api-surface.md)).

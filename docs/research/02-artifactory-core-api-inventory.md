@@ -1,5 +1,7 @@
 # Artifactory core REST API inventory
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: 2026-10-12. This document inventories the Artifactory REST API families
 this project implements: repositories, artifacts and storage, searches and AQL,
 replication, the trash can, and the package-type endpoints for the eight target
@@ -32,8 +34,8 @@ Source: <https://docs.jfrog.com/artifactory/reference/repositories-api/llms.txt>
 | GET | `/api/repositories/configurations?packageType=&repoType=` | Get all configurations | 200 | Admin. `{"LOCAL":[],"REMOTE":[],"VIRTUAL":[],"FEDERATED":[],"RELEASE_BUNDLE":[]}`; media type `...repositories.RepositoryConfigurationsList+json`. 7.61.3+. |
 | GET | `/api/repositories?type=&packageType=&project=` | List repositories | 200 | Admin or scopes `artifact:*:r` / `system:info:r`. `type` is `local`, `remote`, `virtual`, `federated` or `distribution`; `packageType` accepts any value (the documented enum is stale). Body `[{key,type,description,url,packageType}]`; media type `...RepositoryDetailsList+json`. |
 | GET | `/api/repositories/{remoteRepoName}/configuration` | Shared remote configuration | 200 | Deprecated; use get configuration. |
-| DELETE | `/api/repositories/{repoKey}` | Delete repository | 200; 202 deletion already running; 207 partial, configuration kept; 400 blank, trash or support-bundle key; 404; 409 import in progress or worker veto; 424 federation member removal failed | Admin. Removes configuration and content. The Terraform provider requires exactly 200. |
-| DELETE | `/api/v2/repositories/batch` | Delete several repositories | 200 all deleted; 207 mixed; 400 fail-fast; 403, 409, 424, 500 all failed | Body `["a","b"]`. Response `RepoBulkRemovalReport{reports[],statusMessage}`. |
+| DELETE | `/api/repositories/{repoKey}` | Delete repository | 200; 202 deletion already running; 207 partial, configuration kept; 400 blank, trash or support-bundle key; 404; 409 import in progress or worker veto; 424 federation member removal failed | Admin. Removes configuration and content. The Terraform provider requires exactly 200. The success body is JSON from 7.161.15, plain text before ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)); artifactweave answers JSON. |
+| DELETE | `/api/v2/repositories/batch` | Delete several repositories | 200 all deleted; 207 mixed; 400 fail-fast; 403, 409, 424, 500 all failed | Body `["a","b"]`. Response `RepoBulkRemovalReport{reports[],statusMessage}`. New in 7.161.15 ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). |
 
 ## Artifacts and storage API
 
@@ -52,7 +54,7 @@ Source: <https://docs.jfrog.com/artifactory/reference/artifacts-storage-api/llms
 | DELETE | `/api/storage/{repoKey}/{itemPath}?properties=k1,k2[&recursive=0\|1]` | Delete properties | 204; 404 "No properties could be found" (tolerated by the CLI) | `recursive` defaults to 1. |
 | PATCH | `/api/metadata/{repoKey}/{itemPath}?recursiveProperties=0\|1&atomicProperties=0\|1` | Update properties | 204; 400 when `props` missing | Annotate permission. Body `{"props":{"k":"v" \| ["v1","v2"] \| null}}`; `null` removes the key. Used by the Terraform `artifactory_item_properties` resource. 6.1.0+. |
 | POST | `/api/checksum/sha256` | Set sha256 property | 200 | Admin. Body `{"repoKey","path"}`. Legacy: sets a `sha256` property recursively for pre-5.5 content. |
-| POST | `/api/copy/{srcRepo}/{srcPath}?to=/{dstRepo}/{dstPath}[&dry=1][&suppressLayouts=0\|1][&failFast=0\|1]` | Copy item | 200 | Local, remote cache and federated sources. `suppressLayouts` defaults to 1; `dry` to 0. Body `{"messages":[{"level":"INFO\|WARN\|ERROR","message":"..."}]}`, media type `...storage.CopyOrMoveResult+json`. |
+| POST | `/api/copy/{srcRepo}/{srcPath}?to=/{dstRepo}/{dstPath}[&dry=1][&suppressLayouts=0\|1][&failFast=0\|1]` | Copy item | 200 | Local, remote cache and federated sources. `suppressLayouts` defaults to 1; `dry` to 0. Body `{"messages":[{"level":"INFO\|WARN\|ERROR","message":"..."}]}`, media type `...storage.CopyOrMoveResult+json`. A copy or move keeps the item's creation and last-modified times; 7.125.4 added a feature flag, off by default, that gives the target the operation's time as its creation time ([7.125.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)). artifactweave gives a copy new times ([#349](https://github.com/weaveplatform/artifactweave/issues/349)). |
 | POST | `/api/move/{srcRepo}/{srcPath}?to=...` | Move item | 200 | Local repositories only. Same parameters and body as copy. |
 | GET | `/api/archive/download/{repoKey}/{path}?archiveType=zip\|tar\|tar.gz\|tgz[&includeChecksumFiles=true]` | Download folder as archive | 200; 403 when folder download is disabled | Requires the "Enable Folder Download" setting; local and cache only; `archiveType` is mandatory. |
 | POST | `/api/archive/buildArtifacts` | Download build artifacts as archive | 200 | Build-info feature. |
@@ -265,7 +267,11 @@ Deprecated by JFrog: `GET /api/repositories/{repo}/configuration`, `GET /api/sea
 the AQL `archive.entries` domain, `POST /api/distribute`, `POST /api/checksum/sha256`
 (kept for pre-5.5 content), Docker API `V1` and `/v1/auth`, npm `_auth` basic
 authentication, the nuget.org V2 OData feed, and the `[Internal]` replication channel
-endpoints.
+endpoints. The [deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis)
+page also lists Folder Sync (`GET /api/sync/{remoteRepositoryKey}/{folderPath}`), File
+Compliance Info (`GET /api/compliance/{repoKey}/{path}`), Pull/Push Replication
+(`POST /api/replication/{srcRepoKey}/{srcPath}`) and the legacy security API
+([05](05-platform-identity-and-security-apis.md)).
 
 Enterprise-only in JFrog's licensing: every federated endpoint and `rclass: federated`,
 multi-push replication, signed URLs, `cdnRedirect`, and (Pro X and above) Open Metrics.

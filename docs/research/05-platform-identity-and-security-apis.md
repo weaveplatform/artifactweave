@@ -1,5 +1,7 @@
 # 05: Platform identity and security APIs
 
+Checked against: Artifactory 7.161.32
+
 The identity surface artifactweave must mirror: the legacy Artifactory security API that
 the JFrog CLI and the `jfrog/artifactory` Terraform provider still call, the Access v2
 identity APIs that the `jfrog/platform` provider and newer resources use, access tokens
@@ -24,7 +26,11 @@ Claims not confirmed against a primary source are marked *(unverified)*.
 Every page in this family carries the note that the security APIs are moving to Access
 (since 7.49.3) and will be deprecated. They are still called by `artifactory_user`,
 `artifactory_group`, `artifactory_permission_target` and the JFrog CLI, so artifactweave
-serves thin shims over the same internal model as Access v2.
+serves thin shims over the same internal model as Access v2. The [7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) repeat
+that the user, group, token and permission APIs are being replaced by Access and that the
+removal date will be announced in the release notes; the
+[deprecations in process](https://docs.jfrog.com/releases/docs/deprecations-in-process) page
+says they will first be disabled by default and then removed.
 
 Source index: https://docs.jfrog.com/administration/reference/jfrog-artifactory-security-api/llms.txt
 and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
@@ -60,7 +66,7 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | POST | `/api/security/unlockUsers` | 200 | body `["userA"]`; the CLI uses the deprecated path form `POST /api/security/unlockUsers/{name}` with no body, so both are served |
 | POST | `/api/security/unlockAllUsers` | 200 | |
 | POST | `/api/security/users/authorization/expirePassword` | 200 | body `["davids"]` |
-| POST | `/api/security/users/authorization/unexpirePassword/{userName}` | 200 | |
+| POST | `/api/security/users/authorization/unexpirePassword/{userName}` | 200 | **[I]** JFrog's [deprecations table](https://docs.jfrog.com/releases/docs/artifactory-deprecations) says this endpoint "has been removed from Artifactory REST APIs and the UI", with no version, while its [reference page](https://docs.jfrog.com/administration/reference/unexpirepasswordforsingleuser) still documents it. artifactweave serves it; unconfirmed for 7.x |
 | GET / PUT | `/api/security/configuration/passwordExpirationPolicy` | 200 | `{"enabled":true,"passwordMaxAge":60,"notifyByEmail":true}`. The docs show quoted strings but `artifactory_password_expiration_policy` decodes `bool` and `int64`, so real JSON types are emitted |
 | POST | `/api/security/token` | 200 | legacy create or refresh, form-encoded: `grant_type` (`client_credentials` default, `refresh_token`), `username`, `scope` (legacy forms `member-of-groups:<g>`, `api:*`, `jfrt@<id>:admin`; `member-of-groups:*` authenticates as a copy of the real user, admin flag included, per OSS 6.20 `AccessTokenAuthenticationProvider.populateGroups`, and is the scope `jf` requests when it swaps a configured user's password for a token, `jfrog-cli-core` `utils/config/tokenrefresh.go`), `expires_in`, `refreshable`, `audience`, `refresh_token`, `access_token`. Not on JFrog's deprecation page; `jf` still implements it |
 | GET | `/api/security/token` | 200 | `{"tokens":[{token_id,issuer,subject,expiry,refreshable,issued_at}]}` |
@@ -149,6 +155,14 @@ Create body: `{username,password,email,groups[],admin,profile_updatable,internal
 `username` and `email` are required, `password` is optional only when
 `internal_password_disabled` is true. Details add `effective_admin`, `last_logged_in`,
 `realm` (`internal`), `status` (lower-case `invited | enabled | disabled | locked`).
+`last_logged_in` is `null` for a user who never logged in, where it was
+`1970-01-01T00:00:00.000Z` before 7.98.7 ([7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)); artifactweave leaves the field
+out ([#350](https://github.com/weaveplatform/artifactweave/issues/350)). Access answers
+compact JSON from 7.117.5 ([7.117.5 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)) and is served only at `/access` from 7.90.5,
+no longer at `/artifactory/api/access` ([7.90.5 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)); artifactweave does both. From SaaS 7.164.0
+([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71640-saas)), a non-admin with a scoped token may read user, group and permission
+details and project groups and roles, which the `system:` scopes below already allow; that
+change is not yet in self-managed 7.161.32.
 
 ### Groups v2
 
@@ -202,7 +216,7 @@ Source: https://docs.jfrog.com/administration/docs/access-tokens and the per-end
 | Method | Path | Status | Notes |
 |---|---|---|---|
 | POST | `/access/api/v1/tokens` | **200** | create or refresh; JSON or form-urlencoded; non-admins can only create identity tokens; `artifactory_scoped_token` requires exactly 200 |
-| GET | `/access/api/v1/tokens` | 200 | admin sees all, a user sees their own; `{"tokens":[TokenDetails]}`; `last_used` needs `access_token_last_used_enabled` (7.108.3+) |
+| GET | `/access/api/v1/tokens` | 200 | admin sees all, a user sees their own; `{"tokens":[TokenDetails]}`; `last_used` needs `access_token_last_used_enabled` (7.108.3+); a `scope` query parameter filters by scope from 7.133.3 ([7.133.3 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed), SaaS 7.126.0), not yet on the [reference page](https://docs.jfrog.com/administration/reference/gettokens), which says reference tokens are listed from 7.133.8; artifactweave ignores the filter ([#351](https://github.com/weaveplatform/artifactweave/issues/351)) |
 | GET | `/access/api/v1/tokens/{tokenId}` | 200 / 404 | `me` is the current token; the provider removes the resource from state on 404 |
 | DELETE | `/access/api/v1/tokens/{tokenId}` | 200 | revoke by id; `me` allowed |
 | DELETE | `/access/api/v1/tokens/revoke` | 200 | admin; body `{"token":"<jwt or reference>"}` returns `{"revoked_token_id":"..."}` |
@@ -318,6 +332,9 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
 3. **`X-JFrog-Art-Api: <API key or reference token>`**. API keys: deprecation announced in
    7.47.10, creation disabled by default from 7.98, end of life at the end of 2024.
    artifactweave accepts reference tokens in this header and refuses to create API keys.
+   From 7.111.4 an administrator blocks existing API keys with a platform setting that is
+   off by default ([7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)); artifactweave never holds API keys, so none exist to
+   block.
 4. **Anonymous** for ping, version, readiness, liveness, router health and the OIDC token
    exchange. Everything else needs `security.anonAccessEnabled` and a permission that grants
    the `anonymous` user.

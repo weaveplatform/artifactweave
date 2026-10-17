@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 Every Artifactory client authenticates one of several ways: HTTP Basic with a password,

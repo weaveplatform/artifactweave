@@ -1,5 +1,7 @@
 # 09: JFrog CLI compatibility
 
+Checked against: Artifactory 7.161.32
+
 What the JFrog CLI (`jf rt ...`) and its client library actually send, so that
 artifactweave can serve it byte for byte: paths, headers, the generated AQL, the status
 codes the client hard-checks, and the telemetry calls that must be absorbed.

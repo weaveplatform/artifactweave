@@ -1,5 +1,7 @@
 # OIDC token exchange for CI workload identity
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: **2026-10-14**.
 
 Access lets a CI system trade the ID token its platform signs (GitHub Actions, GitLab,
@@ -70,6 +72,11 @@ From <https://docs.jfrog.com/administration/docs/openid-connect-integration>:
 - **[D]** Priority: with a `project_key`, the project's mappings are tried before global
   ones; lower numbers first; equal priorities go to the mapping created first.
 - **[D]** The expiration time is "Limited to 24 hours, or 1440 minutes".
+- **[D]** A mapping's token may carry several scopes, user and group scopes together,
+  from 7.104.5 (SaaS 7.104.2) ([7.104.5 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
+- **[D]** From 7.161.15 (SaaS 7.161.5) administrators can stop project admins seeing
+  global identity mappings ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). SaaS 7.172.1 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)) adds a Resource Scope
+  dynamic mapping; it is not yet in self-managed 7.161.32.
 - **[D]** Dynamic mapping (7.95+): `{{claim}}` takes a claim's value;
   `pattern | regex | replacement` rewrites it, `$0` the whole match and `$1` the first
   group; "If the claim is not found, the token request fails." A groups pattern "is

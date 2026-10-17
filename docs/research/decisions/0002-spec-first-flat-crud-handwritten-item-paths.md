@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 hostweave established spec-first OpenAPI on chi with oapi-codegen strict servers
@@ -60,7 +62,10 @@ take their codes from that table, not from convention.
 `@id`, Terraform `download_url`, Docker `Location` and `WWW-Authenticate` realm,
 file-info `uri` and `downloadUri`, repository `url`) come from one resolver in
 `internal/server/baseurl` with Artifactory's precedence (OSS 6.20
-`HttpUtils.getServletContextUrl`, research 17): `X-JFrog-Override-Base-Url`, then the
+`HttpUtils.getServletContextUrl`, research 17; the 7.x
+[HTTP settings](https://docs.jfrog.com/installation/docs/http-settings) page documents the
+`X-JFrog-Override-Base-Url` header and the Custom Base URL but not their precedence, so the
+order is **[I]**, unconfirmed for 7.x): `X-JFrog-Override-Base-Url`, then the
 configured `base_url` (Artifactory's `urlBase`), then `X-Forwarded-Proto`, `X-Forwarded-Host`
 and `X-Forwarded-Port`, then the request. A configured `base_url` is the operator naming the
 public URL, so no header the operator does not control overrides it; before #313 the forwarded

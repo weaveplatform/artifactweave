@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 The configuration holds secrets: remote repository passwords, proxy passwords, LDAP
