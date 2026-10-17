@@ -1,9 +1,9 @@
 // Package archive reads zip, tar and tar.gz archives: the walker the item
-// service explodes and serves archive entries with, and a bounded reader
-// the format handlers (decision 0032) take one file from a package with,
-// such as an npm tarball's package.json, a Go module zip's go.mod or a
-// jar's POM. Every count an archive's headers give is the uploader's claim,
-// so the bounded reader counts what it actually decompresses.
+// service explodes and serves archive entries with, and a bounded walker
+// and reader the format handlers (decision 0032) read packages with, such
+// as an npm tarball's package.json and file count, a Go module zip's go.mod
+// or a jar's POM. Every count an archive's headers give is the uploader's
+// claim, so the bounded walker counts what it actually decompresses.
 package archive
 
 import (
@@ -267,6 +267,41 @@ type Limits struct {
 // thousand entries or 256 MiB of content is refused rather than read.
 var DefaultLimits = Limits{Entries: 1000, Inflated: 256 << 20, File: 1 << 20}
 
+// Scan is Walk within lim's Entries and Inflated: ErrUnusable once the walk
+// passes either, so a format can read a whole package, such as an npm
+// tarball it counts the files of, without trusting its headers. lim.File
+// is ReadEntry's.
+func Scan(ra io.ReaderAt, size int64, kind Kind, lim Limits, fn func(Entry) error) error {
+	entries := 0
+	budget := &countingReader{left: lim.Inflated}
+	return walk(ra, size, kind, budget.wrap, func(e Entry) error {
+		entries++
+		if entries > lim.Entries {
+			return fmt.Errorf("%w: more than %d entries", ErrUnusable, lim.Entries)
+		}
+		return fn(e)
+	})
+}
+
+// ReadEntry reads e whole, refusing content past lim.File with ErrUnusable.
+func ReadEntry(e Entry, lim Limits) ([]byte, error) {
+	r, err := e.Open()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
+	}
+	if c, ok := r.(io.Closer); ok {
+		defer func() { _ = c.Close() }()
+	}
+	b, err := io.ReadAll(io.LimitReader(r, lim.File+1))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
+	}
+	if int64(len(b)) > lim.File {
+		return nil, fmt.Errorf("%w: %s exceeds %d bytes", ErrUnusable, e.Name, lim.File)
+	}
+	return b, nil
+}
+
 // ReadFile returns the first regular file of the archive in ra whose
 // cleaned name want accepts, with that name. ErrNotFound when no file
 // matches; ErrUnusable when the content is no archive of kind or a limit is
@@ -279,35 +314,18 @@ func ReadFile(
 	want func(name string) bool,
 ) (string, []byte, error) {
 	var (
-		name    string
-		body    []byte
-		entries int
+		name string
+		body []byte
 	)
-	budget := &countingReader{left: lim.Inflated}
-	err := walk(ra, size, kind, budget.wrap, func(e Entry) error {
-		entries++
-		if entries > lim.Entries {
-			return fmt.Errorf("%w: more than %d entries", ErrUnusable, lim.Entries)
-		}
+	err := Scan(ra, size, kind, lim, func(e Entry) error {
 		n, err := Clean(e.Name)
 		if err != nil || n == "" || !e.Regular || !want(n) {
 			return nil //nolint:nilerr // an unusable entry is just not the one
 		}
-		r, err := e.Open()
-		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
+		if body, err = ReadEntry(e, lim); err != nil {
+			return err
 		}
-		if c, ok := r.(io.Closer); ok {
-			defer func() { _ = c.Close() }()
-		}
-		b, err := io.ReadAll(io.LimitReader(r, lim.File+1))
-		if err != nil {
-			return fmt.Errorf("%w: %s: %w", ErrUnusable, e.Name, err)
-		}
-		if int64(len(b)) > lim.File {
-			return fmt.Errorf("%w: %s exceeds %d bytes", ErrUnusable, e.Name, lim.File)
-		}
-		name, body = n, b
+		name = n
 		return errFound
 	})
 	switch {

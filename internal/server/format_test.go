@@ -279,13 +279,14 @@ func TestReindexOperations(t *testing.T) {
 		wantStatus(t, w.do("POST", "/artifactory/api/"+p, "admin", ""), http.StatusNotFound)
 	}
 
-	// Without a format that rebuilds an index, the operation stays a stub.
+	// Without a format that rebuilds an index, the operation stays a stub;
+	// PyPI's format comes in P8.
 	plain := newItemWorld(t, false)
 	if err := plain.db.Repos().Create(ctx, *repo.Defaults(&repo.Config{
-		Key: "npm-local", Class: repo.Local, PackageType: repo.NPM,
+		Key: "pypi-local", Class: repo.Local, PackageType: repo.PyPI,
 	})); err != nil {
 		t.Fatal(err)
 	}
-	wantStatus(t, plain.do("POST", "/artifactory/api/npm/npm-local/reindex", "admin", ""),
+	wantStatus(t, plain.do("POST", "/artifactory/api/pypi/pypi-local/reindex", "admin", ""),
 		http.StatusNotImplemented)
 }
