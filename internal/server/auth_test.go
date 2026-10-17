@@ -132,7 +132,7 @@ func TestAuthenticatePrincipal(t *testing.T) {
 		t.Fatal(err)
 	}
 	var got *auth.Principal
-	h := authenticate(a, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+	h := authenticate(a, nil, nil)(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		if p, ok := auth.FromContext(r.Context()); ok {
 			got = &p
 		}
@@ -178,7 +178,7 @@ func TestAuthenticateStoreFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := authenticate(a, nil)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+	h := authenticate(a, nil, nil)(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Error("the request reached the handler")
 	}))
 	for name, headers := range map[string]map[string]string{

@@ -364,7 +364,9 @@ func TestStubsAndEnvelopes(t *testing.T) {
 
 func TestTextSurfaces404(t *testing.T) {
 	h := testHandler()
-	for _, path := range []string{"/artifactory/api/go/nope/github.com/x/y/@v/list", "/artifactory/api/pypi/nope/simple/x/"} {
+	// Go's paths are the router kit's, which answers 501 without a store;
+	// its checksum database is 404 before any lookup.
+	for _, path := range []string{"/artifactory/api/go/nope/sumdb/sum.golang.org/supported", "/artifactory/api/pypi/nope/simple/x/"} {
 		rec := do(t, h, "GET", path, nil, "")
 		if rec.Code != 404 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {
 			t.Fatalf("%s: %d %q", path, rec.Code, rec.Header().Get("Content-Type"))

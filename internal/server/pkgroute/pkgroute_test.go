@@ -34,6 +34,7 @@ func testFormat(sources map[repo.Class]pkgroute.Source) pkgroute.Protocol {
 		Types:    []repo.PackageType{repo.Generic},
 		Surface:  apierror.NPM,
 		Reserved: []string{"auth", "{repoKey}/reindex"},
+		Absent:   []string{"hidden/"},
 		Sources:  sources,
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
 			files := func(r *http.Request) (pkgroute.Path, error) {
@@ -299,6 +300,47 @@ func TestReservedOperations(t *testing.T) {
 		if c.want == http.StatusOK && rec.Body.String() != "jfrog operation" {
 			t.Errorf("%s %s reached %q, not the operation", c.method, c.path, rec.Body)
 		}
+	}
+}
+
+// TestAbsent: an absent path answers 404 to anyone before its repository
+// is looked up, so a repository that does not exist answers it the same.
+func TestAbsent(t *testing.T) {
+	f := newKitFixture(t, nil)
+	for _, path := range []string{
+		base + local + "/hidden/a", base + "nope/hidden/a", base + "gen-remote/hidden",
+	} {
+		rec := f.do(http.MethodPost, path, "", "")
+		if rec.Code != http.StatusNotFound ||
+			!strings.Contains(npmError(t, rec), "does not serve") {
+			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	p := testFormat(nil)
+	for path, want := range map[string]bool{
+		base + local + "/hidden/a":   true,
+		base + local + "/hidden":     true,
+		base + local + "/hiddenx":    false,
+		base + local + "/files/a":    false,
+		base + local:                 false,
+		"/artifactory/api/x/hidden/": false,
+	} {
+		if got := p.IsAbsent(path); got != want {
+			t.Errorf("IsAbsent(%s) = %v, want %v", path, got, want)
+		}
+	}
+}
+
+func TestDB(t *testing.T) {
+	db := inmem.New()
+	var got store.Store
+	r := chi.NewRouter()
+	pkgroute.Mount(r, pkgroute.Options{Store: db}, pkgroute.Protocol{
+		Name: "dbfmt", Types: []repo.PackageType{repo.Generic},
+		Routes: func(_ chi.Router, k *pkgroute.Kit) { got = k.DB() },
+	})
+	if got != db {
+		t.Fatalf("DB() = %v, want the kit's store", got)
 	}
 }
 

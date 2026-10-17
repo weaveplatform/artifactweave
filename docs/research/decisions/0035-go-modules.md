@@ -28,10 +28,10 @@ cannot contain `@` (R26 1.2), so the split is unambiguous:
 
 | Method | Path | Answer |
 |---|---|---|
-| `GET` | `<module>/@v/list` | The listed versions (below) |
+| `GET`, `HEAD` | `<module>/@v/list` | The listed versions (below) |
 | `GET`, `HEAD` | `<module>/@v/<version>.info` | The version's `.info`, stored or synthesised |
 | `GET`, `HEAD` | `<module>/@v/<version>.mod`, `.zip` | The stored file |
-| `GET` | `<module>/@latest`, `<module>/@v/latest.info` | The latest version's `.info` |
+| `GET`, `HEAD` | `<module>/@latest`, `<module>/@v/latest.info` | The latest version's `.info` |
 | `PUT` | `<module>/@v/<version>.zip`, `.mod`, `.info` | A deploy (below) |
 | any | `sumdb/...` | 404 (below) |
 
@@ -158,7 +158,11 @@ Every error under `/artifactory/api/go/` is plain text, `text/plain; charset=utf
 Every request under `<repo>/sumdb/` answers 404 before authentication and before the
 repository is looked up, so the go command consults `sum.golang.org` directly, or nothing
 for modules matched by `GONOSUMDB` or `GOPRIVATE` (R26 2). The first element of a module path
-must contain a dot, so `sumdb` never names a module.
+must contain a dot, so `sumdb` never names a module. Artifactory 7.x proxies
+`sum.golang.org` there unless `artifactory.go.sumdb.enabled=false`, as JFrog's current Go
+modules documentation says (checked against Artifactory 7.161.32); the proxy is a v1 cut
+(research 10), and what Artifactory answers with it switched off is on the live-capture
+list (#216).
 
 ## Rationale
 

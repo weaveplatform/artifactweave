@@ -60,12 +60,19 @@ const refreshRoute = "POST /access/api/v1/tokens"
 // only public routes answer. Every
 // principal is then authorised once (auth.Authorize): its permissions are
 // evaluated for the request, and handlers ask that evaluator, through
-// access, every question.
-func authenticate(a *auth.Authenticator, st store.Store) func(http.Handler) http.Handler {
+// access, every question. A path absent reports, such as Go's checksum
+// database (pkgroute.Protocol.Absent), passes untouched, credentials or
+// not: its router answers it 404 whoever asks.
+func authenticate(
+	a *auth.Authenticator,
+	st store.Store,
+	absent func(escaped string) bool,
+) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			if selfAuthenticated[r.Method+" "+r.URL.Path] {
+			if selfAuthenticated[r.Method+" "+r.URL.Path] ||
+				absent != nil && absent(r.URL.EscapedPath()) {
 				next.ServeHTTP(w, r)
 				return
 			}

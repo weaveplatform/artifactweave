@@ -70,6 +70,13 @@ type Protocol struct {
 	// the kit used a method no route serves, and answers 405 rather than
 	// being read as a package path.
 	Reserved []string
+	// Absent are paths below every repository key that answer 404 before
+	// the request is authenticated or its repository looked up, as
+	// prefixes of the escaped path after the key: Go's "sumdb/" (decision
+	// 0035). The go command takes any other answer to its checksum
+	// database probe, a 401 included, for an outage and fails. The server
+	// asks IsAbsent before it authenticates; Mount answers them.
+	Absent []string
 	// Sources serves each repository class the protocol reads, the seam
 	// remote (P9, decision 0007) and virtual (P10, decision 0008) classes
 	// plug into. Nil serves local and federated repositories from their own
@@ -81,6 +88,19 @@ type Protocol struct {
 	// escapes; ParsePath decodes them. What the router answers no route
 	// for is 404 or 405 in the protocol's envelope.
 	Routes func(r chi.Router, k *Kit)
+}
+
+// IsAbsent reports whether escaped, a request's escaped path, is one of
+// p's Absent paths in any repository.
+func (p Protocol) IsAbsent(escaped string) bool {
+	rel, ok := strings.CutPrefix(escaped, "/artifactory/api/"+p.Name+"/")
+	if !ok {
+		return false
+	}
+	_, rest, ok := strings.Cut(rel, "/")
+	return ok && slices.ContainsFunc(p.Absent, func(prefix string) bool {
+		return strings.HasPrefix(rest, prefix) || rest == strings.TrimSuffix(prefix, "/")
+	})
 }
 
 // Source reads a repository's items for a protocol.
@@ -176,6 +196,11 @@ func (k *Kit) resolve(next http.Handler) http.Handler {
 		rel := strings.TrimPrefix(r.URL.EscapedPath(), k.prefix+"/")
 		if k.isReserved(rel) {
 			k.Error(w, r, methodNotAllowed(r))
+			return
+		}
+		if k.p.IsAbsent(r.URL.EscapedPath()) {
+			k.Error(w, r, apierror.New(http.StatusNotFound,
+				"artifactweave does not serve "+r.URL.Path+"."))
 			return
 		}
 		escKey, rest, _ := strings.Cut(rel, "/")
@@ -288,6 +313,10 @@ func refusal(r *http.Request) error {
 	}
 	return auth.ErrUnauthenticated
 }
+
+// DB is the store the kit resolves repositories in, for a handler that
+// reads the package index (decision 0018) or lists a folder.
+func (k *Kit) DB() store.Store { return k.o.Store }
 
 // Item returns the item at path in the request's repository, through its
 // Source.

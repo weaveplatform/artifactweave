@@ -49,6 +49,7 @@ internal/
     gen/                       # generated strict servers, one package per spec
     apierror/ baseurl/         # error envelopes and the base-URL resolver
     docker/                    # the registry protocol: /v2 routing, blobs and uploads
+    golang/                    # the GOPROXY protocol under /artifactory/api/go (decision 0035)
     pkgroute/                  # the router kit npm, Go and later protocols mount through
                                # (decision 0032)
   sqlstore/
