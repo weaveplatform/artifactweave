@@ -28,6 +28,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
@@ -346,6 +347,30 @@ func Serves(t repo.PackageType) bool { return layout.Serves(t) }
 func notFound(w http.ResponseWriter, r *http.Request) {
 	Write(w, Errorf(http.StatusNotFound, CodeUnsupported,
 		"not a registry operation: %s %s", r.Method, r.URL.Path))
+}
+
+// blackedOut answers a pull from a blacked-out repository 404 NAME_UNKNOWN
+// with Artifactory's message, as a push to it is answered, before the item
+// is looked for: every Artifactory download is refused that way
+// (generic.CheckDownload).
+func (g *Registry) blackedOut(w http.ResponseWriter, r *http.Request, q Request) bool {
+	if err := generic.CheckBlackedOut(q.Repo, q.Name); err != nil {
+		g.writeErr(w, r, err)
+		return true
+	}
+	return false
+}
+
+// excluded answers a pulled item the repository's include and exclude
+// patterns reject as a missing one, 404 under code, with Artifactory's
+// message.
+func excluded(w http.ResponseWriter, q Request, it types.Item, code string) bool {
+	var refused *format.Rejection
+	if errors.As(generic.CheckDownload(q.Repo, it.FullPath(), false), &refused) {
+		Write(w, Errorf(http.StatusNotFound, code, "%s", refused.Message))
+		return true
+	}
+	return false
 }
 
 // writeErr writes err, noting an unexpected one for the access log. A

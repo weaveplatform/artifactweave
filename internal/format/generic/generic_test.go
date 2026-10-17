@@ -101,3 +101,78 @@ func TestHooksDoNothing(t *testing.T) {
 		t.Errorf("class %v", got)
 	}
 }
+
+// A download is refused 404, existing or not, from a blacked-out repository
+// and of a path the patterns reject; a virtual repository is never blacked
+// out and has its own wording.
+func TestCheckDownload(t *testing.T) {
+	const excludedMsg = "The repository 'libs' rejected the artifact 'libs:secret/a.jar' due to " +
+		"its include/exclude pattern settings."
+	dark := func(c *repo.Config) { c.BlackedOut = ptr(true) }
+	picky := func(c *repo.Config) { c.ExcludesPattern = ptr("secret/**") }
+	virtual := func(patch func(*repo.Config)) func(*repo.Config) {
+		return func(c *repo.Config) {
+			c.Class = repo.Virtual
+			if patch != nil {
+				patch(c)
+			}
+		}
+	}
+	for _, tc := range []struct {
+		name   string
+		patch  func(*repo.Config)
+		path   string
+		folder bool
+		msg    string
+	}{
+		{name: "defaults allow everything", path: "a/b.jar"},
+		{name: "the root of a picky repository", patch: picky, path: "", folder: true},
+		{
+			name:  "blacked out",
+			patch: dark, path: "a.jar",
+			msg: "The repository 'libs' is blacked out and cannot serve artifact 'libs:a.jar'.",
+		},
+		{
+			name:  "the root of a blacked-out repository",
+			patch: dark, path: "", folder: true,
+			msg: "The repository 'libs' is blacked out and cannot serve artifact 'libs:'.",
+		},
+		{name: "excluded", patch: picky, path: "secret/a.jar", msg: excludedMsg},
+		{
+			name:  "an excluded folder",
+			patch: picky, path: "secret", folder: true,
+			msg: "The repository 'libs' rejected the artifact 'libs:secret' due to its " +
+				"include/exclude pattern settings.",
+		},
+		{
+			name:  "a folder leading to included files",
+			patch: func(c *repo.Config) { c.IncludesPattern = ptr("org/acme/**") },
+			path:  "org", folder: true,
+		},
+		{
+			name:  "the same path as a file",
+			patch: func(c *repo.Config) { c.IncludesPattern = ptr("org/acme/**") },
+			path:  "org",
+			msg: "The repository 'libs' rejected the artifact 'libs:org' due to its " +
+				"include/exclude pattern settings.",
+		},
+		{name: "a blacked-out virtual repository serves", patch: virtual(dark), path: "a.jar"},
+		{
+			name:  "a virtual repository's patterns",
+			patch: virtual(picky), path: "secret/a.jar",
+			msg: "No repository found to serve the request for libs:secret/a.jar",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := CheckDownload(config(tc.patch), tc.path, tc.folder)
+			var refused *format.Rejection
+			switch {
+			case tc.msg == "" && err != nil:
+				t.Fatalf("refused: %v", err)
+			case tc.msg != "" && (!errors.As(err, &refused) ||
+				refused.Status != http.StatusNotFound || refused.Message != tc.msg):
+				t.Fatalf("refusal %v, want 404 %q", err, tc.msg)
+			}
+		})
+	}
+}

@@ -16,8 +16,10 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/formats"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
@@ -500,12 +502,37 @@ type found struct {
 // as its format resolves it (item.Service.Resolve).
 type resolver func(ctx context.Context, c repo.Config, cached bool, p string) (string, error)
 
+// download is what a download applies on its way to an item, and the
+// storage API, which describes the path as given, does not: Artifactory's
+// download checks (generic.CheckDownload) against the path and folder it
+// checks, and the format's rewrite of the path.
+type download struct {
+	path    string
+	folder  bool
+	resolve resolver
+}
+
+// newDownload checks p as Artifactory does: its request parsing splits an
+// archive entry ("<archive>!/<entry>") off the archive's path
+// (ArtifactoryRequestBase.zipResourcePath), and RepoBase.accepts checks a
+// checksum sidecar as the file it describes. folder is whether the request
+// ended in a slash.
+func newDownload(p string, folder bool, resolve resolver) *download {
+	if archive, _, ok := strings.Cut(p, "!/"); ok {
+		p, folder = archive, false
+	} else if artifact, _, ok := item.Sidecar(p); ok {
+		p, folder = artifact, false
+	}
+	return &download{path: p, folder: folder, resolve: resolve}
+}
+
 // lookup finds the item at p for a download from c: a local repository's
 // own tree, a remote repository's cache (nothing is fetched upstream until
 // P9), or the first member of a virtual repository, in order, that the
 // caller may read and that holds it. root reports the repository root, which
-// is not an item. A non-nil resolve rewrites p in each repository that
-// holds items before it is looked up there.
+// is not an item. A non-nil dl refuses what Artifactory refuses in each
+// repository it reaches, and rewrites p as each repository that holds items
+// resolves it before looking there; the storage API passes nil.
 func lookup(
 	ctx context.Context,
 	st store.Store,
@@ -513,18 +540,23 @@ func lookup(
 	cached bool,
 	p string,
 	acc access,
-	resolve resolver,
+	dl *download,
 	seen map[string]bool,
 ) (found, error) {
 	if seen[c.Key] {
 		return found{}, store.ErrNotFound
 	}
 	seen[c.Key] = true
+	if dl != nil {
+		if err := generic.CheckDownload(c, dl.path, dl.folder); err != nil {
+			return found{}, err //nolint:wrapcheck // a Rejection is the answer
+		}
+	}
 	if c.Class != repo.Virtual {
 		cached = cached || c.Class == repo.Remote
-		if resolve != nil {
+		if dl != nil && dl.resolve != nil {
 			var err error
-			if p, err = resolve(ctx, c, cached, p); err != nil {
+			if p, err = dl.resolve(ctx, c, cached, p); err != nil {
 				return found{}, err
 			}
 		}
@@ -545,8 +577,12 @@ func lookup(
 		if !acc.folder(m, p, types.ActionRead) {
 			continue
 		}
-		f, err := lookup(ctx, st, m, false, p, acc, resolve, seen)
-		if err == nil || !errors.Is(err, store.ErrNotFound) {
+		f, err := lookup(ctx, st, m, false, p, acc, dl, seen)
+		// A member that refuses the download is passed over like one that
+		// lacks the item, as Artifactory's search goes on past every member
+		// that does not serve it (VirtualRepoDownloadStrategy.processStandard).
+		var refused *format.Rejection
+		if err == nil || (!errors.Is(err, store.ErrNotFound) && !errors.As(err, &refused)) {
 			return f, err
 		}
 	}
@@ -579,28 +615,36 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 	}
 	// A folder check first: the path may be a file or a folder, and in a
 	// virtual repository the item lives in a member. The exact right is
-	// checked once the item is found.
+	// checked once the item is found. Artifactory refuses a blacked-out
+	// repository or an excluded path before it checks permissions; this
+	// answers a caller who may not read the path without telling it how
+	// the repository is configured (DV-057).
 	if !acc.folder(c, req.path, types.ActionRead) {
 		writeErr(w, r, denied(p))
 		return
 	}
+	dl := newDownload(req.path, req.folder, s.items(st).Resolve)
 	if req.path == "" {
+		if err := generic.CheckDownload(c, "", true); err != nil {
+			writeErr(w, r, s.itemError(ctx, "download check", err))
+			return
+		}
 		s.listFolder(
 			w,
 			r,
 			st,
+			c,
 			found{repo: c, item: types.Item{RepoKey: c.Key, Cached: cached, Folder: true}},
 			acc,
 		)
 		return
 	}
-	resolve := s.items(st).Resolve
-	f, err := lookup(ctx, st, c, cached, req.path, acc, resolve, map[string]bool{})
+	f, err := lookup(ctx, st, c, cached, req.path, acc, dl, map[string]bool{})
 	if errors.Is(err, store.ErrNotFound) {
 		// "<archive>!/<entry>" names an entry inside an archive file; a path
 		// that exists as an item is served as one first.
 		if archive, entry, ok := strings.Cut(req.path, "!/"); ok {
-			a, err := lookup(ctx, st, c, cached, archive, acc, resolve, map[string]bool{})
+			a, err := lookup(ctx, st, c, cached, archive, acc, dl, map[string]bool{})
 			if err != nil {
 				writeErr(w, r, itemNotFound())
 				return
@@ -612,7 +656,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 			s.getArchiveEntry(w, r, st, a, entry)
 			return
 		}
-		s.getSidecar(w, r, st, c, cached, req.path, acc, resolve)
+		s.getSidecar(w, r, st, c, cached, req.path, acc, dl)
 		return
 	}
 	if err != nil {
@@ -631,7 +675,7 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if f.item.Folder {
-		s.listFolder(w, r, st, f, acc)
+		s.listFolder(w, r, st, c, f, acc)
 		return
 	}
 	s.serveFile(w, r, st, f, p)
@@ -691,14 +735,14 @@ func (s artifactoryService) getSidecar(
 	cached bool,
 	p string,
 	acc access,
-	resolve resolver,
+	dl *download,
 ) {
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
 		writeErr(w, r, itemNotFound())
 		return
 	}
-	f, err := lookup(r.Context(), st, c, cached, artifact, acc, resolve, map[string]bool{})
+	f, err := lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
 	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" ||
 		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {
@@ -789,11 +833,13 @@ func (s *statusWriter) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 func startsAtZero(rng string) bool { return strings.HasPrefix(strings.TrimSpace(rng), "bytes=0-") }
 
 // listFolder answers a folder GET with a plain HTML index, as Artifactory
-// serves browsers.
+// serves browsers. named is the repository the request named, a virtual
+// repository when f was found in one of its members.
 func (s artifactoryService) listFolder(
 	w http.ResponseWriter,
 	r *http.Request,
 	st store.Store,
+	named repo.Config,
 	f found,
 	acc access,
 ) {
@@ -817,10 +863,19 @@ func (s artifactoryService) listFolder(
 	var b strings.Builder
 	fmt.Fprintf(&b, "<!DOCTYPE html>\n<html><head><title>Index of %s</title></head><body>\n", title)
 	fmt.Fprintf(&b, "<h1>Index of %s</h1>\n<pre>", title)
+	patterns := []authz.RepoPatterns{authz.PatternsOf(f.repo)}
+	if named.Key != f.repo.Key {
+		patterns = append(patterns, authz.PatternsOf(named))
+	}
 	for _, c := range children {
 		// Children the caller may not see are left out; a folder shows when
-		// something below it is readable.
-		if !acc.item(f.repo, c.FullPath(), c.Folder, types.ActionRead) {
+		// something below it is readable. So are children the patterns
+		// reject, the member's and the virtual repository's, as
+		// Artifactory's browsing leaves them out
+		// (TreeBrowsingCriteriaBuilder.applyRepoIncludeExclude,
+		// RepositoryBrowsingServiceImpl.virtualRepoAccepts).
+		if !acc.item(f.repo, c.FullPath(), c.Folder, types.ActionRead) ||
+			!acceptedByAll(patterns, c.FullPath(), c.Folder) {
 			continue
 		}
 		href, text := url.PathEscape(c.Name), c.Name
@@ -835,6 +890,16 @@ func (s artifactoryService) listFolder(
 	if r.Method != http.MethodHead {
 		_, _ = io.WriteString(w, b.String())
 	}
+}
+
+// acceptedByAll reports whether every set of patterns accepts p.
+func acceptedByAll(patterns []authz.RepoPatterns, p string, folder bool) bool {
+	for _, pat := range patterns {
+		if !pat.Accepts(p, folder) {
+			return false
+		}
+	}
+	return true
 }
 
 // deleteItem answers DELETE on an item path: the item and everything below

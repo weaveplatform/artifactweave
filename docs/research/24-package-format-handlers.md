@@ -109,3 +109,8 @@ rule for every format **[S, from the decisions]**:
 | 5.1 | Whether Artifactory's own derived writes (`maven-metadata.xml`, npm metadata) pass through the storage interceptors (1.7) | [I] |
 | 5.2 | Whether Artifactory refuses a deploy outside `includesPattern`, inside `excludesPattern` or to a blacked-out repository for every package type, and with which status and message | [I] |
 | 5.3 | Whether Artifactory returns `X-Checksum-*` headers on every deploy's 201, or only on some paths | [I] |
+| 5.4 | Whether 7.x still refuses a download from a blacked-out repository, or of an excluded path, with 6.20's 404 and messages, ahead of the read permission check (decision 0032, #328) | [I] |
+| 5.5 | What a Docker pull answers for a blacked-out repository and for a manifest or blob the patterns reject; the Docker addon is not open source, and artifactweave answers 404 `NAME_UNKNOWN`, `MANIFEST_UNKNOWN` and `BLOB_UNKNOWN` with the generic messages | [I] |
+| 5.6 | Whether Docker tag lists, referrers and the catalog of a blacked-out repository answer 404 or list nothing; artifactweave still lists them | [I] |
+| 5.7 | Whether the storage API's file list (`?list`) leaves out items the patterns reject, and how it treats a virtual repository's blacked-out member; it is built by the closed REST addon, and artifactweave refuses only a blacked-out repository named directly | [I] |
+| 5.8 | Whether 7.x's storage API item info still describes items of a blacked-out repository and excluded paths, as 6.20's `ArtifactResource.prepareStorageInfoResponse` does | [I] |
