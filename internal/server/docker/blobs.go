@@ -51,6 +51,9 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 		Write(w, err)
 		return
 	}
+	if g.blackedOut(w, r, q) {
+		return
+	}
 	hex, err := blobDigest(q.Reference)
 	if err != nil {
 		Write(w, err)
@@ -64,6 +67,9 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	if err != nil {
 		g.writeErr(w, r, err)
+		return
+	}
+	if excluded(w, q, it, CodeBlobUnknown) {
 		return
 	}
 	h := w.Header()
