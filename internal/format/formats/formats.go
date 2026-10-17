@@ -10,11 +10,22 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
+// handlers are the formats with handlers of their own, each with the test
+// for the package types it serves. A format adds one line here.
+var handlers = []struct {
+	serves  func(repo.PackageType) bool
+	handler format.Handler
+}{
+	{docker.Serves, docker.Handler{}},
+}
+
 // For returns the format of a package type. A type is generic until its
 // format lands: generic keeps no package index.
 func For(t repo.PackageType) format.Handler {
-	if docker.Serves(t) {
-		return docker.Handler{}
+	for _, h := range handlers {
+		if h.serves(t) {
+			return h.handler
+		}
 	}
 	return generic.Handler{}
 }

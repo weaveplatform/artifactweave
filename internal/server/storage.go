@@ -18,6 +18,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -467,7 +468,7 @@ func (v storageView) properties(ctx context.Context, f found, names string) (str
 		return "", nil, fmt.Errorf("properties: %w", err)
 	}
 	if names != "" {
-		want := splitValues(names)
+		want := pkgroute.SplitValues(names)
 		for k := range props {
 			if !slices.Contains(want, k) {
 				delete(props, k)
@@ -606,7 +607,7 @@ func (s artifactoryService) setProperties(w http.ResponseWriter, r *http.Request
 func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Request) {
 	s.editProperties(w, r, storagePrefix, "recursive", func(q url.Values) (propertyEdit, error) {
 		var keys []string
-		for _, k := range splitValues(q.Get("properties")) {
+		for _, k := range pkgroute.SplitValues(q.Get("properties")) {
 			if k != "" {
 				keys = append(keys, k)
 			}
@@ -737,7 +738,7 @@ func parseProperties(s string) (types.Properties, error) {
 		if len(kv) < 2 {
 			return nil, badRequest("property %q has no value", key)
 		}
-		props[key] = append(props[key], splitValues(strings.Join(kv[1:], "="))...)
+		props[key] = append(props[key], pkgroute.SplitValues(strings.Join(kv[1:], "="))...)
 	}
 	if len(props) == 0 {
 		return nil, badRequest("properties names nothing to set")
