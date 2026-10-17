@@ -1,5 +1,7 @@
 # 08: The JFrog Terraform providers
 
+Checked against: Artifactory 7.161.32
+
 The three JFrog providers are the GitOps client artifactweave must satisfy unchanged. This
 document records what each provider calls at configure time, every resource and data
 source, the endpoints and exact status codes each resource needs, and the version gates

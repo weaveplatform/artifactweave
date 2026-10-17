@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 Artifactory's retention primitive for GitOps users is the package cleanup policy: a cron

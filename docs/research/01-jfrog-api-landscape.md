@@ -1,5 +1,7 @@
 # JFrog API landscape
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: 2026-10-12. This document records where JFrog publishes the API
 definitions that this project mirrors, how they are organised, what can and cannot be
 reused, and how the inventories in the rest of this research set were produced and
@@ -122,7 +124,9 @@ The embedded definitions declare three security schemes and most endpoints accep
 them: `BasicAuth` (HTTP basic with a password, an access token or a reference token as the
 password), `BearerAuth` (an access token or reference token), and `ApiKeyAuth` (header
 `X-JFrog-Art-Api`, historically an API key, now a reference token since API keys reached
-end of life). Anonymous access is permitted only for ping, version, readiness, liveness,
+end of life; creation is disabled from 7.98.7, and from 7.111.4 an administrator blocks
+existing keys with a platform setting that is off by default, per the
+[7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed) and [7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)). Anonymous access is permitted only for ping, version, readiness, liveness,
 health and the OIDC token exchange unless anonymous access is enabled in the security
 configuration. Details are in [05-platform-identity-and-security-apis.md](05-platform-identity-and-security-apis.md).
 
@@ -155,6 +159,16 @@ configuration GET returns `application/xml`.
    seen only in a community report, a client fixture or an older guide. Unverified values
    must be captured against a live Artifactory before they are hard-coded; the open list
    is in [12-open-questions.md](12-open-questions.md).
+5. On 2026-10-17 (#342) the inventories were checked against the Artifactory 7.x release
+   notes: the [self-managed notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases) (7.84.10 to 7.161.32) and the
+   [SaaS notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases) (7.80.0 to 7.174.0). Notes for releases past their end of life are
+   no longer published ([Artifactory End of Life](https://docs.jfrog.com/releases/docs/artifactory-end-of-life)),
+   so earlier 7.x changes are covered only through the current reference pages. The
+   deprecation pages were read too: [Artifactory deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations),
+   [deprecations in process](https://docs.jfrog.com/releases/docs/deprecations-in-process),
+   [JFrog Platform deprecations](https://docs.jfrog.com/releases/docs/jfrog-platform-deprecations)
+   and [deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis).
+   The order of sources is in the research README, under "Target version and sources".
 
 ## Parity oracle
 

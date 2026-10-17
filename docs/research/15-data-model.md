@@ -1,5 +1,7 @@
 # Data model derived from the JFrog API definitions
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: **2026-10-12**. This report derives artifactweave's domain model from
 the 637 OpenAPI blocks cached by the parity oracle (`.specoracle/<family>/<page>.json`,
 see [01](01-jfrog-api-landscape.md)). It names every wire entity the in-scope APIs

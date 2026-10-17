@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 Artifactory's Event API exposes subscriptions over domains (artifact, artifact property,
@@ -9,7 +11,10 @@ docker, build, user and the lifecycle domains) with event types, criteria, and t
 types: a plain webhook with an optional signing secret and custom headers, and a custom
 webhook with a templated payload and named secrets. The `jfrog/artifactory` Terraform
 provider has one resource per domain and handler type (24 in total) and validates event
-type names client-side.
+type names client-side. From SaaS 7.172.1 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)) the two GET subscription endpoints no longer
+return a webhook's signing secret: `secret` is empty and a boolean `secret_configured` says
+whether one is set. Self-managed 7.161.32 does not have this yet; artifactweave follows it
+when webhooks are built, since it only removes a secret from a read.
 
 ## Decision
 

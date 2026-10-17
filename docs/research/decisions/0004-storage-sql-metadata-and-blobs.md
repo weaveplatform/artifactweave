@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 The server must run as one static binary with no external dependencies and must also run

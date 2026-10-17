@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 Clients and orchestrators probe Artifactory through several health endpoints

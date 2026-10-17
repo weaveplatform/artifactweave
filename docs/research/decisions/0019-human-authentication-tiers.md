@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: Artifactory 7.161.32
+
 ## Context
 
 Artifactory authenticates people through LDAP, SAML, Crowd, HTTP SSO and OIDC, provisions
