@@ -122,11 +122,16 @@ func resolveRepo(ctx context.Context, st store.Store, key string) (repo.Config, 
 func (s artifactoryService) itemError(ctx context.Context, op string, err error) error {
 	var api *apierror.Error
 	var refused *format.Rejection
+	var sidecar *item.SidecarError
 	switch {
 	case errors.As(err, &api):
 		return api
 	case errors.As(err, &refused):
 		return apierror.New(refused.Status, refused.Message)
+	case errors.As(err, &sidecar) && errors.Is(err, store.ErrNotFound):
+		return apierror.New(http.StatusNotFound, sidecar.Message)
+	case errors.As(err, &sidecar):
+		return apierror.New(http.StatusConflict, sidecar.Message)
 	case errors.Is(err, item.ErrChecksumMismatch):
 		return apierror.New(http.StatusConflict,
 			"Checksum policy rejected the upload: the content does not match the declared checksum")
@@ -292,17 +297,32 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 	case strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true"):
 		it, err = svc.DeployByChecksum(ctx, s.deployRequest(r, t, req, p))
 	default:
-		if artifact, alg, ok := item.Sidecar(req.path); ok && s.isFile(ctx, st, c, artifact) {
+		if artifact, alg, ok := item.Sidecar(req.path); ok &&
+			(svc.OwnsSidecars(c) || s.isFile(ctx, st, c, artifact)) {
 			s.recordChecksum(w, r, svc, item.Target{Repo: c, Path: artifact}, alg)
 			return
 		}
 		it, err = svc.Deploy(ctx, s.deployRequest(r, t, req, p))
+	}
+	if answered(w, err) {
+		return
 	}
 	if err != nil {
 		writeErr(w, r, s.itemError(ctx, "deploy", err))
 		return
 	}
 	writeJSON(w, http.StatusCreated, itemCreated(ctx, it))
+}
+
+// answered writes the status of a write the format took without making it
+// (format.Accepted), with no body, as Artifactory answers one.
+func answered(w http.ResponseWriter, err error) bool {
+	var accepted *format.Accepted
+	if !errors.As(err, &accepted) {
+		return false
+	}
+	w.WriteHeader(accepted.Status)
+	return true
 }
 
 func (artifactoryService) deployRequest(
@@ -347,7 +367,11 @@ func (s artifactoryService) recordChecksum(
 	}
 	// Sidecars may carry "<hex>  <file name>" as sha1sum writes them.
 	value, _, _ := strings.Cut(strings.TrimSpace(string(b)), " ")
-	if _, err := svc.RecordChecksum(r.Context(), t, alg, value); err != nil {
+	_, err = svc.RecordSidecar(r.Context(), t, alg, value, r.ContentLength)
+	if answered(w, err) {
+		return
+	}
+	if err != nil {
 		writeErr(w, r, s.itemError(r.Context(), "record checksum", err))
 		return
 	}

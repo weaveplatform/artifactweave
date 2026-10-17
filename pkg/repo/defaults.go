@@ -63,7 +63,7 @@ func localDefaults(c *Config) {
 	if c.SnapshotVersionBehavior == "" {
 		c.SnapshotVersionBehavior = Unique
 	}
-	setBool(&c.SuppressPomConsistencyChecks, false)
+	setBool(&c.SuppressPomConsistencyChecks, suppressPomChecks(c.PackageType))
 	setInt(&c.MaxUniqueTags, 0)
 	setInt(&c.DockerTagRetention, DefaultDockerTagRetention)
 	if c.DockerAPIVersion == "" {
@@ -94,7 +94,7 @@ func remoteDefaults(c *Config) {
 	setBool(&c.HandleReleases, true)
 	setBool(&c.HandleSnapshots, true)
 	setInt(&c.MaxUniqueSnapshots, 0)
-	setBool(&c.SuppressPomConsistencyChecks, false)
+	setBool(&c.SuppressPomConsistencyChecks, suppressPomChecks(c.PackageType))
 	setBool(&c.DisableProxy, false)
 	setBool(&c.HardFail, false)
 	setBool(&c.Offline, false)
@@ -162,6 +162,12 @@ func virtualDefaults(c *Config) {
 		c.DockerAPIVersion = DockerV2
 	}
 }
+
+// suppressPomChecks is suppressPomConsistencyChecks' default for t: on for
+// gradle, ivy and sbt and off for maven, as the Terraform provider and
+// Artifactory's UI set it (research 27 section 6), and off for every other
+// type, which has no POM checks.
+func suppressPomChecks(t PackageType) bool { return t == Gradle || t == Ivy || t == SBT }
 
 func setBool(p **bool, v bool) {
 	if *p == nil {

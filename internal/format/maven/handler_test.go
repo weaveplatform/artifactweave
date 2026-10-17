@@ -107,7 +107,7 @@ func (w *world) deploy(paths ...string) []types.Item {
 	out := make([]types.Item, 0, len(paths))
 	for _, p := range paths {
 		it, err := w.items.Deploy(w.ctx, item.Deploy{
-			Target: item.Target{Repo: w.c, Path: p}, Body: strings.NewReader(p),
+			Target: item.Target{Repo: w.c, Path: p}, Body: strings.NewReader(bodyOf(p)),
 		})
 		if err != nil {
 			w.t.Fatal(err)
@@ -115,6 +115,28 @@ func (w *world) deploy(paths ...string) []types.Item {
 		out = append(out, it)
 	}
 	return out
+}
+
+// bodyOf is a file's content: its path, or for a POM one that names the
+// coordinates of its Maven path, so the POM checks accept it.
+func bodyOf(p string) string {
+	if !maven.IsPom(p) {
+		return p
+	}
+	segs := strings.Split(p, "/")
+	n := len(segs)
+	return pomXML(strings.Join(segs[:n-3], "."), segs[n-3], segs[n-2], "")
+}
+
+// pomXML is a POM of g:a:v, with extra inside its project element.
+func pomXML(g, a, v, extra string) string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>` + g + `</groupId>
+  <artifactId>` + a + `</artifactId>
+  <version>` + v + `</version>` + extra + `
+</project>`
 }
 
 func (w *world) delete(p string) {
@@ -177,7 +199,6 @@ func TestIndex(t *testing.T) {
 		dir+"1.0/app-1.0.jar",
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.090000-1.jar",
 		dir+"1.0-SNAPSHOT/app-1.0-20261017.100000-2.jar",
-		dir+"1.0-SNAPSHOT/maven-metadata.xml",
 		dir+"1.0-alpha-1/app-1.0-alpha-1.jar",
 		dir+"maven-metadata.xml",
 		dir+"notes.txt",
@@ -194,7 +215,7 @@ func TestIndex(t *testing.T) {
 			at(4),
 			[]string{"app-1.0-20261017.090000-1.jar", "app-1.0-20261017.100000-2.jar"},
 		},
-		{"1.0-alpha-1", at(7), []string{"app-1.0-alpha-1.jar"}},
+		{"1.0-alpha-1", at(6), []string{"app-1.0-alpha-1.jar"}},
 		{"1.0", at(2), []string{"app-1.0.jar", "app-1.0.pom"}},
 		{"1.1", at(1), []string{"app-1.1.jar"}},
 	}

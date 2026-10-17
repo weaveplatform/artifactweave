@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
@@ -94,12 +95,13 @@ func indexedVersion(v string, its []types.Item) pkgindex.IndexedVersion {
 // version left, when it has none.
 func syncVersion(
 	ctx context.Context,
-	st store.Store,
+	env format.Env,
 	c repo.Config,
 	r reader,
 	cached bool,
 	co Coordinates,
 ) error {
+	st := env.Store
 	its, err := versionFiles(ctx, st, c, r, cached, co)
 	if err != nil {
 		return err
@@ -113,6 +115,16 @@ func syncVersion(
 	})
 	if err != nil {
 		return fmt.Errorf("maven: package %s: %w", co.Package, err)
+	}
+	var prev []byte
+	switch pv, err := st.Packages().Version(ctx, p.ID, co.Version); {
+	case err == nil:
+		prev = pv.Metadata
+	case !errors.Is(err, store.ErrNotFound):
+		return fmt.Errorf("maven: version %s of %s: %w", co.Version, co.Package, err)
+	}
+	if v.Metadata, err = metadataOf(ctx, env, prev, its); err != nil {
+		return err
 	}
 	_, err = pkgindex.Sync(ctx, st, p, v)
 	return err //nolint:wrapcheck // pkgindex wraps its own
@@ -157,7 +169,8 @@ func dropVersion(ctx context.Context, st store.Store, c repo.Config, co Coordina
 // so after the hooks' own maintenance nothing changes. A package indexed
 // afresh is dated by its earliest version. Without a layout nothing is read,
 // so the index is emptied.
-func reindex(ctx context.Context, st store.Store, c repo.Config, r reader) error {
+func reindex(ctx context.Context, env format.Env, c repo.Config, r reader) error {
+	st := env.Store
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		hits, err := st.Items().Search(ctx, &aql.Query{Criteria: files(c)}, aql.Options{})
 		if err != nil {
@@ -176,9 +189,17 @@ func reindex(ctx context.Context, st store.Store, c repo.Config, r reader) error
 		}
 		want := make([]pkgindex.Indexed, 0, len(byVersion))
 		for _, name := range slices.Sorted(maps.Keys(byVersion)) {
+			prev, err := indexedMetadata(ctx, st, c, name)
+			if err != nil {
+				return err
+			}
 			p := pkgindex.Indexed{Name: name}
 			for _, ver := range slices.Sorted(maps.Keys(byVersion[name])) {
-				v := indexedVersion(ver, byVersion[name][ver])
+				its := byVersion[name][ver]
+				v := indexedVersion(ver, its)
+				if v.Metadata, err = metadataOf(ctx, env, prev[ver], its); err != nil {
+					return err
+				}
 				p.Versions = append(p.Versions, v)
 				p.Created = earliest(p.Created, v.Created)
 			}
@@ -190,6 +211,32 @@ func reindex(ctx context.Context, st store.Store, c repo.Config, r reader) error
 		return err //nolint:wrapcheck // the transaction returns ours
 	}
 	return nil
+}
+
+// indexedMetadata is the metadata the index holds for each version of
+// package name in c, so a reindex reads only the POMs that changed.
+func indexedMetadata(
+	ctx context.Context,
+	st store.Store,
+	c repo.Config,
+	name string,
+) (map[string][]byte, error) {
+	p, err := st.Packages().Find(ctx, c.Key, name)
+	if errors.Is(err, store.ErrNotFound) {
+		return map[string][]byte{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("maven: package %s: %w", name, err)
+	}
+	vs, err := st.Packages().Versions(ctx, p.ID)
+	if err != nil {
+		return nil, fmt.Errorf("maven: versions of %s: %w", name, err)
+	}
+	out := make(map[string][]byte, len(vs))
+	for _, v := range vs {
+		out[v.Version] = v.Metadata
+	}
+	return out, nil
 }
 
 func earliest(a, b time.Time) time.Time {

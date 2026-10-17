@@ -127,7 +127,9 @@ type Write struct {
 	// parameters, or the properties a copy or move carries over. Admit may
 	// add or change them.
 	Properties types.Properties
-	// Size and Checksums describe the content; both are empty for OpChecksum.
+	// Size and Checksums describe the content. For OpChecksum, Checksums is
+	// empty and Size is the length of the sidecar's body as the client
+	// declared it, or -1.
 	Size      int64
 	Checksums types.Checksums
 	// From is the source of a copy or move.
@@ -224,6 +226,29 @@ func ClassOf(h Handler, c repo.Config, path string) Class {
 		return cl.Classify(c, path)
 	}
 	return ClassUnique
+}
+
+// SidecarOwner is a format whose repositories take every upload named as a
+// checksum sidecar ("a/b.jar.sha1") as a checksum of its file, as
+// Artifactory does: Admit sees each as an OpChecksum, whether or not the
+// file exists, and one whose file is missing is refused. In the other
+// formats such an upload without its file is stored as a file of its own.
+type SidecarOwner interface {
+	OwnsSidecars()
+}
+
+// Accepted is a format's answer that a write succeeds without being made.
+// Artifactory takes some uploads of what it computes itself, such as
+// Maven's snapshot metadata and the checksums of any metadata, with a
+// success status and stores nothing. Admit returns it, as an error, only
+// for an OpDeploy or an OpChecksum; the HTTP layer answers Status with an
+// empty body, and an exploded archive skips the entry.
+type Accepted struct {
+	Status int
+}
+
+func (a *Accepted) Error() string {
+	return fmt.Sprintf("format: accepted with status %d and not stored", a.Status)
 }
 
 // Rejection is a format's refusal of a request. The HTTP layer answers it

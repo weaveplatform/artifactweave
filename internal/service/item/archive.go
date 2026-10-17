@@ -130,6 +130,12 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 			types.Checksums{},
 			now,
 		)
+		// An entry the format takes without storing, such as Maven's
+		// snapshot metadata, is left out as a single upload of it would be.
+		var accepted *format.Accepted
+		if errors.As(err, &accepted) {
+			return nil
+		}
 		return err
 	}
 	if d.Atomic {
