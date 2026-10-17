@@ -1,5 +1,7 @@
 # Glossary
 
+Checked against: Artifactory 7.161.32
+
 Terms used across this research set, in the sense Artifactory and its clients use them.
 Where a term has a different meaning in an upstream protocol, the Artifactory sense is
 given first.
@@ -52,3 +54,5 @@ given first.
 | network mirror | The alternative Terraform provider installation protocol served per repository under `/api/terraform/<repo>/providers/`. |
 | webhook subscription | An Event service object with a key, an event filter (domain, event types, criteria) and one handler (`webhook` or `custom-webhook`). |
 | descriptor | Artifactory's global configuration document, served as XML and patched as YAML, holding repositories, proxies, property sets, layouts, backups and security settings. |
+| federated repository, RTFS | A repository whose members on up to ten JFrog Platform Deployments accept writes and converge. In 7.x the Artifactory Federation Service (RTFS), a standalone service at `/rtfs`, carries the events; the earlier federation embedded in Artifactory is "legacy federation", sunset from 7.133.3. |
+| cold storage, smart archiving | Two ways JFrog archives rarely used content: cold storage moves it to a separate self-hosted cold instance; smart archiving moves package versions to an archive instance in JFrog Cloud, for SaaS and, from 7.117.14, hybrid self-hosted deployments. artifactweave archives to a cold blob tier instead. |

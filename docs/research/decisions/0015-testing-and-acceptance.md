@@ -1,5 +1,7 @@
 # 0015: Testing and acceptance
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context

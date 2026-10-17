@@ -1,5 +1,7 @@
 # 13: Review log
 
+Checked against: Artifactory 7.161.32
+
 Before the plan was approved, three independent reviewers challenged it: an architecture
 critic, a fact-checker for the Artifactory core and protocol inventories (documents 02 to
 04), and a fact-checker for the platform, Terraform and CLI inventories (documents 05 to
@@ -147,3 +149,27 @@ Treating `federated` as local when the only member is the instance itself also s
 the reviews; the owner withdrew it on 2026-10-13 in favour of federation between
 artifactweave peers ([ADR 0003](decisions/0003-repository-model.md),
 [ADR 0022](decisions/0022-federated-repositories.md)).
+
+## Artifactory 7.x check (2026-10-17)
+
+[#343](https://github.com/weaveplatform/artifactweave/issues/343) checked research 10 to 13,
+16, 18 to 20 and the glossary, decisions 0015, 0021 to 0030 and 0033, and the storage, CDN,
+licence, federation and Workers rows of the deviations register. It checked them against
+the Artifactory 7.x release notes up to 7.161.32 and the current product pages, following
+the [target version and sources](README.md#target-version-and-sources) rule.
+
+**What it changed:**
+- **Federated repositories:** federation now runs in RTFS at `/rtfs`, and four status
+  operations are legacy-only.
+- **Pairing:** the use cases are now `federated-repo/*` and `federated-repo/r`, which the
+  OpenAPI spec already had.
+- **Smart archiving:** it also serves self-hosted (hybrid) deployments, not only SaaS.
+- **Platform Federation:** the Grid product syncs projects and identity on SaaS only.
+- **Workers:** scheduled workers, the current action list, and JFrog's host check on
+  `axios`.
+- **Storage:** the parameters added to the GCS and Azure providers, and the zone read order
+  that signed-URL redirects follow.
+- **Scope:** CDN redirect is now listed as implemented rather than a stub.
+
+**What it confirmed or left open:** each document's "Artifactory 7.x check" table lists
+the claims it confirmed and those still marked [I].

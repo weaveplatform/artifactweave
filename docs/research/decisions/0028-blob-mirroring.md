@@ -1,5 +1,7 @@
 # 0028: Mirroring blobs across stores, clouds and regions
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -60,7 +62,8 @@ The server refuses to start unless W <= R <= M.
 - A failure part-way through a read reopens on the next member and seeks to the same
   offset, which is safe because blobs are immutable.
 - A redirected download is signed by the first member in read order that holds the blob
-  and signs the route asked for: the object store, or the member's CDN. Each member has its
+  and signs the route asked for, as Artifactory signs against the shards in its zone read
+  order since 7.84.10 (RTDEV-39396, [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed)): the object store, or the member's CDN. Each member has its
   own `cdn` block, so a mirror can put a different CDN in front of each cloud. Signing never
   counts against a member's health ([0029](0029-cdn-delivery-and-download-redirect.md)).
 - A member still committing after the quorum does not hold the blob yet. Until it finishes,
@@ -100,7 +103,9 @@ safely:
 3. Remove it from `blob.mirror.members`. Its records then appear under `removedMembers`
    until they are deleted; its stored data is not touched.
 
-**Administration.** Artifactory's storage summary has nothing per shard. artifactweave's
+**Administration.** Artifactory's storage summary has nothing per shard; 7.x reports shard
+health only as the `jfsh_shard_accessibility_status_total` metric (7.111.4,
+[release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)). artifactweave's
 adds one field, which JFrog clients ignore:
 - **`GET /api/storageinfo`** gains `blobMirrors` when a tier is a mirror. A summary without
   mirrors is unchanged. There is one entry per mirrored tier (`blob`, `cold_blob`), with:

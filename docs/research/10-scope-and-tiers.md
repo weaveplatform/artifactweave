@@ -1,5 +1,7 @@
 # 10: Scope and tiers
 
+Checked against: Artifactory 7.161.32
+
 Which JFrog product APIs artifactweave implements, shims, stubs or ignores, which error
 envelope each surface uses, and what the known clients do when they hit a stub. The
 tiering is the contract behind [ADR 0001](decisions/0001-mirror-the-jfrog-api-surface.md);
@@ -76,9 +78,36 @@ The table is implemented once in `internal/server/apierror` and tested per surfa
 | JFConnect (`/jfconnect/api/v1/**`) | licence entitlement and usage reporting to JFrog | ignore, except the metrics sink every `jf` command posts to, which answers 2xx | |
 | MyJFrog (`my.jfrog.com`, `/api/jmis/**`, `/api/usage/**`, `/api/v1/offline_register`) | JFrog's SaaS account portal | ignore: a different host and an account artifactweave does not have | |
 | AWS IAM role mapping, Vault configuration, log shipping | cloud integrations | stub (501) | `platform_aws_iam_role`, `artifactory_vault_configuration` fail at apply with 501 |
-| Signed URLs (`/api/signed/url`), CDN redirect, `/api/v1/metrics/application` | Enterprise and Cloud extras | stub | |
+| Signed URLs (`/api/signed/url`, `/api/signed/url/key`), `/api/v1/metrics/application` | Enterprise and Cloud extras | stub | |
+| Direct cloud storage download and CDN redirect (`downloadRedirect`, `cdnRedirect`, `X-JFrog-Download-Redirect-To`) | redirecting downloads to the object store or a CDN | implement ([0029](decisions/0029-cdn-delivery-and-download-redirect.md)) | `jf rt dl` follows the redirect, including split downloads |
 
-## Explicit v1 cuts
+## Artifactory 7.x check
+
+Checked on 2026-10-17 against the self-managed release notes up to 7.161.32
+(https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases), the legacy notes
+for 7.0 to 7.83 (https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf) and the deprecations page
+(https://docs.jfrog.com/releases/docs/artifactory-deprecations). The tier table above
+stands. It was corrected in one place: CDN redirect was listed as a stub, but it has been
+implemented since P4b. What 7.x changed in the products the table lists:
+
+| Product | 7.x | Source |
+|---|---|---|
+| Federated repositories | Served by the standalone Artifactory Federation Service (RTFS) at `/rtfs` from 7.111.12. Four status operations are legacy-only, and new features such as unidirectional sync are RTFS-only ([research 16](16-enterprise-products.md#4-federated-repositories)) | https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed |
+| Cold storage and archive | Smart archiving also serves a self-hosted active instance (hybrid, Enterprise+, from 7.117.14) | https://docs.jfrog.com/administration/docs/archive.md |
+| Platform Federation and Grid | The Grid product syncs projects and identity on SaaS only (7.154.0); the documented `/pfed` API still carries Curation entity types | https://docs.jfrog.com/administration/docs/jfrog-grid.md |
+| Workers | Scheduled workers from 7.104.5; repository events on self-managed from 7.161.15 | https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed, https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed |
+| Distribution and release bundles v1 | Still available; the v1 Replicator was deprecated in 7.84.10 | https://docs.jfrog.com/releases/docs/artifactory-deprecations |
+| Pipelines | Confirmed sunset: end of life on 1 June 2025 | https://releases.jfrog.io/artifactory/legacydocs/JFrog-Pipelines-End-of-Life-Jun-1-2025.pdf |
+| Mission Control | Its user plugins were removed in 7.117; Access Federation still needs Mission Control and a Circle of Trust | https://docs.jfrog.com/releases/docs/artifactory-deprecations, https://docs.jfrog.com/administration/docs/access-federation.md |
+
+**New 7.x services the table does not list.** The table has no row for:
+- the Topology service and One Model, a GraphQL hub (7.104.5);
+- the Integration service, deprecated in 7.77.3;
+- Package Traffic Controller (7.146.35).
+
+Whether any client in scope calls these services is **[I]**, so they get no tier until a
+client needs one.
+
 
 Recorded with their reasons in [12-open-questions.md](12-open-questions.md):
 `terraformbackend` (needs the Terraform Enterprise API), NuGet v2 OData beyond what

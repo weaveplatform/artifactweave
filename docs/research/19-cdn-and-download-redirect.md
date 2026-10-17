@@ -1,5 +1,7 @@
 # CDN delivery and download redirect
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: **2026-10-14**.
 
 Artifactory can answer a download with a redirect, either straight to the cloud object
@@ -27,6 +29,7 @@ Each fact carries its basis:
 |---|---|---|
 | Supported on self-hosted Enterprise+ and Edge licences when binaries are on S3, Google Cloud Storage or Azure Blob Storage, and on all AWS and GCP cloud subscriptions | doc | [direct-download] |
 | Enabled on the binary provider in `binarystore.xml` with `enableSignedUrlRedirect=true`, on the `s3-storage-v3`, `google-storage-v2` and `azure-blob-storage-v2` templates | doc | [dd-step1] |
+| From 7.84.10 S3 direct download no longer works with the `eventual` and cluster providers; JFrog points to the `s3-storage-v3-direct` template | doc | [rn-78410] |
 | `signedUrlExpirySeconds` sets the signed URL's lifetime: "The default is 30 seconds" | doc | [dd-step1] |
 | Enabled per repository with `downloadRedirect` (UI "Enable Redirect Download"), default `false`; "there is no global configuration to redirect all requests automatically" | doc | [dd-step2] |
 | Supported on local, remote, virtual and generic repositories. A remote repository must have `storeArtifactsLocally=true`, otherwise Artifactory reports an error | doc | [dd-step2] |
@@ -212,11 +215,26 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 | A fake edge checks CloudFront or Cloud CDN signatures and serves blobs from a store; acceptance runs `jf rt dl` of a split download through each, with MinIO or fake-gcs-server behind | `pkg/cdn/cdntest`, `test/acceptance/features/cdn.feature` |
 | A fake Front Door checks nothing, passes the SAS through to its storage origin and caches whole-object responses under the full URL up to a cap; acceptance runs a split `jf rt dl` and a repeated download through it with Azurite behind, which checks the SAS and applies the overrides. Azurite refuses an anonymous read with 403 `AuthorizationFailure`. Not modelled: the route's real cache behaviour (8 MiB chunks, ranged responses) and Private Link | `pkg/cdn/cdntest/frontdoor.go`, `test/acceptance/features/cdn_front_door.feature` |
 
+## Artifactory 7.x check
+
+Checked on 2026-10-17 against the self-managed release notes up to 7.161.32 and the
+legacy notes for 7.0 to 7.83. Section 1 was corrected in place.
+
+| Claim | 7.x | Source |
+|---|---|---|
+| Direct cloud storage download on S3, GCS and Azure with `enableSignedUrlRedirect` and `signedUrlExpirySeconds` (30 s) | Confirmed. Changed for S3: not with the `eventual` and cluster providers from 7.84.10 | [dd-step1], [rn-78410] |
+| `X-JFrog-Download-Redirect-To` values `None`, `S3`, `CF` | Confirmed; 7.19.4 introduced the choice between S3, CloudFront and no signed-URL redirect | [dd-step4], [rn-legacy] (7.19.4) |
+| Signed URLs and the signed URL key | Confirmed; introduced in 7.5.0 with the Create Signed URL and Replace Signed URL Key APIs | [rn-legacy] (7.5.0) |
+| `cdnRedirect` is SaaS CloudFront for Enterprise X and Enterprise+ | Confirmed; CDN distribution is on by default for SaaS Enterprise and Enterprise+ from 7.5 | [cdn-saas], [rn-legacy] (7.5.0) |
+| The redirect URL keeps the item's media type | Confirmed: 7.84.10 fixed CDN downloads whose content type held a `+`, which the redirect URL had dropped (RTDEV-40507). artifactweave's blob contract signs only `application/x-test`, so a `+` media type is not covered by a test | [rn-78410], `pkg/blob/blobtest` |
+| Which shard a signed URL comes from | Changed in [research 18](18-cloud-blob-storage.md#31-how-artifactory-does-it): the sharding provider's zone read order, which is what artifactweave's mirror does | [rn-78410] |
+
 ## Versions at the research baseline
 
 | Component | Version | Note |
 |---|---|---|
 | JFrog Artifactory docs | 7.x, read 2026-10-14 | docs.jfrog.com pages fetched as markdown |
+| Artifactory release notes | self-managed up to 7.161.32, read 2026-10-17 | [Artifactory 7.x check](#artifactory-7x-check) |
 | jfrog-client-go | master `6053434e9301` (after v1.55.0) | `download.go`, `directdownload.go`, `httpclient/client.go` |
 | `jfrog/artifactory` Terraform provider | master `990e8dfdb64e` (after v12.11.14) | |
 | Go | 1.27.1 | `net/http` redirect policy |
@@ -227,6 +245,8 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 ## Sources
 
 **JFrog**
+- [rn-78410]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed
+- [rn-legacy]: https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf
 - [direct-download]: https://docs.jfrog.com/installation/docs/direct-cloud-storage-download
 - [dd-step1]: https://docs.jfrog.com/installation/docs/step-1-configure-the-artifactory-filestore-for-direct-cloud-storage
 - [dd-step2]: https://docs.jfrog.com/installation/docs/step-2-specify-repositories-for-direct-download

@@ -1,5 +1,7 @@
 # 0021: Peer trust and sync protocol
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -40,12 +42,15 @@ last-seen time.
 4. `DELETE .../pairing/{usecase}` removes the use case; a peer with no use cases left is
    removed and its outbox cursors are dropped.
 
-Use cases are JFrog's names where they mean the same thing (`platform-federation`) plus
-artifactweave's own: `federation` (repositories), `distribution`, `access-federation`.
-One peer relationship can carry several use cases. JFrog use cases with no artifactweave
-counterpart answer 404: `mission-control` and `bridge`, and `artifactory-cold` because
-cold storage is a blob tier rather than a paired instance
-([0024](0024-cold-storage-tier.md)).
+Use cases are JFrog's names where they mean the same thing (`platform-federation` on the
+Access endpoint; `federated-repo/*` for two-way and `federated-repo/r` for receive-only
+federated repository trust on the Artifactory endpoint, as 7.x documents them and
+`api/src/artifactory/paths-admin.yaml` specifies) plus artifactweave's own:
+`distribution` and `access-federation`. One peer relationship can carry several use cases.
+JFrog use cases with no artifactweave counterpart answer 404: `mission-control` and
+`bridge`, and `artifactory-cold` and `artifactory-cold/<namespace>` because cold storage
+is a blob tier rather than a paired instance ([0024](0024-cold-storage-tier.md),
+[pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)).
 
 **Transport.** Peer traffic is HTTPS on the normal listener under the
 `/artifactweave/peer/v1/` prefix, which is artifactweave's own API, specified in its own

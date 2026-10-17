@@ -1,5 +1,7 @@
 # 0027: Cloud blob backends: Google Cloud Storage and Azure Blob Storage
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -232,4 +234,7 @@ the SDK wiring on Linux CI.
 - `github.com/Azure/azure-sdk-for-go/sdk/storage/azblob@v1.8.2`: `blockblob/client.go`,
   `sas/service.go`.
 - JFrog binary providers `google-storage-v2` and `azure-blob-storage-v2` on
-  docs.jfrog.com.
+  docs.jfrog.com. Both are current in 7.161.32. 7.x added `retryIntervalMillis` to
+  `google-storage-v2` (7.96.3) and `sasStartTimeOffsetSeconds` (7.146.35) and Workload
+  Identity (7.125.4) to `azure-blob-storage-v2`; none of these changes this decision
+  ([research 18](../18-cloud-blob-storage.md#artifactory-7x-check)).

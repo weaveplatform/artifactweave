@@ -1,5 +1,7 @@
 # 0029: CDN delivery and download redirect
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -16,6 +18,14 @@ Artifactory can answer a download with a 302 instead of streaming the bytes, in 
   SaaS only, AWS only, Enterprise X or Enterprise+.
 
 A client can steer the choice with `X-JFrog-Download-Redirect-To: None | S3 | CF`.
+
+Checked against 7.x: all of the above stands in 7.161.32
+([research 19](../19-cdn-and-download-redirect.md#artifactory-7x-check)). The header dates
+from 7.19.4, and signed URLs from 7.5.0. One change applies to self-hosted S3 only: from
+7.84.10, direct download no longer works with the `eventual` and cluster providers, and
+JFrog points to the `s3-storage-v3-direct` template. 7.84.10 also fixed redirect URLs that
+had dropped a `+` from the media type (RTDEV-40507), and artifactweave's signed URLs must
+keep it ([release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed)).
 
 artifactweave already redirects `downloadRedirect` GETs to a presigned URL on any store that
 can sign (research 19 section 5). Teams leaving Artifactory run on all three clouds and want

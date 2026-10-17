@@ -1,5 +1,7 @@
 # 11: Prior art
 
+Checked against: Artifactory 7.161.32
+
 Existing registries that solve parts of the same problem, what artifactweave borrows from
 each, and what it deliberately does not copy. The comparison is limited to projects whose
 behaviour or source was checked at the research baseline.
