@@ -276,3 +276,47 @@ func TestReadFileInflationBudget(t *testing.T) {
 		t.Fatalf("within budget: %q %v", got, err)
 	}
 }
+
+// Scan walks every entry within the limits, and stops with ErrUnusable at
+// the first it passes, whatever the callback would do.
+func TestScan(t *testing.T) {
+	body := tarOf(t, true,
+		entry{name: "package/a", body: "1"}, entry{name: "package/b", body: "22"})
+	var names []string
+	err := archive.Scan(bytes.NewReader(body), int64(len(body)), archive.TarGz,
+		archive.DefaultLimits, func(e archive.Entry) error {
+			names = append(names, e.Name)
+			return nil
+		})
+	if err != nil || strings.Join(names, ",") != "package/a,package/b" {
+		t.Fatalf("%v %v", names, err)
+	}
+	few := archive.DefaultLimits
+	few.Entries = 1
+	if err := archive.Scan(bytes.NewReader(body), int64(len(body)), archive.TarGz, few,
+		func(archive.Entry) error { return nil }); !errors.Is(err, archive.ErrUnusable) {
+		t.Fatalf("entries: %v", err)
+	}
+}
+
+var errOpen = errors.New("open failed")
+
+// An entry that cannot be opened or read is unusable.
+func TestReadEntryFailures(t *testing.T) {
+	for name, open := range map[string]func() (io.Reader, error){
+		"open": func() (io.Reader, error) { return nil, errOpen },
+		"read": func() (io.Reader, error) {
+			return io.MultiReader(strings.NewReader("x"),
+				iotestErr{}), nil
+		},
+	} {
+		_, err := archive.ReadEntry(archive.Entry{Name: name, Open: open}, archive.DefaultLimits)
+		if !errors.Is(err, archive.ErrUnusable) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+}
+
+type iotestErr struct{}
+
+func (iotestErr) Read([]byte) (int, error) { return 0, errOpen }
