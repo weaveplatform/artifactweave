@@ -79,6 +79,31 @@ func Compile(def Definition) (*Layout, error) {
 // Definition returns the source definition.
 func (l *Layout) Definition() Definition { return l.def }
 
+// versionTokens are the version tokens a download path may carry where an
+// integration revision goes.
+const versionTokens = `|\[INTEGRATION\]|\[RELEASE\]`
+
+// VersionTokens returns the layout a download path that may ask for a
+// version token is read with: [INTEGRATION] and [RELEASE] also stand for
+// either integration revision, as Artifactory reads a request
+// (RepoLayoutUtils.getTokenRegExp with version tokens). A base revision
+// already reads [RELEASE]. Without this, the lazy base revision would take
+// in a following -[INTEGRATION], and the request would read as a release.
+// The definition stays the layout's own.
+func (l *Layout) VersionTokens() (*Layout, error) {
+	def := l.def
+	def.FolderIntegrationRevisionRegExp = orDefault(
+		def.FolderIntegrationRevisionRegExp,
+	) + versionTokens
+	def.FileIntegrationRevisionRegExp = orDefault(def.FileIntegrationRevisionRegExp) + versionTokens
+	out, err := Compile(def)
+	if err != nil {
+		return nil, err
+	}
+	out.def = l.def
+	return out, nil
+}
+
 // Match extracts token values from an artifact path. When the layout has a
 // distinctive descriptor pattern that pattern is tried first, because a POM
 // also matches the artifact pattern with ext=pom and the descriptor match is

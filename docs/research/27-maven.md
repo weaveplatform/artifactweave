@@ -415,6 +415,21 @@ highest in version order, whatever the upload order.
     `deployer`. Under `non-unique` it is served as it is.
   - When several candidates have the same version, the one whose path contains the
     translated request path wins; otherwise the first.
+- **[D]** JFrog's current Retrieve Artifact reference
+  (https://docs.jfrog.com/artifactory/reference/retrieveartifact, read 2026-10-17 for
+  Artifactory 7.161.32) says: `SNAPSHOT` and `[RELEASE]` give "the latest Maven integration
+  or release artifact"; for other layouts `[INTEGRATION]` and `[RELEASE]` give the latest
+  "based on alphabetical sorting"; "Only local, cache and virtual repositories will be used";
+  `artifactory.request.searchLatestReleaseByDateCreated=true` orders by created date; both
+  `[folderItegRev]` and `[fileItegRev]` must be in the layout; the two tokens "cannot be mixed
+  together"; and properties take part in resolution. It gives no order for Maven.
+- **[D]** The self-managed release notes from 7.84 to 7.161.32 change none of this. The one
+  item on it, RTDEV-47968 (7.90.13 and 7.98.7), fixes a 404 when retrieving the latest
+  artifact after an upgrade to 7.90.9. Notes before 7.84 are only in JFrog's legacy PDF
+  archive and were not read.
+- **[I]** The alphabetical order for other layouts is older than 6.20, whose code used the
+  Mercury order and creation dates instead; artifactweave follows the 7.x documentation
+  (decision 0036), and #216 asks which a live 7.x does.
 
 ## 9. calculateMetadata and generatePom
 
@@ -484,6 +499,12 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
     6.20).
 12. The `[INTEGRATION]` token in a repository with the Maven layout: ignored, as in 6.20
     (section 8).
+13. The order of `[RELEASE]` and `[INTEGRATION]` outside the Maven layout on 7.x:
+    alphabetical, as documented, or Mercury order and creation date, as 6.20's code did
+    (section 8).
+14. Whether 7.x still resolves `-SNAPSHOT` and Maven `[RELEASE]` with 6.20's rules: Mercury
+    order of base and file revision, the last modified build under `deployer`, the caller's
+    view of the folder, and the candidate whose path holds the request first (section 8).
 
 ## 12. Versions at the research baseline
 
