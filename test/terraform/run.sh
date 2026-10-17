@@ -164,8 +164,13 @@ apply_identity() {
 		TF_VAR_ci_user=tf-ci TF_VAR_permission_name=tf-team TF_VAR_keypair_name=tf-signing
 	tf apply -auto-approve
 	# The permission written through Access v2 must read back through the
-	# legacy v2 permission target API with its repository.
-	tf state show data.artifactory_permission_target.team | grep -q "\"$TF_VAR_repository_key\"" ||
+	# legacy v2 permission target API with its repository. The state is read
+	# whole before the grep: grep -q exits at its first match, Terraform then
+	# dies of SIGPIPE on its next write, and pipefail fails the check although
+	# the repository was there.
+	local team
+	team=$(tf state show data.artifactory_permission_target.team)
+	grep -q "\"$TF_VAR_repository_key\"" <<<"$team" ||
 		{ echo "the legacy permission target API does not report $TF_VAR_repository_key" >&2; exit 1; }
 }
 
