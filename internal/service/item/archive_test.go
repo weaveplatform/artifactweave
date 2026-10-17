@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/archive"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -304,70 +305,12 @@ func TestExplodeAtomicity(t *testing.T) {
 	}
 }
 
-func TestEntryPath(t *testing.T) {
-	for in, want := range map[string]string{
-		"a/b.txt": "a/b.txt", "./a//b.txt": "a/b.txt", "dir/": "dir", "./": "",
-		"a\\b.txt": "a/b.txt",
-	} {
-		if got, err := entryPath(in); err != nil || got != want {
-			t.Errorf("%q: %q %v", in, got, err)
-		}
-	}
-	for _, in := range []string{"../x", "/x", "C:/x", "a/../../x", "a/\x00"} {
-		if _, err := entryPath(in); !errors.Is(err, ErrBadArchive) {
-			t.Errorf("%q: %v", in, err)
-		}
-	}
-}
-
-func TestSniffAndKinds(t *testing.T) {
-	ustar := make([]byte, 300)
-	copy(ustar[257:], "ustar")
-	for name, c := range map[string]struct {
-		head []byte
-		file string
-		want ArchiveKind
-	}{
-		"zip magic":   {[]byte("PK\x03\x04"), "x", Zip},
-		"empty zip":   {[]byte("PK\x05\x06"), "x", Zip},
-		"gzip magic":  {[]byte{0x1f, 0x8b}, "x", TarGz},
-		"tar magic":   {ustar, "x", Tar},
-		"jar name":    {nil, "x.JAR", Zip},
-		"tar name":    {nil, "x.tar", Tar},
-		"tgz name":    {nil, "x.tgz", TarGz},
-		"tar.gz name": {nil, "x.tar.gz", TarGz},
-		"neither":     {[]byte("text"), "x.txt", NotArchive},
-	} {
-		if got := sniffArchive(c.head, c.file); got != c.want {
-			t.Errorf("%s: %v", name, got)
-		}
-	}
-	for s, want := range map[string]ArchiveKind{"zip": Zip, "TAR": Tar, "tar.gz": TarGz, "tgz": TarGz} {
-		if k, ok := ParseArchiveKind(s); !ok || k != want {
-			t.Errorf("%s: %v", s, k)
-		}
-	}
-	if _, ok := ParseArchiveKind("rar"); ok {
-		t.Error("rar")
-	}
-	if Zip.ContentType() != "application/zip" || Tar.ContentType() != "application/x-tar" ||
-		TarGz.ContentType() != "application/x-gzip" || Zip.Ext() != ".zip" || Tar.Ext() != ".tar" ||
-		TarGz.Ext() != ".tar.gz" {
-		t.Error("content types and extensions")
-	}
+func TestArchiveWriterKinds(t *testing.T) {
 	if _, err := newArchiveWriter(io.Discard, NotArchive); !errors.Is(err, ErrBadArchive) {
 		t.Error(err)
 	}
-	if err := walkArchive(
-		bytes.NewReader(nil),
-		0,
-		NotArchive,
-		nil,
-	); !errors.Is(
-		err,
-		ErrBadArchive,
-	) {
-		t.Error(err)
+	if k, ok := ParseArchiveKind("tgz"); !ok || k != TarGz {
+		t.Errorf("tgz: %v", k)
 	}
 }
 
@@ -447,12 +390,12 @@ func TestArchiveFiles(t *testing.T) {
 		}
 		var names []string
 		data := buf.Bytes()
-		if err := walkArchive(
+		if err := archive.Walk(
 			bytes.NewReader(data),
 			int64(len(data)),
 			kind,
-			func(e archiveEntry) error {
-				names = append(names, e.name)
+			func(e archive.Entry) error {
+				names = append(names, e.Name)
 				return nil
 			},
 		); err != nil {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
@@ -192,10 +193,13 @@ func countsDownload(r *http.Request, status int) bool {
 		(status == http.StatusPartialContent && startsAtZero(r.Header.Get("Range")))
 }
 
-// recordDownload updates the item's statistics. Best effort: a failed count
-// must not fail the download.
+// recordDownload updates the item's statistics and its package version's
+// last download (decision 0018). Best effort: a failed count must not fail
+// the download.
 func recordDownload(ctx context.Context, st store.Store, f found, p auth.Principal) {
-	_ = st.Items().RecordDownload(ctx, f.item.ID, store.Download{By: p.Name, At: time.Now().UTC()})
+	at := time.Now().UTC()
+	_ = st.Items().RecordDownload(ctx, f.item.ID, store.Download{By: p.Name, At: at})
+	_ = pkgindex.RecordDownload(ctx, st, f.item.ID, at)
 }
 
 // throttle lets one event through per interval and counts the ones it holds
