@@ -40,7 +40,9 @@ the protocol that changed it.
 **Required hooks** stay as on main, now taking `Env`: `Deployed` after a file is stored,
 `Deleting` before each file is removed, and `Deleted` once after a delete or a move.
 
-**Optional interfaces.** A format implements only what it needs:
+**Optional interfaces.** A format implements only what it needs. Each is named here by
+its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotator`,
+`Reindexer` and `Classifier` (#267).
 
 | Interface | Runs | Does | First used by |
 |---|---|---|---|

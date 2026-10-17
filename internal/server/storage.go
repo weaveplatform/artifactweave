@@ -159,7 +159,9 @@ func (v storageView) target(ctx context.Context) (found, error) {
 			RepoKey: v.repo.Key, Cached: v.cached, Folder: true,
 		}}, nil
 	}
-	return lookup(ctx, v.st, v.repo, v.cached, v.path, v.acc, map[string]bool{})
+	// The storage API describes the item at the path as given; only
+	// downloads resolve it through the format.
+	return lookup(ctx, v.st, v.repo, v.cached, v.path, v.acc, nil, map[string]bool{})
 }
 
 // trees are the repository trees a folder view reads: the repository, or a
@@ -633,8 +635,9 @@ func (s artifactoryService) patchMetadata(w http.ResponseWriter, r *http.Request
 }
 
 // editProperties applies a property edit to an item and, when recursive (the
-// default) and it is a folder, to everything below it, in one transaction.
-// Only local repositories and remote caches hold editable properties.
+// default) and it is a folder, to everything below it, in one transaction
+// with the format's Annotated hook for each. Only local repositories and
+// remote caches hold editable properties.
 func (s artifactoryService) editProperties(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -672,9 +675,10 @@ func (s artifactoryService) editProperties(
 		return
 	}
 	cached := v.cached || v.repo.Class == repo.Remote
+	items := s.items(v.st)
 	err = v.st.Tx(ctx, func(ctx context.Context) error {
 		apply := func(it types.Item) error {
-			return v.st.Items().PatchProperties(ctx, it.ID, edit.set, edit.remove)
+			return items.Annotate(ctx, v.repo, it, edit.set, edit.remove)
 		}
 		var target types.Item
 		folder := true

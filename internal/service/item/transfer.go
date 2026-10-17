@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -64,18 +65,22 @@ type TransferResult struct {
 }
 
 // step is one planned item: the source and its target path, and the file a
-// copied file replaces.
+// copied file replaces. A file also carries the properties it lands with,
+// as the target's format admitted them, and what that format inspected.
 type step struct {
-	src     types.Item
-	dst     string
-	replace types.Item
+	src        types.Item
+	dst        string
+	replace    types.Item
+	props      types.Properties
+	inspection any
 }
 
 // Transfer copies or moves t.From to t.To. Every item is planned first:
 // an item that cannot land (a file where a folder must go, or the reverse,
-// or an overwrite the caller may not make) is reported and skipped with its
-// subtree, or ends the plan when t.FailFast. The planned items are then
-// written in one transaction; a dry run stops after the plan.
+// an overwrite the caller may not make, or a file the target's format
+// refuses) is reported and skipped with its subtree, or ends the plan when
+// t.FailFast. The planned items are then written in one transaction; a dry
+// run stops after the plan.
 func (s *Service) Transfer(ctx context.Context, t Transfer) (TransferResult, error) {
 	var res TransferResult
 	steps, err := s.plan(ctx, t, &res)
@@ -173,6 +178,7 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 	if err != nil {
 		return nil, err
 	}
+	hooks, env := s.format(t.To.Repo.PackageType), s.env()
 	var steps []step
 	var skipped []string
 	for _, src := range sources {
@@ -190,7 +196,10 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 			}
 			dst = translate(full)
 		}
-		st, problem, err := s.check(ctx, t, src, dst)
+		st, problem, err := s.admitStep(ctx, hooks, env, t, src, dst)
+		if err == nil && problem == "" {
+			st, problem, err = s.check(ctx, t, st)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -210,14 +219,50 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 	return steps, nil
 }
 
-// check plans one item, or says why it cannot land.
-func (s *Service) check(
+// admitStep plans where a file lands as the target's format inspects and
+// admits it, or says why the format refuses it. A folder lands as planned.
+func (s *Service) admitStep(
 	ctx context.Context,
+	hooks format.Handler,
+	env format.Env,
 	t Transfer,
 	src types.Item,
 	dst string,
 ) (step, string, error) {
 	st := step{src: src, dst: dst}
+	if src.Folder {
+		return st, "", nil
+	}
+	props, err := s.Store.Items().Properties(ctx, src.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
+		return st, "", fmt.Errorf("item: properties of %s: %w", src.FullPath(), err)
+	}
+	op := format.OpCopy
+	if t.Move {
+		op = format.OpMove
+	}
+	w := format.Write{
+		Op: op, Path: dst, Properties: props,
+		Size: src.Size, Checksums: src.Actual, From: src,
+	}
+	if env, err = inspect(ctx, hooks, env, t.To.Repo, w); err == nil {
+		w, err = admit(ctx, hooks, env, t.To.Repo, w)
+	}
+	var refused *format.Rejection
+	if errors.As(err, &refused) {
+		return st, fmt.Sprintf("Cannot transfer %s:%s to %s:%s: %s",
+			t.From.Repo.Key, src.FullPath(), t.To.Repo.Key, dst, refused.Message), nil
+	}
+	if err != nil {
+		return st, "", err
+	}
+	st.dst, st.props, st.inspection = w.Path, w.Properties, env.Inspection
+	return st, "", nil
+}
+
+// check plans one item, or says why it cannot land.
+func (s *Service) check(ctx context.Context, t Transfer, st step) (step, string, error) {
+	src, dst := st.src, st.dst
 	existing, err := s.Store.Items().Get(ctx, t.To.Repo.Key, false, dst)
 	if errors.Is(err, store.ErrNotFound) {
 		return st, "", nil
@@ -336,14 +381,20 @@ func (s *Service) Layout(ctx context.Context, name string) (*layout.Layout, erro
 	return l, nil
 }
 
-// apply writes the planned items, then, for a move, removes the sources.
+// apply writes the planned items, each followed by its format's hooks,
+// then, for a move, removes the sources.
 func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 	now := s.now()
 	items := s.Store.Items()
+	hooks, env := s.format(t.To.Repo.PackageType), s.env()
 	for _, st := range steps {
-		props, err := items.Properties(ctx, st.src.ID)
-		if err != nil && !errors.Is(err, store.ErrNotFound) {
-			return fmt.Errorf("item: properties of %s: %w", st.src.FullPath(), err)
+		props := st.props
+		if st.src.Folder {
+			var err error
+			props, err = items.Properties(ctx, st.src.ID)
+			if err != nil && !errors.Is(err, store.ErrNotFound) {
+				return fmt.Errorf("item: properties of %s: %w", st.src.FullPath(), err)
+			}
 		}
 		landed, err := s.land(ctx, t, st, now)
 		if err != nil {
@@ -365,6 +416,9 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 				}
 			}
 		}
+		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props); err != nil {
+			return err
+		}
 	}
 	if t.Move {
 		return s.removeSources(ctx, t, steps)
@@ -372,8 +426,29 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 	return nil
 }
 
-// land writes one planned item at its target. A copy is a new item created
-// now by the caller; a move keeps the item's own history.
+// landed runs the target format's hooks for an item a copy or move wrote,
+// once its properties are in place: Deployed for a file, and Annotated for
+// the properties it carried over.
+func (s *Service) landed(
+	ctx context.Context,
+	hooks format.Handler,
+	env format.Env,
+	c repo.Config,
+	st step,
+	it types.Item,
+	props types.Properties,
+) error {
+	if !it.Folder {
+		env.Inspection = st.inspection
+		if err := hooks.Deployed(ctx, env, c, it); err != nil {
+			return err //nolint:wrapcheck // the format's own error
+		}
+	}
+	return s.annotated(ctx, hooks, env, c, it, format.Annotation{Set: props})
+}
+
+// land writes one planned item at its target, without hooks. A copy is a
+// new item created now by the caller; a move keeps the item's own history.
 func (s *Service) land(
 	ctx context.Context,
 	t Transfer,
@@ -434,9 +509,6 @@ func (s *Service) land(
 			return types.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
 		}
 	}
-	if err := format.For(t.To.Repo.PackageType).Deployed(ctx, s.Store, t.To.Repo, out); err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the format's own error
-	}
 	return out, nil
 }
 
@@ -445,7 +517,7 @@ func (s *Service) land(
 // empty, deepest first. Items that failed to move stay, with their folders.
 func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) error {
 	items := s.Store.Items()
-	hooks := format.For(t.From.Repo.PackageType)
+	hooks, env := s.format(t.From.Repo.PackageType), s.env()
 	var versions []types.PackageVersion
 	var folders, files []types.Item
 	for _, st := range steps {
@@ -454,7 +526,7 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 			continue
 		}
 		files = append(files, st.src)
-		if err := hooks.Deleting(ctx, s.Store, t.From.Repo, st.src); err != nil {
+		if err := hooks.Deleting(ctx, env, t.From.Repo, st.src); err != nil {
 			return err //nolint:wrapcheck // the format's own error
 		}
 		pv, ok, err := pkgindex.VersionOf(ctx, s.Store, st.src.ID)
@@ -490,7 +562,7 @@ func (s *Service) removeSources(ctx context.Context, t Transfer, steps []step) e
 	if err := pkgindex.Prune(ctx, s.Store, versions); err != nil {
 		return err //nolint:wrapcheck // pkgindex wraps its own
 	}
-	if err := hooks.Deleted(ctx, s.Store, t.From.Repo, files); err != nil {
+	if err := hooks.Deleted(ctx, env, t.From.Repo, files); err != nil {
 		return err //nolint:wrapcheck // the format's own error
 	}
 	return nil

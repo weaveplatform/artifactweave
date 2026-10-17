@@ -16,10 +16,14 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -182,12 +186,16 @@ func resolveRepo(ctx context.Context, st store.Store, key string) (repo.Config, 
 	return c, cached, fmt.Errorf("get repository %s: %w", key, err)
 }
 
-// itemError maps the item service's errors onto statuses.
+// itemError maps the item service's errors onto statuses. A format's
+// Rejection answers with its own status and message.
 func (s artifactoryService) itemError(ctx context.Context, op string, err error) error {
 	var api *apierror.Error
+	var refused *format.Rejection
 	switch {
 	case errors.As(err, &api):
 		return api
+	case errors.As(err, &refused):
+		return apierror.New(refused.Status, refused.Message)
 	case errors.Is(err, item.ErrChecksumMismatch):
 		return apierror.New(http.StatusConflict,
 			"Checksum policy rejected the upload: the content does not match the declared checksum")
@@ -217,7 +225,38 @@ func (s artifactoryService) itemError(ctx context.Context, op string, err error)
 func itemNotFound() error { return apierror.New(http.StatusNotFound, "Could not find resource") }
 
 func (s artifactoryService) items(st store.Store) *item.Service {
-	return &item.Service{Store: st, Blobs: s.cfg.Blobs}
+	svc := &item.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats}
+	// A nil queue must not become a non-nil Enqueuer.
+	if s.cfg.Work != nil {
+		svc.Work = s.cfg.Work
+	}
+	return svc
+}
+
+// builds and registry return the services that write items on behalf of
+// builds and Docker promotion, with the same format hooks as items.
+func (s artifactoryService) builds(st store.Store) *build.Service {
+	svc := &build.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats}
+	if s.cfg.Work != nil {
+		svc.Work = s.cfg.Work
+	}
+	return svc
+}
+
+func (s artifactoryService) registry(st store.Store) *registry.Service {
+	svc := &registry.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats}
+	if s.cfg.Work != nil {
+		svc.Work = s.cfg.Work
+	}
+	return svc
+}
+
+// format returns a package type's format.
+func (s artifactoryService) format(t repo.PackageType) format.Handler {
+	if s.cfg.Formats != nil {
+		return s.cfg.Formats(t)
+	}
+	return formats.For(t)
 }
 
 // writeErr renders err in r's surface. An error that is not an
@@ -457,11 +496,16 @@ type found struct {
 	item types.Item
 }
 
+// resolver rewrites a download's path in a repository that holds items,
+// as its format resolves it (item.Service.Resolve).
+type resolver func(ctx context.Context, c repo.Config, cached bool, p string) (string, error)
+
 // lookup finds the item at p for a download from c: a local repository's
 // own tree, a remote repository's cache (nothing is fetched upstream until
 // P9), or the first member of a virtual repository, in order, that the
 // caller may read and that holds it. root reports the repository root, which
-// is not an item.
+// is not an item. A non-nil resolve rewrites p in each repository that
+// holds items before it is looked up there.
 func lookup(
 	ctx context.Context,
 	st store.Store,
@@ -469,6 +513,7 @@ func lookup(
 	cached bool,
 	p string,
 	acc access,
+	resolve resolver,
 	seen map[string]bool,
 ) (found, error) {
 	if seen[c.Key] {
@@ -476,7 +521,14 @@ func lookup(
 	}
 	seen[c.Key] = true
 	if c.Class != repo.Virtual {
-		it, err := st.Items().Get(ctx, c.Key, cached || c.Class == repo.Remote, p)
+		cached = cached || c.Class == repo.Remote
+		if resolve != nil {
+			var err error
+			if p, err = resolve(ctx, c, cached, p); err != nil {
+				return found{}, err
+			}
+		}
+		it, err := st.Items().Get(ctx, c.Key, cached, p)
 		if err != nil {
 			return found{}, err //nolint:wrapcheck // ErrNotFound is the answer
 		}
@@ -493,7 +545,7 @@ func lookup(
 		if !acc.folder(m, p, types.ActionRead) {
 			continue
 		}
-		f, err := lookup(ctx, st, m, false, p, acc, seen)
+		f, err := lookup(ctx, st, m, false, p, acc, resolve, seen)
 		if err == nil || !errors.Is(err, store.ErrNotFound) {
 			return f, err
 		}
@@ -542,12 +594,13 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-	f, err := lookup(ctx, st, c, cached, req.path, acc, map[string]bool{})
+	resolve := s.items(st).Resolve
+	f, err := lookup(ctx, st, c, cached, req.path, acc, resolve, map[string]bool{})
 	if errors.Is(err, store.ErrNotFound) {
 		// "<archive>!/<entry>" names an entry inside an archive file; a path
 		// that exists as an item is served as one first.
 		if archive, entry, ok := strings.Cut(req.path, "!/"); ok {
-			a, err := lookup(ctx, st, c, cached, archive, acc, map[string]bool{})
+			a, err := lookup(ctx, st, c, cached, archive, acc, resolve, map[string]bool{})
 			if err != nil {
 				writeErr(w, r, itemNotFound())
 				return
@@ -559,11 +612,11 @@ func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
 			s.getArchiveEntry(w, r, st, a, entry)
 			return
 		}
-		s.getSidecar(w, r, st, c, cached, req.path, acc)
+		s.getSidecar(w, r, st, c, cached, req.path, acc, resolve)
 		return
 	}
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "lookup item", err))
+		writeErr(w, r, s.itemError(ctx, "lookup item", err))
 		return
 	}
 	if !acc.item(f.repo, f.item.FullPath(), f.item.Folder, types.ActionRead) {
@@ -638,13 +691,14 @@ func (s artifactoryService) getSidecar(
 	cached bool,
 	p string,
 	acc access,
+	resolve resolver,
 ) {
 	artifact, alg, ok := item.Sidecar(p)
 	if !ok {
 		writeErr(w, r, itemNotFound())
 		return
 	}
-	f, err := lookup(r.Context(), st, c, cached, artifact, acc, map[string]bool{})
+	f, err := lookup(r.Context(), st, c, cached, artifact, acc, resolve, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
 	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" ||
 		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {

@@ -266,7 +266,7 @@ func (s *Service) landFolder(
 	set := types.Properties{}
 	set.Set(layout.RepoNameProperty, p.To.Name)
 	set.Set(layout.ManifestProperty, folder)
-	if err := s.Store.Items().PatchProperties(ctx, landed.ID, set, nil); err != nil {
+	if err := items.Annotate(ctx, p.To.Repo, landed, set, nil); err != nil {
 		return fmt.Errorf("registry: properties of %s: %w", landed.FullPath(), err)
 	}
 	return nil

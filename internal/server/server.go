@@ -14,6 +14,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
@@ -26,6 +27,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/mirror"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -85,6 +87,13 @@ type Config struct {
 	// DockerSubdomainMatch turns on the Docker subdomain method
 	// (docker.subdomain_match): <repo>.<BaseURL host>/v2/... addresses repo.
 	DockerSubdomainMatch bool
+	// Work is the runtime's work queue, which formats ask for derived work
+	// (decision 0033). Nil writes that work to the store's queue directly,
+	// where the workers find it on their next poll.
+	Work *work.Queue
+	// Formats returns a package type's format; nil means formats.For. Only
+	// tests set it, to substitute formats that record their hooks.
+	Formats func(repo.PackageType) format.Handler
 }
 
 // newRegistry is the Docker registry for cfg. A nil token service must not

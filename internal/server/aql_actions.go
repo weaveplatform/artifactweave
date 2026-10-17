@@ -46,13 +46,13 @@ func (s artifactoryService) aqlAction(
 			kept = append(kept, h)
 		}
 	}
+	items := s.items(st)
 	switch {
 	case q.Action == aql.UpdateProperties:
-		return kept, updateProperties(ctx, st, q, kept)
+		return kept, updateProperties(ctx, st, items, configs, q, kept)
 	case q.DryRun:
 		return kept, nil
 	}
-	items := s.items(st)
 	for _, h := range kept {
 		t := item.Target{
 			Repo: configs[h.Item.RepoKey], Cached: h.Item.Cached, Path: h.Item.FullPath(),
@@ -79,10 +79,18 @@ func actsOn(c repo.Config, it types.Item) bool {
 }
 
 // updateProperties replaces the values of each of q's keys that a hit has
-// with q's new value, in one transaction unless q is a dry run. Keys a hit
-// lacks are not added. Each hit's properties become the keys it changes, with
-// their new values, which is what its row shows either way.
-func updateProperties(ctx context.Context, st store.Store, q *aql.Query, hits []aql.Hit) error {
+// with q's new value, in one transaction with the formats' Annotated hooks
+// unless q is a dry run. Keys a hit lacks are not added. Each hit's
+// properties become the keys it changes, with their new values, which is
+// what its row shows either way.
+func updateProperties(
+	ctx context.Context,
+	st store.Store,
+	items *item.Service,
+	configs map[string]repo.Config,
+	q *aql.Query,
+	hits []aql.Hit,
+) error {
 	for n, h := range hits {
 		set := types.Properties{}
 		for _, k := range q.Keys {
@@ -97,7 +105,13 @@ func updateProperties(ctx context.Context, st store.Store, q *aql.Query, hits []
 	}
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		for _, h := range hits {
-			if err := st.Items().PatchProperties(ctx, h.Item.ID, h.Properties, nil); err != nil {
+			if err := items.Annotate(
+				ctx,
+				configs[h.Item.RepoKey],
+				h.Item,
+				h.Properties,
+				nil,
+			); err != nil {
 				return fmt.Errorf("properties of %s/%s: %w", h.Item.RepoKey, h.Item.FullPath(), err)
 			}
 		}

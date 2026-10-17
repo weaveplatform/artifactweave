@@ -57,7 +57,7 @@ func (s artifactoryService) DeleteDockerTag(
 	if layout.ReservedTag(tag) {
 		return nil, missing
 	}
-	_, err = (&registry.Service{Store: st, Blobs: s.cfg.Blobs}).DeleteMultiArch(ctx,
+	_, err = s.registry(st).DeleteMultiArch(ctx,
 		registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
@@ -114,7 +114,7 @@ func (s artifactoryService) PromoteDockerImage(
 	if !acc.file(from, args.name+"/", read) || !acc.file(to, args.toName+"/", types.ActionWrite) {
 		return nil, denied(p)
 	}
-	svc := &registry.Service{Store: st, Blobs: s.cfg.Blobs}
+	svc := s.registry(st)
 	promotion := registry.Promotion{
 		From: registry.Owner{Repo: from, Name: args.name, By: p.Name},
 		To:   registry.Owner{Repo: to, Name: args.toName, By: p.Name},
@@ -244,7 +244,7 @@ func (s artifactoryService) FindParentManifestLists(
 	case !acc.file(c, name+"/", types.ActionRead):
 		return nil, denied(p)
 	}
-	parents, err := (&registry.Service{Store: st, Blobs: s.cfg.Blobs}).ParentManifests(ctx,
+	parents, err := s.registry(st).ParentManifests(ctx,
 		registry.Owner{Repo: c, Name: name, By: p.Name}, tag)
 	switch {
 	case errors.Is(err, store.ErrNotFound):

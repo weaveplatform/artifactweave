@@ -2,8 +2,10 @@
 // (content into the blob store, then the item and its blob reference in one
 // transaction), checksum deploy, folders, client checksums and deletion into
 // the trash can (decision 0010). Every write calls the repository format's
-// hooks (internal/format) inside the same transaction; a format indexes what
-// it deploys, and a delete prunes the package index for every format.
+// hooks (internal/format, decision 0032): Inspect once the content is
+// stored, then Admit and the hooks inside the write's transaction. A format
+// indexes what it deploys, and a delete prunes the package index for every
+// format.
 package item
 
 import (
@@ -53,6 +55,13 @@ type Service struct {
 	Blobs blob.Store
 	// Now supplies the time; nil means time.Now.
 	Now func() time.Time
+	// Formats returns a package type's format; nil means formats.For.
+	// Tests substitute formats that record or fail their hooks.
+	Formats func(repo.PackageType) format.Handler
+	// Work takes the derived work formats ask for. Nil writes it to the
+	// store's queue directly, where every node's workers find it on their
+	// next poll; a queue also wakes its own idle workers on commit.
+	Work Enqueuer
 }
 
 func (s *Service) now() time.Time {
@@ -183,6 +192,20 @@ func (s *Service) storeCommitted(
 	return stored, err
 }
 
+// inspected returns the environment of a deploy's hooks, with what the
+// format's Inspect read from the stored content.
+func (s *Service) inspected(
+	ctx context.Context,
+	d Deploy,
+	actual types.Checksums,
+	size int64,
+) (format.Env, error) {
+	return inspect(ctx, s.format(d.Repo.PackageType), s.env(), d.Repo, format.Write{
+		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
+		Properties: d.Properties, Size: size, Checksums: actual,
+	})
+}
+
 // finishCollection completes a garbage collection that is removing sha's
 // content, as the collector would. A deleting row has no references and can
 // gain none, so whoever finishes the removal is safe; doing it here means a
@@ -238,7 +261,8 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 	return stored, err
 }
 
-// storeFile writes the item for stored content in one transaction (putFile).
+// storeFile writes the item for stored content in one transaction
+// (putFile), once the format inspected it.
 func (s *Service) storeFile(
 	ctx context.Context,
 	d Deploy,
@@ -246,10 +270,14 @@ func (s *Service) storeFile(
 	size int64,
 	declared types.Checksums,
 ) (types.Item, error) {
+	env, err := s.inspected(ctx, d, actual, size)
+	if err != nil {
+		return types.Item{}, err
+	}
 	var stored types.Item
-	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		var err error
-		stored, err = s.putFile(ctx, d, actual, size, declared, s.now())
+		stored, err = s.putFile(ctx, env, d, actual, size, declared, s.now())
 		return err
 	})
 	if err != nil {
@@ -259,10 +287,45 @@ func (s *Service) storeFile(
 }
 
 // putFile writes, inside the caller's transaction, the item for stored
-// content: parent folders, the item (replacing a file at the path), the blob
-// reference (and the release of an overwritten file's), the properties and
-// the format hook.
+// content as the format admits it, then runs the format's hooks: Deployed,
+// and Annotated for the properties the deploy set.
 func (s *Service) putFile(
+	ctx context.Context,
+	env format.Env,
+	d Deploy,
+	actual types.Checksums,
+	size int64,
+	declared types.Checksums,
+	now time.Time,
+) (types.Item, error) {
+	h := s.format(d.Repo.PackageType)
+	w, err := admit(ctx, h, env, d.Repo, format.Write{
+		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
+		Properties: d.Properties, Size: size, Checksums: actual,
+	})
+	if err != nil {
+		return types.Item{}, err
+	}
+	d.Path, d.Properties = w.Path, w.Properties
+	stored, err := s.writeFile(ctx, d, actual, size, declared, now)
+	if err != nil {
+		return types.Item{}, err
+	}
+	if err := h.Deployed(ctx, env, d.Repo, stored); err != nil {
+		return types.Item{}, err //nolint:wrapcheck // the format's own error
+	}
+	if err := s.annotated(ctx, h, env, d.Repo, stored,
+		format.Annotation{Set: d.Properties}); err != nil {
+		return types.Item{}, err
+	}
+	return stored, nil
+}
+
+// writeFile writes, inside the caller's transaction, the item for stored
+// content without any hook: parent folders, the item (replacing a file at
+// the path), the blob reference (and the release of an overwritten file's)
+// and the properties.
+func (s *Service) writeFile(
 	ctx context.Context,
 	d Deploy,
 	actual types.Checksums,
@@ -325,9 +388,6 @@ func (s *Service) putFile(
 			return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
 		}
 	}
-	if err := format.For(d.Repo.PackageType).Deployed(ctx, s.Store, d.Repo, stored); err != nil {
-		return types.Item{}, err //nolint:wrapcheck // the format's own error
-	}
 	return stored, nil
 }
 
@@ -351,9 +411,7 @@ func (s *Service) MakeFolder(
 			return fmt.Errorf("item: get %s: %w", full, err)
 		}
 		if len(props) > 0 {
-			if err := s.Store.Items().PatchProperties(ctx, folder.ID, props, nil); err != nil {
-				return fmt.Errorf("item: properties of %s: %w", full, err)
-			}
+			return s.Annotate(ctx, t.Repo, folder, props, nil)
 		}
 		return nil
 	})
@@ -447,9 +505,10 @@ func (a Algorithm) set(c *types.Checksums, v string) {
 	}
 }
 
-// RecordChecksum handles a checksum sidecar upload for the file at t.Path:
-// the client's value is recorded as the file's original checksum, and under
-// the client-checksums policy it must equal the content's (decision 0004).
+// RecordChecksum handles a checksum sidecar upload for the file at t.Path,
+// once the format admits it: the client's value is recorded as the file's
+// original checksum, and under the client-checksums policy it must equal
+// the content's (decision 0004).
 func (s *Service) RecordChecksum(
 	ctx context.Context,
 	t Target,
@@ -465,19 +524,25 @@ func (s *Service) RecordChecksum(
 	value = a.Of(declared)
 	var stored types.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
-		it, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, t.Path)
+		w, err := admit(ctx, s.format(t.Repo.PackageType), s.env(), t.Repo, format.Write{
+			Op: format.OpChecksum, Path: strings.Trim(t.Path, "/"), Cached: t.Cached,
+		})
 		if err != nil {
-			return fmt.Errorf("item: get %s: %w", t.Path, err)
+			return err
+		}
+		it, err := s.Store.Items().Get(ctx, t.Repo.Key, t.Cached, w.Path)
+		if err != nil {
+			return fmt.Errorf("item: get %s: %w", w.Path, err)
 		}
 		if it.Folder {
-			return fmt.Errorf("%w: %s is a folder", ErrConflict, t.Path)
+			return fmt.Errorf("%w: %s is a folder", ErrConflict, w.Path)
 		}
 		if value != a.Of(it.Actual) && clientPolicy(t.Repo) {
 			return ErrChecksumMismatch
 		}
 		a.set(&it.Original, value)
 		if stored, err = s.Store.Items().Put(ctx, it); err != nil {
-			return fmt.Errorf("item: put %s: %w", t.Path, err)
+			return fmt.Errorf("item: put %s: %w", w.Path, err)
 		}
 		return nil
 	})
@@ -540,11 +605,11 @@ func (s *Service) remove(
 		if err != nil {
 			return err
 		}
-		hooks := format.For(t.Repo.PackageType)
+		hooks, env := s.format(t.Repo.PackageType), s.env()
 		var versions []types.PackageVersion
 		for _, it := range removed {
 			if !it.Folder {
-				if err := hooks.Deleting(ctx, s.Store, t.Repo, it); err != nil {
+				if err := hooks.Deleting(ctx, env, t.Repo, it); err != nil {
 					return err //nolint:wrapcheck // the format's own error
 				}
 				pv, ok, err := pkgindex.VersionOf(ctx, s.Store, it.ID)
@@ -576,7 +641,7 @@ func (s *Service) remove(
 		if err := pkgindex.Prune(ctx, s.Store, versions); err != nil {
 			return err //nolint:wrapcheck // pkgindex wraps its own
 		}
-		if err := hooks.Deleted(ctx, s.Store, t.Repo, removed); err != nil {
+		if err := hooks.Deleted(ctx, env, t.Repo, removed); err != nil {
 			return err //nolint:wrapcheck // the format's own error
 		}
 		if trash {

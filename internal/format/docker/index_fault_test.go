@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -245,16 +246,21 @@ func TestIndexFailures(t *testing.T) {
 	h := layout.Handler{}
 	deployed := func(pick func(x *indexed) types.Item) func(*indexed, store.Store) error {
 		return func(x *indexed, st store.Store) error {
-			return h.Deployed(context.Background(), st, x.c, pick(x))
+			return h.Deployed(context.Background(), format.Env{Store: st}, x.c, pick(x))
 		}
 	}
 	manifest := deployed(func(x *indexed) types.Item { return x.manifest })
 	fresh := deployed(func(x *indexed) types.Item { return x.freshManifest })
 	deleted := func(x *indexed, st store.Store) error {
-		return h.Deleted(context.Background(), st, x.c, []types.Item{x.manifest, x.byDigest})
+		return h.Deleted(
+			context.Background(),
+			format.Env{Store: st},
+			x.c,
+			[]types.Item{x.manifest, x.byDigest},
+		)
 	}
 	reindex := func(x *indexed, st store.Store) error {
-		return layout.Reindex(context.Background(), st, x.c)
+		return h.Reindex(context.Background(), format.Env{Store: st}, x.c)
 	}
 	noManifest := func(t *testing.T, x *indexed) { x.removeQuietly(t, "app/v1/manifest.json") }
 	noManifests := func(t *testing.T, x *indexed) {

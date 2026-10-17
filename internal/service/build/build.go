@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -54,6 +55,10 @@ type Service struct {
 	// Page bounds the store pages a listing reads; zero means
 	// store.MaxLimit.
 	Page int
+	// Formats and Work reach the item service's format hooks (decision
+	// 0032); nil means formats.For and the store's queue.
+	Formats func(repo.PackageType) format.Handler
+	Work    item.Enqueuer
 }
 
 func (s *Service) now() time.Time {
@@ -64,7 +69,9 @@ func (s *Service) now() time.Time {
 }
 
 func (s *Service) items() *item.Service {
-	return &item.Service{Store: s.Store, Blobs: s.Blobs, Now: s.Now}
+	return &item.Service{
+		Store: s.Store, Blobs: s.Blobs, Now: s.Now, Formats: s.Formats, Work: s.Work,
+	}
 }
 
 // ProjectKey is the store's key for a project parameter: "" for the default
