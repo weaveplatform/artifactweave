@@ -53,6 +53,10 @@ func ComparatorFor(t repo.PackageType) VersionComparator {
 		return StringComparator(CompareNuGet)
 	case repo.Docker, repo.OCI, repo.HelmOCI:
 		return CreatedOrder{}
+	case repo.Maven, repo.Gradle, repo.Ivy, repo.SBT:
+		// Artifactory's metadata, [RELEASE] and versions searches order
+		// these by Mercury (decision 0036), so the index does too.
+		return StringComparator(CompareMercury)
 	default:
 		return StringComparator(CompareMaven)
 	}
