@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -192,74 +193,41 @@ func syncTag(
 	if err != nil {
 		return err
 	}
-	at := PushTime(m)
-	pv, err := st.Packages().Version(ctx, p.ID, folder)
-	switch {
-	case errors.Is(err, store.ErrNotFound):
-		pv, err = st.Packages().PutVersion(ctx, types.PackageVersion{
-			PackageID: p.ID, Version: folder, Created: at,
-		})
-	case err == nil && !pv.Created.Equal(at):
-		pv.Created = at
-		pv, err = st.Packages().PutVersion(ctx, pv)
-	}
+	files, err := folderFiles(ctx, st, c.Key, cached, dir)
 	if err != nil {
-		return fmt.Errorf("docker: version %s of %s: %w", folder, name, err)
+		return err
 	}
-	return linkFolder(ctx, st, pv, c.Key, cached, dir)
+	_, err = pkgindex.Sync(ctx, st, p, pkgindex.IndexedVersion{
+		Version: folder, Created: PushTime(m), Files: files,
+	})
+	return err //nolint:wrapcheck // pkgindex wraps its own
 }
 
-// linkFolder makes the version's files exactly the files in dir. Every
-// write keeps the links exact, since an item's deletion drops its links;
-// a link to anything else is damage a reindex repairs by recreating the
-// version with its dates, statistics and metadata, as the store cannot
-// unlink one file.
-func linkFolder(
+// folderFiles lists the IDs of the files directly in dir: the files of the
+// tag folder's version.
+func folderFiles(
 	ctx context.Context,
 	st store.Store,
-	pv types.PackageVersion,
 	repoKey string,
 	cached bool,
 	dir string,
-) error {
-	var want []types.Item
+) ([]int64, error) {
+	var ids []int64
 	for page := (store.Page{Limit: pageSize}); ; {
 		children, next, err := st.Items().Children(ctx, repoKey, cached, dir, page)
 		if err != nil {
-			return fmt.Errorf("docker: list %s: %w", dir, err)
+			return nil, fmt.Errorf("docker: list %s: %w", dir, err)
 		}
 		for _, f := range children {
 			if !f.Folder {
-				want = append(want, f)
+				ids = append(ids, f.ID)
 			}
 		}
 		if next == "" {
-			break
+			return ids, nil
 		}
 		page.After = next
 	}
-	linked, err := st.Packages().Files(ctx, pv.ID)
-	if err != nil {
-		return fmt.Errorf("docker: files of %s: %w", dir, err)
-	}
-	in := map[int64]bool{}
-	for _, f := range want {
-		in[f.ID] = true
-	}
-	if slices.ContainsFunc(linked, func(id int64) bool { return !in[id] }) {
-		if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
-			return fmt.Errorf("docker: relink %s: %w", dir, err)
-		}
-		if pv, err = st.Packages().PutVersion(ctx, pv); err != nil {
-			return fmt.Errorf("docker: relink %s: %w", dir, err)
-		}
-	}
-	for _, f := range want {
-		if err := link(ctx, st, pv, f); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // dropTag removes the version of a folder that no longer holds a manifest,
@@ -339,11 +307,11 @@ func (a affected) sync(ctx context.Context, st store.Store, c repo.Config) error
 
 // reindex brings the package index of the local image repository c back in
 // line with its item tree, which stays the source of truth (decision 0018):
-// packages and versions the tree no longer backs go, every image holding a
-// manifest is a package and every tag folder a version with exactly its
-// folder's files. Records the tree still backs keep their dates and
-// download statistics, so after the hooks' own maintenance nothing
-// changes; an image indexed afresh is dated by its earliest manifest.
+// every image holding a manifest is a package, dated by its earliest
+// manifest when indexed afresh, and every tag folder holding one a version
+// with exactly its folder's files; pkgindex.Reconcile drops the rest and
+// keeps what the tree still backs, so after the hooks' own maintenance
+// nothing changes.
 func reindex(ctx context.Context, st store.Store, c repo.Config) error {
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
@@ -361,10 +329,11 @@ func reindex(ctx context.Context, st store.Store, c repo.Config) error {
 		for _, h := range hits {
 			a.add(h.Item)
 		}
-		if err := a.dropUnbacked(ctx, st, c.Key); err != nil {
+		want, err := a.indexed(ctx, st, c)
+		if err != nil {
 			return err
 		}
-		return a.sync(ctx, st, c)
+		return pkgindex.Reconcile(ctx, st, c, want) //nolint:wrapcheck // pkgindex wraps its own
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours
@@ -372,44 +341,44 @@ func reindex(ctx context.Context, st store.Store, c repo.Config) error {
 	return nil
 }
 
-// dropUnbacked removes the repository's packages that are no image of a,
-// and the versions that are no tag of a.
-func (a affected) dropUnbacked(ctx context.Context, st store.Store, repoKey string) error {
-	for page := (store.Page{Limit: pageSize}); ; {
-		pkgs, next, err := st.Packages().List(ctx, repoKey, page)
+// indexed reads the index a's images and tags make: each image dated by its
+// earliest manifest, each tag folder a version dated by its manifest's push.
+func (a affected) indexed(
+	ctx context.Context,
+	st store.Store,
+	c repo.Config,
+) ([]pkgindex.Indexed, error) {
+	byImage := map[string]*pkgindex.Indexed{}
+	for _, name := range slices.Sorted(maps.Keys(a.images)) {
+		first, _, err := firstManifest(ctx, st.Items(), c.Key, name)
 		if err != nil {
-			return fmt.Errorf("docker: packages of %s: %w", repoKey, err)
+			return nil, err
 		}
-		for _, p := range pkgs {
-			if err := a.dropPackage(ctx, st, p); err != nil {
-				return err
-			}
-		}
-		if next == "" {
-			return nil
-		}
-		page.After = next
+		byImage[name] = &pkgindex.Indexed{Name: name, Created: first.Created}
 	}
-}
-
-func (a affected) dropPackage(ctx context.Context, st store.Store, p types.Package) error {
-	if !a.images[p.Name] {
-		if err := st.Packages().Delete(ctx, p.ID); err != nil {
-			return fmt.Errorf("docker: drop package %s: %w", p.Name, err)
+	for _, k := range slices.Sorted(maps.Keys(a.tags)) {
+		name, folder := a.tags[k][0], a.tags[k][1]
+		dir := name + "/" + folder
+		m, ok, err := FolderManifest(ctx, st.Items(), c.Key, a.cached, dir)
+		if err != nil {
+			return nil, err
 		}
-		return nil
-	}
-	vs, err := st.Packages().Versions(ctx, p.ID)
-	if err != nil {
-		return fmt.Errorf("docker: versions of %s: %w", p.Name, err)
-	}
-	for _, v := range vs {
-		if _, ok := a.tags[p.Name+"/"+v.Version]; ok {
+		if !ok {
+			// The search found a manifest here; one gone since is no tag.
 			continue
 		}
-		if err := st.Packages().DeleteVersion(ctx, v.ID); err != nil {
-			return fmt.Errorf("docker: drop version %s of %s: %w", v.Version, p.Name, err)
+		files, err := folderFiles(ctx, st, c.Key, a.cached, dir)
+		if err != nil {
+			return nil, err
 		}
+		p := byImage[name]
+		p.Versions = append(p.Versions, pkgindex.IndexedVersion{
+			Version: folder, Created: PushTime(m), Files: files,
+		})
 	}
-	return nil
+	out := make([]pkgindex.Indexed, 0, len(byImage))
+	for _, name := range slices.Sorted(maps.Keys(byImage)) {
+		out = append(out, *byImage[name])
+	}
+	return out, nil
 }

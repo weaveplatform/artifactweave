@@ -19,6 +19,7 @@ exclude:
     # the t.Fatal paths taken only when a backend violates the contract.
     - ^pkg/blob/blobtest/
     - ^pkg/store/storetest/
+    - ^internal/format/formattest/
     # Test harness that starts PostgreSQL for the contract runs; its branches
     # are container start-up failures.
     - ^internal/sqlstore/sqltest/
