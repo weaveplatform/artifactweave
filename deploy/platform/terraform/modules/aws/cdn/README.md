@@ -88,7 +88,7 @@ policy waits for this module's statement; then pass the statement back to the st
 
 ```hcl
 module "cdn" {
-  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/cdn?ref=v0.0.0" # x-release-please-version
+  source = "git::https://github.com/weaveplatform/artifactweave.git//deploy/platform/terraform/modules/aws/cdn?ref=v0.1.0" # x-release-please-version
 
   name          = "artifactweave-example"
   origin_bucket = { bucket = module.storage.bucket, arn = module.storage.arn, region = module.storage.region }
