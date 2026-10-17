@@ -1,4 +1,4 @@
-# 11: Prior art
+# 11: Reference materials
 
 Checked against: Artifactory 7.161.32
 

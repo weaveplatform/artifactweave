@@ -31,7 +31,7 @@ the design rests on.
 
 | Path | What |
 |---|---|
-| [docs/research/](docs/research/README.md) | Endpoint inventories, package protocols, Terraform and CLI compatibility, scope tiers, prior art, open questions |
+| [docs/research/](docs/research/README.md) | Endpoint inventories, package protocols, Terraform and CLI compatibility, scope tiers, reference materials, open questions |
 | [docs/research/decisions/](docs/research/decisions/README.md) | Decision records |
 | [docs/implementation/](docs/implementation/plan.md) | Phases, milestones, definition of done, repository layout |
 | [docs/operations/](docs/operations/configuration-reference.md) | Configuration, reverse proxy, backup and restore |
