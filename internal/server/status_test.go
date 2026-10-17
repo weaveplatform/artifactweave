@@ -69,6 +69,7 @@ func statusTable() []statusCase {
 		registryManifestStatusRows(),
 		registryReferrersStatusRows(),
 		registryListingStatusRows(),
+		partStatusRows(),
 	)
 }
 
@@ -140,7 +141,7 @@ func newStatusFixture(
 		}
 	}
 	shared := true
-	for _, c := range []repo.Config{
+	for _, c := range append([]repo.Config{
 		{Key: "libs-local", Class: repo.Local},
 		{Key: "remote-shared", Class: repo.Remote, URL: "https://up.example", ShareConfiguration: &shared},
 		{Key: "remote-private", Class: repo.Remote, URL: "https://up.example"},
@@ -148,7 +149,7 @@ func newStatusFixture(
 		{Key: "del-one", Class: repo.Local},
 		{Key: "del-batch", Class: repo.Local},
 		{Key: "upd-batch", Class: repo.Local},
-	} {
+	}, formatRepos()...) {
 		if err := db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
 			t.Fatal(err)
 		}
@@ -187,6 +188,11 @@ func newStatusFixture(
 	seedRegistryStatus(t, db, blobs, secrets)
 	seedRegistryManifests(t, db, blobs)
 	seedRegistryDeletes(t, db, blobs)
+	for _, p := range statusParts {
+		if p.seed != nil {
+			p.seed(t, db, blobs)
+		}
+	}
 	a, err := auth.NewAuthenticator(db.Users(), db.Settings(), auth.Options{
 		Hash: testHash, Tokens: tokens,
 	})
@@ -197,6 +203,11 @@ func newStatusFixture(
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
 		Tokens:    tokens,
 		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+	}
+	for _, p := range statusParts {
+		if p.tune != nil {
+			p.tune(&cfg)
+		}
 	}
 	for _, f := range tune {
 		f(&cfg)
@@ -470,17 +481,22 @@ func TestStatusTable(t *testing.T) {
 	}
 }
 
-// implementedHandwritten lists the hand-written routes with real handlers;
-// the guard below holds them to the same rule as the generated ones.
-var implementedHandwritten = map[string]bool{
-	"POST /artifactory/api/security/token":                   true,
-	"POST /artifactory/api/security/token/revoke":            true,
-	"PATCH /artifactory/api/system/configuration":            true,
+// implementedHandwritten lists the hand-written routes with real handlers,
+// one map per feature, and each format's (statusParts); the guards below
+// hold them to the same rule as the generated ones.
+var implementedHandwritten = routeUnion(
+	append([]map[string]bool{
+		contentRoutes, searchRoutes, uploadRoutes, legacyTokenRoutes, descriptorRoutes,
+		registryRoutes,
+	}, partRoutes(func(p statusPart) map[string]bool { return p.handwritten })...)...,
+)
+
+// contentRoutes are the item, storage, transfer and archive routes.
+var contentRoutes = map[string]bool{
 	"PUT /artifactory/{repoKey}/{filePath}":                  true,
 	"GET /artifactory/{repoKey}/{filePath}":                  true,
 	"HEAD /artifactory/{repoKey}/{filePath}":                 true,
 	"DELETE /artifactory/{repoKey}/{filePath}":               true,
-	"POST /artifactory/api/search/aql":                       true,
 	"GET /artifactory/api/storage/{repoKey}/{itemPath}":      true,
 	"PUT /artifactory/api/storage/{repoKey}/{itemPath}":      true,
 	"DELETE /artifactory/api/storage/{repoKey}/{itemPath}":   true,
@@ -489,39 +505,44 @@ var implementedHandwritten = map[string]bool{
 	"POST /artifactory/api/move/{srcRepoKey}/{srcFilePath}":  true,
 	"GET /artifactory/api/archive/download/{repoKey}/{path}": true,
 	"GET /artifactory/{repoKey}/{archivePath}!/{entryPath}":  true,
-	"POST " + uploadsCreate:                                  true,
-	"POST " + uploadsURLPart:                                 true,
-	"PUT " + uploadsPart:                                     true,
-	"POST " + uploadsComplete:                                true,
-	"POST " + uploadsStatus:                                  true,
-	"POST " + uploadsAbort:                                   true,
 	"POST /artifactory/api/zap/{repoPath}":                   true,
 	"GET /artifactory/api/storage/auto-trashcan":             true,
-	"GET /artifactory/api/versions/{repo}/{path}":            true,
-	registryProbe: true,
-	prefixProbe:   true,
-	headBlob:      true,
-	getBlob:       true,
-	deleteBlob:    true,
-	startUpload:   true,
-	appendUpload:  true,
-	finishUpload:  true,
-	uploadStatus:  true,
-	cancelUpload:  true,
-	headManifest:  true,
-	getManifest:   true,
-	putManifest:   true,
-	registryToken: true,
-	prefixToken:   true,
-	registryAuth:  true,
-	legacyAuth:    true,
-	getReferrers:  true,
-	tagsRoute:     true,
-	catalogRoute:  true,
-	repoCatalog:   true,
-	delManifest:   true,
-	jfrogCatalog:  true,
-	jfrogTags:     true,
+}
+
+// searchRoutes are the hand-written searches.
+var searchRoutes = map[string]bool{
+	"POST /artifactory/api/search/aql":            true,
+	"GET /artifactory/api/versions/{repo}/{path}": true,
+}
+
+// uploadRoutes are the JFrog CLI's multipart upload routes.
+var uploadRoutes = map[string]bool{
+	"POST " + uploadsCreate:   true,
+	"POST " + uploadsURLPart:  true,
+	"PUT " + uploadsPart:      true,
+	"POST " + uploadsComplete: true,
+	"POST " + uploadsStatus:   true,
+	"POST " + uploadsAbort:    true,
+}
+
+// legacyTokenRoutes are the Artifactory token API's hand-written routes.
+var legacyTokenRoutes = map[string]bool{
+	"POST /artifactory/api/security/token":        true,
+	"POST /artifactory/api/security/token/revoke": true,
+}
+
+// descriptorRoutes is the YAML configuration patch.
+var descriptorRoutes = map[string]bool{"PATCH /artifactory/api/system/configuration": true}
+
+// routeUnion is every route in maps.
+func routeUnion(maps ...map[string]bool) map[string]bool {
+	out := map[string]bool{}
+	for _, m := range maps {
+		for route := range m {
+			out[route] = true
+		}
+	}
+	return out
 }
 
 func descriptorStatusRows() []statusCase {

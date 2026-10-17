@@ -24,6 +24,7 @@ import (
 	gridgen "github.com/weaveplatform/artifactweave/internal/server/gen/grid"
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
@@ -94,7 +95,15 @@ type Config struct {
 	// Formats returns a package type's format; nil means formats.For. Only
 	// tests set it, to substitute formats that record their hooks.
 	Formats func(repo.PackageType) format.Handler
+	// Protocols are mounted through the router kit after the built-in ones
+	// (protocols). Only tests set it, to mount a test-only protocol.
+	Protocols []pkgroute.Protocol
 }
+
+// protocols are the package protocols with routers of their own, mounted
+// through the router kit (decision 0032). A format with a protocol adds its
+// constructor here.
+var protocols = []func() pkgroute.Protocol{}
 
 // newRegistry is the Docker registry for cfg. A nil token service must not
 // become a non-nil interface, which would leave the token endpoint
@@ -185,6 +194,12 @@ func New(cfg Config) http.Handler {
 	artSvc.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
 	registry.Register(r)
+	for _, p := range protocols {
+		pkgroute.Mount(r, artSvc.protocolOptions(), p())
+	}
+	for _, p := range cfg.Protocols {
+		pkgroute.Mount(r, artSvc.protocolOptions(), p)
+	}
 
 	// Products artifactweave does not implement. 501 names the product;
 	// Mission Control is a plain 404 because clients treat an absent service

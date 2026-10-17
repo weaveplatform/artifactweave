@@ -49,6 +49,8 @@ internal/
     gen/                       # generated strict servers, one package per spec
     apierror/ baseurl/         # error envelopes and the base-URL resolver
     docker/                    # the registry protocol: /v2 routing, blobs and uploads
+    pkgroute/                  # the router kit npm, Go and later protocols mount through
+                               # (decision 0032)
   sqlstore/
     sqlcommon/                 # Dialect, unit of work, migrator
     sqlite/ postgres/          # dialect packages + migrations/<dialect>/*.sql

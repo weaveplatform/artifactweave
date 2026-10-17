@@ -21,6 +21,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/build"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
@@ -67,93 +68,21 @@ func parseItemPath(r *http.Request) (itemRequest, error) {
 // parseEscapedItemPath parses an escaped "{repoKey}/{path}", as found after
 // a route's prefix.
 func parseEscapedItemPath(escaped string) (itemRequest, error) {
-	req := itemRequest{
-		folder: strings.HasSuffix(escaped, "/"), props: types.Properties{},
-		mandatory: map[string]bool{},
+	parsed, err := pkgroute.ParsePath(escaped)
+	if err != nil {
+		return itemRequest{}, err //nolint:wrapcheck // already a 400 for the client
 	}
-	var names []string
-	segments := strings.Split(strings.Trim(escaped, "/"), "/")
-	for i, seg := range segments {
-		name, params, _ := strings.Cut(seg, ";")
-		n, err := url.PathUnescape(name)
-		if err != nil {
-			return req, badRequest("malformed path: %v", err)
-		}
-		switch {
-		case i == 0:
-			req.key = n
-		case n == "" && i == len(segments)-1 && params != "":
-			// "a/b/;k=v": matrix parameters after a folder's slash.
-			req.folder = true
-		default:
-			names = append(names, n)
-		}
-		if params == "" {
-			continue
-		}
-		if err := req.addMatrix(params); err != nil {
-			return req, err
-		}
+	req := itemRequest{folder: parsed.Folder, props: parsed.Props, mandatory: parsed.Mandatory}
+	if len(parsed.Segments) > 0 {
+		req.key = parsed.Segments[0]
+		req.path = strings.Join(parsed.Segments[1:], "/")
 	}
-	req.path = strings.Join(names, "/")
 	if req.path != "" {
 		if _, _, _, err := types.SplitItemPath(req.path); err != nil {
 			return req, badRequest("malformed path %q", req.path)
 		}
 	}
 	return req, nil
-}
-
-// addMatrix parses "k=v1,v2;k2+=v3". Commas separate values unless escaped
-// with a backslash, as in the properties API. A value is form-decoded, so "+"
-// is a space: the JFrog CLI escapes values with url.QueryEscape, and
-// Artifactory decodes them with URLDecoder (research 17). Keys keep "+",
-// whose trailing use marks a mandatory property.
-func (req *itemRequest) addMatrix(params string) error {
-	for _, p := range strings.Split(params, ";") {
-		if p == "" {
-			continue
-		}
-		k, v, _ := strings.Cut(p, "=")
-		k, err := url.PathUnescape(k)
-		if err != nil {
-			return badRequest("malformed matrix parameter %q", p)
-		}
-		mandatory := false
-		if base, ok := strings.CutSuffix(k, "+"); ok {
-			k, mandatory = base, true
-		}
-		if err := types.ValidatePropertyKey(k); err != nil {
-			return badRequest("invalid property key %q", k)
-		}
-		v, err = url.QueryUnescape(v)
-		if err != nil {
-			return badRequest("malformed matrix parameter %q", p)
-		}
-		req.props[k] = append(req.props[k], splitValues(v)...)
-		if mandatory {
-			req.mandatory[k] = true
-		}
-	}
-	return nil
-}
-
-func splitValues(v string) []string {
-	var out []string
-	var cur strings.Builder
-	for i := 0; i < len(v); i++ {
-		switch {
-		case v[i] == '\\' && i+1 < len(v):
-			i++
-			cur.WriteByte(v[i])
-		case v[i] == ',':
-			out = append(out, cur.String())
-			cur.Reset()
-		default:
-			cur.WriteByte(v[i])
-		}
-	}
-	return append(out, cur.String())
 }
 
 // itemCaller returns the caller and its permissions for an item request.
@@ -380,26 +309,10 @@ func (artifactoryService) deployRequest(
 	req itemRequest,
 	p auth.Principal,
 ) item.Deploy {
-	declared := types.Checksums{
-		SHA1: r.Header.Get("X-Checksum-Sha1"), SHA256: r.Header.Get("X-Checksum-Sha256"),
-		MD5: r.Header.Get("X-Checksum-Md5"),
-	}
-	// X-Checksum names its algorithm by length; the JFrog CLI sends sha256
-	// in it.
-	if v := strings.TrimSpace(r.Header.Get("X-Checksum")); v != "" {
-		switch len(v) {
-		case 64:
-			declared.SHA256 = v
-		case 40:
-			declared.SHA1 = v
-		default:
-			declared.MD5 = v
-		}
-	}
 	return item.Deploy{
 		Target:     t,
 		Body:       r.Body,
-		Declared:   declared,
+		Declared:   pkgroute.DeclaredChecksums(r.Header),
 		Properties: req.props,
 		By:         p.Name,
 	}
@@ -726,9 +639,7 @@ func (s artifactoryService) serveFile(
 	ctx := r.Context()
 	it := f.item
 	h := w.Header()
-	h.Set("X-Checksum-Sha1", it.Actual.SHA1)
-	h.Set("X-Checksum-Sha256", it.Actual.SHA256)
-	h.Set("X-Checksum-Md5", it.Actual.MD5)
+	pkgroute.SetChecksums(h, it.Actual)
 	h.Set("X-Artifactory-Filename", it.Name)
 	h.Set("Content-Type", it.MimeType)
 	h.Set("Content-Disposition", blob.Disposition(it.Name))
