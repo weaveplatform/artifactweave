@@ -50,6 +50,8 @@ internal/
     apierror/ baseurl/         # error envelopes and the base-URL resolver
     docker/                    # the registry protocol: /v2 routing, blobs and uploads
     golang/                    # the GOPROXY protocol under /artifactory/api/go (decision 0035)
+    npm/                       # the npm registry: packuments, version manifests, tarballs
+                               # (decision 0034)
     pkgroute/                  # the router kit npm, Go and later protocols mount through
                                # (decision 0032)
   sqlstore/

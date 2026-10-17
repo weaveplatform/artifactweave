@@ -1,11 +1,40 @@
 package server
 
+import (
+	"testing"
+
+	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
 // npmMatrixPart is npm's share of the route × principal matrix, which
-// its pull requests (#286–#294) fill in.
+// its pull requests (#286–#294) fill in. Package work lies under the
+// writer's grants and lib outside them, so a packument is held to the
+// same grants as its tarball.
 var npmMatrixPart = matrixPart{
 	rows: func() []matrixRow {
+		local := npmBase + "npm-local/"
+		reads := func(name string) rule {
+			return holds("npm-local", npmfmt.CanonicalPath(name, "1.0.0"), types.ActionRead)
+		}
 		return []matrixRow{
-			row(npmReindex, "/artifactory/api/npm/npm-local/reindex", "", administrators, 200),
+			row(npmReindex, local+"reindex", "", administrators, 200),
+			row(npmPackument, local+"work", "", reads("work"), 200),
+			row(npmPackument, local+"lib", "", reads("lib"), 200),
+			row(npmManifest, local+"work/1.0.0", "", reads("work"), 200),
+			row(npmManifest, local+"lib/latest", "", reads("lib"), 200),
+			row(npmTarball, local+"work/-/work-1.0.0.tgz", "", reads("work"), 200),
+			row(npmTarball, local+"lib/-/lib-1.0.0.tgz", "", reads("lib"), 200),
+			row(npmTarballHead, local+"lib/-/lib-1.0.0.tgz", "", reads("lib"), 200),
+			row(npmPing, local+"-/ping", "", anyone, 200),
+			row(npmWhoami, local+"-/whoami", "", signedIn, 200),
+		}
+	},
+	seed: func(t *testing.T, f *matrixFixture) {
+		t.Helper()
+		for _, name := range []string{"work", "lib"} {
+			f.deploy(t, "npm-local", npmfmt.CanonicalPath(name, "1.0.0"),
+				npmTarballOf(name, "1.0.0"))
 		}
 	},
 }

@@ -307,6 +307,29 @@ func (k *Kit) Require(
 	return false
 }
 
+// RequireFolder is Require for a folder, which a caller may read when it
+// may read a path below it. A protocol that answers for a whole package,
+// such as npm's packument, asks it of the package's folder before saying
+// whether the package exists, so a refusal says nothing about what is
+// there.
+func (k *Kit) RequireFolder(
+	w http.ResponseWriter,
+	r *http.Request,
+	path string,
+	want types.Actions,
+) bool {
+	if p, ok := auth.FromContext(r.Context()); ok && p.Access() != nil {
+		c := RequestFrom(r).Repo
+		if p.Access().AllowsFolder(types.ResourceArtifact, authz.Repo{
+			Key: c.Key, Class: string(c.Class),
+		}, path, want) {
+			return true
+		}
+	}
+	k.Error(w, r, refusal(r))
+	return false
+}
+
 func refusal(r *http.Request) error {
 	if p, ok := auth.FromContext(r.Context()); ok && !p.Anonymous {
 		return auth.ErrForbidden
@@ -315,7 +338,8 @@ func refusal(r *http.Request) error {
 }
 
 // DB is the store the kit resolves repositories in, for a handler that
-// reads the package index (decision 0018) or lists a folder.
+// reads the package index (decision 0018) or lists a folder: Go's version
+// lists and npm's packuments are built from the index.
 func (k *Kit) DB() store.Store { return k.o.Store }
 
 // Item returns the item at path in the request's repository, through its
