@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf16"
 )
 
 // ErrInvalidItemPath reports a repository path that cannot name an item.
@@ -130,6 +131,35 @@ func ValidatePropertyKey(key string) error {
 }
 
 func isSpaceOrControl(r rune) bool { return r <= ' ' || r == 0x7f }
+
+// PropertyValueMax and BuildPropertyValueMax are the longest property values
+// the stores keep, in UTF-16 code units, which is how Artifactory 6.20's Java
+// counts them (PROP_VALUE_MAX_SIZE in PropertiesDao, and in BuildsDao and
+// BuildModulesDao). Artifactory cuts a longer value on write rather than
+// refusing it, and so do the stores.
+const (
+	PropertyValueMax      = 4000
+	BuildPropertyValueMax = 2048
+)
+
+// TruncatePropertyValue cuts v to at most limit UTF-16 code units. Java's
+// substring, which Artifactory uses, can split a surrogate pair; here a
+// character that would straddle the limit is dropped whole, so the result
+// stays valid UTF-8.
+func TruncatePropertyValue(v string, limit int) string {
+	// A UTF-8 string has at least as many bytes as UTF-16 code units.
+	if len(v) <= limit {
+		return v
+	}
+	units := 0
+	for i, r := range v {
+		units += utf16.RuneLen(r)
+		if units > limit {
+			return v[:i]
+		}
+	}
+	return v
+}
 
 // Set replaces the values of key.
 func (p Properties) Set(key string, values ...string) {

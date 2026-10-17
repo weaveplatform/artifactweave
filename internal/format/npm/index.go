@@ -7,7 +7,6 @@ import (
 	"maps"
 	"slices"
 	"time"
-	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
@@ -57,7 +56,9 @@ func setProperties(
 	want := types.Properties{PropName: {t.Name}, PropVersion: {t.Version}}
 	var remove []string
 	if t.Description != "" {
-		want[PropDescription] = []string{truncate(t.Description, maxPropertyValue)}
+		want[PropDescription] = []string{
+			types.TruncatePropertyValue(t.Description, types.PropertyValueMax),
+		}
 	} else if _, ok := props[PropDescription]; ok {
 		remove = append(remove, PropDescription)
 	}
@@ -85,29 +86,16 @@ func setProperties(
 	return props, nil
 }
 
-// maxPropertyValue bounds the property values the format takes from
-// package.json. PostgreSQL indexes every property value and refuses an
-// index row past 2704 bytes, so a long description would otherwise fail
-// the deploy; the whole of package.json stays in the version's Metadata.
-const maxPropertyValue = 2048
-
-// truncate cuts s to at most n bytes, at a character boundary.
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	for n > 0 && !utf8.RuneStart(s[n]) {
-		n--
-	}
-	return s[:n]
-}
-
 // keywordsValue is npm.keywords for keywords: a JSON array, of as many of
-// them as fit in maxPropertyValue, or "" for none.
+// them as fit in a property value, or "" for none. The store would cut a
+// longer value (types.PropertyValueMax) to text that is no longer JSON;
+// the description it may cut, and setProperties cuts it the same way, so
+// that it compares what the store holds. Metadata keeps both whole.
 func keywordsValue(keywords []string) string {
 	for n := len(keywords); n > 0; n-- {
-		if v := jsonText(keywords[:n]); len(v) <= maxPropertyValue {
-			return string(v)
+		v := string(jsonText(keywords[:n]))
+		if types.TruncatePropertyValue(v, types.PropertyValueMax) == v {
+			return v
 		}
 	}
 	return ""

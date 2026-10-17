@@ -465,7 +465,8 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 	return out, err
 }
 
-// setKeys replaces the values of every key in props.
+// setKeys replaces the values of every key in props, each cut to
+// types.PropertyValueMax; values that become equal are stored once.
 func (i items) setKeys(ctx context.Context, id int64, props types.Properties) error {
 	for k, values := range props {
 		if _, err := i.s.exec(ctx, "set property "+k,
@@ -476,14 +477,10 @@ func (i items) setKeys(ctx context.Context, id int64, props types.Properties) er
 			if _, err := i.s.exec(
 				ctx,
 				"set property "+k,
-				InsertIgnore(
-					"item_properties",
-					[]string{"item_id", "key", "value"},
-					[]string{"item_id", "key", "value"},
-				),
+				InsertIgnore("item_properties", []string{"item_id", "key", "value"}, nil),
 				id,
 				k,
-				v,
+				types.TruncatePropertyValue(v, types.PropertyValueMax),
 			); err != nil {
 				return err
 			}

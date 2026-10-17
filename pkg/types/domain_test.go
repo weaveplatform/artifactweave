@@ -92,6 +92,34 @@ func TestProperties(t *testing.T) {
 	}
 }
 
+func TestTruncatePropertyValue(t *testing.T) {
+	// "é" is two UTF-8 bytes and one UTF-16 code unit; "😀" is four bytes
+	// and a surrogate pair.
+	cases := []struct {
+		name, in, want string
+		limit          int
+	}{
+		{"short", "abc", "abc", 3},
+		{"bytes over, units within", strings.Repeat("é", 3), strings.Repeat("é", 3), 3},
+		{"cut by code units", strings.Repeat("é", 5), strings.Repeat("é", 3), 3},
+		{"pair fits", "a😀", "a😀", 3},
+		{"pair would straddle", "ab😀", "ab", 3},
+		{"pair after the limit", "abc😀", "abc", 3},
+	}
+	for _, c := range cases {
+		if got := types.TruncatePropertyValue(c.in, c.limit); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+	long := strings.Repeat("é", types.PropertyValueMax+1)
+	if got := types.TruncatePropertyValue(
+		long,
+		types.PropertyValueMax,
+	); got != long[:2*types.PropertyValueMax] {
+		t.Errorf("PropertyValueMax: kept %d bytes", len(got))
+	}
+}
+
 func TestTrashRecordDocument(t *testing.T) {
 	rec := types.TrashRecord{
 		Item: types.Item{

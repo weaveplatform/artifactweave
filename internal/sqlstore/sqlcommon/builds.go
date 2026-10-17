@@ -140,7 +140,8 @@ func (b buildStore) loadContent(ctx context.Context, run *types.Build) error {
 		})
 }
 
-// writeProperties stores one property set at a module position.
+// writeProperties stores one property set at a module position, as
+// store.NormaliseBuild left it.
 func (b buildStore) writeProperties(
 	ctx context.Context,
 	id int64,
@@ -151,7 +152,7 @@ func (b buildStore) writeProperties(
 	for k, values := range props {
 		for _, v := range values {
 			if _, err := b.s.exec(ctx, "add build property "+k,
-				InsertIgnore("build_properties", cols, cols), id, pos, k, v); err != nil {
+				InsertIgnore("build_properties", cols, nil), id, pos, k, v); err != nil {
 				return err
 			}
 		}

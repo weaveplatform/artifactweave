@@ -2,6 +2,7 @@ package aql
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -392,11 +393,51 @@ func (c *compiler) propertyRow(p *PropertyCriterion, op Op) {
 	if p.Value == "*" && (op == OpEq || op == OpMatch) {
 		return
 	}
+	if c.d == PostgreSQL && col == "p.value" {
+		c.valuePrefix(op, p.Value)
+	}
 	if c.d == PostgreSQL && op != OpEq {
 		col += ` COLLATE "C"`
 	}
 	c.b.WriteString(" AND ")
 	c.text(col, op, p.Value)
+}
+
+// valuePrefixLen is the length, in characters, of the property value prefix
+// that PostgreSQL indexes (its migration 0013), because a whole value can be
+// longer than a B-tree entry holds.
+const valuePrefixLen = 255
+
+// valuePrefix writes a condition on the indexed prefix of p.value that every
+// row meeting op against v also meets, so PostgreSQL can find the rows
+// through the index and then compare whole values. Under COLLATE "C",
+// cutting two values to the same length can make them equal but never
+// reverses their order, so a range holds for the prefixes with equality
+// allowed.
+func (c *compiler) valuePrefix(op Op, v string) {
+	n := strconv.Itoa(valuePrefixLen)
+	prefix := " AND left(p.value, " + n + ")"
+	switch op {
+	case OpEq:
+		c.b.WriteString(prefix + " = left(" + c.bind(v) + ", " + n + ")")
+	case OpGt, OpGte:
+		c.b.WriteString(prefix + " >= left(" + c.bind(v) + ", " + n + ")")
+	case OpLt, OpLte:
+		c.b.WriteString(prefix + " <= left(" + c.bind(v) + ", " + n + ")")
+	case OpMatch:
+		// The literal characters before the first wildcard start every
+		// match; LIKE with a literal prefix scans the index as a range.
+		lit, _, _ := strings.Cut(v, "*")
+		lit, _, _ = strings.Cut(lit, "?")
+		if lit == "" {
+			return
+		}
+		if r := []rune(lit); len(r) > valuePrefixLen {
+			lit = string(r[:valuePrefixLen])
+		}
+		c.b.WriteString(prefix + " LIKE " + c.bind(likePattern(lit)+"%") +
+			" ESCAPE '" + likeEscape + "'")
+	}
 }
 
 // propertyColumn writes the key condition of an "@key" criterion and returns
