@@ -91,8 +91,14 @@ func Upsert(table string, cols, key []string) string {
 	return Insert(table, cols) + conflict + "UPDATE SET " + strings.Join(sets, ", ")
 }
 
-// InsertIgnore renders INSERT ... ON CONFLICT (key) DO NOTHING.
+// InsertIgnore renders INSERT ... ON CONFLICT (key) DO NOTHING, or ON
+// CONFLICT DO NOTHING for any unique index when key is empty: a target must
+// name a unique index's exact columns, and the property tables' differ
+// between dialects (PostgreSQL migration 0013).
 func InsertIgnore(table string, cols, key []string) string {
+	if len(key) == 0 {
+		return Insert(table, cols) + " ON CONFLICT DO NOTHING"
+	}
 	return Insert(table, cols) + " ON CONFLICT (" + strings.Join(key, ", ") + ") DO NOTHING"
 }
 

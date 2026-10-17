@@ -608,7 +608,7 @@ Debug logger overrides (`/api/system/debug/loggers`) are deliberately not persis
 ### 4.1 As built in P2 (2026-10-13)
 
 P2 created 71 tables in five migrations per dialect (73 with migration 0006 for blob mirroring) (`internal/sqlstore/{sqlite,postgres}/migrations/0001_content` to
-`0005_enterprise`); both dialects define the same tables and indexes, and the PostgreSQL contract run passes
+`0005_enterprise`); both dialects define the same tables and indexes (but for the property indexes below), and the PostgreSQL contract run passes
 against PostgreSQL 17. Where the physical schema differs from the table above, the domain types in `pkg/types`
 decided:
 
@@ -630,6 +630,7 @@ decided:
 | `builds` | migration 0012 (2026-10-15); adds `id`, `url`, `created_by`, `modified_at`, `modified_by` and the `document` column | the identity is four columns, so child rows and promotions reference a surrogate key; an append (`BuildStore.Replace`) stamps a modification |
 | `build_artifacts (module_id)`, `build_dependencies (module_id)` | keyed by `(build_id, module_position, position)` under a new `build_modules (build_id, position, module_id, type)`; artifacts add `path`, dependencies `dependency_id`, `name`, `path` | module IDs are not guaranteed unique within a document, and module and file order must round-trip |
 | (none) | `build_properties (build_id, module_position, key, value)`, `module_position` -1 for the build | one row per value for the AQL `build.property` and `module.property` domains |
+| `item_properties`, `build_properties` indexes | on PostgreSQL, from migration 0013 (#338): unique on `md5(value)` with the row's other key columns, and a lookup index on `(key, left(value, 255))`; SQLite keeps the whole value in both | a B-tree entry is at most 2704 bytes on PostgreSQL, and a value may be 4000 UTF-16 code units ([0004](decisions/0004-storage-sql-metadata-and-blobs.md#decision)) |
 | `build_promotions` | `id, created_at, created_by, status, comment, ci_user, source_repo, repo`; no `dry_run` | the fields of a promotion status in the document (`repository`, `ciUser`, `user`, `timestamp`); a dry run records nothing |
 | (none) | `build_retention (project_key, name, count, minimum_build_date, delete_artifacts, keep_numbers)` | the `buildRetention` a publish carries, kept per build name; deleting or renaming the name takes it along |
 

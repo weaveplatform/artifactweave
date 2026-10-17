@@ -298,17 +298,9 @@ func (i items) requireItem(id int64) error {
 	return nil
 }
 
-// cleanProperties is how the stores keep properties: values sorted and
-// unique, and keys without values dropped, because the property table has
-// one row per value.
+// cleanProperties is store.CleanProperties to types.PropertyValueMax.
 func cleanProperties(props types.Properties) types.Properties {
-	out := types.Properties{}
-	for k, v := range props {
-		if len(v) > 0 {
-			out.Set(k, v...)
-		}
-	}
-	return out
+	return store.CleanProperties(props, types.PropertyValueMax)
 }
 
 func (i items) Properties(ctx context.Context, id int64) (types.Properties, error) {

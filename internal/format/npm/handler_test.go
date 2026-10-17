@@ -15,7 +15,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -192,12 +191,12 @@ func TestDeployIndexes(t *testing.T) {
 	}
 }
 
-// Values taken from package.json stay within what every store can index:
-// a long description is cut at a character boundary, and keywords that do
-// not fit are left out of npm.keywords, all of which Metadata keeps.
+// Values taken from package.json are cut as the store cuts every property
+// value (types.PropertyValueMax), and keywords that do not fit are left out
+// of npm.keywords so it stays JSON; Metadata keeps all of them.
 func TestLongPropertyValues(t *testing.T) {
 	w := newWorld(t)
-	long := strings.Repeat("é", 3000)
+	long := strings.Repeat("é", types.PropertyValueMax+1000)
 	many := make([]string, 0, 400)
 	for i := range 400 {
 		many = append(many, fmt.Sprintf("keyword-%03d", i))
@@ -206,17 +205,20 @@ func TestLongPropertyValues(t *testing.T) {
 	p := "x/-/x-1.0.0.tgz"
 	w.deploy(p, pkg("x", "1.0.0", `"description":"`+long+`","keywords":`+string(kw)), nil)
 	props := w.props(p)
-	d := props[npm.PropDescription][0]
-	if len(d) != 2048 || !utf8.ValidString(d) || !strings.HasPrefix(long, d) {
+	if d := props[npm.PropDescription][0]; d != long[:2*types.PropertyValueMax] {
 		t.Errorf("description of %d bytes", len(d))
 	}
 	var got []string
 	if err := json.Unmarshal([]byte(props[npm.PropKeywords][0]), &got); err != nil ||
 		len(got) == 0 || len(got) == len(many) || !slices.Equal(got, many[:len(got)]) ||
-		len(props[npm.PropKeywords][0]) > 2048 {
+		len(props[npm.PropKeywords][0]) > types.PropertyValueMax {
 		t.Errorf("keywords %d %v", len(got), err)
 	}
-	w.deploy(p, pkg("x", "1.0.0", `"keywords":["`+strings.Repeat("k", 3000)+`"]`), nil)
+	w.deploy(
+		p,
+		pkg("x", "1.0.0", `"keywords":["`+strings.Repeat("k", types.PropertyValueMax)+`"]`),
+		nil,
+	)
 	if _, ok := w.props(p)[npm.PropKeywords]; ok {
 		t.Error("kept a keyword that cannot fit")
 	}

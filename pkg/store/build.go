@@ -95,8 +95,8 @@ type BuildStore interface {
 }
 
 // NormaliseBuild is what every backend stores and returns for b: Normalise,
-// with build and module property values sorted and unique and keys without
-// values dropped, because the property table holds one row per value.
+// with build and module properties cleaned (CleanProperties) to
+// types.BuildPropertyValueMax.
 func NormaliseBuild(b types.Build) types.Build {
 	b = Normalise(b)
 	b.Properties = cleanBuildProperties(b.Properties)
@@ -106,20 +106,30 @@ func NormaliseBuild(b types.Build) types.Build {
 	return b
 }
 
-// cleanBuildProperties keeps the keys that have values, with their values
-// sorted and unique.
+// cleanBuildProperties is CleanProperties, nil when no key has a value.
 func cleanBuildProperties(props types.Properties) types.Properties {
-	if len(props) == 0 {
-		return nil
-	}
-	out := types.Properties{}
-	for k, v := range props {
-		if len(v) > 0 {
-			out.Set(k, v...)
-		}
-	}
+	out := CleanProperties(props, types.BuildPropertyValueMax)
 	if len(out) == 0 {
 		return nil
+	}
+	return out
+}
+
+// CleanProperties is how the stores keep properties, one row per value:
+// keys without values dropped, each value cut to limit
+// (types.TruncatePropertyValue), and the values sorted and unique, so two
+// values that differ only past the limit become one.
+func CleanProperties(props types.Properties, limit int) types.Properties {
+	out := types.Properties{}
+	for k, values := range props {
+		if len(values) == 0 {
+			continue
+		}
+		cut := make([]string, len(values))
+		for i, v := range values {
+			cut[i] = types.TruncatePropertyValue(v, limit)
+		}
+		out.Set(k, cut...)
 	}
 	return out
 }

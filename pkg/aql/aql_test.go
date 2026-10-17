@@ -462,6 +462,71 @@ func TestPropertyAndStatCriteria(t *testing.T) {
 	}
 }
 
+// TestCompileValuePrefix checks the conditions on the indexed value prefix
+// PostgreSQL gets beside each positive value comparison; the store contract
+// suite checks the rows they find.
+func TestCompileValuePrefix(t *testing.T) {
+	long := strings.Repeat("é", valuePrefixLen+5)
+	cases := []struct {
+		criteria, want string
+		args           []any
+	}{
+		{
+			`{"@k":"v"}`, ` AND p.key = ? AND left(p.value, 255) = left(?, 255) AND p.value = ?)`,
+			[]any{"k", "v", "v"},
+		},
+		{
+			`{"@k":{"$gt":"v"}}`,
+			` AND left(p.value, 255) >= left(?, 255) AND p.value COLLATE "C" > ?)`,
+			[]any{"k", "v", "v"},
+		},
+		{
+			`{"@k":{"$lte":"v"}}`,
+			` AND left(p.value, 255) <= left(?, 255) AND p.value COLLATE "C" <= ?)`,
+			[]any{"k", "v", "v"},
+		},
+		{
+			`{"@k":{"$match":"a_b*c?"}}`,
+			` AND left(p.value, 255) LIKE ? ESCAPE '\' AND (p.value COLLATE "C" LIKE ? ESCAPE '\'))`,
+			[]any{"k", `a\_b%`, `a\_b%c_`},
+		},
+		// A literal longer than the prefix is cut to it, in characters.
+		{
+			`{"@k":{"$match":"` + long + `*"}}`, ` LIKE ? ESCAPE '\' AND (p.value`,
+			[]any{"k", long[:2*valuePrefixLen] + "%", long + "%"},
+		},
+		// Without a literal start there is nothing to narrow on, and a
+		// negative criterion narrows the row it looks for, not the items.
+		{`{"@k":{"$match":"*a"}}`, `p.key = ? AND (p.value COLLATE "C" LIKE`, []any{"k", "%a"}},
+		{
+			`{"@k":{"$ne":"v"}}`,
+			`NOT EXISTS (SELECT 1 FROM item_properties p WHERE p.item_id = items.id ` +
+				`AND p.key = ? AND left(p.value, 255) = left(?, 255) AND p.value = ?)`,
+			[]any{"k", "v", "v"},
+		},
+		{
+			`{"property.value":"v"}`,
+			`items.id AND left(p.value, 255) = left(?, 255) AND p.value = ?)`,
+			[]any{"v", "v"},
+		},
+		{`{"property.key":"k"}`, `items.id AND p.key = ?)`, []any{"k"}},
+	}
+	for _, c := range cases {
+		q := mustParse(t, `items.find(`+c.criteria+`)`)
+		pg, err := q.Compile(PostgreSQL, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		// items.find adds a criterion on the type, bound last.
+		if !strings.Contains(pg.Where, c.want) || !slices.Equal(pg.Args, append(c.args, "file")) {
+			t.Errorf("%s:\n%s %q\nwant %s %q", c.criteria, pg.Where, pg.Args, c.want, c.args)
+		}
+		if lite, _ := q.Compile(SQLite, Options{}); strings.Contains(lite.Where, "left(") {
+			t.Errorf("%s: SQLite narrows on a prefix: %s", c.criteria, lite.Where)
+		}
+	}
+}
+
 func TestCompileSecondaryDomains(t *testing.T) {
 	q := mustParse(t, `items.find({"$msp":[{"@l":{"$nmatch":"a*"}},{"@*":{"$ne":"*"}},`+
 		`{"property.key":{"$gt":"b"}}],"stat.downloaded_by":{"$match":"a*"},`+
