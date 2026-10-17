@@ -47,7 +47,7 @@ func read(ctx context.Context, st store.Store, c repo.Config, p, v string) (
 	pkgindex.IndexedVersion, bool, error,
 ) {
 	out := pkgindex.IndexedVersion{Version: v}
-	files, _, err := st.Items().Descendants(ctx, c.Key, false, p+"/"+v,
+	files, _, err := st.Items().Descendants(ctx, c.Key, pkgindex.Stored(c).Cached, p+"/"+v,
 		store.Page{Limit: store.MaxLimit})
 	if err != nil {
 		return out, false, err
@@ -130,7 +130,7 @@ func (h tagged) Annotated(
 
 func (h tagged) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	return env.Store.Tx(ctx, func(ctx context.Context) error {
-		all, _, err := env.Store.Items().Descendants(ctx, c.Key, false, "",
+		all, _, err := env.Store.Items().Descendants(ctx, c.Key, pkgindex.Stored(c).Cached, "",
 			store.Page{Limit: store.MaxLimit})
 		if err != nil {
 			return err

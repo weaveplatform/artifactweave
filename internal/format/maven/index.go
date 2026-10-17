@@ -18,10 +18,11 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// files is the AQL criterion for c's files.
+// files is the AQL criterion for the files c's index reads: a remote
+// repository's are in its cache (pkgindex.Stored).
 func files(c repo.Config) aql.And {
 	return aql.And{
-		aql.RepoSet{Refs: []aql.RepoRef{{Key: c.Key}}},
+		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 	}
 }

@@ -9,10 +9,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
+
+// Stored is where c's package index finds its files: a remote repository's
+// cache, which alone holds a remote's items (decision 0018 indexes items
+// cached from a remote), or the repository's own items. A format's hooks and
+// its reindex both read here and only here, so a reindex rebuilds what the
+// hooks kept.
+func Stored(c repo.Config) aql.RepoRef {
+	return aql.RepoRef{Key: c.Key, Cached: c.Class == repo.Remote}
+}
 
 // Version names one version of a package in a repository.
 type Version struct {

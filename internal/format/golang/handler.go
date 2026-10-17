@@ -129,7 +129,7 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 	st := env.Store
 	err := st.Tx(ctx, func(ctx context.Context) error {
 		hits, err := st.Items().Search(ctx, &aql.Query{Criteria: aql.And{
-			aql.RepoSet{Refs: []aql.RepoRef{{Key: c.Key}}},
+			aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 			&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 			&aql.FieldCriterion{Field: aql.FieldPath, Op: aql.OpMatch, Text: "*/@v"},
 		}}, aql.Options{})
@@ -192,7 +192,8 @@ func fileOf(it types.Item) (File, bool) {
 // syncVersion makes version v of module m in c what the tree says: linked
 // to exactly the version files stored, and dated by the first of them. The
 // same reading of the tree is what Reindex does, so the hooks and a
-// reindex agree.
+// reindex agree; files stored anywhere but where the index reads
+// (pkgindex.Stored) are not indexed.
 func syncVersion(
 	ctx context.Context,
 	st store.Store,
@@ -200,6 +201,9 @@ func syncVersion(
 	cached bool,
 	m, v string,
 ) error {
+	if cached != pkgindex.Stored(c).Cached {
+		return nil
+	}
 	var files []int64
 	var created time.Time
 	for _, ext := range []string{ExtZip, ExtMod, ExtInfo} {
