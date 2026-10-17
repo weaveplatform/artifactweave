@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format/formattest"
+	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -29,6 +30,8 @@ func pomFile(path, p, v string) formattest.File {
 // file to deploy.)
 func TestContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
+		// Every write to a package queues its metadata, whatever the layout.
+		Work: []string{maven.KindMetadata},
 		Type: repo.Maven,
 		Version: func(p, v string, n int) formattest.Version {
 			dir := "org/example/" + p + "/"
@@ -61,6 +64,8 @@ func TestContract(t *testing.T) {
 // integration version by a 14-digit timestamp on the folder and the files.
 func TestContractGradle(t *testing.T) {
 	formattest.Run(t, formattest.Format{
+		// Every write to a package queues its metadata, whatever the layout.
+		Work:   []string{maven.KindMetadata},
 		Type:   repo.Gradle,
 		Layout: repo.LayoutGradle,
 		Version: func(p, v string, n int) formattest.Version {
@@ -84,6 +89,8 @@ func TestContractGradle(t *testing.T) {
 // version's.
 func TestContractIvy(t *testing.T) {
 	formattest.Run(t, formattest.Format{
+		// Every write to a package queues its metadata, whatever the layout.
+		Work:   []string{maven.KindMetadata},
 		Type:   repo.Ivy,
 		Layout: repo.LayoutIvy,
 		Version: func(p, v string, n int) formattest.Version {
@@ -103,6 +110,8 @@ func TestContractIvy(t *testing.T) {
 // in their names.
 func TestContractSBT(t *testing.T) {
 	formattest.Run(t, formattest.Format{
+		// Every write to a package queues its metadata, whatever the layout.
+		Work:   []string{maven.KindMetadata},
 		Type:   repo.SBT,
 		Layout: repo.LayoutSBT,
 		Version: func(p, v string, n int) formattest.Version {

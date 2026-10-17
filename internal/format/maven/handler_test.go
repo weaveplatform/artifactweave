@@ -57,13 +57,22 @@ func TestClassify(t *testing.T) {
 		{unique, "com/acme/app/maven-metadata.xml", format.ClassDerived},
 		{unique, "com/acme/app/1.0-SNAPSHOT/maven-metadata.xml", format.ClassDerived},
 		{deployer, "com/acme/app/1.0-SNAPSHOT/maven-metadata.xml", format.ClassMetadata},
-		{deployer, "com/acme/app/maven-metadata.xml", format.ClassDerived},
+		{deployer, "com/acme/app/maven-metadata.xml", format.ClassMetadata},
 	} {
 		if got := h.Classify(tc.c, tc.path); got != tc.want {
 			t.Errorf("%s under %s: %v", tc.path, tc.c.SnapshotVersionBehavior, got)
 		}
 	}
 }
+
+// noWork takes the work the hooks queue and does nothing with it.
+func noWork(context.Context, string, string, []byte) error { return nil }
+
+// noQueue is a work queue that drops what it is given, so the index tests'
+// clock, which moves on every read, is not read for the queue's dates.
+type noQueue struct{}
+
+func (noQueue) Enqueue(context.Context, string, string, []byte) error { return nil }
 
 // world is a Maven repository behind the item service, with a clock that
 // moves a minute on every read of it.
@@ -95,7 +104,7 @@ func newWorld(t *testing.T, tune func(*repo.Config)) *world {
 		t.Fatal(err)
 	}
 	w.c = c
-	w.items = &item.Service{Store: w.db, Blobs: blobs, Now: func() time.Time {
+	w.items = &item.Service{Store: w.db, Blobs: blobs, Work: noQueue{}, Now: func() time.Time {
 		w.now = w.now.Add(time.Minute)
 		return w.now
 	}}
@@ -270,7 +279,7 @@ func TestHookLayouts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	env := format.Env{Store: db, Layouts: layouts{}}
+	env := format.Env{Store: db, Layouts: layouts{}, Enqueue: noWork}
 	if err := h.Deployed(ctx, env, c, it); err != nil {
 		t.Fatal(err)
 	}
@@ -435,16 +444,26 @@ func TestIndexFailures(t *testing.T) {
 		if err != nil {
 			w.t.Fatal(err)
 		}
-		return h.Deployed(w.ctx, format.Env{Store: st, Layouts: layouts{}}, w.c, it)
+		return h.Deployed(
+			w.ctx,
+			format.Env{Store: st, Layouts: layouts{}, Enqueue: noWork},
+			w.c,
+			it,
+		)
 	}
 	deleted := func(also ...string) func(w *world, st store.Store) error {
 		return func(w *world, st store.Store) error {
 			removed := gone(w, also...)
-			return h.Deleted(w.ctx, format.Env{Store: st, Layouts: layouts{}}, w.c, removed)
+			return h.Deleted(
+				w.ctx,
+				format.Env{Store: st, Layouts: layouts{}, Enqueue: noWork},
+				w.c,
+				removed,
+			)
 		}
 	}
 	reindex := func(w *world, st store.Store) error {
-		return h.Reindex(w.ctx, format.Env{Store: st, Layouts: layouts{}}, w.c)
+		return h.Reindex(w.ctx, format.Env{Store: st, Layouts: layouts{}, Enqueue: noWork}, w.c)
 	}
 	for _, tc := range []struct {
 		name string
@@ -484,7 +503,7 @@ func TestDeletedUnindexed(t *testing.T) {
 	w := newWorld(t, nil)
 	w.deploy("com/acme/app/1.1/app-1.1.jar")
 	h := maven.Handler{}
-	env := format.Env{Store: w.db, Layouts: layouts{}}
+	env := format.Env{Store: w.db, Layouts: layouts{}, Enqueue: noWork}
 	removed := []types.Item{
 		{RepoKey: w.c.Key, Path: "com/acme/app/1.0", Name: "app-1.0.jar"},
 		{RepoKey: w.c.Key, Path: "com/acme/other/1.0", Name: "other-1.0.jar"},

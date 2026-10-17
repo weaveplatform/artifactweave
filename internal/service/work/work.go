@@ -373,6 +373,13 @@ func (q *Queue) EnsureFresh(ctx context.Context, kind, key string) error {
 	if _, ok := q.handler(kind); !ok {
 		return fmt.Errorf("%w for %q", ErrNoHandler, kind)
 	}
+	// Most reads owe nothing, as every download of a Maven metadata file
+	// asks: a plain read says so without the locking transaction a lease
+	// takes, which on SQLite holds its one writer. Any other answer is left
+	// to the lease.
+	if _, err := q.q.Get(ctx, kind, key); errors.Is(err, store.ErrNotFound) {
+		return nil
+	}
 	wait := 10 * time.Millisecond
 	for {
 		now := q.o.Now()

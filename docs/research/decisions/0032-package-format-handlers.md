@@ -34,6 +34,7 @@ the protocol that changed it.
 - `Derive`, which writes a derived item (content plus item) inside the current transaction
   *without* re-entering the hooks. The item service implements it, so formats need not import
   `item`;
+- `Underive`, which removes a derived item the same way, past the trash can (#279);
 - `Enqueue`, the persistent work queue's enqueue (decision
   [0033](0033-persistent-work-queue.md)), usable inside the current transaction.
 
@@ -42,7 +43,7 @@ the protocol that changed it.
 
 **Optional interfaces.** A format implements only what it needs. Each is named here by
 its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotator`,
-`Reindexer` and `Classifier` (#267).
+`Reindexer` and `Classifier` (#267), and `Worker` (#279).
 
 | Interface | Runs | Does | First used by |
 |---|---|---|---|
@@ -52,6 +53,7 @@ its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotato
 | `Annotated` | After an item's properties change | Updates the index or queues derived work | npm (`npm.disttag`) |
 | `Reindexer` | On a JFrog reindex operation, and for maintenance | Rebuilds the format's index for a repository from the item tree | Docker (adopting `docker.Reindex`), npm, Maven, P8 |
 | `Classifier` | When asked | Says whether a path is a unique binary, metadata, or a derived item | P9 cache expiry, P11 replication, P13 federation |
+| `Work` | From the work queue, and before a download that `Owed` says waits for it | Runs the derived work the format queued, outside any transaction | Maven (#279) |
 
 `Annotated` was added after the research: Artifactory's npm metadata follows property
 changes (`NpmMetadataInterceptor`, research 24 fact 1.2), and P7's npm dist-tags are

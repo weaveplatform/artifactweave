@@ -48,7 +48,8 @@ type Env struct {
 	// Store is the metadata store.
 	Store store.Store
 	// Blobs reads stored content, such as the file a hook indexes. Formats
-	// write content only through Derive.
+	// write content only through Derive and remove it only through
+	// Underive.
 	Blobs Blobs
 	// Now is the clock.
 	Now func() time.Time
@@ -60,6 +61,11 @@ type Env struct {
 	// output never re-enters it. A format must not derive an item another
 	// format would need to index.
 	Derive func(ctx context.Context, d Derived) (types.Item, error)
+	// Underive removes the file at path, which the format derived, without
+	// any hook and past the trash can, releasing its content; nothing at
+	// path is no error. A restore would bring back data the format
+	// recomputes anyway.
+	Underive func(ctx context.Context, c repo.Config, cached bool, path string) error
 	// Enqueue asks the persistent work queue for kind's work on key
 	// (decision 0033). Called with a hook's ctx, the work is asked for
 	// exactly when the write commits, and not at all after a rollback.
@@ -201,6 +207,28 @@ type Annotator interface {
 // in one.
 type Reindexer interface {
 	Reindex(ctx context.Context, env Env, c repo.Config) error
+}
+
+// WorkRef names one item of the persistent work queue: a kind and a key.
+type WorkRef struct {
+	Kind, Key string
+}
+
+// Worker is a format that queues derived work with Env.Enqueue and runs it
+// from the persistent work queue (decision 0033), such as Maven's metadata.
+type Worker interface {
+	// WorkKinds are the kinds the format enqueues: code constants, unique
+	// across formats.
+	WorkKinds() []string
+	// Work runs one item of one of the format's kinds, outside any
+	// transaction. It must be idempotent and read the state it derives from
+	// afresh, since an item can run again and coalesces every request made
+	// before the run began.
+	Work(ctx context.Context, env Env, item types.WorkItem) error
+	// Owed names the work a download of path from c must see done before
+	// it is read, so a client never reads derived data that lags a
+	// completed write.
+	Owed(c repo.Config, cached bool, path string) []WorkRef
 }
 
 // Class says what kind of content an item is, for cache expiry (P9),

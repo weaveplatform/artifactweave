@@ -71,6 +71,13 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   with 201 and queues the package's metadata in the same transaction. The run replaces the
   file with derived metadata whenever the package has a version with a POM, so a read always
   returns the server's metadata; with no such version the client's file stays.
+- **Deployer** (amended 2026-10-17, #279). A repository whose `snapshotVersionBehavior` is
+  `deployer` gets no derived metadata at any level: nothing is queued, written or removed,
+  and every `maven-metadata.xml` in it is the client's. Artifactory 7.x documents the setting
+  so ("Metadata will not be generated when selecting the Deployer option", `local-repositories`),
+  and 7.x fixed a delete of a snapshot emptying a `deployer` repository's metadata
+  (RTFACT-26126). 6.20's source skipped only snapshot files under `deployer`; that difference
+  is on #216.
 - **Metadata checksums.** A checksum PUT for `maven-metadata.xml` answers 200 and is
   ignored; a metadata file's checksums are always the server's, so the client's later
   `.sha1` never fails under `client-checksums`.
@@ -92,7 +99,13 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   `maven-plugin` packaging also queues its group's plugin metadata; a unique build in a
   repository with `maxUniqueSnapshots` above 0 queues the cleanup.
 - **Runs** read the package index, not the folder tree, and write through `Derive`, so they
-  do not re-enter the hooks and the files carry server checksums.
+  do not re-enter the hooks and the files carry server checksums. They remove through
+  `Underive`. A derived file records `_system_` as its creator and modifier, which is how a run
+  tells it from a client's artifact-level file (#279).
+- **Plugin metadata** is queued when a POM gains or loses `artifactory.maven.mavenPlugin`, on
+  a deploy, a property change, a copy, move or restore, and when a marked POM is deleted.
+  Artifactory 7.10 calculates it on every deploy and delete; the result is the same, since it
+  depends only on the marked POMs (#279).
 - **Reads.** A GET or HEAD of a `maven-metadata.xml`, or of its sidecar, whose package or
   group has pending work calls `EnsureFresh` first, so a client never reads stale metadata.
   A parked item answers 500 in the error envelope.
@@ -107,9 +120,10 @@ departures:
   order, `latest` and `version` the highest of them, `release` the highest release, and
   `lastUpdated`. Metadata is removed when no POM is left (#279).
 - **Plugin level,** for each group with a plugin POM: one `plugin` per artifactId, with
-  `prefix` from the artifactId and `name` from the POM. It is removed only when the group has
-  no plugin left; Artifactory also removes it whenever that folder is recalculated, until its
-  queued plugin calculation writes it back.
+  `prefix` from the artifactId and `name` from the POM of its highest version, where
+  Artifactory takes whichever POM its search returns first. It is removed only when the group
+  has no plugin left; Artifactory also removes it whenever that folder is recalculated, until
+  its queued plugin calculation writes it back.
 
 **`maxUniqueSnapshots`.** A run applies Artifactory's rule (research 27 section 7) to the
 queued package: per classifier, while there are more unique builds than the limit, the
