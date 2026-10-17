@@ -16,6 +16,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/authz"
+	"github.com/weaveplatform/artifactweave/internal/format/generic"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
@@ -266,6 +267,16 @@ func (s artifactoryService) getStorage(w http.ResponseWriter, r *http.Request) {
 		mode == "permissions" && !p.Admin:
 		writeErr(w, r, denied(p))
 		return
+	}
+	// The file list of a blacked-out repository answers 404 with
+	// BlackedOutException's message (ArtifactResource.writeStreamingFileList).
+	// The other views describe the item regardless, as 6.20's do: its item
+	// info checks read permission alone (prepareStorageInfoResponse).
+	if mode == "list" && v.repo.Class != repo.Virtual {
+		if err := generic.CheckBlackedOut(v.repo, v.path); err != nil {
+			writeErr(w, r, s.itemError(ctx, "storage list", err))
+			return
+		}
 	}
 	f, err := v.target(ctx)
 	if err != nil {

@@ -64,6 +64,50 @@ never import `internal/server`.
 **Generic deploy policy.** `includesPattern`, `excludesPattern` and `blackedOut` are checked
 for every package type through `Admit`, on the generic handler that every format embeds.
 
+**Generic download policy** (amended 2026-10-17, #328). Artifactory 6.20 refuses a download
+before it looks for the item, whether or not the item exists, and for administrators too
+(`DbLocalRepo.checkDownloadIsAllowed` calls `RealRepoBase.assertValidPath` with
+`downloadRequest` set). `generic.CheckDownload` does the same:
+- **A blacked-out repository** answers 404 with `BlackedOutException`'s message, as a deploy
+  does.
+- **A path the patterns reject** answers 404 with `IncludeExcludeException`'s message, where a
+  deploy answers 409.
+- **The path checked is Artifactory's:** the archive of an archive entry, which its request
+  parsing splits off (`ArtifactoryRequestBase.zipResourcePath`), and the file a checksum
+  sidecar describes (`RepoBase.accepts`). A path is a folder when the request ends in a slash
+  (`RepoPathImpl`). The root is always accepted.
+- **Read permission is checked first,** where Artifactory checks it after, so a caller who may
+  not read the path gets 401 or 403 and learns nothing of the repository's settings (DV-057).
+- **A virtual repository** passes over a member that refuses, as it passes over one without
+  the item, and answers "Could not find resource" when none serves it
+  (`VirtualRepoDownloadStrategy.processStandard`). Its own patterns rejecting the path leave
+  it no member to search: 404 "No repository found to serve the request for `<key>:<path>`".
+  It has no `blackedOut` (`RealRepoDescriptor` carries it), so the flag is ignored there.
+
+Where the policy applies:
+- GET and HEAD of items, checksum sidecars, archive entries and folder listings. Listings
+  also leave out children the patterns reject, the member's and the virtual repository's
+  (`TreeBrowsingCriteriaBuilder.applyRepoIncludeExclude`,
+  `RepositoryBrowsingServiceImpl.virtualRepoAccepts`).
+- Docker manifest and blob pulls: a blacked-out repository answers `NAME_UNKNOWN`, as a push
+  does, and a manifest or blob the patterns reject answers `MANIFEST_UNKNOWN` or
+  `BLOB_UNKNOWN`, as a missing one does. The Docker addon is not open source, so these codes
+  are inferred (research 24, 5.5).
+- The storage API's file list (`?list`) of a blacked-out repository
+  (`ArtifactResource.writeStreamingFileList` maps `BlackedOutException` to 404).
+- The read paths of later formats, which find items through the same download lookup or call
+  `generic.CheckDownload` themselves (#269).
+
+Where it does not apply, as in 6.20:
+- The storage API's item info and its other views describe the item: `ArtifactResource`
+  checks read permission alone.
+- AQL and the search APIs do not hide a blacked-out repository's items: `AqlRestResult.canRead`
+  and `SearcherBase.isResultAcceptable` check permissions and patterns only. Both already hide
+  what the patterns reject from everyone but administrators (research 22 section 1.3), where
+  Artifactory's search APIs also show it to a caller who may annotate it (DV-058).
+
+Research 24 section 5 (5.4 to 5.8) lists what stays unconfirmed until P19 (#216).
+
 **Everything indexed is rebuildable from items.** What a format indexes, and every item it
 derives, follows from the items, their content and their properties alone, so a reindex, a
 federation member (decision [0022](0022-federated-repositories.md)) and a replication target
@@ -127,6 +171,15 @@ repository.
 The hook model mirrors Artifactory's interceptors (research 24 section 1), which is how
 Artifactory keeps format behaviour the same whichever API wrote the item.
 
+**The download policy** follows Artifactory's source, with two departures:
+- **Permission before configuration.** Artifactory tells any caller that a repository is
+  blacked out or that a path is excluded; checking read permission first answers a caller
+  who may not read the path as every other refusal does (DV-057).
+- **One visibility rule for searches.** artifactweave answers the search APIs from the AQL
+  engine (decision [0012](0012-search-and-aql.md)), so they hide what AQL hides; Artifactory's
+  search APIs filter their results apart from AQL and exempt a caller who may annotate
+  (DV-058).
+
 **Alternatives considered:**
 - *Per-format write services that the protocol handlers call:* every format would also need
   to catch writes from `jf rt u`, copy and move, and the generic deploy routes. Hooks on the
@@ -154,6 +207,8 @@ Artifactory keeps format behaviour the same whichever API wrote the item.
 - Unit and fault tests for each optional interface, `Derive` and the `Rejection` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).
+- Every read path refuses a blacked-out repository and an excluded path, in unit tests and
+  in `download_policy.feature` with `jf rt dl` (#328).
 
 ## References
 
@@ -162,3 +217,12 @@ Artifactory keeps format behaviour the same whichever API wrote the item.
   [0031-docker-oci-registry](0031-docker-oci-registry.md), [0033-persistent-work-queue](0033-persistent-work-queue.md)
 - Artifactory OSS 6.20, `base/capi/src/main/java/org/artifactory/sapi/interceptor/StorageInterceptor.java`
   at `b99e5649bcad`
+- Artifactory OSS 6.20 at `b99e5649bcad`, for the download policy:
+  `backend/core/src/main/java/org/artifactory/repo/RealRepoBase.java`,
+  `backend/core/src/main/java/org/artifactory/repo/db/DbLocalRepo.java`,
+  `backend/core/src/main/java/org/artifactory/repo/virtual/VirtualRepoDownloadStrategy.java`,
+  `backend/core/src/main/java/org/artifactory/repo/service/RepositoryBrowsingServiceImpl.java`,
+  `backend/core/src/main/java/org/artifactory/repo/service/RepositoryServiceImpl.java`
+  (`isRepoPathVisible`), `backend/core/src/main/java/org/artifactory/search/SearcherBase.java`,
+  `base/api/src/main/java/org/artifactory/aql/result/AqlRestResult.java` and
+  `web/rest/src/main/java/org/artifactory/rest/resource/artifact/ArtifactResource.java`
