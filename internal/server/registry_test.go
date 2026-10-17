@@ -255,6 +255,16 @@ func registryBlobMatrix() []matrixRow {
 	}
 }
 
+// registryRoutes are the registry's routes (decision 0031).
+var registryRoutes = map[string]bool{
+	registryProbe: true, prefixProbe: true, headBlob: true, getBlob: true, deleteBlob: true,
+	startUpload: true, appendUpload: true, finishUpload: true, uploadStatus: true,
+	cancelUpload: true, headManifest: true, getManifest: true, putManifest: true,
+	registryToken: true, prefixToken: true, registryAuth: true, legacyAuth: true,
+	getReferrers: true, tagsRoute: true, catalogRoute: true, repoCatalog: true,
+	delManifest: true, jfrogCatalog: true, jfrogTags: true,
+}
+
 func registryStatusRows() []statusCase {
 	const prefixed = "/artifactory/api/docker/libs-local/v2/"
 	return []statusCase{

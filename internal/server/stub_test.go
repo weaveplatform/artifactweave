@@ -13,10 +13,18 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 )
 
-// implemented lists the generated operations that have real handlers. Every
-// other generated operation must reach the UnimplementedStrict stub and answer
-// 501 in its service's envelope; this list grows as phases land.
-var implemented = map[string]bool{
+// implemented lists the generated operations that have real handlers:
+// generatedRoutes, and each format's (statusParts). Every other generated
+// operation must reach the UnimplementedStrict stub and answer 501 in its
+// service's envelope; this list grows as phases land.
+var implemented = routeUnion(append(
+	[]map[string]bool{generatedRoutes},
+	partRoutes(func(p statusPart) map[string]bool { return p.generated })...,
+)...)
+
+// generatedRoutes are the generated operations with real handlers outside
+// the formats' parts.
+var generatedRoutes = map[string]bool{
 	"GET /artifactory/api/system/version":      true,
 	"GET /artifactory/api/system/license":      true,
 	"GET /artifactory/api/v1/system/readiness": true,

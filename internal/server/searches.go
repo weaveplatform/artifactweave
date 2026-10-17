@@ -15,6 +15,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -453,7 +454,7 @@ func propertyFilters(q url.Values, need bool) (aql.And, error) {
 	for _, k := range keys {
 		var values []string
 		for _, v := range q[k] {
-			for _, one := range splitValues(v) {
+			for _, one := range pkgroute.SplitValues(v) {
 				if one != "" {
 					values = append(values, one)
 				}

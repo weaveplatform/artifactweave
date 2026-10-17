@@ -81,19 +81,19 @@ var matrixPrincipals = []matrixPrincipal{
 	{name: "gadmin", user: "gadmin", admin: true, grants: []matrixGrant{{"*", "", allContent}}},
 	{name: "nobody", user: "nobody"},
 	// Grants on artifactory-build-info are the build resource's (#165).
-	{name: "reader", user: "reader", grants: []matrixGrant{
+	{name: "reader", user: "reader", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "", types.ActionRead},
 		{types.BuildInfoRepository, "", types.ActionRead},
 		{dockerA, "", types.ActionRead},
-	}},
-	{name: "writer", user: "writer", grants: []matrixGrant{
+	}, formatGrants("", types.ActionRead))},
+	{name: "writer", user: "writer", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "work/", rwd},
 		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
 		{dockerA, "work/", rwd},
-	}},
+	}, formatGrants("work/", rwd))},
 	// member holds A and every build through its group, and reads B through
 	// a direct grant.
-	{name: "member", user: "member", grants: []matrixGrant{
+	{name: "member", user: "member", grants: slices.Concat([]matrixGrant{
 		{
 			"libs-local",
 			"",
@@ -102,15 +102,15 @@ var matrixPrincipals = []matrixPrincipal{
 		{"libs-b", "", types.ActionRead},
 		{types.BuildInfoRepository, "", rwd},
 		{dockerA, "", rawd},
-	}},
+	}, formatGrants("", rawd))},
 	// The seeded Any Remote permission: anonymous reads and deploys to
 	// remote repositories while anonymous access is on.
 	{
 		name: "anon-on", user: auth.AnonymousUser, anonymous: true, anonymousOn: true,
-		grants: []matrixGrant{
+		grants: slices.Concat([]matrixGrant{
 			{"remote-shared", "", types.ActionRead | types.ActionWrite},
 			{"remote-private", "", types.ActionRead | types.ActionWrite},
-		},
+		}, formatRemoteGrants(types.ActionRead|types.ActionWrite)),
 	},
 	{name: "anon-off", user: auth.AnonymousUser, anonymous: true},
 	// member's token scoped to A: what member holds in A, nothing in B.
@@ -122,9 +122,9 @@ var matrixPrincipals = []matrixPrincipal{
 	// on B.
 	{
 		name: "tok-groups", user: "member", token: true, scope: "applied-permissions/groups:team",
-		narrowed: true, grants: []matrixGrant{
+		narrowed: true, grants: slices.Concat([]matrixGrant{
 			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
-		},
+		}, formatGrants("", rawd)),
 	},
 	// admin's token scoped to A: every action there, but no admin endpoint.
 	{
@@ -400,6 +400,7 @@ func matrixTable() []matrixRow {
 		registryManifestMatrix(),
 		registryReferrersMatrix(),
 		registryListingMatrix(),
+		partMatrixRows(),
 	)
 }
 
@@ -1051,6 +1052,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		repos = append(repos, repo.Config{Key: "r-" + p, Class: repo.Local})
 	}
 	repos = append(repos, matrixRegistryRepos()...)
+	repos = append(repos, formatRepos()...)
 	for _, c := range repos {
 		must(db.Repos().Create(ctx, *repo.Defaults(&c)))
 	}
@@ -1089,6 +1091,23 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		dockerA,
 		"**",
 	)
+	// The formats' repositories have one permission per principal, so
+	// their grants follow the same pattern as libs-local's.
+	formatGrant := func(name string, g types.Grants, under string) {
+		must(db.Permissions().Create(ctx, types.Permission{
+			Name: name,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: g, Targets: formatTargets(under),
+			}},
+		}))
+	}
+	formatGrant("matrix-formats-reader", users("reader", types.ActionRead), "")
+	formatGrant("matrix-formats-writer", users("writer", rwd), "work/")
+	formatGrant(
+		"matrix-formats-team",
+		types.Grants{Groups: map[string]types.Actions{"team": rawd}},
+		"",
+	)
 	buildGrant := func(name string, g types.Grants) {
 		must(db.Permissions().Create(ctx, types.Permission{
 			Name: name,
@@ -1119,6 +1138,11 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	f.deploy(t, "libs-b", "b/get.txt", []byte("matrix"))
 	seedMatrixRegistry(t, f)
 	seedMatrixManifests(t, f)
+	for _, p := range matrixParts {
+		if p.seed != nil {
+			p.seed(t, f)
+		}
+	}
 	k := testKeys()
 	rs := roles.Service{Store: db}
 	for _, p := range names {
@@ -1153,11 +1177,17 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		Hash: testHash, Tokens: tokens,
 	})
 	must(err)
-	f.h = New(Config{
+	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
 		Tokens:    tokens,
 		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
-	})
+	}
+	for _, p := range matrixParts {
+		if p.tune != nil {
+			p.tune(&cfg)
+		}
+	}
+	f.h = New(cfg)
 	f.secrets = secrets
 	return f
 }
