@@ -75,6 +75,7 @@ confirmed from the provider's default layout map:
 | `go-default` | `go` |
 | `terraform-module-default`, `terraform-provider-default` | `terraform` by `terraformType` (the provider's `terraform_module` and `terraform_provider` resources) |
 | `bower-default`, `composer-default`, `conan-default`, `puppet-default`, `ansible-default`, `swift-default`, `nix-default`, `build-default` | other ecosystems |
+| `vcs-default` | none by default; Artifactory's built-in layout for `vcs` remotes |
 
 A layout is defined by `artifactPathPattern`, `distinctiveDescriptorPathPattern`,
 `descriptorPathPattern`, `folderIntegrationRevisionRegExp` and
@@ -91,6 +92,41 @@ file integration revision:   SNAPSHOT|(?:(?:\d{8}.\d{6})-(?:\d+))
 
 Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
 <https://raw.githubusercontent.com/jfrog/terraform-provider-artifactory/master/pkg/artifactory/resource/repository/default_repo_layout_map.go>.
+
+### Bundled definitions
+
+`pkg/layout/bundled.go` holds each bundled definition with its source (#277):
+
+- **Fifteen are copied from Artifactory 6.20's default descriptor** [S]:
+  `base/config/src/main/resources/META-INF/default/artifactory.config.xml:112-221` in the
+  `knottnhupfer/artifactory-oss` mirror at `b99e5649bcad`, kept in its order. They are
+  `maven-2-default`, `ivy-default`, `gradle-default`, `maven-1-default`, `nuget-default`,
+  `npm-default`, `bower-default`, `vcs-default`, `sbt-default`, `simple-default`,
+  `composer-default`, `conan-default`, `puppet-default`, `go-default` and `build-default`.
+  Maven 1 uses `.+` for both integration revisions and every later non-JVM layout `.*`.
+- **Two depart from the descriptor on purpose:** `go-default` (DV-040) and
+  `conan-default` (DV-056) match nothing as Artifactory ships them.
+- **Six were added in 7.x without a published definition:** `sbt-ivy-default` (named on
+  JFrog's sbt page), and `terraform-module-default`, `terraform-provider-default`,
+  `ansible-default`, `swift-default` and `nix-default` (named in the Terraform provider's
+  default map). They are reconstructed from the storage paths JFrog documents [I] (DV-055)
+  and are on the P19 list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+
+Artifactory turns a pattern into an expression in `RepoLayoutUtils.generateRegExpFromPattern`
+[S]: `[module]` is greedy (`[^/]+`), so where it appears only in a file name, as in
+`maven-1-default` and `build-default`, `commons-lang-2.1.jar` is module `commons-lang`; a `?`
+outside a token is escaped as a literal; and a repeated token is a back-reference to its first
+value. `pkg/layout` matches all three.
+
+What the bundled layouts do not describe, shown by real paths in
+`pkg/layout/bundled_test.go` [S]:
+
+| Layout | Path it does not match | Why |
+|---|---|---|
+| `npm-default` | `lodash/-/lodash-4.17.21.tgz` | npm's tarball path is not the layout's |
+| `ivy-default` | `org.gradle.sample/project1/1.0/jars/project1.jar` | Ivy's own default pattern has no revision in the file name |
+| `gradle-default` | `org.gradle.sample/project1/1.0/ivy-1.0.xml` | Gradle's ivy-publish writes the descriptor in the revision folder; the layout expects it beside the module folders, as in Gradle's old Wharf cache |
+| `sbt-default` | `org.example/lib_2.13/1.0/jars/lib_2.13.jar` | the slashes after the optional `scala_` and `sbt_` groups are mandatory, so only plugin paths match; JFrog's sbt page says the layout does not support cleanup |
 
 ## Common fields
 

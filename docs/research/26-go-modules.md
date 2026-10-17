@@ -228,7 +228,7 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
 - **[I]** Artifactory stores a version at the path `jf gp` deploys it to,
   `<module>/@v/<version>.{zip,mod,info}`, with the module path and version as written, not
   case-encoded: the build-info `jf gp` records names that path (section 3.1).
-- **[S]** artifactweave's `go-default` (`pkg/layout/bundled.go:93-99`) is
+- **[S]** artifactweave's `go-default` (`pkg/layout/bundled.go:146-154`) is
   `[orgPath]/[module]/@v/[baseRev].[ext]`. Checked against `pkg/layout` on 2026-10-16:
   - `github.com/go-chi/chi/v5/@v/v5.3.2.zip` gives `orgPath` `github.com/go-chi/chi`,
     `module` `v5`, `baseRev` `v5.3.2` and `ext` `zip`;

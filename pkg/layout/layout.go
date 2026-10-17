@@ -203,16 +203,18 @@ type pattern struct {
 	repeated bool
 }
 
-// tokenRegexps are the expressions Artifactory uses for the built-in tokens.
-// Organisation, module, revision and classifier stop at a slash; the
-// extension additionally must not start with a digit or contain a hyphen so
-// that "1.0-sources.jar" splits into baseRev, classifier and ext rather than
-// swallowing the classifier into the extension. "7z" is the one documented
-// exception to the leading-digit rule.
+// tokenRegexps are the expressions Artifactory uses for the built-in tokens
+// (RepoLayoutUtils.getTokenRegExp in 6.20). Organisation, module, revision and
+// classifier stop at a slash; the extension additionally must not start with a
+// digit or contain a hyphen so that "1.0-sources.jar" splits into baseRev,
+// classifier and ext rather than swallowing the classifier into the extension.
+// "7z" is the one documented exception to the leading-digit rule. Module alone
+// is greedy: where it appears only in a file name, as in maven-1-default and
+// build-default, commons-lang-2.1.jar is module commons-lang, not commons.
 var tokenRegexps = map[string]string{
 	TokenOrg:        `[^/]+?`,
 	TokenOrgPath:    `.+?`,
-	TokenModule:     `[^/]+?`,
+	TokenModule:     `[^/]+`,
 	TokenBaseRev:    `[^/]+?`,
 	TokenClassifier: `[^/]+?`,
 	TokenExt:        `(?:(?:[^\d/\-][^/\-]*)|7z)`,
