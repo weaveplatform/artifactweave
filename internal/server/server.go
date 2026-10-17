@@ -26,6 +26,7 @@ import (
 	pfedgen "github.com/weaveplatform/artifactweave/internal/server/gen/pfed"
 	workergen "github.com/weaveplatform/artifactweave/internal/server/gen/worker"
 	"github.com/weaveplatform/artifactweave/internal/server/golang"
+	"github.com/weaveplatform/artifactweave/internal/server/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -105,7 +106,7 @@ type Config struct {
 // protocols are the package protocols with routers of their own, mounted
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
-var protocols = []func() pkgroute.Protocol{golang.Protocol}
+var protocols = []func() pkgroute.Protocol{golang.Protocol, npm.Protocol}
 
 // newRegistry is the Docker registry for cfg. A nil token service must not
 // become a non-nil interface, which would leave the token endpoint

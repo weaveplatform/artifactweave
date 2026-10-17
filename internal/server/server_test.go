@@ -320,12 +320,13 @@ func TestStubsAndEnvelopes(t *testing.T) {
 			404,
 			`{"errors":[{"code":"UNSUPPORTED","message":"not a registry operation: GET /artifactory/api/docker/nope/v2/img/nothing"}]}`,
 		},
+		// Without a repository key, which the npm registry's routes need.
 		{
 			"npm 404",
 			"GET",
-			"/artifactory/api/npm/nope/left-pad",
+			"/artifactory/api/npm/",
 			404,
-			`{"error":"not found: GET /artifactory/api/npm/nope/left-pad"}`,
+			`{"error":"not found: GET /artifactory/api/npm/"}`,
 		},
 		{
 			"terraform 404",
