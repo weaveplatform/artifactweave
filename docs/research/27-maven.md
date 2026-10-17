@@ -93,8 +93,9 @@ shows the behaviour, the claim is **[I]** and is on the live-comparison list for
   | `gradle-default` | `[org]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]` | `[org]/[module]/ivy-[baseRev](-[fileItegRev]).xml` | `\d{14}`; `\d{14}` |
   | `maven-1-default` | `[org]/[type]s/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]` | `.pom` | `.+`; `.+` |
 
-  `sbt-default` is not defined in that class; artifactweave's copy in `pkg/layout/bundled.go`
-  is marked unverified and is checked by #277.
+  `sbt-default` is not defined in that class but in the default descriptor
+  (`artifactory.config.xml:172-179`), which #277 checked artifactweave's copy against
+  ([research 03](03-repository-configuration-model.md#bundled-definitions)).
 - **[S]** The Terraform provider gives each type a default `repoLayoutRef`: `maven-2-default`
   for Maven and Gradle, `ivy-default` for Ivy and `sbt-default` for SBT
   (`default_repo_layout_map.go`). Artifactory's REST API defaults every type to
