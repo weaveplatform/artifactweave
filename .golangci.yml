@@ -85,6 +85,15 @@ linters:
             ignore: true
           - pkg: github.com/weaveplatform/artifactweave/pkg/types/wire
             ignore: true
+    wrapcheck:
+      # Constructors of new errors with an HTTP status, this project's
+      # errors.New. wrapcheck 2.13 (golangci-lint 2.15) also reports calls that
+      # return a custom error type as error, so every return of these failed.
+      # Matching by signature, not by package, keeps errors passed up from
+      # other packages of the module checked.
+      extra-ignore-sigs:
+        - apierror.New(
+        - format.Reject(
 
   # 4) Issue-filtering (not disabling analysis, just silencing reports)
   exclusions:
