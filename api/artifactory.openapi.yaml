@@ -9981,7 +9981,8 @@ paths:
       x-tier: shim
   /api/security/configuration/passwordExpirationPolicy:
     get:
-      description: Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor.
+      deprecated: true
+      description: Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
       operationId: getPasswordExpirationPolicy
       responses:
         '200':
@@ -10001,7 +10002,8 @@ paths:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpasswordexpirationpolicy.md
     put:
-      description: Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+      deprecated: true
+      description: Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
       operationId: setPasswordExpirationPolicy
       requestBody:
         content:
@@ -10549,7 +10551,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getlockedoutusers.md
   /api/security/permissions:
     get:
-      description: Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only.
+      deprecated: true
+      description: Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
       operationId: getPermissionTargets
       responses:
         '200':
@@ -10579,7 +10582,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargets.md
   /api/security/permissions/{permissionTargetName}:
     delete:
-      description: Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated.
+      deprecated: true
+      description: Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
       operationId: deletePermissionTarget
       parameters:
         - description: Required path parameter. The target name.
@@ -10610,7 +10614,8 @@ paths:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontarget.md
     get:
-      description: 'Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only.'
+      deprecated: true
+      description: 'Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.'
       operationId: getPermissionTargetDetails
       parameters:
         - description: Required path parameter. The target name.
@@ -10643,7 +10648,8 @@ paths:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetails.md
     put:
-      description: Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+      deprecated: true
+      description: Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
       operationId: createOrReplacePermissionTarget
       parameters:
         - description: Required path parameter. The target name; wins over name in the body.
@@ -11072,7 +11078,8 @@ paths:
       tags:
         - security
     get:
-      description: Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works.
+      deprecated: true
+      description: Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
       operationId: getUserDetails
       parameters:
         - description: Required path parameter. The user name.
@@ -11973,7 +11980,7 @@ paths:
       x-tier: shim
   /api/system/license:
     get:
-      description: Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads it back.
+      description: Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
       operationId: getSystemLicense
       responses:
         '200':
@@ -11989,14 +11996,14 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Artifactory returns this on SaaS instances; artifactweave never does.
         '401':
-          description: Rejected credentials (documented by Artifactory; not produced here).
+          description: Rejected credentials.
         '403':
-          description: Non-admin caller (documented by Artifactory; not produced here).
+          description: Caller is not an administrator.
       summary: Licence information
       tags:
         - system
     post:
-      description: Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+      description: Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
       operationId: installLicense
       requestBody:
         content:
@@ -12080,22 +12087,20 @@ paths:
       tags:
         - system
     post:
-      description: Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+      description: Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
       operationId: installHALicenses
       requestBody:
         content:
           application/json:
             schema:
-              description: One entry per licence key.
-              items:
-                description: A single licence key.
-                properties:
-                  licenseKey:
-                    description: Optional within this object. The licence key text; ignored.
-                    type: string
-                type: object
-              type: array
-        description: The keys to install, one object per key.
+              description: One licence key object, or an array with one object per key.
+              oneOf:
+                - $ref: '#/components/schemas/LicenseKey'
+                - description: One entry per licence key.
+                  items:
+                    $ref: '#/components/schemas/LicenseKey'
+                  type: array
+        description: The keys to install, as one key object or an array of them.
         required: true
       responses:
         '200':
@@ -12105,7 +12110,7 @@ paths:
                 $ref: '#/components/schemas/LicenseBatchResult'
           description: Per-key outcome.
         '400':
-          description: The body is not a JSON array of objects.
+          description: The body is neither a licence key object nor an array of them.
         '401':
           description: Rejected credentials.
         '403':
@@ -12903,7 +12908,7 @@ paths:
       x-handwritten: true
   /api/system/verifyconnection:
     post:
-      description: Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+      description: Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
       operationId: verifyConnection
       requestBody:
         content:
@@ -12968,7 +12973,7 @@ paths:
                 $ref: '#/components/schemas/SystemVersion'
           description: The compatibility version.
         '401':
-          description: Artifactory documents this for rejected credentials. artifactweave serves the endpoint anonymously and never returns it, but keeps it for parity.
+          description: Rejected credentials. artifactweave serves the endpoint without credentials, but a request that carries credentials which fail is refused with 401, as Artifactory documents.
       summary: Artifactory-compatible version
       tags:
         - system
@@ -17520,7 +17525,7 @@ components:
           description: Optional within this object. Older single-string form of the error message that some Artifactory versions send alongside or instead of errors.
           type: string
         errors:
-          description: Optional within this object. One entry per error; clients read the first.
+          description: Optional within this object. One entry per error. No JFrog client in scope parses this body.
           items:
             description: One error.
             properties:
@@ -19762,7 +19767,8 @@ components:
       properties:
         errors:
           type: array
-          description: Required within this object. One entry per error; clients read the first.
+          description: >-
+            Required within this object. One entry per error. jfrog-client-go reports the whole body after the status, except release bundle import, which reads the first entry's message; the Terraform providers join the messages of every entry.
           items:
             type: object
             required: [status, message]
@@ -20557,6 +20563,13 @@ components:
           type: boolean
         scopesList:
           description: Optional within this object. Space-separated dependency scopes the checks covered.
+          type: string
+      type: object
+    LicenseKey:
+      description: A single licence key, as one entry of a batch install.
+      properties:
+        licenseKey:
+          description: Optional within this object. The licence key text; ignored.
           type: string
       type: object
     LicenseSearchResult:
@@ -22903,8 +22916,9 @@ components:
             description: Optional within this object. An add-on name.
         license:
           type: string
+          x-unverified: true
           description: >-
-            Optional within this object. Always the literal artifactweave. Real Artifactory servers emit a licence type here; no client parses it.
+            Optional within this object. Always the literal artifactweave. The 7.x reference does not list this field. The Artifactory 6.20 source emits a hash of the installed licence key here and leaves the field out when no licence is installed; unverified for 7.x. No client parses it.
     Tracker:
       description: The issue tracker the build's issues come from.
       properties:

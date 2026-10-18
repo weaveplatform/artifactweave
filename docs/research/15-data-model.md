@@ -272,7 +272,7 @@ introduce no stored entity of their own.
 Identity: `(repoKey, url)` for a target; `replicationKey` is the server-owned key. The
 direction (push from a local, pull into a remote) is derived from the repository class.
 
-### 2.5 Build-info *(not in oracle; from [09](09-jfrog-cli-compatibility.md))*
+### 2.5 Build-info *(not in oracle at the baseline; from [09](09-jfrog-cli-compatibility.md))*
 
 | Entity | Fields | Notes |
 |---|---|---|
@@ -286,7 +286,7 @@ direction (push from a local, pull into a remote) is derived from the repository
 
 | Record | Shape | Notes |
 |---|---|---|
-| Version | `{version, revision, addons[]}` (+ `license`, observed, not in the oracle) | server-owned; `version` is the compatibility string from decision [0005](decisions/0005-authentication-and-tokens.md) |
+| Version | `{version, revision, addons[]}` (+ `license`, not in the oracle: the 6.20 source sends a licence key hash there, **[I]** for 7.x) | server-owned; `version` is the compatibility string from decision [0005](decisions/0005-authentication-and-tokens.md) |
 | License | `{type, validThrough, licensedTo}`; HA list adds `licenseHash, nodeId, nodeUrl, expired`; install `{licenseKey}` → `{status, message}` | served honestly |
 | Probes | readiness/liveness `{code}`; ping text; `GET /api/system` text | |
 | Configuration descriptor | XML (`GET`/`POST /api/system/configuration`), YAML patch (`PATCH`, `application/yaml`), `baseUrl` text | sections in [06](06-system-configuration-and-descriptor.md); the descriptor is a view over Repository, Proxy, PropertySet, Layout, Backup, MailServer, Security settings |
@@ -694,10 +694,12 @@ Untyped or free-form in the oracle:
   resources, OIDC `claims`, `GET /api/security/lockedUsers` (array of strings is implied),
   `unlockUsers` and `expirePassword` request arrays, PyPI JSON endpoints, Puppet module and
   release bodies.
-- Build-info has no block in any crawled family; the shapes above come from the CLI
-  source. JFrog's Builds API pages do embed OpenAPI blocks, and
-  [research 22](22-aql-searches-build-info.md#3-build-info) records them with the checks
-  the CLI makes.
+- Build-info had no block in any crawled family at the research baseline, so the shapes
+  above come from the CLI source. The oracle has fetched the Builds API family since
+  [#194](https://github.com/weaveplatform/artifactweave/pull/194); its `uploadbuild` block
+  types the `BuildInfo` document, and
+  [research 22](22-aql-searches-build-info.md#3-build-info) records the blocks with the
+  checks the CLI makes.
 - The legacy user and group create, update and delete pages are not in the security
   family index any more (JFrog removed them from the reference while the endpoints still
   exist), so their request shapes are reproduced from [05](05-platform-identity-and-security-apis.md).

@@ -90,7 +90,7 @@ components:
             versions send alongside or instead of errors.
           type: string
         errors:
-          description: Optional within this object. One entry per error; clients read the first.
+          description: Optional within this object. One entry per error. No JFrog client in scope parses this body.
           items:
             description: One error.
             properties:

@@ -8,10 +8,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 )
 
-// surfaceFor picks the error envelope from the request path. Clients parse
-// errors (jfrog-client-go reads errors[].message, Docker reads errors[].code,
-// npm prints error), so the shape must match the surface even for a 404 that
-// no handler claimed.
+// surfaceFor picks the error envelope from the request path. Clients read
+// errors by surface (the Terraform providers join errors[] entries, Docker
+// reads errors[].code, npm prints error, jfrog-client-go prints the body), so
+// the shape must match the surface even for a 404 that no handler claimed.
 func surfaceFor(path string) apierror.Surface {
 	switch {
 	case strings.HasPrefix(path, "/xray/"):

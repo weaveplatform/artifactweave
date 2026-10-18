@@ -23,6 +23,13 @@ components:
           description: Optional within this object. The overall HTTP-style status, 200 when every entry succeeded.
           type: integer
       type: object
+    LicenseKey:
+      description: A single licence key, as one entry of a batch install.
+      properties:
+        licenseKey:
+          description: Optional within this object. The licence key text; ignored.
+          type: string
+      type: object
     NodeLicense:
       description: The licence of one cluster node. artifactweave reports a single node.
       properties:
@@ -554,8 +561,8 @@ paths:
   /api/system/license:
     get:
       description: Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly;
-        no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads
-        it back.
+        no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key
+        through POST /api/system/licenses and then reads this document back. Admin only.
       operationId: getSystemLicense
       responses:
         '200':
@@ -571,16 +578,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Artifactory returns this on SaaS instances; artifactweave never does.
         '401':
-          description: Rejected credentials (documented by Artifactory; not produced here).
+          description: Rejected credentials.
         '403':
-          description: Non-admin caller (documented by Artifactory; not produced here).
+          description: Caller is not an administrator.
       summary: Licence information
       tags:
       - system
     post:
       description: Artifactory installs a licence from the posted key. artifactweave has no licences; it validates
-        that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete
-        without error. Admin only.
+        that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without
+        error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf
+        command posts a licence. Admin only.
       operationId: installLicense
       requestBody:
         content:
@@ -669,23 +677,23 @@ paths:
       tags:
       - system
     post:
-      description: Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts
-        the array, stores nothing and reports every key as installed. Admin only.
+      description: Artifactory installs one licence per posted key and reports a status per key. JFrog documents an
+        array of key objects, but the platform_license Terraform resource posts a single key object, so both forms
+        are accepted; that resource fails on any error status except a 400 whose messages map its key to "License
+        already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
       operationId: installHALicenses
       requestBody:
         content:
           application/json:
             schema:
-              description: One entry per licence key.
-              items:
-                description: A single licence key.
-                properties:
-                  licenseKey:
-                    description: Optional within this object. The licence key text; ignored.
-                    type: string
-                type: object
-              type: array
-        description: The keys to install, one object per key.
+              description: One licence key object, or an array with one object per key.
+              oneOf:
+              - $ref: '#/components/schemas/LicenseKey'
+              - description: One entry per licence key.
+                items:
+                  $ref: '#/components/schemas/LicenseKey'
+                type: array
+        description: The keys to install, as one key object or an array of them.
         required: true
       responses:
         '200':
@@ -695,7 +703,7 @@ paths:
                 $ref: '#/components/schemas/LicenseBatchResult'
           description: Per-key outcome.
         '400':
-          description: The body is not a JSON array of objects.
+          description: The body is neither a licence key object nor an array of them.
         '401':
           description: Rejected credentials.
         '403':
@@ -944,8 +952,8 @@ paths:
     post:
       description: Performs a GET against the given endpoint from the server, using the global proxy settings and
         the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories.
-        Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported
-        as 400 with the reason. Admin only.
+        Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection
+        failure or a timeout is reported as 400 with the reason. Admin only.
       operationId: verifyConnection
       requestBody:
         content:
@@ -1015,8 +1023,8 @@ paths:
                 $ref: '#/components/schemas/SystemVersion'
           description: The compatibility version.
         '401':
-          description: Artifactory documents this for rejected credentials. artifactweave serves the endpoint anonymously
-            and never returns it, but keeps it for parity.
+          description: Rejected credentials. artifactweave serves the endpoint without credentials, but a request
+            that carries credentials which fail is refused with 401, as Artifactory documents.
       summary: Artifactory-compatible version
       tags:
       - system

@@ -17,8 +17,10 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 )
 
-// requestIDHeader is what Artifactory's own responses carry, so logs on both
-// sides of a reverse proxy line up.
+// requestIDHeader lines up artifactweave's logs with a reverse proxy's. It is
+// artifactweave's choice, not Artifactory's: Artifactory's correlation header
+// is X-Artifactory-Trace-Id, sent only when artifactory.trace.id.response.header
+// is true, from 7.79 (JFrog KB "How to correlate Artifactory and NGINX logs").
 const requestIDHeader = "X-Request-ID"
 
 // requestID reuses a caller-supplied id so a client can correlate retries, and

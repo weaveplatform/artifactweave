@@ -871,8 +871,9 @@ paths:
       x-tier: shim
   /api/security/configuration/passwordExpirationPolicy:
     get:
+      deprecated: true
       description: Returns the platform-wide password expiry settings. Admin only. The same policy is visible in
-        the security section of the YAML descriptor.
+        the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
       operationId: getPasswordExpirationPolicy
       responses:
         '200':
@@ -892,8 +893,10 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpasswordexpirationpolicy.md
     put:
+      deprecated: true
       description: Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values,
         because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+        Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
       operationId: setPasswordExpirationPolicy
       requestBody:
         content:
@@ -1465,8 +1468,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getlockedoutusers.md
   /api/security/permissions:
     get:
+      deprecated: true
       description: Lists every target by name and detail URL, including targets created through the v2 or Access
-        APIs. Admin only.
+        APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
       operationId: getPermissionTargets
       responses:
         '200':
@@ -1496,8 +1500,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargets.md
   /api/security/permissions/{permissionTargetName}:
     delete:
+      deprecated: true
       description: Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote
-        targets can be deleted; anonymous access then grants nothing until they are recreated.
+        targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog
+        in favour of DELETE /access/api/v2/permissions/{name}.
       operationId: deletePermissionTarget
       parameters:
       - description: Required path parameter. The target name.
@@ -1528,8 +1534,9 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontarget.md
     get:
+      deprecated: true
       description: 'Returns the target projected to the v1 shape: only its repository section, with action names
-        mapped back to the single-letter codes. Admin only.'
+        mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.'
       operationId: getPermissionTargetDetails
       parameters:
       - description: Required path parameter. The target name.
@@ -1562,9 +1569,10 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetails.md
     put:
+      deprecated: true
       description: Creates the target or replaces its repository section; build and release bundle sections set
         through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories
-        are a 400. Answers 200 with a confirmation message.
+        are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
       operationId: createOrReplacePermissionTarget
       parameters:
       - description: Required path parameter. The target name; wins over name in the body.
@@ -2010,8 +2018,10 @@ paths:
       tags:
       - security
     get:
+      deprecated: true
       description: Returns the legacy user document without the password. Admin only. The seeded anonymous user
-        is readable here, which is how artifactory_anonymous_user works.
+        is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour
+        of GET /access/api/v2/users/{username}.
       operationId: getUserDetails
       parameters:
       - description: Required path parameter. The user name.

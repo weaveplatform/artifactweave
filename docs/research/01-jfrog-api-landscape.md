@@ -1,6 +1,8 @@
 # JFrog API landscape
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
+2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)). **[J]** marks
+a JFrog Jira issue, as in the [research README](README.md#target-version-and-sources).
 
 Research baseline: 2026-10-12. This document records where JFrog publishes the API
 definitions that this project mirrors, how they are organised, what can and cannot be
@@ -130,6 +132,12 @@ existing keys with a platform setting that is off by default, per the
 health and the OIDC token exchange unless anonymous access is enabled in the security
 configuration. Details are in [05-platform-identity-and-security-apis.md](05-platform-identity-and-security-apis.md).
 
+7.x differs: version requires a valid user. From 7.35.1 anonymous callers cannot read it
+even with anonymous access enabled, although the reference page still says "Requires a valid
+user (can be anonymous)" (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414),
+fixed in 7.35.1; [Get Artifactory Version](https://docs.jfrog.com/administration/reference/getartifactoryversion.md));
+fixed by [#384](https://github.com/weaveplatform/artifactweave/issues/384).
+
 Sources: <https://docs.jfrog.com/administration/docs/access-tokens>,
 <https://docs.jfrog.com/user-management/docs/api-key>,
 <https://docs.jfrog.com/user-management/docs/identity-tokens>.
@@ -178,8 +186,9 @@ the embedded OpenAPI block of every endpoint page under `.specoracle/` in the wo
 copy. That directory is gitignored: JFrog's definitions are proprietary and only ever
 exist locally or in a CI cache, never in the repository.
 
-`make oracle-fetch` fills the cache (about 500 pages across the 21 families listed in
-`tools/specoracle/main.go`). `make parity` normalises both sides through one walker,
+`make oracle-fetch` fills the cache (658 pages and 648 OpenAPI blocks across the 22 families
+listed in `tools/specoracle/main.go`, on 2026-10-18; the Builds family joined in
+[#194](https://github.com/weaveplatform/artifactweave/pull/194)). `make parity` normalises both sides through one walker,
 `internal/specoracle`, and compares every documented operation with
 `api/*.openapi.yaml`: method and path (parameter names ignored), query and header
 parameters and their enums, request media types and property paths, response status

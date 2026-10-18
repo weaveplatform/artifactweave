@@ -1,6 +1,9 @@
 # 06: System API and the configuration descriptor
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
+2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)). **[KB]** marks
+a JFrog KB article and **[J]** a JFrog Jira issue, as in the
+[research README](README.md#target-version-and-sources).
 
 The system endpoints every client touches (ping, version, health, telemetry), the inputs to
 the version-string decision, and the Artifactory configuration descriptor in its YAML and
@@ -21,12 +24,12 @@ Items marked *(unverified)* have no primary-source confirmation.
 | GET | `/artifactory/api/system/ping` | anonymous | 200 | `text/plain` body `OK` |
 | GET | `/artifactory/api/v1/system/readiness` | anonymous | 200 | `{"code":"OK"}` |
 | GET | `/artifactory/api/v1/system/liveness` | anonymous | 200 / 500 | `{"code":"OK"}` |
-| GET | `/artifactory/api/system/version` | anonymous | 200 | `{"version":"...","revision":"...","addons":[]}`; also served as `application/vnd.org.jfrog.artifactory.system.Version+json`. Real servers add `license`; no client parses it |
+| GET | `/artifactory/api/system/version` | anonymous | 200 | `{"version":"...","revision":"...","addons":[]}`; also served as `application/vnd.org.jfrog.artifactory.system.Version+json`. The 7.x reference has no `license` field; the 6.20 source (`VersionResource.java`) adds the licence key hash there when a licence is installed, **[I]** for 7.x; no client parses it |
 | GET | `/artifactory/api/system` | admin | 200 | `text/plain` system info |
 | POST | `/artifactory/api/system/verifyconnection` | admin | 200 | `{endpoint,username,password}` |
 | GET | `/artifactory/api/system/license` | admin | 200 | `{"type":"...","validThrough":"...","licensedTo":"..."}`; read only by `platform_license` |
 | POST | `/artifactory/api/system/license` | admin | 200 | `{"licenseKey":"..."}`; accepted and ignored |
-| GET / POST / DELETE | `/artifactory/api/system/licenses[?licenseHash=a,b]` | admin or `system:info/licenses:r` | 200 | HA list `[{type,validThrough,licensedTo,licenseHash,nodeId,nodeUrl,expired}]` |
+| GET / POST / DELETE | `/artifactory/api/system/licenses[?licenseHash=a,b]` | admin or `system:info/licenses:r` | 200 | HA list `[{type,validThrough,licensedTo,licenseHash,nodeId,nodeUrl,expired}]`. JFrog documents an array body for `POST`, but `platform_license` installs by posting one `{"licenseKey":"..."}` object here and then reads `/license` back ([`resource_license.go`](https://github.com/jfrog/terraform-provider-platform/blob/1dd3a35/pkg/platform/resource_license.go)) |
 | GET | `/artifactory/api/system/service_id` | admin | 200 | `jfrt@<uuid>` |
 | GET | `/artifactory/api/storageinfo` | admin or `system:info/storage:r` | 200 | shape in [02-artifactory-core-api-inventory.md](02-artifactory-core-api-inventory.md) |
 | POST | `/artifactory/api/storageinfo/calculate` | admin | 202 | |
@@ -48,7 +51,7 @@ Items marked *(unverified)* have no primary-source confirmation.
 | POST | `/artifactory/api/system/support/bundle` (+ list, get, delete) | admin | 200 | not served |
 | GET | `/access/api/v1/system/ping` | anonymous | 200 | `OK` |
 | GET | `/access/api/v1/system/version` | anonymous | 200 | `{"name":"<version>","version":"<version>"}`; the `jfrog/platform` provider parses `name` as the Access version |
-| GET | `/router/api/v1/system/health` | anonymous | 200 / 503 | `{"router":{"state":"HEALTHY"},"services":[{"service_id":"jfrt@...","state":"HEALTHY"}]}`; 503 when any service is unhealthy (source is a jfrog.com help article, not a reference page) |
+| GET | `/router/api/v1/system/health` | anonymous | 200 / 503 | `{"router":{"state":"HEALTHY"},"services":[{"service_id":"jfrt@...","state":"HEALTHY"}]}`; 503 when any service is unhealthy. The shape is **[I]**: the reference page `https://docs.jfrog.com/administration/reference/routerhealthcheck` now answers 404, and `https://jfrog.com/help/r/jfrog-rest-apis/health-check` redirects to Mission Control's `mcsystemping`. A **[KB]** [article](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha) shows a `state` per service and ids such as `jfrt@01d8m3sm6q0rj21rqj47331ayc`, read from the router's `topology/health` |
 | GET | `/router/api/v1/system/ping` | anonymous | 200 | only in the third-party mirror; no 7.x page documents it: **[I]**, unconfirmed for 7.x |
 | POST | `/artifactory/api/system/usage` | any | 200 / 202 | undocumented usage ping sent by the Terraform providers at configure time and by `jf` on servers ≥6.9.0; accepted and ignored |
 | POST | `/jfconnect/api/v1/backoffice/metrics/log` | any | 200 / 201 | sent by every `jf` command when the server reports ≥7.102; failures are only debug-logged; accepted and ignored |
@@ -56,6 +59,38 @@ Items marked *(unverified)* have no primary-source confirmation.
 | POST | `/artifactory/api/import/repositories?path&repo&metadata&verbose` | admin | 200 | deferred |
 | GET / POST | `/artifactory/api/export/system` | admin | 200 | `{exportPath,includeMetadata,createArchive,bypassFiltering,verbose,failOnError,failIfEmpty,m2,incremental,excludeContent}`; deferred |
 | POST | `/artifactory/api/artifactexport/repository` | admin | 200 | `{action:"repository",path,repository,excludeMetadata,m2,verbose}`; deferred |
+
+Where artifactweave does not yet serve these endpoints as 7.x does:
+- 7.x differs: version requires a valid user, and from 7.35.1 anonymous callers cannot read
+  it even with anonymous access enabled (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414),
+  fixed in 7.35.1); fixed by [#384](https://github.com/weaveplatform/artifactweave/issues/384).
+- 7.x differs: ping answers 500 when Artifactory is not working, and readiness and liveness
+  answer an error status with the reason
+  ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md),
+  [readiness](https://docs.jfrog.com/administration/reference/getreadinessprobe.md),
+  [liveness](https://docs.jfrog.com/administration/reference/getlivenessprobe.md)); fixed by
+  [#403](https://github.com/weaveplatform/artifactweave/issues/403).
+- 7.x differs: router health gives the router and each service a `node_id`, `state` and
+  `message`, names each service by its real `jfrt@<id>` or `jfac@<id>` id, and answers 503
+  when a service is unhealthy, in the example with state `UNHEALTHY_PEER` (the
+  search-indexed copy of the removed `routerhealthcheck` page, and a **[KB]**
+  [sample response](https://jfrog.com/help/r/artifactory-how-to-use-artifactory-health-check/sample-response-for-health-check-on-artifactory-ha)
+  for the ids);
+  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
+- 7.x differs: 7.x also serves `/router/api/v1/system/readiness` and `liveness` and
+  `/access/api/v1/system/readiness` and `liveness`, which JFrog's own tools poll through the
+  public URL ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml),
+  [jfrog-secret-rotator-lambda `lambda_function.py`](https://github.com/jfrog/jfrog-secret-rotator-lambda/blob/main/secret-rotator/lambda_function.py));
+  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
+- 7.x differs: `service_id` returns `jfrt@<id>` as text to administrators, and
+  `jf atc --grant-admin` reads it to build the `jfrt@<id>:admin` scope
+  ([Get Service ID](https://docs.jfrog.com/administration/reference/getserviceid-1.md),
+  [`createaccesstoken.go`](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0a92d7c74c315335b3c8800044b25/artifactory/commands/generic/createaccesstoken.go));
+  artifactweave answers 501; fixed by [#391](https://github.com/weaveplatform/artifactweave/issues/391).
+- 7.x differs: `GET .../configuration/webServer` also answers a non-admin, with the proxy
+  method, the ports and the repositories that user may read
+  ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md));
+  fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
 
 Reverse proxy (`webServer`) shape:
 

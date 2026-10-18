@@ -2510,7 +2510,7 @@ type AdminLegacyErrorResponse struct {
 	// Error Optional within this object. Older single-string form of the error message that some Artifactory versions send alongside or instead of errors.
 	Error *string `json:"error,omitempty"`
 
-	// Errors Optional within this object. One entry per error; clients read the first.
+	// Errors Optional within this object. One entry per error. No JFrog client in scope parses this body.
 	Errors *[]struct {
 		// Message Optional within this object. Human-readable explanation.
 		Message *string `json:"message,omitempty"`
@@ -4227,7 +4227,7 @@ type ErrorDetails struct {
 
 // ErrorResponse The Artifactory error envelope used by every /artifactory response.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error; clients read the first.
+	// Errors Required within this object. One entry per error. jfrog-client-go reports the whole body after the status, except release bundle import, which reads the first entry's message; the Terraform providers join the messages of every entry.
 	Errors []struct {
 		// Message Required within this object. Human readable explanation.
 		Message string `json:"message"`
@@ -4739,6 +4739,12 @@ type LicenseControl struct {
 
 	// ScopesList Optional within this object. Space-separated dependency scopes the checks covered.
 	ScopesList *string `json:"scopesList,omitempty"`
+}
+
+// LicenseKey A single licence key, as one entry of a batch install.
+type LicenseKey struct {
+	// LicenseKey Optional within this object. The licence key text; ignored.
+	LicenseKey *string `json:"licenseKey,omitempty"`
 }
 
 // LicenseSearchResult Items tagged with licence information. artifactweave stores licence tags as ordinary properties and this search reads them; automatic discovery is not supported.
@@ -5913,7 +5919,7 @@ type SystemVersion struct {
 	// Addons Required within this object. Always empty; Artifactory lists licensed add-ons here and no client depends on the contents.
 	Addons []string `json:"addons"`
 
-	// License Optional within this object. Always the literal artifactweave. Real Artifactory servers emit a licence type here; no client parses it.
+	// License Optional within this object. Always the literal artifactweave. The 7.x reference does not list this field. The Artifactory 6.20 source emits a hash of the installed licence key here and leaves the field out when no licence is installed; unverified for 7.x. No client parses it.
 	License *string `json:"license,omitempty"`
 
 	// Revision Required within this object. The artifactweave build identifier (git describe output), so operators can tell the real version apart from the compatibility version.
@@ -7245,10 +7251,12 @@ type DeleteHALicenseParams struct {
 }
 
 // InstallHALicensesJSONBody defines parameters for InstallHALicenses.
-type InstallHALicensesJSONBody = []struct {
-	// LicenseKey Optional within this object. The licence key text; ignored.
-	LicenseKey *string `json:"licenseKey,omitempty"`
+type InstallHALicensesJSONBody struct {
+	union json.RawMessage
 }
+
+// InstallHALicensesJSONBody1 defines parameters for InstallHALicenses.
+type InstallHALicensesJSONBody1 = []LicenseKey
 
 // GetClusterLocksParams defines parameters for GetClusterLocks.
 type GetClusterLocksParams struct {
@@ -7765,6 +7773,8 @@ type SearchBuildArtifactsJSONRequestBody = ArtifactorySearchesApiBuildArtifactsR
 type SearchBuildArtifactsApplicationVndOrgJfrogArtifactorySearchBuildArtifactsRequestPlusJSONRequestBody = ArtifactorySearchesApiBuildArtifactsRequest
 
 // SetPasswordExpirationPolicyJSONRequestBody defines body for SetPasswordExpirationPolicy for application/json ContentType.
+//
+// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 type SetPasswordExpirationPolicyJSONRequestBody = PasswordExpirationPolicy
 
 // UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
@@ -7800,9 +7810,13 @@ type VerifyKeyPairJSONRequestBody = KeyPairInput
 type SetDistributionPublicGpgKeyJSONRequestBody = TrustedKeyInput
 
 // CreateOrReplacePermissionTargetJSONRequestBody defines body for CreateOrReplacePermissionTarget for application/json ContentType.
+//
+// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 type CreateOrReplacePermissionTargetJSONRequestBody = PermissionTarget
 
 // CreateOrReplacePermissionTargetApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONRequestBody defines body for CreateOrReplacePermissionTarget for application/vnd.org.jfrog.artifactory.security.PermissionTarget+json ContentType.
+//
+// Deprecated: this type has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 type CreateOrReplacePermissionTargetApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONRequestBody = PermissionTarget
 
 // UnlockLockedOutUsersJSONRequestBody defines body for UnlockLockedOutUsers for application/json ContentType.
@@ -7847,7 +7861,7 @@ type SetLoggerDebugLevelsJSONRequestBody = LoggerLevelsRequest
 type InstallLicenseJSONRequestBody InstallLicenseJSONBody
 
 // InstallHALicensesJSONRequestBody defines body for InstallHALicenses for application/json ContentType.
-type InstallHALicensesJSONRequestBody = InstallHALicensesJSONBody
+type InstallHALicensesJSONRequestBody InstallHALicensesJSONBody
 
 // StartSha256MigrationJSONRequestBody defines body for StartSha256Migration for application/json ContentType.
 type StartSha256MigrationJSONRequestBody StartSha256MigrationJSONBody
@@ -8584,6 +8598,68 @@ func (t SetRepositoryReplicationConfigurationJSONBody) MarshalJSON() ([]byte, er
 }
 
 func (t *SetRepositoryReplicationConfigurationJSONBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsLicenseKey returns the union data inside the InstallHALicensesJSONBody as a LicenseKey
+func (t InstallHALicensesJSONBody) AsLicenseKey() (LicenseKey, error) {
+	var body LicenseKey
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromLicenseKey overwrites any union data inside the InstallHALicensesJSONBody as the provided LicenseKey
+func (t *InstallHALicensesJSONBody) FromLicenseKey(v LicenseKey) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeLicenseKey performs a merge with any union data inside the InstallHALicensesJSONBody, using the provided LicenseKey
+func (t *InstallHALicensesJSONBody) MergeLicenseKey(v LicenseKey) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsInstallHALicensesJSONBody1 returns the union data inside the InstallHALicensesJSONBody as a InstallHALicensesJSONBody1
+func (t InstallHALicensesJSONBody) AsInstallHALicensesJSONBody1() (InstallHALicensesJSONBody1, error) {
+	var body InstallHALicensesJSONBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromInstallHALicensesJSONBody1 overwrites any union data inside the InstallHALicensesJSONBody as the provided InstallHALicensesJSONBody1
+func (t *InstallHALicensesJSONBody) FromInstallHALicensesJSONBody1(v InstallHALicensesJSONBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeInstallHALicensesJSONBody1 performs a merge with any union data inside the InstallHALicensesJSONBody, using the provided InstallHALicensesJSONBody1
+func (t *InstallHALicensesJSONBody) MergeInstallHALicensesJSONBody1(v InstallHALicensesJSONBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t InstallHALicensesJSONBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *InstallHALicensesJSONBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -10521,27 +10597,33 @@ type ClientInterface interface {
 
 	// GetPasswordExpirationPolicy Get the password expiration policy
 	//
-	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor.
+	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
 	//
 	// Corresponds with GET /api/security/configuration/passwordExpirationPolicy (the `GetPasswordExpirationPolicy` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetPasswordExpirationPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetPasswordExpirationPolicyWithBody Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	SetPasswordExpirationPolicyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetPasswordExpirationPolicy Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	SetPasswordExpirationPolicy(ctx context.Context, body SetPasswordExpirationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetUserEncryptedPassword Get an encrypted form of the caller's password
@@ -10769,50 +10851,62 @@ type ClientInterface interface {
 
 	// GetPermissionTargets List permission targets (v1)
 	//
-	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only.
+	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
 	//
 	// Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetPermissionTargets(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeletePermissionTarget Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated.
+	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
 	//
 	// Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	DeletePermissionTarget(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionTargetDetails Get a permission target (v1)
 	//
-	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only.
+	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
 	//
 	// Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetPermissionTargetDetails(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrReplacePermissionTargetWithBody Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplacePermissionTargetWithBody(ctx context.Context, permissionTargetName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrReplacePermissionTarget Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplacePermissionTarget(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type.
 	//
 	// Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetLegacyTokens List access tokens (legacy)
@@ -10930,9 +11024,11 @@ type ClientInterface interface {
 
 	// GetUserDetails Get a user (legacy)
 	//
-	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works.
+	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
 	//
 	// Corresponds with GET /api/security/users/{userName} (the `GetUserDetails` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUserDetails(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateUserWithBody Update a user (legacy)
@@ -11132,14 +11228,14 @@ type ClientInterface interface {
 
 	// GetSystemLicense Licence information
 	//
-	// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads it back.
+	// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
 	//
 	// Corresponds with GET /api/system/license (the `GetSystemLicense` operationId).
 	GetSystemLicense(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// InstallLicenseWithBody Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11148,7 +11244,7 @@ type ClientInterface interface {
 
 	// InstallLicense Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11171,7 +11267,7 @@ type ClientInterface interface {
 
 	// InstallHALicensesWithBody Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11180,7 +11276,7 @@ type ClientInterface interface {
 
 	// InstallHALicenses Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11379,7 +11475,7 @@ type ClientInterface interface {
 
 	// VerifyConnectionWithBody Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11388,7 +11484,7 @@ type ClientInterface interface {
 
 	// VerifyConnection Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -16288,9 +16384,10 @@ func (c *Client) RevokeUserApiKey(ctx context.Context, username string, reqEdito
 
 // GetPasswordExpirationPolicy Get the password expiration policy
 //
-// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor.
+// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
 //
 // Corresponds with GET /api/security/configuration/passwordExpirationPolicy (the `GetPasswordExpirationPolicy` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetPasswordExpirationPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPasswordExpirationPolicyRequest(c.Server)
 	if err != nil {
@@ -16305,11 +16402,12 @@ func (c *Client) GetPasswordExpirationPolicy(ctx context.Context, reqEditors ...
 
 // SetPasswordExpirationPolicyWithBody Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 //
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) SetPasswordExpirationPolicyWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetPasswordExpirationPolicyRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -16324,11 +16422,12 @@ func (c *Client) SetPasswordExpirationPolicyWithBody(ctx context.Context, conten
 
 // SetPasswordExpirationPolicy Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) SetPasswordExpirationPolicy(ctx context.Context, body SetPasswordExpirationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetPasswordExpirationPolicyRequest(c.Server, body)
 	if err != nil {
@@ -16806,9 +16905,10 @@ func (c *Client) GetLockedOutUsers(ctx context.Context, reqEditors ...RequestEdi
 
 // GetPermissionTargets List permission targets (v1)
 //
-// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only.
+// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
 //
 // Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetPermissionTargets(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPermissionTargetsRequest(c.Server)
 	if err != nil {
@@ -16823,9 +16923,10 @@ func (c *Client) GetPermissionTargets(ctx context.Context, reqEditors ...Request
 
 // DeletePermissionTarget Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated.
+// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
 //
 // Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) DeletePermissionTarget(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeletePermissionTargetRequest(c.Server, permissionTargetName)
 	if err != nil {
@@ -16840,9 +16941,10 @@ func (c *Client) DeletePermissionTarget(ctx context.Context, permissionTargetNam
 
 // GetPermissionTargetDetails Get a permission target (v1)
 //
-// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only.
+// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
 //
 // Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetPermissionTargetDetails(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPermissionTargetDetailsRequest(c.Server, permissionTargetName)
 	if err != nil {
@@ -16857,11 +16959,12 @@ func (c *Client) GetPermissionTargetDetails(ctx context.Context, permissionTarge
 
 // CreateOrReplacePermissionTargetWithBody Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 //
 // Takes any type of body and a specified content type.
 //
 // Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) CreateOrReplacePermissionTargetWithBody(ctx context.Context, permissionTargetName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateOrReplacePermissionTargetRequestWithBody(c.Server, permissionTargetName, contentType, body)
 	if err != nil {
@@ -16876,11 +16979,12 @@ func (c *Client) CreateOrReplacePermissionTargetWithBody(ctx context.Context, pe
 
 // CreateOrReplacePermissionTarget Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/json` content type.
 //
 // Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) CreateOrReplacePermissionTarget(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateOrReplacePermissionTargetRequest(c.Server, permissionTargetName, body)
 	if err != nil {
@@ -16895,11 +16999,12 @@ func (c *Client) CreateOrReplacePermissionTarget(ctx context.Context, permission
 
 // CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type.
 //
 // Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateOrReplacePermissionTargetRequestWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody(c.Server, permissionTargetName, body)
 	if err != nil {
@@ -17152,9 +17257,10 @@ func (c *Client) DeleteUser(ctx context.Context, userName string, reqEditors ...
 
 // GetUserDetails Get a user (legacy)
 //
-// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works.
+// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
 //
 // Corresponds with GET /api/security/users/{userName} (the `GetUserDetails` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *Client) GetUserDetails(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetUserDetailsRequest(c.Server, userName)
 	if err != nil {
@@ -17588,7 +17694,7 @@ func (c *Client) ActivateArtifactoryKeyEncryption(ctx context.Context, reqEditor
 
 // GetSystemLicense Licence information
 //
-// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads it back.
+// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
 //
 // Corresponds with GET /api/system/license (the `GetSystemLicense` operationId).
 func (c *Client) GetSystemLicense(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17605,7 +17711,7 @@ func (c *Client) GetSystemLicense(ctx context.Context, reqEditors ...RequestEdit
 
 // InstallLicenseWithBody Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17624,7 +17730,7 @@ func (c *Client) InstallLicenseWithBody(ctx context.Context, contentType string,
 
 // InstallLicense Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17677,7 +17783,7 @@ func (c *Client) GetHALicenseInfo(ctx context.Context, reqEditors ...RequestEdit
 
 // InstallHALicensesWithBody Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17696,7 +17802,7 @@ func (c *Client) InstallHALicensesWithBody(ctx context.Context, contentType stri
 
 // InstallHALicenses Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -18165,7 +18271,7 @@ func (c *Client) ListSupportBundles(ctx context.Context, reqEditors ...RequestEd
 
 // VerifyConnectionWithBody Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18184,7 +18290,7 @@ func (c *Client) VerifyConnectionWithBody(ctx context.Context, contentType strin
 
 // VerifyConnection Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -37239,29 +37345,35 @@ type ClientWithResponsesInterface interface {
 
 	// GetPasswordExpirationPolicyWithResponse Get the password expiration policy
 	//
-	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor.
+	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/security/configuration/passwordExpirationPolicy (the `GetPasswordExpirationPolicy` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetPasswordExpirationPolicyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPasswordExpirationPolicyResponse, error)
 
 	// SetPasswordExpirationPolicyWithBodyWithResponse Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	SetPasswordExpirationPolicyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPasswordExpirationPolicyResponse, error)
 
 	// SetPasswordExpirationPolicyWithResponse Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	SetPasswordExpirationPolicyWithResponse(ctx context.Context, body SetPasswordExpirationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPasswordExpirationPolicyResponse, error)
 
 	// GetUserEncryptedPasswordWithResponse Get an encrypted form of the caller's password
@@ -37511,56 +37623,68 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetsWithResponse List permission targets (v1)
 	//
-	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only.
+	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetPermissionTargetsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPermissionTargetsResponse, error)
 
 	// DeletePermissionTargetWithResponse Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated.
+	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	DeletePermissionTargetWithResponse(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*DeletePermissionTargetResponse, error)
 
 	// GetPermissionTargetDetailsWithResponse Get a permission target (v1)
 	//
-	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only.
+	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetPermissionTargetDetailsWithResponse(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*GetPermissionTargetDetailsResponse, error)
 
 	// CreateOrReplacePermissionTargetWithBodyWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplacePermissionTargetWithBodyWithResponse(ctx context.Context, permissionTargetName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrReplacePermissionTargetResponse, error)
 
 	// CreateOrReplacePermissionTargetWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplacePermissionTargetWithResponse(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplacePermissionTargetResponse, error)
 
 	// CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplacePermissionTargetResponse, error)
 
 	// GetLegacyTokensWithResponse List access tokens (legacy)
@@ -37692,11 +37816,13 @@ type ClientWithResponsesInterface interface {
 
 	// GetUserDetailsWithResponse Get a user (legacy)
 	//
-	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works.
+	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/security/users/{userName} (the `GetUserDetails` operationId).
+	//
+	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	GetUserDetailsWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*GetUserDetailsResponse, error)
 
 	// UpdateUserWithBodyWithResponse Update a user (legacy)
@@ -37918,7 +38044,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSystemLicenseWithResponse Licence information
 	//
-	// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads it back.
+	// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37927,7 +38053,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallLicenseWithBodyWithResponse Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37936,7 +38062,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallLicenseWithResponse Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37963,7 +38089,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallHALicensesWithBodyWithResponse Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37972,7 +38098,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallHALicensesWithResponse Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38209,7 +38335,7 @@ type ClientWithResponsesInterface interface {
 
 	// VerifyConnectionWithBodyWithResponse Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38218,7 +38344,7 @@ type ClientWithResponsesInterface interface {
 
 	// VerifyConnectionWithResponse Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -64298,11 +64424,13 @@ func (c *ClientWithResponses) RevokeUserApiKeyWithResponse(ctx context.Context, 
 
 // GetPasswordExpirationPolicyWithResponse Get the password expiration policy
 //
-// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor.
+// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/security/configuration/passwordExpirationPolicy (the `GetPasswordExpirationPolicy` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) GetPasswordExpirationPolicyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPasswordExpirationPolicyResponse, error) {
 	rsp, err := c.GetPasswordExpirationPolicy(ctx, reqEditors...)
 	if err != nil {
@@ -64313,11 +64441,13 @@ func (c *ClientWithResponses) GetPasswordExpirationPolicyWithResponse(ctx contex
 
 // SetPasswordExpirationPolicyWithBodyWithResponse Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) SetPasswordExpirationPolicyWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPasswordExpirationPolicyResponse, error) {
 	rsp, err := c.SetPasswordExpirationPolicyWithBody(ctx, contentType, body, reqEditors...)
 	if err != nil {
@@ -64328,11 +64458,12 @@ func (c *ClientWithResponses) SetPasswordExpirationPolicyWithBodyWithResponse(ct
 
 // SetPasswordExpirationPolicyWithResponse Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
+// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/security/configuration/passwordExpirationPolicy (the `SetPasswordExpirationPolicy` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) SetPasswordExpirationPolicyWithResponse(ctx context.Context, body SetPasswordExpirationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPasswordExpirationPolicyResponse, error) {
 	rsp, err := c.SetPasswordExpirationPolicy(ctx, body, reqEditors...)
 	if err != nil {
@@ -64734,11 +64865,13 @@ func (c *ClientWithResponses) GetLockedOutUsersWithResponse(ctx context.Context,
 
 // GetPermissionTargetsWithResponse List permission targets (v1)
 //
-// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only.
+// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) GetPermissionTargetsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetPermissionTargetsResponse, error) {
 	rsp, err := c.GetPermissionTargets(ctx, reqEditors...)
 	if err != nil {
@@ -64749,11 +64882,13 @@ func (c *ClientWithResponses) GetPermissionTargetsWithResponse(ctx context.Conte
 
 // DeletePermissionTargetWithResponse Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated.
+// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) DeletePermissionTargetWithResponse(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*DeletePermissionTargetResponse, error) {
 	rsp, err := c.DeletePermissionTarget(ctx, permissionTargetName, reqEditors...)
 	if err != nil {
@@ -64764,11 +64899,13 @@ func (c *ClientWithResponses) DeletePermissionTargetWithResponse(ctx context.Con
 
 // GetPermissionTargetDetailsWithResponse Get a permission target (v1)
 //
-// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only.
+// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) GetPermissionTargetDetailsWithResponse(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*GetPermissionTargetDetailsResponse, error) {
 	rsp, err := c.GetPermissionTargetDetails(ctx, permissionTargetName, reqEditors...)
 	if err != nil {
@@ -64779,11 +64916,13 @@ func (c *ClientWithResponses) GetPermissionTargetDetailsWithResponse(ctx context
 
 // CreateOrReplacePermissionTargetWithBodyWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithBodyWithResponse(ctx context.Context, permissionTargetName string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrReplacePermissionTargetResponse, error) {
 	rsp, err := c.CreateOrReplacePermissionTargetWithBody(ctx, permissionTargetName, contentType, body, reqEditors...)
 	if err != nil {
@@ -64794,11 +64933,12 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithBodyWithRespons
 
 // CreateOrReplacePermissionTargetWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithResponse(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplacePermissionTargetResponse, error) {
 	rsp, err := c.CreateOrReplacePermissionTarget(ctx, permissionTargetName, body, reqEditors...)
 	if err != nil {
@@ -64809,11 +64949,12 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithResponse(ctx co
 
 // CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type, and returns a wrapper object for the known response body format(s).
 //
 // Corresponds with PUT /api/security/permissions/{permissionTargetName} (the `CreateOrReplacePermissionTarget` operationId).
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse(ctx context.Context, permissionTargetName string, body CreateOrReplacePermissionTargetApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplacePermissionTargetResponse, error) {
 	rsp, err := c.CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody(ctx, permissionTargetName, body, reqEditors...)
 	if err != nil {
@@ -65029,11 +65170,13 @@ func (c *ClientWithResponses) DeleteUserWithResponse(ctx context.Context, userNa
 
 // GetUserDetailsWithResponse Get a user (legacy)
 //
-// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works.
+// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/security/users/{userName} (the `GetUserDetails` operationId).
+//
+// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 func (c *ClientWithResponses) GetUserDetailsWithResponse(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*GetUserDetailsResponse, error) {
 	rsp, err := c.GetUserDetails(ctx, userName, reqEditors...)
 	if err != nil {
@@ -65395,7 +65538,7 @@ func (c *ClientWithResponses) ActivateArtifactoryKeyEncryptionWithResponse(ctx c
 
 // GetSystemLicenseWithResponse Licence information
 //
-// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value, and the platform_license Terraform resource only reads it back.
+// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65410,7 +65553,7 @@ func (c *ClientWithResponses) GetSystemLicenseWithResponse(ctx context.Context, 
 
 // InstallLicenseWithBodyWithResponse Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65425,7 +65568,7 @@ func (c *ClientWithResponses) InstallLicenseWithBodyWithResponse(ctx context.Con
 
 // InstallLicenseWithResponse Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so the platform_license resource and jf complete without error. Admin only.
+// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65470,7 +65613,7 @@ func (c *ClientWithResponses) GetHALicenseInfoWithResponse(ctx context.Context, 
 
 // InstallHALicensesWithBodyWithResponse Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65485,7 +65628,7 @@ func (c *ClientWithResponses) InstallHALicensesWithBodyWithResponse(ctx context.
 
 // InstallHALicensesWithResponse Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. artifactweave accepts the array, stores nothing and reports every key as installed. Admin only.
+// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65884,7 +66027,7 @@ func (c *ClientWithResponses) ListSupportBundlesWithResponse(ctx context.Context
 
 // VerifyConnectionWithBodyWithResponse Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65899,7 +66042,7 @@ func (c *ClientWithResponses) VerifyConnectionWithBodyWithResponse(ctx context.C
 
 // VerifyConnectionWithResponse Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Any 2xx or 3xx from the endpoint counts as success; a connection failure, timeout or 4xx and 5xx is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

@@ -2899,7 +2899,8 @@ components:
           description: Optional within this object. Extra context such as the bundle or target the error concerns.
         errors:
           type: array
-          description: Required within this object. One entry per error; clients read the first.
+          description: >-
+            Required within this object. One entry per error. jfrog-client-go reports the whole body after the status and reads no field of it.
           items:
             type: object
             required: [status, message]

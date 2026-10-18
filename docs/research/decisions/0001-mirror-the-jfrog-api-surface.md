@@ -2,7 +2,8 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
+2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -39,6 +40,13 @@ Wire compatibility with Artifactory 7.x is the product contract:
   - *stub*: a well-formed `501` in that product's own error envelope so clients fail
     predictably (Xray, Lifecycle and AppTrust, Evidence);
   - *ignore*: `404` (Pipelines, Mission Control, MyJFrog, the SaaS bridges, JFConnect).
+    The one JFConnect exception is the metrics sink
+    `POST /jfconnect/api/v1/backoffice/metrics/log`, which answers 200 and discards the
+    body (`internal/server/server.go`, DV-011): every `jf` command posts there once the
+    server reports 7.102 or later, and accepts 200 or 201
+    ([jfrog-cli-core `common/commands/command.go`](https://github.com/jfrog/jfrog-cli-core/blob/25dbeb0335c03f14a284b1a34c654a9ceadf85b5/common/commands/command.go),
+    [jfrog-client-go `jfconnect/services/metrics.go`](https://github.com/jfrog/jfrog-client-go/blob/3b4b900d8174ba878d1ce7ef1df8d18fad341472/jfconnect/services/metrics.go);
+    [10-scope-and-tiers](../10-scope-and-tiers.md)).
 - For every stubbed product the research records the observed client reaction (the JFrog
   CLI and the Terraform providers), cited from client source, so a stub is never assumed
   to be harmless.

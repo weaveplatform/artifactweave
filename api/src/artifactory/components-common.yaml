@@ -28,9 +28,12 @@ components:
             description: Optional within this object. An add-on name.
         license:
           type: string
+          x-unverified: true
           description: >-
-            Optional within this object. Always the literal artifactweave. Real
-            Artifactory servers emit a licence type here; no client parses it.
+            Optional within this object. Always the literal artifactweave. The 7.x
+            reference does not list this field. The Artifactory 6.20 source emits a
+            hash of the installed licence key here and leaves the field out when no
+            licence is installed; unverified for 7.x. No client parses it.
     License:
       type: object
       additionalProperties: false
@@ -62,7 +65,11 @@ components:
       properties:
         errors:
           type: array
-          description: Required within this object. One entry per error; clients read the first.
+          description: >-
+            Required within this object. One entry per error. jfrog-client-go
+            reports the whole body after the status, except release bundle import,
+            which reads the first entry's message; the Terraform providers join the
+            messages of every entry.
           items:
             type: object
             required: [status, message]

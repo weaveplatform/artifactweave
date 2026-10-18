@@ -881,7 +881,7 @@ type ErrorResponse struct {
 	// Detail Optional within this object. Extra context such as the bundle or target the error concerns.
 	Detail *string `json:"detail,omitempty"`
 
-	// Errors Required within this object. One entry per error; clients read the first.
+	// Errors Required within this object. One entry per error. jfrog-client-go reports the whole body after the status and reads no field of it.
 	Errors []struct {
 		// Message Required within this object. Human readable explanation.
 		Message string `json:"message"`
