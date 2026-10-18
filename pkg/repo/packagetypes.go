@@ -54,6 +54,7 @@ const (
 	LayoutGo                = "go-default"
 	LayoutTerraformModule   = "terraform-module-default"
 	LayoutTerraformProvider = "terraform-provider-default"
+	LayoutCargo             = "cargo-default"
 	LayoutBower             = "bower-default"
 	LayoutComposer          = "composer-default"
 	LayoutConan             = "conan-default"

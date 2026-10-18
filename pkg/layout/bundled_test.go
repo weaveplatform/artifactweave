@@ -18,7 +18,7 @@ import (
 //     layouts;
 //   - sbt librarymanagement's Resolver.ivyStylePatterns,
 //     [organisation]/[module]/(scala_[scalaVersion]/)(sbt_[sbtVersion]/)[revision]/[type]s/[artifact](-[classifier]).[ext];
-//   - JFrog's Conan, Terraform and Swift repository pages;
+//   - JFrog's Cargo, Conan, Terraform and Swift repository pages;
 //   - the Maven 1, npm, NuGet, Puppet Forge, Composer and Ansible Galaxy file
 //     names those ecosystems publish.
 var realPaths = []struct {
@@ -319,6 +319,20 @@ var realPaths = []struct {
 		},
 		false,
 	},
+	// JFrog's Cargo page's example, and crate names with an underscore, a
+	// hyphen and a pre-release version, as cargo publish names them.
+	{"cargo-default", "crates/package/package-1.0.0.crate", layout.Values{
+		"module": "package", "baseRev": "1.0.0", "ext": "crate",
+	}, false},
+	{"cargo-default", "crates/serde_json/serde_json-1.0.114.crate", layout.Values{
+		"module": "serde_json", "baseRev": "1.0.114", "ext": "crate",
+	}, false},
+	{"cargo-default", "crates/tokio-util/tokio-util-0.7.10.crate", layout.Values{
+		"module": "tokio-util", "baseRev": "0.7.10", "ext": "crate",
+	}, false},
+	{"cargo-default", "crates/rand/rand-0.9.0-alpha.1.crate", layout.Values{
+		"module": "rand", "baseRev": "0.9.0-alpha.1", "ext": "crate",
+	}, false},
 	{"ansible-default", "geerlingguy/k8s/geerlingguy-k8s-0.11.0.tar.gz", layout.Values{
 		"orgPath": "geerlingguy", "org": "geerlingguy", "module": "k8s", "baseRev": "0.11.0",
 	}, false},
@@ -377,6 +391,8 @@ func TestBundledLayoutsRejectPathsTheyDoNotDescribe(t *testing.T) {
 		{"gradle-default", "org.gradle.sample/project1/1.0/ivy-1.0.xml", "Gradle's ivy-publish writes the descriptor in the revision folder"},
 		{"sbt-default", "org.example/lib_2.13/1.0/jars/lib_2.13.jar", "the plugin folders' slashes are mandatory"},
 		{"vcs-default", "jfrog/jfrog-cli/releases/v2.50.0/jfrog-cli-v2.50.0.tar.gz", "refs is tags or branches"},
+		{"cargo-default", "serde/serde-1.0.197.crate", "JFrog's Cargo page: a crate outside crates/ is not identified"},
+		{"cargo-default", "crates/serde/serde_json-1.0.114.crate", "the file is named after its folder's crate"},
 	} {
 		if _, err := mustLookup(t, tt.layout).Match(tt.path); !errors.Is(err, layout.ErrNoMatch) {
 			t.Errorf("%s %s (%s): want ErrNoMatch, got %v", tt.layout, tt.path, tt.why, err)
@@ -391,8 +407,8 @@ func TestBundledNames(t *testing.T) {
 		"maven-2-default", "ivy-default", "gradle-default", "maven-1-default", "nuget-default",
 		"npm-default", "bower-default", "vcs-default", "sbt-default", "simple-default",
 		"composer-default", "conan-default", "puppet-default", "go-default", "build-default",
-		"sbt-ivy-default", "terraform-module-default", "terraform-provider-default",
-		"ansible-default", "swift-default", "nix-default",
+		"cargo-default", "sbt-ivy-default", "terraform-module-default",
+		"terraform-provider-default", "ansible-default", "swift-default", "nix-default",
 	}
 	var got []string
 	for _, d := range layout.Bundled() {

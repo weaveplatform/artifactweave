@@ -20,8 +20,8 @@ func mustLookup(t *testing.T, name string) *layout.Layout {
 
 func TestBundledCompile(t *testing.T) {
 	defs := layout.Bundled()
-	if len(defs) != 21 {
-		t.Fatalf("expected 21 bundled layouts, got %d", len(defs))
+	if len(defs) != 22 {
+		t.Fatalf("expected 22 bundled layouts, got %d", len(defs))
 	}
 	for _, d := range defs {
 		l, err := layout.Compile(d)
