@@ -3,7 +3,9 @@
 // router kit (decision 0032). Packuments and version manifests are built on
 // each request from what the npm format keeps in the package index, and
 // tarballs download through the item routes' download, so redirects and
-// download counts apply to them as to any file.
+// download counts apply to them as to any file. A publish stores the
+// tarball through the item service, whose npm format indexes it as it
+// indexes a REST deploy.
 package npm
 
 import (
@@ -21,8 +23,21 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
+// Options are the npm registry's settings.
+type Options struct {
+	// MaxPublishSize is the largest publish request accepted
+	// (npm.max_publish_size); zero means DefaultMaxPublishSize.
+	MaxPublishSize int64
+}
+
+// DefaultMaxPublishSize is decision 0034's default npm.max_publish_size.
+const DefaultMaxPublishSize = 1 << 30
+
 // Protocol is npm's registry protocol.
-func Protocol() pkgroute.Protocol {
+func Protocol(o Options) pkgroute.Protocol {
+	if o.MaxPublishSize <= 0 {
+		o.MaxPublishSize = DefaultMaxPublishSize
+	}
 	return pkgroute.Protocol{
 		Name:    "npm",
 		Types:   []repo.PackageType{repo.NPM},
@@ -32,12 +47,13 @@ func Protocol() pkgroute.Protocol {
 		// is a package name too, whose packument a GET asks for, while the
 		// operation's own POST reaches the generated server ahead of the kit.
 		Reserved: []string{"auth", "{repoKey}/auth/{scope}"},
-		Routes:   routes,
+		Routes: func(r chi.Router, k *pkgroute.Kit) {
+			routes(r, handler{k: k, maxPublish: o.MaxPublishSize})
+		},
 	}
 }
 
-func routes(r chi.Router, k *pkgroute.Kit) {
-	h := handler{k: k}
+func routes(r chi.Router, h handler) {
 	r.Get("/-/ping", h.ping)
 	r.Get("/-/whoami", h.whoami)
 	// Every other GET names a package: its packument, one version's
@@ -45,9 +61,13 @@ func routes(r chi.Router, k *pkgroute.Kit) {
 	// claims answer 404.
 	r.Get("/*", h.read)
 	r.Head("/*", h.read)
+	r.Put("/*", h.write)
 }
 
-type handler struct{ k *pkgroute.Kit }
+type handler struct {
+	k          *pkgroute.Kit
+	maxPublish int64
+}
 
 // ping answers every caller the server lets through: an authenticated
 // one, or anonymous while anonymous access is on (decision 0034). npm

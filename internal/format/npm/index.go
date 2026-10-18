@@ -290,7 +290,7 @@ func readOnce(
 	if t, ok := read[it.Actual.SHA256]; ok {
 		return t, nil
 	}
-	t, _, err := readStored(ctx, env.Blobs, it.Actual.SHA256)
+	t, _, err := ReadStored(ctx, env.Blobs, it.Actual.SHA256)
 	if err != nil {
 		return nil, err
 	}

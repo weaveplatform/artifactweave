@@ -95,6 +95,9 @@ type Config struct {
 	// lists one file twice (build.block_duplicate_entries false); the zero
 	// value refuses it, as Artifactory 7.x does by default.
 	AllowDuplicateBuildEntries bool
+	// NPMMaxPublishSize caps an npm publish request (npm.max_publish_size);
+	// zero means decision 0034's default.
+	NPMMaxPublishSize int64
 	// Work is the runtime's work queue, which formats ask for derived work
 	// (decision 0033). Nil writes that work to the store's queue directly,
 	// where the workers find it on their next poll.
@@ -110,7 +113,12 @@ type Config struct {
 // protocols are the package protocols with routers of their own, mounted
 // through the router kit (decision 0032). A format with a protocol adds its
 // constructor here.
-var protocols = []func() pkgroute.Protocol{golang.Protocol, npm.Protocol}
+var protocols = []func(Config) pkgroute.Protocol{
+	func(Config) pkgroute.Protocol { return golang.Protocol() },
+	func(cfg Config) pkgroute.Protocol {
+		return npm.Protocol(npm.Options{MaxPublishSize: cfg.NPMMaxPublishSize})
+	},
+}
 
 // newRegistry is the Docker registry for cfg. A nil token service must not
 // become a non-nil interface, which would leave the token endpoint
@@ -177,7 +185,7 @@ func New(cfg Config) http.Handler {
 	)
 	mounted := make([]pkgroute.Protocol, 0, len(protocols)+len(cfg.Protocols))
 	for _, p := range protocols {
-		mounted = append(mounted, p())
+		mounted = append(mounted, p(cfg))
 	}
 	mounted = append(mounted, cfg.Protocols...)
 	if cfg.Auth != nil {

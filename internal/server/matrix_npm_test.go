@@ -28,6 +28,11 @@ var npmMatrixPart = matrixPart{
 			row(npmTarballHead, local+"lib/-/lib-1.0.0.tgz", "", reads("lib"), 200),
 			row(npmPing, local+"-/ping", "", anyone, 200),
 			row(npmWhoami, local+"-/whoami", "", signedIn, 200),
+			// Each principal publishes to a fixture of its own: the
+			// version is published once.
+			row(npmPublish, local+"work", npmPublishBody("work", "2.0.0"),
+				holds("npm-local", npmfmt.CanonicalPath("work", "2.0.0"), types.ActionWrite),
+				200).alone(),
 		}
 	},
 	seed: func(t *testing.T, f *matrixFixture) {

@@ -5,6 +5,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"crypto/sha1" //nolint:gosec // npm's dist.shasum is SHA-1 by definition
+	"crypto/sha512"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
@@ -32,6 +37,8 @@ const (
 	npmTarballHead = "HEAD " + npmBase + "{repoKey}/{package}/-/{tarball}"
 	npmPing        = "GET " + npmBase + "{repoKey}/-/ping"
 	npmWhoami      = "GET " + npmBase + "{repoKey}/-/whoami"
+	// npmPublish is npm publish (#288).
+	npmPublish = "PUT " + npmBase + "{repoKey}/{package}"
 )
 
 // npmStatusPart is npm's share of the status table, which its pull
@@ -39,7 +46,7 @@ const (
 var npmStatusPart = statusPart{
 	handwritten: map[string]bool{
 		npmPackument: true, npmManifest: true, npmTarball: true, npmTarballHead: true,
-		npmPing: true, npmWhoami: true,
+		npmPing: true, npmWhoami: true, npmPublish: true,
 	},
 	generated: map[string]bool{npmReindex: true},
 	rows: func() []statusCase {
@@ -105,6 +112,46 @@ var npmStatusPart = statusPart{
 			{npmWhoami, local + "-/whoami", "user", "", 200},
 			{npmWhoami, local + "-/whoami", "anonymous", "", 401},
 			{npmWhoami, local + "-/whoami", "", "", 401},
+
+			{npmPublish, local + "status-new", "admin", npmPublishBody("status-new", "1.0.0"), 200},
+			{npmPublish, local + "@acme%2fnew", "admin", npmPublishBody("@acme/new", "1.0.0"), 200},
+			// A version is published once, for every caller (decision 0034).
+			{npmPublish, local + "status-pkg", "admin", npmPublishBody("status-pkg", "1.0.0"), 403},
+			{npmPublish, local + "status-pkg", "admin", npmPublishBody("other", "3.0.0"), 400},
+			{npmPublish, local + "status-pkg", "user", npmPublishBody("status-pkg", "3.0.0"), 403},
+			{
+				npmPublish,
+				local + "status-pkg",
+				"anonymous",
+				npmPublishBody("status-pkg", "3.0.0"),
+				401,
+			},
+			{npmPublish, local + "status-pkg", "", npmPublishBody("status-pkg", "3.0.0"), 401},
+			{
+				npmPublish,
+				npmBase + "missing/status-pkg",
+				"admin",
+				npmPublishBody("status-pkg", "3.0.0"),
+				404,
+			},
+			{
+				npmPublish,
+				npmBase + "libs-local/status-pkg",
+				"admin",
+				npmPublishBody("status-pkg", "3.0.0"),
+				404,
+			},
+			{
+				npmPublish,
+				npmBase + "npm-remote/status-pkg",
+				"admin",
+				npmPublishBody("status-pkg", "3.0.0"),
+				501,
+			},
+			// A packument update (npm deprecate) is #289's.
+			{npmPublish, local + "status-pkg", "admin", `{"name":"status-pkg","versions":{}}`, 501},
+			// Unpublish is #290's.
+			{npmPublish, local + "status-pkg/-rev/1-abc", "admin", "{}", 405},
 		}
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
@@ -143,6 +190,29 @@ func deployNPM(
 
 // npmTarballOf is a package tarball whose package.json gives name and
 // version. Writes to a buffer cannot fail, so neither can this.
+// npmPublishBody is the body npm publish sends for the tarball of name at
+// version, with the dist facts npm computes for it.
+func npmPublishBody(name, version string) string {
+	tgz := npmTarballOf(name, version)
+	s1 := sha1.Sum(tgz) //nolint:gosec // npm's dist.shasum is SHA-1
+	s5 := sha512.Sum512(tgz)
+	b, _ := json.Marshal(map[string]any{
+		"_id": name, "name": name, "dist-tags": map[string]string{"latest": version},
+		"versions": map[string]any{version: map[string]any{
+			"name": name, "version": version, "dist": map[string]string{
+				"shasum":    hex.EncodeToString(s1[:]),
+				"integrity": "sha512-" + base64.StdEncoding.EncodeToString(s5[:]),
+			},
+		}},
+		"_attachments": map[string]any{name + "-" + version + ".tgz": map[string]any{
+			"content_type": "application/octet-stream",
+			"data":         base64.StdEncoding.EncodeToString(tgz),
+			"length":       len(tgz),
+		}},
+	})
+	return string(b)
+}
+
 func npmTarballOf(name, version string) []byte {
 	var buf bytes.Buffer
 	gz := gzip.NewWriter(&buf)
