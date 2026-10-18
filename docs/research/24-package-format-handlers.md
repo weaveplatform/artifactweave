@@ -2,7 +2,7 @@
 
 Research baseline: **2026-10-16**.
 
-Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#6-artifactory-7x-check) records it.
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#6-artifactory-7x-check) records it.
 
 Phase P7 adds npm, Go and Maven local repositories at once, and P8 adds PyPI, NuGet, Helm and
 Terraform. Each format reacts to what is deployed: it indexes packages and versions, writes
@@ -20,6 +20,7 @@ Each claim is labelled:
 |---|---|
 | **[D]** | documented at the cited place, read on 2026-10-16 |
 | **[S]** | seen in source code at the cited commit |
+| **[J]** | recorded in JFrog's public Jira (`https://jfrog.atlassian.net/rest/api/2/issue/<KEY>`), read on 2026-10-18; it counts as 7.x behaviour under the rules in the [research README](README.md) |
 | **[I]** | inferred from the documented facts; not stated by any source |
 
 Sources:
@@ -62,7 +63,7 @@ Sources:
 | 2.10 | The store has `RecordVersionDownload` (`pkg/store/content.go`), but nothing calls it: `serveFile` records item downloads only | [S] |
 | 2.11 | `pkg/layout/bundled.go` compiles the bundled layouts. `maven-2-default`, `ivy-default` and `gradle-default` are verified; `maven-1-default`, `sbt-default`, `sbt-ivy-default`, `npm-default`, `go-default`, `nuget-default` and `terraform-module-default` are marked unverified. #277 later checked every bundled layout ([research 03](03-repository-configuration-model.md#bundled-definitions)) | [S] |
 | 2.12 | `item.Service.Layout` (`transfer.go` line 305) resolves a layout by name. The token reading the P5 searches use (`layoutScope.read`, `coordinates`) is private to `internal/server/searches_layout.go` | [S] |
-| 2.13 | `repo.Defaults` sets `repoLayoutRef` to `maven-2-default` whatever the package type when it is omitted (`pkg/repo/defaults.go` line 36), as Artifactory's REST API does. A protocol handler therefore cannot take its storage paths from `repoLayoutRef` | [S] |
+| 2.13 | `repo.Defaults` sets `repoLayoutRef` to `maven-2-default` whatever the package type when it is omitted (`pkg/repo/defaults.go` line 36), as Artifactory's REST API does. A protocol handler therefore cannot take its storage paths from `repoLayoutRef`. 7.x differs for sbt, which gets `sbt-default`; fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396) | [S] for the code; [D] the [createrepository](https://docs.jfrog.com/artifactory/reference/createrepository.md) OpenAPI: "Default `maven-2-default` where applicable"; [D] [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md) (updated 2026-01-05, read 2026-10-18): `sbt-default` "is automatically applied when creating a repository without specifying a layout" |
 | 2.14 | The item routes match `/artifactory/{repoKey}/...` with `repoKey` any segment but `api` (`notAPI`, `internal/server/handwritten.go` line 104), so `/artifactory/api/npm/...` and `/artifactory/api/go/...` answer 404 today | [S] |
 | 2.15 | The Docker registry is the one hand-written protocol package: `internal/server/docker`, mounted by `registry.Register(r)` in `internal/server/server.go` (line 178) before the generated servers, with the JFrog operations beside it reaching the generated server (decision 0031) | [S] |
 | 2.16 | `surfaceFor` (`internal/server/stubs.go`) already picks the npm envelope `{"error":"..."}` for `/artifactory/api/npm/`, the plain-text one for `/artifactory/api/go/` and `/artifactory/api/pypi/`, and the Terraform registry's for `/artifactory/api/terraform/` | [S] |
@@ -119,7 +120,7 @@ rule for every format **[S, from the decisions]**:
 
 ## 6. Artifactory 7.x check
 
-Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 **Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation.
 
@@ -136,6 +137,12 @@ Artifactory wires it.
 - **5.4.** No 7.x page or note describes a download from a blacked-out repository, so it stays
   open.
 - **npm.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) refuses copy and move into `.npm/` (research 25 section 5).
+  7.x differs from fact 2.16: the JFrog operations `api/npm/auth` and
+  `api/npm/<repo>/auth/<scope>` answer errors in the Artifactory envelope,
+  `{"errors":[{"status":400,"message":"Not supported user type."}]}` on 7.73.0 ([J] RTFACT-30181,
+  research 25 section 4), where `surfaceFor` gives every `/artifactory/api/npm/` path npm's;
+  fixed by [#292](https://github.com/weaveplatform/artifactweave/issues/292) and, for
+  `api/npm/<repo>/reindex`, [#293](https://github.com/weaveplatform/artifactweave/issues/293).
 - **Maven.** 7.x accepts more POMs, with a leading blank line, non-breaking spaces or
   ISO-8859-1 (research 27 section 6).
 
