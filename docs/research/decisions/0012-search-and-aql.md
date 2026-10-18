@@ -80,8 +80,8 @@ resolve against the configured repositories before the query runs, on every engi
 
 **Output.** The include, sort, offset and limit rules follow research 22 §1.2:
 - naming an item field replaces the defaults, and property or statistic fields add to them;
-- `sort`, `offset` and `limit` are refused unless the include names only primary-domain
-  fields;
+- `sort`, `offset` and `limit` are accepted whatever the include, and apply to the items, as
+  **Exploding includes** below sets out; a sort names only fields in the output;
 - `distinct` defaults to true, and `.distinct(false)` turns it off;
 - `?compact=true` minifies the response;
 - a `stream: true` header is accepted, and the response shape stays the same.
@@ -156,8 +156,17 @@ resolve against the configured repositories before the query runs, on every engi
     escaped, then `*` becomes `%` and `?` becomes `_`.
 - **Property criteria.** Each `@key` criterion compiles to its own `EXISTS` over the
   property table, and `{"@*":v}` is an any-key `EXISTS`.
-- **Exploding includes.** `.include("property")` multiplies rows, so sort, offset and limit
-  are applied to the primary-domain query first, matching Artifactory's restriction.
+- **Exploding includes.** Joining properties into the item query would give one row per
+  item and property, so they are not joined. The item query is sorted, offset and limited on
+  its own, and the store then loads the properties and statistics of the items it returned.
+  - **Each result row is one item,** with all of its properties and statistics inside it,
+    whatever the include.
+  - **`.sort()`** orders the items by the item fields it names.
+  - **`.offset(N)`** skips the first N items in that order, and `range.start_pos` is N.
+  - **`.limit(N)`** returns at most N items, each with all of its properties.
+  - **Not Artifactory's rows.** Beside a property or statistic include, Artifactory ignores
+    the sort and counts its joined item-property rows, so its limit can return fewer items
+    than N ([DV-074](../../implementation/deviations.md#api-behaviour)).
 - **Relative dates.** `$before` and `$last` are resolved at compile time.
 
 **Fixtures.** The query shape the JFrog CLI generates is captured as fixtures from the CLI
@@ -288,6 +297,15 @@ A real parser is the only way to serve the CLI's queries and users' queries from
 code path and to test them against both dialects. Compiling to SQL keeps the item table as
 the single source of truth and avoids a second index.
 
+**Sort, offset and limit on the items, whatever the include,** gives the JFrog CLI what its
+flags ask for: `--offset N` skips N files, and `--sort-by` orders files. Counting joined
+item-property rows is a limitation JFrog documents, and its own client works around it by
+leaving `property` out of the include for a sort or a limit and fetching properties in a
+second query. Refusing the query, as artifactweave first did, broke `jf rt s --offset` and
+`jf rt dl --offset` (#386), which keep `property` in the include. The rows differ from
+Artifactory's, so this is a deviation
+([DV-074](../../implementation/deviations.md#api-behaviour)).
+
 **Remote keys matching their caches** is what makes `jf rt dl <remote>/<path>` work once a
 file is cached, which JFrog documents as the way to download from a remote (#68).
 
@@ -335,6 +353,11 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 
 **Alternatives considered:**
 - *Pattern-matching the CLI's queries only:* fragile and useless to users.
+- *Counting joined item-property rows beside a property include, as Artifactory does:* a
+  page could end inside an item's properties, `--offset 1` would skip one property of the
+  first file rather than the file, and a limit would return fewer files than it names.
+- *Refusing sort, offset and limit beside a property or statistic include:* Artifactory
+  accepts the query, and `jf rt s --offset` and `jf rt dl --offset` send it.
 - *A separate search engine:* another process to run, against the single-binary goal.
 - *Actions answering a count only:* a dry run could not show which items it would touch.
 - *Actions for administrators only:* stricter than the per-item operations they batch, for
@@ -365,18 +388,24 @@ repository include and exclude patterns "so AQL results align with ... other sea
 methods". The handlers this decision read from 6.20 (References) remain unconfirmed for
 7.x.
 
+`sort`, `offset` and `limit` beside a property or statistic include are accepted, as 7.x
+accepts them. JFrog's page says they "will not work" there and shows an "Example where
+sorting is ignored", not a refusal
+([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md)). The
+JFrog CLI depends on it: jfrog-client-go keeps `property` in the include unless a spec has
+a sort or a limit (`includePropertiesInAqlForSpec`), so `jf rt s --offset N` and
+`jf rt dl --offset N` send `.offset(N)` beside it. What 7.x then returns differs, as
+**Exploding includes** and [DV-074](../../implementation/deviations.md#api-behaviour)
+record: the same page says a limit can return "fewer artifacts than N when one artifact has
+several properties", and a 7.21.7 user report shows the sort ignored
+([RTFACT-26346](https://jfrog.atlassian.net/browse/RTFACT-26346)). How 7.x counts an
+offset there is inferred ([research 22 §1.2](../22-aql-searches-build-info.md#12-output-sorting-and-limits);
+[#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+
 The audit against KB, Jira and client sources on 2026-10-18
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found these
 differences. Each issue named fixes the code, and corrects this record's text when it
 lands:
-- 7.x differs: it accepts `sort`, `offset` or `limit` beside a property or statistic
-  include, where they "will not work", rather than refusing the query; `pkg/aql` answers
-  400, so `jf rt s --offset N` and `jf rt dl --offset N` fail
-  ([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md); the
-  jfrog-client-go `includePropertiesInAqlForSpec` includes `property` when a spec has
-  neither a sort nor a limit, so an offset alone meets it;
-  [RTFACT-26346](https://jfrog.atlassian.net/browse/RTFACT-26346), a 7.21.7 user report);
-  fixed by [#386](https://github.com/weaveplatform/artifactweave/issues/386).
 - 7.x differs: a query over the size limit answers 400 `AQL query is too long; please
   reduce the query length to less than 6000 chars`, the number being the configured limit
   ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md)); fixed by
@@ -453,6 +482,9 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   published build produced, and nothing else.
 - An acceptance round trip: `jf rt dl remote/*.jar` downloads a file seeded into the
   remote's cache.
+- An acceptance round trip: `jf rt s --offset 1` and `jf rt dl --offset 1` skip the first
+  file, which has two properties, and return the rest; shared cases run sort, offset and
+  limit beside property, key and statistic includes on every backend.
 - Dry-run and real-run tests for both actions, including skipped items, and shared
   fixtures for their criteria run in memory and on SQLite and PostgreSQL.
 - GET search endpoint response-shape tests, against Maven, Ivy and broken layouts and

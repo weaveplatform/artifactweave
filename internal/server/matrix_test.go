@@ -584,6 +584,12 @@ func contentMatrix() []matrixRow {
 			aql, "/artifactory/api/search/aql",
 			`items.find({"repo":"libs-local"}).include("repo","path","name")`, aqlCaller, 200,
 		),
+		// jf rt s --offset's shape: .offset() beside "property".
+		row(
+			aql, "/artifactory/api/search/aql",
+			`items.find({"repo":"libs-local"}).include("repo","path","name","property").offset(1)`,
+			aqlCaller, 200,
+		),
 		row(
 			create, uploadsCreate+"?repoKey=libs-local&repoPath=work/big-{p}.bin&partSizeMB=1", "",
 			holds("libs-local", "work/", write), 200,

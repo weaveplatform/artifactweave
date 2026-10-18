@@ -13,7 +13,7 @@ ARTIFACTWEAVE_AQL_CAPTURE="$out" ARTIFACTWEAVE_ACCEPT_LOCAL=1 GOWORK=off \
 	go test -count=1 ./test/acceptance/ -run 'TestFeatures/the_query_shapes_the_fixtures_capture'
 names=(
 	search_recursive search_props_sort search_props_properties
-	search_root_offset_limit search_root_properties download_exclusions
+	search_root_offset_limit search_root_properties search_offset download_exclusions
 	download_remote set_props_with_props copy_move_file search_build
 	download_build delete_any
 )

@@ -632,10 +632,11 @@ paths:
         secondary domains reachable from them; the archive.entries domain is not supported. Criteria are JSON objects:
         {"field":value} means $eq; {"field":{"$op":value}} with $eq, $ne, $gt, $gte, $lt, $lte, $match, $nmatch, $before and $last; $and and $or combine them and siblings are an
         implicit $and; {"@key":value} and {"@*":value} address properties; {"$msp":[...]} matches on a single property.
-        Wildcards * and ? apply only with $match and $nmatch and are matched case-sensitively. sort, offset and
-        limit are refused unless include names only fields of the primary domain, and sort only on fields in the
-        output. An empty query is rejected with 400. An authenticated user is required, and anonymous callers are
-        refused with 403; a user without admin rights may query the items domain, must include repo, path and
+        Wildcards * and ? apply only with $match and $nmatch and are matched case-sensitively. sort names only
+        fields in the output. sort, offset and limit apply to the result rows, one per found record whatever the
+        include: the properties and statistics of an item are listed inside its row, so offset(n) skips n items and
+        limit(n) returns at most n items, each with all of its properties. An empty query is rejected with 400.
+        An authenticated user is required, and anonymous callers are refused with 403; a user without admin rights may query the items domain, must include repo, path and
         name, and receives only rows they may read that the include and exclude patterns of the repository accept.
         With a token scoped build:<repository>/<path>:r such a user may also query builds and build.promotions;
         a builds query must include name, number and repo, and returns only the runs they may read. For

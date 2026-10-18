@@ -609,17 +609,55 @@ func TestResponseSecondaryDomains(t *testing.T) {
 // rules and the longer secondary-domain errors.
 func TestParseOutputRules(t *testing.T) {
 	for src, want := range map[string]error{
-		`items.find().include("property").limit(1)`:            ErrInvalid,
-		`items.find().include("property.key").offset(0)`:       ErrInvalid,
-		`items.find().include("@k").offset(1)`:                 ErrInvalid,
-		`items.find().include("stat").sort({"$asc":["name"]})`: ErrInvalid,
-		`items.find().include("stat.downloads").limit(1)`:      ErrInvalid,
-		`items.find().include("name").sort({"$asc":["size"]})`: ErrInvalid,
-		`items.find().include("virtual_repos")`:                ErrInvalid,
-		`items.find().include("repo","name","virtual_repos")`:  ErrInvalid,
+		`items.find().include("name").sort({"$asc":["size"]})`:                    ErrInvalid,
+		`items.find().include("name","property").sort({"$asc":["size"]})`:         ErrInvalid,
+		`items.find().include("property").sort({"$asc":["sha256"]}).offset(1)`:    ErrInvalid,
+		`items.find().include("stat").sort({"$asc":["stat.downloads"]}).limit(1)`: ErrUnsupported,
+		`items.find().include("virtual_repos")`:                                   ErrInvalid,
+		`items.find().include("repo","name","virtual_repos")`:                     ErrInvalid,
 	} {
 		if _, err := Parse(src); !errors.Is(err, want) {
 			t.Errorf("Parse(%s) = %v, want %v", src, err, want)
+		}
+	}
+}
+
+// TestParseModifiersBesideSubDomainIncludes: sort, offset and limit beside
+// a property or statistic include are accepted, as Artifactory accepts them
+// (aql-query-output), and keep their values for the item query. The first
+// query is the one jf rt s --offset 1 sends (jfrog-client-go
+// includePropertiesInAqlForSpec keeps "property" without a sort or limit).
+func TestParseModifiersBesideSubDomainIncludes(t *testing.T) {
+	type want struct {
+		sort                  bool
+		offset, limit         int
+		hasOffset, hasLimit   bool
+		properties, statistic bool
+	}
+	for src, w := range map[string]want{
+		`items.find({"$or":[{"$and":[{"repo":"libs-local","path":{"$match":"*"},"name":{"$match":"*"}}]}]})` +
+			`.include("name","repo","path","actual_md5","actual_sha1","sha256","size","type","modified",` +
+			`"created","property").offset(1)`: {offset: 1, hasOffset: true, properties: true},
+		`items.find().include("property").limit(1)`:      {limit: 1, hasLimit: true, properties: true},
+		`items.find().include("property.key").offset(0)`: {hasOffset: true, properties: true},
+		`items.find().include("@k").offset(1)`:           {offset: 1, hasOffset: true, properties: true},
+		`items.find().include("stat").sort({"$asc":["name"]})`: {
+			sort: true, statistic: true,
+		},
+		`items.find().include("stat.downloads").limit(1)`: {limit: 1, hasLimit: true, statistic: true},
+		`items.find().include("name","property","stat").sort({"$desc":["name"]}).offset(2).limit(3)`: {
+			sort: true, offset: 2, hasOffset: true, limit: 3, hasLimit: true,
+			properties: true, statistic: true,
+		},
+	} {
+		q := mustParse(t, src)
+		got := want{
+			sort: q.Sort != nil, offset: q.Offset, limit: q.Limit,
+			hasOffset: q.HasOffset, hasLimit: q.HasLimit,
+			properties: q.Properties(), statistic: len(q.Stats()) > 0,
+		}
+		if got != w {
+			t.Errorf("Parse(%s) = %+v, want %+v", src, got, w)
 		}
 	}
 }
