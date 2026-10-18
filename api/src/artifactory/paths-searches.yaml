@@ -7,12 +7,12 @@ components:
       name: imageName
       required: true
       schema:
-        description: Image name as the Docker client sends it, for example library/nginx.
+        description: Image name, for example library/nginx.
         minLength: 1
         type: string
     DockerRepoKey:
       description: Required path parameter. Key of the Docker, OCI or Helm OCI repository to list, matched without
-        regard to case because Docker clients send references in lower case only.
+        regard to case.
       in: path
       name: repo-key
       required: true
@@ -101,8 +101,7 @@ components:
           type: integer
       type: object
     ArchiveSearchResult:
-      description: Result of the archive entry search, which Artifactory removed in 7.90.5. Kept for parity with
-        JFrog's definition; artifactweave never returns it, because the search always answers 501.
+      description: Result of the archive entry search. Not returned; the search always answers 501.
       properties:
         results:
           description: Optional within this object. One entry per archive member name that matched.
@@ -126,7 +125,7 @@ components:
       description: Selects the build run whose artifacts should be listed, and narrows them.
       properties:
         buildName:
-          description: Required within this object. Name of the build as published with jf rt build-publish.
+          description: Required within this object. Name of a published build.
           minLength: 1
           type: string
         buildNumber:
@@ -261,7 +260,7 @@ components:
           type: array
       type: object
     ErrorDetail:
-      description: One entry of the Artifactory error envelope.
+      description: One entry of the standard error envelope.
       properties:
         message:
           description: Required within this object. Human-readable reason.
@@ -324,8 +323,8 @@ components:
           type: string
       type: object
     LicenseSearchResult:
-      description: Items tagged with licence information. artifactweave stores licence tags as ordinary properties
-        and this search reads them; automatic discovery is not supported.
+      description: Items tagged with licence information. Licence tags are stored as ordinary properties and this
+        search reads them; automatic discovery is not supported.
       properties:
         results:
           description: Optional within this object. One entry per item and licence.
@@ -334,7 +333,7 @@ components:
             properties:
               found:
                 description: Optional within this object. Licence name discovered by automatic detection. Always
-                  empty in artifactweave because autofind is not implemented.
+                  empty; automatic discovery is not supported.
                 type: string
               license:
                 description: Optional within this object. Licence name stored on the item.
@@ -428,11 +427,10 @@ paths:
     get:
       description: Lists the image names of one Docker, OCI or Helm OCI repository, in the shape of the registry _catalog
         extension. An image is a folder holding at least one manifest. Names are sorted case-insensitively with ties
-        broken by byte order, and paginated with n and last as the tags list is, so clients can reuse their registry
-        pagination code. Needs Read; images the caller cannot read are left out (decision 0031). This operation lists
-        one repository with bare image names; the registry-wide /v2/_catalog lists every repository the caller can read,
-        each name prefixed with its repository key as <repo>/<image> (decision 0003). Errors are registry errors with
-        OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution exist.
+        broken by byte order, and paginated with n and last as the tags list is. Needs Read; images the caller cannot
+        read are left out. This operation lists one repository with bare image names; the registry-wide /v2/_catalog
+        lists every repository the caller can read, each name prefixed with its repository key as <repo>/<image>.
+        Errors are registry errors with OCI codes. Remote and virtual repositories are refused with 405.
       operationId: listDockerRepositories
       parameters:
       - $ref: '#/components/parameters/DockerRepoKey'
@@ -481,8 +479,8 @@ paths:
         '404':
           $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
         '405':
-          description: The repository is a remote or virtual repository, which the registry does not serve yet; the
-            body is a registry error with the code UNSUPPORTED.
+          description: The repository is a remote or virtual repository; the body is a registry error with the code
+            UNSUPPORTED.
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
@@ -494,8 +492,7 @@ paths:
     post:
       description: Finds the multi-platform manifest lists that reference a given image manifest, so a caller can
         learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are
-        found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation
-        under the Docker API path.
+        found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
       operationId: findParentManifestLists
       parameters:
       - $ref: '#/components/parameters/DockerRepoKey'
@@ -561,13 +558,11 @@ paths:
   /api/docker/{repo-key}/v2/{imageName}/tags/list:
     get:
       description: Lists the tags of one image in the shape of the registry tags endpoint. The tags are the image's
-        tag folders that hold a manifest; digest folders are not tags, which matches the digest-named entries Artifactory
-        leaves out from 7.90.1. Tags are sorted case-insensitively, as the OCI distribution specification requires, with
-        ties broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the
-        response carries a Link header to the next page, as the registry does. An image with stored manifests but no tags
-        answers an empty list, and an unknown image answers 404. Needs Read on the image (decision 0031). Errors are registry
-        errors with OCI codes. Remote and virtual repositories are refused until upstream fetching and member resolution
-        exist.
+        tag folders that hold a manifest; digest folders are not tags. Tags are sorted case-insensitively, with ties
+        broken by byte order. n limits the page and last continues after the given tag; when more tags follow, the
+        response carries a Link header to the next page. An image with stored manifests but no tags answers an empty
+        list, and an unknown image answers 404. Needs Read on the image. Errors are registry errors with OCI codes.
+        Remote and virtual repositories are refused with 405.
       operationId: listDockerTags
       parameters:
       - $ref: '#/components/parameters/DockerRepoKey'
@@ -619,8 +614,8 @@ paths:
         '404':
           $ref: '#/components/responses/ArtifactorySearchesApiNotFound'
         '405':
-          description: The repository is a remote or virtual repository, which the registry does not serve yet; the
-            body is a registry error with the code UNSUPPORTED.
+          description: The repository is a remote or virtual repository; the body is a registry error with the code
+            UNSUPPORTED.
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:
@@ -630,13 +625,12 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockertags.md
   /api/search/aql:
     post:
-      description: 'Runs an Artifactory Query Language query. The body is the query text, not JSON, and is limited
-        to 6,000 characters; longer bodies are rejected with 400. A query has the form domain.find(criteria).include(fields).sort({"$asc"|"$desc":[fields]}).offset(n).limit(n),
-        and may add .transitive() (accepted and ignored) and .distinct(bool) (default true). The JFrog CLI emits
-        the suffixes in the order include, sort, offset, transitive, limit. Domains are items, properties, builds,
-        build.promotions and the dotted secondary domains reachable from them; the archive.entries domain is not
-        supported. Criteria are JSON objects: {"field":value} means $eq; {"field":{"$op":value}} with $eq, $ne,
-        $gt, $gte, $lt, $lte, $match, $nmatch, $before and $last; $and and $or combine them and siblings are an
+      description: 'Runs an AQL query. The body is the query text, not JSON, and is limited to 6,000 characters;
+        longer bodies are rejected with 400. A query has the form domain.find(criteria).include(fields).sort({"$asc"|"$desc":[fields]}).offset(n).limit(n),
+        and may add .transitive() (accepted and ignored) and .distinct(bool) (default true). The suffixes may appear
+        in any order, each at most once. Domains are items, properties, builds, build.promotions and the dotted
+        secondary domains reachable from them; the archive.entries domain is not supported. Criteria are JSON objects:
+        {"field":value} means $eq; {"field":{"$op":value}} with $eq, $ne, $gt, $gte, $lt, $lte, $match, $nmatch, $before and $last; $and and $or combine them and siblings are an
         implicit $and; {"@key":value} and {"@*":value} address properties; {"$msp":[...]} matches on a single property.
         Wildcards * and ? apply only with $match and $nmatch and are matched case-sensitively. sort, offset and
         limit are refused unless include names only fields of the primary domain, and sort only on fields in the
@@ -703,8 +697,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchaql.md
   /api/search/archive:
     get:
-      description: Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5.
-        artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL
+      description: Not implemented; answers 501. It would find entries inside archives by member name; use AQL
         instead.
       operationId: searchArchive
       parameters:
@@ -1110,14 +1103,13 @@ paths:
   /api/search/latestVersion:
     get:
       description: Returns the latest version of a module as plain text, using the repository layout to extract
-        versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file
+        versions and the Mercury version ordering to compare them; integration versions are given by file
         version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ?
         returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the
         latest integration version of that module version. Local repositories, remote caches and virtual
-        repositories' members are consulted; remote=1 is accepted and answered from them too, until remote
-        repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with
-        Artifactory's message when the module has no versions, no release, or no matching version. Anonymous
-        callers may search when anonymous access is enabled.
+        repositories' members are consulted; remote=1 is accepted and answered from them too. The response is the
+        bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching
+        version. Anonymous callers may search when anonymous access is enabled.
       operationId: searchLatestVersion
       parameters:
       - description: Optional query parameter. Organisation (Maven group id).
@@ -1139,8 +1131,8 @@ paths:
         schema:
           description: Version pattern or module version.
           type: string
-      - description: Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave
-          answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
+      - description: Optional query parameter. 1 asks for the upstream of remote repositories too; it is answered
+          as 0 (the default), from local repositories and caches.
         in: query
         name: remote
         schema:
@@ -1174,7 +1166,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchlatestversion.md
   /api/search/license:
     get:
-      description: Finds items whose licence properties match the requested statuses. artifactweave reads the licence
+      description: Finds items whose licence properties match the requested statuses. The search reads the licence
         tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has
         no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
       operationId: searchLicense
@@ -1230,8 +1222,8 @@ paths:
           - 0
           - 1
           type: integer
-      - description: 'Optional query parameter. Accepted for compatibility and ignored: artifactweave does not discover
-          licences. Defaults to 0.'
+      - description: Optional query parameter. Accepted and ignored; licences are not discovered automatically.
+          Defaults to 0.
         in: query
         name: autofind
         schema:
@@ -1379,12 +1371,12 @@ paths:
   /api/search/versions:
     get:
       description: Lists every version of a module found through the repository layout, newest first in the
-        Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of
+        Mercury version ordering. Without v both release and integration versions are returned, a folder of
         unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches;
         any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file
         version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is
-        accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there
-        is no version to list. Anonymous callers may search when anonymous access is enabled.
+        accepted and answered from them too. Returns 404 when there is no version to list. Anonymous callers may
+        search when anonymous access is enabled.
       operationId: searchVersions
       parameters:
       - description: Optional query parameter. Organisation (Maven group id).
@@ -1406,8 +1398,8 @@ paths:
         schema:
           description: Version pattern or module version.
           type: string
-      - description: Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave
-          answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
+      - description: Optional query parameter. 1 asks for the upstream of remote repositories too; it is answered
+          as 0 (the default), from local repositories and caches.
         in: query
         name: remote
         schema:

@@ -2,8 +2,7 @@ components:
   schemas:
     ChecksumReplicationConfig:
       description: 'Settings for checksum-only replication, where artifact content moves through storage-level replication
-        and artifactweave only replicates metadata. Not supported in v1: the operation that takes this body answers
-        501.'
+        and only metadata is replicated. Not implemented: the operation that takes this body answers 501.'
       properties:
         checkBinaryExistenceAllowed:
           description: Required within this object. Permits replications on this instance to set checkBinaryExistenceInFilestore
@@ -29,7 +28,7 @@ components:
           type: boolean
         trustUntil:
           description: Optional within this object. Instant after which trusted checksums are no longer accepted
-            without content. The format is not fixed by the upstream documentation.
+            without content. The format is unspecified.
           type: string
       type: object
     GlobalSystemReplicationConfig:
@@ -44,9 +43,8 @@ components:
           type: boolean
       type: object
     MultipleReplicationConfigRequest:
-      description: 'Multi-push replication configuration: one schedule fanning out to several targets. Not supported
-        in v1; the operations that take this body answer 501. Use one single-target configuration per repository
-        instead.'
+      description: 'Multi-push replication configuration: one schedule fanning out to several targets. Not implemented;
+        the operations that take this body answer 501. Use one single-target configuration per repository instead.'
       properties:
         cronExp:
           description: Required within this object. Schedule in Quartz cron syntax shared by every target.
@@ -72,7 +70,7 @@ components:
       properties:
         checkBinaryExistenceInFilestore:
           description: Optional within this object. Skip transferring content the target already holds, as allowed
-            by the target's checksum replication settings. Accepted and ignored in v1.
+            by the target's checksum replication settings. Accepted and ignored.
           type: boolean
         cronExp:
           description: Optional within this object. Schedule in Quartz cron syntax, for example 0 0 2 * * ?. Omitted
@@ -85,7 +83,7 @@ components:
           type: boolean
         enableEventReplication:
           description: Optional within this object. True replicates each write as it happens in addition to the
-            schedule. Defaults to false. Event-based replication is accepted and stored but not acted on in v1.
+            schedule. Defaults to false. Event-based replication is accepted and stored but not acted on.
           type: boolean
         enabled:
           description: Optional within this object. False keeps the configuration but stops the schedule. Defaults
@@ -108,8 +106,7 @@ components:
           type: string
         replicationKey:
           description: Optional within this object. Server-owned identifier of this configuration; ignored on input.
-            Whether Artifactory keeps it stable across updates is not documented, so clients should not depend on
-            it.
+            It is not guaranteed to stay the same across updates, so clients should not depend on it.
           readOnly: true
           type: string
         repoKey:
@@ -186,7 +183,7 @@ components:
       properties:
         checkBinaryExistenceInFilestore:
           description: Optional within this object. Skip transferring content the target already holds. Accepted
-            and ignored in v1.
+            and ignored.
           type: boolean
         delete:
           default: false
@@ -286,8 +283,7 @@ components:
 paths:
   /api/config/storage/checksumReplication:
     get:
-      description: 'Reads the checksum replication settings of this instance. Not supported in v1: artifactweave
-        has no storage-level replication, so the operation answers 501.'
+      description: Not implemented; answers 501. It would read the checksum replication settings of this instance.
       operationId: getChecksumReplication
       responses:
         '200':
@@ -313,7 +309,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getchecksumreplication.md
       x-tier: stub
     put:
-      description: Configures checksum replication on this instance. Not supported in v1; answers 501.
+      description: Not implemented; answers 501. It would configure checksum replication on this instance.
       operationId: configureChecksumReplication
       requestBody:
         content:
@@ -353,11 +349,10 @@ paths:
         class: a local repository pushes to the targets in the body or, when the body is omitted, to its stored
         configuration; a remote repository pulls from its upstream into the cache, and its body may name at most
         one target. The path may name a folder below the repository to limit the run. The run is scheduled and the
-        call answers 200 with an empty body as soon as it is accepted, as Artifactory does; progress and per-file
-        messages go to the server log, and the status operation reports the outcome. Multi-target pushes to several
-        instances in one call are not supported in v1 and a body with more than one target is rejected with 400.
-        Callers other than administrators are limited to the user query result limit when choosing files. The caller
-        needs manage permission on the repository.'
+        call answers 200 with an empty body as soon as it is accepted; progress and per-file messages go to the
+        server log, and the status operation reports the outcome. A body with more than one target is rejected with
+        400. Callers other than administrators are limited to the user query result limit when choosing files. The
+        caller needs manage permission on the repository.'
       operationId: executePullPushReplication
       parameters:
       - description: Required path parameter. Repository key, optionally followed by a folder path, for example
@@ -369,8 +364,7 @@ paths:
           description: Repository key with an optional folder path.
           minLength: 1
           type: string
-      - description: Optional query parameter. Named replication strategy. Artifactory declares the parameter without
-          publishing its accepted values; artifactweave accepts any value and ignores it.
+      - description: Optional query parameter. Named replication strategy. Any value is accepted and ignored.
         in: query
         name: strategy
         required: false
@@ -382,7 +376,7 @@ paths:
         content:
           application/json:
             schema:
-              description: One options object per target; at most one in v1.
+              description: One options object per target; at most one.
               items:
                 $ref: '#/components/schemas/ReplicationRequest'
               type: array
@@ -463,8 +457,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getreplicationstatus.md
   /api/replications/channels/release:
     post:
-      description: Closes every event-based pull replication channel other instances hold open against this one,
-        forcing them to reconnect. Event-based replication is not supported in v1; the operation answers 501.
+      description: Not implemented; answers 501. It would close every event-based pull replication channel other
+        instances hold open against this one, forcing them to reconnect.
       operationId: closeEventBasedPullReplicationChannels
       responses:
         '200':
@@ -492,8 +486,8 @@ paths:
       x-tier: stub
   /api/replications/channels/{repoKey}:
     get:
-      description: Lists the remote instances subscribed to a local repository for event-based pull replication.
-        Event-based replication is not supported in v1; the operation answers 501.
+      description: Not implemented; answers 501. It would list the remote instances subscribed to a local repository
+        for event-based pull replication.
       operationId: getRemoteRepositoriesRegisteredForReplication
       parameters:
       - description: Required path parameter. Key of the local repository.
@@ -533,8 +527,8 @@ paths:
       x-tier: stub
   /api/replications/multiple/{repoKey}:
     post:
-      description: Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one
-        single-target replication per repository instead.
+      description: Not implemented; answers 501. It would update a multi-push replication configuration. Configure
+        one single-target replication per repository instead.
       operationId: updateMultiPushReplication
       parameters:
       - description: Required path parameter. Key of the local repository.
@@ -578,7 +572,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updatemultipushreplication.md
       x-tier: stub
     put:
-      description: Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+      description: Not implemented; answers 501. It would create or replace a multi-push replication configuration.
       operationId: createOrReplaceMultiPushReplication
       parameters:
       - description: Required path parameter. Key of the local repository.
@@ -720,8 +714,8 @@ paths:
       - replication
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryreplicationconfiguration.md
     post:
-      description: 'Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory
-        routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable
+      description: 'Updates fields of an existing replication configuration; omitted fields keep their values. Two
+        reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable
         request and the call switches many replications on or off at once, selected by wildcard patterns over their
         target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through
         this path. Administrators only.'
@@ -781,9 +775,8 @@ paths:
     put:
       description: Creates or replaces the replication configuration of a local or remote repository. The body is
         one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from
-        the first element for all. Several targets in the array amount to multi-push, which is not supported in
-        v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider
-        accepts any 2xx.
+        the first element for all. Several targets in the array amount to multi-push, which is rejected with 400.
+        Administrators only. Answers 201 when the configuration is stored.
       operationId: setRepositoryReplicationConfiguration
       parameters:
       - description: Required path parameter. Key of the local or remote repository.
@@ -800,7 +793,7 @@ paths:
             schema:
               oneOf:
               - $ref: '#/components/schemas/ReplicationConfigRequest'
-              - description: Array form; only a single element is accepted in v1.
+              - description: Array form; only a single element is accepted.
                 items:
                   $ref: '#/components/schemas/ReplicationConfigRequest'
                 type: array
@@ -808,8 +801,7 @@ paths:
         required: true
       responses:
         '200':
-          description: Configuration stored. artifactweave returns 201 as Artifactory does; this entry is kept for
-            parity with the documented response set.
+          description: Not returned; a stored configuration answers 201.
         '400':
           content:
             application/json:
