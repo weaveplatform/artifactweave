@@ -8408,7 +8408,7 @@ paths:
         - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleterepository.md
     get:
-      description: Returns the stored configuration with defaults filled in. Admins and tokens scoped repo:<key>:r receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+      description: Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
       operationId: getRepositoryConfiguration
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -8460,7 +8460,7 @@ paths:
         - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md
     post:
-      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.'
+      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.'
       operationId: updateRepositoryConfiguration
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -8526,7 +8526,7 @@ paths:
         - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration.md
     put:
-      description: 'Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.'
+      description: 'Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.'
       operationId: createRepository
       parameters:
         - $ref: '#/components/parameters/repoKey'
@@ -11709,7 +11709,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: A summary naming the entities created, updated and deleted and any sections that were stored without effect.
+                description: A summary naming the entities created, updated and deleted and any sections that were accepted without effect and not stored.
                 type: string
           description: The patch was applied.
         '400':
@@ -19940,7 +19940,7 @@ components:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         projectKey:
-          description: Optional within this object. Key of the project that owns the repository. When set, environments must also be set, and the repository key must carry the project prefix. Changing it moves the repository between projects.
+          description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix, which Artifactory's web UI adds. Changing it moves the repository between projects.
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration.
@@ -20735,7 +20735,7 @@ components:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         projectKey:
-          description: Optional within this object. Key of the project that owns the repository. When set, environments must also be set, and the repository key must carry the project prefix. Changing it moves the repository between projects.
+          description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix, which Artifactory's web UI adds. Changing it moves the repository between projects.
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration.
@@ -21949,7 +21949,7 @@ components:
           description: Optional within this object. When true a virtual repository resolves this member before members without the flag. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         projectKey:
-          description: Optional within this object. Key of the project that owns the repository. When set, environments must also be set, and the repository key must carry the project prefix. Changing it moves the repository between projects.
+          description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix, which Artifactory's web UI adds. Changing it moves the repository between projects.
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered for items in this repository. Each name must exist in the property sets configuration.
@@ -23240,7 +23240,7 @@ components:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
           type: string
         projectKey:
-          description: Optional within this object. Key of the project that owns the repository. When set, environments must also be set, and the repository key must carry the project prefix. Changing it moves the repository between projects.
+          description: Optional within this object. Key of the project that owns the repository. In a project, missing environments become DEV (decision 0013). The repository key is not checked for the project prefix, which Artifactory's web UI adds. Changing it moves the repository between projects.
           type: string
         rclass:
           description: Required within this object. The repository class. It selects which of the class-specific fields apply and how the string-typed booleans are rendered on read. Always virtual for this schema.

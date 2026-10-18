@@ -402,7 +402,7 @@ paths:
             text/plain:
               schema:
                 description: A summary naming the entities created, updated and deleted and any sections that were
-                  stored without effect.
+                  accepted without effect and not stored.
                 type: string
           description: The patch was applied.
         '400':

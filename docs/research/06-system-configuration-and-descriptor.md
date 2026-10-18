@@ -15,7 +15,15 @@ Research baseline: **2026-10-12**. Sources: the per-endpoint pages under
 https://docs.jfrog.com/administration/reference/jfrog-platform-artifactory-system-api/llms.txt
 and https://docs.jfrog.com/administration/reference/jfrog-platform-rest-apis/llms.txt, the
 installation docs on YAML configuration, the Terraform provider and JFrog CLI sources.
-Items marked *(unverified)* have no primary-source confirmation.
+Items marked *(unverified)* have no primary-source confirmation. Other claims carry a label
+where the source matters:
+
+| Label | Means |
+|---|---|
+| **[D]** | documented at the cited JFrog page |
+| **[S]** | seen in a JFrog client's source at the cited tag |
+| **[J]** | JFrog's public Jira, under the [rules for Jira claims](README.md#target-version-and-sources) |
+| **[I]** | inferred; no source states it |
 
 ## System endpoints
 
@@ -163,14 +171,24 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 - The format is `key: [entity]`; named entities are maps keyed by their name
   (`localRepositories.docker-local`).
 - A patch creates what does not exist and updates what does; omitted keys are untouched.
-- Deletion is `key: null` (or `~`).
+- Deletion is `key: null` (or `~`). Inside a repository element, only string fields other
+  than `type` may be set to `null`; other fields take a value of their own type
+  ([D] https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md).
 - An empty document deletes every local, remote and virtual repository. artifactweave
   rejects an empty patch with 400 instead.
-- The bootstrap file `$JFROG_HOME/artifactory/var/etc/artifactory/artifactory.config.import.yml`
-  is applied once at first start, only when no repositories exist, and is deleted after
-  loading (https://docs.jfrog.com/installation/docs/artifactory-bootstrap-yaml-file.md).
-  artifactweave's `--bootstrap <file>` and `artifactweave config apply <file>` accept the
-  same document.
+- A successful patch answers `<n> changes to config merged successfully` ([J]
+  [RTFACT-31174](https://jfrog.atlassian.net/browse/RTFACT-31174) quotes "14 changes to
+  config merged successfully" from 7.84; [RTFACT-17040](https://jfrog.atlassian.net/browse/RTFACT-17040)).
+- Artifactory's bootstrap file,
+  `$JFROG_HOME/artifactory/var/etc/artifactory/artifactory.config.import.yml`, is not this
+  format. It holds `version`, `GeneralConfiguration{licenseKey, baseUrl, proxies[]}` and
+  `OnboardingConfiguration{repoTypes[]}`, the package types to create default repositories
+  for. Artifactory applies it once at first start, only when no repositories exist, and
+  deletes it after loading ([D] https://docs.jfrog.com/installation/docs/artifactory-bootstrap-yaml-file.md).
+- artifactweave's `--bootstrap <file>` takes the PATCH format instead, the same document as
+  `artifactweave config apply <file>`, and applies it once, on the first start
+  (`internal/app/descriptor.go`). A real `artifactory.config.import.yml` parses, but every
+  section in it is ignored.
 - The YAML repository keys differ from the JSON ones: `type` for `packageType`,
   `repoLayout` for `repoLayoutRef`, `xray.enabled` for `xrayIndex`, and per-type blocks such
   as `helm.chartsBaseUrl`, `nuget`, `vcs`, `externalDependencies`.
@@ -203,11 +221,11 @@ https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.
 | `trashcanConfig` | `enabled, retentionPeriodDays` |
 | `replicationsConfig` | `blockPullReplications, blockPushReplications` |
 | `systemMessageConfig` | `enabled, message, title, titleColor` |
-| `repoLayouts.<name>` | `artifactPathPattern, distinctiveDescriptorPathPattern, descriptorPathPattern, folderIntegrationRevisionRegExp, fileIntegrationRevisionRegExp` (field names from the XSD; the YAML page does not list them) |
+| `repoLayouts.<name>` | `artifactPathPattern, distinctiveDescriptorPathPattern, descriptorPathPattern, folderIntegrationRevisionRegExp, fileIntegrationRevisionRegExp` (field names from the XSD; the YAML page does not list them). The `artifactory_repository_layout` resource also sends `name`, repeating the entry key ([S] provider 12.11.14 [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)) |
 | `security` | `anonAccessEnabled, anonAccessToBuildInfosDisabled (deprecated), userLockPolicy{enabled, loginAttempts}, passwordSettings{encryptionPolicy: REQUIRED\|SUPPORTED\|UNSUPPORTED, expirationPolicy{enabled, passwordMaxAge, notifyByEmail}}, ldapSettings.<key>{ldapUrl, emailAttribute, ldapPoisoningProtection, search{managerDn, managerPassword, searchBase, searchFilter, searchSubTree}, userDnPattern, autoCreateUser, enabled, pagingSupportEnabled}, ldapGroupSettings.<name>{enabledLdap, filter, groupBaseDn, groupMemberAttribute, groupNameAttribute, strategy: STATIC\|DYNAMIC\|HIERARCHY, subTree}, crowdSettings{...}, samlSettings{...}, oauthSettings{enableIntegration, persistUsers, allowUserToAccessProfile, oauthProvidersSettings.<name>{providerType: github\|openId\|google\|cloudfoundry, ...}}, httpSsoSettings{httpSsoProxied, remoteUserRequestVariable, allowUserToAccessProfile, noAutoUserCreation, syncLdapGroups}` |
-| `localRepositories.<key>` | `type, checksumPolicyType, repoLayout, snapshotVersionBehavior, xray{enabled}, downloadRedirect, blackedOut, handleReleases, handleSnapshots, includesPattern, excludesPattern, propertySets, ...` |
-| `remoteRepositories.<key>` | the local keys plus `url, username, password, proxy, socketTimeoutMillis, assumedOfflinePeriodSecs, retrievalCachePeriodSecs, missedRetrievalCachePeriodSecs, bower, cocoaPods, nuget, helm, composer, vcs, externalDependencies, contentSynchronisation` |
-| `virtualRepositories.<key>` | `repositories[], includesPattern, excludesPattern, p2, keyPair, virtualCacheConfig{virtualRetrievalCachePeriodSecs}, forceMavenAuthentication` |
+| `localRepositories.<key>` | `type, checksumPolicyType, repoLayout, snapshotVersionBehavior, xray{enabled}, downloadRedirect{enabled}, blackedOut, handleReleases, handleSnapshots, includesPattern, excludesPattern, propertySets, yumGroupFileNames, primaryKeyPairDescriptor, secondaryKeyPairRef, ...`; `type` includes `terraformbe` for Terraform backend repositories |
+| `remoteRepositories.<key>` | the local keys plus `url, username, password, proxy, socketTimeoutMillis, assumedOfflinePeriodSecs, retrievalCachePeriodSecs, missedRetrievalCachePeriodSecs, bower, cocoaPods{cocoaPodsSpecsRepoUrl}, nuget, helm, composer, vcs, externalDependencies, contentSynchronisation`; `remoteRepoLayout` in JFrog support's YAML ([research 03](03-repository-configuration-model.md#json-and-yaml-name-differences)) |
+| `virtualRepositories.<key>` | `repositories[], includesPattern, excludesPattern, p2{urls[]}, keyPair, virtualCacheConfig{virtualRetrievalCachePeriodSecs}, forceMavenAuthentication` |
 | `federatedRepositories.<key>` | local keys plus `federatedMembers[]`, `proxy`, `primaryKeyPairRef` (list format in the docs; echoed but treated as local) |
 
 Example (from https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md):
@@ -251,8 +269,16 @@ security:
   `security.passwordSettings`, `security.ldapSettings`, `security.ldapGroupSettings`
   (LDAP in a later phase), `oauthSettings`, `systemMessageConfig`. Other sections are
   accepted without effect and the response lists them as ignored; they are not stored,
-  because some carry passwords. P3 applies the repository sections, `proxies`,
-  `propertySets` and `repoLayouts`; the rest are ignored until their features land.
+  because some carry passwords. P3 applies `localRepositories`, `remoteRepositories`,
+  `virtualRepositories`, `proxies`, `propertySets` and `repoLayouts`
+  (`internal/descriptor/parse.go`). The rest are ignored until their features land,
+  `federatedRepositories` among them until P13.
+- Where the PATCH differs from 7.x (found by #378; the issue named changes the code):
+  - 7.x differs: a successful patch answers `<n> changes to config merged successfully` ([J] RTFACT-31174, RTFACT-17040; "Semantics"); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
+  - 7.x differs: repository entries accept the keys in JFrog's YAML samples, among them `downloadRedirect{enabled}`, `cocoaPods`, `yumGroupFileNames`, virtual `p2{urls}`, `type: terraformbe`, `primaryKeyPairDescriptor` and `remoteRepoLayout` ([D] [YAML page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md); [J] RTFACT-29540, RTFACT-29858); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
+  - 7.x differs: a `repoLayouts` entry may carry `name`, as the `artifactory_repository_layout` resource sends it ([S] provider 12.11.14, "Section shapes"); fixed by [#393](https://github.com/weaveplatform/artifactweave/issues/393).
+  - 7.x differs: `null` is allowed only on a repository's string fields ([D] [delete an element](https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md)), where artifactweave also takes it on other fields and resets them to their defaults; fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
+  - 7.x differs: Artifactory applies every section the YAML pages document ([D] https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
 - `GET` returns an XML descriptor generated from current state, so that the
   `artifactory_*` configuration resources can read back what they wrote.
 - Secrets inside a descriptor may be given as `${ENV_VAR}` references, resolved at apply

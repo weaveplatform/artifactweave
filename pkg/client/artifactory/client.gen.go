@@ -10178,14 +10178,14 @@ type ClientInterface interface {
 
 	// GetRepositoryConfiguration Read a repository configuration
 	//
-	// Returns the stored configuration with defaults filled in. Admins and tokens scoped repo:<key>:r receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+	// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 	//
 	// Corresponds with GET /api/repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
 	GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateRepositoryConfigurationWithBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10194,7 +10194,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfiguration Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10203,7 +10203,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10212,7 +10212,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -10221,7 +10221,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -10230,7 +10230,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -10239,7 +10239,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10248,7 +10248,7 @@ type ClientInterface interface {
 
 	// CreateRepository Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10257,7 +10257,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10266,7 +10266,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -10275,7 +10275,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -10284,7 +10284,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -15410,7 +15410,7 @@ func (c *Client) DeleteRepository(ctx context.Context, repoKey RepoKey, reqEdito
 
 // GetRepositoryConfiguration Read a repository configuration
 //
-// Returns the stored configuration with defaults filled in. Admins and tokens scoped repo:<key>:r receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 //
 // Corresponds with GET /api/repositories/{repoKey} (the `GetRepositoryConfiguration` operationId).
 func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15427,7 +15427,7 @@ func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey
 
 // UpdateRepositoryConfigurationWithBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15446,7 +15446,7 @@ func (c *Client) UpdateRepositoryConfigurationWithBody(ctx context.Context, repo
 
 // UpdateRepositoryConfiguration Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15465,7 +15465,7 @@ func (c *Client) UpdateRepositoryConfiguration(ctx context.Context, repoKey Repo
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -15484,7 +15484,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -15503,7 +15503,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -15522,7 +15522,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -15541,7 +15541,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15560,7 +15560,7 @@ func (c *Client) CreateRepositoryWithBody(ctx context.Context, repoKey RepoKey, 
 
 // CreateRepository Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15579,7 +15579,7 @@ func (c *Client) CreateRepository(ctx context.Context, repoKey RepoKey, body Cre
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -15598,7 +15598,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -15617,7 +15617,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -15636,7 +15636,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -36866,7 +36866,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRepositoryConfigurationWithResponse Read a repository configuration
 	//
-	// Returns the stored configuration with defaults filled in. Admins and tokens scoped repo:<key>:r receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+	// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36875,7 +36875,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36884,7 +36884,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36893,7 +36893,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36902,7 +36902,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36911,7 +36911,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36920,7 +36920,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36929,7 +36929,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36938,7 +36938,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36947,7 +36947,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36956,7 +36956,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36965,7 +36965,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36974,7 +36974,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -63609,7 +63609,7 @@ func (c *ClientWithResponses) DeleteRepositoryWithResponse(ctx context.Context, 
 
 // GetRepositoryConfigurationWithResponse Read a repository configuration
 //
-// Returns the stored configuration with defaults filled in. Admins and tokens scoped repo:<key>:r receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
+// Returns the stored configuration with defaults filled in. Admins receive every field; other callers that can read the repository receive the public subset (key, rclass, packageType, description, layout and patterns) with secrets omitted. Remote passwords and sensitive headers are masked for everyone. The vendor media type for the repository's class is returned when the client asks for it.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63624,7 +63624,7 @@ func (c *ClientWithResponses) GetRepositoryConfigurationWithResponse(ctx context
 
 // UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63639,7 +63639,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithBodyWithResponse(
 
 // UpdateRepositoryConfigurationWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63654,7 +63654,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithResponse(ctx cont
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63669,7 +63669,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63684,7 +63684,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63699,7 +63699,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository and requires environments. Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63714,7 +63714,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // CreateRepositoryWithBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63729,7 +63729,7 @@ func (c *ClientWithResponses) CreateRepositoryWithBodyWithResponse(ctx context.C
 
 // CreateRepositoryWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63744,7 +63744,7 @@ func (c *ClientWithResponses) CreateRepositoryWithResponse(ctx context.Context, 
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63759,7 +63759,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63774,7 +63774,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63789,7 +63789,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, projectKey needs environments, and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
