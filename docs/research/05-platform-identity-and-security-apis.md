@@ -517,5 +517,4 @@ permission ones. The others:
 - How an exclude pattern meets an include pattern in a permission target.
 - The characters allowed in environment names; only the length and case are documented.
 - What the seeded `Any Remote` grants on a fresh 7.x instance, which the pages describe only
-  as without `anonymous`, and whether an upgrade to 7.84.3 or later removes `anonymous` from
-  an older instance's `Anything` and `Any Remote`, which the pages do not say.
+  as without `anonymous`.

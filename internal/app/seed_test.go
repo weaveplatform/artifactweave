@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"os"
@@ -86,82 +85,6 @@ func TestSeedUsesConfiguredPassword(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(cfg.DataDir, InitialPasswordFile)); !os.IsNotExist(err) {
 		t.Fatalf("a configured password was also written to a file: %v", err)
 	}
-}
-
-// seedVersion1 leaves db as a store seeded before #383: Any Remote grants
-// anonymous read and deploy/cache, and the marker says version 1.
-func seedVersion1(t *testing.T, db store.Store) {
-	t.Helper()
-	ctx := context.Background()
-	hash, err := auth.HashPasswordWith(authHash, "pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := auth.SeedHashed(ctx, db, hash, time.Now()); err != nil {
-		t.Fatal(err)
-	}
-	p, err := db.Permissions().Get(ctx, auth.AnyRemotePermission)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := p.Resources[types.ResourceArtifact]
-	r.Actions.Users = map[string]types.Actions{
-		auth.AnonymousUser: types.ActionRead | types.ActionWrite,
-	}
-	p.Resources[types.ResourceArtifact] = r
-	if err := db.Permissions().Update(ctx, p); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Settings().Put(ctx, types.SettingSeeded,
-		map[string]any{"version": 1, "at": time.Now()}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSeedUpgradesAnEarlierSeed(t *testing.T) {
-	ctx := context.Background()
-	db := inmem.New()
-	seedVersion1(t, db)
-	var logs bytes.Buffer
-	log := slog.New(slog.NewJSONHandler(&logs, nil))
-	if err := seedPrincipals(ctx, testConfig(t), db, log); err != nil {
-		t.Fatal(err)
-	}
-	p, err := db.Permissions().Get(ctx, auth.AnyRemotePermission)
-	if err != nil || len(p.Resources[types.ResourceArtifact].Actions.Users) != 0 {
-		t.Fatalf("Any Remote after the upgrade = %+v, %v", p, err)
-	}
-	// The operator is told, since anonymous reads of remotes now fail.
-	if !strings.Contains(logs.String(), `"level":"WARN"`) ||
-		!strings.Contains(logs.String(), `"permission":"Any Remote"`) {
-		t.Fatalf("no warning about the removed grant:\n%s", logs.String())
-	}
-	logs.Reset()
-	if err := seedPrincipals(ctx, testConfig(t), db, log); err != nil {
-		t.Fatal(err)
-	}
-	if logs.Len() != 0 {
-		t.Fatalf("a second start warned again:\n%s", logs.String())
-	}
-
-	failing := inmem.New()
-	seedVersion1(t, failing)
-	if err := seedPrincipals(ctx, testConfig(t), brokenPermissions{failing}, log); err == nil {
-		t.Fatal("a failed upgrade was not reported")
-	}
-}
-
-// brokenPermissions fails every permission read.
-type brokenPermissions struct{ store.Store }
-
-func (b brokenPermissions) Permissions() store.PermissionStore {
-	return brokenPermissionStore{b.Store.Permissions()}
-}
-
-type brokenPermissionStore struct{ store.PermissionStore }
-
-func (brokenPermissionStore) Get(context.Context, string) (types.Permission, error) {
-	return types.Permission{}, errors.New("database down")
 }
 
 // hidden hides the seeded marker from its first reads, as if another

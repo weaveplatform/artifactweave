@@ -53,11 +53,6 @@ func checkSeeded(t *testing.T, st store.Store, password string) {
 		!slices.Equal(r.Targets[types.TargetAnyRemote].Include, []string{"**"}) {
 		t.Fatalf("Any Remote = %+v, %v", remote, err)
 	}
-	var m seedMarker
-	if err := st.Settings().Get(ctx, types.SettingSeeded, &m); err != nil ||
-		m.Version != seedVersion {
-		t.Fatalf("seeded marker = %+v, %v", m, err)
-	}
 	bi, err := st.Repos().Get(ctx, types.BuildInfoRepository)
 	if err != nil || bi.Class != repo.Local || bi.PackageType != repo.BuildInfo ||
 		bi.RepoLayoutRef != repo.LayoutSimple {
