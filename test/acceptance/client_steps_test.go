@@ -56,6 +56,7 @@ func (w *world) registerClients(sc *godog.ScenarioContext) {
 	sc.Step(`^the registry is fronted by TLS$`, w.frontWithTLS)
 	sc.Step(`^the Go proxy is "([^"]*)"$`, w.setGoProxy)
 	sc.Step(`^I run go "([^"]*)"$`, w.runGo)
+	sc.Step(`^I run go "([^"]*)" in "([^"]*)"$`, w.runGoIn)
 	sc.Step(`^I deploy the file "([^"]*)" to "([^"]*)" as admin$`, w.deployFile)
 	sc.Step(`^I deploy the files under "([^"]*)" to "([^"]*)" as admin$`, w.deployTree)
 	sc.Step(
@@ -180,8 +181,10 @@ func (w *world) frontWithTLS() error {
 	if w.vars == nil {
 		w.vars = map[string]string{}
 	}
+	// {tlshost} lets a scenario put another user's credentials in the URL.
+	w.vars["tlshost"] = strings.TrimPrefix(front.URL, "https://")
 	w.vars["tlsauthurl"] = "https://admin:" + testAdminPassword + "@" +
-		strings.TrimPrefix(front.URL, "https://") + "/artifactory"
+		w.vars["tlshost"] + "/artifactory"
 	return nil
 }
 
@@ -193,14 +196,18 @@ func (w *world) setGoProxy(proxy string) error {
 // runGo runs the runner's go command against the scenario's proxy, with
 // every cache under the scenario's files and nothing reaching the public
 // checksum database or a newer toolchain.
-func (w *world) runGo(args string) error {
+func (w *world) runGo(args string) error { return w.runGoIn(args, "") }
+
+// runGoIn runs the go command in a directory of the scenario's files, such
+// as a consumer module's.
+func (w *world) runGoIn(args, sub string) error {
 	dir, err := w.filesDir()
 	if err != nil {
 		return err
 	}
 	cache := filepath.Join(dir, ".go")
 	cmd := exec.Command("go", w.clientArgs(args)...)
-	cmd.Dir = dir
+	cmd.Dir = filepath.Join(dir, sub)
 	cmd.Env = append(os.Environ(),
 		"GOPROXY="+w.goProxy,
 		"GONOSUMDB=*",
