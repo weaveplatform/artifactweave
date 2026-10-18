@@ -507,7 +507,8 @@ var v2Sections = []types.ResourceType{
 // CreateOrReplacePermissionTargetV2 creates the permission or replaces its
 // v2 sections whole. Administrators may create; holders of MANAGE may
 // replace the actions of one that exists, granting or revoking only the
-// actions they hold and never MANAGE (createorreplacepermissiontargetv2.json,
+// actions they hold and never MANAGE, and leaving their own entries and
+// their groups' as they are (createorreplacepermissiontargetv2.json,
 // decision 0006).
 func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 	ctx context.Context,
@@ -540,12 +541,7 @@ func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 			case !c.manages(old):
 				return types.Permission{}, auth.ErrForbidden
 			case !c.dec.Admin():
-				if err := permission.CheckManagerEdit(
-					old,
-					p,
-					v2Sections,
-					c.dec.Grantable,
-				); err != nil {
+				if err := permission.CheckManagerEdit(old, p, v2Sections, c.dec); err != nil {
 					return types.Permission{}, fmt.Errorf("permissions: %w", err)
 				}
 			}

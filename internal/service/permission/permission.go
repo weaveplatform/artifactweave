@@ -259,18 +259,32 @@ func (s Service) Write(
 	return s.write(ctx, name, change)
 }
 
+// Manager is a holder of MANAGE who is not an administrator, as
+// CheckManagerEdit asks about it; *authz.Decider is one.
+type Manager interface {
+	// Grantable returns the actions it may grant or revoke in a section
+	// whose stored grants are g.
+	Grantable(g types.Grants) types.Actions
+	// Self returns its user name and the groups whose entries are its own.
+	Self() (user string, groups []string)
+}
+
 // CheckManagerEdit checks a replace of the sections of old by those of p
-// made by a holder of MANAGE who is not an administrator. Such a holder may
-// change only actions (createorreplacepermissiontargetv2.json): every
-// section and target stays, with the same patterns. In each section it may
-// grant or revoke only what grantable allows, which authz.Decider.Grantable
-// answers from the stored grants; judged on p's grants instead, a holder
-// could first give itself an action and then pass it on.
+// made by m. Such a holder may change only actions
+// (createorreplacepermissiontargetv2.json): every section and target stays,
+// with the same patterns. It may not change its own entry, or the entry of
+// a group it belongs to: the permissions page lets a manager change the
+// grants of "other users and groups", and without the rule a holder could
+// strip or rewrite the grants an administrator gave it. In each section it
+// may grant or revoke only what m.Grantable allows from the stored grants;
+// judged on p's grants instead, a holder could first give itself an action
+// and then pass it on.
 func CheckManagerEdit(
 	old, p types.Permission,
 	sections []types.ResourceType,
-	grantable func(types.Grants) types.Actions,
+	m Manager,
 ) error {
+	user, groups := m.Self()
 	for _, rt := range sections {
 		was, inOld := old.Resources[rt]
 		now, inNew := p.Resources[rt]
@@ -278,7 +292,17 @@ func CheckManagerEdit(
 			return fmt.Errorf("%w: A user with Manage permission can only edit the actions",
 				ErrForbidden)
 		}
-		may := grantable(was.Actions)
+		// An absent entry reads as no actions, so an own entry that a body
+		// leaves out is a revoke and is refused, while one it repeats
+		// unchanged passes.
+		if was.Actions.Users[user] != now.Actions.Users[user] ||
+			slices.ContainsFunc(groups, func(g string) bool {
+				return was.Actions.Groups[g] != now.Actions.Groups[g]
+			}) {
+			return fmt.Errorf("%w: A user with Manage permission cannot change its own actions "+
+				"or those of its groups", ErrForbidden)
+		}
+		may := m.Grantable(was.Actions)
 		if (changed(was.Actions.Users, now.Actions.Users)|
 			changed(was.Actions.Groups, now.Actions.Groups))&^may != 0 {
 			return fmt.Errorf("%w: A user with Manage permission can grant or revoke only "+

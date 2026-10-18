@@ -79,6 +79,11 @@ type Decider struct {
 	// does not act as the user, and groups are those it acts through.
 	user   string
 	groups []string
+	// self and member are who the subject is, whatever a token scope
+	// narrowed it to act as: its user name, and the groups it belongs to or
+	// a groups scope acts through.
+	self   string
+	member []string
 }
 
 // New reads the permissions that apply to s and returns its Decider.
@@ -87,7 +92,10 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 		return &Decider{}, nil
 	}
 	sc := analyse(s.Scope)
-	d := &Decider{open: sc.open, scope: s.Scope, rules: map[types.ResourceType][]rule{}}
+	d := &Decider{
+		open: sc.open, scope: s.Scope, rules: map[types.ResourceType][]rule{},
+		self: s.Name, member: slices.Clone(s.Groups),
+	}
 	if sc.filtered {
 		d.filter = sc.artifact
 		if d.filter == nil {
@@ -183,6 +191,15 @@ func (d *Decider) Grantable(g types.Grants) types.Actions {
 		return 0
 	}
 	return held &^ types.ActionManage
+}
+
+// Self returns the user the subject is and the groups it belongs to or acts
+// through, whose entries in a permission are its own (decision 0006). A
+// token scope does not narrow them: a token that acts only through a group
+// is still its user's, so editing the user's entry with it is still a
+// holder editing its own grants.
+func (d *Decider) Self() (user string, groups []string) {
+	return d.self, slices.Clone(d.member)
 }
 
 // Actions returns every action the subject holds on path in repo's

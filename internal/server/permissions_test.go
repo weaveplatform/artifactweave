@@ -335,23 +335,34 @@ func TestManageHolderGrants(t *testing.T) {
 		keep  = `"users":{"user":["read","write","manage"]}`
 		build = `"users":{"user":["read"]}`
 	)
+	const (
+		heldOnly = "only actions it holds"
+		own      = "cannot change its own actions"
+	)
 	for _, c := range []struct {
 		name, body string
 		want       int
+		msg        string
 	}{
-		{"grant held actions", body(keep+`,"groups":{"readers":["read","write"]}`, build), 200},
-		{"revoke a held action", body(keep+`,"groups":{"readers":["read"]}`, build), 200},
-		{"grant an action it lacks", body(keep+`,"groups":{"readers":["delete"]}`, build), 403},
-		{"grant MANAGE", body(keep+`,"groups":{"readers":["read","manage"]}`, build), 403},
-		{"revoke its own MANAGE", body(`"users":{"user":["read","write"]}`, build), 403},
+		{"grant held actions", body(keep+`,"groups":{"readers":["read","write"]}`, build), 200, ""},
+		{"revoke a held action", body(keep+`,"groups":{"readers":["read"]}`, build), 200, ""},
+		{
+			"grant an action it lacks",
+			body(keep+`,"groups":{"readers":["delete"]}`, build), 403, heldOnly,
+		},
+		{
+			"grant MANAGE",
+			body(keep+`,"groups":{"readers":["read","manage"]}`, build), 403, heldOnly,
+		},
+		{"revoke its own MANAGE", body(`"users":{"user":["read","write"]}`, build), 403, own},
 		{
 			"grant in a section it does not manage",
-			body(keep, build+`,"groups":{"readers":["read"]}`), 403,
+			body(keep, build+`,"groups":{"readers":["read"]}`), 403, heldOnly,
 		},
 	} {
 		rec := do(t, h, http.MethodPut, permV2+"/mixed", holder, c.body)
 		mustStatus(t, rec, c.want, c.name)
-		if c.want == 403 && !strings.Contains(rec.Body.String(), "only actions it holds") {
+		if !strings.Contains(rec.Body.String(), c.msg) {
 			t.Errorf("%s: message %s", c.name, rec.Body)
 		}
 	}
@@ -373,6 +384,70 @@ func TestManageHolderGrants(t *testing.T) {
 	rec = do(t, h, http.MethodPut, permV2+"/mixed", adminJSON(),
 		body(keep+`,"groups":{"readers":["read","manage"]}`, build))
 	mustStatus(t, rec, 200, "an administrator grants MANAGE")
+}
+
+// TestManageHolderOwnEntries follows a holder of MANAGE through its group:
+// it may change another user's entry but not its own, nor its group's, even
+// within the actions it holds; an administrator still may (decision 0006).
+func TestManageHolderOwnEntries(t *testing.T) {
+	h := statusFixture(t, false)
+	admin := adminJSON()
+	rec := do(t, h, http.MethodPut, secGroups+"/leads", admin, `{"name":"leads"}`)
+	mustStatus(t, rec, 201, "group")
+	rec = do(t, h, http.MethodPut, secUsers+"/lead", admin,
+		`{"name":"lead","email":"lead@example.com","password":"Lead-pass-1","groups":["leads"]}`)
+	mustStatus(t, rec, 201, "user")
+	rec = do(t, h, http.MethodPost, permAcc, admin, `{"name":"own","resources":{"artifact":{`+
+		`"actions":{"users":{"lead":["READ"],"user":["READ"]},`+
+		`"groups":{"leads":["READ","WRITE","MANAGE"]}},`+
+		`"targets":{"perm-local":{"include_patterns":["**"]}}}}}`)
+	mustStatus(t, rec, 201, "create")
+	holder := jsonHeaders(basic("lead", "Lead-pass-1"))
+	body := func(users, groups string) string {
+		return `{"repo":{"repositories":["perm-local"],"actions":{` +
+			`"users":{` + users + `},"groups":{` + groups + `}}}}`
+	}
+	const (
+		self  = `"lead":["read"]`
+		group = `"leads":["read","write","manage"]`
+	)
+	for _, c := range []struct {
+		name, body string
+		want       int
+	}{
+		{"repeat its own entries unchanged", body(self+`,"user":["read"]`, group), 200},
+		{"grant another user a held action", body(self+`,"user":["read","write"]`, group), 200},
+		{"grant itself a held action", body(`"lead":["read","write"],"user":["read","write"]`, group), 403},
+		{"remove its own entry", body(`"user":["read","write"]`, group), 403},
+		{"revoke a held action from its group", body(
+			self+`,"user":["read","write"]`, `"leads":["read","manage"]`,
+		), 403},
+		{"remove its group's entry", body(self+`,"user":["read","write"]`, ""), 403},
+	} {
+		rec := do(t, h, http.MethodPut, permV2+"/own", holder, c.body)
+		mustStatus(t, rec, c.want, c.name)
+		if c.want == 403 && !strings.Contains(rec.Body.String(), "cannot change its own actions") {
+			t.Errorf("%s: message %s", c.name, rec.Body)
+		}
+	}
+	var acc struct {
+		Resources map[string]struct {
+			Actions struct{ Users, Groups map[string][]string }
+		}
+	}
+	rec = do(t, h, http.MethodGet, permAcc+"/own", basic("admin", "pw"), "")
+	mustStatus(t, rec, 200, "read back")
+	permDecode(t, rec, &acc)
+	art := acc.Resources["artifact"].Actions
+	if !slices.Equal(art.Users["lead"], []string{"READ"}) ||
+		!slices.Equal(art.Users["user"], []string{"READ", "WRITE"}) ||
+		!slices.Equal(art.Groups["leads"], []string{"READ", "WRITE", "MANAGE"}) {
+		t.Fatalf("after the holder's edits: %+v", art)
+	}
+	// An administrator changes the holder's entries through the same replace.
+	rec = do(t, h, http.MethodPut, permV2+"/own", admin,
+		body(`"lead":["read","write"]`, `"leads":["read","manage"]`))
+	mustStatus(t, rec, 200, "an administrator changes the holder's entries")
 }
 
 func TestAccessSections(t *testing.T) {
