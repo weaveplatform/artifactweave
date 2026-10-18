@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32 (self-managed; SaaS 7.174.0); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#artifactory-7x-check) records it.
 
 ## Context
 
@@ -46,6 +46,47 @@ evaluator small and makes the legacy shims thin.
 - *Implementing only Access v2*: breaks the JFrog CLI's `permission-target-*` commands and
   the `artifactory_permission_target` resource.
 
+## Artifactory 7.x check
+
+The decision stands against 7.161.32 (SaaS 7.174.0), audited on 2026-10-18 with the KB, Jira
+and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378);
+[research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check)). The
+evaluator's basics match 7.x: grants are additive, a virtual repository has no permission
+target of its own, and anonymous gets 401 where a user gets 403
+([permissions](https://docs.jfrog.com/administration/docs/permissions),
+[security configuration](https://docs.jfrog.com/administration/docs/security-configuration)).
+So do the routes, statuses and shapes of the v1, v2 and Access v2 permission APIs. These
+differ:
+- 7.x differs: `applied-permissions/admin` makes the token an admin token, even for a user
+  that does not exist
+  ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token));
+  fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+- 7.x differs: a MANAGE holder may grant only the actions it holds, and never MANAGE
+  (`exclude-manage`, the Permissions V2 default;
+  [permissions](https://docs.jfrog.com/administration/docs/permissions)); fixed by
+  [#381](https://github.com/weaveplatform/artifactweave/issues/381).
+- 7.x differs: reading one Access permission section needs an administrator
+  ([getpermissionresource](https://docs.jfrog.com/administration/reference/getpermissionresource));
+  fixed by [#382](https://github.com/weaveplatform/artifactweave/issues/382).
+- 7.x differs: the Access listing's `user` filter matches user names without case
+  ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions)); fixed by
+  [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+- 7.x differs: the Manage Resources role lets its holders manage permissions and see every
+  permission target, where artifactweave stores `manage_resources` and `resources_manager`
+  but grants nothing for them
+  ([permissions](https://docs.jfrog.com/administration/docs/permissions); JA-16022 in
+  [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed));
+  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+- 7.x differs: a v2 `build` section without `repositories` targets `artifactory-build-info`,
+  and a `releaseBundle` section `release-bundles`
+  ([createorreplacepermissiontargetv2](https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2));
+  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+
+Decision [0005](0005-authentication-and-tokens.md#artifactory-7x-check) records the seeded
+`Any Remote` grant to `anonymous`, and
+[research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check) the `+` that
+stands for a space in permission names.
+
 ## Constraints
 
 - Pattern matching follows Ant semantics (`*`, `**`, `?`), case-sensitive, and is tested
@@ -72,11 +113,17 @@ These are choices made where no source documents Artifactory's behaviour:
   scope, the subject acts as an administrator only when the scope keeps applied permissions:
   `applied-permissions/user` or `admin` for its own flag, or a groups scope naming an admin
   group.
-- **Token scopes** only remove; the evaluator never adds what the subject does not hold:
+- **Token scopes** only remove, apart from the groups a groups scope names; the evaluator
+  never adds what the subject does not hold:
   - `applied-permissions/user` and `applied-permissions/admin` keep the user's own and
     group grants.
-  - `applied-permissions/groups:…` keeps only the named groups the subject belongs to, and
-    drops the user's direct grants.
+  - `applied-permissions/groups:…` acts through every group it names, whether or not the
+    subject belongs to it, and drops the user's direct grants. The evaluator keeps only the
+    named groups the subject has, so `auth.Principal.Subject` first adds the named groups to
+    the subject (`internal/auth/principal.go`). Access documents the same: a groups-only
+    token acts through "Explicitly mapped groups only"
+    ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Transient
+    Users and Auto Join Groups").
   - `applied-permissions/roles:…` grants nothing until projects arrive (P11).
   - `artifact:<repo|*>[/<ant path>]:<letters>` entries intersect artifact access with what
     they name.
@@ -149,6 +196,10 @@ undocumented.
     grant every pattern on every target.
   - The v2 by-user and by-group views carry full documents and leave it out.
 - **Access listing** (documented, `getpermissions.json`):
+  - The page gives the `user`, `group`, `include_inherited_groups` and `expand` parameters as
+    available from Artifactory 7.210.0, a release later than both 7.161.32 and SaaS 7.174.0
+    ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions), read
+    2026-10-18). artifactweave serves them ahead of that release.
   - `expand` without a `user` or `group` filter answers 400.
   - A filter naming a user or group that does not exist answers 404.
   - `limit` runs from 1 to 99999.

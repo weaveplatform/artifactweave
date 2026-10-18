@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32 (self-managed; SaaS 7.174.0); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#artifactory-7x-check) records it.
 
 ## Context
 
@@ -338,6 +338,112 @@ exist. Reporting the real artifactweave version elsewhere keeps the lie bounded.
   a second key to rotate, or a stored record for every `docker pull`, which Artifactory
   avoids with its persistence threshold. A scoped, unstored access token reuses the
   signing and verification already in place.
+
+## Artifactory 7.x check
+
+Audited against 7.161.32 (SaaS 7.174.0) on 2026-10-18 with the KB, Jira and client sources
+([#378](https://github.com/weaveplatform/artifactweave/issues/378);
+[research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check),
+[research 21](../21-oidc-token-exchange.md#6-artifactory-7x-check)). The token routes, fields
+and scope grammar, the legacy token shapes, the Access v2 users and groups, the account policy
+endpoints and the OIDC configuration and exchange shapes match 7.x. These differ.
+
+**The default token lifetime.** JFrog's sources disagree:
+- the [access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens)
+  (updated 2026-07-06) says "The default expiry is 3600 seconds";
+- the Access configuration reference gives `token.default-expiry: 31536000`
+  ([supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)),
+  and the [recommended configurations](https://docs.jfrog.com/administration/reference/recommended-configurations)
+  page says "Default value: 1 year";
+- the JFrog CLI's `jf atc --expiry` help says the platform default is "1 year by default"
+  (jfrog-cli `utils/cliutils/commandsflags.go`, `atcExpiry`).
+
+Maintainer decision (2026-10-18): the default becomes one year, following the configuration
+reference and the CLI.
+- 7.x differs: a token created without `expires_in` lives one year, and `default_expiry`
+  reads 31536000 until an administrator changes it (the sources above); fixed by
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+
+**Tokens:**
+- 7.x differs: a non-administrator's `expires_in: 0` answers 200 or 403, never 400. With
+  `token.max-expiry` at its default 0, "users can set the `expires_in` parameter to any value"
+  ([recommended configurations](https://docs.jfrog.com/administration/reference/recommended-configurations)),
+  and a refused request is 403, "The requested token details are forbidden"
+  ([createtoken](https://docs.jfrog.com/administration/reference/createtoken)); fixed by
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+- 7.x differs: a refreshable token is revocable, and listed, whatever its lifetime
+  ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue):
+  "created with `force_revocable: true` or `refreshable: true`"); fixed by
+  [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+- 7.x differs: revoking a non-revocable token by id answers 400 (KB
+  [000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui));
+  fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+- 7.x differs: revoking a non-revocable token by value answers 404, "Token not found or not
+  revocable"
+  ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue));
+  fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+- 7.x differs: a token whose lifetime is below `persistent-expiry-threshold` (10800 s) is not
+  stored, so its id reads 404
+  ([supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)).
+  artifactweave stores every token so that `artifactory_scoped_token` can read its token back,
+  but that resource treats a 404 after create as a warning only
+  (`resource_artifactory_scoped_token.go`, lines 512 to 523, terraform-provider-artifactory
+  v12.11.14). Kept, as a deviation registered by #378.
+- 7.x differs: a password sent with Basic may create tokens only once an administrator turns on
+  "Enable Token Generation via API" (`token.allow-basic-auth: false` by default;
+  [createtoken](https://docs.jfrog.com/administration/reference/createtoken),
+  [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations));
+  fixed by [#385](https://github.com/weaveplatform/artifactweave/issues/385).
+- 7.x differs: a token for a user that does not exist authenticates as a transient user, and a
+  groups-scoped one acts with its groups' permissions
+  ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Support
+  Authentication for Non-existing Users"). Here an administrator may mint such a token, but
+  it answers 401 on every use; only OIDC tokens act as transient users (**The token**
+  above); fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+- 7.x differs: the legacy `GET /api/security/token` and `POST /api/security/token/revoke` are
+  admin only
+  ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis),
+  Get Tokens and Revoke Token); fixed by
+  [#382](https://github.com/weaveplatform/artifactweave/issues/382).
+
+**Account policies and seeded principals:**
+- 7.x differs: failed Basic logins also suspend the account for a moment, answering 403 for a
+  delay that grows to at most 60 seconds, and `seconds-to-unlock` defaults to 1
+  ([security configuration](https://docs.jfrog.com/administration/docs/security-configuration),
+  "Temporary Login Suspension";
+  [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations));
+  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+- 7.x differs: from 7.84.3 `anonymous` is no longer in the `Anything` and `Any Remote`
+  permissions ([permissions](https://docs.jfrog.com/administration/docs/permissions)); fixed by
+  [#383](https://github.com/weaveplatform/artifactweave/issues/383).
+
+**OIDC token exchange** ([research 21](../21-oidc-token-exchange.md#3-matching-and-the-token-issued)
+section 3 describes each point, from
+[OpenID Connect integration](https://docs.jfrog.com/administration/docs/openid-connect-integration)):
+- 7.x differs: a mapping that resolves a username adds `applied-permissions/user`, so the
+  token acts through its named groups and the auto-join groups; from 7.133.10 not with a
+  project roles scope (JA-18771 in
+  [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed),
+  JA-19609 in
+  [7.133.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-713310-self-managed));
+  fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
+- 7.x differs: one mapping may combine a user with a groups pattern, and a user pattern with a
+  groups pattern; it may not combine groups with a groups pattern, a user with a user pattern,
+  or admin with anything (the page's combination table); fixed by
+  [#409](https://github.com/weaveplatform/artifactweave/issues/409).
+- 7.x differs: a two-part pattern matches its template against the claim, the claim's place
+  being a capture group, and a claim that does not match fails the request ("Dynamic
+  Mapping"); fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
+- 7.x differs: from 7.130.0 a pattern may chain more than three parts and use
+  `op:replaceAll`, `op:replaceFirst` and `op:replaceLast` ("Advanced Dynamic Mappings");
+  fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
+- 7.x differs: a Resource Scope mapping turns a claim such as `jfrog_scope` into an
+  `artifact:` scope (SaaS
+  [7.172.1](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas));
+  fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
+- 7.x differs: with no `project_key`, "all identity mappings compete equally based on priority
+  and creation time", a project's mappings included ("Identity Mappings"); fixed by
+  [#409](https://github.com/weaveplatform/artifactweave/issues/409).
 
 ## Constraints
 

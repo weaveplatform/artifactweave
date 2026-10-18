@@ -1406,7 +1406,7 @@ paths:
       summary: Get the user lock policy
       tags:
       - config
-      x-oracle-source: https://docs.jfrog.com/administration/reference/getaccessuserlockpolicy.md
+      x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
     put:
       description: Replaces the user lock policy and returns what was stored. Send every field; an omitted field is
         stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it
@@ -1447,7 +1447,7 @@ paths:
       summary: Replace the user lock policy
       tags:
       - config
-      x-oracle-source: https://docs.jfrog.com/administration/reference/configureaccessuserlockpolicy.md
+      x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
   /api/v1/config/token/default_expiry:
     get:
       description: Returns the lifetime, in seconds, that POST /api/v1/tokens gives to tokens created without expires_in.

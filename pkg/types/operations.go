@@ -305,7 +305,11 @@ type AccessLockSettings struct {
 }
 
 // DefaultAccessLockSettings is in force while none is stored: Access's
-// server defaults (docs.jfrog.com, getAccessUserLockPolicy).
+// server defaults. docs.jfrog.com, supported Access configurations
+// (security.user-lock-policy), documents the two delays. The
+// getAccessUserLockPolicy reference page, the source of the attempts before
+// suspension and the suspension switch, is gone; the endpoint is now
+// documented only in the migration notes of the deprecated JFrog APIs page.
 func DefaultAccessLockSettings() AccessLockSettings {
 	return AccessLockSettings{
 		MaxLoginDelayIncorrectAttempts: 2,

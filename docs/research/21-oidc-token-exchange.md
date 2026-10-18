@@ -1,6 +1,6 @@
 # OIDC token exchange for CI workload identity
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32 (self-managed; SaaS 7.174.0); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#6-artifactory-7x-check) records it.
 
 Research baseline: **2026-10-14**.
 
@@ -70,17 +70,53 @@ From <https://docs.jfrog.com/administration/docs/openid-connect-integration>:
   claims (`custom_claims.department.group`, Artifactory 7.161.5+). How `*` differs from
   `**`, and whether a list matches any element, is not stated.
 - **[D]** Priority: with a `project_key`, the project's mappings are tried before global
-  ones; lower numbers first; equal priorities go to the mapping created first.
+  ones; lower numbers first; equal priorities go to the mapping created first. "When no
+  `project_key` is supplied, all identity mappings compete equally based on priority and
+  creation time", a project's mappings included ("Identity Mappings").
 - **[D]** The expiration time is "Limited to 24 hours, or 1440 minutes".
 - **[D]** A mapping's token may carry several scopes, user and group scopes together,
   from 7.104.5 (SaaS 7.104.2) ([7.104.5 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
 - **[D]** From 7.161.15 (SaaS 7.161.5) administrators can stop project admins seeing
   global identity mappings ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). SaaS 7.172.1 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)) adds a Resource Scope
-  dynamic mapping; it is not yet in self-managed 7.161.32.
-- **[D]** Dynamic mapping (7.95+): `{{claim}}` takes a claim's value;
-  `pattern | regex | replacement` rewrites it, `$0` the whole match and `$1` the first
-  group; "If the claim is not found, the token request fails." A groups pattern "is
-  applied to all groups and adds the pattern to the group scope".
+  dynamic mapping; it is not yet in self-managed 7.161.32. The integration page dates it from
+  7.161.5: a claim such as `jfrog_scope` becomes the token's resource scope, and a bare
+  repository name is normalised to `artifact:<repo>/**:r`.
+- **[D]** Dynamic mapping (7.95+), "Dynamic Mapping": a pattern names its claim as
+  `{{claim}}`, and "If the claim is not found, the token request fails."
+  - `{{claim}}` alone takes the claim's value as it is.
+  - `template | replacement` matches the template against the claim. `{{claim}}` stands for a
+    capture group, and the text around it must match literally. The replacement builds the
+    result from `$0`, the whole match, and `$1`, the group: `jf{{actor}}jf|$1` turns
+    `jfuser-f12jf` into `user-f12`, and `{{actor}} | hub$0jfrog` turns `user` into
+    `hubuserjfrog`. A claim that does not match fails the request:
+    `jf{{mail}}jfrog.com|$0` fails for a mail that does not start with `jf`.
+  - `{{claim}} | regex | replacement` matches the claim against a regular expression.
+  - A groups pattern "is applied to all groups and adds the pattern to the group scope".
+- **[D]** Advanced dynamic mappings (7.130.0+, "Advanced Dynamic Mappings"): a pattern may
+  chain more than three parts, and a part may be `op:replaceAll("a","b")`,
+  `op:replaceFirst(…)` or `op:replaceLast(…)`. For example
+  `{{actor}} | op:replaceAll("-","_") | ^([^_]+)_([^_]+)_([^_]+)_mac$ | $1_$2_$3_artifactory_cicd`.
+- **[D]** A mapping that resolves a username issues "a token with the
+  `applied-permissions/user` scope", which is added to any groups scope ("Transient Users in
+  OIDC Token Exchange"). User only acts through the auto-join groups, groups only through the
+  named groups, and user with groups through both. 7.133.3 fixed a token from group mapping
+  with dynamic user mapping that lacked the user scope (JA-18771,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)).
+  From 7.133.10 a mapping with a project roles scope no longer gets it (JA-19609,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-713310-self-managed)).
+- **[D]** Which scopes one mapping may combine (the page's table under "Identity Mappings"):
+
+  | Scope | Combines with |
+  |---|---|
+  | Admin | nothing |
+  | User | Groups, Groups Dynamic, Resource Dynamic |
+  | Groups | User, User Dynamic, Resource Dynamic |
+  | User Dynamic | Groups, Groups Dynamic, Resource Dynamic |
+  | Groups Dynamic | User, User Dynamic, Resource Dynamic |
+  | Resource Dynamic | every scope but Admin |
+
+  The table marks each cell with an icon; `30c2518e…svg` is a cross and `a8f4274b…svg` a
+  tick.
 - **[D]** GitHub: `organization` is mandatory unless `enable_permissive_configuration`
   is true (7.110.1+), and case sensitive. Token issuer is needed "only when the OIDC
   provider URL differs from the token's issuer". Azure's `azure_app_id` is "required
@@ -144,3 +180,30 @@ Artifactory's Docker registry, and as whom.
 | setup-jfrog-cli | `1e5845068719` (section 3a) |
 | jfrog-cli-artifactory | `4a0f3827cfa0` (section 3a) |
 | terraform-provider-shared | `adad42471470` (section 3a) |
+
+## 6. Artifactory 7.x check
+
+Audited on 2026-10-18 against Artifactory 7.161.32 (SaaS 7.174.0) with the KB, Jira and
+client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)). The
+integration page was read as `.md`, updated 2026-10-13.
+
+**Confirmed for 7.x:** the operations and shapes of section 1, what the clients send and read
+(section 2), transient users and the synthetic subject, nested claims, the 24-hour limit and
+the order of mappings with a `project_key`.
+
+**Corrected here:** section 3 left out how a two-part pattern matches, the 7.130.0
+operators, the user scope that a resolved username adds, which scopes one mapping may
+combine, and how mappings compete without a `project_key`.
+
+**Where artifactweave differs:** on those five points and the Resource Scope mapping.
+Decision 0005's [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check)
+lists them; [#409](https://github.com/weaveplatform/artifactweave/issues/409) fixes them.
+
+**Unconfirmed for 7.x**, for the live check on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216):
+- `*` and `**` in claims (section 4);
+- whether a `token_spec.expires_in` over 24 hours is refused or capped;
+- what `self_revocable` changes;
+- whether an exchanged token shorter than six hours can be revoked. 7.133.3 fixed revoking one
+  with a project roles scope (JA-18290,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)).
