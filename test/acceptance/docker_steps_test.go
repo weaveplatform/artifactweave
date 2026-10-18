@@ -9,8 +9,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 )
@@ -32,6 +35,7 @@ func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^the Docker daemon can reach the registry$`, w.dockerReachable)
 	sc.Step(`^I run docker login as "([^"]*)" with password "([^"]*)"$`, w.dockerLogin)
 	sc.Step(`^I run docker "([^"]*)"$`, w.runDocker)
+	sc.Step(`^a buildx builder that pushes to the registry$`, w.buildxBuilder)
 	sc.Step(`^(crane|oras|cosign) is available$`, w.toolAvailable)
 	sc.Step(`^I run (crane|oras|cosign) "([^"]*)"$`, w.runTool)
 	sc.Step(`^I keep the output as "([^"]*)"$`, w.keepOutput)
@@ -74,6 +78,41 @@ func (w *world) runDocker(args string) error {
 		append([]string{"--config", dir}, strings.Fields(w.expand(args))...)...)
 	cmd.Dir = w.dir
 	return w.runClient(cmd)
+}
+
+// buildxBuilder creates a docker-container buildx builder in the
+// scenario's docker configuration and selects it, so buildx build pushes
+// multi-platform images, which the daemon's own builder does only with the
+// containerd image store. Plain docker build keeps the default builder
+// whatever is selected, so the builder's name is kept as {builder} for
+// BUILDX_BUILDER. Its BuildKit shares the host's network to reach the
+// binary on 127.0.0.1, speaking plain HTTP to it, and the scenario's end
+// removes it.
+func (w *world) buildxBuilder() error {
+	dir, err := w.dockerConfigDir()
+	if err != nil {
+		return err
+	}
+	conf := filepath.Join(dir, "buildkitd.toml")
+	if err := os.WriteFile(conf,
+		fmt.Appendf(nil, "[registry.%q]\n  http = true\n", w.expand("{host}")), 0o600); err != nil {
+		return err
+	}
+	name := "artifactweave-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	out, err := exec.Command("docker", "--config", dir, "buildx", "create", "--name", name,
+		"--driver", "docker-container", "--driver-opt", "network=host",
+		"--buildkitd-config", conf, "--use", "--bootstrap").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("buildx create: %w\n%s", err, out)
+	}
+	w.closers = append(w.closers, func() {
+		_ = exec.Command("docker", "--config", dir, "buildx", "rm", "--force", name).Run()
+	})
+	if w.vars == nil {
+		w.vars = map[string]string{}
+	}
+	w.vars["builder"] = name
+	return nil
 }
 
 // toolAvailable skips the scenario unless the tool's pinned binary is

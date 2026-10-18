@@ -219,15 +219,24 @@ func TestReferences(t *testing.T) {
 			t.Errorf("ValidTag(%q) = %v", tag, !valid)
 		}
 	}
+	// A sha256__<hex> tag is an ordinary tag, as in a 7.x local repository.
 	for tag, reserved := range map[string]bool{
-		"_uploads": true, "sha256__" + hex: true, "sha256__x": true, "uploads": false, "v1": false,
+		"_uploads": true, "sha256__" + hex: false, "sha256__x": false, "uploads": false, "v1": false,
 	} {
 		if layout.ReservedTag(tag) != reserved {
 			t.Errorf("ReservedTag(%q) = %v", tag, !reserved)
 		}
 	}
-	if layout.DigestFolder("ab") != "sha256__ab" {
-		t.Fatal(layout.DigestFolder("ab"))
+	// A digest folder keeps the digest's colon, the exact path jf docker
+	// build searches; no valid tag can name it.
+	folder := layout.DigestFolder(hex)
+	if folder != "sha256:"+hex || layout.ValidTag(folder) || !layout.IsDigestFolder(folder) {
+		t.Fatal(folder)
+	}
+	for _, f := range []string{"sha256__" + hex, "v1", layout.UploadsFolder} {
+		if layout.IsDigestFolder(f) {
+			t.Errorf("IsDigestFolder(%q)", f)
+		}
 	}
 }
 
@@ -270,7 +279,7 @@ func findManifest(t *testing.T, db store.Store) {
 		}
 	}
 	deploy("a_b/v1/manifest.json", "tagged")
-	deploy("a_b/sha256__"+sum("list")+"/list.manifest.json", "list")
+	deploy("a_b/"+layout.DigestFolder(sum("list"))+"/list.manifest.json", "list")
 	deploy("a_b/sub/v1/manifest.json", "deep")
 	deploy("a_b/v2/sha256__"+sum("layer"), "layer")
 	deploy("a_b/v2/other.json", "other")

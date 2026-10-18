@@ -8,6 +8,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -18,6 +19,7 @@ import (
 func runContent(t *testing.T, newStore Factory) {
 	t.Run("Repos", func(t *testing.T) { testRepos(t, newStore(t).Repos()) })
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
+	t.Run("ColonPaths", func(t *testing.T) { testColonPaths(t, newStore(t).Items()) })
 	t.Run("ItemProperties", func(t *testing.T) { testItemProperties(t, newStore(t).Items()) })
 	t.Run("ItemStats", func(t *testing.T) { testItemStats(t, newStore(t).Items()) })
 	t.Run("ItemSearch", func(t *testing.T) { testItemSearch(t, newStore(t)) })
@@ -430,6 +432,67 @@ func testItems(t *testing.T, s store.ItemStore) {
 		get[store.DeleteResult](t)(s.Delete(ctx, "r", true, ".")))
 	if got := get[types.Item](t)(s.Get(ctx, "r", false, "z.txt")); got.Name != "z.txt" {
 		t.Fatalf("unrelated item lost: %+v", got)
+	}
+}
+
+// testColonPaths stores a Docker digest folder, whose name keeps the
+// digest's colon as a 7.x local repository does, beside the sha256__ tag
+// folder that differs from it in that character alone: reads, listings,
+// searches and deletes treat the colon as an ordinary character.
+func testColonPaths(t *testing.T, s store.ItemStore) {
+	ctx := context.Background()
+	for i, it := range []types.Item{
+		folderItem("r", "img"),
+		folderItem("r", "img/sha256:ab"),
+		fileItem("r", "img/sha256:ab/manifest.json", 1),
+		folderItem("r", "img/sha256__ab"),
+		fileItem("r", "img/sha256__ab/manifest.json", 2),
+	} {
+		got := get[types.Item](t)(s.Put(ctx, it))
+		same(t, fmt.Sprintf("Put %d", i), stored(it, got.ID), got)
+	}
+	got := get[types.Item](t)(s.Get(ctx, "r", false, "/img/sha256:ab/manifest.json"))
+	if got.Path != "img/sha256:ab" || got.Name != "manifest.json" || got.Depth != 3 {
+		t.Fatalf("Get = %q %q %d", got.Path, got.Name, got.Depth)
+	}
+	list := func(fn func(store.Page) ([]types.Item, string, error)) []string {
+		t.Helper()
+		return itemPaths(pages(t, 1, fn))
+	}
+	// Byte order puts ':' before '_'.
+	same(t, "Children of the image", []string{"img/sha256:ab", "img/sha256__ab"},
+		list(func(p store.Page) ([]types.Item, string, error) {
+			return s.Children(ctx, "r", false, "img", p)
+		}))
+	same(t, "Descendants of the digest folder", []string{"img/sha256:ab/manifest.json"},
+		list(func(p store.Page) ([]types.Item, string, error) {
+			return s.Descendants(ctx, "r", false, "img/sha256:ab", p)
+		}))
+	search := func(query string) []string {
+		t.Helper()
+		q, err := aql.Parse(query)
+		must(t, err)
+		hits := get[[]aql.Hit](t)(s.Search(ctx, q, aql.Options{}))
+		out := make([]string, 0, len(hits))
+		for _, h := range hits {
+			out = append(out, h.Item.FullPath())
+		}
+		return out
+	}
+	same(t, "$eq on the path", []string{"img/sha256:ab/manifest.json"},
+		search(`items.find({"repo":"r","path":"img/sha256:ab"})`))
+	same(t, "$match on the path", []string{"img/sha256:ab/manifest.json"},
+		search(`items.find({"repo":"r","path":{"$match":"img/sha256:*"}})`))
+	same(t, "$match across both folders",
+		[]string{"img/sha256:ab/manifest.json", "img/sha256__ab/manifest.json"},
+		search(`items.find({"repo":"r","path":{"$match":"img/sha256*"}}).sort({"$asc":["path"]})`))
+	res := get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "img/sha256:ab"))
+	same(t, "Delete the digest folder", store.DeleteResult{
+		Files: 1, Folders: 1, Bytes: blob(1).Size,
+		BlobRefs: map[string]int64{blob(1).Checksums.SHA256: 1},
+	}, res)
+	if _, err := s.Get(ctx, "r", false, "img/sha256__ab/manifest.json"); err != nil {
+		t.Fatalf("the tag folder went with the digest folder: %v", err)
 	}
 }
 

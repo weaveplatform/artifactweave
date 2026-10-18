@@ -57,7 +57,7 @@ each code with the reference registry's status (R23 1.3):
 | `MANIFEST_UNKNOWN` | 404 | `TOOMANYREQUESTS` | 429 |
 
 Only these fourteen codes are sent, with one exception, `TAG_INVALID` for the reserved
-tags below; the other legacy schema-1 codes and the reference registry's `RANGE_INVALID` are
+tag below; the other legacy schema-1 codes and the reference registry's `RANGE_INVALID` are
 not. `message` is a short English sentence, and `detail`, when present,
 names what failed (the digest, the tag, the expected and actual sizes). The JFrog REST
 operations under `/artifactory/api/docker/<repo>/v2/` that are not registry operations
@@ -138,21 +138,27 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   - Pushed by tag: `<name>/<tag>/manifest.json` for an image, `<name>/<tag>/list.manifest.json`
     for an index or list, with the image's config and layers linked into the tag folder
     as `sha256__<hex>`.
-  - Pushed by digest: `<name>/sha256__<hex>/manifest.json` (or `list.manifest.json`),
-    with its blobs linked beside it. Platform manifests of a multi-architecture image live
-    here. `jf docker push` finds them in any folder of the image by their `sha256`, but a
-    7.x local repository keeps them in `<name>/sha256:<hex>/`, and `jf docker build`
-    searches only that exact path (R23 5.1). [#387](https://github.com/weaveplatform/artifactweave/issues/387) moves these folders.
+  - Pushed by digest: `<name>/sha256:<hex>/manifest.json` (or `list.manifest.json`), the
+    digest with its colon as the folder's name, with its blobs linked beside it as
+    `sha256__<hex>`. Platform manifests of a multi-architecture image live here, as a 7.x
+    local repository keeps them: `jf docker push` finds them in any folder of the image by
+    their `sha256`, and `jf docker build` searches only this exact path (R23 5.1;
+    jfrog-cli-artifactory `docker_dependencies.go`;
+    [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432)). A folder named
+    `sha256__<hex>` is the remote-cache form of the same folder (R23 5.1); remote Docker
+    repositories are not served yet, so no repository holds one as a digest folder.
   - Pushing a different manifest over an existing tag needs Delete, as Artifactory's
     Strict Tag Overwrite does, and replaces the folder's contents in one transaction.
     Pushing the identical manifest again changes nothing and needs only Deploy, so a
     repeated `docker push` by a deployer succeeds and the build properties `jf` set on
     the layers stay.
-  - Two tags are reserved and answer 400 `TAG_INVALID`, though the tag grammar allows
-    them: `_uploads`, which would collide with the uploads folder, as on Artifactory, and
-    any tag starting with `sha256__`, whose folder would read back as a push by digest.
+  - One tag is reserved and answers 400 `TAG_INVALID`, though the tag grammar allows it:
+    `_uploads`, which would collide with the uploads folder, as on Artifactory. A digest
+    folder needs no reservation, since no tag may hold a colon, and a tag starting with
+    `sha256__` is an ordinary tag, as the tags list of a 7.x local repository shows it
+    (R23 8).
 - **Properties** set on every stored manifest, in the same transaction:
-  `docker.manifest` (the folder's name, the tag or `sha256__<hex>`),
+  `docker.manifest` (the folder's name, the tag or `sha256:<hex>`),
   `docker.manifest.digest` (`sha256:<hex>`), `docker.manifest.type` (the media type),
   `docker.repoName` (`<name>`) and `sha256` (the hex digest). An image manifest's config
   labels become `docker.label.<label>` properties. A manifest with a `subject` also gets
@@ -264,8 +270,9 @@ Unique Tags and Tag Retention follow Artifactory's documented rules (R23 5.3):
 - after each push, the pushed image's oldest tags beyond `maxUniqueTags` are removed,
   `latest` included, with their retained versions;
 - with `dockerTagRetention` at 2 or more, an overwritten tag's previous manifest stays in
-  its digest folder, `<name>/sha256__<hex>/`, and the oldest such versions beyond the
-  setting minus one are removed;
+  its digest folder, `<name>/sha256:<hex>/`, and the oldest such versions beyond the
+  setting minus one are removed. **[I]** No source shows where 7.x keeps such a version;
+  this follows the digest folders above (R23 8);
 - a list manifest is removed with the platform manifests no other tag references.
 
 ## Rationale
@@ -274,8 +281,8 @@ Matching from the end of the path is the only rule that accepts every name the g
 allows. Sending each code with the reference registry's status keeps the clients' error
 handling on the paths it was written for.
 
-The layout is the one the JFrog CLI reads: tag folders, `sha256__` files, digest folders for
-platform images and the five manifest properties. Linking blobs by reference keeps the
+The layout is the one the JFrog CLI reads: tag folders, `sha256__` files, `sha256:<hex>`
+digest folders for platform images and the five manifest properties. Linking blobs by reference keeps the
 layout without storing a layer once per tag.
 
 Three choices depart from Artifactory and are in the
@@ -307,23 +314,25 @@ a `referrers.json` (DV-036).
 ## Artifactory 7.x check
 
 The decision stands against 7.161.32
-([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check)), with two
+([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check)), with three
 additions:
 - **`docker.os` and `docker.architecture`** go on each image manifest, as 7.x sets them from
   7.125.4 ([#352](https://github.com/weaveplatform/artifactweave/issues/352)); see
   "Platform properties" above.
 - **A digest mismatch is always refused,** where 7.x accepts it unless an administrator sets
   the flag added in 7.111.4 (DV-061).
+- **Digest folders keep the colon.** A manifest pushed by digest, every platform manifest of
+  a multi-architecture push among them, lives in `<name>/sha256:<hex>/`, as in a 7.x local
+  repository, where `jf docker build` searches only that path (jfrog-cli-artifactory
+  `docker_dependencies.go`, [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432);
+  [#387](https://github.com/weaveplatform/artifactweave/issues/387)); see "Where a manifest
+  lives" above.
 
 The referrers hardening of 7.161.16 (403 without Read on the subject) matches the permission
 table above.
 
 The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where
 7.x differs from this decision. Research 23 sections 7 and 12 give the evidence in full.
-- 7.x differs: a manifest pushed by digest lives in `<name>/sha256:<hex>/` in a local
-  repository, and `jf docker build` searches only there (jfrog-cli-artifactory
-  `docker_dependencies.go`, [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432));
-  fixed by [#387](https://github.com/weaveplatform/artifactweave/issues/387).
 - 7.x differs: from 7.21.2 each platform image of a list push also gets a descriptive
   `<tag>-<os>-<arch>` tag ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
   "Multi-Architecture Tagging"); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
@@ -387,12 +396,12 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
     succeeded; blob `DELETE` answers 405 here.
 - Acceptance: `docker`, `crane`, `oras` and `cosign` round trips, `jf docker push` and
   `jf docker pull` with `--build-name` and `--build-number` followed by
-  `jf rt build-publish`, `jf rt build-docker-create` for an image pushed by `crane`, and
-  `jf rt docker-promote`. `jf docker build` and `jf docker buildx build` are not covered
-  yet: they look for a local repository's platform manifests at the exact path
-  `<name>/sha256:<hex>`, not by the push search (R23 5.1), and [#387](https://github.com/weaveplatform/artifactweave/issues/387) adds them to
-  the acceptance suite with the folders they need. `jf docker scan` is not covered, as it
-  calls Xray's stub.
+  `jf rt build-publish`, `jf rt build-docker-create` for an image pushed by `crane`,
+  `jf rt docker-promote`, and a `docker buildx` multi-architecture push followed by
+  `jf docker build` with `JFROG_RUN_NATIVE` set, whose build-info takes the base image's
+  layers and the pushed platform layers from the exact paths `<name>/sha256:<hex>`
+  (R23 5.1). `jf docker buildx build` runs the same command. `jf docker scan` is not
+  covered, as it calls Xray's stub.
 
 ## References
 

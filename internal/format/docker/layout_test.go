@@ -85,7 +85,7 @@ func findBlob(t *testing.T, db store.Store) {
 	upload, tagged, digest := sum("upload"), sum("tagged"), sum("by digest")
 	deploy("docker-local", "a_b.c/_uploads/sha256__"+upload, "upload")
 	deploy("docker-local", "a_b.c/v1/sha256__"+tagged, "tagged")
-	deploy("docker-local", "a_b.c/sha256__"+sum("m")+"/sha256__"+digest, "by digest")
+	deploy("docker-local", "a_b.c/"+layout.DigestFolder(sum("m"))+"/sha256__"+digest, "by digest")
 	// Only deeper, in another image named a_b.c/sub.
 	deploy("docker-local", "a_b.c/sub/v1/sha256__"+sum("deep"), "deep")
 	// Under the name's look-alike, which a LIKE wildcard would match.

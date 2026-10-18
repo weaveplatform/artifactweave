@@ -286,7 +286,7 @@ func TestPromoteErrors(t *testing.T) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA)
 		body, digest := manifestOf(layerA)
-		if err := w.push(body, digest, "v1"); err != nil {
+		if err := w.push(body, digest, "v1", layout.DigestFolder(digest)); err != nil {
 			t.Fatal(err)
 		}
 		o := w.owner("app")
@@ -296,6 +296,7 @@ func TestPromoteErrors(t *testing.T) {
 		}{
 			"absent tag":      {o, "v9"},
 			"reserved tag":    {o, layout.UploadsFolder},
+			"digest folder":   {o, layout.DigestFolder(digest)},
 			"no image":        {w.owner("nothing"), ""},
 			"no tag in image": {w.owner("nothing"), "v1"},
 		} {

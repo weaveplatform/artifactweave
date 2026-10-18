@@ -59,6 +59,10 @@ type world struct {
 	// jfHome is the JFrog CLI's configuration for the scenario, so a
 	// server added by jf c add is there for the commands after it.
 	jfHome string
+	// jfEnv is added to the JFrog CLI's environment for the rest of the
+	// scenario, such as JFROG_RUN_NATIVE, without which jf docker build
+	// collects no build-info.
+	jfEnv []string
 	// vars holds values kept from command output, for {name} in jf
 	// arguments.
 	vars map[string]string
@@ -159,6 +163,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the JFrog CLI is available$`, w.jfAvailable)
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
 	sc.Step(`^I run jf "([^"]*)" in "([^"]*)"$`, w.runJFIn)
+	sc.Step(`^the JFrog CLI runs with "([^"]*)" set to "([^"]*)"$`, w.setJFEnv)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
 	sc.Step(`^the command fails$`, w.commandFails)
 	sc.Step(
@@ -770,6 +775,13 @@ func (w *world) awaitExpiry(name string) error {
 	return nil
 }
 
+// setJFEnv sets a variable in the JFrog CLI's environment for the rest of
+// the scenario, its value expanded (expand).
+func (w *world) setJFEnv(name, value string) error {
+	w.jfEnv = append(w.jfEnv, name+"="+w.expand(value))
+	return nil
+}
+
 // runJF runs the JFrog CLI with its arguments expanded (expand).
 // JFROG_CLI_HOME_DIR isolates the CLI's config from the developer's, and
 // JFROG_CLI_TEMP_DIR its build-info between commands; both last for the
@@ -820,6 +832,7 @@ func (w *world) runJFIn(args, sub string) error {
 		// scenario's docker login from here.
 		cmd.Env = append(cmd.Env, "DOCKER_CONFIG="+w.dockerConfig)
 	}
+	cmd.Env = append(cmd.Env, w.jfEnv...)
 	out, err := cmd.CombinedOutput()
 	w.body = out
 	w.lastRC = 0

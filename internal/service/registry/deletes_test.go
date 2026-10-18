@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -61,7 +62,7 @@ func TestDeleteManifest(t *testing.T) {
 		ctx := context.Background()
 		w.upload(imageConfig, layerA, layerB)
 		body, digest := manifestOf(layerA)
-		if err := w.push(body, digest, "v1", "sha256__"+digest); err != nil {
+		if err := w.push(body, digest, "v1", layout.DigestFolder(digest)); err != nil {
 			t.Fatal(err)
 		}
 		other, otherDigest := manifestOf(layerB)
@@ -71,7 +72,8 @@ func TestDeleteManifest(t *testing.T) {
 		if err := w.svc.DeleteManifest(ctx, w.owner("app"), digest); err != nil {
 			t.Fatal(err)
 		}
-		if w.exists("app/v1") || w.exists("app/sha256__"+digest) || !w.exists("app/v2") {
+		byDigest := "app/" + layout.DigestFolder(digest)
+		if w.exists("app/v1") || w.exists(byDigest) || !w.exists("app/v2") {
 			t.Fatal("the wrong folders went")
 		}
 		if err := w.svc.DeleteManifest(ctx, w.owner("app"), digest); !errors.Is(

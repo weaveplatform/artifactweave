@@ -160,7 +160,7 @@ func TestPushByDigestWithTags(t *testing.T) {
 			t.Fatal(err)
 		}
 		for folder, name := range map[string]string{
-			"sha256__" + digest: "sha256__" + digest, "a": "a", "b": "b",
+			layout.DigestFolder(digest): "sha256:" + digest, "a": "a", "b": "b",
 		} {
 			tree := w.tree("app/" + folder)
 			if len(tree) != 3 || tree["manifest.json"] != digest {

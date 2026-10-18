@@ -1,10 +1,11 @@
 // Package docker is the storage layout of Docker and OCI images in a
 // repository's item tree (decision 0031), which the JFrog CLI reads with AQL
-// and the storage API: an image is a folder, each tag or digest a folder of
-// its own below it, and every blob a file named sha256__<hex> in the folders
-// of the images that use it. Finished uploads wait in the image's _uploads
-// folder until a manifest links them. A format package never imports
-// internal/server, nor the item service, which calls the format hooks.
+// and the storage API: an image is a folder, each tag a folder of its own
+// below it and each manifest pushed by digest a folder named sha256:<hex>,
+// and every blob a file named sha256__<hex> in the folders of the images
+// that use it. Finished uploads wait in the image's _uploads folder until a
+// manifest links them. A format package never imports internal/server, nor
+// the item service, which calls the format hooks.
 package docker
 
 import (
@@ -29,9 +30,10 @@ func Serves(t repo.PackageType) bool {
 // uploads, as on Artifactory; jf leaves it out of its searches.
 const UploadsFolder = "_uploads"
 
-// blobPrefix starts a blob's file name: a digest's colon is not allowed in
-// every path the item tree is exported to, so Artifactory writes two
-// underscores instead.
+// blobPrefix starts a blob's file name, sha256__<hex>, in every folder of an
+// image, digest folders included: jf looks blobs up by that name (research
+// 23, 5.1). It is not the digest folder's prefix in a local repository (see
+// DigestFolder).
 const blobPrefix = "sha256__"
 
 // BlobFile is the file name of the blob whose SHA-256 is hex.

@@ -3,17 +3,11 @@ package docker
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
-
-// IsDigestFolder reports whether a folder below an image is a digest
-// folder (a push by digest, a platform manifest or a retained version),
-// which is never a tag.
-func IsDigestFolder(folder string) bool { return strings.HasPrefix(folder, blobPrefix) }
 
 // Retained returns the previous manifests of the image name's tag that Tag
 // Retention kept (decision 0031), oldest push first. A retained manifest is
@@ -31,7 +25,7 @@ func Retained(
 		&aql.FieldCriterion{
 			Field: aql.FieldPath,
 			Op:    aql.OpMatch,
-			Text:  name + "/" + blobPrefix + "*",
+			Text:  name + "/" + DigestFolder("") + "*",
 		},
 		&aql.PropertyCriterion{Part: aql.PartPair, Key: ManifestProperty, Op: aql.OpEq, Value: tag},
 	)

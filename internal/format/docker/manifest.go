@@ -357,17 +357,32 @@ var tagRE = regexp.MustCompile(`^[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}$`)
 // ValidTag reports whether tag is a tag by the specification's grammar.
 func ValidTag(tag string) bool { return tagRE.MatchString(tag) }
 
-// ReservedTag reports whether a valid tag would collide with the folders
-// the layout keeps beside tag folders: _uploads, as on Artifactory, and a
-// digest folder's sha256__ name (decision 0031), which the grammar allows
-// as a tag but would read back as a push by digest.
-func ReservedTag(tag string) bool {
-	return tag == UploadsFolder || strings.HasPrefix(tag, blobPrefix)
-}
+// ReservedTag reports whether a valid tag would collide with a folder the
+// layout keeps beside tag folders: _uploads, as on Artifactory. A digest
+// folder needs no reservation, since no tag may hold its colon, and
+// sha256__<hex> is an ordinary tag, as in a 7.x local repository (research
+// 23, 8).
+func ReservedTag(tag string) bool { return tag == UploadsFolder }
+
+// digestPrefix starts the name of a digest folder in a local repository:
+// the digest itself, colon and all, the exact path jf docker build searches
+// for a platform manifest (research 23, 5.1). A remote repository's cache
+// names the same folder with blobPrefix instead, library/<image>/sha256__<hex>.
+// Caching images (P9) adds that form here, in DigestFolder and
+// IsDigestFolder, through which every reader of the layout names and
+// recognises digest folders.
+const digestPrefix = "sha256:"
 
 // DigestFolder is the folder below an image of the manifest pushed by its
-// digest, whose SHA-256 is hex.
-func DigestFolder(hex string) string { return blobPrefix + hex }
+// digest, whose SHA-256 is hex: every platform manifest of a
+// multi-architecture push, and a tag's previous manifest kept by Tag
+// Retention.
+func DigestFolder(hex string) string { return digestPrefix + hex }
+
+// IsDigestFolder reports whether a folder below an image is a digest
+// folder (a push by digest, a platform manifest or a retained version),
+// which is never a tag.
+func IsDigestFolder(folder string) bool { return strings.HasPrefix(folder, digestPrefix) }
 
 // FindManifest returns the stored manifest whose SHA-256 is hex in one of
 // the image name's own folders, a tag folder or a digest folder, each a
