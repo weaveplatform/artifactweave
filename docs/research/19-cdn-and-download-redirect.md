@@ -1,6 +1,6 @@
 # CDN delivery and download redirect
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 (#378)
 
 Research baseline: **2026-10-14**.
 
@@ -17,6 +17,8 @@ Each fact carries its basis:
 | Label | Means |
 |---|---|
 | **doc** | Documented by the vendor, at the cited page |
+| **KB** | Stated in a JFrog KB article, at the cited page |
+| **J** | Recorded in JFrog's public Jira, at the cited issue, under the [rules for Jira claims](README.md#target-version-and-sources) |
 | **src** | Seen in source code, at the cited path and commit |
 | **inf** | Inferred from the cited facts; not stated anywhere |
 | **run** | Observed against the real service, in the cited real-cloud run |
@@ -30,6 +32,8 @@ Each fact carries its basis:
 | Supported on self-hosted Enterprise+ and Edge licences when binaries are on S3, Google Cloud Storage or Azure Blob Storage, and on all AWS and GCP cloud subscriptions | doc | [direct-download] |
 | Enabled on the binary provider in `binarystore.xml` with `enableSignedUrlRedirect=true`, on the `s3-storage-v3`, `google-storage-v2` and `azure-blob-storage-v2` templates | doc | [dd-step1] |
 | From 7.84.10 S3 direct download no longer works with the `eventual` and cluster providers; JFrog points to the `s3-storage-v3-direct` template | doc | [rn-78410] |
+| 7.90.8 fixed S3 redirects that were served from Artifactory instead of the bucket, and CloudFront redirects that failed (RTDEV-46659) | doc | [rn-7908] |
+| 7.90.9 fixed signed URL redirects with the cluster-sharding provider over a cloud provider, on the `cluster-s3-storage-v3`, `cluster-google-storage-v2` and `cluster-azure-blob-storage-v2` templates (RTDEV-46858). The self-managed notes record no later change for the `eventual` provider | doc | [rn-7909] |
 | `signedUrlExpirySeconds` sets the signed URL's lifetime: "The default is 30 seconds" | doc | [dd-step1] |
 | Enabled per repository with `downloadRedirect` (UI "Enable Redirect Download"), default `false`; "there is no global configuration to redirect all requests automatically" | doc | [dd-step2] |
 | Supported on local, remote, virtual and generic repositories. A remote repository must have `storeArtifactsLocally=true`, otherwise Artifactory reports an error | doc | [dd-step2] |
@@ -37,6 +41,8 @@ Each fact carries its basis:
 | Clients that do not follow a 302 are served by Artifactory as usual | doc | [dd-step2] |
 | "Minimum Direct Cloud Storage Download Size": "the default for self-hosted customers is 1 MB". Smaller files are served by Artifactory | doc | [dd-step3] |
 | Package types: Generic, Go, Helm, Helm OCI, Docker, Maven, RPM, npm, Debian (client 9 or later), PyPI, Bower, CRAN, Composer, Conan, Gradle, Vagrant, Git LFS and Hugging Face | doc | [direct-download] |
+| Docker layers and manifests both redirect once they reach the minimum size. Manifests are almost always under 1 MB, so they redirect only when the minimum is lowered; at 0 MB a local pull gets the manifest by 302. A remote Docker repository accepted a 302 for layers but not for manifests, which RTFACT-29705 (affects 7.59.9, Done) fixed | J | [rtfact-29705] |
+| A HEAD answered with a redirect signed for GET is a bug: RTFACT-21799 ("Download service returns a 'GET' signedUrl redirect for 'HEAD' request") was fixed in 7.5.0 | J | [rtfact-21799] |
 | curl, wget and Gradle need a "supported client version"; firewalls must allow the storage and CDN domains | doc | [direct-download], [dd-step5] |
 
 ### 1.2 CloudFront on self-hosted Artifactory
@@ -58,7 +64,7 @@ Each fact carries its basis:
 | The repository API says the flag "applies to Artifactory Cloud and requires an Enterprise or Enterprise+ license" | doc | [createrepository] |
 | JFrog's OpenAPI defines `cdnRedirect` and `downloadRedirect` as strings on local and federated repositories only; Artifactory sends booleans ([research 03](03-repository-configuration-model.md#typing-traps)) | doc | [createrepository] |
 | The SaaS feature table has separate "CDN for Public Content" and "CDN for authenticated users" rows whose tier icons differ; the page states no rule in text | doc | [cdn-saas] |
-| JFrog's KB says SaaS CDN redirects packages "larger than 200KB" | doc | [cdn-kb] |
+| JFrog's KB says SaaS CDN redirects packages "larger than 200KB" | KB | [cdn-kb] |
 
 ### 1.4 The redirect request header
 
@@ -94,14 +100,17 @@ Read at `jfrog/terraform-provider-artifactory@990e8dfdb64e` (master after v12.11
 
 ### 2.2 The JFrog CLI
 
-Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0):
+Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0), and again at
+`3b4b900d8174` (2026-10-14) for the audit (#378), where the facts and line numbers below are
+unchanged:
 
 | Fact | Basis | Source |
 |---|---|---|
 | The HTTP client follows GET redirects with Go's default policy; POST redirects are captured and re-sent by hand | src | `http/httpclient/client.go` (`doRequest`) |
 | A file is downloaded in parts when it is larger than `MinSplitSize`×1000 bytes; the default is 5120, so 5,120,000 bytes, with `SplitCount` 3 | src | `artifactory/services/download.go:431,693` |
 | Before a split download it calls `IsAcceptRanges`, which sends a HEAD with `followRedirect=true`, requires 200 and checks `Accept-Ranges: bytes` exactly | src | `artifactory/services/download.go:474`; `http/httpclient/client.go` (`SendHead`, `IsAcceptRanges`) |
-| A HEAD that follows a redirect to a URL presigned for GET gets 403 from S3 (SigV4 signs the method) and GCS V4, so the download fails | inf | as above; [research 18 section 1.4](18-cloud-blob-storage.md#14-signed-urls-and-authentication) |
+| A HEAD that follows a redirect to a URL presigned for GET is refused by S3, because SigV4 signs the method, so the download fails. JFrog records the failure for a HEAD that Artifactory redirected: "AWS returns 404 on HEAD (as the signature is for GET, not HEAD)" (RTFACT-31121, SaaS, 2025, Done). artifactweave's S3 probe saw 403 | J, run | [rtfact-31121]; [research 18 section 4](18-cloud-blob-storage.md#s3-answers-2026-10-16), question 8 |
+| GCS V4 refuses the same HEAD, since it also signs the method | inf | [research 18 section 1.4](18-cloud-blob-storage.md#14-signed-urls-and-authentication) |
 | Each part of a split download is its own ranged GET through the registry | src | `artifactory/services/download.go` (`DownloadFileConcurrently`) |
 | `DirectDownloadService.validateChecksumFromHeaders` reads `X-Checksum-*` from the final response and returns success when none is present, so checksum verification is skipped after a redirect to storage | src | `artifactory/services/directdownload.go:677-684` |
 | `jf rt dl` checks downloads against the checksums its AQL query returned, not response headers | src | [research 09](09-jfrog-cli-compatibility.md) |
@@ -112,7 +121,7 @@ Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0):
 |---|---|---|
 | OCI clients "MUST NOT forward `Authorization` headers across host boundaries unless explicitly configured to do so" | doc | [oci-spec] line 829 |
 | npm (make-fetch-happen) deletes `authorization` when a redirect changes host | src | `npm/make-fetch-happen` `lib/fetch.js:64-68` |
-| Older curl, wget and Gradle send the registry's credentials to the storage host as well as the signed query, which storage rejects with 400 "Only one auth mechanism allowed"; JFrog lists curl 7.58.0, wget 1.20.3 and Gradle 5.6 as the fixed versions | doc | [kb-400] |
+| Older curl, wget and Gradle send the registry's credentials to the storage host as well as the signed query, which storage rejects with 400 "Only one auth mechanism allowed"; JFrog lists curl 7.58.0, wget 1.20.3 and Gradle 5.6 as the fixed versions | KB | [kb-400] |
 
 ## 3. Cloud CDNs for private, signed delivery
 
@@ -130,7 +139,7 @@ Read at `jfrog/jfrog-client-go@6053434e9301` (master after v1.55.0):
 | Whether signature parameters enter the cache key when a cache policy includes all query strings is not documented | inf | [cf-cache-key], [cf-query-strings] |
 | Go: `github.com/aws/aws-sdk-go-v2/feature/cloudfront/sign` offers `NewURLSigner(keyID, crypto.Signer)`, `Sign` (canned) and `SignWithPolicy`, cookie signers and PEM loaders (`LoadPEMPrivKey` for PKCS#1, `LoadPEMPrivKeyPKCS8AsSigner`) | doc | [cf-go-sign] |
 | SHA-1 is the default hash; `HashSHA256` (since v1.11.0) "requires appending `Hash-Algorithm=SHA256`" to the URL | doc | [cf-go-sign] |
-| Largest cacheable GET response: 50 GB | doc | [cf-limits] |
+| Largest cacheable GET response: 50 GB. Artifactory 7.104.5 fixed a 400 for files larger than 50 GB requested with CloudFront configured (RTDEV-49674) | doc | [cf-limits], [rn-71045] |
 
 ### 3.2 Google Cloud CDN
 
@@ -218,16 +227,22 @@ At first written for main at `00888fc`, after #139; updated for #146 (the redire
 ## Artifactory 7.x check
 
 Checked on 2026-10-17 against the self-managed release notes up to 7.161.32 and the
-legacy notes for 7.0 to 7.83. Section 1 was corrected in place.
+legacy notes for 7.0 to 7.83. Section 1 was corrected in place. The audit of 2026-10-18
+(#378) added the KB, Jira and client sources, the 7.90.8 and 7.90.9 fixes, and the facts on
+Docker manifests, HEAD and files over 50 GB; decision
+[0029](decisions/0029-cdn-delivery-and-download-redirect.md#context) lists where
+artifactweave differs from 7.x.
 
 | Claim | 7.x | Source |
 |---|---|---|
-| Direct cloud storage download on S3, GCS and Azure with `enableSignedUrlRedirect` and `signedUrlExpirySeconds` (30 s) | Confirmed. Changed for S3: not with the `eventual` and cluster providers from 7.84.10 | [dd-step1], [rn-78410] |
+| Direct cloud storage download on S3, GCS and Azure with `enableSignedUrlRedirect` and `signedUrlExpirySeconds` (30 s) | Confirmed. Changed for S3: not with the `eventual` and cluster providers from 7.84.10. 7.90.9 fixed signed URL redirects with the cluster-sharding provider on the cluster S3, GCS and Azure templates (RTDEV-46858), and 7.90.8 fixed S3 downloads served by Artifactory instead of the bucket, and CloudFront redirects that failed (RTDEV-46659) | [dd-step1], [rn-78410], [rn-7908], [rn-7909] |
 | `X-JFrog-Download-Redirect-To` values `None`, `S3`, `CF` | Confirmed; 7.19.4 introduced the choice between S3, CloudFront and no signed-URL redirect | [dd-step4], [rn-legacy] (7.19.4) |
 | Signed URLs and the signed URL key | Confirmed; introduced in 7.5.0 with the Create Signed URL and Replace Signed URL Key APIs | [rn-legacy] (7.5.0) |
 | `cdnRedirect` is SaaS CloudFront for Enterprise X and Enterprise+ | Confirmed; CDN distribution is on by default for SaaS Enterprise and Enterprise+ from 7.5 | [cdn-saas], [rn-legacy] (7.5.0) |
 | The redirect URL keeps the item's media type | Confirmed: 7.84.10 fixed CDN downloads whose content type held a `+`, which the redirect URL had dropped (RTDEV-40507). artifactweave's blob contract signs only `application/x-test`, so a `+` media type is not covered by a test | [rn-78410], `pkg/blob/blobtest` |
 | Which shard a signed URL comes from | Changed in [research 18](18-cloud-blob-storage.md#31-how-artifactory-does-it): the sharding provider's zone read order, which is what artifactweave's mirror does | [rn-78410] |
+| A HEAD is not answered with a redirect signed for GET | Confirmed as JFrog's intent: fixed in 7.5.0 (RTFACT-21799), and a SaaS report of the same failure closed as Done in 2025 (RTFACT-31121). Whether 7.161.32 redirects a HEAD is on #216 | [rtfact-21799], [rtfact-31121] |
+| Docker layers redirect | Confirmed; manifests redirect too once they reach the minimum size (RTFACT-29705) | [direct-download], [rtfact-29705] |
 
 ## Versions at the research baseline
 
@@ -235,7 +250,7 @@ legacy notes for 7.0 to 7.83. Section 1 was corrected in place.
 |---|---|---|
 | JFrog Artifactory docs | 7.x, read 2026-10-14 | docs.jfrog.com pages fetched as markdown |
 | Artifactory release notes | self-managed up to 7.161.32, read 2026-10-17 | [Artifactory 7.x check](#artifactory-7x-check) |
-| jfrog-client-go | master `6053434e9301` (after v1.55.0) | `download.go`, `directdownload.go`, `httpclient/client.go` |
+| jfrog-client-go | master `6053434e9301` (after v1.55.0); re-read at `3b4b900d8174` (2026-10-14) for #378 | `download.go`, `directdownload.go`, `httpclient/client.go` |
 | `jfrog/artifactory` Terraform provider | master `990e8dfdb64e` (after v12.11.14) | |
 | Go | 1.27.1 | `net/http` redirect policy |
 | `aws-sdk-go-v2/feature/cloudfront/sign` | v1.12.5 (2026-10-08) | |
@@ -246,6 +261,9 @@ legacy notes for 7.0 to 7.83. Section 1 was corrected in place.
 
 **JFrog**
 - [rn-78410]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed
+- [rn-7908]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7908-self-managed
+- [rn-7909]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7909-self-managed
+- [rn-71045]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed
 - [rn-legacy]: https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf
 - [direct-download]: https://docs.jfrog.com/installation/docs/direct-cloud-storage-download
 - [dd-step1]: https://docs.jfrog.com/installation/docs/step-1-configure-the-artifactory-filestore-for-direct-cloud-storage
@@ -257,6 +275,9 @@ legacy notes for 7.0 to 7.83. Section 1 was corrected in place.
 - [cdn-kb]: https://jfrog.com/help/r/artifactory-cdn-redirect-in-jfrog-cloud/artifactory-cdn-redirect-in-jfrog-cloud
 - [createrepository]: https://docs.jfrog.com/artifactory/reference/createrepository
 - [kb-400]: https://jfrog.com/help/r/artifactory-how-to-resolve-a-400-bad-request-error-when-trying-to-download-or-resolve-artifacts
+- [rtfact-21799]: https://jfrog.atlassian.net/browse/RTFACT-21799 (affects 7.4.0, fixed 7.5.0)
+- [rtfact-29705]: https://jfrog.atlassian.net/browse/RTFACT-29705 (affects 7.59.9, Done)
+- [rtfact-31121]: https://jfrog.atlassian.net/browse/RTFACT-31121 (SaaS, resolved Done 2025-04-06)
 
 **Clients**
 - [go-http-client]: https://pkg.go.dev/net/http#Client

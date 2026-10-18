@@ -783,8 +783,8 @@ components:
           type: string
       type: object
     StorageSummaryInfo:
-      description: Snapshot of storage usage. The figures are computed by the last `calculate` run, not on every
-        request, so they can lag writes.
+      description: Snapshot of storage usage. artifactweave computes the figures on every request, so they never lag
+        writes; Artifactory serves the result of its last calculation.
       properties:
         binariesSummary:
           allOf:
@@ -792,6 +792,154 @@ components:
           description: Optional within this object. Totals over the content-addressed blob store and the items that
             reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory
             emits and what the JFrog CLI prints verbatim.
+        # The server writes blobMirrors from wire.StorageSummaryMirrors, embedded beside the generated type
+        # (summaryWithMirrors in internal/server/storageinfo.go). A second field named blobMirrors at the same depth
+        # would make encoding/json drop both, so the generated field is json:"-" and typed as the wire type.
+        blobMirrors:
+          description: Optional within this object. artifactweave's addition (decision 0028), sent only when a blob
+            tier is a mirror. Artifactory reports nothing per shard, and JFrog clients ignore the field. One entry per
+            mirrored tier.
+          items:
+            description: One mirrored blob tier.
+            properties:
+              members:
+                description: Required within this object. The tier's configured member stores.
+                items:
+                  description: One member store.
+                  properties:
+                    available:
+                      description: Required within this object. False while the member's circuit breaker is open, when
+                        reads skip it and writes treat it as down.
+                      type: boolean
+                    averageLatencyMs:
+                      description: Required within this object. The member's observed average latency, in milliseconds.
+                      format: int64
+                      type: integer
+                    backend:
+                      description: Optional within this object. The member's backend, `fs`, `s3`, `gcs` or `azure`.
+                      type: string
+                    name:
+                      description: Required within this object. The member's name under `blob.stores`.
+                      type: string
+                    replicas:
+                      additionalProperties:
+                        description: The member's replica records in one state.
+                        properties:
+                          bytes:
+                            description: Required within this object. Total size of those replicas, in bytes.
+                            format: int64
+                            type: integer
+                          count:
+                            description: Required within this object. Number of replica records in the state.
+                            format: int64
+                            type: integer
+                          size:
+                            description: Required within this object. `bytes` human-formatted with a unit, as the
+                              rest of the summary is.
+                            type: string
+                        required:
+                        - count
+                        - bytes
+                        - size
+                        type: object
+                      description: Required within this object. Replica records keyed by state. All four states,
+                        `present`, `pending`, `deleting` and `failed`, are always present.
+                      type: object
+                    soleCopies:
+                      description: Required within this object. Blobs whose only present copy is on this member. A
+                        drained member is safe to remove once this is 0.
+                      format: int64
+                      type: integer
+                    writeEnabled:
+                      description: Required within this object. False while the member is drained, when it takes no
+                        new copies and reads continue.
+                      type: boolean
+                    zone:
+                      description: Optional within this object. The member's zone. Omitted when none is set.
+                      type: string
+                  required:
+                  - name
+                  - writeEnabled
+                  - available
+                  - averageLatencyMs
+                  - replicas
+                  - soleCopies
+                  type: object
+                type: array
+              redundancy:
+                description: Required within this object. Copies kept of each blob.
+                type: integer
+              removedMembers:
+                description: Required within this object. Members no longer configured that still have replica records.
+                  The mirror no longer reads from them, so their sole copies are out of reach until they are configured
+                  again. Empty when there are none.
+                items:
+                  description: One removed member.
+                  properties:
+                    name:
+                      description: Required within this object. The removed member's name.
+                      type: string
+                    replicas:
+                      additionalProperties:
+                        description: The removed member's replica records in one state.
+                        properties:
+                          bytes:
+                            description: Required within this object. Total size of those replicas, in bytes.
+                            format: int64
+                            type: integer
+                          count:
+                            description: Required within this object. Number of replica records in the state.
+                            format: int64
+                            type: integer
+                          size:
+                            description: Required within this object. `bytes` human-formatted with a unit, as the
+                              rest of the summary is.
+                            type: string
+                        required:
+                        - count
+                        - bytes
+                        - size
+                        type: object
+                      description: Required within this object. Replica records keyed by state, as on a member.
+                      type: object
+                    soleCopies:
+                      description: Required within this object. Blobs whose only present copy is on this removed member.
+                      format: int64
+                      type: integer
+                  required:
+                  - name
+                  - replicas
+                  - soleCopies
+                  type: object
+                type: array
+              tier:
+                description: Required within this object. The mirrored tier, `blob` or `cold_blob`.
+                type: string
+              underReplicatedBlobs:
+                description: Required within this object. Blobs with fewer present copies than `redundancy`, not counting
+                  blobs being deleted.
+                format: int64
+                type: integer
+              writeQuorum:
+                description: Required within this object. Copies that must be stored before an upload succeeds.
+                type: integer
+              zone:
+                description: Optional within this object. This instance's zone, which reads and writes prefer. Omitted
+                  when none is set.
+                type: string
+            required:
+            - tier
+            - redundancy
+            - writeQuorum
+            - underReplicatedBlobs
+            - members
+            - removedMembers
+            type: object
+          type: array
+          x-go-json-ignore: true
+          x-go-type: '[]wire.BlobMirror'
+          x-go-type-import:
+            path: github.com/weaveplatform/artifactweave/pkg/types/wire
         fileStoreSummary:
           allOf:
           - $ref: '#/components/schemas/FileStoreSummary'
@@ -1957,8 +2105,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemproperties.md
   /api/storageinfo:
     get:
-      description: Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r`
-        token scope.
+      description: Returns the storage usage snapshot, computed on every request. Artifactory also admits the
+        `system:info/storage:r` token scope; artifactweave answers administrators only until #390.
       operationId: getStorageSummaryInfo
       responses:
         '200':
@@ -1985,7 +2133,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md
   /api/storageinfo/calculate:
     post:
-      description: Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+      description: Acknowledges a recalculation of the storage summary with 202. The summary is computed on every
+        request, so there is nothing to recalculate. Admin only.
       operationId: refreshStorageSummaryInfo
       responses:
         '202':
@@ -2013,8 +2162,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/refreshstoragesummaryinfo.md
   /api/system/storage/optimize:
     post:
-      description: Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin
-        only. Returns a plain-text acknowledgement.
+      description: Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts
+        balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text
+        acknowledgement.
       operationId: optimizeSystemStorage
       responses:
         '200':
