@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -92,6 +93,67 @@ func TestCopyAndMoveOverHTTP(t *testing.T) {
 		"/artifactory/api/copy/other-local/?to=/libs-local/all/&suppressLayouts=1&failFast=0",
 		"admin", ""), http.StatusOK)
 	wantStatus(t, w.do("GET", "/artifactory/libs-local/all/m/b.txt", "admin", ""), http.StatusOK)
+}
+
+// A copied or moved file keeps its creation and last-modified times, as
+// Artifactory 7.x does by default (7.125.4 release notes, #349): the
+// storage API and AQL report the source's, not the operation's.
+func TestCopyAndMoveKeepTimes(t *testing.T) {
+	w := newItemWorld(t, false)
+	w.put("/artifactory/libs-local/d/a.txt", "a")
+	ctx := context.Background()
+	src, err := w.db.Items().Get(ctx, "libs-local", false, "d/a.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	then := time.Date(2020, 1, 2, 3, 4, 5, 0, time.UTC)
+	src.Created, src.Modified, src.Updated = then, then.Add(time.Hour), then.Add(2*time.Hour)
+	src.CreatedBy, src.ModifiedBy = "alice", "carol"
+	if _, err := w.db.Items().Put(ctx, src); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do("POST",
+		"/artifactory/api/copy/libs-local/d/a.txt?to=/other-local/c/a.txt", "admin", ""),
+		http.StatusOK)
+	wantStatus(t, w.do("POST",
+		"/artifactory/api/move/libs-local/d/a.txt?to=/other-local/m/a.txt", "admin", ""),
+		http.StatusOK)
+
+	for _, p := range []string{"c/a.txt", "m/a.txt"} {
+		rec := w.do("GET", "/artifactory/api/storage/other-local/"+p, "admin", "")
+		wantStatus(t, rec, http.StatusOK)
+		var info map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil {
+			t.Fatal(err)
+		}
+		if info["created"] != "2020-01-02T03:04:05.000Z" ||
+			info["lastModified"] != "2020-01-02T04:04:05.000Z" ||
+			info["lastUpdated"] != "2020-01-02T05:04:05.000Z" ||
+			info["createdBy"] != "alice" || info["modifiedBy"] != "carol" {
+			t.Errorf("%s: storage info %s", p, rec.Body)
+		}
+	}
+	// The folders the copy made are new, made by the caller.
+	rec := w.do("GET", "/artifactory/api/storage/other-local/c", "admin", "")
+	if !strings.Contains(rec.Body.String(), `"createdBy":"admin"`) {
+		t.Errorf("folder %s", rec.Body)
+	}
+
+	query := `items.find({"repo":"other-local","name":"a.txt"}).include("path","created","modified")`
+	rec = w.do("POST", "/artifactory/api/search/aql", "admin", query, "Content-Type", "text/plain")
+	wantStatus(t, rec, http.StatusOK)
+	var res struct {
+		Results []map[string]any `json:"results"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || len(res.Results) != 2 {
+		t.Fatalf("aql %s", rec.Body)
+	}
+	for _, r := range res.Results {
+		if r["created"] != "2020-01-02T03:04:05.000Z" ||
+			r["modified"] != "2020-01-02T04:04:05.000Z" {
+			t.Errorf("aql %v", r)
+		}
+	}
 }
 
 func TestCopyAndMoveRefused(t *testing.T) {

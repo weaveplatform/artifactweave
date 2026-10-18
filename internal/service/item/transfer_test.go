@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -29,6 +30,14 @@ func (w *world) must(p, body string) types.Item {
 		w.t.Fatal(err)
 	}
 	return it
+}
+
+// sameHistory reports whether a copied or moved file kept its source's
+// creation, modification and update times and users.
+func sameHistory(got, src types.Item) bool {
+	return got.Created.Equal(src.Created) && got.CreatedBy == src.CreatedBy &&
+		got.Modified.Equal(src.Modified) && got.ModifiedBy == src.ModifiedBy &&
+		got.Updated.Equal(src.Updated)
 }
 
 func (w *world) get(c repo.Config, p string) (types.Item, bool) {
@@ -56,7 +65,11 @@ func TestCopyFile(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()
 	other := w.addRepo(repo.Config{Key: "other", Class: repo.Local})
+	// Deployed an hour before the copy, so the copy's times tell which
+	// moment they came from.
+	w.svc.Now = func() time.Time { return at.Add(-time.Hour) }
 	src := w.must("a/x.txt", "content")
+	w.svc.Now = func() time.Time { return at }
 	if err := w.db.Items().SetProperties(ctx, src.ID, types.Properties{"k": {"v"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -69,9 +82,14 @@ func TestCopyFile(t *testing.T) {
 		!strings.Contains(res.Messages[0].Text, "1 artifacts and 0 folders were copied") {
 		t.Fatalf("result %+v", res)
 	}
+	// The file keeps its own history (Artifactory 7.x's default); the folder
+	// the copy made is new, made now by the caller.
 	got, ok := w.get(other, "b/y.txt")
-	if !ok || got.Actual != src.Actual || got.CreatedBy != "bob" || !got.Created.Equal(at) {
-		t.Fatalf("copy %+v", got)
+	if !ok || got.Actual != src.Actual || !sameHistory(got, src) || got.Created.Equal(at) {
+		t.Fatalf("copy %+v of %+v", got, src)
+	}
+	if dir, ok := w.get(other, "b"); !ok || dir.CreatedBy != "bob" || !dir.Created.Equal(at) {
+		t.Fatalf("folder %+v", dir)
 	}
 	if props, _ := w.db.Items().Properties(ctx, got.ID); props["k"][0] != "v" {
 		t.Fatalf("properties %v", props)
@@ -144,7 +162,7 @@ func TestCopyAndMoveFolder(t *testing.T) {
 		t.Fatal("the moved folder is still there")
 	}
 	moved, ok := w.get(w.loc, "m/1.txt")
-	if !ok || moved.CreatedBy != one.CreatedBy || w.refs(one.Actual.SHA256) != before {
+	if !ok || !sameHistory(moved, one) || w.refs(one.Actual.SHA256) != before {
 		t.Fatalf("moved %+v refs %d", moved, w.refs(one.Actual.SHA256))
 	}
 	if st, _ := w.db.Items().Stats(ctx, moved.ID); st.DownloadCount != 1 {

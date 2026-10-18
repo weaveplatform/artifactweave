@@ -284,8 +284,10 @@ func TestCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
 		w.at(c, 3)
 		w.transfer(c, item.Target{Repo: w.docker, Path: "app"},
 			item.Target{Repo: w.docker, Path: "moved"}, true)
+		// A copy keeps its files' times, as Artifactory 7.x does by default
+		// (#349), so the copied tag is dated by the push.
 		got := w.index(mirror)["app"].Tags["v1"]
-		if !got.Created.Equal(start.Add(2*time.Minute)) ||
+		if !got.Created.Equal(start.Add(time.Minute)) ||
 			!slices.Equal(got.Files, files("app", "v1", imageConfig, layerA)) {
 			t.Fatalf("copy %+v", got)
 		}

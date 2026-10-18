@@ -447,8 +447,13 @@ func (s *Service) landed(
 	return s.annotated(ctx, hooks, env, c, it, format.Annotation{Set: props})
 }
 
-// land writes one planned item at its target, without hooks. A copy is a
-// new item created now by the caller; a move keeps the item's own history.
+// land writes one planned item at its target, without hooks. A file keeps
+// its own history either way: Artifactory 7.x keeps a copied or moved
+// item's creation and last-modified times unless a feature flag, off by
+// default, says otherwise (7.125.4 release notes); who created and last
+// modified it, and when it was last updated, follow 6.20, whose mover copies
+// the whole ItemInfo (DbMutableItem.fillInfo). A folder a copy creates is
+// new, created now by the caller; one a move creates keeps its history.
 func (s *Service) land(
 	ctx context.Context,
 	t Transfer,
@@ -488,11 +493,9 @@ func (s *Service) land(
 		RepoKey: t.To.Repo.Key, Name: st.dst,
 		Size: st.src.Size, Actual: st.src.Actual, Original: st.src.Original,
 		MimeType: st.src.MimeType,
-		Created:  now, CreatedBy: t.By, Modified: now, ModifiedBy: t.By, Updated: now,
-	}
-	if t.Move {
-		it.Created, it.CreatedBy = st.src.Created, st.src.CreatedBy
-		it.Modified, it.ModifiedBy = st.src.Modified, st.src.ModifiedBy
+		Created:  st.src.Created, CreatedBy: st.src.CreatedBy,
+		Modified: st.src.Modified, ModifiedBy: st.src.ModifiedBy,
+		Updated: st.src.Updated,
 	}
 	out, err := items.Put(ctx, it)
 	if err != nil {
