@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 ## Context
 
@@ -78,6 +78,12 @@ GET and HEAD serve them from item metadata. PUT validates the client value again
 artifact per the repository's `checksumPolicyType`: `client-checksums` rejects a mismatch
 and records the client value as `original_*`; `server-generated-checksums` records and
 ignores. Mismatches feed the bad-checksum search.
+Serving and checking `.sha512` files is an artifactweave extension, a deviation registered
+by #378. No 7.x page or release note documents SHA-512 for generic or Maven files, and an
+open request asks JFrog to add it for generic files
+(**[J]** [RTFACT-30948](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30948)). How
+7.x treats an uploaded `.sha512` file is on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
 **Garbage collection.** Items reference blobs; deleting an item moves it to the trash can
 and the blob stays referenced until the trash entry is purged. GC runs as a task behind
@@ -115,6 +121,18 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
   2400 on PostgreSQL (`db.postgres.property.value.max.size`), but 7.x documents 2400, so
   every store keeps 2400 and a value reads back the same whichever database holds it.
 - *bun, ent, gorm*: heavier abstractions and harder to test to 95%.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32. The audit of P1 to P7
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found these differences
+in the deploy and checksum paths, which
+[research 02](../02-artifactory-core-api-inventory.md#artifactory-7x-check) lists with the
+rest of the storage API:
+- 7.x differs: a checksum deploy reuses content only when the caller can read an existing artifact with that checksum, and answers 404 otherwise ([deployartifactbychecksum](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md)); fixed by [#379](https://github.com/weaveplatform/artifactweave/issues/379).
+- 7.x differs: a re-deploy whose declared checksum equals the stored file's needs no delete permission, unless `enforce.permission.check.on.identical.checksum.deploy=true` ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), 7.26.3, RTDEV-24969); fixed by [#400](https://github.com/weaveplatform/artifactweave/issues/400).
+- 7.x differs: under `client-checksums`, a `.sha1` or `.md5` file serves the client's checksum, and answers 404 while the client has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories)); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+- 7.x differs: every deploy records the SHA-256 as an original checksum, including when the client sent none (**[KB]** the same article). Since [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) (RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not publish a checksum value"; fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
 
 ## Constraints
 

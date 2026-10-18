@@ -2288,7 +2288,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: A missing or invalid parameter, or a repository that takes no deploys.
+          description: A missing or invalid parameter.
         '401':
           content:
             application/json:
@@ -2307,6 +2307,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository does not exist.
+        '405':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The repository is remote, or virtual without a default deployment repository, as for a deploy.
       summary: Start a multipart upload
       tags:
       - storage

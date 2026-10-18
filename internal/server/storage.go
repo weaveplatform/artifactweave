@@ -40,8 +40,10 @@ const (
 	mediaStats        = "application/vnd.org.jfrog.storage.StatsInfo+json"
 )
 
-// noProperties is the 404 for a properties view with nothing to show, in
-// the wording the JFrog CLI tolerates on a properties delete (research 09).
+// noProperties is the 404 for a properties view with nothing to show. The
+// wording matters: jfrog-client-go's GetItemProperties reads a 404 as "no
+// properties" only when the body says this, and fails on any other 404
+// (research 09).
 func noProperties() error {
 	return apierror.New(http.StatusNotFound, "No properties could be found.")
 }
@@ -613,8 +615,10 @@ func (s artifactoryService) setProperties(w http.ResponseWriter, r *http.Request
 }
 
 // deleteProperties answers DELETE /api/storage/{repo}/{path}?properties=k1,k2.
-// Removing a key the item lacks is not an error (the spec's contract; the
-// JFrog CLI also tolerates Artifactory's 404 for it).
+// Removing a key the item lacks is not an error and answers 204, because
+// jf rt delete-props accepts only 204: the CLI tolerates the "No properties
+// could be found" 404 when it reads properties, never on a delete
+// (research 09).
 func (s artifactoryService) deleteProperties(w http.ResponseWriter, r *http.Request) {
 	s.editProperties(w, r, storagePrefix, "recursive", func(q url.Values) (propertyEdit, error) {
 		var keys []string

@@ -1,6 +1,6 @@
 # Artifactory core REST API inventory
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 Research baseline: 2026-10-12. This document inventories the Artifactory REST API families
 this project implements: repositories, artifacts and storage, searches and AQL,
@@ -49,12 +49,12 @@ Source: <https://docs.jfrog.com/artifactory/reference/artifacts-storage-api/llms
 | PUT | same with `X-Explode-Archive: true` | Deploy from archive | 201 | zip, tar, tar.gz, tgz. `X-Explode-Archive-Atomic: true` for all-or-nothing. Only the extracted content is stored. Disables checksum deploy in the CLI. |
 | GET | `/{repoKey}/{archivePath}!/{entryPath}` | Archive entry download | 200; 404 | Read permission. `!` then `/` is required. |
 | DELETE | `/{repoKey}/{filePath}` | Delete item | 204; 404 | Delete permission. Folders delete recursively. Works on remote caches. |
-| GET | `/api/storage/{repoKey}/{itemPath}` | Item information | 200; 404 | Without a mode: file or folder info. `?list[&deep=0\|1&depth=N&listFolders=0\|1&mdTimestamps=0\|1&includeRootPath=0\|1]` needs a non-anonymous user. `?stats`. `?lastModified` needs deploy permission and for folders returns the newest item recursively. `?properties[=k1,k2]` (404 when none). `?permissions`. |
+| GET | `/api/storage/{repoKey}/{itemPath}` | Item information | 200; 404 | Without a mode: file or folder info. `?list[&deep=0\|1&depth=N&listFolders=0\|1&mdTimestamps=0\|1&includeRootPath=0\|1]` needs a non-anonymous user. `?stats`. `?lastModified` needs deploy permission and for folders returns the newest item recursively. `?properties[=k1,k2]` (404 "No properties could be found." when none, which the JFrog CLI reads as no properties). `?permissions`. |
 | PUT | `/api/storage/{repoKey}/{itemPath}?properties=k1=v1[,v2]\|k2=v3[&recursive=0\|1]` | Set properties | 204 | Local and cache items only. `recursive` defaults to 1. Separate properties with `;` or `\|`, values with `,`; escape `,`, `\`, `\|` and `=` with `%5C`. |
-| DELETE | `/api/storage/{repoKey}/{itemPath}?properties=k1,k2[&recursive=0\|1]` | Delete properties | 204; 404 "No properties could be found" (tolerated by the CLI) | `recursive` defaults to 1. |
+| DELETE | `/api/storage/{repoKey}/{itemPath}?properties=k1,k2[&recursive=0\|1]` | Delete properties | 204; 404 when the item or repository does not exist | `recursive` defaults to 1. The JFrog CLI's `delete-props` accepts only 204. It tolerates the 404 "No properties could be found" only when it reads properties (`GetItemProperties` in jfrog-client-go `artifactory/services/props.go`). |
 | PATCH | `/api/metadata/{repoKey}/{itemPath}?recursiveProperties=0\|1&atomicProperties=0\|1` | Update properties | 204; 400 when `props` missing | Annotate permission. Body `{"props":{"k":"v" \| ["v1","v2"] \| null}}`; `null` removes the key. Used by the Terraform `artifactory_item_properties` resource. 6.1.0+. |
 | POST | `/api/checksum/sha256` | Set sha256 property | 200 | Admin. Body `{"repoKey","path"}`. Legacy: sets a `sha256` property recursively for pre-5.5 content. |
-| POST | `/api/copy/{srcRepo}/{srcPath}?to=/{dstRepo}/{dstPath}[&dry=1][&suppressLayouts=0\|1][&failFast=0\|1]` | Copy item | 200 | Local, remote cache and federated sources. `suppressLayouts` defaults to 1; `dry` to 0. Body `{"messages":[{"level":"INFO\|WARN\|ERROR","message":"..."}]}`, media type `...storage.CopyOrMoveResult+json`. A copy or move keeps the item's creation and last-modified times; 7.125.4 added a feature flag, off by default, that gives the target the operation's time as its creation time ([7.125.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)). artifactweave keeps a copied or moved file's creation and last-modified times too, and does not offer the flag ([DV-062](../implementation/deviations.md)). Who created and last modified it, and when it was last updated, are kept as well: 7.x documents none of them, and 6.20's mover copies the whole item record (`DbMutableItem.fillInfo` in `knottnhupfer/artifactory-oss` at `b99e5649bcad`) **[I]**. A folder a copy creates is new, created by the caller; one a move creates keeps its own times ([#349](https://github.com/weaveplatform/artifactweave/issues/349)). |
+| POST | `/api/copy/{srcRepo}/{srcPath}?to=/{dstRepo}/{dstPath}[&dry=1][&suppressLayouts=0\|1][&failFast=0\|1]` | Copy item | 200 | Local, remote cache and federated sources. `suppressLayouts` defaults to 1; `dry` to 0. Body `{"messages":[{"level":"INFO\|WARNING\|ERROR","message":"..."}]}` (the `CopyOrMoveMessage.level` enum in [copyitem](https://docs.jfrog.com/artifactory/reference/copyitem.md)), media type `...storage.CopyOrMoveResult+json`. A copy or move keeps the item's creation and last-modified times; 7.125.4 added a feature flag, off by default, that gives the target the operation's time as its creation time ([7.125.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)). artifactweave keeps a copied or moved file's creation and last-modified times too, and does not offer the flag ([DV-062](../implementation/deviations.md)). Who created and last modified it, and when it was last updated, are kept as well: 7.x documents none of them, and 6.20's mover copies the whole item record (`DbMutableItem.fillInfo` in `knottnhupfer/artifactory-oss` at `b99e5649bcad`) **[I]**. A folder a copy creates is new, created by the caller; one a move creates keeps its own times ([#349](https://github.com/weaveplatform/artifactweave/issues/349)). |
 | POST | `/api/move/{srcRepo}/{srcPath}?to=...` | Move item | 200 | Local repositories only. Same parameters and body as copy. |
 | GET | `/api/archive/download/{repoKey}/{path}?archiveType=zip\|tar\|tar.gz\|tgz[&includeChecksumFiles=true]` | Download folder as archive | 200; 403 when folder download is disabled | Requires the "Enable Folder Download" setting; local and cache only; `archiveType` is mandatory. |
 | POST | `/api/archive/buildArtifacts` | Download build artifacts as archive | 200 | Build-info feature. |
@@ -88,7 +88,21 @@ File info:
 `path` carries a leading `/`; `size` is a string; timestamps are ISO 8601 with
 milliseconds. Folder info replaces the size and checksum fields with
 `"children":[{"uri":"/name","folder":true}]`. The `?list` form is
-`{"uri","created","files":[{"uri":"/rel/path","size":"-1" for folders,"lastModified","folder","sha1","mdTimestamps":{}}]}`.
+`{"uri","created","files":[{"uri":"/rel/path","size":-1 for folders,"lastModified","folder","sha1","sha2","mdTimestamps":{"properties":"<ISO time>"}}]}`:
+- `size` is a JSON number. JFrog's reference example shows a string, but jfrog-client-go
+  decodes it as `json.Number`, and the Terraform `artifactory_file_list` data source decodes
+  it as `int64`. The data source's acceptance test expects `-1` for a folder **[S]**
+  (`datasource_artifactory_file_list.go` in `jfrog/terraform-provider-artifactory`).
+- Files carry `sha2`, the SHA-256. With `mdTimestamps=1`, an item with properties reports
+  when they were last written as `properties`. jfrog-client-go's `fileListTest`, which runs
+  against a live Artifactory, asserts both **[S]** (`tests/artifactorystorage_test.go` at
+  `3b4b900d8174`).
+- `includeRootPath=1` ("Include folder root path",
+  [getstorageitem](https://docs.jfrog.com/artifactory/reference/getstorageitem.md)) adds an
+  entry for the listed folder. The same test deploys four items and expects five entries,
+  so the extra one is taken to be the folder itself **[I]**. Its exact shape is
+  unconfirmed.
+
 Stats are `{"uri","lastDownloaded":<epoch ms>,"downloadCount","lastDownloadedBy"}`.
 Properties are `{"uri","properties":{"k":["v1","v2"]}}` and values are always arrays.
 Permissions are `{"uri","principals":{"users":{},"groups":{}}}`.
@@ -104,9 +118,38 @@ The storage summary is:
 
 Numbers are human-formatted strings and a `TOTAL` row closes the list.
 
-Checksum sidecars `.sha1`, `.md5`, `.sha256` and `.sha512` are served next to every
-artifact and are not items themselves. With `downloadRedirect` enabled a download answers
-302 to a signed object-store URL.
+Checksum sidecars `.sha1`, `.md5` and `.sha256` are served next to every artifact and are
+not items themselves. artifactweave also serves `.sha512`, which is its own extension (a
+deviation registered by #378). No 7.x page or release note documents SHA-512 for generic or
+Maven files, and an open request asks JFrog to add it for generic files
+(**[J]** [RTFACT-30948](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30948)). With
+`downloadRedirect` enabled a download answers 302 to a signed object-store URL.
+
+### Artifactory 7.x check
+
+The audit of P1 to P7 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
+read this section again on 2026-10-18. Its sources were the reference pages above, the
+release notes and known issues, KB articles, JFrog's Jira, jfrog-client-go `master` at
+`3b4b900d8174` with its live integration tests, jfrog-cli-core, and the Terraform
+provider's acceptance tests. The rows hold for 7.x with the corrections made in them.
+artifactweave differs from 7.x in these places:
+
+- 7.x differs: a checksum deploy reuses content only when the caller can read an existing artifact with that checksum, and answers 404 otherwise ([deployartifactbychecksum](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md)); fixed by [#379](https://github.com/weaveplatform/artifactweave/issues/379).
+- 7.x differs: a re-deploy whose declared checksum equals the stored file's needs no delete permission, unless `enforce.permission.check.on.identical.checksum.deploy=true` ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), 7.26.3, RTDEV-24969); fixed by [#400](https://github.com/weaveplatform/artifactweave/issues/400).
+- 7.x differs: a deploy answers `uri` with the download URL, the same as `downloadUri`, and a folder's `path` and `uri` end in `/` ([deployartifact](https://docs.jfrog.com/artifactory/reference/deployartifact.md) example; the trailing slash is from 6.20's `SuccessfulDeploymentResponseHelper` **[I]**); fixed by [#400](https://github.com/weaveplatform/artifactweave/issues/400).
+- 7.x differs: under `client-checksums`, `GET <file>.sha1` or `.md5` serves the client's checksum, and answers 404 while the client has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories), modified 2026-10-11); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+- 7.x differs: every deploy records the SHA-256 as an original checksum, including when the client sent none (**[KB]** the same article). Since [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) (RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not publish a checksum value"; fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+- 7.x differs: `GET /{repoKey}/{filePath}?trace` answers a `text/plain` trace of the resolution instead of the content ([retrieveartifact](https://docs.jfrog.com/artifactory/reference/retrieveartifact.md)); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
+- 7.x differs: properties can be set on, read from and deleted from a repository itself ([setitemproperties](https://docs.jfrog.com/artifactory/reference/setitemproperties.md): "file, folder, repository, or Release Bundle v2"; **[S]** the Terraform provider's `TestAccItemProperties_repo_only`); fixed by [#388](https://github.com/weaveplatform/artifactweave/issues/388).
+- 7.x differs: `?list` sends `size` as a number (**[S]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
+- 7.x differs: `?list` file entries carry `sha2` (**[S]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
+- 7.x differs: `?list&mdTimestamps=1` reports when an item's properties were last written (**[S]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
+- 7.x differs: `?list&includeRootPath=1` adds an entry for the listed folder (**[S]** and **[I]**, the `?list` form above); fixed by [#389](https://github.com/weaveplatform/artifactweave/issues/389).
+- 7.x differs: `PATCH /api/metadata` also accepts `stats`, and answers 400 only when both `props` and `stats` are missing ([updateitemproperties](https://docs.jfrog.com/artifactory/reference/updateitemproperties.md)); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
+- 7.x differs: a copy or move whose source does not exist answers 400 with a `CopyOrMoveResult` body ([copyitem](https://docs.jfrog.com/artifactory/reference/copyitem.md), [moveitem](https://docs.jfrog.com/artifactory/reference/moveitem.md)); fixed by [#400](https://github.com/weaveplatform/artifactweave/issues/400).
+- 7.x differs: "Max Parallel Folder Downloads" caps the folder archive downloads that run at once ([general settings](https://docs.jfrog.com/installation/docs/general-settings), Folder Download Settings; 6.20's default of 10 and its 400 beyond the cap are **[I]**); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
+- 7.x differs: storage summary rows carry `usedSpaceInBytes`, a number, and `projectKey` (**[S]** jfrog-client-go's live `storageInfoTest`; jfrog-cli-core `artifactory/utils/storageinfo.go` reads `usedSpaceInBytes` first); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
+- 7.x differs: a non-admin whose token has the `system:info/storage:r` scope may read the storage summary ([getstoragesummaryinfo](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md); [7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
 
 ## Searches API
 
@@ -219,6 +262,12 @@ Source: <https://docs.jfrog.com/artifactory/reference/trash-cangarbage-collectio
 | POST | `/api/trash/restore/{repoKey}/{path}?to=<repo/path>[&transaction-size=N]` | Restore an item | 202 text/plain | Same permissions as clean. |
 | POST | `/api/deleteDirectoryTrashProperty/start` | Remove redundant trash folder records | 200 | JSON body. |
 | POST | `/api/system/storage/gc` | Run garbage collection | 200 | Admin. |
+
+The audit of P1 to P7 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
+confirmed these rows for 7.x. artifactweave differs from 7.x in two places:
+
+- 7.x differs: a non-admin restores only items deleted from repositories it holds delete permission on, and cannot see or restore any other repository's ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories", from 7.41.4; [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed), RTDEV-58624); fixed by [#380](https://github.com/weaveplatform/artifactweave/issues/380).
+- 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10: the expected and the observed properties of restored items both include them); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
 
 ## Federated repositories API
 

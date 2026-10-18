@@ -1,6 +1,6 @@
 # 05: Platform identity and security APIs
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 The identity surface artifactweave must mirror: the legacy Artifactory security API that
 the JFrog CLI and the `jfrog/artifactory` Terraform provider still call, the Access v2
@@ -345,7 +345,14 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
 
 Built-in principals that Artifactory ships and artifactweave seeds at first start:
 `admin`, `anonymous`, the `readers` group, and the `Anything` and `Any Remote` permission
-targets. `anonAccessEnabled` toggles read access for `anonymous` through those targets.
+targets. Since 7.84.3 neither target grants `anonymous` by default
+([permissions](https://docs.jfrog.com/administration/docs/permissions); "Changes to
+Anonymous Access" in the
+[7.84.10 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed)).
+`anonAccessEnabled` lets requests without credentials act as `anonymous`, which then reads
+only what a permission target grants it. JFrog's advice is a new permission target that
+gives `anonymous` read access to the repositories it needs.
+- 7.x differs: `Any Remote` ships without `anonymous` ([permissions](https://docs.jfrog.com/administration/docs/permissions)), while artifactweave's seed (`internal/auth/seed.go`) grants `anonymous` read and deploy/cache on every remote repository; fixed by [#383](https://github.com/weaveplatform/artifactweave/issues/383).
 
 ## Tier notes
 

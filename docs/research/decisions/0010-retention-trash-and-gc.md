@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 ## Context
 
@@ -74,6 +74,18 @@ index makes the version rules correct across formats. A Quartz parser is require
 - *Standard five-field cron*: rejects the schedules users already have.
 - *Deleting straight to GC*: loses the trash can semantics and the restore endpoint that
   operators rely on.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32. The audit of P1 to P7
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) confirmed the trash
+can's defaults (on, 14 days, local deletes only), the trash and GC endpoints' statuses and
+the 400 for their permission failures. It found these differences
+([research 02](../02-artifactory-core-api-inventory.md#trash-can-and-garbage-collection)):
+- 7.x differs: a non-admin restores only items deleted from repositories it holds delete permission on, and cannot see or restore any other repository's ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories", from 7.41.4; [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed), RTDEV-58624); fixed by [#380](https://github.com/weaveplatform/artifactweave/issues/380).
+- 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
+- 7.x differs: storage summary rows carry `usedSpaceInBytes`, a number, and `projectKey` (**[S]** jfrog-client-go's live `storageInfoTest` at `3b4b900d8174`); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
+- 7.x differs: a non-admin whose token has the `system:info/storage:r` scope may read the storage summary ([getstoragesummaryinfo](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md); [7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
 
 ## Constraints
 
