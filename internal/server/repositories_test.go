@@ -139,8 +139,9 @@ func (f faultyRepos) List(ctx context.Context, rf store.RepoFilter) ([]repo.Conf
 	return f.RepoStore.List(ctx, rf) //nolint:wrapcheck // test double
 }
 
+// Get fails for every key under "get", or for one key under "get:<key>".
 func (f faultyRepos) Get(ctx context.Context, key string) (repo.Config, error) {
-	if f.fail["get"] {
+	if f.fail["get"] || f.fail["get:"+key] {
 		return repo.Config{}, errBoom
 	}
 	return f.RepoStore.Get(ctx, key) //nolint:wrapcheck // test double

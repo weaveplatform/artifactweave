@@ -335,12 +335,12 @@ func deployed(path string) seeder {
 	}
 }
 
-// trashed seeds a file at path in libs-local's trash can.
-func trashed(path string) seeder {
+// trashed seeds a file at path in the trash can, deleted from repoKey.
+func trashed(repoKey, path string) seeder {
 	return func(t *testing.T, f *matrixFixture, p string) {
 		t.Helper()
 		path := strings.ReplaceAll(path, "{p}", p)
-		c := f.deploy(t, "libs-local", path, []byte(p))
+		c := f.deploy(t, repoKey, path, []byte(p))
 		if _, err := f.items.Delete(
 			context.Background(),
 			item.Target{Repo: c, Path: path},
@@ -662,13 +662,26 @@ func trashMatrix() []matrixRow {
 			"/artifactory/api/trash/clean/libs-local/work/trash-{p}.txt", "",
 			trashRule(holdsEither("libs-local", "work/", types.ActionDelete, types.ActionManage)),
 			204,
-		).seeding(trashed("work/trash-{p}.txt")),
-		// Restoring needs manage on the destination.
+		).seeding(trashed("libs-local", "work/trash-{p}.txt")),
+		// Restoring needs manage on the destination and delete or manage
+		// where the item was trashed from (#380).
 		row(
 			"POST /artifactory/api/trash/restore/{fromPath}",
 			"/artifactory/api/trash/restore/libs-local/work/trash-{p}.txt?to=libs-local", "",
-			trashRule(holds("libs-local", "", types.ActionManage)), 202,
-		).seeding(trashed("work/trash-{p}.txt")),
+			trashRule(allOf(
+				holds("libs-local", "", types.ActionManage),
+				holdsEither("libs-local", "work/", types.ActionDelete, types.ActionManage),
+			)), 202,
+		).seeding(trashed("libs-local", "work/trash-{p}.txt")),
+		// From B into A: tok-admin-repo manages A but holds nothing in B.
+		row(
+			"POST /artifactory/api/trash/restore/{fromPath}",
+			"/artifactory/api/trash/restore/libs-b/work/b-trash-{p}.txt?to=libs-local", "",
+			trashRule(allOf(
+				holds("libs-local", "", types.ActionManage),
+				holdsEither("libs-b", "work/", types.ActionDelete, types.ActionManage),
+			)), 202,
+		).seeding(trashed("libs-b", "work/b-trash-{p}.txt")),
 		at("POST /artifactory/api/trash/empty", "", trashRule(administrators), 202),
 	}
 }

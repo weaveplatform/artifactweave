@@ -130,7 +130,7 @@ func TestRestoreToOriginal(t *testing.T) {
 	if w.exists(w.libs, "a/b/f.txt") || w.refs(t, f.Actual.SHA256) != 1 {
 		t.Fatal("a trashed file must be gone from the repository and keep its reference")
 	}
-	n, err := w.trash.Restore(ctx, "libs", "a", trash.Destination{Repo: w.libs}, "bob")
+	n, err := w.trash.Restore(ctx, "libs", "a", trash.Destination{Repo: w.libs}, "bob", nil)
 	if err != nil || n != 4 {
 		t.Fatalf("restored %d, %v; want the folders a and a/b and two files", n, err)
 	}
@@ -154,6 +154,7 @@ func TestRestoreToOriginal(t *testing.T) {
 		"a",
 		trash.Destination{Repo: w.libs},
 		"bob",
+		nil,
 	); !errors.Is(
 		err,
 		trash.ErrNothingTrashed,
@@ -173,6 +174,7 @@ func TestRestoreElsewhere(t *testing.T) {
 		"a/b",
 		trash.Destination{Repo: w.other, Path: "x/y"},
 		"bob",
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -189,6 +191,7 @@ func TestRestoreElsewhere(t *testing.T) {
 		"",
 		trash.Destination{Repo: w.other, Path: "all"},
 		"bob",
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -212,6 +215,7 @@ func TestRestoreNewestAndOverwrite(t *testing.T) {
 		"f.txt",
 		trash.Destination{Repo: w.libs},
 		"bob",
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -227,13 +231,54 @@ func TestRestoreNewestAndOverwrite(t *testing.T) {
 	}
 }
 
+func TestRestorePermit(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	// Four items in two batches of two, the refused one last: the first
+	// batch must not be restored either.
+	for _, p := range []string{"a/1.txt", "a/2.txt", "a/secret.txt"} {
+		w.deploy(t, w.libs, p, p, nil)
+	}
+	w.remove(t, w.libs, "a")
+	var asked []string
+	_, err := w.trash.Restore(ctx, "libs", "a", trash.Destination{Repo: w.other}, "bob",
+		func(it types.Item) bool {
+			asked = append(asked, it.RepoKey+"/"+it.FullPath())
+			return it.FullPath() != "a/secret.txt"
+		})
+	if !errors.Is(err, trash.ErrNotPermitted) ||
+		!strings.Contains(err.Error(), "libs/a/secret.txt") {
+		t.Fatalf("restore with a refused item: %v", err)
+	}
+	if len(asked) != 4 || asked[0] != "libs/a" {
+		t.Fatalf("the permit is asked about every selected item: %v", asked)
+	}
+	if w.exists(w.other, "a") || w.exists(w.other, "a/1.txt") {
+		t.Fatal("a refused restore moves nothing")
+	}
+	if left, _ := w.trash.Entries(ctx, "libs", ""); len(left) != 4 {
+		t.Fatalf("a refused restore keeps every entry: %v", left)
+	}
+	n, err := w.trash.Restore(ctx, "libs", "a/1.txt", trash.Destination{Repo: w.other}, "bob",
+		func(types.Item) bool { return true })
+	if err != nil || n != 1 || !w.exists(w.other, "a/1.txt") {
+		t.Fatalf("permitted restore: %d, %v", n, err)
+	}
+	// Nothing trashed is reported before any item is asked about.
+	_, err = w.trash.Restore(ctx, "libs", "absent", trash.Destination{Repo: w.other}, "bob",
+		func(types.Item) bool { t.Fatal("asked with nothing selected"); return false })
+	if !errors.Is(err, trash.ErrNothingTrashed) {
+		t.Fatalf("restore of nothing: %v", err)
+	}
+}
+
 func TestRestoreConflict(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/f.txt", "content", nil)
 	w.remove(t, w.libs, "a/f.txt")
 	w.deploy(t, w.libs, "a/f.txt/below.txt", "a folder now", nil)
-	_, err := w.trash.Restore(ctx, "libs", "a/f.txt", trash.Destination{Repo: w.libs}, "bob")
+	_, err := w.trash.Restore(ctx, "libs", "a/f.txt", trash.Destination{Repo: w.libs}, "bob", nil)
 	if !errors.Is(err, item.ErrConflict) {
 		t.Fatalf("restore over a folder: %v", err)
 	}
@@ -261,6 +306,7 @@ func TestRestoreIntoExistingFolder(t *testing.T) {
 		"d",
 		trash.Destination{Repo: w.libs},
 		"bob",
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -442,11 +488,11 @@ func TestStoreFailures(t *testing.T) {
 	dst := trash.Destination{Repo: w.libs}
 	for name, run := range map[string]func() error{
 		"restore list": func() error {
-			_, err := svc(map[string]error{"list": errBoom}).Restore(ctx, "libs", "a", dst, "bob")
+			_, err := svc(map[string]error{"list": errBoom}).Restore(ctx, "libs", "a", dst, "bob", nil)
 			return err
 		},
 		"restore drop": func() error {
-			_, err := svc(map[string]error{"delete": errBoom}).Restore(ctx, "libs", "a", dst, "bob")
+			_, err := svc(map[string]error{"delete": errBoom}).Restore(ctx, "libs", "a", dst, "bob", nil)
 			return err
 		},
 		"clean list": func() error {

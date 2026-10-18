@@ -120,7 +120,7 @@ func (s artifactoryService) cleanTrash(ctx context.Context, repoPath string) err
 			return trashRefusal(p, "Only an administrator can clean trash of a deleted repository")
 		case err != nil:
 			return s.internalError(ctx, "get repository", err)
-		case !acc.file(c, rest, types.ActionDelete) && !acc.file(c, rest, types.ActionManage):
+		case !acc.removes(c, rest):
 			return trashRefusal(p, "Delete or manage permission on '%s' is required", key)
 		}
 	}
@@ -169,7 +169,13 @@ func (s artifactoryService) restoreTrashPath(w http.ResponseWriter, r *http.Requ
 
 // restoreTrash moves what was trashed at from into to, a repository key
 // with an optional path. The destination must be a local repository, and
-// the caller needs manage permission on it, as documented.
+// the caller needs manage permission on it, as documented. The caller also
+// needs delete or manage on the original repository, as for clean, at from
+// and at every restored item's original path: checking the destination
+// alone let manage on one repository take another repository's trashed files
+// and read them (#380). The check at from refuses before the trash is read,
+// so a refusal never tells the caller whether anything is trashed there.
+// Once the original repository is gone only an admin can restore from it.
 func (s artifactoryService) restoreTrash(
 	ctx context.Context,
 	from, to string,
@@ -203,12 +209,36 @@ func (s artifactoryService) restoreTrash(
 	case !acc.file(dst, toPath, types.ActionManage):
 		return trashRefusal(p, "Manage permission on '%s' is required", toKey)
 	}
+	var permit func(types.Item) bool
+	if !p.Admin {
+		origin, err := st.Repos().Get(ctx, fromKey)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			return trashRefusal(
+				p,
+				"Only an administrator can restore trash of a deleted repository",
+			)
+		case err != nil:
+			return s.internalError(ctx, "get repository", err)
+		case !acc.removes(origin, fromPath):
+			return trashRefusal(p, "Delete or manage permission on '%s' is required",
+				strings.Trim(from, "/"))
+		}
+		// An exclude pattern, or an include that admits from but not what
+		// lies below it, can still refuse an item the check above allowed.
+		permit = func(it types.Item) bool { return acc.removes(origin, it.FullPath()) }
+	}
 	svc := s.trashService(st)
 	if size != nil {
 		svc.Batch = *size
 	}
-	_, err = svc.Restore(ctx, fromKey, fromPath, trash.Destination{Repo: dst, Path: toPath}, p.Name)
+	_, err = svc.Restore(ctx, fromKey, fromPath,
+		trash.Destination{Repo: dst, Path: toPath}, p.Name, permit)
 	switch {
+	case errors.Is(err, trash.ErrNotPermitted):
+		return trashRefusal(p,
+			"Delete or manage permission on everything trashed at '%s' is required",
+			strings.Trim(from, "/"))
 	case errors.Is(err, trash.ErrNothingTrashed):
 		return apierror.New(http.StatusNotFound, fmt.Sprintf("Nothing is trashed at '%s'", from))
 	case errors.Is(err, item.ErrConflict), errors.Is(err, types.ErrInvalidItemPath):
@@ -217,6 +247,13 @@ func (s artifactoryService) restoreTrash(
 		return s.internalError(ctx, "restore trash", err)
 	}
 	return nil
+}
+
+// removes reports whether the caller may take what lies at path in c out
+// of the trash can: delete or manage there. Manage is accepted on its own
+// because a permission can grant it without delete.
+func (a access) removes(c repo.Config, path string) bool {
+	return a.file(c, path, types.ActionDelete) || a.file(c, path, types.ActionManage)
 }
 
 // cutRepoPath splits "key/some/path" into the key and the path, as given.

@@ -11526,7 +11526,7 @@ type ClientInterface interface {
 
 	// RestoreItemFromTrashCan Restore an item from the trash can
 	//
-	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers with Manage permission on the destination. Answers 202 with the plain-text message Successfully restored trash items.
+	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
 	//
 	// Corresponds with POST /api/trash/restore/{fromPath} (the `RestoreItemFromTrashCan` operationId).
 	RestoreItemFromTrashCan(ctx context.Context, fromPath string, params *RestoreItemFromTrashCanParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -18392,7 +18392,7 @@ func (c *Client) EmptyTrashCan(ctx context.Context, reqEditors ...RequestEditorF
 
 // RestoreItemFromTrashCan Restore an item from the trash can
 //
-// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers with Manage permission on the destination. Answers 202 with the plain-text message Successfully restored trash items.
+// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
 //
 // Corresponds with POST /api/trash/restore/{fromPath} (the `RestoreItemFromTrashCan` operationId).
 func (c *Client) RestoreItemFromTrashCan(ctx context.Context, fromPath string, params *RestoreItemFromTrashCanParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38396,7 +38396,7 @@ type ClientWithResponsesInterface interface {
 
 	// RestoreItemFromTrashCanWithResponse Restore an item from the trash can
 	//
-	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers with Manage permission on the destination. Answers 202 with the plain-text message Successfully restored trash items.
+	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -66137,7 +66137,7 @@ func (c *ClientWithResponses) EmptyTrashCanWithResponse(ctx context.Context, req
 
 // RestoreItemFromTrashCanWithResponse Restore an item from the trash can
 //
-// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers with Manage permission on the destination. Answers 202 with the plain-text message Successfully restored trash items.
+// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
 //
 // Returns a wrapper object for the known response body format(s).
 //

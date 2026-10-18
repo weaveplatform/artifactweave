@@ -34,6 +34,9 @@ const (
 // ErrNothingTrashed is a restore from a path with no trashed items.
 var ErrNothingTrashed = errors.New("trash: nothing is trashed at the path")
 
+// ErrNotPermitted is a restore that selected an item its permit refused.
+var ErrNotPermitted = errors.New("trash: restoring an item is not permitted")
+
 // Settings returns the trash can settings. Unset means on with Artifactory's
 // 14 days, and a stored retention below one day means the default too: the
 // settings document may carry only "enabled".
@@ -129,11 +132,18 @@ type Destination struct {
 // repoKey/from back into dst and returns how many items it restored. Each
 // batch is one transaction that recreates the items and drops their entries;
 // a conflict stops the restore with the earlier batches kept.
+//
+// permit is asked about every selected item, at its original path, before
+// any batch moves, so one refusal restores nothing and answers
+// ErrNotPermitted. Asking per batch instead would leave the batches before
+// the refused item restored. A nil permit allows every item, for a caller
+// such as an administrator that may restore anything.
 func (s *Service) Restore(
 	ctx context.Context,
 	repoKey, from string,
 	dst Destination,
 	by string,
+	permit func(types.Item) bool,
 ) (int, error) {
 	from = strings.Trim(from, "/")
 	entries, err := s.Entries(ctx, repoKey, from)
@@ -143,6 +153,14 @@ func (s *Service) Restore(
 	selected := Newest(entries)
 	if len(selected) == 0 {
 		return 0, ErrNothingTrashed
+	}
+	if permit != nil {
+		for _, e := range selected {
+			if !permit(e.Record.Item) {
+				return 0, fmt.Errorf("%w: %s/%s",
+					ErrNotPermitted, e.Record.Item.RepoKey, e.Record.Item.FullPath())
+			}
+		}
 	}
 	restored := 0
 	for chunk := range slices.Chunk(selected, s.batch()) {

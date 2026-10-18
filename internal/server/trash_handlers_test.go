@@ -1,14 +1,18 @@
 package server
 
 import (
+	"context"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
+	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
 func TestTrashListingAndRestore(t *testing.T) {
@@ -83,6 +87,119 @@ func TestTrashListingAndRestore(t *testing.T) {
 		rec.Body.String() != restoredMessage {
 		t.Fatalf("one-segment restore: %d %q", rec.Code, rec.Body)
 	}
+}
+
+// TestTrashRestoreNeedsOrigin: manage on the destination is not enough to
+// restore; the caller also needs delete or manage where the items were
+// trashed from, at every restored path (#380).
+func TestTrashRestoreNeedsOrigin(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	grant := func(name, repoKey string, a types.Actions, include, exclude []string) {
+		t.Helper()
+		if err := w.db.Permissions().Create(ctx, types.Permission{
+			Name: name,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{"user": a}},
+				Targets: map[string]types.Target{
+					repoKey: {Include: include, Exclude: exclude},
+				},
+			}},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, p := range []string{"a/one.txt", "a/secret/two.txt", "b/three.txt"} {
+		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
+	}
+	for _, p := range []string{"a", "b"} {
+		wantStatus(t, w.do("DELETE", "/artifactory/libs-local/"+p, "admin", ""),
+			http.StatusNoContent)
+	}
+	trashed := func() int {
+		t.Helper()
+		entries, _, err := w.db.Trash().List(ctx, "libs-local", "", store.Page{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(entries)
+	}
+	restore := func(from string) *httptest.ResponseRecorder {
+		t.Helper()
+		return w.do("POST", "/artifactory/api/trash/restore/"+from+"?to=other-local", "user", "")
+	}
+	grant("restore-dest", "other-local", types.ActionManage, []string{"**"}, nil)
+
+	// Manage on the destination alone: refused, and nothing moves.
+	wantStatus(t, restore("libs-local/a"), http.StatusBadRequest)
+	wantStatus(t, w.do("GET", "/artifactory/other-local/a/one.txt", "admin", ""),
+		http.StatusNotFound)
+	if n := trashed(); n != 6 {
+		t.Fatalf("a refused restore keeps the trash: %d entries", n)
+	}
+	// Refused before the trash is read: no hint whether anything is there.
+	wantStatus(t, restore("libs-local/absent"), http.StatusBadRequest)
+
+	// Delete on a/ but not a/secret/: a/ as a whole is refused, with
+	// nothing restored, while the permitted file alone is restored.
+	grant("restore-a", "libs-local", types.ActionDelete,
+		[]string{"a/**"}, []string{"a/secret/**"})
+	rec := restore("libs-local/a")
+	wantStatus(t, rec, http.StatusBadRequest)
+	if !strings.Contains(rec.Body.String(), "everything trashed at 'libs-local/a'") {
+		t.Fatalf("refusal: %s", rec.Body)
+	}
+	wantStatus(t, w.do("GET", "/artifactory/other-local/a/one.txt", "admin", ""),
+		http.StatusNotFound)
+	wantStatus(t, restore("libs-local/a/one.txt"), http.StatusAccepted)
+	wantStatus(t, w.do("GET", "/artifactory/other-local/a/one.txt", "admin", ""), http.StatusOK)
+	// Permitted, with nothing trashed there: now the caller may know.
+	wantStatus(t, restore("libs-local/a/absent"), http.StatusNotFound)
+	// b/ is outside the grant.
+	wantStatus(t, restore("libs-local/b"), http.StatusBadRequest)
+
+	// Manage without delete on the origin is enough too.
+	grant("restore-secret", "libs-local", types.ActionManage, []string{"a/secret/**"}, nil)
+	wantStatus(t, restore("libs-local/a/secret"), http.StatusAccepted)
+	wantStatus(t, w.do("GET", "/artifactory/other-local/a/secret/two.txt", "admin", ""),
+		http.StatusOK)
+
+	// Once the original repository is gone, only an admin restores from it.
+	if err := w.db.Repos().Delete(ctx, "libs-local"); err != nil {
+		t.Fatal(err)
+	}
+	grant("restore-any", "ANY LOCAL", types.ActionDelete|types.ActionManage, []string{"**"}, nil)
+	wantStatus(t, restore("libs-local/b"), http.StatusBadRequest)
+	wantStatus(t, w.do("POST", "/artifactory/api/trash/restore/libs-local/b?to=other-local",
+		"admin", ""), http.StatusAccepted)
+	wantStatus(t, w.do("GET", "/artifactory/other-local/b/three.txt", "admin", ""), http.StatusOK)
+}
+
+// A failure reading the original repository is a server error, not a
+// refusal or a restore.
+func TestTrashOriginReadFailure(t *testing.T) {
+	fail := map[string]bool{}
+	w := newItemWorld(t, false, func(c *Config) {
+		db := c.Store.(*inmem.Store) //nolint:forcetypeassert // fixture
+		c.Store = faultyStore{Store: db, fail: fail}
+	})
+	wantStatus(t, w.do("PUT", "/artifactory/libs-local/f.txt", "admin", "f"), http.StatusCreated)
+	wantStatus(t, w.do("DELETE", "/artifactory/libs-local/f.txt", "admin", ""),
+		http.StatusNoContent)
+	if err := w.db.Permissions().Create(context.Background(), types.Permission{
+		Name: "restore-dest",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{"user": types.ActionManage}},
+			Targets: map[string]types.Target{"other-local": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	fail["get:libs-local"] = true
+	wantStatus(t, w.do("POST", "/artifactory/api/trash/restore/libs-local/f.txt?to=other-local",
+		"user", ""), http.StatusInternalServerError)
+	wantStatus(t, w.do("DELETE", "/artifactory/api/trash/clean/libs-local/f.txt", "user", ""),
+		http.StatusInternalServerError)
 }
 
 func TestStorageInfoBody(t *testing.T) {

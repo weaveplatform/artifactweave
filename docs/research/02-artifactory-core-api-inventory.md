@@ -261,14 +261,31 @@ Source: <https://docs.jfrog.com/artifactory/reference/trash-cangarbage-collectio
 |---|---|---|---|---|
 | POST | `/api/trash/empty` | Empty the trash can | 202 | Admin. |
 | DELETE | `/api/trash/clean/{repoKey}/{path}` | Delete an item from the trash can | 204 | Project admins or holders of manage or delete permission. |
-| POST | `/api/trash/restore/{repoKey}/{path}?to=<repo/path>[&transaction-size=N]` | Restore an item | 202 text/plain | Same permissions as clean. |
+| POST | `/api/trash/restore/{repoKey}/{path}?to=<repo/path>[&transaction-size=N]` | Restore an item | 202 text/plain | Manage on the destination ([restoreitemfromtrashcan](https://docs.jfrog.com/artifactory/reference/restoreitemfromtrashcan.md)), and delete or manage on the repository the items were deleted from, as for clean. |
 | POST | `/api/deleteDirectoryTrashProperty/start` | Remove redundant trash folder records | 200 | JSON body. |
 | POST | `/api/system/storage/gc` | Run garbage collection | 200 | Admin. |
 
 The audit of P1 to P7 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
-confirmed these rows for 7.x. artifactweave differs from 7.x in two places:
+confirmed these rows for 7.x.
 
-- 7.x differs: a non-admin restores only items deleted from repositories it holds delete permission on, and cannot see or restore any other repository's ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories", from 7.41.4; [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed), RTDEV-58624); fixed by [#380](https://github.com/weaveplatform/artifactweave/issues/380).
+A restore needs permission on the repository the items were deleted from as well as on the
+destination. From 7.41.4 a non-admin restores only items deleted from repositories it holds
+delete permission on, and cannot restore any other repository's
+([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring
+Deleted Repositories";
+[7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed),
+RTDEV-58624). 7.x refuses a restore without it with "User doesn't have permissions to move
+'auto-trashcan:docker-v2-local/PROJECT/COMPONENT'. Needs delete permissions."
+(**[J]** [RTFACT-29653](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29653), open,
+affects 7.55.13). The same issue reports that 7.x wants delete on the whole origin
+repository, so a folder-level grant does not let its holder restore that folder **[I]**.
+artifactweave checks delete or manage on the origin at the requested path and at every
+restored item's original path, and requires Manage on the destination as the reference page
+states ([decision 0010](decisions/0010-retention-trash-and-gc.md#artifactory-7x-check)).
+
+artifactweave differs from 7.x in two places:
+
+- 7.x differs: from 7.41.4 a non-admin with deploy or manage on a repository sees that repository's trashed items in the trash can, and only those ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories"). artifactweave lists the `auto-trashcan` storage path to admins only.
 - 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10: the expected and the observed properties of restored items both include them); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
 
 ## Federated repositories API

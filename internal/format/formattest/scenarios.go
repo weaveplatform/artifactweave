@@ -216,6 +216,7 @@ func (w *world) restore(p string) error {
 		p,
 		trash.Destination{Repo: w.a},
 		"formattest",
+		nil,
 	); err != nil {
 		return fmt.Errorf("restore %s: %w", p, err)
 	}

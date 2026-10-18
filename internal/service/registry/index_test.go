@@ -307,7 +307,7 @@ func TestCopiesMovesAndRestoresKeepTheIndex(t *testing.T) {
 		}
 		bin := trash.Service{Store: w.db, Items: w.itemsAt(c)}
 		if _, err := bin.Restore(ctx, w.docker.Key, "moved",
-			trash.Destination{Repo: w.docker, Path: "moved"}, "alice"); err != nil {
+			trash.Destination{Repo: w.docker, Path: "moved"}, "alice", nil); err != nil {
 			t.Fatal(err)
 		}
 		if got := w.index(w.docker)["moved"].Tags["v1"]; !got.Created.Equal(

@@ -13103,7 +13103,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/emptytrashcan.md
   /api/trash/restore/{fromPath}:
     post:
-      description: Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers with Manage permission on the destination. Answers 202 with the plain-text message Successfully restored trash items.
+      description: Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
       operationId: restoreItemFromTrashCan
       parameters:
         - description: 'Required path parameter. Trashed location: original repository key followed by the item path, or the key alone for everything trashed from that repository.'
