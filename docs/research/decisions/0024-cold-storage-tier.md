@@ -1,13 +1,17 @@
 # 0024: Cold storage tier
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
 
 JFrog archives rarely used content to a separate cold Artifactory instance (self-hosted,
-Enterprise X and Enterprise+) or, in SaaS, through smart archiving policies; both keep the
-content searchable and restorable from the live instance
-([research 16](../16-enterprise-products.md#2-cold-storage-archive-and-retention)). The
+Enterprise X and Enterprise+) or through smart archiving policies to an archive instance in
+JFrog Cloud (Enterprise+; SaaS from 7.111, a self-hosted active instance from 7.117.14);
+both keep the content searchable and restorable from the live instance
+([research 16](../16-enterprise-products.md#2-cold-storage-archive-and-retention),
+[archive](https://docs.jfrog.com/administration/docs/archive.md)). The
 owner brought both API families into scope on 2026-10-13 and chose a cold blob tier inside
 the same instance over a second cold instance.
 
@@ -52,7 +56,9 @@ restore job that copies each blob back from the cold store, recreates the item a
 original path (or the fallback, central or new destination when the original is taken or
 not requested), restores its properties and re-indexes packages. Restore is
 non-destructive: the archived record and the cold blob stay until expiry. A job is capped
-at 30,000 artifacts by default, as in JFrog.
+at 30,000 artifacts by default, as in JFrog
+(`artifactory.retention.warm.restore.artifact.limit`, confirmed for 7.x by
+[cold storage](https://docs.jfrog.com/administration/docs/cold-storage.md)).
 
 **Expiry.** `expirationTimeInMonths` purges archived records and their cold blobs once
 they reach the age; purging is a run with its own status.
@@ -90,6 +96,12 @@ Alternatives considered:
   the records are compact and indexed for search only.
 - The JFrog namespace field is named `jfrogColdStorageNamespaceId` on the wire and is
   kept as named.
+- Two 7.x behaviours this decision does not settle yet; P16 settles them:
+  - A package version already in cold storage is not archived again: Artifactory keeps
+    the older archived copy and skips the newer one with an info log (7.71.2,
+    [legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)).
+  - Archiving from a federated repository is not synced to the other members, a limitation
+    JFrog still documents ([cold storage](https://docs.jfrog.com/administration/docs/cold-storage.md)).
 
 ## Verification
 

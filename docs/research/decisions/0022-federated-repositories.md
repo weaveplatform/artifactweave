@@ -1,5 +1,7 @@
 # 0022: Federated repositories
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -13,6 +15,15 @@ repositories into scope on 2026-10-13 with artifactweave-only peers
 status and failed-binary handling, and the repository configuration carries
 `members[{url, enabled}]`.
 
+In Artifactory 7.x the federation runs in the standalone Artifactory Federation Service
+(RTFS) at `/rtfs` (from 7.111.12). 7.133.3 announced the sunset of the legacy federation
+embedded in Artifactory, and develops new features, such as unidirectional sync with the
+`federated-repo/r` pairing use case, for RTFS only. RTFS does not support four status
+operations: `state`, `status/repo` (v1 and v2), `status/mirrorsLag` and
+`status/unavailableMirrors`. JFrog now files these under "Legacy Federation Monitoring"
+([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed),
+[API index](https://docs.jfrog.com/artifactory/reference/federated-repositories-api/llms.txt)).
+
 ## Decision
 
 **A federated repository is a local repository with members.** It stores and serves
@@ -23,7 +34,7 @@ the peer protocol ([0021](0021-peer-trust-and-sync-protocol.md)) on the stream
 
 **Members.** Each entry in `members` names a peer's repository as
 `<peer base URL>/artifactory/<repoKey>`. A member URL whose host is not a paired peer with
-the `federation` use case is rejected with 400 naming the URL. This instance's own entry
+the `federated-repo/*` use case is rejected with 400 naming the URL. This instance's own entry
 may be present or omitted. `enabled` is a boolean (JFrog documents a string; either is
 accepted) and maps to whether events flow to that member. When a federated repository is created or its member list
 changes, the instance sends the configuration to each member over the peer protocol and
@@ -55,7 +66,9 @@ applied items rather than shipped, so every member's metadata reflects its own c
   binary tasks: `SYNCING` when every member's cursor is within the lag threshold,
   `OUT_OF_SYNC` when one is behind, `FULL_SYNC_RUNNING` during a snapshot, `DISABLED`
   when the repository's federation is switched off. Lag is the time between an event's
-  registration and its acknowledgement.
+  registration and its acknowledgement. artifactweave serves the four operations that
+  Artifactory 7.x keeps for legacy federation only, since they are computed from the same
+  cursors and a client written against legacy federation still calls them.
 - The failed-binary endpoints list, replay and delete the failed blob fetches recorded by
   0021.
 
@@ -79,9 +92,17 @@ Alternatives considered:
 
 ## Constraints
 
-- Members must be artifactweave instances paired for `federation`.
+- Members must be artifactweave instances paired for `federated-repo/*` (or
+  `federated-repo/r` for a receive-only member).
 - JFrog limits a federation to ten members; artifactweave keeps the same limit so plans
-  written for Artifactory behave the same.
+  written for Artifactory behave the same. Confirmed for 7.x
+  ([members](https://docs.jfrog.com/artifactory/docs/federation-members-and-topology.md)).
+- Pairing for federation uses JFrog's 7.x use cases on the Artifactory endpoint, as
+  `api/src/artifactory/paths-admin.yaml` specifies: `federated-repo/*` for two-way trust and
+  `federated-repo/r` for receive-only trust
+  ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)).
+  How a receive-only member (unidirectional federation, RTFS only in 7.x) behaves is not
+  yet designed.
 - A repository cannot be both federated and the target of push replication from the same
   source, to avoid two writers on one path set.
 - The status payload fields `mirrorEventsStatusInfo` and `federatedArtifactStatus` are

@@ -1,4 +1,6 @@
-# 11: Prior art
+# 11: Reference materials
+
+Checked against: Artifactory 7.161.32
 
 Existing registries that solve parts of the same problem, what artifactweave borrows from
 each, and what it deliberately does not copy. The comparison is limited to projects whose

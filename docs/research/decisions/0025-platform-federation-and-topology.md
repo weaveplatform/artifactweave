@@ -1,5 +1,7 @@
 # 0025: Platform federation and topology
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -42,6 +44,17 @@ but they carry no data because Curation is out of scope. Identity replication is
 configured through Access Federation (above) and repository replication through federated
 repositories ([0022](0022-federated-repositories.md)), not through a federation's entity
 list.
+
+Checked against 7.x: the documented pfed API (the Curation Federation reference) still
+names only Curation entity types
+([pfed](https://docs.jfrog.com/administration/reference/curation-federation-pfed-service.md)).
+JFrog's Platform Federation product, the Grid, now also syncs projects, members, roles,
+stages, users, groups, permission targets and access tokens as global entities across a
+mesh of sites. That runs on SaaS only, from 7.154.0, as Enterprise+ early access
+([jfrog-grid](https://docs.jfrog.com/administration/docs/jfrog-grid.md)). Its API for those
+entities is not documented, so this decision keeps identity on Access Federation **[I]**.
+Access Federation targets are registered with the `<base>/access` URL; 7.90.5 dropped
+`<base>/artifactory/api/access` ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)).
 
 **Topology and monitoring.** A Grid topology is a named set of sites, each a JPD, with
 status `Connected` or `Disconnected` from the peer status. Monitoring entities are derived

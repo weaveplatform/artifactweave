@@ -1,5 +1,7 @@
 # 0030: Reference deployments and platform testing
 
+Checked against: Artifactory 7.161.32
+
 Status: Accepted
 
 ## Context

@@ -1,12 +1,18 @@
 # 0026: Workers runtime
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
 
-JFrog Workers attach TypeScript functions to 35 platform actions: before-actions that can
-stop a request, after-actions that run asynchronously, and HTTP-triggered workers
-([research 16](../16-enterprise-products.md#5-workers)). The owner brought Workers into
+JFrog Workers attach TypeScript functions to platform actions: before-actions that can
+stop a request, after-actions that run asynchronously, HTTP-triggered workers
+(`GENERIC_EVENT`) and, from 7.104.5, scheduled workers (`SCHEDULED_EVENT`) on a cron
+expression ([research 16](../16-enterprise-products.md#5-workers),
+[7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)). The action list is the one
+`api/src/worker/paths-workers.yaml` specifies; research 16 maps it to the current 7.x
+event catalogue. The owner brought Workers into
 scope on 2026-10-13 and chose goja, a pure-Go JavaScript engine, with esbuild transpiling
 TypeScript in-process, so the single static binary stays a single static binary.
 
@@ -26,7 +32,11 @@ in-process client to this instance's own API; `clients.axios`, an outbound HTTP 
 `wait(ms)`; `state`, persisted per worker with JFrog's default limits (10 items,
 40-character keys, 250-character values; not saved when the execution fails);
 `getRemainingExecutionTime()`; `crypto` with `hash`, `hmac` (sha256, sha512) and
-`randomBytes` (at most 4,096 bytes). `console` output is captured into the execution
+`randomBytes` (at most 4,096 bytes). JFrog has since added
+`platformHttp.request(method, body, headers)` (Workers 1.216) and fire-and-forget `axios`
+methods (`getAndForget`, `postAndForget`, `deleteAndForget`; Workers 1.494 SaaS, 1.542
+self-managed), which return as soon as the request is scheduled ([Workers releases](https://docs.jfrog.com/releases/docs/jfrog-workers-release-information));
+artifactweave provides both. `console` output is captured into the execution
 record. No filesystem, no timers other than `wait`, no Node modules.
 
 **Execution hosts.** Workers do not run inside the registry process. A small pool of
@@ -62,7 +72,11 @@ distinct error codes.
 
 **Outbound network.** `clients.axios` only reaches hosts on an allow-list in the
 application configuration (empty by default), never link-local or loopback addresses,
-and never this instance except through `platformHttp`.
+and never this instance except through `platformHttp`. Self-managed JFrog Workers also
+refuse some hosts: with `enableLocalNetworkValidation`, on by default, `axios` cannot call
+localhost, "unicast IPs" or JFrog's domain names, and any other host is allowed
+([Workers YAML](https://docs.jfrog.com/installation/docs/worker-yaml-configuration.md)).
+The allow-list is the stricter of the two (DV-006).
 
 **Hook points.** Before-actions run synchronously in the request path of the item, upload,
 download, copy, move, delete, property, repository, build-info, token and replication

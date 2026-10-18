@@ -2,7 +2,7 @@
 
 | Path | What |
 |---|---|
-| [research/](research/README.md) | The foundational research: where JFrog's APIs are documented, the endpoint inventories, the package protocols, the Terraform providers and CLI compatibility surface, scope tiers, prior art, open questions and the review log. Research baseline 2026-10-12 |
+| [research/](research/README.md) | The foundational research: where JFrog's APIs are documented, the endpoint inventories, the package protocols, the Terraform providers and CLI compatibility surface, scope tiers, reference materials, open questions and the review log. Research baseline 2026-10-12 |
 | [research/decisions/](research/decisions/README.md) | Decision records 0001–0030, following `research/decisions/TEMPLATE.md` |
 | [implementation/plan.md](implementation/plan.md) | Phases P0–P18 (with P1b, P2b and P4b), milestones, exit criteria and build status |
 | [implementation/definition-of-done.md](implementation/definition-of-done.md) | Gates for every pull request and phase |

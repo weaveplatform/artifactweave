@@ -1,5 +1,7 @@
 # 12: Open questions
 
+Checked against: Artifactory 7.161.32
+
 Questions the research did not settle, who resolves each, and what each one blocks. Items
 move out of this file into a decision record when they are resolved.
 
@@ -48,7 +50,10 @@ frozen, and the captured request and response are checked in as fixtures.
 | Federated repository plans | how `artifactory_federated_*_repository` reports a 400 when a `member` URL is not a paired peer (the only case still rejected now that federation is real), so the error message reads well in a plan | P13 |
 | Release bundle v1 create body and states | the request and response of `POST /distribution/api/v1/release_bundle` (untyped in the oracle) and the wire names of the bundle states and per-target distribution statuses | P15 |
 | Worker result statuses | the stop and warn statuses each before-action accepts beyond `DOWNLOAD_PROCEED`, the field name for worker secrets on `context`, and the execution-history record fields | P17 |
-| Federation status payloads | the contents of `mirrorEventsStatusInfo` and `federatedArtifactStatus` in the repository status response (untyped in the oracle) | P13 |
+| Federation status payloads | the contents of `mirrorEventsStatusInfo` and `federatedArtifactStatus` in the repository status response (untyped in the oracle). In 7.x `status/repo` is legacy-federation only, which RTFS does not serve ([16](16-enterprise-products.md#4-federated-repositories)), so the capture needs a trial on legacy federation | P13 |
+| Release bundle view paths | the `GET .../{name}/{version}/status?type=target`, `GET .../{name}/{version}/artifacts` and target-side `DELETE /api/release/bundles/{name}/{version}` that the 7.146.7 release notes list and the API reference does not ([16](16-enterprise-products.md#1-distribution-and-release-bundles-v1)) | P15 |
+| Worker actions without a catalogue entry | whether 7.x still accepts `AFTER_SAVE`, `BEFORE_UPLOAD_REQUEST`, `BEFORE_REMOTE_INFO_REQUEST` and `AFTER_WORKLOAD_STATE_CHANGE_REQUEST` ([16](16-enterprise-products.md#the-action-catalogue)) | P17 |
+| Platform Federation global entities | how JFrog's Grid product carries projects, stages, users, groups, permission targets and tokens between SaaS sites, which its documented pfed API does not show ([0025](decisions/0025-platform-federation-and-topology.md)) | P14 |
 
 ## Items to re-verify when dependencies move
 

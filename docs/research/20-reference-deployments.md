@@ -1,5 +1,7 @@
 # Reference deployments: multi-region storage, Terraform practice and CI identity
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: **2026-10-14**.
 
 artifactweave runs on fs, S3, GCS and Azure blob stores and can mirror blobs across them

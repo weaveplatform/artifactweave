@@ -1,5 +1,7 @@
 # 16: Distribution, cold storage, federation and Workers
 
+Checked against: Artifactory 7.161.32
+
 Five JFrog products that the first research pass placed out of scope and that the project
 owner brought into scope on 2026-10-13: Distribution with release bundles v1, cold-storage
 archive and retention, platform federation and topology, federated repositories, and
@@ -103,6 +105,16 @@ https://docs.jfrog.com/artifactory/reference/retention-release-bundle-v1-api/llm
   ([0023](decisions/0023-release-bundles-and-distribution.md)).
 - The `archive` flag on version delete is accepted and ignored; bundle import reads from
   the directory configured as `distribution.import_dir` (default `<data_dir>/import`).
+- In 7.x release bundles v1 remain available but are not forward-compatible with release
+  bundles v2 (7.63.5, [legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)). The Replicator for v1 was deprecated in
+  7.84.10 without changing what Distribution does
+  ([deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations)). From
+  7.146.7 the Artifactory bundle view also answers for release bundles v2 with
+  `type=target`. Those release notes also list `GET .../{name}/{version}/status?type=target`,
+  `GET .../{name}/{version}/artifacts` and a target-side
+  `DELETE /api/release/bundles/{name}/{version}`, which the API reference does not
+  document **[I]** ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed),
+  [API index](https://docs.jfrog.com/artifactory/reference/release-bundles-v1-api/llms.txt)).
 
 Timing: P15.
 
@@ -118,8 +130,11 @@ artifacts or whole package versions by repository, path, name, properties and ag
 custom AQL query), move the binaries and metadata to the cold instance and remove them
 from the live one. Archived items are searched from the live instance and restored in the
 background, to their original location with a fallback path or to a new location; restore
-leaves the cold copy in place. Smart archiving (`/api/archive/v2`) is the SaaS variant
-with package-level policies shaped like cleanup policies.
+leaves the cold copy in place. Smart archiving (`/api/archive/v2`) has package-level
+policies shaped like cleanup policies and archives to an archive instance in JFrog Cloud:
+on SaaS with Enterprise+ from 7.111, and for a self-hosted active instance ("hybrid smart
+archiving", Enterprise+) from 7.117.14. One active instance pairs with one archive
+instance ([archive](https://docs.jfrog.com/administration/docs/archive.md)).
 
 Sources: https://docs.jfrog.com/administration/docs/cold-storage.md,
 https://docs.jfrog.com/administration/docs/archive.md,
@@ -171,6 +186,16 @@ defines topologies of sites and reports monitoring of synchronised entities per 
 JFrog sells this as Enterprise+ and wires it through Mission Control and the Circle of
 Trust.
 
+In 7.x, JFrog Platform Federation, the Grid product built on the pfed service, also
+syncs projects, members, roles, global and project stages, users, groups, permission
+targets and access tokens as global entities across a mesh of sites (no star topology).
+It reached SaaS in 7.154.0 as an Enterprise+ early-access feature and does not yet take
+self-managed sites ([jfrog-grid](https://docs.jfrog.com/administration/docs/jfrog-grid.md)).
+Its documented API, the Curation Federation (pfed) reference, still names only Curation
+entity types, so how the Grid product carries projects and identity is **[I]**. Access
+Federation targets use `<base>/access`: 7.90.5 dropped the
+`<base>/artifactory/api/access` form ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)).
+
 Sources: https://docs.jfrog.com/administration/docs/access-federation.md,
 https://docs.jfrog.com/administration/docs/jfrog-grid.md,
 https://docs.jfrog.com/administration/reference/jfrog-platform-access-federation-api/llms.txt.
@@ -211,7 +236,16 @@ exchange events (deploy, delete, move, copy, property changes, optionally statis
 over a dedicated federation service and fetch binaries they lack. A full sync rebuilds a
 member from another; status endpoints report per-member connection state, lag, failed
 binary transfers and inconsistent configurations. A local repository can be migrated to
-federated and back. Enterprise X and Enterprise+ only.
+federated and back. Enterprise X and Enterprise+ only, from 7.18.3, and at most ten
+members ([members](https://docs.jfrog.com/artifactory/docs/federation-members-and-topology.md)).
+
+In 7.x the federation service is the standalone Artifactory Federation Service (RTFS):
+SaaS from 7.104.2, self-managed from January 2025, with PostgreSQL for its own store
+([RTFS](https://docs.jfrog.com/artifactory/docs/artifactory-federation-service-rtfs.md)).
+Its context path moved from `/artifactory/service/rtfs` to `/rtfs` in 7.111.12
+([7.111.12](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-711112-self-managed)). 7.133.3 announced the sunset of the legacy
+federation embedded in Artifactory, after an 18-month migration period, and develops new
+features such as unidirectional sync for RTFS only ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)).
 
 Sources: https://docs.jfrog.com/artifactory/reference/federated-repositories-api/llms.txt,
 https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
@@ -222,7 +256,7 @@ https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
 |---|---|---|
 | Membership and conversion | `POST /artifactory/api/federation/migrate/{repoKey}`, `.../convertToLocal`, `.../removeMember`, `.../configSync/{repoKey}` | 200, 400, 404 on convert |
 | Synchronisation | `POST .../fullSync/{repoKey}`, `.../forceFullSync/{repoKey}`, `.../recovery?repoKey&force`, `.../reconnect`; `PUT .../propagateCreatedTime`, `.../prioritization/{repoKey}` | 200; reconnect 424 when the federation client fails |
-| Status | `GET .../state`, `.../inconsistentRepos`, `.../status/repo/{repoKey}` (v1 and `/api/v2/...`), `.../status/stateList?status`, `.../status/stateSummary`, `.../status/connectionStates/{repoKey}`, `.../status/mirrorsLag?thresholdTimeInMs`, `.../status/unavailableMirrors` | 200; 405 when federation is disabled |
+| Status | `GET .../state`, `.../inconsistentRepos`, `.../status/repo/{repoKey}` (v1 and `/api/v2/...`), `.../status/stateList?status`, `.../status/stateSummary`, `.../status/connectionStates/{repoKey}`, `.../status/mirrorsLag?thresholdTimeInMs`, `.../status/unavailableMirrors` | 200; 405 when federation is disabled. In 7.x, `state`, `status/repo` (v1 and v2), `mirrorsLag` and `unavailableMirrors` are "Legacy Federation Monitoring": RTFS does not support them ([API index](https://docs.jfrog.com/artifactory/reference/federated-repositories-api/llms.txt), [sync state](https://docs.jfrog.com/artifactory/reference/getfederationsyncstate.md)) |
 | Failed binaries | `GET .../binaries/failures/list?repoKey&limit&page`, `PUT .../replay?repoKey&sha1`, `DELETE .../delete?repoKey&sha1` | 200 |
 | Pairing | `POST/PUT/DELETE /artifactory/api/v1/service_trust/pairing/{usecase}`; `POST /access/api/v1/service_trust/pairing/{useCase}` | 200, 404 on unknown use case |
 
@@ -237,7 +271,7 @@ https://docs.jfrog.com/artifactory/docs/access-federation-vs-repo-federation.md.
 | Unavailable mirror | `[{localRepoKey, remoteUrl, remoteRepoKey, status}]` | |
 | Failed binary task | `[{sha1, repoKey, creationTime, failuresCount}]` | |
 | Repository status | `{localKey, binariesTasksInfo{inProgressTasks, failingTasks}, mirrorEventsStatusInfo[], federatedArtifactStatus{}}` | the last two are untyped in the oracle |
-| Pairing token | `{pairing_token}`; exchange body `{pairing_token}` → `{message}` | JFrog use cases include `mission-control`, `bridge`, `platform-federation` and `artifactory-cold`; artifactweave adds its own (see [0021](decisions/0021-peer-trust-and-sync-protocol.md)). `artifactory-cold` answers 404 because cold storage is a blob tier, not a paired instance |
+| Pairing token | `{pairing_token}`; exchange body `{pairing_token}` → `{message}` | On the Artifactory endpoint 7.x documents `federated-repo/*` (two-way federated repository trust), `federated-repo/r` (receive-only, for unidirectional federation), `artifactory-cold` and `artifactory-cold/<namespace>`, and answers 404 to anything else ([pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md)); the Access endpoint's use cases include `mission-control`, `bridge` and `platform-federation`; artifactweave adds its own (see [0021](decisions/0021-peer-trust-and-sync-protocol.md)). `artifactory-cold` answers 404 because cold storage is a blob tier, not a paired instance |
 
 ### Clients
 
@@ -252,13 +286,20 @@ peer; the earlier rule that rejected multi-member lists with 400 is withdrawn. T
 
 A worker is a TypeScript function attached to a platform event (an action). Before-actions
 run in the request path and can stop it (for example refuse a download); after-actions run
-asynchronously after the event; HTTP-triggered workers (`GENERIC_EVENT`) run when called.
+asynchronously after the event; HTTP-triggered workers (`GENERIC_EVENT`) run when called;
+scheduled workers (`SCHEDULED_EVENT`) run on a cron expression, from 7.104.5
+([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
 Each worker carries a key, the action, the source code, an enabled flag, a debug flag, a
 shared flag and filter criteria on repositories. The runtime is a sandbox without Node
 APIs or imports. JFrog's SaaS limits are 20 seconds of execution time, 1 second of CPU
-time, 64 MB of memory and 100,000 characters of source, with an execution rate ceiling and
-a back-off that blocks a worker after ten failures in ten minutes; self-managed
-installations configure the limits.
+time, 64 MB of memory and 100,000 characters of source, with an execution rate ceiling
+(1,200 executions a second, 120 a second sustained for a minute) and a back-off that
+blocks a worker after ten failures in ten minutes, up to 17 minutes, reset daily;
+self-managed installations configure the limits in the Workers YAML
+([limits](https://docs.jfrog.com/administration/docs/workers-limitations.md),
+[YAML](https://docs.jfrog.com/installation/docs/worker-yaml-configuration.md)). The YAML's
+`enableLocalNetworkValidation` (on by default) stops `clients.axios` from calling localhost,
+"unicast IPs" and JFrog's domain names.
 
 Sources: https://docs.jfrog.com/administration/reference/createworker.md,
 https://docs.jfrog.com/administration/docs/typescript-code-for-workers.md,
@@ -276,22 +317,27 @@ https://docs.jfrog.com/administration/docs/worker-event-types.md.
 
 ### The action catalogue
 
-35 actions are named in the create-worker definition, grouped here by the hook point they
-need in artifactweave:
+The actions below are those of the create-worker definition as `api/src/worker/paths-workers.yaml`
+specifies them, grouped by the hook point they need in artifactweave. The current event
+catalogue ([event types](https://docs.jfrog.com/administration/docs/worker-event-types.md))
+names 41 events in prose, and each maps to one of them. It shows no identifiers, and four
+actions here have no catalogue entry (`AFTER_SAVE`, `BEFORE_UPLOAD_REQUEST`,
+`BEFORE_REMOTE_INFO_REQUEST`, `AFTER_WORKLOAD_STATE_CHANGE_REQUEST`), so whether 7.x still
+accepts them is **[I]**:
 
 | Hook point | Actions |
 |---|---|
 | Download path (before) | `BEFORE_DOWNLOAD_REQUEST`, `BEFORE_DOWNLOAD`, `BEFORE_REMOTE_DOWNLOAD` |
-| Download path (after) | `AFTER_DOWNLOAD`, `AFTER_REMOTE_DOWNLOAD` |
-| Remote resolution | `ALT_REMOTE_PATH`, `ALT_REMOTE_CONTENT`, `ALT_ALL_RESPONSES` |
-| Upload and create | `BEFORE_UPLOAD_REQUEST`, `BEFORE_CREATE`, `AFTER_CREATE`, `AFTER_SAVE` |
-| Copy, move and delete | `BEFORE_COPY`, `AFTER_COPY`, `BEFORE_MOVE`, `AFTER_MOVE`, `BEFORE_DELETE` |
-| Properties | `BEFORE_PROPERTY_CREATE`, `AFTER_PROPERTY_CREATE`, `AFTER_PROPERTY_DELETE` |
-| Repositories | `AFTER_REPO_CREATE`, `BEFORE_REPO_UPDATE`, `AFTER_REPO_UPDATE`, `BEFORE_REPO_DELETE`, `AFTER_REPO_DELETE` |
+| Download path (after) | `AFTER_DOWNLOAD`, `AFTER_REMOTE_DOWNLOAD`, `AFTER_DOWNLOAD_ERROR` |
+| Remote resolution | `BEFORE_REMOTE_INFO`, `BEFORE_REMOTE_INFO_REQUEST`, `ALT_REMOTE_PATH`, `ALT_REMOTE_CONTENT`, `ALT_RESPONSE`, `ALT_ALL_RESPONSES` |
+| Upload and create | `BEFORE_UPLOAD_REQUEST`, `BEFORE_UPLOAD`, `BEFORE_CREATE`, `AFTER_CREATE`, `AFTER_SAVE` |
+| Copy, move and delete | `BEFORE_COPY`, `AFTER_COPY`, `BEFORE_MOVE`, `AFTER_MOVE`, `BEFORE_DELETE`, `AFTER_DELETE` |
+| Properties | `BEFORE_PROPERTY_CREATE`, `AFTER_PROPERTY_CREATE`, `BEFORE_PROPERTY_DELETE`, `AFTER_PROPERTY_DELETE` |
+| Repositories | `BEFORE_REPO_CREATE`, `AFTER_REPO_CREATE`, `BEFORE_REPO_UPDATE`, `AFTER_REPO_UPDATE`, `BEFORE_REPO_DELETE`, `AFTER_REPO_DELETE` (repository events reached self-managed in 7.161.15) |
 | Build-info | `BEFORE_BUILD_INFO_SAVE`, `AFTER_BUILD_INFO_SAVE` |
-| Tokens | `BEFORE_CREATE_TOKEN`, `BEFORE_REVOKE_TOKEN`, `BEFORE_TOKEN_EXPIRY` |
-| Replication | `BEFORE_DIRECTORY_REPLICATION`, `BEFORE_DELETE_REPLICATION`, `BEFORE_STATISTICS_REPLICATION` |
-| Other | `AFTER_WORKLOAD_STATE_CHANGE_REQUEST` (JFrog runtime workloads; no artifactweave equivalent), `GENERIC_EVENT` (HTTP-triggered) |
+| Tokens | `BEFORE_CREATE_TOKEN`, `BEFORE_REVOKE_TOKEN`, `BEFORE_TOKEN_EXPIRY` (from 7.111.4) |
+| Replication | `BEFORE_DIRECTORY_REPLICATION`, `BEFORE_FILE_REPLICATION`, `BEFORE_PROPERTY_REPLICATION`, `BEFORE_DELETE_REPLICATION`, `BEFORE_STATISTICS_REPLICATION` |
+| Other | `AFTER_WORKLOAD_STATE_CHANGE` and `AFTER_WORKLOAD_STATE_CHANGE_REQUEST` (JFrog runtime workloads; no artifactweave equivalent), `GENERIC_EVENT` (HTTP-triggered), `SCHEDULED_EVENT` (cron) |
 
 ### Entities and runtime contract
 
@@ -301,7 +347,7 @@ need in artifactweave:
 | Action metadata (v2) | `action{application, name}, description, samplePayload, sampleCode, typesDefinitions, supportProjects, filterType, mandatoryFilter, wikiUrl, async, requestSchema, executionRequestType` | artifactweave writes its own samples and type definitions |
 | Execution record | the worker's return value under `result`, plus logs and timing *(field names undocumented)* | `GET .../execution_history` |
 | Function signature | default export `(context, data) => Promise<result>`; `data` carries the event payload and `userContext{id, isToken, realm}` | |
-| Context | `baseUrl`, `platformToken`, `clients.platformHttp` (calls back into the platform), `clients.axios` (outbound HTTP), `wait(ms)`, `state` (persisted between runs: 10 items, 40-character keys, 250-character values by default), `getRemainingExecutionTime()`, `crypto{hash, hmac (sha256, sha512), randomBytes (at most 4096)}` | no `setTimeout`, no Node modules, no `import`; TypeScript targeting ES2022 |
+| Context | `baseUrl`, `platformToken`, `clients.platformHttp` (calls back into the platform; `request(method, body, headers)` beside the verb methods), `clients.axios` (outbound HTTP; `getAndForget`, `postAndForget` and `deleteAndForget` return without waiting, from Workers 1.542 self-managed, [Workers releases](https://docs.jfrog.com/releases/docs/jfrog-workers-release-information)), `wait(ms)`, `state` (persisted between runs: 10 items, 40-character keys, 250-character values by default), `getRemainingExecutionTime()`, `crypto{hash, hmac (sha256, sha512), randomBytes (at most 4096)}` | no `setTimeout`, no Node modules, no `import`; TypeScript targeting ES2022 |
 | Result | `{status, message}`; `DOWNLOAD_PROCEED` is the documented status for download hooks; the stop and warn statuses per action are *(unverified)* | |
 
 ### Clients
@@ -319,3 +365,29 @@ The JFrog CLI has a `jf worker` command group for scaffolding and deploying work
 | `full_broadcast` answers 304 when nothing changed | section 3 |
 | `reconnect` answers 424 when the peer is unreachable | section 4 |
 | Distribution answers 200 for a dry run and 202 for a started distribution on the same path | section 1 |
+
+## Artifactory 7.x check
+
+Checked on 2026-10-17 against the self-managed release notes up to 7.161.32
+([releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), the
+legacy notes for 7.0 to 7.83 ([PDF](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)), the Workers release notes and the
+current product pages cited above. The sections above were corrected in place; this table
+lists what each claim became.
+
+| Claim | 7.x | Source |
+|---|---|---|
+| Release bundles v1 and Distribution endpoints and statuses | Confirmed; v1 kept beside v2. The extra bundle-view paths in the 7.146.7 notes are **[I]** | [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations) |
+| Cold storage pairs a live and a cold self-hosted instance (Enterprise X, Enterprise+) | Confirmed; 30,000 artifacts per restore run (`artifactory.retention.warm.restore.artifact.limit`) confirmed | [cold storage](https://docs.jfrog.com/administration/docs/cold-storage.md) |
+| Smart archiving is the SaaS variant | Changed: SaaS from 7.111 and hybrid self-hosted from 7.117.14, both Enterprise+, archiving to an instance in JFrog Cloud | [archive](https://docs.jfrog.com/administration/docs/archive.md) |
+| Archiving from a federated repository | Confirmed limitation: archive and restore events are not synced to the other members (since 7.27.3, still documented) | [cold storage](https://docs.jfrog.com/administration/docs/cold-storage.md) |
+| A package version already in cold storage | Added: archiving it again keeps the older archived copy and skips the newer one with an info log (7.71.2) | [legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf) |
+| Platform federations carry Curation entity types only | Confirmed for the documented pfed API; the Grid product also syncs projects and identity on SaaS, how is **[I]** | [jfrog-grid](https://docs.jfrog.com/administration/docs/jfrog-grid.md), [pfed](https://docs.jfrog.com/administration/reference/curation-federation-pfed-service.md) |
+| Access Federation target URLs | Changed: `<base>/access`, not `<base>/artifactory/api/access` (7.90.5) | [7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed) |
+| Federated repositories: Enterprise X and Enterprise+, up to ten members | Confirmed (from 7.18.3) | [members](https://docs.jfrog.com/artifactory/docs/federation-members-and-topology.md) |
+| Members exchange events over a dedicated federation service | Changed: the standalone RTFS at `/rtfs` (7.111.12); legacy federation sunset announced in 7.133.3; four status operations are legacy-only | [RTFS](https://docs.jfrog.com/artifactory/docs/artifactory-federation-service-rtfs.md), [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed) |
+| Federation socket timeout | Added: 300,000 ms by default (7.111.8) | [7.111.8](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71118-self-managed) |
+| Pairing use cases | Changed: on the Artifactory endpoint they are `federated-repo/*`, `federated-repo/r` (unidirectional, RTFS only) and the two `artifactory-cold` forms; `api/src/artifactory/paths-admin.yaml` already specifies the `federated-repo` pair | [pairing](https://docs.jfrog.com/artifactory/reference/generatepairingtoken.md) |
+| Worker triggers: before, after and HTTP | Changed: scheduled workers from 7.104.5; the action catalogue grew to the list above | [7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed), [event types](https://docs.jfrog.com/administration/docs/worker-event-types.md) |
+| Worker limits and back-off | Confirmed, with the rate ceiling and the 17-minute back-off made explicit | [limits](https://docs.jfrog.com/administration/docs/workers-limitations.md) |
+| Worker context | Added: fire-and-forget `axios` methods and `platformHttp.request`; JFrog blocks `axios` calls to local and JFrog hosts by default | [Workers releases](https://docs.jfrog.com/releases/docs/jfrog-workers-release-information), [YAML](https://docs.jfrog.com/installation/docs/worker-yaml-configuration.md) |
+| Worker stop and warn statuses per action | Still **[I]** | |

@@ -1,5 +1,7 @@
 # 0023: Release bundles v1 and Distribution
 
+Checked against: Artifactory 7.161.32
+
 Status: Proposed
 
 ## Context
@@ -12,6 +14,17 @@ owner brought Distribution and release bundles v1 into scope on 2026-10-13, with
 being artifactweave instances ([0021](0021-peer-trust-and-sync-protocol.md)). Release
 bundles v2 and the Lifecycle service stay out of scope, but the Distribution API also
 exposes v2 distribution endpoints.
+
+Artifactory 7.x keeps release bundles v1 beside v2, though v1 is not forward-compatible
+with v2 (7.63.5, [legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)). The v1 Replicator was deprecated in 7.84.10
+without changing what Distribution does
+([deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations)). From
+7.146.7 the Artifactory bundle view (`/api/release/bundles?type=target` and below) also
+answers for v2 bundles. The same release notes list a `status` and an `artifacts`
+operation under a bundle version, and a target-side
+`DELETE /api/release/bundles/{name}/{version}`. The release bundles v1 API reference
+documents none of the three, so artifactweave leaves them out until P19 captures them
+**[I]** ([7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)).
 
 ## Decision
 

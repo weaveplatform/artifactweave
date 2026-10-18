@@ -1,5 +1,7 @@
 # Cloud blob storage: Google Cloud Storage and Azure Blob Storage
 
+Checked against: Artifactory 7.161.32
+
 Research baseline: **2026-10-13**.
 
 Artifactory stores binaries on Google Cloud Storage and Azure Blob Storage as well as S3
@@ -128,7 +130,8 @@ about $0.003 at $0.005 per 1,000.
 | `enableSignedUrlRedirect` | false |
 | `signedUrlExpirySeconds` | 30 |
 | `maxConnections` | 100 |
-| `maxRetries` | 1 |
+| `maxRetries` | 1; retries a 50x from GCS, from 7.96.3 |
+| `retryIntervalMillis` | 1000; the wait between those retries |
 | proxy settings | |
 
 No multipart or part-size settings are documented. The layout is keyed by SHA-1.
@@ -271,7 +274,7 @@ A declared digest avoids the copy entirely: stage on the final name and commit w
 | `multiPartLimit` | 256 MiB |
 | `multipartElementSize` | 100 MiB |
 | `maxConnections` | 5 |
-| `sasStartTimeOffsetSeconds` | 900 |
+| `sasStartTimeOffsetSeconds` | 900, from 7.146.35, against intermittent 403s from clock skew |
 
 Managed identity is supported through `useInstanceCredentials` for AKS Workload Identity
 from 7.125.4 ([azure-workload-identity]).
@@ -297,7 +300,8 @@ Artifactory spreads binaries over several storage units with the `sharding` bina
 | `readBehavior` | roundRobin; `zone`; `crossNetworkStrategy` on clusters | how reads pick a shard [sharding] [sharding-cluster] |
 | `writeBehavior` | roundRobin; also freeSpace, percentageFreeSpace, zone variants | where new copies go [sharding] |
 | `concurrentStreamWaitTimeout` | 30,000 ms | one upload stream is buffered and fanned out to R writer threads; the write counts when all finish [sharding] |
-| `maxBalancingRunTime`, `balancerThreads` | no limit, 1 | the balancer that restores redundancy [sharding] |
+| `maxBalancingRunTime`, `balancerThreads`, `enableShardingBalancer` | 0.0 ms (no limit), 1, `true` | the balancer that restores redundancy and its off switch (7.63.14) [sharding] |
+| `accessibleCheckThreads`, `accessibleCheckTimeoutMillis` | | the shard health check (7.55.13); 7.111.4 exports it as `jfsh_shard_accessibility_status_total` (1 accessible, 0 not, -1 timed out) [sharding] |
 | sub-provider `zone`, `checkPeriod` (15 s), `writeEnabled` (since 6.18) | | a shard's zone, its health re-check interval, and a read-only drain switch that still lets GC delete [state-aware] [state-aware-s3] |
 | `shared.node.crossZoneOrder` | | the order zones are written in [sharding] |
 
@@ -312,7 +316,7 @@ Artifactory spreads binaries over several storage units with the `sharding` bina
 - **Topology changes apply to new data only** on S3 shards [s3-templates].
 - **Automatic removal of surplus copies lost data.** It deleted data when combined with bucket replication (KB 000006410) [kb-6410].
 - **Storage summary:** `GET /api/storageinfo` has no per-shard detail [storageinfo].
-- **Signed URLs:** which shard's URL a redirect uses is undocumented.
+- **Signed URLs:** a redirect signs against the shards in the sharding provider's zone read order. 7.84.10 fixed `enableSignedUrlRedirect` on `state-aware-s3` to follow that order (RTDEV-39396) [rtdev-39396].
 
 **Related features copy between instances, not inside one filestore.** These are
 repository replication, federated repositories and Edge. JFrog advises against running
@@ -519,3 +523,23 @@ From `TestRealS3Probes` (`pkg/blob/s3/real_test.go`) in run 38892387927, against
 - [data-lake-storage-known-issues]: https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-known-issues
 - [azure-blob-storage-v2]: https://docs.jfrog.com/installation/docs/azure-blob-storage-v2-binary-provider
 - [azure-workload-identity]: https://docs.jfrog.com/installation/docs/azure-workload-identity
+- [rtdev-39396]: https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed
+
+## Artifactory 7.x check
+
+Checked on 2026-10-17 against the self-managed release notes up to 7.161.32
+(https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases), the legacy notes
+for 7.0 to 7.83 (https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf) and the current binary-provider pages cited above. Sections
+1.6, 2.7 and 3.1 were corrected in place.
+
+| Claim | 7.x | Source |
+|---|---|---|
+| `google-storage-v2` parameters | Confirmed; `retryIntervalMillis` added beside `maxRetries` (7.96.3, improved in 7.104.5) | [google-storage-v2], https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed |
+| `azure-blob-storage-v2` parameters and Workload Identity | Confirmed; `sasStartTimeOffsetSeconds` arrived in 7.146.35, Workload Identity in 7.125.4 | https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714635-self-managed, https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed |
+| Sharding parameters (`redundancy`, `lenientLimit`, `readBehavior`, `concurrentStreamWaitTimeout`) | Confirmed | [sharding] |
+| Balancing | Confirmed; `enableShardingBalancer` (7.63.14) and the `maxBalancingRunTime` default of 0.0 ms added | [sharding], [legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf) |
+| `writeEnabled` on state-aware shards, "since 6.18" | Confirmed for 7.x: still documented, default `true` | [state-aware] |
+| Repair waits for garbage collection until 7.104.5 | Confirmed | [optimize] |
+| Which shard a signed URL redirect uses | Changed: the zone read order of the sharding provider (7.84.10 fix) | [rtdev-39396] |
+| S3 storage | Added: the S3 provider uses AWS SDK v2 by default from 7.146.7 (`awsSdkV2`), except with KMS client-side encryption, which stays on SDK v1 (7.146.22) | https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed, https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714622-self-managed |
+| `GET /api/storageinfo` has no per-shard detail | Confirmed for the API; per-shard health is a metric (7.111.4) | [storageinfo], https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed |

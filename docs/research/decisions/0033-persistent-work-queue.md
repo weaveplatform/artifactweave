@@ -1,5 +1,7 @@
 # 0033: Persistent work queue
 
+Checked against: Artifactory 7.161.32
+
 Status: Accepted
 
 ## Context
@@ -15,7 +17,10 @@ Doing that work inside the deploy's write transaction does not scale:
 - **Bulk publishes:** a build that deploys fifty modules would recalculate on every upload.
 
 Artifactory recalculates artifact-level Maven metadata after commit, on a queue with eight
-workers, for these reasons.
+workers, for these reasons. The eight workers come from the 6.20 source (research 27);
+no 7.x document confirms that number, so it is **[I]** for 7.x. 7.10.1 changed the plugin
+level: "Maven plugin metadata is now calculated for every deploy or delete actions"
+([legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)).
 
 Until now the only background mechanism has been the `leases` table: one singleton lease
 per job, which keeps garbage collection and mirror repair from overlapping across nodes. It
