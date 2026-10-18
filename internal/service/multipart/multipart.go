@@ -250,12 +250,22 @@ func (s *Service) authenticate(ctx context.Context, token string) (store.Upload,
 	return u, ss, nil
 }
 
-func signature(key, id string, part int) string {
+// mac signs msg with a session's key.
+func mac(key, msg string) string {
 	k, _ := hex.DecodeString(key)
 	m := hmac.New(sha256.New, k)
-	_, _ = m.Write([]byte(id + "/" + strconv.Itoa(part)))
+	_, _ = m.Write([]byte(msg))
 	return hex.EncodeToString(m.Sum(nil))
 }
+
+func signature(key, id string, part int) string { return mac(key, id+"/"+strconv.Itoa(part)) }
+
+// checksumToken is what the checksum deploy after a finished upload sends
+// as X-Checksum-Deploy-Token. The upload id alone would find the session,
+// but it is in every part URL, which the CLI sends without credentials and
+// proxies log; signed, the token is something only the status poll hands
+// out. The "checksum:" prefix keeps it from ever being a part's signature.
+func checksumToken(key, id string) string { return id + "." + mac(key, "checksum:"+id) }
 
 // PartURL returns the path and query the CLI PUTs part to, relative to the
 // server's base URL. The CLI sends that request without credentials, so the
@@ -576,7 +586,7 @@ func (s *Service) Status(ctx context.Context, token string) (Status, error) {
 	switch {
 	case ss.Status == StatusFinished:
 		done := 100
-		out.Progress, out.ChecksumToken = &done, u.ID
+		out.Progress, out.ChecksumToken = &done, checksumToken(ss.PartKey, u.ID)
 	case ss.Status != StatusProcessing:
 	case running:
 		out.Progress = &progress
@@ -584,6 +594,28 @@ func (s *Service) Status(ctx context.Context, token string) (Status, error) {
 		out.Status, out.Error = StatusRetryable, "the completion was interrupted"
 	}
 	return out, nil
+}
+
+// Finished reports whether token is the checksum token of a finished upload
+// that by made of the content with SHA-256 sum. That content is indexed
+// with no item yet, so the checksum deploy that stores the item finds no
+// file the caller may read; this lets it through instead, for that caller
+// and that content only. A token that opens nothing is false rather than an
+// error, so the deploy goes on to its other checks.
+func (s *Service) Finished(ctx context.Context, token, by, sum string) (bool, error) {
+	id, _, ok := strings.Cut(token, ".")
+	if !ok || id == "" {
+		return false, nil
+	}
+	_, ss, err := s.load(ctx, id)
+	if errors.Is(err, ErrBadToken) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return ss.Status == StatusFinished && ss.By == by && ss.SHA256 == sum &&
+		subtle.ConstantTimeCompare([]byte(token), []byte(checksumToken(ss.PartKey, id))) == 1, nil
 }
 
 // Abort discards an upload: its staged parts, its blob upload and its

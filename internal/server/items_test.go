@@ -8,6 +8,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -430,6 +431,101 @@ func TestChecksumDeploy(t *testing.T) {
 		w.do("PUT", "/artifactory/libs-local/none.bin", "admin", "", "X-Checksum-Deploy", "true"),
 		http.StatusBadRequest,
 	)
+}
+
+// TestChecksumDeployNeedsRead (#379): a checksum deploy reuses stored
+// content only when the caller may read a file that holds it. Anything else
+// is the 404 of a miss, body and all, so a checksum learned elsewhere
+// neither copies the content nor confirms that the server holds it.
+func TestChecksumDeployNeedsRead(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	byChecksum := func(p, as, content string) *httptest.ResponseRecorder {
+		return w.do("PUT", "/artifactory/"+p, as, "",
+			"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex(content))
+	}
+	wantStatus(
+		t,
+		w.do("PUT", "/artifactory/other-local/secret.bin", "admin", "secret"),
+		http.StatusCreated,
+	)
+	// deployer may deploy to libs-local, and read there, but not in
+	// other-local.
+	stolen := byChecksum("libs-local/stolen.bin", "deployer", "secret")
+	wantStatus(t, stolen, http.StatusNotFound)
+	miss := byChecksum("libs-local/miss.bin", "deployer", "never stored")
+	if stolen.Body.String() != miss.Body.String() {
+		t.Fatalf("an unreadable hit %q differs from a miss %q", stolen.Body, miss.Body)
+	}
+	if _, err := w.db.Items().
+		Get(ctx, "libs-local", false, "stolen.bin"); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a refused checksum deploy stored the item: %v", err)
+	}
+	// One file it may read is enough, whatever other repositories hold.
+	wantStatus(
+		t,
+		w.do("PUT", "/artifactory/libs-local/seen/secret.bin", "admin", "secret"),
+		http.StatusCreated,
+	)
+	wantStatus(t, byChecksum("libs-local/reused.bin", "deployer", "secret"), http.StatusCreated)
+	got := w.do("GET", "/artifactory/libs-local/reused.bin", "deployer", "")
+	if got.Body.String() != "secret" {
+		t.Fatalf("reused content %q", got.Body)
+	}
+	// A trashed file is not one: once both readable copies are deleted the
+	// content is out of reach again, though the trash can still holds it.
+	for _, p := range []string{"seen/secret.bin", "reused.bin"} {
+		deleted := w.do("DELETE", "/artifactory/libs-local/"+p, "admin", "")
+		wantStatus(t, deleted, http.StatusNoContent)
+	}
+	wantStatus(t, byChecksum("libs-local/again.bin", "deployer", "secret"), http.StatusNotFound)
+	// An administrator reads every file, so other-local's copy serves it.
+	wantStatus(t, byChecksum("libs-local/admin.bin", "admin", "secret"), http.StatusCreated)
+}
+
+// TestReadsContent covers what the HTTP tests cannot reach: a file in a
+// repository that no longer exists counts for no one, a readable file past
+// the first page is still found, and store failures are errors, which
+// answer 500 rather than a 404 that would send the client to upload.
+func TestReadsContent(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	cheapSeed(t, db)
+	libs := *repo.Defaults(&repo.Config{Key: "libs-local", Class: repo.Local})
+	if err := db.Repos().Create(ctx, libs); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256Hex("content")
+	put := func(key, name string) {
+		t.Helper()
+		if _, err := db.Items().Put(ctx, types.Item{
+			RepoKey: key, Name: name, Actual: types.Checksums{SHA256: sum},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for n := range store.MaxLimit {
+		put("gone", fmt.Sprintf("f%d.bin", n))
+	}
+	acc, err := accessFor(ctx, db, auth.Principal{Name: "admin", Admin: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := readsContent(ctx, db, acc, sum); ok || err != nil {
+		t.Fatalf("files of a deleted repository: %v %v", ok, err)
+	}
+	put("libs-local", "late.bin")
+	if ok, err := readsContent(ctx, db, acc, sum); !ok || err != nil {
+		t.Fatalf("a readable file on the second page: %v %v", ok, err)
+	}
+	for name, st := range map[string]store.Store{
+		"find": buildSearchFaults{Store: db, fail: "find"},
+		"repo": faultyStore{Store: db, fail: map[string]bool{"get": true}},
+	} {
+		if _, err := readsContent(ctx, st, acc, sum); !errors.Is(err, errBoom) {
+			t.Errorf("%s failing: %v", name, err)
+		}
+	}
 }
 
 func TestFoldersAndListing(t *testing.T) {

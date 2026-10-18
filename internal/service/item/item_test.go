@@ -319,6 +319,58 @@ func TestDeployByChecksum(t *testing.T) {
 	}
 }
 
+// TestDeployByChecksumReusable: the caller's right to the content decides,
+// once the content is found; a refusal is the same ErrNoBlob as a miss, so
+// it does not tell the caller the content exists.
+func TestDeployByChecksumReusable(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	c := sums("guarded content")
+	if _, err := w.deploy("first", "guarded content", types.Checksums{}); err != nil {
+		t.Fatal(err)
+	}
+	var asked []types.Blob
+	byChecksum := func(p string, ok bool, err error) (types.Item, error) {
+		return w.svc.DeployByChecksum(ctx, Deploy{
+			Target: Target{Repo: w.loc, Path: p}, Declared: types.Checksums{SHA1: c.SHA1},
+			Reusable: func(_ context.Context, b types.Blob) (bool, error) {
+				asked = append(asked, b)
+				return ok, err
+			},
+		})
+	}
+	if _, err := byChecksum("refused", false, nil); !errors.Is(err, ErrNoBlob) {
+		t.Fatalf("refused: %v", err)
+	}
+	_, err := w.db.Items().Get(ctx, w.loc.Key, false, "refused")
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a refused deploy stored an item: %v", err)
+	}
+	if _, err := byChecksum("failed", false, errBoom); !errors.Is(err, errBoom) ||
+		errors.Is(err, ErrNoBlob) {
+		t.Fatalf("a failing check is an error, not a miss: %v", err)
+	}
+	if it, err := byChecksum("allowed", true, nil); err != nil || it.Actual != c {
+		t.Fatalf("allowed: %+v %v", it, err)
+	}
+	if len(asked) != 3 || asked[0].Checksums != c {
+		t.Fatalf("asked about %+v", asked)
+	}
+	// A checksum that finds nothing never asks.
+	asked = nil
+	_, err = w.svc.DeployByChecksum(ctx, Deploy{
+		Target:   Target{Repo: w.loc, Path: "miss"},
+		Declared: types.Checksums{SHA1: strings.Repeat("1", 40)},
+		Reusable: func(context.Context, types.Blob) (bool, error) {
+			asked = append(asked, types.Blob{})
+			return true, nil
+		},
+	})
+	if !errors.Is(err, ErrNoBlob) || len(asked) != 0 {
+		t.Fatalf("a miss: %v, asked %d times", err, len(asked))
+	}
+}
+
 func TestDeployCommitted(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()

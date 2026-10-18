@@ -150,12 +150,24 @@ one such session; see [research 09](../09-jfrog-cli-compatibility.md#multipart-u
 
 ## Artifactory 7.x check
 
-The decision stands against 7.161.32. The audit of P1 to P7
+The decision stands against 7.161.32. A checksum deploy reuses stored content only when the
+caller can read an existing artifact with that checksum, and answers 404 otherwise, the same
+404 as for content the server lacks
+([deployartifactbychecksum](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md);
+[#379](https://github.com/weaveplatform/artifactweave/issues/379)). Content-addressed storage
+makes that check necessary: one blob serves every file with its checksum, so the blob is
+reused only through a file the caller may read. The checksum deploy that ends a multipart
+upload finds no such file, because the upload indexed the content with no item. The status
+poll's `checksumToken`, sent back as `X-Checksum-Deploy-Token` (**[S]** jfrog-client-go
+`upload.go`), stands in for it, for the user who made the upload and that content only. How
+7.x checks the token is not published (**[I]**). Artifactory 6.20 skips the read check for an
+administrator (`ChecksumDeployPermissionValidator.hasReadPermission`), which 7.x does not
+document (**[I]**). Here an administrator passes it as a reader of every file, so content
+that no file holds, such as a trashed file's, is uploaded again. The audit of P1 to P7
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found these differences
 in the deploy and checksum paths, which
 [research 02](../02-artifactory-core-api-inventory.md#artifactory-7x-check) lists with the
 rest of the storage API:
-- 7.x differs: a checksum deploy reuses content only when the caller can read an existing artifact with that checksum, and answers 404 otherwise ([deployartifactbychecksum](https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md)); fixed by [#379](https://github.com/weaveplatform/artifactweave/issues/379).
 - 7.x differs: a re-deploy whose declared checksum equals the stored file's needs no delete permission, unless `enforce.permission.check.on.identical.checksum.deploy=true` ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), 7.26.3, RTDEV-24969); fixed by [#400](https://github.com/weaveplatform/artifactweave/issues/400).
 - 7.x differs: under `client-checksums`, a `.sha1` or `.md5` file serves the client's checksum, and answers 404 while the client has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories)); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
 - 7.x differs: every deploy records the SHA-256 as an original checksum, including when the client sent none (**[KB]** the same article). Since [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) (RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not publish a checksum value"; fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).

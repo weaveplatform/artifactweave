@@ -162,6 +162,12 @@ func TestStoreAndBlobFailures(t *testing.T) {
 	if _, err := s.Status(ctx, token); !errors.Is(err, errBoom) {
 		t.Fatalf("status with a failing store: %v", err)
 	}
+	// A store failure is an error, not a token that fails to verify, so the
+	// checksum deploy answers 500 rather than a 404 that looks like a miss.
+	f.set("get", 1)
+	if _, err := s.Finished(ctx, token, "admin", ""); !errors.Is(err, errBoom) {
+		t.Fatalf("finished with a failing store: %v", err)
+	}
 	f.set("begin", 1)
 	if err := put(t, s, token, 1, data[:1<<20]); !errors.Is(err, errBoom) {
 		t.Fatalf("a part whose blob upload cannot begin: %v", err)

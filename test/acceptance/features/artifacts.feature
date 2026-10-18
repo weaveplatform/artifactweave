@@ -58,3 +58,42 @@ Feature: Deploy and download generic artifacts
     Then the command succeeds
     And the files "big.bin" and "out/big.bin" are identical
     And the server answered 206 to GET "/artifactory/generic-local/a/big.bin"
+
+  # A checksum deploy reuses stored content only for a caller that may read
+  # a file holding it (#379). The CLI takes the 404 as a miss and uploads.
+  @jf
+  Scenario: jf rt u uploads content the user may not read instead of reusing it
+    Given the JFrog CLI is available
+    And I PUT "/artifactory/api/repositories/hidden-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    And I PUT "/artifactory/api/security/users/deployer" as admin with body:
+      """
+      {"name": "deployer", "email": "deployer@example.com", "password": "Deployer-pass1"}
+      """
+    # A new user joins readers, which reads every repository.
+    And I PATCH "/access/api/v2/groups/readers/members" as admin with JSON:
+      """
+      {"remove": ["deployer"]}
+      """
+    And I POST "/access/api/v2/permissions" as admin with body:
+      """
+      {"name": "deployer-generic", "resources": {"artifact": {
+        "actions": {"users": {"deployer": ["READ", "WRITE"]}},
+        "targets": {"generic-local": {"include_patterns": ["**"], "exclude_patterns": []}}}}}
+      """
+    And a file "big.bin" of 65536 bytes
+    When I run jf "rt u {dir}/big.bin hidden-local/ --flat --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I run jf "rt u {dir}/big.bin generic-local/mine/ --flat --url {url} --user deployer --password Deployer-pass1"
+    Then the command succeeds
+    And the server answered 404 to PUT "/artifactory/generic-local/mine/big.bin"
+    And the server answered 201 to PUT "/artifactory/generic-local/mine/big.bin"
+    # Now a file the user may read holds the content, so the next one hits.
+    When I run jf "rt u {dir}/big.bin generic-local/again/ --flat --url {url} --user deployer --password Deployer-pass1"
+    Then the command succeeds
+    And the server answered 201 to PUT "/artifactory/generic-local/again/big.bin"
+    And the server never answered 404 to PUT "/artifactory/generic-local/again/big.bin"
+    When I GET "/artifactory/generic-local/mine/big.bin" as "deployer" with password "Deployer-pass1"
+    Then the response status is 200

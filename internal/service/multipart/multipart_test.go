@@ -122,7 +122,8 @@ func TestOutOfOrderRoundTrip(t *testing.T) {
 	}
 	st := wait(t, s, token)
 	id, _, _ := strings.Cut(token, ".")
-	if st.Status != multipart.StatusFinished || st.ChecksumToken != id || *st.Progress != 100 {
+	if st.Status != multipart.StatusFinished || !strings.HasPrefix(st.ChecksumToken, id+".") ||
+		*st.Progress != 100 {
 		t.Fatalf("status %+v", st)
 	}
 	b, err := w.db.Blobs().Find(ctx, types.Checksums{SHA1: sha1Of(data)})
@@ -187,6 +188,71 @@ func TestAuthentication(t *testing.T) {
 	}
 	if _, err := s.Status(ctx, "other.secret"); !errors.Is(err, multipart.ErrBadToken) {
 		t.Fatalf("other backend: %v", err)
+	}
+}
+
+// TestFinished: the checksum token the status poll hands out proves a
+// finished upload of one content by one caller, and nothing else.
+func TestFinished(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	s := w.service()
+	token, err := s.Create(ctx, "libs", "f.bin", 1, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := content(mib + 5)
+	if err := put(t, s, token, 1, data[:mib]); err != nil {
+		t.Fatal(err)
+	}
+	id, _, _ := strings.Cut(token, ".")
+	finished := func(tok, by, sum string) bool {
+		t.Helper()
+		ok, err := s.Finished(ctx, tok, by, sum)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return ok
+	}
+	// Before completion there is no checksum token to present; the upload
+	// id, which the part URLs carry, is not one.
+	if finished(id, "alice", "") || finished(id+".x", "alice", "") {
+		t.Fatal("an unfinished upload passes")
+	}
+	if err := put(t, s, token, 2, data[mib:]); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Complete(ctx, token, sha1Of(data)); err != nil {
+		t.Fatal(err)
+	}
+	st := wait(t, s, token)
+	b, err := w.db.Blobs().Find(ctx, types.Checksums{SHA1: sha1Of(data)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sum := b.Checksums.SHA256
+	if !finished(st.ChecksumToken, "alice", sum) {
+		t.Fatal("the uploader's checksum token does not pass")
+	}
+	for name, tc := range map[string]struct{ token, by, sum string }{
+		"another caller":    {st.ChecksumToken, "mallory", sum},
+		"other content":     {st.ChecksumToken, "alice", strings.Repeat("0", 64)},
+		"the upload id":     {id, "alice", sum},
+		"the upload token":  {token, "alice", sum},
+		"a forged token":    {id + "." + strings.Repeat("0", 64), "alice", sum},
+		"no upload id":      {"." + strings.Repeat("0", 64), "alice", sum},
+		"an unknown upload": {"missing.x", "alice", sum},
+	} {
+		if finished(tc.token, tc.by, tc.sum) {
+			t.Errorf("%s passes", name)
+		}
+	}
+	// Once the session is gone, so is its token.
+	if err := s.Abort(ctx, token); err != nil {
+		t.Fatal(err)
+	}
+	if finished(st.ChecksumToken, "alice", sum) {
+		t.Fatal("an aborted upload's checksum token passes")
 	}
 }
 

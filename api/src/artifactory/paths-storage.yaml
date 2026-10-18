@@ -980,7 +980,8 @@ components:
           description: Optional within this object. Share of the parts assembled, in percent.
           type: integer
         checksumToken:
-          description: Optional within this object. Token for the checksum deploy that follows a finished upload.
+          description: Optional within this object. Token for the checksum deploy that follows a finished upload,
+            sent as `X-Checksum-Deploy-Token`. It holds for the caller that made the upload and its content only.
           type: string
       type: object
     UpdatePropertiesRequest:
@@ -2942,8 +2943,9 @@ paths:
         two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose
         entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true`
         makes the extraction all-or-nothing). With `X-Checksum-Deploy: true` and a checksum header the server deploys
-        an existing binary with that checksum without a body, answering 201, or 404 when no readable binary matches
-        so the client uploads normally.'
+        an existing binary with that checksum without a body, answering 201. The caller must be able to read a file
+        with that checksum, or send in `X-Checksum-Deploy-Token` the `checksumToken` of its own finished multipart
+        upload of that content; otherwise, as when no binary matches, it answers 404 so the client uploads normally.'
       operationId: deployArtifact
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
@@ -3022,6 +3024,17 @@ paths:
         schema:
           description: 'Checksum whose algorithm is inferred from its length: 32 hex characters MD5, 40 SHA-1, 64
             SHA-256.'
+          type: string
+      - description: Optional header parameter. With `X-Checksum-Deploy`, the `checksumToken` that the status of the
+          caller's own finished multipart upload returned. It lets the caller deploy that upload's content by
+          checksum, which no file it can read holds yet.
+        in: header
+        name: X-Checksum-Deploy-Token
+        required: false
+        schema:
+          description: With `X-Checksum-Deploy`, the `checksumToken` that the status of the caller's own finished
+            multipart upload returned. It lets the caller deploy that upload's content by checksum, which no file it
+            can read holds yet.
           type: string
       requestBody:
         content:

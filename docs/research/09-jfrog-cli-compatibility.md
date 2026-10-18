@@ -99,6 +99,12 @@ uploads never use multipart, and files over 5 TiB don't either.
   upload survives a restart.
 - **Completion** runs in the background: append, commit checked against the SHA-1, then index
   the content with no references. The checksum deploy then adds the item's reference.
+- **The checksum token.** A checksum deploy reuses content only for a caller that can read a
+  file holding it (research 02, [#379](https://github.com/weaveplatform/artifactweave/issues/379)),
+  and no file holds a finished upload's content yet. So the `checksumToken` the status poll
+  returns stands in for that read: the upload id signed with the session's key, which passes
+  for the user who made the upload and its content only. The id alone is not enough, because
+  it travels in the part URLs, which carry no credentials.
 - **The token** stands in for Bearer access tokens until P4. The auth middleware passes the
   token-carrying routes and the part `PUT` through, and the multipart service verifies the
   token and the signature itself.
