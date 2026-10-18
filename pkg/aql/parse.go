@@ -500,17 +500,14 @@ func itemCriteria(v value) (value, error) {
 	return out, nil
 }
 
-// validate applies Artifactory's output rules (research 22 §1.2): sort,
-// offset and limit only with an include of item fields alone, sorting only
-// on fields in the output, and virtual_repos only beside repo, path and
-// name.
+// validate applies Artifactory's output rules (research 22 §1.2): sorting
+// only on fields in the output, and virtual_repos only beside repo, path and
+// name. Sort, offset and limit beside a property or statistic include are
+// not refused, because Artifactory accepts them and jf rt s --offset sends
+// .offset() beside "property" (its include drops "property" only for a sort
+// or a limit). They apply to the items (decision 0012, "Exploding
+// includes").
 func (q *Query) validate() error {
-	if (q.Sort != nil || q.HasOffset || q.HasLimit) && !q.primaryOnly() {
-		return fmt.Errorf(
-			"%w: sort, offset and limit need an include of item fields only",
-			ErrInvalid,
-		)
-	}
 	fields := q.Fields()
 	if q.Sort != nil {
 		for _, f := range q.Sort.Fields {

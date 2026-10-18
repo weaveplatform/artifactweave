@@ -210,7 +210,11 @@ var cliWant = map[string][]string{
 	"search_props_properties":  {jar, pom},
 	"search_root_offset_limit": {pom, readme},
 	"search_root_properties":   {jar, pom, util},
-	"download_exclusions":      {jar, util},
+	// jf rt s --offset 1 keeps "property" in the include. The offset skips
+	// the first item, the jar, although it has two properties: counting
+	// item-property rows, as Artifactory does, would skip only one of them.
+	"search_offset":       {pom, util, readme},
+	"download_exclusions": {jar, util},
 	// The CLI names a remote repository by its own key, never "-cache"; the
 	// key matches the remote's cache (decision 0012), reported as "-cache".
 	"download_remote":      {cached},
@@ -314,6 +318,25 @@ func Cases() []Case {
 		`items.find({"repo":"libs-local"}).include("property")`, jar, pom, util, readme)
 	q("key include filters items", `items.find().include("repo","path","name","@release")`,
 		jar, util)
+	// Sort, offset and limit beside a property or statistic include apply to
+	// the items (decision 0012). The two jars have two properties each, held
+	// inside one row each, so they neither shift the offset nor use up the
+	// limit, and the sort orders the items.
+	q("offset beside a property include counts items",
+		`items.find({"repo":"libs-local"}).include("property").offset(1)`, pom, util, readme)
+	q("limit beside a property include counts items",
+		`items.find({"repo":"libs-local"}).include("property").limit(2)`, jar, pom)
+	q("sort beside a property include orders items",
+		`items.find({"repo":"libs-local"}).include("name","created","property")`+
+			`.sort({"$desc":["created"]})`,
+		readme, util, pom, jar)
+	q("window beside a key include",
+		`items.find().include("repo","path","name","@release").sort({"$desc":["name"]}).limit(1)`,
+		util)
+	q("window beside a stat include",
+		`items.find({"repo":"libs-local"}).include("stat")`+
+			`.sort({"$asc":["size"]}).offset(1).limit(2)`,
+		pom, jar)
 	q("two key includes need both keys", `items.find().include("@release","@owner")`, util)
 	// $msp, research 22 §1.1: without it each criterion may be met by a
 	// different value of the key, with it by one value.

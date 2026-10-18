@@ -112,6 +112,9 @@ func (q *Query) Compile(d Dialect, o Options) (Compiled, error) {
 		}
 	}
 	c.b.WriteString(c.alias[""] + ".id ASC")
+	// The window counts the found rows alone. Properties and statistics are
+	// never joined here (the store loads them for the rows this returns), so
+	// an item with several properties is still one row to skip or count.
 	offset, limit := q.Window(o)
 	switch {
 	case limit >= 0:

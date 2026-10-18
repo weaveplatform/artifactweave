@@ -51,11 +51,10 @@ var (
 	ErrRestricted = errors.New("aql: restricted")
 	// ErrEmpty reports a request with no query at all.
 	ErrEmpty = errors.New("aql: empty query")
-	// ErrInvalid reports a query that parses but breaks an output rule:
-	// sort, offset or limit beside an include of another domain, a sort on
-	// a field the output leaves out, or virtual_repos without repo, path
-	// and name. It also reports a suffix the query's action does not take,
-	// and a properties.update without .keys() or .newValue().
+	// ErrInvalid reports a query that parses but breaks an output rule: a
+	// sort on a field the output leaves out, or virtual_repos without repo,
+	// path and name. It also reports a suffix the query's action does not
+	// take, and a properties.update without .keys() or .newValue().
 	ErrInvalid = errors.New("aql: invalid query")
 )
 
@@ -310,7 +309,10 @@ type Query struct {
 	// Sort is nil when the query does not sort.
 	Sort *Sort
 	// Offset and Limit are the suffixes; HasOffset and HasLimit tell
-	// .offset(0) and .limit(0) from none.
+	// .offset(0) and .limit(0) from none. Like Sort, they count result rows,
+	// which are items whatever the include: properties and statistics render
+	// inside their item's row, so they never add rows to skip or count.
+	// Artifactory counts its joined item-property rows instead (DV-074).
 	Offset    int
 	HasOffset bool
 	Limit     int
@@ -433,12 +435,6 @@ func (q *Query) Stats() []StatField {
 		}
 	}
 	return out
-}
-
-// primaryOnly reports whether the include names only item fields, the rule
-// sort, offset and limit need.
-func (q *Query) primaryOnly() bool {
-	return !q.Properties() && len(q.Stats()) == 0
 }
 
 // CheckRestricted applies decision 0012's rule for non-admin callers: every

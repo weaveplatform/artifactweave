@@ -118,6 +118,10 @@ Feature: JFrog CLI round trip
     # search_root_offset_limit
     When I run jf "rt s libs-local/* --sort-by name --offset 1 --limit 2 --url {url} --user admin --password {password}"
     Then the command succeeds
+    # search_offset: without --sort-by or --limit the include keeps
+    # "property", so .offset() sits beside it in one query.
+    When I run jf "rt s libs-local/* --offset 1 --url {url} --user admin --password {password}"
+    Then the command succeeds
     # download_exclusions: each pattern becomes an $or of negations, so the
     # pom alone stays behind.
     When I run jf "rt dl libs-local/org/acme* dl/ --exclusions *.pom --url {url} --user admin --password {password}"

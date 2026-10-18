@@ -496,6 +496,9 @@ func runOf(b *types.Build) types.Build {
 	}
 }
 
+// window applies q's offset and limit to the found rows. A row carries its
+// properties and statistics inside it, so the window skips and counts items
+// whatever the include, as the compiled LIMIT and OFFSET do.
 func window[T any](q *Query, o Options, out []T) []T {
 	offset, limit := q.Window(o)
 	out = out[min(offset, len(out)):]

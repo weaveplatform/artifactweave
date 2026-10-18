@@ -643,7 +643,7 @@ func TestSearchAQL(t *testing.T) {
 	}
 	// An output rule refused by the parser is a 400 too.
 	wantStatus(t, w.do("POST", "/artifactory/api/search/aql", "admin",
-		`items.find().include("property").limit(1)`), http.StatusBadRequest)
+		`items.find().include("name").sort({"$asc":["size"]})`), http.StatusBadRequest)
 
 	// Indented by default, as Artifactory answers; ?compact=true minifies,
 	// and stream: true changes nothing.
@@ -687,6 +687,57 @@ func aqlRows(
 		out[n] = fmt.Sprintf("%v/%v/%v", r["repo"], r["path"], r["name"])
 	}
 	return out, res.Range
+}
+
+// TestSearchAQLWindowBesideProperties: jf rt s --offset sends .offset()
+// beside "property", and the window counts items (decision 0012). x.jar is
+// skipped whole although it has two properties, a limit returns whole items
+// with all their properties, and a non-admin gets the same rows.
+func TestSearchAQLWindowBesideProperties(t *testing.T) {
+	w := newItemWorld(t, false)
+	for _, p := range []string{"a/x.jar;k=1;j=2", "a/y.jar;k=3", "z.jar"} {
+		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
+	}
+	const find = `items.find({"repo":"libs-local"}).include("repo","path","name","property")`
+	type kv struct{ Key, Value string }
+	run := func(user, query string) ([]string, [][]kv, map[string]any) {
+		t.Helper()
+		rec := w.do("POST", aqlURL, user, query)
+		var res struct {
+			Results []struct {
+				Repo, Path, Name string
+				Properties       []kv
+			}
+			Range map[string]any
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil || rec.Code != 200 {
+			t.Fatalf("%s as %s: %d %s", query, user, rec.Code, rec.Body)
+		}
+		var rows []string
+		var props [][]kv
+		for _, r := range res.Results {
+			rows = append(rows, r.Repo+"/"+r.Path+"/"+r.Name)
+			props = append(props, r.Properties)
+		}
+		return rows, props, res.Range
+	}
+	for _, user := range []string{"admin", "deployer"} {
+		rows, props, rng := run(user, find+`.offset(1)`)
+		if !slices.Equal(rows, []string{"libs-local/a/y.jar", "libs-local/./z.jar"}) ||
+			!slices.Equal(props[0], []kv{{"k", "3"}}) || props[1] != nil ||
+			rng["start_pos"] != float64(1) || rng["total"] != float64(2) {
+			t.Fatalf("offset as %s: %q %v %v", user, rows, props, rng)
+		}
+		rows, props, _ = run(user, find+`.limit(1)`)
+		if !slices.Equal(rows, []string{"libs-local/a/x.jar"}) ||
+			!slices.Equal(props[0], []kv{{"j", "2"}, {"k", "1"}}) {
+			t.Fatalf("limit as %s: %q %v", user, rows, props)
+		}
+		rows, _, _ = run(user, find+`.sort({"$desc":["name"]}).offset(1).limit(1)`)
+		if !slices.Equal(rows, []string{"libs-local/a/y.jar"}) {
+			t.Fatalf("sort as %s: %q", user, rows)
+		}
+	}
 }
 
 func TestSearchAQLAnonymous(t *testing.T) {

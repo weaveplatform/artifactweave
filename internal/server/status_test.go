@@ -298,6 +298,8 @@ func itemStatusRows() []statusCase {
 		upl    = "GET /artifactory/api/v1/uploads/config"
 		lib    = "/artifactory/libs-local"
 		q      = `items.find({"repo":"libs-local"}).include("repo","path","name")`
+		// What jf rt s --offset 1 sends: .offset() beside "property".
+		qOffset = `items.find({"repo":"libs-local"}).include("repo","path","name","property").offset(1)`
 	)
 	return []statusCase{
 		{put, lib + "/new/a.txt", "admin", "a", 201},
@@ -332,6 +334,8 @@ func itemStatusRows() []statusCase {
 
 		{aqlOp, "/artifactory/api/search/aql", "admin", q, 200},
 		{aqlOp, "/artifactory/api/search/aql", "user", q, 200},
+		{aqlOp, "/artifactory/api/search/aql", "admin", qOffset, 200},
+		{aqlOp, "/artifactory/api/search/aql", "user", qOffset, 200},
 		{aqlOp, "/artifactory/api/search/aql", "admin", "items.find(", 400},
 		{aqlOp, "/artifactory/api/search/aql", "anonymous", q, 403},
 		{aqlOp, "/artifactory/api/search/aql", "admin", "", 400},

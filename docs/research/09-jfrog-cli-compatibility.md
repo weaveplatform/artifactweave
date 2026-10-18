@@ -141,6 +141,10 @@ capture" with the server logging each query at debug level):
 - A command that prints or needs properties sends a second query that fetches them:
   `"$and":[<the first query's criteria>,{"$or":[{"@*":{"$match":"*"}}]}]`, including
   `property`.
+- Only `--sort-by` or `--limit` moves `property` into that second query
+  (`includePropertiesInAqlForSpec`). `--offset` alone keeps it in the include, so
+  `jf rt s --offset 1` sends one query with `.offset(1)` beside `property` (the
+  `search_offset` fixture), and so does `jf rt dl --offset 1`.
 - `--transitive` cannot be combined with `--sort-by`; jf refuses the spec.
 - Each `--exclusions` pattern adds its own `"$or"` key at the same level (keys repeat):
   `"$or":[{"path":{"$nmatch":"p"},"name":{"$nmatch":"n"}}]`, meaning "not both". So an

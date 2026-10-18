@@ -18,6 +18,7 @@ Each claim is labelled:
 |---|---|
 | **[D]** | documented by JFrog at the cited URL, read on 2026-10-15, or on 2026-10-18 for what the audit (#378) added |
 | **[S]** | seen in source code at the cited commit |
+| **[J]** | recorded in JFrog's public Jira at the cited issue; a user report alone stays on [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
 | **[I]** | inferred from the documented facts; not stated by any source |
 
 Sources:
@@ -94,6 +95,26 @@ Sources:
   (`aql-query-output`).
 - **[D] Sort, limit and offset** work only when the query has no include, or when the include
   names fields of the primary domain only. Sorting is only on fields in the output.
+  - **Beside another domain's fields they are accepted, not refused.** The page shows such a
+    query as an "Example where sorting is ignored", and says sort, limit and offset "will not
+    work" there. `.limit(N)` can return "fewer artifacts than N when one artifact has
+    several properties", so it counts the joined item-property rows
+    ([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md),
+    updated 2026-10-05).
+  - **[J] What a user saw on 7.21.7.** A sort beside an `@svc` include answered 200 with the
+    rows unsorted, and a comment reports `.limit(10)` beside `property` returning 2 items
+    ([RTFACT-26346](https://jfrog.atlassian.net/browse/RTFACT-26346), closed without a fix
+    version).
+  - **[D] Since 7.104.5** "AQL results are complete and not missing properties"
+    ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
+  - **[S] The JFrog CLI sends this shape.** jfrog-client-go drops `property` from the include
+    only for a sort or a limit, and then fetches properties in a second query
+    (`includePropertiesInAqlForSpec` in `aqlquerybuilder.go`, master `3b4b900d`). So
+    `jf rt s --offset N` and `jf rt dl --offset N` send `.offset(N)` beside `property`;
+    jf 2.126.0's query is the `search_offset` fixture in `pkg/aql/aqltest/testdata`.
+  - **[I] How `.offset(N)` counts** there: by joined rows, as `.limit(N)` does, and whether
+    an item cut by the window keeps all its properties since 7.104.5. No source says either
+    ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 - **[D] Limit and permissions.** `.limit(N)` reads N rows before permission filtering, so a
   non-admin may get fewer than N.
   - The `scan-factor` request header (7.133.0 and later) lets the search read beyond N, so a
@@ -433,6 +454,9 @@ artifactweave does for each.
 - **[I] An action without `.dryRun()`.** Every documented example names it, so no 7.x page
   shows the default. Artifactory 6.20 defaults to a dry run (§1.5), and only a dry run makes
   leaving it out harmless.
+- **[I] Offset beside a property include.** Whether `.offset(N)` counts joined
+  item-property rows, as `.limit(N)` does, and whether an item the window cuts keeps all its
+  properties since 7.104.5 (§1.2).
 - **[I] Out of P5.** The `releases` and `release_artifacts` domains depend on release
   bundles v1 (P15). `item.infos` needs a record of property modifications that the item store
   does not keep.
