@@ -65,14 +65,14 @@ func TestSubjectProperties(t *testing.T) {
 	got := layout.Properties(layout.Manifest{
 		MediaType: layout.MediaTypeOCIManifest, Digest: "abc", Subject: subject,
 		ArtifactType: "application/vnd.example.sig",
-	}, "app", "sig", nil)
+	}, "app", "sig", layout.Config{})
 	if !got.Has("oci.subject", digest("s")) ||
 		!got.Has("oci.artifactType", "application/vnd.example.sig") {
 		t.Fatal(got)
 	}
 	got = layout.Properties(layout.Manifest{
 		MediaType: layout.MediaTypeOCIIndex, Digest: "abc", Subject: subject,
-	}, "app", "list", nil)
+	}, "app", "list", layout.Config{})
 	if !got.Has("oci.subject", digest("s")) || len(got["oci.artifactType"]) != 0 {
 		t.Fatal(got)
 	}

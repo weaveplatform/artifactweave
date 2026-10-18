@@ -13,6 +13,7 @@ import (
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -94,7 +95,8 @@ func (w *world) platforms() []string {
 
 // An index or manifest list is stored by tag as list.manifest.json with
 // its properties, beside nothing: its platform manifests stay in their own
-// digest folders, where jf finds them (research 23, 5.1).
+// digest folders, where jf finds them (research 23, 5.1). Naming many
+// platforms, it carries no docker.os or docker.architecture.
 func TestPushIndex(t *testing.T) {
 	each(t, func(t *testing.T, w *world, _ func() store.Store) {
 		ps := w.platforms()
@@ -138,6 +140,61 @@ func TestPushIndex(t *testing.T) {
 			descriptorOf(layout.MediaTypeOCIIndex, inner) + `]}`
 		if err := w.pushAs(layout.MediaTypeOCIIndex, outer, sum(outer), "outer"); err != nil {
 			t.Fatal(err)
+		}
+	})
+}
+
+// Each platform manifest of a multi-architecture image carries its own
+// docker.os and docker.architecture, which a property search finds; the
+// config's variant goes into neither.
+func TestPlatformProperties(t *testing.T) {
+	each(t, func(t *testing.T, w *world, _ func() store.Store) {
+		w.upload(layerA)
+		var bodies []string
+		paths := map[string]string{}
+		for arch, config := range map[string]string{
+			"amd64": `{"architecture":"amd64","os":"linux"}`,
+			"arm64": `{"architecture":"arm64","os":"linux","variant":"v8"}`,
+		} {
+			w.upload(config)
+			body, digest := manifestWith(config, layerA)
+			if err := w.push(body, digest, layout.DigestFolder(digest)); err != nil {
+				t.Fatal(err)
+			}
+			bodies = append(bodies, body)
+			paths[arch] = "app/" + layout.DigestFolder(digest) + "/" + layout.ManifestFile
+		}
+		list, listDigest := indexOf(layout.MediaTypeOCIIndex, bodies...)
+		if err := w.pushAs(layout.MediaTypeOCIIndex, list, listDigest, "v1"); err != nil {
+			t.Fatal(err)
+		}
+		for arch, p := range paths {
+			got := w.properties(p)
+			if diff := cmp.Diff(types.Properties{
+				layout.OSProperty: {"linux"}, layout.ArchitectureProperty: {arch},
+			}, types.Properties{
+				layout.OSProperty:           got[layout.OSProperty],
+				layout.ArchitectureProperty: got[layout.ArchitectureProperty],
+			}); diff != "" {
+				t.Errorf("%s: %s", arch, diff)
+			}
+		}
+		q := aql.Query{Criteria: aql.And{
+			aql.RepoSet{Refs: []aql.RepoRef{{Key: "docker-local"}}},
+			&aql.PropertyCriterion{
+				Part: aql.PartPair, Key: layout.ArchitectureProperty, Op: aql.OpEq, Value: "arm64",
+			},
+		}}
+		hits, err := w.db.Items().Search(context.Background(), &q, aql.Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var found []string
+		for _, h := range hits {
+			found = append(found, h.Item.FullPath())
+		}
+		if diff := cmp.Diff([]string{paths["arm64"]}, found); diff != "" {
+			t.Fatal(diff)
 		}
 	})
 }
