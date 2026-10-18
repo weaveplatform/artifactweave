@@ -53,7 +53,11 @@ serves the same permission through the Access v2, v2 and v1 permission APIs.
 
 The providers do not accept a password. Give them an access token, either:
 - **minted by an administrator**, with `POST /access/api/v1/tokens` or `jf atc`, scoped to
-  `applied-permissions/admin` for configuration that manages users and permissions; or
+  `applied-permissions/admin` for configuration that manages users and permissions. That
+  call takes the administrator's password only once `token.allow_basic_auth` is on
+  ([configuration reference](../../docs/operations/configuration-reference.md)). While it
+  is off, the legacy `POST /artifactory/api/security/token` takes the password and returns
+  the first token; or
 - **exchanged in CI** through OIDC token exchange
   ([decision 0005](../../docs/research/decisions/0005-authentication-and-tokens.md),
   [research 21](../../docs/research/21-oidc-token-exchange.md)). A pipeline presents its

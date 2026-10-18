@@ -30,7 +30,12 @@ func formAs(headers map[string]string) map[string]string {
 	return out
 }
 
-// mintAdmin creates a token through the Access API as admin.
+// allowBasicTokens turns token.allow_basic_auth on, for a fixture whose
+// tests mint their tokens with the admin's password.
+func allowBasicTokens(c *Config) { c.AllowBasicAuthTokens = true }
+
+// mintAdmin creates a token through the Access API as admin, with the
+// admin's password: the fixture needs allowBasicTokens.
 func mintAdmin(t *testing.T, h http.Handler, body string) map[string]any {
 	t.Helper()
 	rec := do(t, h, http.MethodPost, "/access/api/v1/tokens", jsonAs(basic("admin", "pw")), body)
@@ -44,7 +49,7 @@ func mintAdmin(t *testing.T, h http.Handler, body string) map[string]any {
 // create answers 200 with token_id, the id reads back, revocation answers
 // 200, and the read then answers 404 so the resource leaves state.
 func TestScopedTokenLifecycle(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	created := mintAdmin(t, h, `{"username":"svc","scope":"applied-permissions/user",`+
 		`"expires_in":86400,"description":"terraform","include_reference_token":true,"project_key":""}`)
 	id, _ := created["token_id"].(string)
@@ -90,7 +95,7 @@ func TestScopedTokenLifecycle(t *testing.T) {
 // shorter than the revocable threshold, so the list leaves them out, while
 // a forced-revocable one of the same lifetime is listed.
 func TestTokenListOmitsNonRevocable(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	short := mintAdmin(t, h, `{"expires_in":600}`)
 	forced := mintAdmin(t, h, `{"expires_in":600,"force_revocable":true}`)
 	rec := do(t, h, http.MethodGet, "/access/api/v1/tokens", basic("admin", "pw"), "")
@@ -150,7 +155,7 @@ func TestLegacyTokenListAndRevokeAdminOnly(t *testing.T) {
 // the refresh token, and revokes the token it replaces; revocation by value
 // answers the id and the token stops working.
 func TestTokenRefreshAndRevokeByValue(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	first := mintAdmin(t, h, `{"refreshable":true,"expires_in":86400}`)
 	access, _ := first["access_token"].(string)
 	if rec := do(
@@ -207,10 +212,54 @@ func TestTokenRefreshAndRevokeByValue(t *testing.T) {
 	}
 }
 
+// TestAccessTokenWithPassword: a password creates no token through the
+// Access API until token.allow_basic_auth is on (#385), and is answered as
+// Access answers Basic credentials it does not take. A token, even sent as
+// the Basic password, and the legacy route are not affected, and neither is
+// a refresh, whose credential is its refresh token.
+func TestAccessTokenWithPassword(t *testing.T) {
+	const legacy = "/artifactory/api/security/token"
+	off := statusFixture(t, false)
+	create := func(h http.Handler, hdr map[string]string, body string) *httptest.ResponseRecorder {
+		return do(t, h, http.MethodPost, "/access/api/v1/tokens", jsonAs(hdr), body)
+	}
+	password := basic("user", "pw")
+	for _, user := range []string{"admin", "user"} {
+		rec := create(off, basic(user, "pw"), `{}`)
+		if rec.Code != http.StatusUnauthorized ||
+			!strings.Contains(rec.Body.String(), "Unsupported authentication method Basic") {
+			t.Fatalf("%s's password: %d %s", user, rec.Code, rec.Body)
+		}
+	}
+	rec := do(t, off, http.MethodPost, legacy, formAs(password), "username=user&refreshable=true")
+	if rec.Code != http.StatusOK {
+		t.Fatalf("the legacy route with a password: %d %s", rec.Code, rec.Body)
+	}
+	issued := decodeObject(t, rec.Body.String())
+	access, _ := issued["access_token"].(string)
+	refresh, _ := issued["refresh_token"].(string)
+	for name, headers := range map[string]map[string]string{
+		"Bearer":             bearerAuth(access),
+		"the Basic password": basic("user", access),
+	} {
+		if rec := create(off, headers, `{}`); rec.Code != http.StatusOK {
+			t.Fatalf("a token as %s: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+	grant := `{"grant_type":"refresh_token","refresh_token":"` + refresh + `"}`
+	if rec := create(off, password, grant); rec.Code != http.StatusOK {
+		t.Fatalf("a refresh beside a password: %d %s", rec.Code, rec.Body)
+	}
+	on := statusFixture(t, false, allowBasicTokens)
+	if rec := create(on, password, `{}`); rec.Code != http.StatusOK {
+		t.Fatalf("a password with token.allow_basic_auth on: %d %s", rec.Code, rec.Body)
+	}
+}
+
 // TestTokenCreateRules: the JFrog CLI's form body is accepted; a token whose
 // scope is narrower than its user's identity cannot mint a broader one.
 func TestTokenCreateRules(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	rec := do(t, h, http.MethodPost, "/access/api/v1/tokens", formAs(basic("user", "pw")),
 		"scope=applied-permissions/user&expires_in=3600")
 	if rec.Code != http.StatusOK {
@@ -249,7 +298,7 @@ func TestTokenCreateRules(t *testing.T) {
 // TestDefaultExpiryApplies: the default set through the API is what a token
 // created without expires_in gets.
 func TestDefaultExpiryApplies(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	rec := do(
 		t,
 		h,
@@ -570,7 +619,7 @@ func TestLegacyMemberOfAllGroupsIsTheUser(t *testing.T) {
 // string; a scope no token has lists nothing, and no parameter lists every
 // token. A token issued with a reference token is listed like any other.
 func TestTokenListScopeFilter(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	mint := func(body string) string {
 		t.Helper()
 		id, _ := mintAdmin(t, h, body)["token_id"].(string)

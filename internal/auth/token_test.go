@@ -101,7 +101,7 @@ func TestTokenPrincipal(t *testing.T) {
 		}
 		if err != nil || p.Name != want.Name || p.Admin != want.Admin ||
 			!slices.Equal(p.Groups, want.Groups) || p.Scope.String() != v[raw].Scope.String() ||
-			p.Access() == nil {
+			p.Access() == nil || p.Password {
 			t.Errorf("%s: %+v, %v; want %+v", raw, p, err, want)
 		}
 	}
@@ -110,9 +110,10 @@ func TestTokenPrincipal(t *testing.T) {
 			t.Errorf("%s: %v", raw, err)
 		}
 	}
-	// A Basic user name must be the token's subject.
-	if _, err := a.Token(ctx, "dev-user", "dev"); err != nil {
-		t.Fatal(err)
+	// A Basic user name must be the token's subject, and a token sent as
+	// the Basic password is still a token, not a password.
+	if p, err := a.Token(ctx, "dev-user", "dev"); err != nil || p.Password {
+		t.Fatalf("dev's token as a Basic password: %+v, %v", p, err)
 	}
 	if _, err := a.Token(ctx, "dev-user", "root"); !errors.Is(err, ErrBadCredentials) {
 		t.Fatalf("another user's token: %v", err)

@@ -415,8 +415,9 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
 `make terraform TERRAFORM_MODE=apply` adds the full run, which the `terraform` CI job runs:
 1. Build and start one `-cover` binary, writing its coverage to `cover/terraform`.
 2. Mint an admin access token with the bootstrap admin's password
-   (`POST /access/api/v1/tokens`). The providers authenticate only with a Bearer token.
-   Set `TERRAFORM_ACCESS_TOKEN` to supply one instead.
+   (`POST /access/api/v1/tokens`), which the server takes because step 1 starts it with
+   `ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true`. The providers authenticate only with a Bearer
+   token. Set `TERRAFORM_ACCESS_TOKEN` to supply one instead.
 3. Apply each scenario with its own steps:
    - **repositories:** apply the repository with properties on the repository itself,
      deploy `fixture.txt`, then apply its properties;

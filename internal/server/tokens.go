@@ -90,6 +90,15 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 	if err != nil {
 		return token.Issued{}, fmt.Errorf("tokens: %w", err)
 	}
+	// Only the Access route honours token.allow_basic_auth. The legacy route
+	// is Artifactory's own, which in 7.x authenticates the caller itself and
+	// asks Access for the token as a service: jf c add with a password swaps
+	// it for a token there (jfrog-cli-core utils/config/tokenrefresh.go), and
+	// jf rt atc with a password still works where jf atc cannot (jfrog-cli
+	// issue 2547). Refusing it too would break every such configuration.
+	if p.Password && !m.legacy && !t.cfg.AllowBasicAuthTokens {
+		return token.Issued{}, errBasicTokenCreation
+	}
 	if narrowedToken(p) {
 		return token.Issued{}, apierror.New(http.StatusForbidden,
 			"A token with a narrowed scope cannot create tokens")
@@ -202,6 +211,15 @@ func (t tokenAPI) refresh(
 
 var errRefreshOtherUser = apierror.New(http.StatusForbidden,
 	"The authenticated user must match the user of the access token being refreshed")
+
+// errBasicTokenCreation answers a password sent to the Access token API
+// while token.allow_basic_auth is off. The message is the one Access gives
+// Basic credentials it does not accept, with the error code UNAUTHORIZED
+// (JFrog KB, "What causes the error message 'Unsupported authentication
+// method Basic' to appear when using a REST API?"); that this switch answers
+// with it, and with 401, is inferred and listed on #216.
+var errBasicTokenCreation = apierror.New(http.StatusUnauthorized,
+	"Unsupported authentication method Basic")
 
 // narrowedToken reports whether p presented a token whose scope is narrower
 // than its user's identity. Such a token must not mint a broader credential,

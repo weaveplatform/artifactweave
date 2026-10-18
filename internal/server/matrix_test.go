@@ -221,6 +221,16 @@ func wholeIdentity(p matrixPrincipal) int {
 	return signedIn(p)
 }
 
+// accessMinter: wholeIdentity through a token. A password creates no token
+// through the Access token API while token.allow_basic_auth is off, its
+// default, which the fixture keeps (#385); the legacy route takes one.
+func accessMinter(p matrixPrincipal) int {
+	if !p.token && !p.anonymous {
+		return http.StatusUnauthorized
+	}
+	return wholeIdentity(p)
+}
+
 // passwordLogin: a caller signed in with a password; the encrypted password
 // stands for one, which a token does not prove (400).
 func passwordLogin(p matrixPrincipal) int {
@@ -801,7 +811,7 @@ func tokenMatrix() []matrixRow {
 		legacy = "/artifactory/api/security/token"
 	)
 	return []matrixRow{
-		at("POST "+tokens, `{}`, wholeIdentity, 200),
+		at("POST "+tokens, `{}`, accessMinter, 200),
 		at("GET "+tokens, "", signedIn, 200),
 		at("DELETE "+tokens+"/revoke", `{"token":"{token}"}`, administrators, 200),
 		row("GET "+tokens+"/{tokenId}", tokens+"/t-{p}", "", signedIn, 200),

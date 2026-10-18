@@ -494,7 +494,7 @@ func TestPermissionBodies(t *testing.T) {
 // writes none, and may not read one section, which is admin only (#382); a
 // group-scoped token loses the MANAGE its user holds directly.
 func TestPermissionTokenScopes(t *testing.T) {
-	h := statusFixture(t, false)
+	h := statusFixture(t, false, allowBasicTokens)
 	token := func(scope string) map[string]string {
 		created := mintAdmin(t, h, `{"username":"user","scope":"`+scope+`"}`)
 		s, _ := created["access_token"].(string)

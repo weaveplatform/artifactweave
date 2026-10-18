@@ -33,8 +33,10 @@ type statusCase struct {
 	// as is who calls: "" without credentials (anonymous access off),
 	// "anonymous" without credentials (anonymous access on), "admin",
 	// "user" (a user in no group, so the seeded permissions grant nothing),
-	// "expired" (an expired, refreshable access token of admin's, as a
-	// Bearer token) or "forged" (that token with its signature altered).
+	// "admin-token" and "user-token" (an identity token of admin's or
+	// user's, as a Bearer token), "expired" (an expired, refreshable access
+	// token of admin's, as a Bearer token) or "forged" (that token with its
+	// signature altered).
 	// A body names the fixture's other token values as {name}
 	// (statusSecrets).
 	as   string
@@ -469,6 +471,22 @@ func TestStatusTable(t *testing.T) {
 		pairs = append(pairs, "{"+name+"}", v)
 	}
 	fill := strings.NewReplacer(pairs...)
+	// The fixture keeps token.allow_basic_auth off, its default, so the
+	// Access token API takes no password; these come from the legacy route,
+	// which does.
+	live := map[string]string{}
+	for _, u := range []string{"admin", "user"} {
+		rec := do(t, off, http.MethodPost, "/artifactory/api/security/token",
+			map[string]string{
+				"Authorization": basic(u, "pw")["Authorization"],
+				"Content-Type":  "application/x-www-form-urlencoded",
+			}, "username="+u)
+		tok, _ := decodeObject(t, rec.Body.String())["access_token"].(string)
+		if rec.Code != http.StatusOK || tok == "" {
+			t.Fatalf("%s's token: %d %s", u, rec.Code, rec.Body)
+		}
+		live[u+"-token"] = tok
+	}
 	for _, c := range statusTable() {
 		h, headers := off, map[string]string(nil)
 		switch c.as {
@@ -476,6 +494,8 @@ func TestStatusTable(t *testing.T) {
 			h = on
 		case "admin", "user":
 			headers = basic(c.as, "pw")
+		case "admin-token", "user-token":
+			headers = bearerAuth(live[c.as])
 		case "expired":
 			headers = bearerAuth(secrets["expired-access"])
 		case "forged":

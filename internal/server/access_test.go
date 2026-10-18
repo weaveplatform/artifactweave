@@ -87,7 +87,8 @@ func accessWorld(t *testing.T) (http.Handler, *token.Service) {
 	}
 	return New(Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		Tokens: tokens,
+		// TestAdminThroughGroup mints tokens with passwords.
+		Tokens: tokens, AllowBasicAuthTokens: true,
 	}), tokens
 }
 

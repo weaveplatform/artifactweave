@@ -47,6 +47,11 @@ type Principal struct {
 	// PasswordExpired marks a principal whose correct password has expired.
 	// The middleware lets it through only to change its own password.
 	PasswordExpired bool
+	// Password marks a principal that a user name and password
+	// authenticated, which the Access token API refuses while
+	// token.allow_basic_auth is off (#385). An empty TokenID cannot stand
+	// for it: anonymous and hand-built principals have none either.
+	Password bool
 	// token marks a principal authenticated by an access token, whose Scope
 	// applies even when it is empty.
 	token bool
