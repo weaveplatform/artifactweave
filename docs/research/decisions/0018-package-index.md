@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 24 section 6](../24-package-format-handlers.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 Many features need "package X, version Y, files [...]" rather than a path tree: cleanup
@@ -60,6 +62,15 @@ rebuilt keeps the item tree authoritative.
 **Alternatives considered:**
 - *Computing versions on demand from paths*: quadratic for large repositories and wrong
   for formats whose version is inside metadata (npm, NuGet).
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32. The package index is artifactweave's own design, and no
+7.x page or note describes Artifactory's internal one. The 7.x notes in this area cover npm and
+Maven indexing performance and the following:
+- **Docker download statistics.** [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) can share download statistics across tags of
+  one digest (an opt-in setting). This touches the version download statistics here
+  (`pkgindex.RecordDownload`). It is an input for when Docker adopts that setting.
 
 ## Constraints
 

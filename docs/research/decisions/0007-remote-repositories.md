@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 03](../03-repository-configuration-model.md#artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 A remote repository proxies an upstream registry and caches what it fetches. Artifactory
@@ -59,6 +61,18 @@ or hides the `-cache` name.
 - *A real `<repo>-cache` repository row*: leaks into listings and lets clients create or
   mutate it.
 - *A separate cache store*: duplicates the item model and breaks AQL over cached items.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32 as a plan for P9. The 7.x notes add inputs for P9:
+- **Zap.** Zapping a remote cache needs Manage or Delete ([7.104.12](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-710412-self-managed)), as artifactweave's
+  `api/zap` already checks.
+- **Remote folder listing** is off by default ([7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)).
+- **Go and npm.** Go remotes serve only through a virtual repository (go-modules), and npm
+  audit is on by default for npm remotes that support it (7.124.0).
+- **Offline detection.** The "assumed offline" state was fixed repeatedly
+  ([7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed), SaaS 7.174.0).
+- **Version tokens** resolve in remote caches ([research 27 section 13](../27-maven.md#13-artifactory-7x-check)).
 
 ## Constraints
 

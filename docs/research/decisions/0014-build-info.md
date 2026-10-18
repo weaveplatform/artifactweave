@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 The JFrog CLI's canonical CI loop uploads with `--build-name` and `--build-number`, then
@@ -155,6 +157,17 @@ pipeline that stops on the error assumes.
 - *Storing build-info only as items:* build queries would need JSON parsing per query.
 - *A unique key of project, name and number:* rejects a second run of the same number,
   which Artifactory accepts and the CLI expects.
+
+## Artifactory 7.x check
+
+7.x changes four points this decision does not yet follow
+([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check)); [#353](https://github.com/weaveplatform/artifactweave/issues/353)
+brings them in and amends this record:
+- A publish with duplicate entries fails by default, unless
+  `artifactory.build.block.duplicate.entries` is false (7.90.15).
+- Promotion promotes every dependency, even those that share a checksum (7.125.4).
+- Entries that name a folder are ignored (7.161.15).
+- A failed build-info search by artifact answers 400 (7.161.15).
 
 ## Constraints
 

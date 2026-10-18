@@ -2,6 +2,8 @@
 
 Research baseline: **2026-10-16**.
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#12-artifactory-7x-check) records it.
+
 Phase P6 serves Docker and OCI images from local `docker`, `oci` and `helmoci` repositories.
 [Research 04](04-package-protocols.md) sketched the protocol, [research 17](17-undocumented-shapes.md)
 resolved the token challenge, and decisions [0003](decisions/0003-repository-model.md),
@@ -432,3 +434,40 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
 | jfrog-cli-artifactory | `4a0f3827cfa0` |
 | jfrog-client-go | `0646d7b50f9a` |
 | Docker Engine deprecations | `docker/cli` `docs/deprecated.md`, 2026-10-16 |
+
+## 12. Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. This report was already written from the 7.x pages ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+[additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md), [oci-repositories](https://docs.jfrog.com/artifactory/docs/oci-repositories.md), [listdockertags](https://docs.jfrog.com/artifactory/reference/listdockertags.md),
+[listdockerrepositories](https://docs.jfrog.com/artifactory/reference/listdockerrepositories.md), [findparentmanifestlists](https://docs.jfrog.com/artifactory/reference/findparentmanifestlists.md)), read again on 2026-10-17.
+
+**Confirmed for 7.x:**
+- Enforce Strict Tag Overwrite: a configuration setting from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), on by default and
+  to become permanent at the end of 2026 (DV-035).
+- Complete list-manifest overwrite, now a Package Settings option ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)).
+- The referrers API from 7.90.1, and filtered tag lists.
+- `parentManifests` "since 7.119.0", needing Read on the repository.
+- Shared layers kept when a promotion overwrites a tag ([7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)).
+- A publisher without Delete may not overwrite layer information (CVE-2026-68754, fixed in
+  [7.161.16](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716116-self-managed)): decision 0031 asks Deploy and Delete to replace a tag.
+
+**Changed or added in 7.x:**
+- **`docker.os` and `docker.architecture`.** From [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed) these properties are set on a
+  pushed or cached `manifest.json`. artifactweave does not set them yet: [#352](https://github.com/weaveplatform/artifactweave/issues/352).
+- **Referrers need Read.** From [7.161.16](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716116-self-managed) (SaaS 7.164.0) the referrers API answers 403
+  to a caller without Read on the subject image. Decision 0031 already requires Read on
+  `<name>/` and answers `DENIED` 403.
+- **Digest mismatches.** [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed) added a flag, off by default, that blocks a blob
+  upload whose digest does not match its SHA-256. Without it Artifactory accepts the
+  mismatch. artifactweave always refuses one with `DIGEST_INVALID`, as the distribution
+  specification requires (DV-061).
+- **Tag download statistics.** Optional download statistics shared across tags of one digest
+  ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
+- **`library/` in tag lists.** Tag lists with or without `library/` for official images
+  ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)); that concerns remote caches of Docker Hub (P9).
+- **Range uploads.** A fix to the start offset of range uploads ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)).
+
+**Unconfirmed for 7.x:** the **[I]** items of section 10 stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216). The **[S]** claims
+here come from the JFrog CLI and the Docker and OCI sources, not from 6.20.

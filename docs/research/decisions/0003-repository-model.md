@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 03](../03-repository-configuration-model.md#artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 Artifactory's repository is the unit everything else hangs off: a key, a class (`rclass`:
@@ -137,6 +139,17 @@ infrastructure, so it is the one a single static binary must own.
 - *`/v2/_catalog` empty or refused, as Artifactory's per-repository catalog suggests*: the
   registry-wide catalog is what `crane catalog <host>` asks for, and prefixing each name
   with its key gives references that pull.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32
+([research 03](../03-repository-configuration-model.md#artifactory-7x-check)). 7.x adds:
+- **Signing key pairs** (`primaryKeyPairRef`, `secondaryKeyPairRef`) that also sign npm
+  packages.
+- **Default layouts** that `pkg/layout` lacks, Cargo and npm Test ([#354](https://github.com/weaveplatform/artifactweave/issues/354)).
+- **npm "Enforce strict layout",** whose REST field is not documented (DV-041).
+- **`includesPattern`** defaults to everything when a create request omits it (7.117.5), as
+  here.
 
 ## Constraints
 

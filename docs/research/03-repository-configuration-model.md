@@ -1,5 +1,7 @@
 # Repository configuration model
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#artifactory-7x-check) records it.
+
 Research baseline: 2026-10-12. This document describes the repository configuration JSON
 that `PUT`, `POST` and `GET /artifactory/api/repositories/{key}` exchange, and its YAML
 descriptor twin. It is the contract behind `pkg/repo` and behind every
@@ -147,7 +149,7 @@ What the bundled layouts do not describe, shown by real paths in
 | `priorityResolution` | `false` | |
 | `downloadRedirect` | `false` | |
 | `cdnRedirect` | `false` | JFrog Cloud Enterprise+ only. |
-| `primaryKeyPairRef`, `secondaryKeyPairRef` | | Signing key pairs (Helm, Debian, Terraform providers). |
+| `primaryKeyPairRef`, `secondaryKeyPairRef` | | Signing key pairs (Helm, Debian, Terraform providers, and npm's ECDSA package signing, [research 25](25-npm.md#5-storage-layout-and-properties)). |
 | `signedUrlTtl`, `xrayDataTtl` | | Read-only in responses. |
 
 ## Local fields
@@ -323,3 +325,37 @@ virtualRepositories:
 | go | | `vcsGitProvider`, `vcsGitDownloadUrl`, `missedRetrievalCachePeriodSecs` 600 | `externalDependenciesEnabled`, `externalDependenciesPatterns` |
 | helm | `forceMetadataNameVersion`, `forceNonDuplicateChart` | `chartsBaseUrl`, `externalDependenciesEnabled`, `externalDependenciesPatterns` | `virtualRetrievalCachePeriodSecs`, `useNamespaces` |
 | terraform | `terraformType` | `terraformRegistryUrl`, `terraformProvidersUrl` | |
+
+## Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The pages read again are [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md), [remote-repositories](https://docs.jfrog.com/artifactory/docs/remote-repositories.md),
+[virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories.md), [repository-layouts](https://docs.jfrog.com/artifactory/docs/repository-layouts.md), [createrepository](https://docs.jfrog.com/artifactory/reference/createrepository.md) and
+[getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md).
+
+**Confirmed for 7.x:**
+- `includesPattern` defaults to everything when a create request leaves it out. An empty
+  string was stored instead until [7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed) (RTDEV-55298).
+- `listRemoteFolderItems` defaults to `false`: remote folder listing has been off by default
+  since [7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed).
+- The Maven settings and their defaults ([research 27 section 13](27-maven.md#13-artifactory-7x-check)).
+- `primaryKeyPairRef` and `secondaryKeyPairRef` in the create and get definitions.
+
+**Changed or added in 7.x:**
+- **Signing key pairs** also sign npm packages (ECDSA), as the row above now says.
+- **Bundled layouts.** The 7.x layout page lists Cargo and npm Test among the default
+  layouts, and `pkg/layout/bundled.go` has neither: [#354](https://github.com/weaveplatform/artifactweave/issues/354).
+- **npm strict layout.** "Enforce strict layout" is an npm setting on the Basic tab, but no
+  repository JSON field for it is documented (DV-041,
+  [research 25 section 6](25-npm.md#6-strict-layout)).
+- **Global excludes.** `artifactory.repo.includeExclude.globalExcludes` ([7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)) adds
+  system-wide exclude patterns. artifactweave has no equivalent, and no client sets it.
+- **Repository API changes** that research 02 covers: filters on Get All Repository
+  Configurations ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and batch updates ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
+
+**Unconfirmed for 7.x:**
+- The bundled layouts copied from the 6.20 descriptor ("Bundled definitions"): 7.x publishes
+  only their names, so their patterns stay as 6.20 had them, on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- 6.20's default for `snapshotVersionBehavior` and `suppressPomConsistencyChecks`, which the
+  table notes.

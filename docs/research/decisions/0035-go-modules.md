@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 26 section 8](../26-go-modules.md#8-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 The go command fetches modules through the GOPROXY protocol, and `jf go-publish` deploys
@@ -218,6 +220,15 @@ the [deviations register](../../implementation/deviations.md).
   command checks every zip it extracts (R26 1.3).
 - *The Artifactory JSON error envelope*: the go command would print only the status.
 - *Copying Artifactory's `go-default` pattern*: it matches nothing.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32. The 7.x Go notes concern remote repositories and VCS
+providers (P9), and the current documentation confirms what the decision takes from it:
+- publishing through `jf gp`;
+- resolution from local and virtual repositories only;
+- the sumdb properties
+([research 26 section 8](../26-go-modules.md#8-artifactory-7x-check)).
 
 ## Constraints
 

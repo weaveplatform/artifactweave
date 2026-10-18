@@ -2,6 +2,8 @@
 
 Research baseline: **2026-10-13**.
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#artifactory-7x-check) records it.
+
 JFrog's published definitions leave some request and response shapes untyped, and some
 wire details are only visible on a live instance. This report records what public
 sources show for each: JFrog's open-source SDK and CLIs, the Terraform providers, JFrog's
@@ -475,3 +477,33 @@ Captures still worth taking on a live instance, in priority order:
 4. `GET /event/api/v1/troubleshooting?start=0&count=1` for the timestamp unit.
 5. The cleanup runs view with no paging parameters, and a policy read with
    `checkRepoAvailability=true`.
+
+## Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation.
+
+**Confirmed for 7.x:**
+- **Base-URL headers.** 7.x still honours both base-URL override headers:
+  - [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed) fixed `X-JFrog-Override-Base-URL` being ignored during `npm install` from a
+    virtual repository;
+  - [7.133.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-713310-self-managed) (RTDEV-73702) fixed npm virtual metadata ignoring
+    `X-Artifactory-Override-Base-Url`.
+
+  Their order of precedence is still 6.20's (DV-037) and stays on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- **Locks from 7.161.** The locks operations are served from 7.161, as section 4 says.
+- **PyPI JSON index.** The PyPI Simple JSON index is opt-in through `Accept` (self-managed
+  [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed)).
+- **Federation.** Its auto-healing retries failed binary tasks ([7.98.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)), and the replay
+  and delete failed binary tasks operations are in the current reference. That agrees with
+  the binary-task fields of section 4.
+- **Distribution v1.** Its Replicator is deprecated from 7.84.10 ([deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations)).
+  Distribution itself continues as section 5 describes.
+
+**Unconfirmed for 7.x:**
+- the base-URL precedence and the matrix-parameter key decoding (section 3);
+- the LDAP group shape, which come from the 6.20 source;
+- every item marked Guess or Likely above.
+
+They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216).

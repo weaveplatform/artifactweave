@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 Docker, `crane`, `oras`, `cosign` and Helm's OCI support speak the OCI Distribution
@@ -284,6 +286,19 @@ a `referrers.json` (DV-036).
   the same question in the transaction that stores the manifest.
 - *A separate table for finished uploads*: `_uploads/` items reuse the item tree and match
   what Artifactory shows; `jf` already excludes the folder from its searches.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32
+([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check)), with two
+additions:
+- **`docker.os` and `docker.architecture`** go on each image manifest, as 7.x sets them from
+  7.125.4 ([#352](https://github.com/weaveplatform/artifactweave/issues/352)).
+- **A digest mismatch is always refused,** where 7.x accepts it unless an administrator sets
+  the flag added in 7.111.4 (DV-061).
+
+The referrers hardening of 7.161.16 (403 without Read on the subject) matches the permission
+table above.
 
 ## Constraints
 

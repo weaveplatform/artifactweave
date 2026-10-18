@@ -2,6 +2,8 @@
 
 Research baseline: **2026-10-16**.
 
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [section 13](#13-artifactory-7x-check) records the check.
+
 Phase P7 serves Maven local repositories, and Gradle, Ivy and SBT repositories through the
 same handler with their own layouts. [Research 03](03-repository-configuration-model.md)
 holds the repository fields and the layout patterns, and
@@ -74,7 +76,9 @@ Sources:
 
 Artifactory 6.20 is the last open-source release. Where 7.x may differ, and where no source
 shows the behaviour, the claim is **[I]** and is on the live-comparison list for P19
-([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+([#216](https://github.com/weaveplatform/artifactweave/issues/216)). Section 13 checks the claims against
+the 7.x documentation and release notes; an **[S]** claim it does not confirm is unconfirmed
+for 7.x and stays on that list.
 
 ## 1. Layouts and coordinates
 
@@ -270,6 +274,9 @@ For a folder with POMs exactly two levels below it, found by an AQL query on dep
 Maven defines `latest` and `release` as the last version *added* (3.1); Artifactory takes the
 highest in version order, whatever the upload order.
 
+- **[D] 7.x** rewrites the artifact level, `<latest>` included, on each deployment: [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)
+  ([SaaS 7.123.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71230-saas), RTDEV-59252) fixed `<latest>` not being updated "upon deployment".
+
 ### 3.5 Plugin level
 
 - **[S]** A POM with `<packaging>maven-plugin</packaging>` gets the property
@@ -376,6 +383,15 @@ highest in version order, whatever the upload order.
 
   At the research baseline artifactweave set `false` for every type (`pkg/repo/defaults.go`,
   `localDefaults` and `remoteDefaults`); #278 sets the provider's per-type defaults.
+- **[D] 7.x parsing.** A POM that starts with an empty line or holds UTF-8 non-breaking
+  spaces is accepted: refusing it with 409 was a bug fixed in [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed) (RTDEV-62985,
+  [SaaS 7.124.1](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71241-saas)). An ISO-8859-1 POM is accepted on upload and copy ([SaaS 7.110.5](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71105-saas),
+  RTDEV-56287), so the parser honours the XML declaration's encoding.
+- **[D] 7.x status.** That bug report shows a POM the check cannot read answered with 409,
+  which settles section 11 item 7.
+- **[D] 7.x logging.** [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) logs a POM path mismatch as a warning instead of an
+  error, "while still reporting incorrect POM metadata"; the deployment is still refused
+  ([local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md)).
 
 ## 7. maxUniqueSnapshots
 
@@ -397,6 +413,15 @@ highest in version order, whatever the upload order.
 - **[S]** The cleanup applies to any layout, not only Maven's, and nothing in it sets a
   floor: a limit of 1 keeps one build. Research 04 reports "the effective minimum is 2"
   from JFrog's knowledge base, which a plain fetch cannot read; that is on #216.
+- **[D] 7.x.** A blank limit keeps every build ([local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md)). Setting it back to
+  0 turns the cleanup off: [SaaS 7.164.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71640-saas) (RTDEV-93991) fixed a reset to 0 that deleted
+  "queued snapshots" instead, which also shows that 7.x queues the cleanup.
+- **[D] 7.x.** [7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed) synchronises `deploymentDate` across federation members because it
+  matters to the Max Unique Snapshots policy; whether 7.x orders builds by deployment date
+  rather than by creation is **[I]**.
+- **[D] 7.x.** A known issue (RTDEV-45622, from 7.35.4, [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues)) records that the
+  limit can be set on npm repositories and deletes artifacts there: the cleanup is not
+  confined to the Maven group, as in 6.20.
 
 ## 8. Version tokens
 
@@ -430,6 +455,7 @@ highest in version order, whatever the upload order.
 - **[I]** The alphabetical order for other layouts is older than 6.20, whose code used the
   Mercury order and creation dates instead; artifactweave follows the 7.x documentation
   (decision 0036), and #216 asks which a live 7.x does.
+- **[D]** The same page says latest version resolution needs Artifactory Pro.
 
 ## 9. calculateMetadata and generatePom
 
@@ -457,6 +483,9 @@ highest in version order, whatever the upload order.
   acknowledgement naming the folder", and `generateMavenPomFile` as writing a POM "deriving
   the coordinates from the repository layout" without the jar's own POM
   (`api/src/artifactory/paths-packagetypes.yaml`); both operations answer 501 today.
+- **[D] 7.x** documents 401, 403 "Permission Denied" and 500 for both operations
+  ([calculatemavenmetadata](https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md), [generatemavenpomfile](https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md)), so 7.x checks a permission
+  it does not name, where 6.20 checked none (DV-052).
 
 ## 10. Corrections to research 03 and 04
 
@@ -487,10 +516,9 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
    the 300 s interval and 60 s quiet period still apply (section 7).
 6. The default `suppressPomConsistencyChecks` of a Gradle, Ivy or SBT repository created over
    REST without the field (section 6).
-7. The status 7.x answers for a POM consistency failure on deploy (409 per the provider's
-   description).
-8. Who may call `calculateMetadata` on 7.x: any authenticated user, as in 6.20, or a
-   permission on the path (section 9).
+7. Settled by the 7.x check: a POM check failure answers 409 (section 6).
+8. Which permission `calculateMetadata` needs on 7.x; 7.x documents a 403, so not every
+   authenticated user may call it (section 9).
 9. `generatePom` on 7.x: the permission it needs, its answer when the POM exists, when the jar
    is missing or has no embedded POM, and for a repository that is not Maven (section 9).
 10. Whether 7.x writes plugin-level metadata with the 6.20 rules, and whether a calculation of
@@ -498,13 +526,15 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
 11. The status `calculateMetadata` answers for a remote or virtual repository on 7.x (404 in
     6.20).
 12. The `[INTEGRATION]` token in a repository with the Maven layout: ignored, as in 6.20
-    (section 8).
+    (section 8). The 7.x documentation names only `SNAPSHOT` and `[RELEASE]` for Maven.
 13. The order of `[RELEASE]` and `[INTEGRATION]` outside the Maven layout on 7.x:
     alphabetical, as documented, or Mercury order and creation date, as 6.20's code did
     (section 8).
 14. Whether 7.x still resolves `-SNAPSHOT` and Maven `[RELEASE]` with 6.20's rules: Mercury
     order of base and file revision, the last modified build under `deployer`, the caller's
     view of the folder, and the candidate whose path holds the request first (section 8).
+15. What 7.x answers for a path that mixes `[RELEASE]` and `[INTEGRATION]` (section 8).
+16. Whether 7.x orders `maxUniqueSnapshots` builds by deployment date (section 7).
 
 ## 12. Versions at the research baseline
 
@@ -517,3 +547,43 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
 | Maven repository metadata model | Maven 3.10.0 reference, 2026-10-16 |
 | Maven Resolver configuration | read 2026-10-16 |
 | Gradle | 6.0 release notes |
+
+## 13. Artifactory 7.x check
+
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
+**Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The Maven pages read are [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md), [maven-repositories](https://docs.jfrog.com/artifactory/docs/maven-repositories.md),
+[repository-layouts](https://docs.jfrog.com/artifactory/docs/repository-layouts.md), [retrieveartifact](https://docs.jfrog.com/artifactory/reference/retrieveartifact.md), [calculatemavenmetadata](https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md) and
+[generatemavenpomfile](https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md).
+
+**Confirmed for 7.x:**
+- The three snapshot behaviours, and no metadata under `deployer` (2.1).
+- The two checksum policies and their 404 and 409 (section 4).
+- `handleReleases`, `handleSnapshots` and the POM consistency refusal (sections 5 and 6), now
+  with its status, 409 (7.125.4).
+- `<latest>` rewritten on each deployment (3.4, 7.125.4).
+- `maxUniqueSnapshots`: blank or 0 keeps every build, and the cleanup also runs outside the
+  Maven group (section 7).
+- The version tokens and `searchLatestReleaseByDateCreated` (section 8).
+
+**Changed or added in 7.x:**
+- POM parsing tolerates a leading empty line, non-breaking spaces and ISO-8859-1 (section 6;
+  posted on [#278](https://github.com/weaveplatform/artifactweave/issues/278)).
+- Tokens resolve in remote caches and virtual repositories too, cannot be mixed, and need
+  both integration revisions in the layout (section 8; posted on [#281](https://github.com/weaveplatform/artifactweave/issues/281)).
+- `calculateMetadata` and `generatePom` answer 403 without the right permission (section 9;
+  DV-052 amended).
+- A reset of `maxUniqueSnapshots` to 0 turns the cleanup off, and the cleanup is queued
+  (section 7).
+
+**Unconfirmed for 7.x:** every other **[S]** claim, which the 6.20 source alone supports:
+- the snapshot adapters and build numbering (2.2, 2.3);
+- when and how metadata is calculated (3.2 to 3.7);
+- the checksum upload statuses (section 4);
+- the snapshot policy message (section 5);
+- the POM check's rules and the defaults table (section 6);
+- the cleanup schedule (section 7);
+- token tie-breaks (section 8);
+- the 6.20 behaviour of `calculateMetadata` (section 9).
+
+They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added.

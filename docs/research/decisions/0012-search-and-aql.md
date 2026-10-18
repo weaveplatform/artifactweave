@@ -2,6 +2,8 @@
 
 Status: Proposed
 
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+
 ## Context
 
 Artifactory Query Language is how the JFrog CLI resolves every file specification
@@ -336,6 +338,15 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
   version coexist.
 - *Build artifacts search allowing anonymous callers, and answering 200 with no results:*
   what JFrog's page implies, but not what Artifactory's handler does.
+
+## Artifactory 7.x check
+
+The decision stands against 7.161.32
+([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check)). Its limits,
+statuses and `scan-factor` come from the 7.x pages. The pattern rule for non-admins
+matches 7.146.7, which made AQL honour repository include and exclude patterns "so AQL
+results align with ... other search methods". The handlers this decision read from 6.20
+(References) remain unconfirmed for 7.x.
 
 ## Constraints
 
