@@ -459,7 +459,7 @@ reference and the CLI.
   ([permissions](https://docs.jfrog.com/administration/docs/permissions)), and artifactweave
   seeds both that way. Decision
   [0006](0006-authorization-native-permission-model.md#seeded-permissions-383) records what
-  the seed grants and how a store seeded earlier is brought up to it.
+  the seed grants.
 
 **OIDC token exchange** ([research 21](../21-oidc-token-exchange.md#3-matching-and-the-token-issued)
 section 3 describes each point, from
