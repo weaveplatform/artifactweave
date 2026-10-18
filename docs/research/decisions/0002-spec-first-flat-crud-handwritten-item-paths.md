@@ -2,7 +2,8 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
+2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -21,10 +22,12 @@ return 204, a folder PUT returns 201.
 
 ## Decision
 
-**Three specs, strict servers for the flat families only.** `api/artifactory.openapi.yaml`,
-`api/access.openapi.yaml` and `api/event.openapi.yaml` (OpenAPI 3.0.3) generate
-oapi-codegen v2.8 strict chi servers into `internal/server/gen/{artifactory,access,event}`
-and Go clients into `pkg/client/{artifactory,access,event}`. The strict servers cover the
+**Seven specs, strict servers for the flat families only.** One OpenAPI 3.0.3 spec per
+service, bundled from `api/src/<service>/`: `api/artifactory.openapi.yaml`,
+`api/access.openapi.yaml` and `api/event.openapi.yaml`, and since P1b
+`api/distribution.openapi.yaml`, `api/pfed.openapi.yaml`, `api/grid.openapi.yaml` and
+`api/worker.openapi.yaml`. Each generates an oapi-codegen v2.8 strict chi server into
+`internal/server/gen/<service>` and a Go client into `pkg/client/<service>`. The strict servers cover the
 families whose operations have single-segment parameters and one response shape:
 repositories, the legacy security shims, Access v2 users, groups and permissions, tokens,
 roles, environments, projects, webhooks, cleanup policies and system.
@@ -45,18 +48,32 @@ configuration PATCH.
 taken from the JFrog docs and from the JFrog CLI and Terraform provider sources. Handlers
 take their codes from that table, not from convention.
 
-**Error envelopes.** One table in `internal/server/errors`, keyed by surface:
+**Error envelopes.** One table in `internal/server/apierror`, keyed by surface:
 
 | Surface | Envelope |
 |---|---|
 | Artifactory REST | `{"errors":[{"status":<int>,"message":"<string>"}]}` |
 | Access, Projects | `{"errors":[{"code":"<string>","message":"<string>"}]}` |
+| Event (`/event/`), Workers (`/worker/`) | as Access; JFrog documents no Workers error body |
+| Distribution (`/distribution/`) | `{"status_code":<int>,"message":"<string>","errors":[{"status":<int>,"message":"<string>"}]}`, with `detail` when set |
+| Cold-storage retention, import and export (`/api/retention/`, `/api/import/`, `/api/export/`, `/api/artifactexport/`) | the Artifactory envelope plus top-level `error` and `message` |
+| Platform federation and Grid (`/pfed/`, `/grid/`) | `{"code":"<CODE>","message":"<string>"}`; Grid adds `details` |
 | OCI `/v2/` | `{"errors":[{"code","message","detail"}]}` with the OCI spec codes |
 | Xray (stub) | `{"error":"<string>"}` |
 | npm | `{"error":"<string>"}` |
 | Terraform registry | `{"errors":["<string>"]}` |
 | Go proxy, PyPI | plain text |
 | NuGet | text or XML as the NuGet client expects |
+
+Two rows differ from 7.x:
+- 7.x differs: the `/pfed` envelope carries `code` as the integer HTTP status; only `/grid`
+  uses a string `code`
+  ([Add Follower JPD](https://docs.jfrog.com/administration/reference/addfollowerjpd.md),
+  `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
+- 7.x differs: on import and export, `error` is the "simple error message (legacy format)"
+  beside `errors[]`, with no top-level `message`
+  ([Export Repository with Metadata](https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md));
+  fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
 
 **Base URL resolver.** Embedded absolute URLs (npm `dist.tarball`, Helm `urls`, NuGet
 `@id`, Terraform `download_url`, Docker `Location` and `WWW-Authenticate` realm,

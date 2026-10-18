@@ -2,7 +2,8 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
+2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -95,9 +96,12 @@ Alternatives considered:
   fixture rather than the parity test.
 - Converters must reproduce the per-endpoint quirks exactly; a boolean that Artifactory
   returns as `"true"` must be returned as `"true"`.
-- The oracle leaves several shapes untyped (free-form objects) and has no build-info
-  blocks; those entities are modelled from the research and must be captured against a
-  live Artifactory before their phase closes.
+- The oracle leaves several shapes untyped (free-form objects); those entities are
+  modelled from the research and must be captured against a live Artifactory before their
+  phase closes. Build-info is no longer among them: the oracle has fetched the Builds API
+  family, whose `uploadbuild` block types the `BuildInfo` document, since
+  [#194](https://github.com/weaveplatform/artifactweave/pull/194)
+  ([research 22](../22-aql-searches-build-info.md#32-the-document)).
 - Adding a wire field is a change to the domain type, the converter and the spec together.
 
 ## Verification

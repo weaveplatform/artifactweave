@@ -1,6 +1,7 @@
 # 10: Scope and tiers
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on
+2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 Which JFrog product APIs artifactweave implements, shims, stubs or ignores, which error
 envelope each surface uses, and what the known clients do when they hit a stub. The
@@ -107,6 +108,24 @@ implemented since P4b. What 7.x changed in the products the table lists:
 
 Whether any client in scope calls these services is **[I]**, so they get no tier until a
 client needs one.
+
+**Envelopes and legacy endpoints.** The audit of 2026-10-18
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found three places where
+7.x answers differently from the tables above:
+- 7.x differs: the `/pfed` error envelope carries `code` as the integer HTTP status, on all
+  10 `/pfed` operations; only `/grid` uses a string `code`
+  ([Add Follower JPD](https://docs.jfrog.com/administration/reference/addfollowerjpd.md),
+  `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
+- 7.x differs: on `/api/import` and `/api/export`, `error` is the "simple error message
+  (legacy format)" beside `errors[]`, with no top-level `message`
+  ([Export Repository with Metadata](https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md),
+  `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
+- 7.x differs: 7.x still serves three legacy security endpoints that artifactweave does not
+  route (404): `POST /api/security/users/authorization/expirePassword/{userName}`,
+  `.../changePassword` and `.../expirePasswordForAllUsers`. They are deprecated, the first
+  two from 7.49.3, and "archived here until being decommissioned"
+  ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md));
+  fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
 
 
 Recorded with their reasons in [12-open-questions.md](12-open-questions.md):

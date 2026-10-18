@@ -1,8 +1,11 @@
 // Package apierror renders errors in the envelope each client surface expects.
 // Artifactory, Access, the OCI distribution API, Xray, npm and the Terraform
-// registry all use different JSON shapes, and clients parse them (jfrog-client-go
-// reads errors[].message, Docker clients read errors[].code), so one table here
-// is the only place a shape is defined. See decision record 0002.
+// registry all use different JSON shapes, and clients read them differently:
+// jfrog-client-go prints the whole body after the status (only its release
+// bundle import reads errors[0].message, and its Xray scan reads error), the
+// Terraform providers join every errors[] entry, and Docker clients read
+// errors[].code. One table here is the only place a shape is defined. See
+// decision record 0002.
 package apierror
 
 import (

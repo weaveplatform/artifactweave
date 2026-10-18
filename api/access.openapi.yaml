@@ -6734,7 +6734,8 @@ components:
       properties:
         errors:
           type: array
-          description: Required within this object. One entry per error; clients read the first.
+          description: >-
+            Required within this object. One entry per error. The Terraform providers join every entry into one error message; jfrog-client-go reports the whole body after the status.
           items:
             type: object
             required: [code, message]

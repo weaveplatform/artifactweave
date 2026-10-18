@@ -265,7 +265,7 @@ type CustomWebhookHandlerUpdateMethod string
 
 // ErrorResponse The error envelope used by every /event response.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error; clients read the first.
+	// Errors Required within this object. One entry per error. The Terraform providers join every entry into one error message; jfrog-client-go reports the whole body after the status.
 	Errors []struct {
 		// Code Required within this object. A symbolic code such as NOT_FOUND.
 		Code string `json:"code"`
