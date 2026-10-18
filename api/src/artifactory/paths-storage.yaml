@@ -2791,9 +2791,14 @@ paths:
         or a virtual repository with a default deployment repository, otherwise 405. A path ending in `/` with an
         empty body creates a folder. Matrix parameters `;key=value` on the last path segment become properties.
         Checksums declared in `X-Checksum-*` headers are recorded as original checksums and verified against the
-        stored bytes; a mismatch is rejected with 409. Responds 201 with the created item. Deploying over an existing
-        path replaces the content unless the repository forbids overwrites. The same route carries two variants
-        selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose
+        stored bytes; a mismatch is rejected with 409. Responds 201 with the created item, at the path it was stored
+        at: in a local Maven, Gradle, Ivy or SBT repository with the `maven-2-default` layout, a snapshot file is
+        renamed as the repository''s `snapshotVersionBehavior` says, so `unique` stores `app-1.0-SNAPSHOT.jar` as
+        `app-1.0-<yyyyMMdd.HHmmss>-<buildNumber>.jar`. Deploying over an existing path replaces the content unless
+        the repository forbids overwrites; replacing needs delete permission at the stored path. A `.md5`, `.sha1`,
+        `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that
+        checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries
+        two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose
         entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true`
         makes the extraction all-or-nothing). With `X-Checksum-Deploy: true` and a checksum header the server deploys
         an existing binary with that checksum without a body, answering 201, or 404 when no readable binary matches
@@ -2910,7 +2915,13 @@ paths:
             application/vnd.org.jfrog.artifactory.storage.ItemCreated+json:
               schema:
                 $ref: '#/components/schemas/ItemCreated'
-          description: The item was stored.
+          description: The item was stored, or a checksum file's value was recorded on its file.
+          headers:
+            Location:
+              description: Set for a checksum file only. The URL of the file the checksum was recorded on, which in a
+                Maven repository may be a unique snapshot build the request did not name.
+              schema:
+                type: string
         '400':
           content:
             application/json:

@@ -307,14 +307,14 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 			CanOverwrite: acc.file(c, req.path, types.ActionDelete),
 		})
 	case strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true"):
-		it, err = svc.DeployByChecksum(ctx, s.deployRequest(r, t, req, p))
+		it, err = svc.DeployByChecksum(ctx, s.fileDeploy(r, t, req, p, acc))
 	default:
 		if artifact, alg, ok := item.Sidecar(req.path); ok &&
 			(svc.OwnsSidecars(c) || s.isFile(ctx, st, c, artifact)) {
 			s.recordChecksum(w, r, svc, item.Target{Repo: c, Path: artifact}, alg)
 			return
 		}
-		it, err = svc.Deploy(ctx, s.deployRequest(r, t, req, p))
+		it, err = svc.Deploy(ctx, s.fileDeploy(r, t, req, p, acc))
 	}
 	if answered(w, err) {
 		return
@@ -352,6 +352,21 @@ func (artifactoryService) deployRequest(
 	}
 }
 
+// fileDeploy is the deploy of one file. The format may store it under
+// another name (Maven's unique snapshots), and replacing a file there needs
+// the right to delete it, as at the path sent.
+func (s artifactoryService) fileDeploy(
+	r *http.Request,
+	t item.Target,
+	req itemRequest,
+	p auth.Principal,
+	acc access,
+) item.Deploy {
+	d := s.deployRequest(r, t, req, p)
+	d.CanOverwritePath = func(full string) bool { return acc.file(t.Repo, full, types.ActionDelete) }
+	return d
+}
+
 func (artifactoryService) isFile(
 	ctx context.Context,
 	st store.Store,
@@ -379,7 +394,7 @@ func (s artifactoryService) recordChecksum(
 	}
 	// Sidecars may carry "<hex>  <file name>" as sha1sum writes them.
 	value, _, _ := strings.Cut(strings.TrimSpace(string(b)), " ")
-	_, err = svc.RecordSidecar(r.Context(), t, alg, value, r.ContentLength)
+	it, err := svc.RecordSidecar(r.Context(), t, alg, value, r.ContentLength)
 	if answered(w, err) {
 		return
 	}
@@ -387,6 +402,10 @@ func (s artifactoryService) recordChecksum(
 		writeErr(w, r, s.itemError(r.Context(), "record checksum", err))
 		return
 	}
+	// The file the checksum was recorded on, which a format may have named
+	// differently from the sidecar (UploadServiceUtils
+	// .sendUploadedChecksumResponse in 6.20).
+	w.Header().Set("Location", downloadURI(r.Context(), it.ReportedRepoKey(), it.FullPath()))
 	w.WriteHeader(http.StatusCreated)
 }
 

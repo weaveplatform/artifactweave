@@ -95,6 +95,17 @@ func (w *metaWorld) deploy(p string, props types.Properties, body ...string) {
 	}
 }
 
+// deployAs deploys p as the repository would under another snapshot
+// behaviour, which names it as that behaviour does, then goes back to its
+// own.
+func (w *metaWorld) deployAs(b repo.SnapshotVersionBehavior, p string) {
+	w.t.Helper()
+	own := w.c.SnapshotVersionBehavior
+	w.c.SnapshotVersionBehavior = b
+	defer func() { w.c.SnapshotVersionBehavior = own }()
+	w.deploy(p, nil)
+}
+
 func (w *metaWorld) delete(p string) {
 	w.t.Helper()
 	if _, err := w.items.Delete(w.ctx, item.Target{Repo: w.c, Path: p}, "deployer"); err != nil {
@@ -237,12 +248,14 @@ func TestSnapshotMetadata(t *testing.T) {
 	b1, b2 := "app-1.0-beta-20261017.090000-1", "app-1.0-beta-20261017.100000-2"
 	for _, p := range []string{
 		b1 + ".pom", b1 + ".jar", b1 + "-sources.jar",
-		b2 + ".jar", b2 + ".pom",
-		// Neither is a unique build.
-		"app-1.0-beta-SNAPSHOT-tests.jar", "notes.txt",
+		b2 + ".jar", b2 + ".pom", "notes.txt",
 	} {
 		w.deploy(dir+p, nil)
 	}
+	// Neither notes.txt nor a -SNAPSHOT file is a unique build. Under
+	// unique a -SNAPSHOT name is stored only from before the behaviour
+	// changed: deployer keeps the name as sent.
+	w.deployAs(repo.Deployer, dir+"app-1.0-beta-SNAPSHOT-tests.jar")
 	body, _, ok := w.get(dir + "maven-metadata.xml")
 	if !ok {
 		t.Fatal("no snapshot metadata")
@@ -264,7 +277,7 @@ func TestSnapshotMetadataBuilds(t *testing.T) {
 	golden(t, "snapshot-nonunique.xml", body)
 
 	w = newMetaWorld(t, nil)
-	w.deploy("com/acme/app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.pom", nil)
+	w.deployAs(repo.NonUnique, "com/acme/app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.pom")
 	body, _, _ = w.get("com/acme/app/1.0-SNAPSHOT/maven-metadata.xml")
 	if !strings.Contains(body, "    <snapshot/>\n") || strings.Contains(body, "snapshotVersions") {
 		t.Errorf("%s", body)

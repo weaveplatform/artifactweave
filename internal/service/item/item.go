@@ -96,6 +96,12 @@ type Deploy struct {
 	// an npm version's tarball. The check is made in the write's
 	// transaction, after the content is stored.
 	IfAbsent bool
+	// CanOverwritePath, when set, is the caller's right to replace the file
+	// at a full path. It is asked about the path the format admits, which a
+	// format may rename (Maven's unique snapshots), so a caller's check of
+	// the path it sent does not cover it; ErrOverwriteDenied when it says
+	// no.
+	CanOverwritePath func(fullPath string) bool
 }
 
 // ParseChecksums checks declared checksums: lowercase hex of the length of
@@ -369,6 +375,8 @@ func (s *Service) writeFile(
 		return types.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
 	case err == nil && old.Folder:
 		return types.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
+	case err == nil && d.CanOverwritePath != nil && !d.CanOverwritePath(full):
+		return types.Item{}, fmt.Errorf("%w: %s", ErrOverwriteDenied, full)
 	case err == nil:
 		it.Created, it.CreatedBy = old.Created, old.CreatedBy
 	case !errors.Is(err, store.ErrNotFound):

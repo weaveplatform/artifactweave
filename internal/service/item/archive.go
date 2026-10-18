@@ -41,8 +41,8 @@ var (
 // corrupt format, an entry escaping its folder, or limits exceeded (400).
 var ErrBadArchive = archive.ErrUnusable
 
-// ErrOverwriteDenied is an explode that would replace existing files the
-// caller may not delete (403).
+// ErrOverwriteDenied is a deploy or an explode that would replace existing
+// files the caller may not delete (403).
 var ErrOverwriteDenied = errors.New("item: no permission to overwrite")
 
 // errFound ends an archive walk once the wanted entry is served.
@@ -121,6 +121,8 @@ func (s *Service) Explode(ctx context.Context, d Explode) (types.Item, error) {
 	write := func(ctx context.Context, fl explodeFile) error {
 		e := d.Deploy
 		e.Path = fl.path
+		// The plan checked each entry's own path; a format may rename it.
+		e.CanOverwritePath = func(string) bool { return d.CanOverwrite }
 		_, err := s.putFile(
 			ctx,
 			fl.env,

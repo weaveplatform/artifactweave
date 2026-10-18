@@ -42,20 +42,27 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   it between the blacked-out check and the patterns, as Artifactory does; a download checks
   it in `Resolve`, after `generic.CheckDownload`, so a path the patterns also refuse answers
   their 404 rather than 409.
-- **Unique snapshots.** A `-SNAPSHOT` file name becomes
-  `<baseRev>-<yyyyMMdd.HHmmss>-<buildNumber>` in UTC, and the response reports the stored
-  path. The build number is assigned at upload from the package index, never from metadata
-  and never by waiting on the queue:
-  - with a `build.timestamp` matrix parameter, the build that already has that timestamp, or
-    else the next number;
+- **Unique snapshots** (amended 2026-10-18, #280). In a local repository, a `-SNAPSHOT` file
+  of its folder's version becomes `<baseRev>-<yyyyMMdd.HHmmss>-<buildNumber>` in UTC, on a
+  deploy, a checksum deploy and an archive entry alike. The response reports the stored path.
+  The build number is assigned at upload from the snapshot folder's unique files, read in the
+  upload's own transaction, never from metadata and never by waiting on the queue:
+  - with a `build.timestamp` matrix parameter (milliseconds since the epoch), the build that
+    already has that timestamp, or else the next number; a value that is not a number is
+    ignored;
+  - a checksum upload: the newest build of its own file (the sidecars below);
   - otherwise Artifactory's rules (research 27 section 2.2): a main artifact takes the next
-    number; a classifier artifact or a POM's sidecar takes the current one; a POM takes the
-    current one when its main artifact arrived first;
-  - "current" is the highest build number the index holds for the version, and the timestamp
-    is that build's, or now for a new build.
-  A name that is already unique is stored as sent.
-- **Non-unique and deployer.** Non-unique renames a unique name back to `-SNAPSHOT`; deployer
-  stores what is sent.
+    number; a classifier artifact takes the current one; a POM takes the current one unless
+    that build already has a POM, as when its main artifact arrived first;
+  - "current" is the highest build number of any unique file in the folder (DV-063), and the
+    timestamp is that build's, or now for a new build.
+
+  A name that is already unique, a release, metadata and any file the layout does not read
+  as a snapshot of its folder's version are stored as sent. Replacing a file at the stored
+  path needs Delete there, as at the path sent.
+- **Non-unique and deployer.** Non-unique renames a unique build of the folder's version back
+  to `-SNAPSHOT`, sidecars included, so each build replaces the last; deployer stores what is
+  sent.
 - **POM checks.** `Inspect` parses the POM; `Admit` applies Artifactory's rules (research 27
   section 6) and refuses with 409 and its message unless `suppressPomConsistencyChecks` is
   set. A copy or move of a POM is checked against the target and refused with 400. A POM
@@ -86,8 +93,11 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
 - **Sidecars.** `.md5`, `.sha1`, `.sha256` and `.sha512` uploads are checked under
   `checksumPolicyType` (decision 0032, #296) with Artifactory's answers: 409 for a body over
   1024 bytes, 409 "Checksum error for ..." for a mismatch under `client-checksums`, 201
-  otherwise, and 404 when the target file does not exist. Under `unique`, a `-SNAPSHOT`
-  sidecar applies to the newest matching unique build.
+  otherwise, and 404 when the target file does not exist. A 201 names the file the checksum
+  was recorded on in `Location`, in every repository, as Artifactory's
+  `sendUploadedChecksumResponse` does. Under `unique`, a `-SNAPSHOT` sidecar applies to the
+  newest unique build whose name, with `-SNAPSHOT` for its build, is the sidecar's file; with
+  none it answers 404 naming the path sent (DV-064).
 
 **Derived work, through the work queue** (as agreed, decisions 0032 and 0033):
 - **Kinds.** Three, each keyed by repository:
@@ -178,10 +188,15 @@ acceptance, and Gradle's run does not gate M2 (decision
 
 ## Rationale
 
-- **Build numbers from the index.** Artifactory reads the next build number from the
-  snapshot folder's metadata, which is why it must recalculate that metadata synchronously on
-  every unique upload. Reading the index, which the upload's own transaction keeps current,
-  lets every metadata level go through the queue.
+- **Build numbers from the folder's files.** Artifactory reads the current build number from
+  the snapshot folder's metadata, the newest unique POM's, which is why it must recalculate
+  that metadata synchronously on every unique upload. Reading the folder's files in the
+  upload's own transaction lets every metadata level go through the queue, and the highest
+  build any file has is never reused: Artifactory's number repeats build 1 in a folder with no
+  POM, and sends a classifier deployed before its build's POM to the previous build (DV-063).
+- **The sidecar that matches no build** answers 404 for the path the client sent. Artifactory
+  names a path built from build 0 and the current time in milliseconds, which the client
+  never sent and cannot find (DV-064).
 - **The queue and rebuild on read.** Recalculating inside the write transaction contends on
   PostgreSQL and blocks SQLite's single writer (decision 0033). Artifactory calculates
   artifact-level metadata after the commit and serves whatever is stored meanwhile. Rebuilding
@@ -265,4 +280,4 @@ The decision stands against 7.161.32. The 7.x documentation and release notes ad
 - Artifactory OSS 6.20, `knottnhupfer/artifactory-oss` at `b99e5649bcad`
 - Maven repository metadata model,
   <https://maven.apache.org/ref/3-LATEST/maven-repository-metadata/repository-metadata.html>
-- [Deviations register](../../implementation/deviations.md): DV-050 to DV-054, DV-060
+- [Deviations register](../../implementation/deviations.md): DV-050 to DV-054, DV-060, DV-063, DV-064
