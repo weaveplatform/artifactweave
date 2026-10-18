@@ -8,25 +8,36 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
-// GetStorageSummaryInfo answers the storage summary. Admin only. It is
-// computed on every request, so it never lags writes.
+// GetStorageSummaryInfo answers the storage summary to an administrator or
+// to a token scoped system:info/storage:r, as 7.x's getstoragesummaryinfo
+// page allows. It is computed on every request, so it never lags writes.
 func (s artifactoryService) GetStorageSummaryInfo(
 	ctx context.Context,
 	_ artgen.GetStorageSummaryInfoRequestObject,
 ) (artgen.GetStorageSummaryInfoResponseObject, error) {
-	if err := adminOnly(ctx); err != nil {
-		return nil, err
+	p, err := auth.RequireAuthenticated(ctx)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // an apierror value
 	}
 	st, err := s.content()
 	if err != nil {
 		return nil, err
+	}
+	a, err := accessFor(ctx, st, p)
+	if err != nil {
+		return nil, s.internalError(ctx, "storage summary access", err)
+	}
+	if !a.d.System("info/storage", types.ScopeRead) {
+		return nil, auth.ErrForbidden
 	}
 	sum, err := usage.Summarize(ctx, st, s.cfg.BlobLocation)
 	if err != nil {
@@ -136,18 +147,19 @@ func (artifactoryService) RefreshStorageSummaryInfo(
 	return artgen.RefreshStorageSummaryInfo202TextResponse("Storage summary calculated"), nil
 }
 
+// notApplicable is what Artifactory's NumberFormatter prints for a
+// percentage of nothing, where Java's division gives NaN.
+const notApplicable = "N/A"
+
 // storageSummary renders the summary with Artifactory's human-formatted
 // strings, which the JFrog CLI prints verbatim.
 func storageSummary(sum usage.Summary) artgen.StorageSummaryInfo {
 	str := func(s string) *string { return &s }
 	num := func(n int64) *int { v := int(n); return &v }
-	optimization := "0%"
-	if sum.ArtifactsSize > 0 {
-		optimization = percent(sum.ArtifactsSize-sum.BinariesSize, sum.ArtifactsSize)
-	}
+	// A 7.x object store reports no space fields at all (the SaaS capture in
+	// research 15), so neither does a store whose volume is not measured.
 	fileStore := artgen.FileStoreSummary{
 		StorageType: str(sum.Location.Type), StorageDirectory: str(sum.Location.Directory),
-		TotalSpace: str("unknown"), UsedSpace: str("unknown"), FreeSpace: str("unknown"),
 	}
 	if sp := sum.Space; sp != nil && sp.Total > 0 {
 		used := sp.Total - sp.Free
@@ -163,17 +175,23 @@ func storageSummary(sum usage.Summary) artgen.StorageSummaryInfo {
 		files, folders, bytes = files+r.Files, folders+r.Folders, bytes+r.Bytes
 	}
 	for _, r := range sum.Rows {
+		packageType := "NA"
+		if r.PackageType != "" {
+			packageType = repo.PackageTypeDisplayName(string(r.PackageType))
+		}
 		rows = append(rows, artgen.RepositorySummary{
-			RepoKey: str(r.Key), RepoType: str(r.Type), PackageType: str(string(r.PackageType)),
-			FilesCount: num(r.Files), FoldersCount: num(r.Folders),
+			RepoKey: str(r.Key), RepoType: str(r.Type), PackageType: str(packageType),
+			ProjectKey: str(r.ProjectKey), FilesCount: num(r.Files), FoldersCount: num(r.Folders),
 			ItemsCount: num(r.Files + r.Folders), UsedSpace: str(humanBytes(r.Bytes)),
-			Percentage: str(percent(r.Bytes, bytes)),
+			UsedSpaceInBytes: &r.Bytes, Percentage: str(percent(r.Bytes, bytes)),
 		})
 	}
+	// 7.x's TOTAL row has no packageType, projectKey or percentage (the
+	// captures in research 15).
 	rows = append(rows, artgen.RepositorySummary{
-		RepoKey: str("TOTAL"), RepoType: str("NA"), PackageType: str("NA"),
+		RepoKey: str("TOTAL"), RepoType: str("NA"),
 		FilesCount: num(files), FoldersCount: num(folders), ItemsCount: num(files + folders),
-		UsedSpace: str(humanBytes(bytes)), Percentage: str("100%"),
+		UsedSpace: str(humanBytes(bytes)), UsedSpaceInBytes: &bytes,
 	})
 	return artgen.StorageSummaryInfo{
 		BinariesSummary: &artgen.BinariesSummary{
@@ -182,31 +200,34 @@ func storageSummary(sum usage.Summary) artgen.StorageSummaryInfo {
 			ArtifactsCount: str(thousands(sum.ArtifactsCount)),
 			ArtifactsSize:  str(humanBytes(sum.ArtifactsSize)),
 			ItemsCount:     str(thousands(sum.ItemsCount)),
-			Optimization:   str(optimization),
+			Optimization: str(
+				percent(sum.ArtifactsSize-sum.BinariesSize, sum.ArtifactsSize),
+			),
 		},
 		FileStoreSummary:        &fileStore,
 		RepositoriesSummaryList: &rows,
 	}
 }
 
-// humanBytes formats n with binary units and up to two decimals, as
-// Artifactory does ("1 KB", "3.48 GB").
+// humanBytes formats n as Artifactory's StorageUnit does: whole bytes below
+// 1 KB, and otherwise two decimals with thousands separators in binary units
+// ("1.00 KB", "1,004.64 KB", "10.00 MB"). TB is the largest unit, as in
+// every 7.x capture, and the largest jfrog-cli-core parses when it falls
+// back to usedSpace.
 func humanBytes(n int64) string {
 	if n < 1024 {
 		return strconv.FormatInt(n, 10) + " bytes"
 	}
-	v := float64(n)
-	unit := ""
-	for _, u := range []string{"KB", "MB", "GB", "TB", "PB"} {
-		v /= 1024
-		unit = u
+	v, unit := float64(n)/1024, "KB"
+	for _, u := range []string{"MB", "GB", "TB"} {
 		if v < 1024 {
 			break
 		}
+		v, unit = v/1024, u
 	}
-	s := strconv.FormatFloat(v, 'f', 2, 64)
-	s = strings.TrimSuffix(strings.TrimRight(s, "0"), ".")
-	return s + " " + unit
+	whole, frac, _ := strings.Cut(strconv.FormatFloat(v, 'f', 2, 64), ".")
+	w, _ := strconv.ParseInt(whole, 10, 64) // FormatFloat wrote the digits, so they parse
+	return thousands(w) + "." + frac + " " + unit
 }
 
 // thousands formats n with comma separators ("125,726").
@@ -222,10 +243,12 @@ func thousands(n int64) string {
 	return b.String()
 }
 
-// percent formats part of whole as "nn.nn%", with trailing zeros dropped.
+// percent formats part of whole as Artifactory's NumberFormatter does: up to
+// two decimals with trailing zeros dropped ("2.08%", "0.1%", "0%"), and
+// notApplicable for a share of nothing, as on an empty instance.
 func percent(part, whole int64) string {
 	if whole <= 0 {
-		return "0%"
+		return notApplicable
 	}
 	s := strconv.FormatFloat(float64(part)*100/float64(whole), 'f', 2, 64)
 	return strings.TrimSuffix(strings.TrimRight(s, "0"), ".") + "%"

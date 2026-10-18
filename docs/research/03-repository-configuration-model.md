@@ -102,10 +102,17 @@ committed on 2026-07-09 to a JFrog engineer's repository. Its `jfrt_repo_by_type
 series ("The number of repositories by type and package type") labels each repository with
 its enumeration name. The same capture's storage-summary series, `jfrt_stg_summary_*`,
 label the same rpm and npm repositories `RPM` and `npm`, which are display names. That is
-how the capture shows that `YUM` and `Npm` are the enumeration names, and it suggests the
-storage summary's `packageType` uses display names [I]. jfrog-cli-core compares the storage
-summary's `packageType` with `Maven`, `Gradle`, `Ivy`, `Docker`, `Conan`, `NuGet` and `SBT`
+how the capture shows that `YUM` and `Npm` are the enumeration names. jfrog-cli-core compares
+the storage summary's `packageType` with `Maven`, `Gradle`, `Ivy`, `Docker`, `Conan`, `NuGet`
+and `SBT`
 ([S] [`transferfiles/delayedartifactshandler.go`](https://github.com/jfrog/jfrog-cli-core/blob/master/artifactory/commands/transferfiles/delayedartifactshandler.go)).
+
+The storage summary (`GET /api/storageinfo`) sends display names, as the metrics capture
+suggests: two captures of the summary itself show npm and rpm repositories as `npm` and
+`RPM`, and every other type they show as the table below spells it
+([research 15, section 2.2](15-data-model.md#22-item-artifactory-artifacts-storage-api)).
+`pkg/repo.PackageTypeDisplayName` holds those two and otherwise defers to
+`PackageTypeName`.
 
 `pkg/repo.PackageTypeName` holds these spellings:
 

@@ -65,6 +65,9 @@ type matrixPrincipal struct {
 	// admin: acts as an administrator.
 	admin  bool
 	grants []matrixGrant
+	// system: the system areas a token scope lets it read
+	// (system:<area>:r), which grant no content.
+	system []string
 }
 
 const (
@@ -141,6 +144,12 @@ var matrixPrincipals = []matrixPrincipal{
 		name: "tok-admin-scope", user: "ghost-admin", token: true,
 		scope: "applied-permissions/admin", identity: types.IdentityTransient, admin: true,
 		grants: []matrixGrant{{"*", "", allContent}},
+	},
+	// member's token scoped to the storage summary alone, which 7.x lets
+	// read it (getstoragesummaryinfo): no content and no other system area.
+	{
+		name: "tok-storage", user: "member", token: true, scope: "system:info/storage:r",
+		narrowed: true, system: []string{"info/storage"},
 	},
 	// Issued an hour and a half ago for an hour (seedMatrixTokens).
 	{name: "tok-expired", user: "admin", token: true, scope: "applied-permissions/user", bad: true},
@@ -280,6 +289,17 @@ func administrators(p matrixPrincipal) int {
 		return 0
 	}
 	return refuse(p)
+}
+
+// systemReaders: an administrator, or a token whose scope lets it read the
+// system area.
+func systemReaders(area string) rule {
+	return func(p matrixPrincipal) int {
+		if p.admin || slices.Contains(p.system, area) {
+			return 0
+		}
+		return refuse(p)
+	}
 }
 
 // holds: a caller holding every action in want at path in repoKey.
@@ -731,7 +751,7 @@ func storageMatrix() []matrixRow {
 			rootMeta+"?recursiveProperties=0", `{"props":{"k":"{p}"}}`,
 			holds("libs-local", "", annotate), 204,
 		),
-		at("GET /artifactory/api/storageinfo", "", administrators, 200),
+		at("GET /artifactory/api/storageinfo", "", systemReaders("info/storage"), 200),
 		at("POST /artifactory/api/storageinfo/calculate", "", administrators, 202),
 		at("POST /artifactory/api/system/storage/optimize", "", administrators, 200),
 		at("POST /artifactory/api/system/storage/gc", "", administrators, 200),

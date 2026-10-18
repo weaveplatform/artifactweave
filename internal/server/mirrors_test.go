@@ -88,7 +88,7 @@ func TestStorageInfoReportsMirrors(t *testing.T) {
 		m.UnderReplicatedBlobs != 1 || len(m.Members) != 2 ||
 		near.Name != "near" || near.Backend != "s3" || !near.WriteEnabled || !near.Available ||
 		near.AverageLatencyMs != 12 || near.Replicas["present"].Count != 2 ||
-		near.Replicas["present"].Size != "2 KB" || len(near.Replicas) != 4 ||
+		near.Replicas["present"].Size != "2.00 KB" || len(near.Replicas) != 4 ||
 		far.Available || far.Replicas["pending"].Count != 1 || far.Replicas["failed"].Size != "0 bytes" ||
 		near.SoleCopies != 1 || far.SoleCopies != 0 || len(m.RemovedMembers) != 1 ||
 		m.RemovedMembers[0].Name != "retired" || m.RemovedMembers[0].SoleCopies != 3 ||

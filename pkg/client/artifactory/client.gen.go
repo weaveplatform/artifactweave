@@ -3261,22 +3261,22 @@ type BatchRepositoryConfigurationArray = []RepositoryConfiguration
 
 // BinariesSummary Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string, such as `3.48 GB` or `125,726`.
 type BinariesSummary struct {
-	// ArtifactsCount Optional within this object. Number of file items, formatted with thousands separators.
+	// ArtifactsCount Optional within this object. Number of file items, those in the trash can included, formatted with thousands separators.
 	ArtifactsCount *string `json:"artifactsCount,omitempty"`
 
-	// ArtifactsSize Optional within this object. Total size of all items as if nothing were deduplicated, formatted with a unit.
+	// ArtifactsSize Optional within this object. Total size of all items, those in the trash can included, as if nothing were deduplicated, formatted as `usedSpace` is.
 	ArtifactsSize *string `json:"artifactsSize,omitempty"`
 
 	// BinariesCount Optional within this object. Number of distinct stored blobs, formatted with thousands separators.
 	BinariesCount *string `json:"binariesCount,omitempty"`
 
-	// BinariesSize Optional within this object. Total size of distinct blobs, formatted with a unit.
+	// BinariesSize Optional within this object. Total size of distinct blobs, formatted as `usedSpace` is.
 	BinariesSize *string `json:"binariesSize,omitempty"`
 
-	// ItemsCount Optional within this object. Number of items, files and folders together, formatted with thousands separators.
+	// ItemsCount Optional within this object. Number of items, files and folders together and those in the trash can included, formatted with thousands separators.
 	ItemsCount *string `json:"itemsCount,omitempty"`
 
-	// Optimization Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), formatted as `nn.nn%`.
+	// Optimization Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), with up to two decimals, such as `5.82%`, or `N/A` while there are no artifacts.
 	Optimization *string `json:"optimization,omitempty"`
 }
 
@@ -4372,18 +4372,18 @@ type FileStatistics struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// FileStoreSummary Capacity figures of the blob store. Space values are human-formatted strings with a unit.
+// FileStoreSummary The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
 type FileStoreSummary struct {
 	// FreeSpace Optional within this object. Free space on the volume, with the percentage in parentheses.
 	FreeSpace *string `json:"freeSpace,omitempty"`
 
-	// StorageDirectory Optional within this object. Root directory for the local disk store, or the bucket and prefix for object storage.
+	// StorageDirectory Optional within this object. Root directory for the local disk store, the bucket and prefix for object storage, or the member stores of a blob mirror.
 	StorageDirectory *string `json:"storageDirectory,omitempty"`
 
-	// StorageType Optional within this object. Backend kind: `file-system` for the local disk store or `s3` for object storage.
+	// StorageType Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.
 	StorageType *string `json:"storageType,omitempty"`
 
-	// TotalSpace Optional within this object. Total capacity of the volume. Reported as `unknown` for object storage.
+	// TotalSpace Optional within this object. Total capacity of the volume.
 	TotalSpace *string `json:"totalSpace,omitempty"`
 
 	// UsedSpace Optional within this object. Space used on the volume, with the percentage in parentheses.
@@ -5577,7 +5577,7 @@ type RepoBulkRemovalReport_Reports_Item struct {
 // RepositoryConfiguration A repository configuration of any class, discriminated by rclass. This is the shape every create, update and read operation uses; the class-specific schemas list the fields each class honours.
 type RepositoryConfiguration = repo.Config
 
-// RepositorySummary Per-repository row of the storage summary. The list ends with a synthetic row whose `repoKey` is `TOTAL`.
+// RepositorySummary Per-repository row of the storage summary. The trash can has a row of its own, `auto-trashcan`. The list ends with a synthetic row whose `repoKey` is `TOTAL`, which sums every other row and has no `packageType`, `projectKey` or `percentage`.
 type RepositorySummary struct {
 	// FilesCount Optional within this object. Number of file items.
 	FilesCount *int `json:"filesCount,omitempty"`
@@ -5588,20 +5588,26 @@ type RepositorySummary struct {
 	// ItemsCount Optional within this object. Files plus folders.
 	ItemsCount *int `json:"itemsCount,omitempty"`
 
-	// PackageType Optional within this object. Package type of the repository, or `NA` on the total row.
+	// PackageType Optional within this object. Display name of the repository's package type, such as `Generic`, `Maven`, `npm` or `RPM`, or `NA` on the `auto-trashcan` row.
 	PackageType *string `json:"packageType,omitempty"`
 
-	// Percentage Optional within this object. Share of `usedSpace` over all repositories, formatted as `nn.nn%`.
+	// Percentage Optional within this object. Share of `usedSpace` in the total, with up to two decimals, such as `2.08%`, or `N/A` while nothing is stored.
 	Percentage *string `json:"percentage,omitempty"`
 
-	// RepoKey Optional within this object. Repository key, or `TOTAL` for the summary row. Caches of remote repositories appear under their `<key>-cache` alias.
+	// ProjectKey Optional within this object. Key of the project the repository belongs to, or `default` for a repository in no project and for the `auto-trashcan` row.
+	ProjectKey *string `json:"projectKey,omitempty"`
+
+	// RepoKey Optional within this object. Repository key, `auto-trashcan` for the trash can, or `TOTAL` for the summary row. Caches of remote repositories appear under their `<key>-cache` alias.
 	RepoKey *string `json:"repoKey,omitempty"`
 
-	// RepoType Optional within this object. `LOCAL`, `REMOTE`, `CACHE`, `VIRTUAL`, `FEDERATED`, or `NA` on the total row.
+	// RepoType Optional within this object. `LOCAL`, `CACHE`, `VIRTUAL` or `FEDERATED`, or `NA` on the `auto-trashcan` and total rows.
 	RepoType *string `json:"repoType,omitempty"`
 
-	// UsedSpace Optional within this object. Sum of file sizes, human-formatted with a unit, before deduplication.
+	// UsedSpace Optional within this object. Sum of file sizes before deduplication, in whole bytes below 1 KB, such as `678 bytes`, and otherwise with two decimals, thousands separators and a binary unit up to TB, such as `1,004.64 KB` or `10.00 MB`.
 	UsedSpace *string `json:"usedSpace,omitempty"`
+
+	// UsedSpaceInBytes Optional within this object. `usedSpace` as a number of bytes.
+	UsedSpaceInBytes *int64 `json:"usedSpaceInBytes,omitempty"`
 }
 
 // ReverseProxyConfig Reverse proxy settings, stored as the reverseProxies section of the descriptor. Both sslPort and httpsPort are accepted and returned.
@@ -5799,10 +5805,10 @@ type StorageSummaryInfo struct {
 	// BlobMirrors Optional within this object. Sent only when a blob tier is a mirror (decision 0028). One entry per mirrored tier.
 	BlobMirrors *[]wire.BlobMirror `json:"-"`
 
-	// FileStoreSummary Optional within this object. Capacity figures of the blob store. Space values are human-formatted strings with a unit.
+	// FileStoreSummary Optional within this object. The blob store and the capacity of its volume. Space values are human-formatted strings with a unit, sent only for a local disk store whose volume can be measured.
 	FileStoreSummary *FileStoreSummary `json:"fileStoreSummary,omitempty"`
 
-	// RepositoriesSummaryList Optional within this object. One row per repository plus the `TOTAL` row, sorted by key.
+	// RepositoriesSummaryList Optional within this object. One row per repository and one for the trash can, sorted by key, then the `TOTAL` row.
 	RepositoriesSummaryList *[]RepositorySummary `json:"repositoriesSummaryList,omitempty"`
 }
 
@@ -11130,7 +11136,7 @@ type ClientInterface interface {
 
 	// GetStorageSummaryInfo Storage summary
 	//
-	// Returns the storage usage snapshot, computed on every request. Admin only.
+	// Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.
 	//
 	// Corresponds with GET /api/storageinfo (the `GetStorageSummaryInfo` operationId).
 	GetStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -17456,7 +17462,7 @@ func (c *Client) ReplaceSignedUrlKey(ctx context.Context, reqEditors ...RequestE
 
 // GetStorageSummaryInfo Storage summary
 //
-// Returns the storage usage snapshot, computed on every request. Admin only.
+// Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.
 //
 // Corresponds with GET /api/storageinfo (the `GetStorageSummaryInfo` operationId).
 func (c *Client) GetStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37926,7 +37932,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetStorageSummaryInfoWithResponse Storage summary
 	//
-	// Returns the storage usage snapshot, computed on every request. Admin only.
+	// Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -65343,7 +65349,7 @@ func (c *ClientWithResponses) ReplaceSignedUrlKeyWithResponse(ctx context.Contex
 
 // GetStorageSummaryInfoWithResponse Storage summary
 //
-// Returns the storage usage snapshot, computed on every request. Admin only.
+// Returns the storage usage snapshot, computed on every request. Requires an administrator or a token whose scope includes `system:info/storage:r`.
 //
 // Returns a wrapper object for the known response body format(s).
 //

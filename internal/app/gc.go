@@ -30,26 +30,36 @@ func logGC(log *slog.Logger) func(gc.Report, error) {
 	}
 }
 
-// location describes the tier's blob store for the storage summary.
+// location describes the tier's blob store for the storage summary. Its type
+// is the name of the Artifactory binary provider template that stores blobs
+// the way the backend does. The object stores are the -direct templates,
+// which write to the bucket with no eventual upload in between, as these
+// backends do; JFrog's S3 SaaS reports s3-storage-v3-direct. A mirror
+// spreads copies over stores of any kind, which in Artifactory is a sharding
+// chain written out in binarystore.xml, and 7.x reports such a chain as
+// user-chain (research 15).
 func (t blobTier) location() usage.Location {
 	b := t.cfg
 	switch b.Backend {
 	case "fs":
 		return usage.Location{Type: "file-system", Directory: t.root, Root: t.root}
 	case "s3":
-		return usage.Location{Type: "s3", Directory: "s3://" + path.Join(b.S3.Bucket, b.S3.Prefix)}
+		return usage.Location{
+			Type:      "s3-storage-v3-direct",
+			Directory: "s3://" + path.Join(b.S3.Bucket, b.S3.Prefix),
+		}
 	case "gcs":
 		return usage.Location{
-			Type:      "google-cloud-storage",
+			Type:      "google-storage-v2-direct",
 			Directory: "gs://" + path.Join(b.GCS.Bucket, b.GCS.Prefix),
 		}
 	case "azure":
 		return usage.Location{
-			Type:      "azure-blob-storage",
+			Type:      "azure-blob-storage-v2-direct",
 			Directory: path.Join(b.Azure.Account, b.Azure.Container, b.Azure.Prefix),
 		}
 	case "mirror":
-		return usage.Location{Type: "mirror", Directory: strings.Join(b.Mirror.Members, ", ")}
+		return usage.Location{Type: "user-chain", Directory: strings.Join(b.Mirror.Members, ", ")}
 	}
 	return usage.Location{}
 }

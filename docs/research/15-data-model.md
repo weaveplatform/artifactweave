@@ -200,37 +200,83 @@ Supporting records in the same family:
 
 | Record | Operation | Shape |
 |---|---|---|
-| Storage summary | `GET /api/storageinfo` | `binariesSummary{binariesCount, binariesSize, artifactsSize, optimization, itemsCount, artifactsCount}` (all **strings**, human formatted), `fileStoreSummary{storageType, storageDirectory, totalSpace, usedSpace, freeSpace}`, `repositoriesSummaryList[{repoKey, repoType, foldersCount, filesCount, usedSpace, itemsCount, packageType, percentage}]` |
+| Storage summary | `GET /api/storageinfo` | `binariesSummary{binariesCount, binariesSize, artifactsSize, optimization, itemsCount, artifactsCount}` (all **strings**, human formatted), `fileStoreSummary{storageType, storageDirectory, totalSpace, usedSpace, freeSpace}` (the space fields only for a measured volume), `repositoriesSummaryList[{repoKey, repoType, foldersCount, filesCount, usedSpace, usedSpaceInBytes, itemsCount, packageType, projectKey, percentage}]` |
 | Background task | `GET /api/tasks` | `tasks[{id, type, state scheduled\|running\|stopped\|cancelled, description, nodeId, started}]` |
 | Prune (PUD) status | `/api/system/storage/prune/*` | `{status running\|stopped\|finished\|error, dryRun, timing{startedAtMillis, startedAt, durationMillis, duration, lastUpdatedMillis, lastUpdated}, progress, report{totalBinariesProcessed, totalBinariesCleaned, totalBytesCleaned}, lastHandledDirectory{...}, error}`; start request `{dryRun, startFromDirectory, startFromBinary, binaryOlderThanDays}` |
 | Build artifacts archive request | `POST /api/archive/buildArtifacts` | `{buildName, buildNumber, buildStatus, repos[], archiveType tar\|zip\|tar.gz\|tgz, mappings[{input, output}]}` |
 | Signed URL request | `POST /api/signed/url` | `{repo_path, valid_for_secs, expiry}` (Enterprise, tier stub) |
 | Trash | `/api/trash/*` | no body shapes; `restore` takes `to` and `transaction-size`; `deleteDirectoryTrashProperty/start` takes `{batchSize, pauseBetweenBatchesMs, batchesCount}` |
 
-The storage summary artifactweave serves (`internal/server/storageinfo.go`) differs from 7.x
-in five ways, all fixed by #390:
-- 7.x differs: a token scoped `system:info/storage:r` may read the summary
-  ([get storage summary info](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo)),
-  where artifactweave allows administrators only; fixed by #390.
-- 7.x differs: each repository row also carries `usedSpaceInBytes`, a number, and
-  `projectKey`, `default` outside a project. jfrog-client-go's test asserts both
-  ([`tests/artifactorystorage_test.go`](https://github.com/jfrog/jfrog-client-go/blob/3b4b900d8174/tests/artifactorystorage_test.go)),
-  and jfrog-cli-core reads `usedSpaceInBytes` before it parses `usedSpace`
-  ([`artifactory/utils/storageinfo.go`](https://github.com/jfrog/jfrog-cli-core/blob/master/artifactory/utils/storageinfo.go),
-  `GetUsedSpaceInBytes`). artifactweave sends neither; fixed by #390.
-- 7.x differs: `packageType` is the display name, `Maven` in JFrog's example and `Generic`
-  and `BuildInfo` in a 7.x SaaS capture ([jartifactory](https://github.com/watsonmartin/jartifactory),
-  2022), where artifactweave sends the lower-case API name; fixed by #390.
-- 7.x differs: sizes group thousands, `1,004.64 KB` in jfrog-cli-core's parser test
-  ([`storageinfo_test.go`](https://github.com/jfrog/jfrog-cli-core/blob/master/artifactory/utils/storageinfo_test.go));
-  an empty instance shows `N/A` for `optimization` and each `percentage`; the TOTAL row has
-  no `packageType`, `percentage` or `projectKey`; and an `auto-trashcan` row counts the trash
-  can (the SaaS capture). artifactweave writes `1004.88 KB` and `0%`, gives the TOTAL row
-  `packageType: "NA"` and `percentage: "100%"`, and has no trash row; fixed by #390.
-- 7.x differs: `fileStoreSummary.storageType` names the binary-provider template, such as
-  `s3-storage-v3-direct` on S3 SaaS, and an object store reports no space fields (the SaaS
-  capture), where artifactweave reports `s3`, `google-cloud-storage`, `azure-blob-storage` or
-  `mirror` (`internal/app/gc.go`) with each space value `"unknown"`; fixed by #390.
+The storage summary artifactweave serves (`internal/server/storageinfo.go`) follows 7.x
+([#390](https://github.com/weaveplatform/artifactweave/issues/390)). Besides JFrog's
+[get storage summary info](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo)
+page and the clients, the evidence is three 7.x captures:
+- **the SaaS capture**: an instance with nothing stored, in the
+  [jartifactory](https://github.com/watsonmartin/jartifactory/blob/c9f18c9daa30272ce4d8bc9e4dcd89df087c92cb/README.md)
+  README (2022);
+- **the 7.46 capture**: a self-hosted instance after a migration from 6.23, with 4.04 TB in
+  its trash can
+  ([`330lv_storageinfo.json`](https://github.com/smohdarif/ps_jfrog_scripts/blob/693d9bcfdce2e8cb0d396bf4d3f31782de54ab43/jf-transfer-migration-helper-scripts/after_migration_helper_scripts/AllReposComparisonReport/input/RT6.23.41_to_7.46_migration/330lv_storageinfo.json));
+- **the bundle capture**: the `storage-summary.json` of a self-hosted support bundle on
+  Java 21, with 584 rows and repositories in projects
+  ([bundle-analysis-tooling](https://github.com/jf-Harsh/bundle-analysis-tooling/blob/580d6b99232acc21e7a2ffebc99dfd8433c1ecad/newlogs3/artifactory/jfrt/jfrt@01fzay6s6x41bs1ytynknf084z/u999jfart002d.in.bundesbank.de/artifactory/system/storage-summary.json)).
+
+What they settle:
+- **Access.** An administrator, or a token whose scope covers `system:info/storage:r`, reads
+  the summary ([D] the page above). The permission evaluator lets `system:info:r` cover it
+  too, as it lets a system area cover its parts [I]. The recalculation stays with
+  administrators.
+- **`usedSpaceInBytes` and `projectKey`.** Each repository row carries `usedSpaceInBytes`, a
+  number, and `projectKey`, `default` for a repository in no project (all three captures).
+  jfrog-client-go's live test asserts both are not empty
+  ([`tests/artifactorystorage_test.go`](https://github.com/jfrog/jfrog-client-go/blob/3b4b900d8174/tests/artifactorystorage_test.go)).
+  jfrog-cli-core's transfer-files reads `usedSpaceInBytes` and parses `usedSpace` only
+  without it
+  ([`artifactory/utils/storageinfo.go`](https://github.com/jfrog/jfrog-cli-core/blob/25dbeb0335c03f14a284b1a34c654a9ceadf85b5/artifactory/utils/storageinfo.go),
+  `GetUsedSpaceInBytes`). JFrog's PS CLI reads `usedSpaceInBytes` alone, as an integer
+  ([`internal/discover/storage.go`](https://github.com/ps-jfrog/jfrog-ps-cli/blob/e7d47648406c8ae5834b877661a51d31f105c92c/internal/discover/storage.go)).
+- **`packageType`** is the package type's display name. That is `Maven` in JFrog's example,
+  and `Generic`, `BuildInfo`, `Docker`, `NuGet`, `Pypi`, `CRAN`, `Helm`, `Go`, `Gradle`,
+  `Terraform` and `HuggingFaceML` in the captures. npm and rpm repositories show as `npm` and
+  `RPM` (the 7.46 and bundle captures), where the repositories list shows `Npm` and `YUM`
+  ([research 03](03-repository-configuration-model.md#package-type-names-in-listings)). 6.20
+  fills the field from `RepoType.getDisplayName()` [I]
+  (`StorageServiceImpl.getStorageSummaryInfo`). `pkg/repo.PackageTypeDisplayName` spells
+  every other type as the list does, which is [I] for types no capture shows.
+- **Sizes** are whole bytes below 1 KB (`101 bytes`). Above that they keep two decimals
+  (`10.00 MB`, `47.10 KB`, `143.20 GB` in the captures) and group thousands: jfrog-cli-core's
+  parser test has `1,004.64 KB`
+  ([`storageinfo_test.go`](https://github.com/jfrog/jfrog-cli-core/blob/25dbeb0335c03f14a284b1a34c654a9ceadf85b5/artifactory/utils/storageinfo_test.go)).
+  TB is the largest unit any capture shows and the largest jfrog-cli-core parses, so
+  artifactweave writes a petabyte as `1,024.00 TB` [I].
+- **Percentages** keep up to two decimals and drop trailing zeros (`0.1%`, `20.46%`, and
+  `0%` for a share that rounds to nothing), as 6.20's `NumberFormatter.formatPercentage`
+  (`###.##%`) does [I]. A share of nothing is `N/A`: the SaaS capture shows it for
+  `optimization` and for every `percentage`.
+- **The trash can** has a row of its own, `auto-trashcan`, with `repoType` and `packageType`
+  `NA` and `projectKey` `default` (all three captures). The TOTAL row and the binaries
+  summary count it: the 7.46 capture's trash row holds 150,423 files, which its TOTAL row
+  and `artifactsCount` include. artifactweave counts the trash as its storage listing shows
+  it, so a path trashed twice is one file, and the folders above a trashed item count as
+  folders [I]. 7.x's other system repositories, such as `jfrog-support-bundle`, have no
+  counterpart here.
+- **The TOTAL row** has `repoKey`, `repoType` `NA`, the counts, `usedSpace` and
+  `usedSpaceInBytes`, and no `packageType`, `percentage` or `projectKey` (all three
+  captures).
+- **`fileStoreSummary.storageType`** names the binary provider template
+  ([filestore configuration](https://docs.jfrog.com/installation/docs/filestore-configuration-landing),
+  "Chain Templates"). A local disk is `file-system` (the 7.46 capture and
+  [marslo's notes](https://marslo.github.io/ibook/artifactory/api.html); JFrog's example
+  writes `filesystem`). S3 SaaS is `s3-storage-v3-direct` (the SaaS capture). A chain
+  written out in `binarystore.xml` is `user-chain` (the bundle capture, and
+  `BinaryProviderConfigBuilder.USER_TEMPLATE` in the 4.x source). For its other backends
+  artifactweave reports `google-storage-v2-direct` and `azure-blob-storage-v2-direct`, the
+  templates that upload straight to the bucket as its backends do, and `user-chain` for a
+  blob mirror, which Artifactory can express only as a sharding chain of its own [I]. An
+  object store reports no `totalSpace`, `usedSpace` or `freeSpace` (the SaaS capture), and
+  neither does a mirror.
+- **Order.** artifactweave sorts the rows by key and puts TOTAL last. The captures follow no
+  order but TOTAL last.
 
 ### 2.3 Search results (`artifactory-searches-api`)
 
