@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 26 section 8](../26-go-modules.md#8-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 26 section 8](../26-go-modules.md#8-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -192,9 +192,11 @@ pseudo-versions could not be resolved.
 forever, so new content under an old version fails every client that has fetched it.
 Refusing different content protects them. Accepting identical content lets a pipeline run
 `jf go-publish` again after a later step failed: the `.zip` and `.mod` are the same and only
-the `.info`'s time changes (R26 3.1). Refusing every republish, as the CLI's help says
-Artifactory does, would fail such a re-run at its first PUT. This departs from Artifactory
-and is DV-039 in the [deviations register](../../implementation/deviations.md).
+the `.info`'s time changes (R26 3.1). Refusing every republish would fail such a re-run at
+its first PUT. Only a context string for AI agents in the JFrog CLI says Artifactory refuses
+every republish (`GetAIDescription`, jfrog-cli #3503, R26 3.1). Neither the CLI's help nor
+any JFrog source says so, so the claim is **[I]**. Departing from it is DV-039 in the
+[deviations register](../../implementation/deviations.md).
 
 **Plain-text errors.** The go command shows an error's body only when it is plain text
 (R26 1.1).
@@ -229,6 +231,14 @@ providers (P9), and the current documentation confirms what the decision takes f
 - resolution from local and virtual repositories only;
 - the sumdb properties
 ([research 26 section 8](../26-go-modules.md#8-artifactory-7x-check)).
+
+Jira and the exported 7.x descriptors add two points (research 26 section 8):
+- 7.x differs: a local repository's `@v/list` gives each version its `.info` time as a second
+  field and lists pseudo-versions ([J] [RTFACT-21670](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21670),
+  fixed in 7.8.1); fixed by [#417](https://github.com/weaveplatform/artifactweave/issues/417).
+- `go-default` is `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]` in three of the
+  four exported 7.x descriptors ([I]), so the layout rationale above describes 6.20 only;
+  [#376](https://github.com/weaveplatform/artifactweave/issues/376) aligns the layout and DV-040.
 
 ## Constraints
 
