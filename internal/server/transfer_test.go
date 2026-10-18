@@ -156,6 +156,38 @@ func TestCopyAndMoveKeepTimes(t *testing.T) {
 	}
 }
 
+// A Cargo repository can name the cargo-default layout Artifactory 7.x
+// bundles (#354), and a copy that translates layouts reads it: a crate copied
+// from a simple-default repository lands at the path JFrog's Cargo page
+// requires. Before cargo-default was bundled, the copy failed to resolve it.
+func TestCopyTranslatesToTheCargoLayout(t *testing.T) {
+	w := newItemWorld(t, false)
+	for key, body := range map[string]string{
+		"crates-local": `{"rclass":"local","packageType":"cargo","repoLayoutRef":"cargo-default"}`,
+		"simple-local": `{"rclass":"local","packageType":"generic","repoLayoutRef":"simple-default"}`,
+	} {
+		wantStatus(t, w.do("PUT", "/artifactory/api/repositories/"+key, "admin", body,
+			"Content-Type", "application/json"), http.StatusOK)
+	}
+	rec := w.do("GET", "/artifactory/api/repositories/crates-local", "admin", "")
+	wantStatus(t, rec, http.StatusOK)
+	var c struct {
+		RepoLayoutRef string `json:"repoLayoutRef"`
+	}
+	err := json.Unmarshal(rec.Body.Bytes(), &c)
+	if err != nil || c.RepoLayoutRef != "cargo-default" {
+		t.Fatalf("configuration %s", rec.Body)
+	}
+
+	w.put("/artifactory/simple-local/rust/serde/serde-1.0.197.crate", "crate")
+	wantStatus(t, w.do("POST",
+		"/artifactory/api/copy/simple-local/rust?to=/crates-local/&suppressLayouts=0", "admin", ""),
+		http.StatusOK)
+	wantStatus(t,
+		w.do("GET", "/artifactory/crates-local/crates/serde/serde-1.0.197.crate", "admin", ""),
+		http.StatusOK)
+}
+
 func TestCopyAndMoveRefused(t *testing.T) {
 	w := newItemWorld(t, true)
 	w.put("/artifactory/libs-local/d/a.txt", "a")

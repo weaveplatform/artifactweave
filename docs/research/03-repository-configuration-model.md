@@ -71,12 +71,12 @@ confirmed from the provider's default layout map:
 |---|---|
 | `maven-2-default` | `maven`, `gradle` (REST default when omitted) |
 | `maven-1-default`, `ivy-default`, `gradle-default`, `sbt-default`, `sbt-ivy-default` | legacy JVM layouts |
-| `simple-default` | `generic`, `docker`, `oci`, `helm`, `helmoci`, `pypi`, `terraform`, `terraformbackend`, `debian`, `rpm`, `alpine`, `conda`, `cran`, `gems`, `gitlfs`, `vagrant` |
+| `simple-default` | `generic`, `docker`, `oci`, `helm`, `helmoci`, `pypi`, `terraform`, `terraformbackend`, `debian`, `rpm`, `alpine`, `cargo`, `conda`, `cran`, `gems`, `gitlfs`, `vagrant` |
 | `npm-default` | `npm` |
 | `nuget-default` | `nuget` |
 | `go-default` | `go` |
 | `terraform-module-default`, `terraform-provider-default` | `terraform` by `terraformType` (the provider's `terraform_module` and `terraform_provider` resources) |
-| `bower-default`, `composer-default`, `conan-default`, `puppet-default`, `ansible-default`, `swift-default`, `nix-default`, `build-default` | other ecosystems |
+| `bower-default`, `cargo-default`, `composer-default`, `conan-default`, `puppet-default`, `ansible-default`, `swift-default`, `nix-default`, `build-default` | other ecosystems |
 | `vcs-default` | none by default; Artifactory's built-in layout for `vcs` remotes |
 
 A layout is defined by `artifactPathPattern`, `distinctiveDescriptorPathPattern`,
@@ -113,6 +113,53 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
   `ansible-default`, `swift-default` and `nix-default` (named in the Terraform provider's
   default map). They are reconstructed from the storage paths JFrog documents [I] (DV-055)
   and are on the P19 list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+- **One was added in 7.x with a known definition:** `cargo-default`,
+  `crates/[module]/[module]-[baseRev].[ext]` with `.*` integration revisions (#354). JFrog
+  does not publish it, but every exported 7.x descriptor below defines it this way, and it
+  describes the one path JFrog's [Cargo page](https://docs.jfrog.com/artifactory/docs/cargo-repositories.md)
+  accepts, `crates/<name>/<name>-<version>.crate`; a crate stored anywhere else is not
+  indexed. The provider's default for a `cargo` repository is still `simple-default`. On the
+  P19 list [I].
+- **"npm Test" is not bundled** [I]. The layouts page lists it among the default layouts,
+  but its only trace in JFrog's documentation is the same page's screenshot of the layout
+  list, which shows a layout named `npm-test-layout` beside `npm-default`. Every bundled
+  layout is named `<type>-default`, no exported 7.x descriptor has it, and the provider's map
+  does not name it, so it reads as a custom layout on the instance the screenshot came from.
+  On the P19 list.
+
+#### Exported 7.x descriptors
+
+Four configuration descriptors exported from running 7.x instances are published in public
+repositories. They are an instance's `artifactory.config.latest.xml`, or an import made from
+one, not JFrog documentation, so what they show is [I]:
+
+| Descriptor | Schema |
+|---|---|
+| [octopusden/octopus-dms-service](https://github.com/octopusden/octopus-dms-service/blob/9500dcb54b52/test-common/src/main/artifactory/dump/20260120.084302/etc/artifactory.config.latest.xml), dumped 2026-01-20 | 3.4.8 |
+| [devarsh10/jfrog-artifactory](https://github.com/devarsh10/jfrog-artifactory/blob/1f7393f59ef0/artifactory/var/etc/artifactory/artifactory.config.latest.xml) | 3.4.5 |
+| [scala/community-build](https://github.com/scala/community-build/blob/0a9bdc4e9f61/artifactory.xml) | 3.4.2 |
+| [Panda-Academy-Workshops/Infrastructure](https://github.com/Panda-Academy-Workshops/Infrastructure/blob/bf56ad425899/artifactory/artifactory.config.import.xml) | 3.1.26 |
+
+All four define `cargo-default` as `pkg/layout` now does. They also define other layouts
+differently from `pkg/layout`. This document records the differences; nothing here acts on
+them yet:
+
+| Layout | Exported 7.x descriptors | `pkg/layout` |
+|---|---|---|
+| `npm-default` | `[orgPath]/-/[module]-[baseRev](-[fileItegRev]).tgz`, in all four | 6.20's `[orgPath]/[module]/[module]-[baseRev](-[fileItegRev]).tgz` |
+| `go-default` | `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]` in three; the scala one keeps 6.20's `[orgPath]/[module]/@v/v[refs].zip` | `[orgPath]/[module]/@v/[baseRev].[ext]` (DV-040) |
+| `terraform-module-default` | `[namespace]/[module-name]/[provider]/[version].[ext]` | `[orgPath]/[module]/[provider<[^/]+>]/[baseRev].[ext]` (DV-055) |
+| `terraform-provider-default` | `[namespace]/[provider-name]/[version]/terraform-provider-[provider-name]_[version]_[os]_[arch].[ext]` | `[orgPath]/[module]/[baseRev]/terraform-provider-[module]_[baseRev]_[os<[^_/]+>]_[arch<[^./]+>].[ext]` (DV-055) |
+| `swift-default` | `[scope]/[name]/[name]-[version].zip` | `[orgPath]/[module]/[module]-[baseRev].[ext]` (DV-055) |
+| `ansible-default` | `collections/[namespace]/[name]/[version]/[namespace]-[name]-[version].tar.gz` | `[orgPath]/[module]/[orgPath]-[module]-[baseRev].tar.gz` (DV-055) |
+| `sbt-ivy-default` | `[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]`, descriptor `ivy-[baseRev](-[fileItegRev])(-[classifier]).xml` in the revision folder; in the two newest only | sbt's Ivy-style pattern (DV-055) |
+| `gradle-default` | in the scala one only | bundled, from 6.20 |
+| `nix-default` | in none | bundled (DV-055) |
+
+The Terraform, Swift and Ansible patterns use tokens outside the documented set
+(`[namespace]`, `[module-name]`, `[provider-name]`, `[scope]`, `[name]`, `[version]`).
+6.20's parser drops an unknown token, as it does `[refs]` in its `go-default` (DV-040);
+whether 7.x's parser reads them is not known.
 
 Artifactory turns a pattern into an expression in `RepoLayoutUtils.generateRegExpFromPattern`
 [S]: `[module]` is greedy (`[^/]+`), so where it appears only in a file name, as in
@@ -345,7 +392,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 **Changed or added in 7.x:**
 - **Signing key pairs** also sign npm packages (ECDSA), as the row above now says.
 - **Bundled layouts.** The 7.x layout page lists Cargo and npm Test among the default
-  layouts, and `pkg/layout/bundled.go` has neither: [#354](https://github.com/weaveplatform/artifactweave/issues/354).
+  layouts. `cargo-default` is bundled now ([#354](https://github.com/weaveplatform/artifactweave/issues/354));
+  "npm Test" is not a bundled layout ("Bundled definitions").
 - **npm strict layout.** "Enforce strict layout" is an npm setting on the Basic tab, but no
   repository JSON field for it is documented (DV-041,
   [research 25 section 6](25-npm.md#6-strict-layout)).
@@ -355,7 +403,9 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   Configurations ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and batch updates ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
 
 **Unconfirmed for 7.x:**
-- The bundled layouts copied from the 6.20 descriptor ("Bundled definitions"): 7.x publishes
-  only their names, so their patterns stay as 6.20 had them, on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- The bundled layouts copied from the 6.20 descriptor ("Bundled definitions"): JFrog
+  publishes only their names, so their patterns stay as 6.20 had them, on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+  Exported 7.x descriptors define `npm-default` and `go-default` differently
+  ("Exported 7.x descriptors").
 - 6.20's default for `snapshotVersionBehavior` and `suppressPomConsistencyChecks`, which the
   table notes.

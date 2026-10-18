@@ -24,10 +24,12 @@ const (
 // gradle-default also match JFrog's repository-layouts page. Two depart from
 // the descriptor on purpose, each recorded in docs/implementation/deviations.md.
 //
-// 7.x adds six layouts, named by the JFrog Terraform provider's default map or
-// JFrog's documentation, whose definitions JFrog does not publish. They are
-// reconstructed from the storage paths JFrog documents (DV-055) and are on the
-// P19 comparison list (#216).
+// 7.x adds seven layouts, named by the JFrog Terraform provider's default map
+// or JFrog's documentation, whose definitions JFrog does not publish.
+// cargo-default is copied from configuration descriptors exported from 7.x
+// instances (research 03, "Bundled definitions"); the other six are
+// reconstructed from the storage paths JFrog documents (DV-055). All seven are
+// on the P19 comparison list (#216).
 var bundled = []Definition{
 	{
 		// artifactory.config.xml:112-119.
@@ -156,6 +158,16 @@ var bundled = []Definition{
 		// artifactory.config.xml:215-221.
 		Name:                            "build-default",
 		ArtifactPathPattern:             "[orgPath]/[module](-[fileItegRev]).[ext]",
+		FolderIntegrationRevisionRegExp: anyItegRev,
+		FileIntegrationRevisionRegExp:   anyItegRev,
+	},
+	{
+		// Every exported 7.x descriptor defines it this way, and lists it
+		// before the other 7.x additions. It describes the one path JFrog's
+		// Cargo page accepts, crates/<name>/<name>-<version>.crate; a crate
+		// stored anywhere else is not indexed.
+		Name:                            "cargo-default",
+		ArtifactPathPattern:             "crates/[module]/[module]-[baseRev].[ext]",
 		FolderIntegrationRevisionRegExp: anyItegRev,
 		FileIntegrationRevisionRegExp:   anyItegRev,
 	},
