@@ -66,7 +66,9 @@ construction, with no search.
   at rotation, or for ever when one never expires. The retirement record is the
   `token.signing_keys` setting.
 - **Issuer and subject:** the issuer is `jfac@<uuid>`, taken from the instance id `jfrt@<uuid>`
-  created at first start.
+  created at first start. `GET /artifactory/api/system/service_id` returns that id to
+  administrators, and the legacy scope `jfrt@<id>:admin` that `jf rt atc --grant-admin` builds
+  from it is `applied-permissions/admin` (#391).
 - **Records:** every token's record is stored, as only digests of its secrets. The one
   exception is the encrypted password's reference token, which is kept sealed so it can be
   shown again (#106). Verification needs the record, so revocation is deletion. GC removes

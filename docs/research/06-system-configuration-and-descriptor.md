@@ -38,7 +38,7 @@ where the source matters:
 | GET | `/artifactory/api/system/license` | admin | 200 | `{"type":"...","validThrough":"...","licensedTo":"..."}`; read only by `platform_license` |
 | POST | `/artifactory/api/system/license` | admin | 200 | `{"licenseKey":"..."}`; accepted and ignored |
 | GET / POST / DELETE | `/artifactory/api/system/licenses[?licenseHash=a,b]` | admin or `system:info/licenses:r` | 200 | HA list `[{type,validThrough,licensedTo,licenseHash,nodeId,nodeUrl,expired}]`. JFrog documents an array body for `POST`, but `platform_license` installs by posting one `{"licenseKey":"..."}` object here and then reads `/license` back ([`resource_license.go`](https://github.com/jfrog/terraform-provider-platform/blob/1dd3a35/pkg/platform/resource_license.go)) |
-| GET | `/artifactory/api/system/service_id` | admin | 200 | `jfrt@<uuid>` |
+| GET | `/artifactory/api/system/service_id` | admin | 200 | `text/plain` `jfrt@<uuid>`, the instance id, with no trailing newline; see below |
 | GET | `/artifactory/api/storageinfo` | admin or `system:info/storage:r` | 200 | shape in [02-artifactory-core-api-inventory.md](02-artifactory-core-api-inventory.md) |
 | POST | `/artifactory/api/storageinfo/calculate` | admin | 202 | |
 | POST | `/artifactory/api/system/storage/gc` | admin | 200 | |
@@ -87,15 +87,31 @@ Where artifactweave does not yet serve these endpoints as 7.x does:
   public URL ([jfrog/charts `stable/artifactory/values.yaml`](https://github.com/jfrog/charts/blob/master/stable/artifactory/values.yaml),
   [jfrog-secret-rotator-lambda `lambda_function.py`](https://github.com/jfrog/jfrog-secret-rotator-lambda/blob/main/secret-rotator/lambda_function.py));
   fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
-- 7.x differs: `service_id` returns `jfrt@<id>` as text to administrators, and
-  `jf atc --grant-admin` reads it to build the `jfrt@<id>:admin` scope
-  ([Get Service ID](https://docs.jfrog.com/administration/reference/getserviceid-1.md),
-  [`createaccesstoken.go`](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0a92d7c74c315335b3c8800044b25/artifactory/commands/generic/createaccesstoken.go));
-  artifactweave answers 501; fixed by [#391](https://github.com/weaveplatform/artifactweave/issues/391).
 - 7.x differs: `GET .../configuration/webServer` also answers a non-admin, with the proxy
   method, the ports and the repositories that user may read
   ([Get Reverse Proxy Configuration](https://docs.jfrog.com/administration/reference/getreverseproxyconfiguration.md));
   fixed by [#403](https://github.com/weaveplatform/artifactweave/issues/403).
+
+`service_id` returns the instance id, `jfrt@<uuid>`, as `text/plain` to administrators
+([Get Service ID](https://docs.jfrog.com/administration/reference/getserviceid-1.md):
+"Security: Requires an admin user", example `jfrt@ee27b1d1-534d-4723-80b5-5bd893d19c43`). Two
+`jf` commands read it:
+- `jf rt atc --grant-admin` (`jf rt access-token-create`) asks the legacy token API for the
+  scope `<service id>:admin`, appending `:admin` to the body as read
+  ([`createaccesstoken.go`](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0a92d7c74c315335b3c8800044b25/artifactory/commands/generic/createaccesstoken.go),
+  lines 112-131; [`system.go`](https://github.com/jfrog/jfrog-client-go/blob/3b4b900/artifactory/services/system.go),
+  `GetServiceId`), so the body carries no trailing newline.
+- `jf rt transfer-files` reads the source instance's
+  ([`transfer.go`](https://github.com/jfrog/jfrog-cli-core/blob/25dbeb0335c03f14a284b1a34c654a9ceadf85b5/artifactory/commands/transferfiles/transfer.go),
+  line 372).
+
+The top-level `jf atc --grant-admin` does not call it: it asks Access for
+`applied-permissions/admin` directly
+([`accesstokencreate.go`](https://github.com/jfrog/jfrog-cli-core/blob/25dbeb0335c03f14a284b1a34c654a9ceadf85b5/general/token/accesstokencreate.go),
+lines 146-147). artifactweave serves the stored instance id, the one its token issuer
+`jfac@<uuid>` is derived from ([decision 0005](decisions/0005-authentication-and-tokens.md)),
+so the scope the CLI builds names this instance. Anonymous callers get 401 and other users
+403, as for the licence; that anonymous gets 401 while anonymous access is on is **[I]**.
 
 Reverse proxy (`webServer`) shape:
 

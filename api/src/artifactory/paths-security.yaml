@@ -2269,15 +2269,17 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/addcertificate.md
   /api/system/service_id:
     get:
-      description: Returns the instance identity in the form jfrt@<uuid>. Admin only. The uuid is generated at first
-        start and is the issuer in every token subject.
+      description: Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing
+        newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance
+        issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope
+        `<service id>:admin` for administrator permissions. Admin only.
       operationId: getServiceId
       responses:
         '200':
           content:
             text/plain:
               schema:
-                description: jfrt@ followed by a uuid.
+                description: '`jfrt@` followed by the instance UUID.'
                 type: string
           description: The service id.
         '401':

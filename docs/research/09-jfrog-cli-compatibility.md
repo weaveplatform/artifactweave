@@ -24,8 +24,9 @@ marked *(unverified)* lack a primary source.
 
 The CLI performs **no startup version check**. It calls `GET api/system/version` for usage
 reporting and before uploads to decide whether multipart upload is available. There is no
-caller of `api/system/status`; `api/system/service_id` is used only by storage-info style
-commands.
+caller of `api/system/status`. `api/system/service_id` is read by `jf rt atc --grant-admin`,
+which builds the scope `<service id>:admin` from it, and by `jf rt transfer-files`
+([research 06](06-system-configuration-and-descriptor.md)).
 
 | Call | Expected status | Notes |
 |---|---|---|

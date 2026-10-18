@@ -100,6 +100,26 @@ func (artifactoryService) GetSystemLicense(
 	}, nil
 }
 
+// GetServiceId answers administrators only, as documented
+// (getserviceid-1.md), with the stored instance id. The token service
+// derives its jfac@ issuer from the same record, so the jfrt@<id>:admin
+// scope jf rt atc --grant-admin builds from this body names this instance.
+func (s artifactoryService) GetServiceId(
+	ctx context.Context,
+	_ artgen.GetServiceIdRequestObject,
+) (artgen.GetServiceIdResponseObject, error) {
+	if err := adminOnly(ctx); err != nil {
+		return nil, err
+	}
+	id, err := s.cfg.Store.Instance().Get(ctx)
+	if err != nil {
+		return nil, s.internalError(ctx, "instance identity", err)
+	}
+	// The body is the bare id, without a trailing newline: jf rt atc
+	// appends ":admin" to it as read, so a newline would split the scope.
+	return artgen.GetServiceId200TextResponse(id.InstanceID), nil
+}
+
 func (artifactoryService) GetSystemReadiness(
 	context.Context,
 	artgen.GetSystemReadinessRequestObject,

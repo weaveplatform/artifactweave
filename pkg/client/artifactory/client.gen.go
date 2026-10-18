@@ -11382,7 +11382,7 @@ type ClientInterface interface {
 
 	// GetServiceId Get the service id
 	//
-	// Returns the instance identity in the form jfrt@<uuid>. Admin only. The uuid is generated at first start and is the issuer in every token subject.
+	// Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope `<service id>:admin` for administrator permissions. Admin only.
 	//
 	// Corresponds with GET /api/system/service_id (the `GetServiceId` operationId).
 	GetServiceId(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -18048,7 +18048,7 @@ func (c *Client) AddCertificateWithBody(ctx context.Context, certificateAlias st
 
 // GetServiceId Get the service id
 //
-// Returns the instance identity in the form jfrt@<uuid>. Admin only. The uuid is generated at first start and is the issuer in every token subject.
+// Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope `<service id>:admin` for administrator permissions. Admin only.
 //
 // Corresponds with GET /api/system/service_id (the `GetServiceId` operationId).
 func (c *Client) GetServiceId(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38224,7 +38224,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetServiceIdWithResponse Get the service id
 	//
-	// Returns the instance identity in the form jfrt@<uuid>. Admin only. The uuid is generated at first start and is the issuer in every token subject.
+	// Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope `<service id>:admin` for administrator permissions. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -65845,7 +65845,7 @@ func (c *ClientWithResponses) AddCertificateWithBodyWithResponse(ctx context.Con
 
 // GetServiceIdWithResponse Get the service id
 //
-// Returns the instance identity in the form jfrt@<uuid>. Admin only. The uuid is generated at first start and is the issuer in every token subject.
+// Returns this instance's service id as plain text, `jfrt@` followed by a UUID, with no trailing newline. The UUID is generated when the instance first starts and never changes; the access tokens the instance issues carry it after `jfac@` in their issuer and subject, and `POST /api/security/token` accepts the scope `<service id>:admin` for administrator permissions. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
