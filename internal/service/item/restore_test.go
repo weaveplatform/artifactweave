@@ -30,11 +30,25 @@ func TestRestoreRecord(t *testing.T) {
 	) {
 		t.Fatalf("restore to the root: %v", err)
 	}
+	// The repository's own properties stay on the repository: a restore
+	// brings back the item's alone (7.x fixed the reverse, RTFACT-29810).
+	root, err := w.svc.EnsureRoot(ctx, Target{Repo: w.loc}, "alice")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := w.svc.Annotate(ctx, w.loc, root, types.Properties{"k": {"repo"}, "r": {"1"}},
+		nil); err != nil {
+		t.Fatal(err)
+	}
 	// A file restored where a file is in the way replaces it.
 	got, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "b/copy.txt"},
 		types.TrashRecord{Item: f, Properties: types.Properties{"k": {"v"}}}, "bob")
 	if err != nil || got.FullPath() != "b/copy.txt" || got.Actual.SHA256 != f.Actual.SHA256 {
 		t.Fatalf("restore %+v, %v", got, err)
+	}
+	if props, err := w.db.Items().Properties(ctx, got.ID); err != nil ||
+		len(props) != 1 || !props.Has("k", "v") {
+		t.Fatalf("restored properties %v, %v", props, err)
 	}
 	if _, err := w.svc.Restore(ctx, Target{Repo: w.loc, Path: "a/f.txt/x"},
 		types.TrashRecord{Item: f}, "bob"); !errors.Is(err, ErrConflict) {

@@ -146,7 +146,10 @@ func (i items) Children(
 	return i.page(
 		ctx,
 		p,
-		func(it types.Item) bool { return it.RepoKey == repoKey && it.Cached == cached && it.Path == folder },
+		func(it types.Item) bool {
+			// The root's record has the root's path too, but is not inside it.
+			return it.RepoKey == repoKey && it.Cached == cached && it.Path == folder && !it.IsRoot()
+		},
 		func(a, b types.Item) int { return cmp.Compare(a.Name, b.Name) },
 		func(it types.Item) []any { return []any{it.Name} },
 	)
@@ -160,7 +163,8 @@ func (i items) Descendants(
 		ctx,
 		p,
 		func(it types.Item) bool {
-			return it.RepoKey == repoKey && it.Cached == cached && below(it.Path, folder)
+			return it.RepoKey == repoKey && it.Cached == cached && below(it.Path, folder) &&
+				!it.IsRoot()
 		},
 		func(a, b types.Item) int { return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Name, b.Name)) },
 		func(it types.Item) []any { return []any{it.Path, it.Name} },
@@ -172,7 +176,9 @@ func (i items) Delete(
 ) (store.DeleteResult, error) {
 	res := store.DeleteResult{BlobRefs: map[string]int64{}}
 	err := i.s.do(ctx, func() error {
-		match := func(it types.Item) bool { return it.RepoKey == repoKey && it.Cached == cached }
+		match := func(it types.Item) bool {
+			return it.RepoKey == repoKey && it.Cached == cached && !it.IsRoot()
+		}
 		if folderPath(fullPath) != types.RootPath {
 			target, err := i.lookup(repoKey, cached, fullPath)
 			if err != nil {
@@ -215,6 +221,51 @@ func (i items) remove(it types.Item) {
 		func(f types.VersionFile, _ bool) bool { return f.ItemID == it.ID })
 }
 
+func (i items) Root(ctx context.Context, repoKey string, cached bool) (types.Item, error) {
+	var out types.Item
+	err := i.s.do(ctx, func() error {
+		id, ok := i.byPath().get(keyOf(types.RootItem(repoKey, cached)))
+		if !ok {
+			return notFound("repository root", repoKey)
+		}
+		out, _ = i.t().get(id)
+		return nil
+	})
+	return out, err
+}
+
+func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error) {
+	if r.RepoKey == "" {
+		return r, fmt.Errorf("repository root: repository key is required: %w", store.ErrInvalid)
+	}
+	root := types.RootItem(r.RepoKey, r.Cached)
+	root.Created, root.CreatedBy = r.Created, r.CreatedBy
+	root.Modified, root.ModifiedBy, root.Updated = r.Modified, r.ModifiedBy, r.Updated
+	var out types.Item
+	err := i.s.do(ctx, func() error {
+		id, ok := i.byPath().get(keyOf(root))
+		if !ok {
+			id = i.s.nextID("items")
+			root.ID = id
+			i.byPath().put(keyOf(root), id)
+			i.t().put(id, root)
+		}
+		out, _ = i.t().get(id)
+		return nil
+	})
+	return out, err
+}
+
+func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
+	return i.s.do(ctx, func() error {
+		if id, ok := i.byPath().get(keyOf(types.RootItem(repoKey, cached))); ok {
+			it, _ := i.t().get(id)
+			i.remove(it)
+		}
+		return nil
+	})
+}
+
 func (i items) FindByChecksum(
 	ctx context.Context,
 	c types.Checksums,
@@ -253,6 +304,9 @@ func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 	err := i.s.do(ctx, func() error {
 		totals := map[itemKey]*store.RepoUsage{}
 		for _, it := range i.t().rows {
+			if it.IsRoot() {
+				continue
+			}
 			k := itemKey{repo: it.RepoKey, cached: it.Cached}
 			u, ok := totals[k]
 			if !ok {

@@ -44,6 +44,14 @@ func TestSplitItemPath(t *testing.T) {
 	if (types.Item{Name: "x"}).FullPath() != "x" {
 		t.Error("empty parent is the root")
 	}
+	root := types.RootItem("r", true)
+	if !root.IsRoot() || !root.Folder || !root.Cached || root.FullPath() != "" ||
+		root.StoragePath() != "/" {
+		t.Errorf("root record %+v: full path %q", root, root.FullPath())
+	}
+	if (types.Item{Path: types.RootPath, Name: "x"}).IsRoot() {
+		t.Error("an item at the root is not the root")
+	}
 }
 
 func TestRepoKeyAliasing(t *testing.T) {

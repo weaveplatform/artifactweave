@@ -1,13 +1,17 @@
-# repositories: local repositories, with properties on one file
+# repositories: local repositories, with properties on a repository and one file
 
-A local generic repository with a set of properties on one file in it, and local npm, Go,
-Maven and Gradle repositories, managed with the `jfrog/artifactory` provider. Use it as the starting point for repository configuration kept
+A local generic repository with a set of properties on the repository itself and another on
+one file in it, and local npm, Go, Maven and Gradle repositories, managed with the
+`jfrog/artifactory` provider. Use it as the starting point for repository configuration kept
 in Terraform. See [Managing artifactweave with Terraform](../../README.md) for the providers
 and how to authenticate them.
 
 ## What it configures
 
 - `artifactory_local_generic_repository.this`: the local generic repository `repository_key`.
+- `artifactory_item_properties.repository`: `repository_properties` on the generic repository
+  itself. The resource has no `item_path`, so the provider sets them on the repository root,
+  and `is_recursive` is false, so they do not reach the files in it.
 - `artifactory_item_properties.this`: `properties` on the file at `item_path` in that
   repository, when `with_properties` is true.
 - `artifactory_local_npm_repository.this` and `artifactory_local_go_repository.this`: local npm
@@ -41,6 +45,10 @@ properties = {
   team = ["platform"]
   tier = ["gold", "silver"]
 }
+repository_properties = {
+  owner = ["platform"]
+  stage = ["test", "release"]
+}
 ```
 
 Pass the token through the environment rather than a file: `export TF_VAR_access_token=…`.
@@ -52,10 +60,10 @@ are applied. That takes two applies:
 
 ```sh
 terraform init
-terraform apply -var with_properties=false   # the repository
+terraform apply -var with_properties=false   # the repository and its own properties
 curl -fsS -H "Authorization: Bearer $TF_VAR_access_token" -X PUT --data-binary @fixture.txt \
   "$TF_VAR_url/artifactory/generic-local/fixture.txt"
-terraform apply                               # the properties
+terraform apply                               # the file's properties
 ```
 
 A second `terraform plan` shows no changes: the provider reads back exactly what it wrote,
@@ -80,7 +88,8 @@ The gated `terraform` job runs `test/terraform/run.sh` against a fresh `-cover` 
 (see [docs/testing/ci.md](../../../../docs/testing/ci.md#terraform-scenarios)). It passes
 `repository_key = tf-generic-local` and `item_path = fixture.txt`, applies with
 `with_properties = false`, deploys `fixture.txt`, applies again, requires an empty plan and
-destroys everything. The npm, Go, Maven and Gradle repositories keep their default keys, and
+destroys everything. The empty plan also proves the repository's own properties read back as
+written. The npm, Go, Maven and Gradle repositories keep their default keys, and
 the empty plan is what proves their layouts and the Maven and Gradle settings round-trip.
 
 ## Reference
@@ -109,6 +118,7 @@ No modules.
 
 | Name | Type |
 | ---- | ---- |
+| [artifactory_item_properties.repository](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/item_properties) | resource |
 | [artifactory_item_properties.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/item_properties) | resource |
 | [artifactory_local_generic_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_generic_repository) | resource |
 | [artifactory_local_go_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_go_repository) | resource |
@@ -128,6 +138,7 @@ No modules.
 | npm\_repository\_key | Key of the local npm repository. | `string` | `"npm-local"` | no |
 | properties | Properties to set on item\_path, each a key with its values. | `map(list(string))` | ```{ "team": [ "platform" ], "tier": [ "gold", "silver" ] }``` | no |
 | repository\_key | Key of the local generic repository. | `string` | `"generic-local"` | no |
+| repository\_properties | Properties to set on the generic repository itself, each a key with its values. | `map(list(string))` | ```{ "owner": [ "platform" ], "stage": [ "test", "release" ] }``` | no |
 | url | Base URL of artifactweave, without /artifactory, for example https://artifacts.example.com. | `string` | n/a | yes |
 | with\_properties | Whether to set the properties on item\_path. Apply with false first, deploy the file, then apply with true. | `bool` | `true` | no |
 
@@ -138,4 +149,5 @@ No modules.
 | item\_path | Path of the file the properties are set on, or null while with\_properties is false. |
 | package\_repository\_keys | Keys of the local npm, Go, Maven and Gradle repositories, by format. |
 | repository\_key | Key of the local generic repository. |
+| repository\_properties | Properties set on the generic repository itself. |
 <!-- END_TF_DOCS -->

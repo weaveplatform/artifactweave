@@ -62,9 +62,24 @@ type Item struct {
 	RemoteURL  string    `json:"remote_url,omitempty"`
 }
 
-// FullPath is the item's path inside its repository without a leading slash.
+// RootItem is the record of a repository root, which holds the properties
+// set on the repository itself. AQL reports a root with "." as both its path
+// and its name and a depth of 0, so the record is stored that way; no other
+// item can be named ".", because SplitItemPath refuses the segment.
+func RootItem(repoKey string, cached bool) Item {
+	return Item{RepoKey: repoKey, Cached: cached, Path: RootPath, Name: RootPath, Folder: true}
+}
+
+// IsRoot reports whether i is a repository root's record (RootItem).
+func (i Item) IsRoot() bool { return i.Path == RootPath && i.Name == RootPath }
+
+// FullPath is the item's path inside its repository without a leading slash,
+// "" for a repository root.
 func (i Item) FullPath() string {
-	if i.Path == RootPath || i.Path == "" {
+	switch {
+	case i.IsRoot():
+		return ""
+	case i.Path == RootPath || i.Path == "":
 		return i.Name
 	}
 	return i.Path + "/" + i.Name
