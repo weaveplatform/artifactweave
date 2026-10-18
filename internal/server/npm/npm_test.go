@@ -45,10 +45,12 @@ const (
 
 // fixture is the npm protocol mounted as the server mounts it, over a
 // store whose npm-local holds what each test deploys. A request names its
-// principal in X-Test-User: none, anonymous, or a user, whose grants the
-// fixture gives:
+// principal in X-Test-User: none, anonymous, admin, or a user, whose
+// grants the fixture gives:
 //   - reader reads all of npm-local;
 //   - partial reads only the 1.x tarballs of package mixed;
+//   - writer reads, deploys and deletes all of npm-local;
+//   - narrow reads and deploys only the 1.x tarballs of package pkg;
 //   - nobody holds nothing.
 type fixture struct {
 	h      http.Handler
@@ -56,6 +58,9 @@ type fixture struct {
 	items  *item.Service
 	tick   time.Time
 	faults []error
+	// opts and principal are what the router is mounted with.
+	opts      pkgroute.Options
+	principal func(http.Handler) http.Handler
 }
 
 func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
@@ -70,20 +75,23 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 			t.Fatal(err)
 		}
 	}
-	grant := func(user, include string) {
+	grant := func(user, include string, actions types.Actions) {
 		t.Helper()
 		if err := db.Permissions().Create(ctx, types.Permission{
 			Name: user,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{user: types.ActionRead}},
+				Actions: types.Grants{Users: map[string]types.Actions{user: actions}},
 				Targets: map[string]types.Target{"npm-local": {Include: []string{include}}},
 			}},
 		}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	grant("reader", "**")
-	grant("partial", "mixed/-/mixed-1.*")
+	read, write, del := types.ActionRead, types.ActionWrite, types.ActionDelete
+	grant("reader", "**", read)
+	grant("partial", "mixed/-/mixed-1.*", read)
+	grant("writer", "**", read|write|del)
+	grant("narrow", "pkg/-/pkg-1.*", read|write)
 	blobs, err := fs.New(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -103,16 +111,15 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 		ItemError: func(_ context.Context, _ string, err error) error { return err },
 		Fault:     func(_ *http.Request, err error) { f.faults = append(f.faults, err) },
 	}
-	r := chi.NewRouter()
-	r.Use(baseurl.Middleware(base))
-	r.Use(func(next http.Handler) http.Handler {
+	f.opts = o
+	f.principal = func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			name := r.Header.Get("X-Test-User")
 			if name == "" {
 				next.ServeHTTP(w, r)
 				return
 			}
-			p := auth.Principal{Name: name}
+			p := auth.Principal{Name: name, Admin: name == "admin"}
 			if name == auth.AnonymousUser {
 				p = auth.Anonymous
 			}
@@ -124,10 +131,19 @@ func newFixture(t *testing.T, wrap ...func(store.Store) store.Store) *fixture {
 			}
 			next.ServeHTTP(w, r.WithContext(auth.WithPrincipal(r.Context(), p)))
 		})
-	})
-	pkgroute.Mount(r, o, npm.Protocol())
-	f.h = r
+	}
+	f.remount(t, npm.Options{})
 	return f
+}
+
+// remount mounts the npm protocol afresh, with o.
+func (f *fixture) remount(t *testing.T, o npm.Options) {
+	t.Helper()
+	r := chi.NewRouter()
+	r.Use(baseurl.Middleware(base))
+	r.Use(f.principal)
+	pkgroute.Mount(r, f.opts, npm.Protocol(o))
+	f.h = r
 }
 
 // now is a clock a minute later at each deploy, so each version has its

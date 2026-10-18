@@ -147,6 +147,8 @@ work:
   max_attempts: 4
 build:
   block_duplicate_entries: false
+npm:
+  max_publish_size: 256MiB
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -199,6 +201,7 @@ build:
 		},
 		Work:  WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
 		Build: BuildConfig{BlockDuplicateEntries: false},
+		NPM:   NPMConfig{MaxPublishSize: 256 << 20},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -242,6 +245,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
+		cfg.NPM.MaxPublishSize != 8<<20 ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -860,6 +864,27 @@ func TestWorkConfig(t *testing.T) {
 	if err != nil || got.Work.Workers != 9 || got.Work.Lease != time.Minute ||
 		got.Work.MaxAttempts != 10 {
 		t.Fatalf("load: %+v, %v", got.Work, err)
+	}
+}
+
+func TestNPMConfig(t *testing.T) {
+	if d := Default().NPM.MaxPublishSize; d != 1<<30 {
+		t.Fatalf("default %s", d)
+	}
+	for _, v := range []string{"0", "-1MiB", "lots"} {
+		if _, err := Load(
+			LoadOptions{Flags: map[string]string{"npm.max_publish_size": v}},
+		); err == nil {
+			t.Errorf("%s accepted", v)
+		}
+	}
+	got, err := Load(LoadOptions{
+		File:  writeFile(t, "npm:\n  max_publish_size: 2GiB\n"),
+		Env:   envOf(map[string]string{"ARTIFACTWEAVE_NPM_MAX_PUBLISH_SIZE": "512MiB"}),
+		Flags: map[string]string{},
+	})
+	if err != nil || got.NPM.MaxPublishSize != 512<<20 {
+		t.Fatalf("load: %+v, %v", got.NPM, err)
 	}
 }
 

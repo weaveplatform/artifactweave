@@ -28,6 +28,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/authz"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -465,6 +466,60 @@ func (k *Kit) StoreOnce(
 		}
 	}
 	return stored, nil
+}
+
+// Upload streams body into the blob store under the request's repository's
+// checksum policy and stores no item, for a protocol that learns where
+// content goes only from the content, such as an npm publish, whose
+// tarball may come before the fields that name its version. StoreNew then
+// stores it; content no item comes to reference is collected as an orphan.
+func (k *Kit) Upload(r *http.Request, body io.Reader) (blob.Info, error) {
+	ctx := r.Context()
+	info, err := k.o.Items().Upload(ctx, item.Deploy{
+		Target: item.Target{Repo: RequestFrom(r).Repo}, Body: body,
+	})
+	if err != nil {
+		return blob.Info{}, k.o.ItemError(ctx, "deploy", err)
+	}
+	return info, nil
+}
+
+// Blobs is the blob store Upload commits to, for a handler that reads
+// what it uploaded before deciding where to store it.
+func (k *Kit) Blobs() blob.Store { return k.o.Items().Blobs }
+
+// StoreNew stores content Upload committed as a new file at path in the
+// request's repository, with props, and answers exists() when path already
+// holds an item: a file published once and never replaced, such as an npm
+// version's tarball (decision 0034). The caller needs Write on path, and
+// never Delete. The item service checks the path inside the write's
+// transaction, so only a store of the same path committing at the same
+// moment can slip past it, and then on PostgreSQL alone, whose
+// transactions read what others committed.
+func (k *Kit) StoreNew(
+	r *http.Request,
+	path string,
+	info blob.Info,
+	props types.Properties,
+	exists func() error,
+) (types.Item, error) {
+	ctx := r.Context()
+	c := RequestFrom(r).Repo
+	if !can(r, c, path, types.ActionWrite) {
+		return types.Item{}, refusal(r)
+	}
+	p, _ := auth.FromContext(ctx)
+	it, err := k.o.Items().DeployCommitted(ctx, item.Deploy{
+		Target: item.Target{Repo: c, Path: path}, Properties: props, By: p.Name,
+		IfAbsent: true,
+	}, info)
+	switch {
+	case errors.Is(err, item.ErrExists):
+		return types.Item{}, exists()
+	case err != nil:
+		return types.Item{}, k.o.ItemError(ctx, "deploy", err)
+	}
+	return it, nil
 }
 
 // Deploy answers a PUT whose body is the file to store at path, with the

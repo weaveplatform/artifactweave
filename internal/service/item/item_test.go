@@ -236,6 +236,32 @@ func TestDeployConflicts(t *testing.T) {
 	}
 }
 
+func TestDeployIfAbsent(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	once := func(p, body string) (types.Item, error) {
+		return w.svc.Deploy(ctx, Deploy{
+			Target: Target{Repo: w.loc, Path: p}, Body: strings.NewReader(body), IfAbsent: true,
+		})
+	}
+	if _, err := once("pkg/-/pkg-1.0.0.tgz", "first"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := once("pkg/-/pkg-1.0.0.tgz", "second"); !errors.Is(err, ErrExists) {
+		t.Fatalf("over a file: %v", err)
+	}
+	if _, err := once("pkg", "x"); !errors.Is(err, ErrExists) {
+		t.Fatalf("over a folder: %v", err)
+	}
+	got, err := w.db.Items().Get(ctx, w.loc.Key, false, "pkg/-/pkg-1.0.0.tgz")
+	if err != nil || got.Actual.SHA256 != sums("first").SHA256 {
+		t.Fatalf("the first file was replaced: %+v %v", got, err)
+	}
+	if b, err := w.db.Blobs().Get(ctx, sums("second").SHA256); err == nil && b.Refs != 0 {
+		t.Fatalf("refused content referenced: %+v", b)
+	}
+}
+
 func TestDeployUploadFails(t *testing.T) {
 	w := newWorld(t)
 	_, err := w.svc.Deploy(context.Background(), Deploy{

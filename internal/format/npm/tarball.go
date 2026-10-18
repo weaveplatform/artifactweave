@@ -198,9 +198,11 @@ func installs(raw json.RawMessage) bool {
 	return false
 }
 
-// readStored reads the stored content sha as a tarball; ok is false when
-// it is none the format can index.
-func readStored(ctx context.Context, blobs format.Blobs, sha string) (*Tarball, bool, error) {
+// ReadStored reads the stored content sha as a tarball; ok is false when
+// it is none the format can index. The npm publish handler reads the
+// tarball it uploaded with it, to check it against the body before
+// storing it.
+func ReadStored(ctx context.Context, blobs format.Blobs, sha string) (*Tarball, bool, error) {
 	rc, info, err := blobs.Open(ctx, sha)
 	if err != nil {
 		return nil, false, fmt.Errorf("npm: open %s: %w", sha, err)

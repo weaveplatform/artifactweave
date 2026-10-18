@@ -47,6 +47,8 @@ var (
 	)
 	// ErrNotFound is a missing item.
 	ErrNotFound = store.ErrNotFound
+	// ErrExists is a deploy with IfAbsent to a path that holds an item.
+	ErrExists = errors.New("item: the path already holds an item")
 )
 
 // Service writes items into a store and its blob store.
@@ -89,6 +91,11 @@ type Deploy struct {
 	// Properties are set on the item (matrix parameters).
 	Properties types.Properties
 	By         string
+	// IfAbsent stores the file only when nothing is at its path, and
+	// refuses with ErrExists otherwise, for a file published once, such as
+	// an npm version's tarball. The check is made in the write's
+	// transaction, after the content is stored.
+	IfAbsent bool
 }
 
 // ParseChecksums checks declared checksums: lowercase hex of the length of
@@ -358,6 +365,8 @@ func (s *Service) writeFile(
 	}
 	old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
 	switch {
+	case err == nil && d.IfAbsent:
+		return types.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
 	case err == nil && old.Folder:
 		return types.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
 	case err == nil:

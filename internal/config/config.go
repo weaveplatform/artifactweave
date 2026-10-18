@@ -58,6 +58,10 @@ const (
 	DefaultWorkWorkers     = 4
 	DefaultWorkLease       = 2 * time.Minute
 	DefaultWorkMaxAttempts = 10
+	// DefaultNPMMaxPublishSize is decision 0034's cap on an npm publish
+	// body. The body carries the tarball in base64, a third larger than the
+	// tarball itself.
+	DefaultNPMMaxPublishSize ByteSize = 1 << 30
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -85,6 +89,7 @@ type Config struct {
 	Search            SearchConfig    `yaml:"search"`
 	Work              WorkConfig      `yaml:"work"`
 	Build             BuildConfig     `yaml:"build"`
+	NPM               NPMConfig       `yaml:"npm"`
 }
 
 // BuildConfig holds the build-info settings (decision 0014).
@@ -93,6 +98,13 @@ type BuildConfig struct {
 	// one file twice, as Artifactory 7.x's
 	// artifactory.build.block.duplicate.entries does by default.
 	BlockDuplicateEntries bool `yaml:"block_duplicate_entries"`
+}
+
+// NPMConfig holds the npm registry's options (decision 0034).
+type NPMConfig struct {
+	// MaxPublishSize is the largest npm publish request accepted; a larger
+	// one answers 413.
+	MaxPublishSize ByteSize `yaml:"max_publish_size"`
 }
 
 // WorkConfig sizes the persistent work queue (decision 0033), which runs
@@ -239,6 +251,7 @@ func Default() Config {
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
 		Build: BuildConfig{BlockDuplicateEntries: true},
+		NPM:   NPMConfig{MaxPublishSize: DefaultNPMMaxPublishSize},
 	}
 }
 
@@ -308,6 +321,7 @@ var keys = append(append([]string{
 	"search.user_query_limit", "search.limit_anonymous_users_only",
 	"work.workers", "work.lease", "work.max_attempts",
 	"build.block_duplicate_entries",
+	"npm.max_publish_size",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -355,11 +369,7 @@ func set(cfg *Config, key, value string) error {
 	case "gc.grace_period":
 		return setDuration(&cfg.GC.GracePeriod, key, value)
 	case "download.redirect.min_size":
-		n, err := ParseByteSize(value)
-		if err != nil {
-			return fmt.Errorf("%s: %w", key, err)
-		}
-		cfg.Download.Redirect.MinSize = n
+		return setByteSize(&cfg.Download.Redirect.MinSize, key, value)
 	case "download.redirect.ttl":
 		return setDuration(&cfg.Download.Redirect.TTL, key, value)
 	case "search.aql.max_results":
@@ -378,6 +388,8 @@ func set(cfg *Config, key, value string) error {
 		return setInt(&cfg.Work.MaxAttempts, key, value)
 	case "build.block_duplicate_entries":
 		return setBool(&cfg.Build.BlockDuplicateEntries, key, value)
+	case "npm.max_publish_size":
+		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -397,6 +409,15 @@ func setInt(dst *int, key, value string) error {
 	n, err := strconv.Atoi(value)
 	if err != nil {
 		return fmt.Errorf("%w: %s=%q is not an integer", ErrInvalidValue, key, value)
+	}
+	*dst = n
+	return nil
+}
+
+func setByteSize(dst *ByteSize, key, value string) error {
+	n, err := ParseByteSize(value)
+	if err != nil {
+		return fmt.Errorf("%s: %w", key, err)
 	}
 	*dst = n
 	return nil
@@ -484,6 +505,10 @@ func (c Config) Validate() error {
 	if c.Work.Lease < time.Second {
 		errs = append(errs, fmt.Errorf("%w: work.lease %s must be at least 1s",
 			ErrInvalidValue, c.Work.Lease))
+	}
+	if c.NPM.MaxPublishSize <= 0 {
+		errs = append(errs, fmt.Errorf("%w: npm.max_publish_size %s must be more than zero",
+			ErrInvalidValue, c.NPM.MaxPublishSize))
 	}
 	return errors.Join(errs...)
 }

@@ -62,7 +62,7 @@ func (Handler) Inspect(
 	if w.Checksums.SHA256 == "" || !candidate(w.Path) {
 		return nil, nil //nolint:nilnil // nothing to read is no failure
 	}
-	t, ok, err := readStored(ctx, env.Blobs, w.Checksums.SHA256)
+	t, ok, err := ReadStored(ctx, env.Blobs, w.Checksums.SHA256)
 	if err != nil || !ok {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func tarballOf(ctx context.Context, env format.Env, it types.Item) (*Tarball, bo
 	if t, ok := env.Inspection.(*Tarball); ok && t.SHA256 == it.Actual.SHA256 {
 		return t, true, nil
 	}
-	return readStored(ctx, env.Blobs, it.Actual.SHA256)
+	return ReadStored(ctx, env.Blobs, it.Actual.SHA256)
 }
 
 // Annotated follows a change to an indexed tarball's dist-tags or

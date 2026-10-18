@@ -108,6 +108,7 @@ func serve(
 			},
 			DockerSubdomainMatch:       cfg.Docker.SubdomainMatch,
 			AllowDuplicateBuildEntries: !cfg.Build.BlockDuplicateEntries,
+			NPMMaxPublishSize:          int64(cfg.NPM.MaxPublishSize),
 			Work:                       rt.work,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,
