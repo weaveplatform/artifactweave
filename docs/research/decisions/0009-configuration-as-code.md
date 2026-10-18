@@ -2,16 +2,21 @@
 
 Status: Proposed
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
 
 ## Context
 
 The project is built around GitOps: repositories, access policies and retention rules are
 declared as code and managed through Terraform and the API. Artifactory already has a
 declarative form, the YAML descriptor accepted by `PATCH /api/system/configuration`
-(repositories, proxies, property sets, layouts, backups, security settings), and a
-bootstrap file applied at first start. The repository's own conventions require strict
-YAML for the application configuration with flag, environment and file precedence.
+(repositories, proxies, property sets, layouts, backups, security settings). Its bootstrap
+file, `artifactory.config.import.yml`, applied once at first start, is a different and
+smaller format: a license key, the base URL, proxies and the package types to create
+default repositories for ([bootstrap YAML](https://docs.jfrog.com/installation/docs/artifactory-bootstrap-yaml-file.md),
+[research 06](../06-system-configuration-and-descriptor.md#semantics)). artifactweave's
+`--bootstrap` takes the PATCH descriptor instead (layer 2 below). The repository's own
+conventions require strict YAML for the application configuration with flag, environment
+and file precedence.
 
 ## Decision
 

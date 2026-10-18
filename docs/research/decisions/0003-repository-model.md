@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 03](../03-repository-configuration-model.md#artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 03](../03-repository-configuration-model.md#artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -22,9 +22,13 @@ port per repository), each needing reverse-proxy or DNS support.
 in [03-repository-configuration-model](../03-repository-configuration-model.md): the
 common fields, the local, remote, virtual and federated fields, the per-package-type
 fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
-in either spelling, written as booleans) and the provider-only keys. Validation enforces the allowed package types per class, the layout
-reference, the include and exclude patterns and the per-type constraints. The struct is
-importable because other weave repositories will declare repositories as code.
+in either spelling, written as booleans) and the provider-only keys. Validation
+(`repo.Validate`) checks the key, the class, the package types allowed for the class, the
+fields scoped to a class (`terraformType`, `proxy`), a remote's `url`, a virtual's members
+and default deployment repository, and that counts and periods are not negative. It does
+not check `repoLayoutRef` against the known layouts, the include and exclude patterns or
+the enumerated values. The struct is importable because other weave repositories will
+declare repositories as code.
 
 **Classes.** `local`, `remote`, `virtual` and `federated` are implemented. A federated
 repository is a local repository whose members are paired artifactweave peers, kept in
@@ -34,8 +38,10 @@ when federation came into scope.
 
 **Package types in scope.** `docker`, `oci`, `helm`, `helmoci`, `npm`, `maven`, `gradle`,
 `go`, `pypi`, `nuget`, `terraform`, `generic`, and `releasebundles` as the storing
-repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types are rejected with the
-Artifactory envelope and a message naming the type.
+repository type for release bundles v1 ([0023](0023-release-bundles-and-distribution.md)). Other types the class allows are
+accepted, and their configuration is persisted and echoed with no package handler of its
+own. A type the class does not allow is refused with the Artifactory envelope and a
+message naming the type.
 
 **Package-type handlers.** Each type registers capabilities with the repository service:
 its layout, its metadata generation (what to rebuild on write and delete), its remote
@@ -151,11 +157,24 @@ The decision stands against 7.161.32
 - **`includesPattern`** defaults to everything when a create request omits it (7.117.5), as
   here.
 
+The audit in [#378](https://github.com/weaveplatform/artifactweave/issues/378) found where
+the Repositories API differs from 7.x. The issue named changes the code, and
+[research 03](../03-repository-configuration-model.md#artifactory-7x-check) lists the
+differences in the configuration model:
+- 7.x differs: `GET /api/repositories` gives `packageType` as the capitalised type name, such as `"Generic"` and `"Maven"` ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md); [S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go) expects `"Alpine"`); fixed by [#392](https://github.com/weaveplatform/artifactweave/issues/392).
+- 7.x differs: a read sends an empty `description` and `notes` as `""` and empty `propertySets` as `[]` ([D] [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and the v2 samples); fixed by [#392](https://github.com/weaveplatform/artifactweave/issues/392).
+- 7.x differs: the v2 read of a generic local repository has no `checksumPolicyType`, `priorityResolution`, `environments` or `forceMetadataNameVersion` ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`); fixed by [#392](https://github.com/weaveplatform/artifactweave/issues/392).
+- 7.x differs: deleting `artifactory-build-info` answers 403 "Deletion of Build Info repository artifactory-build-info is not allowed." ([D] [deleterepositories](https://docs.jfrog.com/artifactory/reference/deleterepositories.md), example `buildInfoBlocked`); fixed by [#397](https://github.com/weaveplatform/artifactweave/issues/397).
+- 7.x differs: a batch delete of `[]` answers 400 with the `statusMessage` "No repository keys were provided for deletion" ([D] deleterepositories, example `emptyRepoKeyList`); fixed by [#397](https://github.com/weaveplatform/artifactweave/issues/397).
+- 7.x differs: a batch delete in which every repository failed has the `statusMessage` "Repositories batch removal failed" ([D] deleterepositories, the 403, 409, 424 and 500 examples); fixed by [#397](https://github.com/weaveplatform/artifactweave/issues/397).
+- 7.x differs: a YAML PATCH can change a repository's package type ([D] [patchsystemconfiguration](https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md): "it is easy to overwrite configurations, such as a repository's package type"). artifactweave refuses the change on every write path, a deviation registered by #378.
+
 ## Constraints
 
-- Keys and types that Artifactory accepts but artifactweave does not implement must fail
-  loudly at create time, never at first use.
-- `terraformbackend` is out of v1 scope and is rejected at create time.
+- Package types that artifactweave does not implement are accepted and persisted; nothing
+  serves their package protocol.
+- `terraformbackend` is out of v1 scope. Like the other unimplemented types, it is
+  accepted and persisted, with no state API behind it.
 - A Docker repository whose key a client cannot send is reachable only through the
   Artifactory REST API; this is documented in the operator guide.
 - The subdomain option needs wildcard DNS and a certificate for `*.<base_url host>`; a

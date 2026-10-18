@@ -43,9 +43,12 @@ const (
 	mediaShared    = "application/vnd.org.jfrog.artifactory.repositories.SharedRemoteRepositoryConfiguration+json"
 )
 
-// Messages quoted from JFrog's documented examples. The plain-text
-// confirmations of create and update are documented only as plain text, so
-// theirs are our own wording, as are the error messages not listed here.
+// Messages quoted from JFrog's documented examples. The create confirmation,
+// "Successfully created repository '<key>'", is quoted from JFrog's curl
+// integration page
+// (https://docs.jfrog.com/integrations/docs/curl-integration.md). No JFrog
+// page shows the update confirmation, so its wording is our own, as are the
+// error messages not listed here.
 const (
 	msgKeyExists  = repos.MsgKeyExists
 	msgProtected  = "Cannot delete repository: repository key is blank, trash or support bundle"

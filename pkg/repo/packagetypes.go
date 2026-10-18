@@ -68,8 +68,10 @@ const (
 // DefaultLayout returns the repoLayoutRef the JFrog Terraform provider assigns
 // to a package type when the caller sets none. The REST API itself falls back
 // to maven-2-default for every type when the field is omitted, which Defaults
-// reproduces; this map is for callers that want the ecosystem-appropriate
-// layout, such as the descriptor importer.
+// reproduces. Nothing in artifactweave calls this outside the tests: every
+// create path, the descriptor's included, goes through Defaults and stores
+// maven-2-default. It is exported for importers of pkg/repo that want the
+// ecosystem-appropriate layout.
 func DefaultLayout(packageType PackageType, terraformType TerraformType) string {
 	switch packageType {
 	case Maven, Gradle:
