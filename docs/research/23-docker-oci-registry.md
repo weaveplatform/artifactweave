@@ -586,7 +586,7 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   supported on Cloud instances"), and neither the deprecations nor the end-of-life page
   removes them, where artifactweave serves only `.../v1/auth`
   ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#use-docker-v1),
-  "Use Docker V1"); a deviation registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
+  "Use Docker V1"); recorded as a cut in [research 10](10-scope-and-tiers.md#product-families).
 - **Challenge on the repository-path method.** 7.x differs: 7.71.5 challenges with
   `realm="<host>/v2/token"` and a scope that names the image without the repository key,
   where artifactweave names the repository's realm and keeps the key in the scope

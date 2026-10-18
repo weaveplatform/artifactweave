@@ -351,7 +351,7 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
   [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
 - 7.x differs: self-managed 7.x still documents Docker V1 repositories, which this
   decision does not serve ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#use-docker-v1),
-  "Use Docker V1"); a deviation registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
+  "Use Docker V1"); recorded as a cut in [research 10](../10-scope-and-tiers.md#product-families).
 
 ## Constraints
 
