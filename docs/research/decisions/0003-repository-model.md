@@ -24,11 +24,15 @@ common fields, the local, remote, virtual and federated fields, the per-package-
 fields, the enumerations, the defaults, the booleans JFrog documents as strings (accepted
 in either spelling, written as booleans) and the provider-only keys. Validation
 (`repo.Validate`) checks the key, the class, the package types allowed for the class, the
-fields scoped to a class (`terraformType`, `proxy`), a remote's `url`, a virtual's members
-and default deployment repository, and that counts and periods are not negative. It does
-not check `repoLayoutRef` against the known layouts, the include and exclude patterns or
-the enumerated values. The struct is importable because other weave repositories will
-declare repositories as code.
+fields scoped to a class (`terraformType`, `proxy`), a remote's `url`, that a virtual's
+default deployment repository is one of its members, and that counts and periods are not
+negative. It does not check `repoLayoutRef` against the known layouts, the include and
+exclude patterns or the enumerated values. A virtual repository may have no members;
+`repos.CheckMembers` checks the members against the stored repositories: each must exist
+and have the virtual repository's package type unless it is generic, with the Maven
+family counted as one type ([research 03](../03-repository-configuration-model.md),
+[#394](https://github.com/weaveplatform/artifactweave/issues/394)). The struct is
+importable because other weave repositories will declare repositories as code.
 
 **Classes.** `local`, `remote`, `virtual` and `federated` are implemented. A federated
 repository is a local repository whose members are paired artifactweave peers, kept in

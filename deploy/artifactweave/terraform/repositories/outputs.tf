@@ -22,3 +22,11 @@ output "package_repository_keys" {
     gradle = artifactory_local_gradle_repository.this.key
   }
 }
+
+output "virtual_repository_keys" {
+  description = "Keys of the virtual npm repository and of the virtual Maven repository, which has no members."
+  value = {
+    npm   = artifactory_virtual_npm_repository.this.key
+    maven = artifactory_virtual_maven_repository.empty.key
+  }
+}

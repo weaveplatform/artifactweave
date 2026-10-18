@@ -550,6 +550,8 @@ func repositoryMatrix() []matrixRow {
 		// Covered by the seeded Any Remote alone, which grants no one.
 		row("GET "+r+"/{repoKey}", r+"/remote-private", "", sees("remote-private"), 200),
 		row("PUT "+r+"/{repoKey}", r+"/new-{p}", `{"rclass":"local"}`, administrators, 200),
+		// A virtual repository without members (#394).
+		row("PUT "+r+"/{repoKey}", r+"/nv-{p}", `{"rclass":"virtual"}`, administrators, 200),
 		row("POST "+r+"/{repoKey}", r+"/libs-local", `{"description":"{p}"}`, administrators, 200),
 		row("DELETE "+r+"/{repoKey}", r+"/r-{p}", "", administrators, 200),
 		row("GET "+v2+"/{repoKey}", v2+"/libs-local", "", sees("libs-local"), 200),

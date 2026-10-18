@@ -68,3 +68,15 @@ variable "gradle_repository_key" {
   default     = "gradle-snapshots-local"
   description = "Key of the local Gradle snapshot repository."
 }
+
+variable "npm_virtual_repository_key" {
+  type        = string
+  default     = "npm"
+  description = "Key of the virtual npm repository over the local npm repository."
+}
+
+variable "maven_virtual_repository_key" {
+  type        = string
+  default     = "maven"
+  description = "Key of the virtual Maven repository, which has no members."
+}

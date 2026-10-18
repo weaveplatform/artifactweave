@@ -324,18 +324,22 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes environments as [] when the slice is empty but not nil,
-// which omitempty would drop: Masked relies on that for API responses, while
-// stored documents keep a nil slice and leave the key out. The outer field
-// shadows the embedded one because encoding/json prefers the shallower field.
+// MarshalJSON writes environments and repositories as [] when the slice is
+// empty but not nil, which omitempty would drop: Masked relies on that for
+// API responses, and a nil slice still leaves the key out. The outer fields
+// shadow the embedded ones because encoding/json prefers the shallower field.
 func (c Config) MarshalJSON() ([]byte, error) {
 	type plain Config
 	doc := struct {
 		plain
 		Environments *[]string `json:"environments,omitempty"`
+		Repositories *[]string `json:"repositories,omitempty"`
 	}{plain: plain(c)}
 	if c.Environments != nil {
 		doc.Environments = &c.Environments
+	}
+	if c.Repositories != nil {
+		doc.Repositories = &c.Repositories
 	}
 	b, err := json.Marshal(doc)
 	if err != nil {

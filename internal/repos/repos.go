@@ -58,15 +58,29 @@ func PrepareCreate(c repo.Config, existing []repo.Config) (repo.Config, error) {
 	return c, nil
 }
 
-// CheckMembers rejects a virtual repository whose members or default
-// deployment repository do not exist among known.
+// CheckMembers rejects a virtual repository whose members do not exist
+// among known, or have a package type the virtual repository cannot
+// aggregate (repo.AcceptsMember). The default deployment repository is a
+// member (repo.Validate), so it is covered too.
+//
+// The type check holds afterwards without a re-check: a repository's package
+// type cannot change (Merge), and Remove takes a deleted repository out of
+// every virtual repository, so a repository created again under its key
+// joins none until a write names it, which this check sees.
 func CheckMembers(c repo.Config, known []repo.Config) error {
 	if c.Class != repo.Virtual {
 		return nil
 	}
 	for _, m := range c.Repositories {
-		if !slices.ContainsFunc(known, func(k repo.Config) bool { return k.Key == m }) {
+		i := slices.IndexFunc(known, func(k repo.Config) bool { return k.Key == m })
+		if i < 0 {
 			return badRequest("Virtual repository member '%s' does not exist", m)
+		}
+		if t := known[i].PackageType; !repo.AcceptsMember(c.PackageType, t) {
+			return badRequest(
+				"Virtual repository member '%s' has package type '%s', which does not match "+
+					"the virtual repository's package type '%s'",
+				m, t, c.PackageType)
 		}
 	}
 	return nil

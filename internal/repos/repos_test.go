@@ -183,6 +183,82 @@ func TestRemove(t *testing.T) {
 	}
 }
 
+func TestCheckMembers(t *testing.T) {
+	known := []repo.Config{
+		{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
+		{Key: "maven-local", Class: repo.Local, PackageType: repo.Maven},
+		{Key: "gradle-remote", Class: repo.Remote, PackageType: repo.Gradle},
+		{Key: "npm-virtual", Class: repo.Virtual, PackageType: repo.NPM},
+	}
+	virtual := func(t repo.PackageType, members ...string) repo.Config {
+		return repo.Config{Key: "v", Class: repo.Virtual, PackageType: t, Repositories: members}
+	}
+	for name, tt := range map[string]struct {
+		c    repo.Config
+		want string
+	}{
+		"not virtual":        {repo.Config{Key: "l", Class: repo.Local, Repositories: []string{"x"}}, ""},
+		"no members":         {virtual(repo.NPM), ""},
+		"same type":          {virtual(repo.NPM, "npm-local", "npm-virtual"), ""},
+		"generic takes any":  {virtual(repo.Generic, "npm-local", "maven-local", "npm-virtual"), ""},
+		"maven family mixes": {virtual(repo.Maven, "maven-local", "gradle-remote"), ""},
+		"unknown member": {
+			virtual(repo.NPM, "ghost"),
+			"Virtual repository member 'ghost' does not exist",
+		},
+		"local of another type": {
+			virtual(repo.NPM, "npm-local", "maven-local"),
+			"Virtual repository member 'maven-local' has package type 'maven', which does " +
+				"not match the virtual repository's package type 'npm'",
+		},
+		"virtual of another type": {
+			virtual(repo.Go, "npm-virtual"),
+			"Virtual repository member 'npm-virtual' has package type 'npm'",
+		},
+		"outside the family": {
+			virtual(repo.Gradle, "npm-local"),
+			"package type 'gradle'",
+		},
+	} {
+		err := CheckMembers(tt.c, known)
+		switch {
+		case tt.want == "" && err != nil:
+			t.Errorf("%s: %v", name, err)
+		case tt.want != "" && (err == nil || !strings.Contains(err.Error(), tt.want)):
+			t.Errorf("%s: %v, want %q", name, err, tt.want)
+		}
+	}
+}
+
+// Deleting a virtual repository's last member must not leave it unable to
+// take an update, which the old at-least-one-member rule did.
+func TestVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
+	ctx := context.Background()
+	db := world(t)
+	if _, _, err := Remove(ctx, db, "libs"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := db.Repos().Get(ctx, "virt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated, err := Merge(v, map[string]json.RawMessage{"description": []byte(`"empty now"`)})
+	if err != nil || updated.Description != "empty now" || len(updated.Repositories) != 0 {
+		t.Fatalf("update of an emptied virtual: %+v, %v", updated, err)
+	}
+	known, _ := db.Repos().List(ctx, store.RepoFilter{})
+	if err := CheckMembers(updated, known); err != nil {
+		t.Fatal(err)
+	}
+	// Still no deployment repository to name.
+	if _, err := Merge(
+		v,
+		map[string]json.RawMessage{"defaultDeploymentRepo": []byte(`"libs"`)},
+	); err == nil {
+		t.Fatal("a virtual without members took a deployment repository")
+	}
+}
+
 func TestRemoveFailures(t *testing.T) {
 	for _, fail := range []string{
 		"items", "unref", "root", "list packages", "delete package", "get virtual", "update virtual",

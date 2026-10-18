@@ -159,6 +159,7 @@ func TestApplyRefusesAndWritesNothing(t *testing.T) {
 		"invalid new":          "localRepositories:\n  bad:\n    type: not-a-type\n",
 		"unknown member":       "virtualRepositories:\n  v:\n    type: generic\n    repositories: [nowhere]\n",
 		"member deleted":       "localRepositories:\n  Mixed-Case: null\nvirtualRepositories:\n  v:\n    type: generic\n    repositories: [Mixed-Case]\n",
+		"member of other type": "virtualRepositories:\n  v:\n    type: npm\n    repositories: [remote-one]\n",
 		"missing key pair":     "localRepositories:\n  signed:\n    type: debian\n    primaryKeyPairRef: absent\n",
 		"proxy without host":   "proxies:\n  p:\n    port: 80\n",
 		"proxy bad port":       "proxies:\n  p:\n    host: h\n    port: 70000\n",
@@ -184,6 +185,39 @@ func TestApplyRefusesAndWritesNothing(t *testing.T) {
 		if _, err := db.Configs().Get(ctx, kind, "good"); !errors.Is(err, store.ErrNotFound) {
 			t.Fatalf("%s: a refused patch wrote its good entry", name)
 		}
+	}
+}
+
+// A virtual repository may have no members, and keeps taking changes once
+// its last member is deleted; a Maven virtual repository aggregates the rest
+// of its family.
+func TestApplyVirtualMembers(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	res := mustApply(t, db, `
+localRepositories:
+  gradle-local:
+    type: gradle
+virtualRepositories:
+  npm-empty:
+    type: npm
+  npm-listed-empty:
+    type: npm
+    repositories: []
+  maven-all:
+    type: maven
+    repositories: [gradle-local]
+`)
+	if len(res.Created) != 4 {
+		t.Fatalf("created %v", res.Created)
+	}
+	mustApply(t, db, "localRepositories:\n  gradle-local: null\n")
+	res = mustApply(t, db, "virtualRepositories:\n  maven-all:\n    description: no members\n")
+	if strings.Join(res.Updated, " ") != "virtualRepositories.maven-all" {
+		t.Fatalf("update of an emptied virtual %+v", res)
+	}
+	if v, err := db.Repos().Get(ctx, "maven-all"); err != nil || len(v.Repositories) != 0 {
+		t.Fatalf("maven-all %+v %v", v, err)
 	}
 }
 
