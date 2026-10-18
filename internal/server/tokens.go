@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -365,10 +366,11 @@ func (s accessService) CreateToken(
 	return out, nil
 }
 
-// GetTokens lists the caller's tokens, or every token for an administrator.
+// GetTokens lists the caller's tokens, or every token for an administrator,
+// keeping only those with the scope the scope parameter names.
 func (s accessService) GetTokens(
 	ctx context.Context,
-	_ accessgen.GetTokensRequestObject,
+	req accessgen.GetTokensRequestObject,
 ) (accessgen.GetTokensResponseObject, error) {
 	recs, svc, err := s.tokenAPI().visible(ctx)
 	if err != nil {
@@ -376,9 +378,21 @@ func (s accessService) GetTokens(
 	}
 	out := accessgen.GetTokens200JSONResponse{Tokens: make([]accessgen.TokenDetails, 0, len(recs))}
 	for _, r := range recs {
+		if req.Params.Scope != nil && !hasScope(r.Scope, *req.Params.Scope) {
+			continue
+		}
 		out.Tokens = append(out.Tokens, tokenDetails(svc, r))
 	}
 	return out, nil
+}
+
+// hasScope reports whether sc is want, whole or as one of its
+// space-separated scopes. JFrog documents the filter (7.133.3) only as
+// returning "token results for a specific scope, such as group"; matching
+// either form exactly is the literal reading, recorded as [I] on #216.
+func hasScope(sc types.Scope, want string) bool {
+	return sc.String() == want ||
+		slices.ContainsFunc(sc.Entries, func(e types.ScopeEntry) bool { return e.String() == want })
 }
 
 // GetTokenById returns one token's metadata. A non-revocable token is still

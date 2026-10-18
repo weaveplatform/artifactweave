@@ -2361,6 +2361,12 @@ type GetScimUserByUsernameParams struct {
 // CreatePairingTokenParamsUseCase defines parameters for CreatePairingToken.
 type CreatePairingTokenParamsUseCase string
 
+// GetTokensParams defines parameters for GetTokens.
+type GetTokensParams struct {
+	// Scope Optional query parameter. Keeps only the tokens with this scope, as Artifactory 7.133.3 added it. A token matches when its whole scope, or one of its space-separated scopes, is exactly this string, such as applied-permissions/groups:readers. A scope no token has gives an empty list.
+	Scope *string `form:"scope,omitempty" json:"scope,omitempty"`
+}
+
 // RevokeTokenByValueJSONBody defines parameters for RevokeTokenByValue.
 type RevokeTokenByValueJSONBody struct {
 	// Token Required within this object. The access token (JWT) or the 64-character reference token.
@@ -4281,10 +4287,10 @@ type ClientInterface interface {
 
 	// GetTokens List access tokens
 	//
-	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata.
+	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 	//
 	// Corresponds with GET /api/v1/tokens (the `GetTokens` operationId).
-	GetTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetTokens(ctx context.Context, params *GetTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateTokenWithBody Create or refresh an access token
 	//
@@ -7626,11 +7632,11 @@ func (c *Client) GetAccessVersion(ctx context.Context, reqEditors ...RequestEdit
 
 // GetTokens List access tokens
 //
-// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata.
+// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 //
 // Corresponds with GET /api/v1/tokens (the `GetTokens` operationId).
-func (c *Client) GetTokens(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetTokensRequest(c.Server)
+func (c *Client) GetTokens(ctx context.Context, params *GetTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTokensRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -13209,7 +13215,7 @@ func NewGetAccessVersionRequest(server string) (*http.Request, error) {
 }
 
 // NewGetTokensRequest constructs an http.Request for the GetTokens method
-func NewGetTokensRequest(server string) (*http.Request, error) {
+func NewGetTokensRequest(server string, params *GetTokensParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -13225,6 +13231,33 @@ func NewGetTokensRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Scope != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "scope", *params.Scope, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -16417,12 +16450,12 @@ type ClientWithResponsesInterface interface {
 
 	// GetTokensWithResponse List access tokens
 	//
-	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata.
+	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/tokens (the `GetTokens` operationId).
-	GetTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTokensResponse, error)
+	GetTokensWithResponse(ctx context.Context, params *GetTokensParams, reqEditors ...RequestEditorFn) (*GetTokensResponse, error)
 
 	// CreateTokenWithBodyWithResponse Create or refresh an access token
 	//
@@ -28649,13 +28682,13 @@ func (c *ClientWithResponses) GetAccessVersionWithResponse(ctx context.Context, 
 
 // GetTokensWithResponse List access tokens
 //
-// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata.
+// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 //
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /api/v1/tokens (the `GetTokens` operationId).
-func (c *ClientWithResponses) GetTokensWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTokensResponse, error) {
-	rsp, err := c.GetTokens(ctx, reqEditors...)
+func (c *ClientWithResponses) GetTokensWithResponse(ctx context.Context, params *GetTokensParams, reqEditors ...RequestEditorFn) (*GetTokensResponse, error) {
+	rsp, err := c.GetTokens(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
