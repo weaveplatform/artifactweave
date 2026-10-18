@@ -44,12 +44,12 @@ and the [deviations register](deviations.md), which cite their evidence.
   compares response codes; describe it as "Not returned." or by the condition it would
   answer.
 - An unimplemented operation says "Not implemented; answers 501."
-- Literal identifiers stay, in code spans: `X-JFrog-Download-Redirect-To`,
-  `/artifactory/api/storage`, `jfrt@`. So do the `x-oracle-source` and `x-unverified`
+- Literal identifiers and values stay, in code spans: `X-JFrog-Download-Redirect-To`,
+  `/artifactory/api/storage`, `jfrt@`, a licence type of `artifactweave`. So do the `x-oracle-source` and `x-unverified`
   extensions, which are metadata rather than descriptions.
 
 `TestOpenAPIDescriptionsDescribeContract` fails any description, summary or `info` text
-that names artifactweave, or names Artifactory or JFrog outside a code span.
+that names artifactweave, Artifactory or JFrog outside a code span.
 
 ## Response-only fields and defaults
 

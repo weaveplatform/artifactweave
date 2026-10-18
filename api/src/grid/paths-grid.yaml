@@ -172,7 +172,7 @@ components:
       description: A licence entry reported for an instance.
       properties:
         type:
-          description: Optional within this object. Licence type; one fixed value for every instance.
+          description: Optional within this object. Licence type; always `artifactweave`.
           type: string
       type: object
     SiteRequest:

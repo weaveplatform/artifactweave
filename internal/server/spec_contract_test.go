@@ -9,9 +9,10 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-// codeSpan matches a Markdown code span. Identifiers such as
-// `X-JFrog-Download-Redirect-To` or `/artifactory/api/...` are part of the
-// contract and may name the product; prose outside them may not.
+// codeSpan matches a Markdown code span. Identifiers and literal values such
+// as `X-JFrog-Download-Redirect-To`, `/artifactory/api/...` or a licence type
+// of `artifactweave` are part of the contract and may name a product; prose
+// outside them may not.
 var codeSpan = regexp.MustCompile("`[^`]*`")
 
 // commentary reports why a description is not a statement of the served
@@ -21,10 +22,10 @@ var codeSpan = regexp.MustCompile("`[^`]*`")
 // deviations register; generated Go comments and clients inherit whatever
 // the spec says, so the check runs on every description in the bundle.
 func commentary(text string) string {
-	if strings.Contains(strings.ToLower(text), "artifactweave") {
-		return "names artifactweave"
-	}
 	prose := codeSpan.ReplaceAllString(text, "")
+	if strings.Contains(strings.ToLower(prose), "artifactweave") {
+		return "names artifactweave outside a code span"
+	}
 	for _, name := range []string{"Artifactory", "JFrog"} {
 		if strings.Contains(prose, name) {
 			return "names " + name + " outside a code span"
@@ -41,8 +42,9 @@ func TestDescriptionCommentary(t *testing.T) {
 		{"Optional within this object. The repository key.", ""},
 		{"Echoes `X-JFrog-Download-Redirect-To` when set.", ""},
 		{"Served under `/artifactory/api/storage`.", ""},
-		{"Never returned by artifactweave; documented for parity.", "names artifactweave"},
-		{"ArtifactWeave stores nothing.", "names artifactweave"},
+		{"Licence type; always `artifactweave`.", ""},
+		{"Never returned by artifactweave; documented for parity.", "names artifactweave outside a code span"},
+		{"ArtifactWeave stores nothing.", "names artifactweave outside a code span"},
 		{"Artifactory lists one licence per node.", "names Artifactory outside a code span"},
 		{"JFrog documents an array.", "names JFrog outside a code span"},
 		{"Real `Artifactory` servers; Artifactory answers 206.", "names Artifactory outside a code span"},
