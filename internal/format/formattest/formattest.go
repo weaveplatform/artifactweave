@@ -3,7 +3,8 @@
 // type, and one set of scenarios proves, on the in-memory, SQLite and
 // PostgreSQL stores, that its package index (decision 0018) stays right on
 // every write path the item service offers: deploy, overwrite, delete, copy,
-// move, restore from the trash can and property changes.
+// move, restore from the trash can, property changes and a remote
+// repository's cache.
 //
 // "Right" has two halves. The fixture says which versions a scenario leaves
 // and which files each links. And the item tree is the source of truth, so
@@ -89,6 +90,10 @@ type Format struct {
 	// committed deploy leaves exactly one item of each per package; a kind
 	// not listed must never be queued.
 	Work []string
+	// NoRemoteCache marks a format that does not index a remote
+	// repository's cache yet, as decision 0018 has the npm, Go and Maven
+	// formats do. Docker sets it until its remote repositories come in P9.
+	NoRemoteCache bool
 }
 
 // Backend opens a fresh, empty store for one scenario.
@@ -155,6 +160,8 @@ const (
 	keyA = "formattest-a"
 	keyB = "formattest-b"
 	keyC = "formattest-c"
+	// keyRemote is the remote repository the cache scenario creates.
+	keyRemote = "formattest-remote"
 )
 
 // world is a store with three empty local repositories of the format's
@@ -215,6 +222,25 @@ func (w *world) repo(key string, tune func(*repo.Config)) repo.Config {
 	return stored
 }
 
+// remote creates a remote repository of the format's type. Only its cache
+// holds items, which the item service stores as a download through it does.
+func (w *world) remote(key string) repo.Config {
+	w.t.Helper()
+	c := repo.Config{
+		Key: key, Class: repo.Remote, URL: "https://upstream.example",
+		PackageType: w.f.Type, RepoLayoutRef: w.f.Layout,
+	}
+	repo.Defaults(&c)
+	if err := w.st.Repos().Create(w.ctx, c); err != nil {
+		w.t.Fatal(err)
+	}
+	stored, err := w.st.Repos().Get(w.ctx, key)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return stored
+}
+
 func (w *world) tick() { w.now = w.now.Add(time.Minute) }
 
 // version is the fixture's version v of package p, deployed for the nth
@@ -230,6 +256,21 @@ func (w *world) deploy(c repo.Config, v Version, props types.Properties) error {
 			Properties: props, By: "formattest",
 		}); err != nil {
 			return fmt.Errorf("deploy %s to %s: %w", f.Path, c.Key, err)
+		}
+	}
+	return nil
+}
+
+// cache stores v's files in remote repository c's cache in order, as
+// downloads through c do.
+func (w *world) cache(c repo.Config, v Version) error {
+	for _, f := range v.Files {
+		w.tick()
+		if _, err := w.items.Deploy(w.ctx, item.Deploy{
+			Target: item.Target{Repo: c, Cached: true, Path: f.Path},
+			Body:   bytes.NewReader(f.Body), By: "formattest",
+		}); err != nil {
+			return fmt.Errorf("cache %s in %s: %w", f.Path, c.Key, err)
 		}
 	}
 	return nil

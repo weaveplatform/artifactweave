@@ -17,6 +17,8 @@ import (
 func TestContract(t *testing.T) {
 	formattest.Run(t, formattest.Format{
 		Type: repo.Docker,
+		// Docker's remote repositories, and the cache they fill, come in P9.
+		NoRemoteCache: true,
 		Version: func(p, v string, n int) formattest.Version {
 			layer := []byte("layer of " + p + ":" + v)
 			sum := sha256.Sum256(layer)

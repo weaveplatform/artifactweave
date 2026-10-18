@@ -39,6 +39,11 @@ func (s artifactoryService) reindex(
 		return "", s.itemError(ctx, "resolve repository", err)
 	case cached || c.PackageType != t:
 		return "", badRequest("Repository '%s' is not a %s repository", key, t)
+	// Decision 0034: the npm operations act on local repositories only. The
+	// format itself rebuilds any repository's index, a remote's from its
+	// cache, as the contract suite holds it to.
+	case t == repo.NPM && c.Class != repo.Local:
+		return "", badRequest("Repository '%s' is not a local npm repository", key)
 	}
 	err = s.items(st).Reindex(ctx, c)
 	switch {

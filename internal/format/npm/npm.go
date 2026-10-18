@@ -12,11 +12,11 @@ package npm
 
 import (
 	"context"
-	"net/http"
 	"slices"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/generic"
+	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -71,8 +71,12 @@ func (Handler) Inspect(
 
 // Deployed indexes a tarball stored at its canonical path, and drops the
 // version of a file that no longer is one, such as a tarball overwritten
-// with another version's content.
+// with another version's content. A tarball stored anywhere but where the
+// index reads (pkgindex.Stored) is not indexed.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+	if it.Cached != pkgindex.Stored(c).Cached {
+		return nil
+	}
 	t, ok, err := tarballOf(ctx, env, it)
 	if err != nil {
 		return err
@@ -138,12 +142,9 @@ func nonEmpty(values []string) []string {
 }
 
 // Reindex rebuilds the repository's npm index from its tarballs and their
-// properties. Only a local repository has tarballs to index, and decision
-// 0034 answers any other 400.
+// properties, a remote repository's from its cache. Which repositories the
+// JFrog reindex operation accepts is the API's rule, not the index's:
+// decision 0034's local-only 400 is answered in internal/server.
 func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	if c.Class != repo.Local {
-		return format.Reject(http.StatusBadRequest,
-			"Repository '%s' is not a local npm repository", c.Key)
-	}
 	return reindex(ctx, env, c)
 }

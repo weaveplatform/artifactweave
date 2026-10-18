@@ -44,6 +44,10 @@ tree remains the source of truth; a reindex rebuilds the index from it.
 trash can and items cached from a remote. Each format's decision sets its package, version,
 files and order: npm ([0034](0034-npm.md)), Go modules ([0035](0035-go-modules.md)), and
 Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)). For all of them:
+- **A remote repository's index** covers its cache, which alone holds a remote's items
+  (`pkgindex.Stored`, #361). The hooks and a reindex both read only there, and the
+  contract suite's cache scenario holds every format to it. Docker's cache follows with
+  its remote repositories in P9.
 - **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment)
   is a cache of what the version's items, content and properties say. A reindex rebuilds
   it, and nothing is kept there that the items do not carry.

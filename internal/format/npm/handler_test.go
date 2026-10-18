@@ -369,16 +369,30 @@ func TestReindex(t *testing.T) {
 	}
 }
 
-// Only a local repository has tarballs to reindex.
-func TestReindexLocalOnly(t *testing.T) {
+// Only a remote repository's cache is indexed (pkgindex.Stored): a tarball
+// in the remote's own items, which no download stores there, joins no
+// version, just as a reindex would not read it. The cache's tarball does.
+func TestRemoteIndexesOnlyItsCache(t *testing.T) {
 	w := newWorld(t)
-	for _, class := range []repo.Class{repo.Remote, repo.Virtual} {
-		err := npm.Handler{}.Reindex(w.ctx, format.Env{Store: w.st}, repo.Config{
-			Key: "npm-" + string(class), Class: class, PackageType: repo.NPM,
-		})
-		var refused *format.Rejection
-		if !errors.As(err, &refused) || refused.Status != http.StatusBadRequest {
-			t.Errorf("%s: %v", class, err)
+	r := repo.Config{
+		Key: "npm-remote", Class: repo.Remote, URL: "https://registry.npmjs.org",
+		PackageType: repo.NPM,
+	}
+	repo.Defaults(&r)
+	if err := w.st.Repos().Create(w.ctx, r); err != nil {
+		t.Fatal(err)
+	}
+	for _, cached := range []bool{false, true} {
+		w.now = w.now.Add(time.Minute)
+		if _, err := w.items.Deploy(w.ctx, item.Deploy{
+			Target: item.Target{Repo: r, Cached: cached, Path: "left-pad/-/left-pad-1.0.0.tgz"},
+			Body:   bytes.NewReader(pkg("left-pad", "1.0.0", "")),
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, err := w.st.Packages().Find(w.ctx, r.Key, "left-pad")
+		if indexed := err == nil; indexed != cached {
+			t.Fatalf("cached %v: indexed %v (%v)", cached, indexed, err)
 		}
 	}
 }

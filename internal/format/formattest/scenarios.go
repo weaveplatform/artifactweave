@@ -32,6 +32,7 @@ var scenarios = []scenario{
 	{"rollback", rollbackScenario},
 	{"work", workScenario},
 	{"patterns", patternsScenario},
+	{"cache", cacheScenario},
 }
 
 // three deploys alpha 1.0, alpha 2.0 and beta 1.0 to c and returns them.
@@ -401,4 +402,40 @@ func patternsScenario(w *world) error {
 		return fmt.Errorf("%w: the copy landed the excluded %s", errBroken, first)
 	}
 	return w.verify(excluding)
+}
+
+// A remote repository's cache is indexed as a local repository is
+// (decision 0018): what a download stores links its version, a reindex
+// rebuilds the same index from the cache, and deleting from the cache
+// unlinks it.
+func cacheScenario(w *world) error {
+	if w.f.NoRemoteCache {
+		return nil
+	}
+	r := w.remote(keyRemote)
+	vs := []Version{
+		w.version("alpha", "1.0", 0), w.version("alpha", "2.0", 0), w.version("beta", "1.0", 0),
+	}
+	for _, v := range vs {
+		if err := w.cache(r, v); err != nil {
+			return err
+		}
+	}
+	if err := errors.Join(w.expect(r, vs...), w.verify(r)); err != nil {
+		return err
+	}
+	for _, f := range vs[1].Files {
+		w.tick()
+		if _, err := w.items.Delete(
+			w.ctx,
+			item.Target{Repo: r, Cached: true, Path: f.Path},
+			"formattest",
+		); err != nil {
+			return fmt.Errorf("delete %s from the cache: %w", f.Path, err)
+		}
+		if err := w.verify(r); err != nil {
+			return fmt.Errorf("after deleting %s from the cache: %w", f.Path, err)
+		}
+	}
+	return errors.Join(w.expect(r, vs[0], vs[2]), w.verify(r))
 }

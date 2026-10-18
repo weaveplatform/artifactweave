@@ -291,8 +291,13 @@ func TestReindexOperations(t *testing.T) {
 	} {
 		wantStatus(t, w.do("POST", c.path, c.as, ""), c.want)
 	}
-	f.reindexErr = format.Reject(http.StatusBadRequest, "only local repositories")
+	// npm's remote and virtual repositories are the API's 400 (decision
+	// 0034), before the format runs; a format's own refusal is answered as
+	// it is.
 	wantStatus(t, w.do("POST", "/artifactory/api/npm/npm-remote/reindex", "admin", ""),
+		http.StatusBadRequest)
+	f.reindexErr = format.Reject(http.StatusBadRequest, "refused by the format")
+	wantStatus(t, w.do("POST", "/artifactory/api/npm/npm-local/reindex", "admin", ""),
 		http.StatusBadRequest)
 
 	// Every generated reindex operation reaches the same handler.

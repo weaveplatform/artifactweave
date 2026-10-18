@@ -208,11 +208,11 @@ func refresh(ctx context.Context, st store.Store, pv types.PackageVersion, id in
 	return nil
 }
 
-// tarballQuery finds the repository's .tgz files, with their properties
-// when props is set.
+// tarballQuery finds the .tgz files c's index reads, a remote repository's
+// in its cache (pkgindex.Stored), with their properties when props is set.
 func tarballQuery(c repo.Config, props bool) *aql.Query {
 	q := &aql.Query{Criteria: aql.And{
-		aql.RepoSet{Refs: []aql.RepoRef{{Key: c.Key}}},
+		aql.RepoSet{Refs: []aql.RepoRef{pkgindex.Stored(c)}},
 		&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
 		&aql.FieldCriterion{Field: aql.FieldName, Op: aql.OpMatch, Text: "*.tgz"},
 	}}
