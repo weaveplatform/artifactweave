@@ -133,7 +133,7 @@ func (e GetMonitoringEntityListParamsStatus) Valid() bool {
 
 // AllEntityTypesSummaryResponse Sync counts per entity type across the topology.
 type AllEntityTypesSummaryResponse struct {
-	// EntityTypes Required within this object. One entry per monitored entity type: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. artifactweave replicates users, groups, permissions and tokens through Access federation (decision 0025); the other types are accepted and report zero counts until their replication exists.
+	// EntityTypes Required within this object. One entry per monitored entity type: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. Users, groups, permissions and tokens are replicated through Access federation; the other types report zero counts.
 	EntityTypes []EntityTypeSummary `json:"entity_types"`
 
 	// Timestamp Required within this object. Server-owned. RFC 3339 time the counts were computed.
@@ -226,7 +226,7 @@ type JPDResponse struct {
 	// Id Optional within this object. Server-owned. The instance's service id.
 	Id *string `json:"id,omitempty"`
 
-	// Licenses Optional within this object. Licence entries; one artifactweave entry.
+	// Licenses Optional within this object. Licence entries; always one entry.
 	Licenses *[]License `json:"licenses,omitempty"`
 
 	// Local Optional within this object. True for the instance answering the request.
@@ -259,7 +259,7 @@ type JPDStatusCode string
 
 // License A licence entry reported for an instance.
 type License struct {
-	// Type Optional within this object. Licence type. artifactweave has no licence tiers and always reports artifactweave.
+	// Type Optional within this object. Licence type; always `artifactweave`.
 	Type *string `json:"type,omitempty"`
 }
 
@@ -281,7 +281,7 @@ type StatusCounts struct {
 	Success int64 `json:"success"`
 }
 
-// TargetSyncStatus Delivery state of one entity from one site to another, taken from the peer outbox acknowledgements (decision 0021).
+// TargetSyncStatus Delivery state of one entity from one site to another, taken from the peer outbox acknowledgements.
 type TargetSyncStatus struct {
 	// Modified Optional within this object. RFC 3339 time the status last changed.
 	Modified *time.Time `json:"modified,omitempty"`
@@ -403,7 +403,7 @@ type ListJPDsParams struct {
 	// Name Optional query parameter. Filter on instance name; * matches any run of characters.
 	Name *string `form:"name,omitempty" json:"name,omitempty"`
 
-	// Tag Optional query parameter. Filter on instance tag. artifactweave instances carry no tags, so only * (or omitting the filter) matches anything.
+	// Tag Optional query parameter. Filter on instance tag. Instances carry no tags, so only * (or omitting the filter) matches anything.
 	Tag *string `form:"tag,omitempty" json:"tag,omitempty"`
 
 	// Url Optional query parameter. Filter on instance URL; * matches any run of characters.
@@ -418,7 +418,7 @@ type ListJPDsParamsStatus string
 
 // GetMonitoringEntityListParams defines parameters for GetMonitoringEntityList.
 type GetMonitoringEntityListParams struct {
-	// EntityType Required query parameter. Entity type public key: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. artifactweave replicates users, groups, permissions and tokens through Access federation (decision 0025); the other types are accepted and report zero counts until their replication exists.
+	// EntityType Required query parameter. Entity type public key: users, groups, permissions, tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. Users, groups, permissions and tokens are replicated through Access federation; the other types report zero counts.
 	EntityType string `form:"entity_type" json:"entity_type"`
 
 	// Status Optional query parameter. Return only entities with at least one target in this state; omitted means any state.
@@ -525,7 +525,7 @@ type ClientInterface interface {
 
 	// ListJPDs List known instances
 	//
-	// Lists the instances this instance knows: itself and every paired peer artifactweave instance (decision 0025). JFrog lists the deployments known to Mission Control; artifactweave has no Mission Control, so the peer table is the source. Filters accept * wildcards. Administrators only.
+	// Lists the instances this instance knows: itself and every paired peer. Filters accept * wildcards. Administrators only.
 	//
 	// Corresponds with GET /api/v1/jpds (the `ListJPDs` operationId).
 	ListJPDs(ctx context.Context, params *ListJPDsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -539,7 +539,7 @@ type ClientInterface interface {
 
 	// CreateGridTopologyWithBody Create a topology
 	//
-	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -548,7 +548,7 @@ type ClientInterface interface {
 
 	// CreateGridTopology Create a topology
 	//
-	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -611,7 +611,7 @@ type ClientInterface interface {
 
 // ListJPDs List known instances
 //
-// Lists the instances this instance knows: itself and every paired peer artifactweave instance (decision 0025). JFrog lists the deployments known to Mission Control; artifactweave has no Mission Control, so the peer table is the source. Filters accept * wildcards. Administrators only.
+// Lists the instances this instance knows: itself and every paired peer. Filters accept * wildcards. Administrators only.
 //
 // Corresponds with GET /api/v1/jpds (the `ListJPDs` operationId).
 func (c *Client) ListJPDs(ctx context.Context, params *ListJPDsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -645,7 +645,7 @@ func (c *Client) ListGridTopologies(ctx context.Context, reqEditors ...RequestEd
 
 // CreateGridTopologyWithBody Create a topology
 //
-// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -664,7 +664,7 @@ func (c *Client) CreateGridTopologyWithBody(ctx context.Context, contentType str
 
 // CreateGridTopology Create a topology
 //
-// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1336,7 +1336,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListJPDsWithResponse List known instances
 	//
-	// Lists the instances this instance knows: itself and every paired peer artifactweave instance (decision 0025). JFrog lists the deployments known to Mission Control; artifactweave has no Mission Control, so the peer table is the source. Filters accept * wildcards. Administrators only.
+	// Lists the instances this instance knows: itself and every paired peer. Filters accept * wildcards. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -1354,7 +1354,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGridTopologyWithBodyWithResponse Create a topology
 	//
-	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1363,7 +1363,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGridTopologyWithResponse Create a topology
 	//
-	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+	// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2085,7 +2085,7 @@ func (r GetMonitoringEntityDetailResponse) ContentType() string {
 
 // ListJPDsWithResponse List known instances
 //
-// Lists the instances this instance knows: itself and every paired peer artifactweave instance (decision 0025). JFrog lists the deployments known to Mission Control; artifactweave has no Mission Control, so the peer table is the source. Filters accept * wildcards. Administrators only.
+// Lists the instances this instance knows: itself and every paired peer. Filters accept * wildcards. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -2115,7 +2115,7 @@ func (c *ClientWithResponses) ListGridTopologiesWithResponse(ctx context.Context
 
 // CreateGridTopologyWithBodyWithResponse Create a topology
 //
-// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2130,7 +2130,7 @@ func (c *ClientWithResponses) CreateGridTopologyWithBodyWithResponse(ctx context
 
 // CreateGridTopologyWithResponse Create a topology
 //
-// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived; artifactweave lowercases the name and replaces each run of characters other than letters and digits with a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
+// Stores a topology and configures Access federation between every pair of its sites, so identity changes made on any site reach the others. The key is derived from name by lowercasing it and replacing each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists. The topology is stored even when configuring a site fails afterwards; check each site's status in the response. Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

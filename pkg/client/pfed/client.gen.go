@@ -54,14 +54,14 @@ type CreateFederationRequest struct {
 	// Description Optional within this object. Free text describing what the federation is for.
 	Description *string `json:"description,omitempty"`
 
-	// Entities Required within this object. The entity types to federate. Must list all four documented types, each once. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025).
+	// Entities Required within this object. The entity types to federate. Must list all four types of the EntityConfig type enum, each once. The federation and its membership are recorded, but these types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead.
 	Entities []EntityConfig `json:"entities"`
 
 	// Name Required within this object. Unique name of the federation on this instance.
 	Name string `json:"name"`
 }
 
-// CreateJpdRequest A follower instance to add to this controller. Obtain pairing_token on the follower with POST /access/api/v1/service_trust/pairing/platform-federation; the token is used once to establish mutual trust (decision 0021) and is not stored.
+// CreateJpdRequest A follower instance to add to this controller. Obtain pairing_token on the follower with POST /access/api/v1/service_trust/pairing/platform-federation; the token is used once to establish mutual trust and is not stored.
 type CreateJpdRequest struct {
 	// Id Required within this object. Label for the follower, unique on this controller; referenced from connection groups.
 	Id string `json:"id"`
@@ -69,17 +69,17 @@ type CreateJpdRequest struct {
 	// PairingToken Required within this object. Write-only. The pairing token issued by the follower for the platform-federation use case. Rejected with 400 when expired, already used or issued for another use case.
 	PairingToken *string `json:"pairing_token,omitempty"`
 
-	// Url Required within this object. Base URL of the follower artifactweave instance.
+	// Url Required within this object. Base URL of the follower instance.
 	Url string `json:"url"`
 }
 
 // EntityConfig One entity type a federation covers.
 type EntityConfig struct {
-	// Type Required within this object. Entity type identifier in <service>.<entityType> form. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025).
+	// Type Required within this object. Entity type identifier in <service>.<entityType> form. These types are recorded but carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead.
 	Type EntityConfigType `json:"type"`
 }
 
-// EntityConfigType Required within this object. Entity type identifier in <service>.<entityType> form. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025).
+// EntityConfigType Required within this object. Entity type identifier in <service>.<entityType> form. These types are recorded but carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead.
 type EntityConfigType string
 
 // ErrorResponse The flat error envelope used by /pfed.
@@ -240,7 +240,7 @@ type ClientInterface interface {
 
 	// CreateFederationWithBody Create a platform federation
 	//
-	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -249,7 +249,7 @@ type ClientInterface interface {
 
 	// CreateFederation Create a platform federation
 	//
-	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -272,14 +272,14 @@ type ClientInterface interface {
 
 	// ListFollowerJpds List follower instances
 	//
-	// Returns every follower instance added to this controller. In artifactweave a JPD is always a peer artifactweave instance; JFrog Platform Deployments cannot join (decision 0025). Administrators only.
+	// Returns every follower instance added to this controller. A follower is always a peer instance paired over the peer protocol. Administrators only.
 	//
 	// Corresponds with GET /api/v1/jpd (the `ListFollowerJpds` operationId).
 	ListFollowerJpds(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AddFollowerJpdWithBody Add a follower instance
 	//
-	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -288,7 +288,7 @@ type ClientInterface interface {
 
 	// AddFollowerJpd Add a follower instance
 	//
-	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -347,7 +347,7 @@ func (c *Client) ListFederations(ctx context.Context, reqEditors ...RequestEdito
 
 // CreateFederationWithBody Create a platform federation
 //
-// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -366,7 +366,7 @@ func (c *Client) CreateFederationWithBody(ctx context.Context, contentType strin
 
 // CreateFederation Create a platform federation
 //
-// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -419,7 +419,7 @@ func (c *Client) GetFederation(ctx context.Context, id FederationId, reqEditors 
 
 // ListFollowerJpds List follower instances
 //
-// Returns every follower instance added to this controller. In artifactweave a JPD is always a peer artifactweave instance; JFrog Platform Deployments cannot join (decision 0025). Administrators only.
+// Returns every follower instance added to this controller. A follower is always a peer instance paired over the peer protocol. Administrators only.
 //
 // Corresponds with GET /api/v1/jpd (the `ListFollowerJpds` operationId).
 func (c *Client) ListFollowerJpds(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -436,7 +436,7 @@ func (c *Client) ListFollowerJpds(ctx context.Context, reqEditors ...RequestEdit
 
 // AddFollowerJpdWithBody Add a follower instance
 //
-// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -455,7 +455,7 @@ func (c *Client) AddFollowerJpdWithBody(ctx context.Context, contentType string,
 
 // AddFollowerJpd Add a follower instance
 //
-// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -916,7 +916,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateFederationWithBodyWithResponse Create a platform federation
 	//
-	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -925,7 +925,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateFederationWithResponse Create a platform federation
 	//
-	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+	// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -952,7 +952,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListFollowerJpdsWithResponse List follower instances
 	//
-	// Returns every follower instance added to this controller. In artifactweave a JPD is always a peer artifactweave instance; JFrog Platform Deployments cannot join (decision 0025). Administrators only.
+	// Returns every follower instance added to this controller. A follower is always a peer instance paired over the peer protocol. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -961,7 +961,7 @@ type ClientWithResponsesInterface interface {
 
 	// AddFollowerJpdWithBodyWithResponse Add a follower instance
 	//
-	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -970,7 +970,7 @@ type ClientWithResponsesInterface interface {
 
 	// AddFollowerJpdWithResponse Add a follower instance
 	//
-	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+	// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1638,7 +1638,7 @@ func (c *ClientWithResponses) ListFederationsWithResponse(ctx context.Context, r
 
 // CreateFederationWithBodyWithResponse Create a platform federation
 //
-// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -1653,7 +1653,7 @@ func (c *ClientWithResponses) CreateFederationWithBodyWithResponse(ctx context.C
 
 // CreateFederationWithResponse Create a platform federation
 //
-// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025). Administrators only.
+// Defines a federation on this controller that groups previously added follower instances. Every follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its membership are recorded, but its entity types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead. Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -1698,7 +1698,7 @@ func (c *ClientWithResponses) GetFederationWithResponse(ctx context.Context, id 
 
 // ListFollowerJpdsWithResponse List follower instances
 //
-// Returns every follower instance added to this controller. In artifactweave a JPD is always a peer artifactweave instance; JFrog Platform Deployments cannot join (decision 0025). Administrators only.
+// Returns every follower instance added to this controller. A follower is always a peer instance paired over the peer protocol. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -1713,7 +1713,7 @@ func (c *ClientWithResponses) ListFollowerJpdsWithResponse(ctx context.Context, 
 
 // AddFollowerJpdWithBodyWithResponse Add a follower instance
 //
-// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -1728,7 +1728,7 @@ func (c *ClientWithResponses) AddFollowerJpdWithBodyWithResponse(ctx context.Con
 
 // AddFollowerJpdWithResponse Add a follower instance
 //
-// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys are sealed at rest (decision 0017). Administrators only.
+// Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at rest. Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

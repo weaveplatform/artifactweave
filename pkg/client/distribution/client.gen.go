@@ -506,7 +506,7 @@ func (e CreateOrRefreshTokenFormdataBodyGrantType) Valid() bool {
 
 // DeleteReleaseBundleRequest Which edges should remove a distributed version.
 type DeleteReleaseBundleRequest struct {
-	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only artifactweave peers paired as edges can match.
+	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only peers paired as edges can match.
 	DistributionRules *[]DistributionRule `json:"distribution_rules,omitempty"`
 
 	// DryRun Optional within this object. When true the response lists the edges that would be affected and nothing changes. Defaults to false.
@@ -665,7 +665,7 @@ type DistributionRequest struct {
 	// AutoCreateMissingRepositories Optional within this object. When true each edge creates target repositories it lacks; otherwise a missing repository fails that edge. Defaults to false.
 	AutoCreateMissingRepositories *bool `json:"auto_create_missing_repositories,omitempty"`
 
-	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only artifactweave peers paired as edges can match.
+	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only peers paired as edges can match.
 	DistributionRules *[]DistributionRule `json:"distribution_rules,omitempty"`
 
 	// DryRun Optional within this object. When true the response lists the selected edges and nothing is sent. Defaults to false.
@@ -696,7 +696,7 @@ type DistributionRule struct {
 	SiteName *string `json:"site_name,omitempty"`
 }
 
-// DistributionStatus One distribution (or remote delete) of a version and its per-target progress. Confirmed by jfrog-client-go (DistributionStatusResponse, DistributionSiteStatus) and JFrog's Distribution REST reference.
+// DistributionStatus One distribution (or remote delete) of a version and its per-target progress.
 type DistributionStatus struct {
 	// CreatedBy Optional within this object. User who created the version.
 	CreatedBy *string `json:"created_by,omitempty"`
@@ -750,10 +750,10 @@ type DistributionStatus struct {
 			// Name Optional within this object. Name of the target as configured.
 			Name *string `json:"name,omitempty"`
 
-			// ServiceId Optional within this object. Service id of the target, jfrt@<id>; for artifactweave the peer's instance id.
+			// ServiceId Optional within this object. Service id of the target, the peer's instance id in the form `jfrt@<uuid>`.
 			ServiceId *string `json:"service_id,omitempty"`
 
-			// Type Optional within this object. Role of the target; edge for every artifactweave target.
+			// Type Optional within this object. Role of the target; always `edge`.
 			Type *string `json:"type,omitempty"`
 		} `json:"target_artifactory,omitempty"`
 
@@ -824,7 +824,7 @@ type DistributionTrackerSimple struct {
 
 // DynamicDistributionRequest The content of a generated bundle and where to send it.
 type DynamicDistributionRequest struct {
-	// DistributionRules Required within this object. Rules selecting the edges; an edge matching any rule is selected. Only artifactweave peers paired as edges can match.
+	// DistributionRules Required within this object. Rules selecting the edges; an edge matching any rule is selected. Only peers paired as edges can match.
 	DistributionRules []DistributionRule `json:"distribution_rules"`
 
 	// Spec Optional within this object. What the generated bundle contains.
@@ -876,12 +876,12 @@ type EdgePriorityUpdate struct {
 	Status *string `json:"status,omitempty"`
 }
 
-// ErrorResponse The Distribution error envelope. status_code and message repeat the first entry of errors so clients reading either form agree.
+// ErrorResponse The Distribution error envelope. status_code and message repeat the first entry of errors.
 type ErrorResponse struct {
 	// Detail Optional within this object. Extra context such as the bundle or target the error concerns.
 	Detail *string `json:"detail,omitempty"`
 
-	// Errors Required within this object. One entry per error. jfrog-client-go reports the whole body after the status and reads no field of it.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Message Required within this object. Human readable explanation.
 		Message string `json:"message"`
@@ -927,7 +927,7 @@ type GpgKey struct {
 	PublicKey string `json:"public_key"`
 }
 
-// GpgKeyAlias One configured GPG signing key, as listed by the aliases operation (Distribution 2.8.1 and later).
+// GpgKeyAlias One configured GPG signing key, as listed by the aliases operation.
 type GpgKeyAlias struct {
 	// Alias Required within this object. Alias of the key.
 	Alias string `json:"alias"`
@@ -939,7 +939,7 @@ type GpgKeyAlias struct {
 	Passphrase *bool `json:"passphrase,omitempty"`
 }
 
-// GpgKeyUpload Body of a GPG key upload. Two forms are accepted because JFrog documents both: the flat form of its current OpenAPI definition (alias, public_key, private_key at the top level) and the wrapped form of its 2.4 and later reference (key plus the propagation flags). A body must carry a key in one form.
+// GpgKeyUpload Body of a GPG key upload, in one of two forms: the flat form (alias, public_key and private_key at the top level) or the wrapped form (key plus the propagation flags). A body must carry a key in one form.
 type GpgKeyUpload struct {
 	// Alias Optional within this object. Flat form: name for the key pair; must be unique.
 	Alias *string `json:"alias,omitempty"`
@@ -958,7 +958,7 @@ type GpgKeyUpload struct {
 		// PublicKey Optional within this object. ASCII-armoured public key. Not combined with vault_data.
 		PublicKey *string `json:"public_key,omitempty"`
 
-		// VaultData Optional within this object. Where to read the pair from a vault instead. Vault integration is not supported in v1 and is rejected with 400.
+		// VaultData Optional within this object. Where to read the pair from a vault instead. A key sent with vault_data is rejected with 400.
 		VaultData *struct {
 			// PrivateKey Optional within this object. Path and key of the private part.
 			PrivateKey *struct {
@@ -978,7 +978,7 @@ type GpgKeyUpload struct {
 				Path *string `json:"path,omitempty"`
 			} `json:"public_key,omitempty"`
 
-			// VaultId Optional within this object. Vault name; hashicorp in JFrog.
+			// VaultId Optional within this object. Vault name, such as hashicorp.
 			VaultId *string `json:"vault_id,omitempty"`
 		} `json:"vault_data,omitempty"`
 	} `json:"key,omitempty"`
@@ -1016,7 +1016,7 @@ type PlatformServiceInstance struct {
 	// ServiceId Optional within this object. Service id of the instance.
 	ServiceId *string `json:"service_id,omitempty"`
 
-	// Type Optional within this object. edge for an edge peer, artifactory for this source instance.
+	// Type Optional within this object. `edge` for an edge peer, `artifactory` for this source instance.
 	Type *string `json:"type,omitempty"`
 }
 
@@ -1026,7 +1026,7 @@ type PropagationReport struct {
 	Report struct {
 		// Details Optional within this object. One entry per target instance and key.
 		Details *[]struct {
-			// JpdId Optional within this object. Id of the target instance; for artifactweave the peer's instance id.
+			// JpdId Optional within this object. Id of the target instance, the peer's instance id.
 			JpdId *string `json:"jpd_id,omitempty"`
 
 			// KeyAlias Optional within this object. Alias of the key pushed.
@@ -1042,7 +1042,7 @@ type PropagationReport struct {
 		// Message Optional within this object. Error detail when the status is not SUCCESS.
 		Message *string `json:"message,omitempty"`
 
-		// Status Required within this object. Overall result. PROPAGATION_NOT_REQUESTED when the call asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched, PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL is JFrog-specific and never returned by artifactweave.
+		// Status Required within this object. Overall result. PROPAGATION_NOT_REQUESTED when the call asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched. PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL is not returned.
 		Status PropagationReportReportStatus `json:"status"`
 	} `json:"report"`
 }
@@ -1050,7 +1050,7 @@ type PropagationReport struct {
 // PropagationReportReportDetailsStatus Optional within this object. SUCCESS or FAILURE for this target.
 type PropagationReportReportDetailsStatus string
 
-// PropagationReportReportStatus Required within this object. Overall result. PROPAGATION_NOT_REQUESTED when the call asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched, PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL is JFrog-specific and never returned by artifactweave.
+// PropagationReportReportStatus Required within this object. Overall result. PROPAGATION_NOT_REQUESTED when the call asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched. PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL is not returned.
 type PropagationReportReportStatus string
 
 // RBv2DistributionRequest Which edges should receive a Release Bundle v2 version.
@@ -1058,7 +1058,7 @@ type RBv2DistributionRequest struct {
 	// AutoCreateMissingRepositories Optional within this object. When true each edge creates target repositories it lacks. Defaults to false.
 	AutoCreateMissingRepositories *bool `json:"auto_create_missing_repositories,omitempty"`
 
-	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only artifactweave peers paired as edges can match.
+	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only peers paired as edges can match.
 	DistributionRules *[]DistributionRule `json:"distribution_rules,omitempty"`
 
 	// DryRun Optional within this object. When true nothing is sent. Defaults to false.
@@ -1067,7 +1067,7 @@ type RBv2DistributionRequest struct {
 	// IncludeEvidence Optional within this object. When true evidence attached to the bundle is sent too.
 	IncludeEvidence *bool `json:"include_evidence,omitempty"`
 
-	// InsecureTls Optional within this object. Skips TLS verification toward the edges. artifactweave always verifies peers (decision 0021) and ignores it.
+	// InsecureTls Optional within this object. Accepted and ignored; TLS toward the edges is always verified.
 	InsecureTls *bool `json:"insecure_tls,omitempty"`
 
 	// Modifications Optional within this object. Path mappings the edges apply when storing the artifacts.
@@ -1079,10 +1079,10 @@ type RBv2DistributionRequest struct {
 
 // RBv2RemoteDeleteRequest Which edges should remove a Release Bundle v2 version.
 type RBv2RemoteDeleteRequest struct {
-	// AutoCreateMissingRepositories Optional within this object. Accepted for symmetry with distribution; has no effect on deletion.
+	// AutoCreateMissingRepositories Optional within this object. Accepted; has no effect on deletion.
 	AutoCreateMissingRepositories *bool `json:"auto_create_missing_repositories,omitempty"`
 
-	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only artifactweave peers paired as edges can match.
+	// DistributionRules Optional within this object. Rules selecting the edges; an edge matching any rule is selected. Only peers paired as edges can match.
 	DistributionRules *[]DistributionRule `json:"distribution_rules,omitempty"`
 
 	// DryRun Optional within this object. When true nothing changes. Defaults to false.
@@ -1092,7 +1092,7 @@ type RBv2RemoteDeleteRequest struct {
 	Priority *DistributionPriorityLevel `json:"priority,omitempty"`
 }
 
-// ReleaseBundleCreation Body of a release bundle v1 create. The same body without name and version updates an unsigned version (ReleaseBundleUpdate). Shape confirmed by jfrog-client-go (createReleaseBundleBody, ReleaseBundleBody) and JFrog's Distribution REST reference.
+// ReleaseBundleCreation Body of a release bundle v1 create. The same body without name and version updates an unsigned version (ReleaseBundleUpdate).
 type ReleaseBundleCreation struct {
 	// Description Optional within this object. Free text describing the version.
 	Description *string `json:"description,omitempty"`
@@ -1134,7 +1134,7 @@ type ReleaseBundleCreation struct {
 			// Aql Required within this object. An AQL items query, for example items.find({"repo":"libs-release-local"}), run against this instance. Every item it returns is pinned by path and SHA-256.
 			Aql string `json:"aql"`
 
-			// ExcludePropsPatterns Optional within this object. Patterns of property keys not copied with this query's artifacts. JFrog's field table places this list on spec rather than on a query, while its example places it here; both positions are accepted and combined.
+			// ExcludePropsPatterns Optional within this object. Patterns of property keys not copied with this query's artifacts. Combined with spec.exclude_props_patterns.
 			ExcludePropsPatterns *[]string `json:"exclude_props_patterns,omitempty"`
 
 			// Mappings Optional within this object. Path rewrites applied when the artifacts are stored on the receiving instance. Each input is a regular expression matched against <repo>/<path>; output may use $1, $2 for its groups.
@@ -1150,7 +1150,7 @@ type ReleaseBundleCreation struct {
 			QueryName *string `json:"query_name,omitempty"`
 		} `json:"queries"`
 
-		// SourceArtifactoryId Optional within this object. Service id of the instance the queries run against. Deprecated by JFrog and ignored: queries always run against this instance.
+		// SourceArtifactoryId Optional within this object. Service id of the instance the queries run against. Deprecated and ignored: queries always run against this instance.
 		// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 		SourceArtifactoryId *string `json:"source_artifactory_id,omitempty"`
 	} `json:"spec"`
@@ -1204,7 +1204,7 @@ type ReleaseBundleUpdate struct {
 			// Aql Required within this object. An AQL items query, for example items.find({"repo":"libs-release-local"}), run against this instance. Every item it returns is pinned by path and SHA-256.
 			Aql string `json:"aql"`
 
-			// ExcludePropsPatterns Optional within this object. Patterns of property keys not copied with this query's artifacts. JFrog's field table places this list on spec rather than on a query, while its example places it here; both positions are accepted and combined.
+			// ExcludePropsPatterns Optional within this object. Patterns of property keys not copied with this query's artifacts. Combined with spec.exclude_props_patterns.
 			ExcludePropsPatterns *[]string `json:"exclude_props_patterns,omitempty"`
 
 			// Mappings Optional within this object. Path rewrites applied when the artifacts are stored on the receiving instance. Each input is a regular expression matched against <repo>/<path>; output may use $1, $2 for its groups.
@@ -1220,7 +1220,7 @@ type ReleaseBundleUpdate struct {
 			QueryName *string `json:"query_name,omitempty"`
 		} `json:"queries"`
 
-		// SourceArtifactoryId Optional within this object. Service id of the instance the queries run against. Deprecated by JFrog and ignored: queries always run against this instance.
+		// SourceArtifactoryId Optional within this object. Service id of the instance the queries run against. Deprecated and ignored: queries always run against this instance.
 		// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 		SourceArtifactoryId *string `json:"source_artifactory_id,omitempty"`
 	} `json:"spec"`
@@ -1232,9 +1232,9 @@ type ReleaseBundleUpdate struct {
 // ReleaseBundleUpdateReleaseNotesSyntax Optional within this object. Markup of content. Defaults to plain_text.
 type ReleaseBundleUpdateReleaseNotesSyntax string
 
-// ReleaseBundleV1Version A release bundle v1 version as Distribution reports it. Field names follow the documented examples for create, sign, list and get. state and status both carry the version state; see status.
+// ReleaseBundleV1Version A release bundle v1 version, as create, sign, list and get return it. state and status both carry the version state.
 type ReleaseBundleV1Version struct {
-	// Archived Optional within this object. Whether the version is archived. Always false in artifactweave.
+	// Archived Optional within this object. Whether the version is archived. Always false.
 	Archived *bool `json:"archived,omitempty"`
 
 	// Artifacts Optional within this object. The artifacts the version pins.
@@ -1251,7 +1251,7 @@ type ReleaseBundleV1Version struct {
 			Values *[]string `json:"values,omitempty"`
 		} `json:"props,omitempty"`
 
-		// RepoPath Optional within this object. <repo>/<path> of the artifact on this instance; the same value as source_repo_path. JFrog's current OpenAPI definition uses this name, its documented examples the source and target pair, so both are sent.
+		// RepoPath Optional within this object. <repo>/<path> of the artifact on this instance; the same value as source_repo_path.
 		RepoPath *string `json:"repo_path,omitempty"`
 
 		// SourceRepoPath Optional within this object. <repo>/<path> of the artifact on this instance.
@@ -1260,7 +1260,7 @@ type ReleaseBundleV1Version struct {
 		// TargetRepoPath Optional within this object. <repo>/<path> the artifact is stored under on a receiving instance, after the query's mappings.
 		TargetRepoPath *string `json:"target_repo_path,omitempty"`
 
-		// XrayScanInfo Optional within this object. Xray block state in JFrog. artifactweave has no Xray, so blocked is always false.
+		// XrayScanInfo Optional within this object. Scan block state of the artifact; blocked is always false.
 		XrayScanInfo *struct {
 			// Blocked Optional within this object. Whether a scan policy blocks the artifact.
 			Blocked *bool `json:"blocked,omitempty"`
@@ -1294,10 +1294,10 @@ type ReleaseBundleV1Version struct {
 		Syntax *ReleaseBundleV1VersionReleaseNotesSyntax `json:"syntax,omitempty"`
 	} `json:"release_notes,omitempty"`
 
-	// State Required within this object. OPEN until the version is signed, then SIGNED; a SIGNED version is immutable and can be distributed or exported. These are the two states JFrog documents and the only ones artifactweave reports.
+	// State Required within this object. OPEN until the version is signed, then SIGNED; a SIGNED version is immutable and can be distributed or exported.
 	State ReleaseBundleV1VersionState `json:"state"`
 
-	// Status Optional within this object. JFrog's current OpenAPI definition names this field while its documented examples use state; artifactweave sends both, with the same value, so clients reading either work.
+	// Status Optional within this object. The version state; always the same value as state.
 	Status *string `json:"status,omitempty"`
 
 	// Version Required within this object. Version within the name.
@@ -1307,7 +1307,7 @@ type ReleaseBundleV1Version struct {
 // ReleaseBundleV1VersionReleaseNotesSyntax Optional within this object. Markup of content. Defaults to plain_text.
 type ReleaseBundleV1VersionReleaseNotesSyntax string
 
-// ReleaseBundleV1VersionState Required within this object. OPEN until the version is signed, then SIGNED; a SIGNED version is immutable and can be distributed or exported. These are the two states JFrog documents and the only ones artifactweave reports.
+// ReleaseBundleV1VersionState Required within this object. OPEN until the version is signed, then SIGNED; a SIGNED version is immutable and can be distributed or exported.
 type ReleaseBundleV1VersionState string
 
 // StuckDistribution A distribution stuck in a non-final state.
@@ -1324,14 +1324,14 @@ type StuckDistribution struct {
 	// DistributionTrackerId Optional within this object. Id of the tracker.
 	DistributionTrackerId *int64 `json:"distributionTrackerId,omitempty"`
 
-	// ReleaseBundlesSchema Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1 on artifactweave.
+	// ReleaseBundlesSchema Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1.
 	ReleaseBundlesSchema *StuckDistributionReleaseBundlesSchema `json:"releaseBundlesSchema,omitempty"`
 
 	// Status Optional within this object. The non-final state it is stuck in.
 	Status *StuckDistributionStatus `json:"status,omitempty"`
 }
 
-// StuckDistributionReleaseBundlesSchema Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1 on artifactweave.
+// StuckDistributionReleaseBundlesSchema Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1.
 type StuckDistributionReleaseBundlesSchema string
 
 // StuckDistributionStatus Optional within this object. The non-final state it is stuck in.
@@ -1486,7 +1486,7 @@ type SystemInfoStatus string
 
 // SystemSettings Distribution settings.
 type SystemSettings struct {
-	// CallHomeEnabled Optional within this object. Accepted and stored for compatibility. artifactweave never sends usage data, so it has no effect.
+	// CallHomeEnabled Optional within this object. Accepted and stored. No usage data is sent, so it has no effect.
 	CallHomeEnabled *bool `json:"call_home_enabled,omitempty"`
 }
 
@@ -1588,7 +1588,7 @@ type UpdateGpgKeyAliasJSONBody struct {
 	// Alias Optional within this object. The new alias; must not be taken.
 	Alias *string `json:"alias,omitempty"`
 
-	// NewAlias Optional within this object. The new alias, older field name; used when alias is absent.
+	// NewAlias Optional within this object. The new alias; used when alias is absent.
 	NewAlias *string `json:"new_alias,omitempty"`
 }
 
@@ -1629,7 +1629,7 @@ type CreateReleaseBundleV1VersionParams struct {
 
 // DeleteAllReleaseBundleV1VersionsParams defines parameters for DeleteAllReleaseBundleV1Versions.
 type DeleteAllReleaseBundleV1VersionsParams struct {
-	// Archive Optional query parameter. Accepted for compatibility with JFrog, where true archives the version instead of deleting it. artifactweave deletes the version either way.
+	// Archive Optional query parameter. Accepted and ignored; the version is deleted either way.
 	Archive *bool `form:"archive,omitempty" json:"archive,omitempty"`
 }
 
@@ -1641,7 +1641,7 @@ type GetReleaseBundleV1VersionsByNameParams struct {
 
 // DeleteReleaseBundleV1VersionParams defines parameters for DeleteReleaseBundleV1Version.
 type DeleteReleaseBundleV1VersionParams struct {
-	// Archive Optional query parameter. Accepted for compatibility with JFrog, where true archives the version instead of deleting it. artifactweave deletes the version either way.
+	// Archive Optional query parameter. Accepted and ignored; the version is deleted either way.
 	Archive *bool `form:"archive,omitempty" json:"archive,omitempty"`
 }
 
@@ -1942,21 +1942,21 @@ type ClientInterface interface {
 
 	// ImportReleaseBundleV1Version Import an exported release bundle v1 archive
 	//
-	// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written. JFrog documents this path under the Distribution prefix although Artifactory serves it; artifactweave serves it here.
+	// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written.
 	//
 	// Corresponds with POST /api/release/import (the `ImportReleaseBundleV1Version` operationId).
 	ImportReleaseBundleV1Version(ctx context.Context, params *ImportReleaseBundleV1VersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDistributionEdgeNodes List edge nodes
 	//
-	// Lists the edges this instance can distribute to: artifactweave instances paired with it in the edge role (decision 0021), with the name and service id each declared at pairing.
+	// Lists the edges this instance can distribute to: the instances paired with it in the edge role, with the name and service id each declared at pairing.
 	//
 	// Corresponds with GET /api/v1/distribution/edge_nodes (the `GetDistributionEdgeNodes` operationId).
 	GetDistributionEdgeNodes(ctx context.Context, params *GetDistributionEdgeNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DistributeReleaseBundleV1VersionWithBody Distribute a release bundle v1 version
 	//
-	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1965,7 +1965,7 @@ type ClientInterface interface {
 
 	// DistributeReleaseBundleV1Version Distribute a release bundle v1 version
 	//
-	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2045,7 +2045,7 @@ type ClientInterface interface {
 
 	// SetGpgSigningKeyWithBody Add a GPG signing key
 	//
-	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2054,7 +2054,7 @@ type ClientInterface interface {
 
 	// SetGpgSigningKey Add a GPG signing key
 	//
-	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2145,7 +2145,7 @@ type ClientInterface interface {
 
 	// GenerateMaintenanceExecutionToken Get a maintenance token
 	//
-	// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation, which makes running a destructive action a deliberate two-step process. Administrators only.
+	// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation. Administrators only.
 	//
 	// Corresponds with GET /api/v1/maintenance/generate_token/{actionType} (the `GenerateMaintenanceExecutionToken` operationId).
 	GenerateMaintenanceExecutionToken(ctx context.Context, actionType GenerateMaintenanceExecutionTokenParamsActionType, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2159,7 +2159,7 @@ type ClientInterface interface {
 
 	// GetOpenMetricsForDistribution Get distribution metrics
 	//
-	// Returns the release bundle and distribution counters in OpenMetrics text, using JFrog's `jfds_` metric names so existing dashboards keep working. Administrators only.
+	// Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric names. Administrators only.
 	//
 	// Corresponds with GET /api/v1/metrics (the `GetOpenMetricsForDistribution` operationId).
 	GetOpenMetricsForDistribution(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2173,7 +2173,7 @@ type ClientInterface interface {
 
 	// CreateReleaseBundleV1VersionWithBody Create a release bundle v1 version
 	//
-	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2182,7 +2182,7 @@ type ClientInterface interface {
 
 	// CreateReleaseBundleV1Version Create a release bundle v1 version
 	//
-	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2297,7 +2297,7 @@ type ClientInterface interface {
 
 	// TriggerXrayScanReleaseBundleV1Version Scan a release bundle v1 version with Xray
 	//
-	// Asks Xray to scan the version's artifacts. artifactweave has no Xray (research 10), so this operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with POST /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan (the `TriggerXrayScanReleaseBundleV1Version` operationId).
 	TriggerXrayScanReleaseBundleV1Version(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2343,14 +2343,14 @@ type ClientInterface interface {
 
 	// GetTokenInfos List tokens
 	//
-	// Lists the tokens issued through the Distribution token operations. They are ordinary artifactweave access tokens (decision 0005), so the Access token list shows them too. Administrators only.
+	// Lists the tokens issued through the Distribution token operations. They are ordinary access tokens, so the Access token list shows them too. Administrators only.
 	//
 	// Corresponds with GET /api/v1/security/token (the `GetTokenInfos` operationId).
 	GetTokenInfos(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrRefreshTokenWithBody Create or refresh a token
 	//
-	// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+	// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2359,7 +2359,7 @@ type ClientInterface interface {
 
 	// CreateOrRefreshTokenWithFormdataBody Create or refresh a token
 	//
-	// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+	// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type.
 	//
@@ -2393,7 +2393,7 @@ type ClientInterface interface {
 
 	// DistributionPing Ping the distribution service
 	//
-	// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. In artifactweave the distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
+	// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. The distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
 	//
 	// Corresponds with GET /api/v1/system/ping (the `DistributionPing` operationId).
 	DistributionPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2489,14 +2489,14 @@ type ClientInterface interface {
 
 	// AbortReleaseBundleV2Distribution Abort a Release Bundle v2 distribution
 	//
-	// Aborts an in-progress Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with PUT /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version} (the `AbortReleaseBundleV2Distribution` operationId).
 	AbortReleaseBundleV2Distribution(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, params *AbortReleaseBundleV2DistributionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DistributeReleaseBundleV2VersionWithBody Distribute a Release Bundle v2 version
 	//
-	// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2505,7 +2505,7 @@ type ClientInterface interface {
 
 	// DistributeReleaseBundleV2Version Distribute a Release Bundle v2 version
 	//
-	// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2528,7 +2528,7 @@ type ClientInterface interface {
 
 	// RemoteDeleteReleaseBundleV2DistributionWithBody Delete a Release Bundle v2 version from edges
 	//
-	// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2537,7 +2537,7 @@ type ClientInterface interface {
 
 	// RemoteDeleteReleaseBundleV2Distribution Delete a Release Bundle v2 version from edges
 	//
-	// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2546,21 +2546,21 @@ type ClientInterface interface {
 
 	// GetReleaseBundleV2DistributionTrackers List Release Bundle v2 distribution trackers
 	//
-	// Lists the distribution trackers of a Release Bundle v2 version. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version} (the `GetReleaseBundleV2DistributionTrackers` operationId).
 	GetReleaseBundleV2DistributionTrackers(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, params *GetReleaseBundleV2DistributionTrackersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetDistributionStatusDetailsByTrackerId Get a Release Bundle v2 distribution tracker
 	//
-	// Returns one Release Bundle v2 distribution tracker. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker} (the `GetDistributionStatusDetailsByTrackerId` operationId).
 	GetDistributionStatusDetailsByTrackerId(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, distributionTracker DistributionTrackerPath, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateReleaseBundleV2DistributionPriorityWithBody Change the priority of a Release Bundle v2 distribution
 	//
-	// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2569,7 +2569,7 @@ type ClientInterface interface {
 
 	// UpdateReleaseBundleV2DistributionPriority Change the priority of a Release Bundle v2 distribution
 	//
-	// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2579,7 +2579,7 @@ type ClientInterface interface {
 
 // ImportReleaseBundleV1Version Import an exported release bundle v1 archive
 //
-// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written. JFrog documents this path under the Distribution prefix although Artifactory serves it; artifactweave serves it here.
+// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written.
 //
 // Corresponds with POST /api/release/import (the `ImportReleaseBundleV1Version` operationId).
 func (c *Client) ImportReleaseBundleV1Version(ctx context.Context, params *ImportReleaseBundleV1VersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2596,7 +2596,7 @@ func (c *Client) ImportReleaseBundleV1Version(ctx context.Context, params *Impor
 
 // GetDistributionEdgeNodes List edge nodes
 //
-// Lists the edges this instance can distribute to: artifactweave instances paired with it in the edge role (decision 0021), with the name and service id each declared at pairing.
+// Lists the edges this instance can distribute to: the instances paired with it in the edge role, with the name and service id each declared at pairing.
 //
 // Corresponds with GET /api/v1/distribution/edge_nodes (the `GetDistributionEdgeNodes` operationId).
 func (c *Client) GetDistributionEdgeNodes(ctx context.Context, params *GetDistributionEdgeNodesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2613,7 +2613,7 @@ func (c *Client) GetDistributionEdgeNodes(ctx context.Context, params *GetDistri
 
 // DistributeReleaseBundleV1VersionWithBody Distribute a release bundle v1 version
 //
-// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2632,7 +2632,7 @@ func (c *Client) DistributeReleaseBundleV1VersionWithBody(ctx context.Context, r
 
 // DistributeReleaseBundleV1Version Distribute a release bundle v1 version
 //
-// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2812,7 +2812,7 @@ func (c *Client) GetGpgSigningKey(ctx context.Context, reqEditors ...RequestEdit
 
 // SetGpgSigningKeyWithBody Add a GPG signing key
 //
-// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2831,7 +2831,7 @@ func (c *Client) SetGpgSigningKeyWithBody(ctx context.Context, contentType strin
 
 // SetGpgSigningKey Add a GPG signing key
 //
-// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3032,7 +3032,7 @@ func (c *Client) ExecuteMaintenanceActionWithTextBody(ctx context.Context, actio
 
 // GenerateMaintenanceExecutionToken Get a maintenance token
 //
-// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation, which makes running a destructive action a deliberate two-step process. Administrators only.
+// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation. Administrators only.
 //
 // Corresponds with GET /api/v1/maintenance/generate_token/{actionType} (the `GenerateMaintenanceExecutionToken` operationId).
 func (c *Client) GenerateMaintenanceExecutionToken(ctx context.Context, actionType GenerateMaintenanceExecutionTokenParamsActionType, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3066,7 +3066,7 @@ func (c *Client) GetStuckDistributions(ctx context.Context, reqEditors ...Reques
 
 // GetOpenMetricsForDistribution Get distribution metrics
 //
-// Returns the release bundle and distribution counters in OpenMetrics text, using JFrog's `jfds_` metric names so existing dashboards keep working. Administrators only.
+// Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric names. Administrators only.
 //
 // Corresponds with GET /api/v1/metrics (the `GetOpenMetricsForDistribution` operationId).
 func (c *Client) GetOpenMetricsForDistribution(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3100,7 +3100,7 @@ func (c *Client) GetAllBundles(ctx context.Context, params *GetAllBundlesParams,
 
 // CreateReleaseBundleV1VersionWithBody Create a release bundle v1 version
 //
-// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3119,7 +3119,7 @@ func (c *Client) CreateReleaseBundleV1VersionWithBody(ctx context.Context, param
 
 // CreateReleaseBundleV1Version Create a release bundle v1 version
 //
-// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3384,7 +3384,7 @@ func (c *Client) SignReleaseBundleV1Version(ctx context.Context, releaseBundleNa
 
 // TriggerXrayScanReleaseBundleV1Version Scan a release bundle v1 version with Xray
 //
-// Asks Xray to scan the version's artifacts. artifactweave has no Xray (research 10), so this operation answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with POST /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan (the `TriggerXrayScanReleaseBundleV1Version` operationId).
 func (c *Client) TriggerXrayScanReleaseBundleV1Version(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3490,7 +3490,7 @@ func (c *Client) SetDistributionPermission(ctx context.Context, permissionName s
 
 // GetTokenInfos List tokens
 //
-// Lists the tokens issued through the Distribution token operations. They are ordinary artifactweave access tokens (decision 0005), so the Access token list shows them too. Administrators only.
+// Lists the tokens issued through the Distribution token operations. They are ordinary access tokens, so the Access token list shows them too. Administrators only.
 //
 // Corresponds with GET /api/v1/security/token (the `GetTokenInfos` operationId).
 func (c *Client) GetTokenInfos(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3507,7 +3507,7 @@ func (c *Client) GetTokenInfos(ctx context.Context, reqEditors ...RequestEditorF
 
 // CreateOrRefreshTokenWithBody Create or refresh a token
 //
-// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3526,7 +3526,7 @@ func (c *Client) CreateOrRefreshTokenWithBody(ctx context.Context, contentType s
 
 // CreateOrRefreshTokenWithFormdataBody Create or refresh a token
 //
-// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type.
 //
@@ -3600,7 +3600,7 @@ func (c *Client) GetDistributionSystemInfo(ctx context.Context, reqEditors ...Re
 
 // DistributionPing Ping the distribution service
 //
-// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. In artifactweave the distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
+// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. The distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
 //
 // Corresponds with GET /api/v1/system/ping (the `DistributionPing` operationId).
 func (c *Client) DistributionPing(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3816,7 +3816,7 @@ func (c *Client) ListSupportBundles(ctx context.Context, reqEditors ...RequestEd
 
 // AbortReleaseBundleV2Distribution Abort a Release Bundle v2 distribution
 //
-// Aborts an in-progress Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with PUT /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version} (the `AbortReleaseBundleV2Distribution` operationId).
 func (c *Client) AbortReleaseBundleV2Distribution(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, params *AbortReleaseBundleV2DistributionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3833,7 +3833,7 @@ func (c *Client) AbortReleaseBundleV2Distribution(ctx context.Context, releaseBu
 
 // DistributeReleaseBundleV2VersionWithBody Distribute a Release Bundle v2 version
 //
-// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3852,7 +3852,7 @@ func (c *Client) DistributeReleaseBundleV2VersionWithBody(ctx context.Context, r
 
 // DistributeReleaseBundleV2Version Distribute a Release Bundle v2 version
 //
-// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3905,7 +3905,7 @@ func (c *Client) GetPublicSigningKeyForDistribution(ctx context.Context, keyName
 
 // RemoteDeleteReleaseBundleV2DistributionWithBody Delete a Release Bundle v2 version from edges
 //
-// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3924,7 +3924,7 @@ func (c *Client) RemoteDeleteReleaseBundleV2DistributionWithBody(ctx context.Con
 
 // RemoteDeleteReleaseBundleV2Distribution Delete a Release Bundle v2 version from edges
 //
-// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3943,7 +3943,7 @@ func (c *Client) RemoteDeleteReleaseBundleV2Distribution(ctx context.Context, re
 
 // GetReleaseBundleV2DistributionTrackers List Release Bundle v2 distribution trackers
 //
-// Lists the distribution trackers of a Release Bundle v2 version. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version} (the `GetReleaseBundleV2DistributionTrackers` operationId).
 func (c *Client) GetReleaseBundleV2DistributionTrackers(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, params *GetReleaseBundleV2DistributionTrackersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3960,7 +3960,7 @@ func (c *Client) GetReleaseBundleV2DistributionTrackers(ctx context.Context, rel
 
 // GetDistributionStatusDetailsByTrackerId Get a Release Bundle v2 distribution tracker
 //
-// Returns one Release Bundle v2 distribution tracker. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker} (the `GetDistributionStatusDetailsByTrackerId` operationId).
 func (c *Client) GetDistributionStatusDetailsByTrackerId(ctx context.Context, releaseBundleName ReleaseBundleNamePath, releaseBundleVersion ReleaseBundleVersionPath, distributionTracker DistributionTrackerPath, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3977,7 +3977,7 @@ func (c *Client) GetDistributionStatusDetailsByTrackerId(ctx context.Context, re
 
 // UpdateReleaseBundleV2DistributionPriorityWithBody Change the priority of a Release Bundle v2 distribution
 //
-// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -3996,7 +3996,7 @@ func (c *Client) UpdateReleaseBundleV2DistributionPriorityWithBody(ctx context.C
 
 // UpdateReleaseBundleV2DistributionPriority Change the priority of a Release Bundle v2 distribution
 //
-// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6928,7 +6928,7 @@ type ClientWithResponsesInterface interface {
 
 	// ImportReleaseBundleV1VersionWithResponse Import an exported release bundle v1 archive
 	//
-	// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written. JFrog documents this path under the Distribution prefix although Artifactory serves it; artifactweave serves it here.
+	// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6937,7 +6937,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetDistributionEdgeNodesWithResponse List edge nodes
 	//
-	// Lists the edges this instance can distribute to: artifactweave instances paired with it in the edge role (decision 0021), with the name and service id each declared at pairing.
+	// Lists the edges this instance can distribute to: the instances paired with it in the edge role, with the name and service id each declared at pairing.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6946,7 +6946,7 @@ type ClientWithResponsesInterface interface {
 
 	// DistributeReleaseBundleV1VersionWithBodyWithResponse Distribute a release bundle v1 version
 	//
-	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6955,7 +6955,7 @@ type ClientWithResponsesInterface interface {
 
 	// DistributeReleaseBundleV1VersionWithResponse Distribute a release bundle v1 version
 	//
-	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+	// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7045,7 +7045,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgSigningKeyWithBodyWithResponse Add a GPG signing key
 	//
-	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7054,7 +7054,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetGpgSigningKeyWithResponse Add a GPG signing key
 	//
-	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+	// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7153,7 +7153,7 @@ type ClientWithResponsesInterface interface {
 
 	// GenerateMaintenanceExecutionTokenWithResponse Get a maintenance token
 	//
-	// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation, which makes running a destructive action a deliberate two-step process. Administrators only.
+	// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7171,7 +7171,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetOpenMetricsForDistributionWithResponse Get distribution metrics
 	//
-	// Returns the release bundle and distribution counters in OpenMetrics text, using JFrog's `jfds_` metric names so existing dashboards keep working. Administrators only.
+	// Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric names. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7189,7 +7189,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateReleaseBundleV1VersionWithBodyWithResponse Create a release bundle v1 version
 	//
-	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7198,7 +7198,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateReleaseBundleV1VersionWithResponse Create a release bundle v1 version
 	//
-	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+	// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7333,7 +7333,7 @@ type ClientWithResponsesInterface interface {
 
 	// TriggerXrayScanReleaseBundleV1VersionWithResponse Scan a release bundle v1 version with Xray
 	//
-	// Asks Xray to scan the version's artifacts. artifactweave has no Xray (research 10), so this operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7387,7 +7387,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTokenInfosWithResponse List tokens
 	//
-	// Lists the tokens issued through the Distribution token operations. They are ordinary artifactweave access tokens (decision 0005), so the Access token list shows them too. Administrators only.
+	// Lists the tokens issued through the Distribution token operations. They are ordinary access tokens, so the Access token list shows them too. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7396,7 +7396,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrRefreshTokenWithBodyWithResponse Create or refresh a token
 	//
-	// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+	// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7405,7 +7405,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrRefreshTokenWithFormdataBodyWithResponse Create or refresh a token
 	//
-	// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+	// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7441,7 +7441,7 @@ type ClientWithResponsesInterface interface {
 
 	// DistributionPingWithResponse Ping the distribution service
 	//
-	// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. In artifactweave the distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
+	// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. The distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7549,7 +7549,7 @@ type ClientWithResponsesInterface interface {
 
 	// AbortReleaseBundleV2DistributionWithResponse Abort a Release Bundle v2 distribution
 	//
-	// Aborts an in-progress Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7558,7 +7558,7 @@ type ClientWithResponsesInterface interface {
 
 	// DistributeReleaseBundleV2VersionWithBodyWithResponse Distribute a Release Bundle v2 version
 	//
-	// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7567,7 +7567,7 @@ type ClientWithResponsesInterface interface {
 
 	// DistributeReleaseBundleV2VersionWithResponse Distribute a Release Bundle v2 version
 	//
-	// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7594,7 +7594,7 @@ type ClientWithResponsesInterface interface {
 
 	// RemoteDeleteReleaseBundleV2DistributionWithBodyWithResponse Delete a Release Bundle v2 version from edges
 	//
-	// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7603,7 +7603,7 @@ type ClientWithResponsesInterface interface {
 
 	// RemoteDeleteReleaseBundleV2DistributionWithResponse Delete a Release Bundle v2 version from edges
 	//
-	// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7612,7 +7612,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReleaseBundleV2DistributionTrackersWithResponse List Release Bundle v2 distribution trackers
 	//
-	// Lists the distribution trackers of a Release Bundle v2 version. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7621,7 +7621,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetDistributionStatusDetailsByTrackerIdWithResponse Get a Release Bundle v2 distribution tracker
 	//
-	// Returns one Release Bundle v2 distribution tracker. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7630,7 +7630,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateReleaseBundleV2DistributionPriorityWithBodyWithResponse Change the priority of a Release Bundle v2 distribution
 	//
-	// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7639,7 +7639,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateReleaseBundleV2DistributionPriorityWithResponse Change the priority of a Release Bundle v2 distribution
 	//
-	// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -11174,7 +11174,7 @@ func (r UpdateReleaseBundleV2DistributionPriorityResponse) ContentType() string 
 
 // ImportReleaseBundleV1VersionWithResponse Import an exported release bundle v1 archive
 //
-// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written. JFrog documents this path under the Distribution prefix although Artifactory serves it; artifactweave serves it here.
+// Imports an archive produced by the export operation, typically on an air-gapped instance. The archive must already be in the instance's release bundle import directory. The signature is verified against this instance's trusted keys (so the signing key's public part must have been propagated or added first), every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names, and the version is recorded. With `dry_run` all checks run and nothing is written.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11189,7 +11189,7 @@ func (c *ClientWithResponses) ImportReleaseBundleV1VersionWithResponse(ctx conte
 
 // GetDistributionEdgeNodesWithResponse List edge nodes
 //
-// Lists the edges this instance can distribute to: artifactweave instances paired with it in the edge role (decision 0021), with the name and service id each declared at pairing.
+// Lists the edges this instance can distribute to: the instances paired with it in the edge role, with the name and service id each declared at pairing.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11204,7 +11204,7 @@ func (c *ClientWithResponses) GetDistributionEdgeNodesWithResponse(ctx context.C
 
 // DistributeReleaseBundleV1VersionWithBodyWithResponse Distribute a release bundle v1 version
 //
-// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11219,7 +11219,7 @@ func (c *ClientWithResponses) DistributeReleaseBundleV1VersionWithBodyWithRespon
 
 // DistributeReleaseBundleV1VersionWithResponse Distribute a release bundle v1 version
 //
-// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and nothing is sent.
+// Sends a signed version to the edges the distribution rules select and returns a tracker. The transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys and every checksum, and only then makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected edges are returned and nothing is sent.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11369,7 +11369,7 @@ func (c *ClientWithResponses) GetGpgSigningKeyWithResponse(ctx context.Context, 
 
 // SetGpgSigningKeyWithBodyWithResponse Add a GPG signing key
 //
-// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11384,7 +11384,7 @@ func (c *ClientWithResponses) SetGpgSigningKeyWithBodyWithResponse(ctx context.C
 
 // SetGpgSigningKeyWithResponse Add a GPG signing key
 //
-// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages, so a key added here is visible there and the reverse.
+// Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added here is visible there and the reverse.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11549,7 +11549,7 @@ func (c *ClientWithResponses) ExecuteMaintenanceActionWithTextBodyWithResponse(c
 
 // GenerateMaintenanceExecutionTokenWithResponse Get a maintenance token
 //
-// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation, which makes running a destructive action a deliberate two-step process. Administrators only.
+// Issues a single-use token for one maintenance action. The token expires after 3 minutes and must be sent as the body of the execute operation. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11579,7 +11579,7 @@ func (c *ClientWithResponses) GetStuckDistributionsWithResponse(ctx context.Cont
 
 // GetOpenMetricsForDistributionWithResponse Get distribution metrics
 //
-// Returns the release bundle and distribution counters in OpenMetrics text, using JFrog's `jfds_` metric names so existing dashboards keep working. Administrators only.
+// Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric names. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11609,7 +11609,7 @@ func (c *ClientWithResponses) GetAllBundlesWithResponse(ctx context.Context, par
 
 // CreateReleaseBundleV1VersionWithBodyWithResponse Create a release bundle v1 version
 //
-// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11624,7 +11624,7 @@ func (c *ClientWithResponses) CreateReleaseBundleV1VersionWithBodyWithResponse(c
 
 // CreateReleaseBundleV1VersionWithResponse Create a release bundle v1 version
 //
-// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision 0023), and the artifacts stay in their repositories.
+// Creates a release bundle version: an immutable manifest of the artifacts selected by the spec's AQL queries, each recorded with its repository path, sha256 checksum and any properties the query adds. When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version is returned without storing anything. A name and version pair is unique; creating an existing pair answers 400. The artifacts stay in their repositories.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11849,7 +11849,7 @@ func (c *ClientWithResponses) SignReleaseBundleV1VersionWithResponse(ctx context
 
 // TriggerXrayScanReleaseBundleV1VersionWithResponse Scan a release bundle v1 version with Xray
 //
-// Asks Xray to scan the version's artifacts. artifactweave has no Xray (research 10), so this operation answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11939,7 +11939,7 @@ func (c *ClientWithResponses) SetDistributionPermissionWithResponse(ctx context.
 
 // GetTokenInfosWithResponse List tokens
 //
-// Lists the tokens issued through the Distribution token operations. They are ordinary artifactweave access tokens (decision 0005), so the Access token list shows them too. Administrators only.
+// Lists the tokens issued through the Distribution token operations. They are ordinary access tokens, so the Access token list shows them too. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11954,7 +11954,7 @@ func (c *ClientWithResponses) GetTokenInfosWithResponse(ctx context.Context, req
 
 // CreateOrRefreshTokenWithBodyWithResponse Create or refresh a token
 //
-// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11969,7 +11969,7 @@ func (c *ClientWithResponses) CreateOrRefreshTokenWithBodyWithResponse(ctx conte
 
 // CreateOrRefreshTokenWithFormdataBodyWithResponse Create or refresh a token
 //
-// JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+// Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair. The tokens are ordinary access tokens.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12029,7 +12029,7 @@ func (c *ClientWithResponses) GetDistributionSystemInfoWithResponse(ctx context.
 
 // DistributionPingWithResponse Ping the distribution service
 //
-// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. In artifactweave the distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
+// Answers 200 with message OK when the instance's distribution features are usable, meaning the database and blob store are reachable. The distribution service is the instance itself. Anonymous callers may use it unless anonymous access is disabled.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -12209,7 +12209,7 @@ func (c *ClientWithResponses) ListSupportBundlesWithResponse(ctx context.Context
 
 // AbortReleaseBundleV2DistributionWithResponse Abort a Release Bundle v2 distribution
 //
-// Aborts an in-progress Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -12224,7 +12224,7 @@ func (c *ClientWithResponses) AbortReleaseBundleV2DistributionWithResponse(ctx c
 
 // DistributeReleaseBundleV2VersionWithBodyWithResponse Distribute a Release Bundle v2 version
 //
-// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12239,7 +12239,7 @@ func (c *ClientWithResponses) DistributeReleaseBundleV2VersionWithBodyWithRespon
 
 // DistributeReleaseBundleV2VersionWithResponse Distribute a Release Bundle v2 version
 //
-// Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12284,7 +12284,7 @@ func (c *ClientWithResponses) GetPublicSigningKeyForDistributionWithResponse(ctx
 
 // RemoteDeleteReleaseBundleV2DistributionWithBodyWithResponse Delete a Release Bundle v2 version from edges
 //
-// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12299,7 +12299,7 @@ func (c *ClientWithResponses) RemoteDeleteReleaseBundleV2DistributionWithBodyWit
 
 // RemoteDeleteReleaseBundleV2DistributionWithResponse Delete a Release Bundle v2 version from edges
 //
-// Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12314,7 +12314,7 @@ func (c *ClientWithResponses) RemoteDeleteReleaseBundleV2DistributionWithRespons
 
 // GetReleaseBundleV2DistributionTrackersWithResponse List Release Bundle v2 distribution trackers
 //
-// Lists the distribution trackers of a Release Bundle v2 version. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -12329,7 +12329,7 @@ func (c *ClientWithResponses) GetReleaseBundleV2DistributionTrackersWithResponse
 
 // GetDistributionStatusDetailsByTrackerIdWithResponse Get a Release Bundle v2 distribution tracker
 //
-// Returns one Release Bundle v2 distribution tracker. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -12344,7 +12344,7 @@ func (c *ClientWithResponses) GetDistributionStatusDetailsByTrackerIdWithRespons
 
 // UpdateReleaseBundleV2DistributionPriorityWithBodyWithResponse Change the priority of a Release Bundle v2 distribution
 //
-// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12359,7 +12359,7 @@ func (c *ClientWithResponses) UpdateReleaseBundleV2DistributionPriorityWithBodyW
 
 // UpdateReleaseBundleV2DistributionPriorityWithResponse Change the priority of a Release Bundle v2 distribution
 //
-// Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete and answers 501.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

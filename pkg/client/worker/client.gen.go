@@ -416,7 +416,7 @@ func (e WorkerUpdateRequestAction) Valid() bool {
 type ActionMetadata struct {
 	// Action Optional within this object. Identity of the action.
 	Action *struct {
-		// Application Optional within this object. Service that raises the action, such as artifactory or access.
+		// Application Optional within this object. Service that raises the action, such as `artifactory` or `access`.
 		Application *string `json:"application,omitempty"`
 
 		// Name Optional within this object. Action name, one of the values accepted by action on create.
@@ -450,7 +450,7 @@ type ActionMetadata struct {
 	// SupportProjects Optional within this object. Whether project administrators may create workers for this action.
 	SupportProjects *bool `json:"supportProjects,omitempty"`
 
-	// TypesDefinitions Optional within this object. TypeScript declarations of the input and result types. Status enums are numeric (for example DOWNLOAD_PROCEED = 1); workers may return either the number or the member name as a string, and artifactweave accepts both.
+	// TypesDefinitions Optional within this object. TypeScript declarations of the input and result types. Status enums are numeric (for example DOWNLOAD_PROCEED = 1); workers may return either the number or the member name as a string; both are accepted.
 	TypesDefinitions *string `json:"typesDefinitions,omitempty"`
 
 	// WikiUrl Optional within this object. Link to documentation for the action.
@@ -460,9 +460,9 @@ type ActionMetadata struct {
 // ActionMetadataFilterType Optional within this object. Which filterCriteria member applies: FILTER_REPO for artifactFilterCriteria, SCHEDULE for schedule. Absent for actions that take no filter.
 type ActionMetadataFilterType string
 
-// ErrorResponse The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// ErrorResponse The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error; clients read the first.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Code Required within this object. A symbolic code such as NOT_FOUND.
 		Code string `json:"code"`
@@ -472,7 +472,7 @@ type ErrorResponse struct {
 	} `json:"errors"`
 }
 
-// Worker A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine (decision 0026). Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// Worker A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 type Worker struct {
 	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400.
 	Action *string `json:"action,omitempty"`
@@ -508,9 +508,9 @@ type Worker struct {
 	SourceCode *string `json:"sourceCode,omitempty"`
 }
 
-// WorkerCreateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine (decision 0026). Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// WorkerCreateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 type WorkerCreateRequest struct {
-	// Action Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+	// Action Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 	Action WorkerCreateRequestAction `json:"action"`
 
 	// Debug Optional within this object. When true every run is recorded in the execution history; when false, the default, only failed runs are.
@@ -544,7 +544,7 @@ type WorkerCreateRequest struct {
 	SourceCode string `json:"sourceCode"`
 }
 
-// WorkerCreateRequestAction Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+// WorkerCreateRequestAction Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 type WorkerCreateRequestAction string
 
 // WorkerExecutionHistoryEntry One recorded run.
@@ -552,7 +552,7 @@ type WorkerExecutionHistoryEntry struct {
 	// EndTimeMillis Optional within this object. When the run ended, epoch milliseconds.
 	EndTimeMillis *int64 `json:"endTimeMillis,omitempty"`
 
-	// ErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+	// ErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 	ErrorCode *WorkerExecutionHistoryEntryErrorCode `json:"errorCode,omitempty"`
 
 	// ErrorMessage Optional within this object. Human readable reason for a failed run.
@@ -586,7 +586,7 @@ type WorkerExecutionHistoryEntry struct {
 	WorkerType *string `json:"workerType,omitempty"`
 }
 
-// WorkerExecutionHistoryEntryErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+// WorkerExecutionHistoryEntryErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 type WorkerExecutionHistoryEntryErrorCode string
 
 // WorkerExecutionPayload Input handed to the worker as its data argument. Its shape depends on the action; GET /api/v2/actions gives a sample payload and TypeScript types for each one.
@@ -597,18 +597,18 @@ type WorkerExecutionResult struct {
 	// Data Optional within this object. What the script returned, unchanged. For BEFORE_ actions it carries the decision (status and message) in the shape the action's types define.
 	Data *map[string]interface{} `json:"data,omitempty"`
 
-	// ErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+	// ErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 	ErrorCode *WorkerExecutionResultErrorCode `json:"errorCode,omitempty"`
 
 	// ErrorMessage Optional within this object. Human readable reason for a failed run; see errorCode.
 	ErrorMessage *string `json:"errorMessage,omitempty"`
 
-	// ExecutionStatus Optional within this object. STATUS_SUCCESS when the script completed. artifactweave writes STATUS_FAILURE for a failed run; JFrog's failure value is not published.
+	// ExecutionStatus Optional within this object. STATUS_SUCCESS when the script completed, STATUS_FAILURE for a failed run.
 	ExecutionStatus      *string                `json:"executionStatus,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// WorkerExecutionResultErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+// WorkerExecutionResultErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 type WorkerExecutionResultErrorCode string
 
 // WorkerFilterCriteria Selects the events that trigger a worker: artifactFilterCriteria for repository actions whose metadata filterType is FILTER_REPO, schedule for SCHEDULED_EVENT (filterType SCHEDULE). Repository keys and the any* switches combine with OR.
@@ -668,7 +668,7 @@ type WorkerScaffoldTsConfig struct {
 	Include *[]string `json:"include,omitempty"`
 }
 
-// WorkerSecret A named secret available to the worker as context.secrets.get(key). Values are sealed at rest (decision 0017) and never returned.
+// WorkerSecret A named secret available to the worker as context.secrets.get(key). Values are sealed at rest and never returned.
 type WorkerSecret struct {
 	// Key Required within this object. Secret name, unique within the worker.
 	Key string `json:"key"`
@@ -701,9 +701,9 @@ type WorkerTestRequest struct {
 // WorkerTestResult Test run outcome keyed by the action name in lower camel case, for example {"genericEvent": {"data": ..., "executionStatus": "STATUS_SUCCESS"}} for GENERIC_EVENT or beforeDownload for BEFORE_DOWNLOAD.
 type WorkerTestResult map[string]WorkerExecutionResult
 
-// WorkerUpdateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine (decision 0026). Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// WorkerUpdateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 type WorkerUpdateRequest struct {
-	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 	Action *WorkerUpdateRequestAction `json:"action,omitempty"`
 
 	// Debug Optional within this object. When true every run is recorded in the execution history; when false, the default, only failed runs are.
@@ -737,19 +737,19 @@ type WorkerUpdateRequest struct {
 	SourceCode *string `json:"sourceCode,omitempty"`
 }
 
-// WorkerUpdateRequestAction Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+// WorkerUpdateRequestAction Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 type WorkerUpdateRequestAction string
 
-// WorkerBadRequest The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerBadRequest The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerBadRequest = ErrorResponse
 
-// WorkerForbidden The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerForbidden The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerForbidden = ErrorResponse
 
-// WorkerNotFound The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerNotFound The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerNotFound = ErrorResponse
 
-// WorkerUnauthorized The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerUnauthorized The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerUnauthorized = ErrorResponse
 
 // GetWorkerExecutionHistoryParams defines parameters for GetWorkerExecutionHistory.
@@ -1029,7 +1029,7 @@ type ClientInterface interface {
 
 	// ExecuteHttpTriggeredWorkerWithBody Execute a worker
 	//
-	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1038,7 +1038,7 @@ type ClientInterface interface {
 
 	// ExecuteHttpTriggeredWorker Execute a worker
 	//
-	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1047,7 +1047,7 @@ type ClientInterface interface {
 
 	// GetWorkerExecutionHistory List recorded executions
 	//
-	// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+	// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 	//
 	// Corresponds with GET /api/v1/execution_history (the `GetWorkerExecutionHistory` operationId).
 	GetWorkerExecutionHistory(ctx context.Context, params *GetWorkerExecutionHistoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1079,7 +1079,7 @@ type ClientInterface interface {
 
 	// CheckWorkersLiveness Workers liveness
 	//
-	// Answers when the Workers service is running. No authentication. In artifactweave the service is part of the single process, so this mirrors the process liveness probe.
+	// Answers when the Workers service is running. No authentication. The service is part of the single process, so this mirrors the process liveness probe.
 	//
 	// Corresponds with GET /api/v1/system/liveness (the `CheckWorkersLiveness` operationId).
 	CheckWorkersLiveness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1093,7 +1093,7 @@ type ClientInterface interface {
 
 	// ExecuteWorkerTestGenericWithBody Test an unsaved script
 	//
-	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1102,7 +1102,7 @@ type ClientInterface interface {
 
 	// ExecuteWorkerTestGeneric Test an unsaved script
 	//
-	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1111,7 +1111,7 @@ type ClientInterface interface {
 
 	// ExecuteWorkerTestWithBody Test a saved worker
 	//
-	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1120,7 +1120,7 @@ type ClientInterface interface {
 
 	// ExecuteWorkerTest Test a saved worker
 	//
-	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1211,7 +1211,7 @@ func (c *Client) GetWorkerActions(ctx context.Context, reqEditors ...RequestEdit
 
 // ExecuteHttpTriggeredWorkerWithBody Execute a worker
 //
-// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1230,7 +1230,7 @@ func (c *Client) ExecuteHttpTriggeredWorkerWithBody(ctx context.Context, workerK
 
 // ExecuteHttpTriggeredWorker Execute a worker
 //
-// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1249,7 +1249,7 @@ func (c *Client) ExecuteHttpTriggeredWorker(ctx context.Context, workerKey strin
 
 // GetWorkerExecutionHistory List recorded executions
 //
-// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 //
 // Corresponds with GET /api/v1/execution_history (the `GetWorkerExecutionHistory` operationId).
 func (c *Client) GetWorkerExecutionHistory(ctx context.Context, params *GetWorkerExecutionHistoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1321,7 +1321,7 @@ func (c *Client) GetWorkerScaffoldTsConfig(ctx context.Context, params *GetWorke
 
 // CheckWorkersLiveness Workers liveness
 //
-// Answers when the Workers service is running. No authentication. In artifactweave the service is part of the single process, so this mirrors the process liveness probe.
+// Answers when the Workers service is running. No authentication. The service is part of the single process, so this mirrors the process liveness probe.
 //
 // Corresponds with GET /api/v1/system/liveness (the `CheckWorkersLiveness` operationId).
 func (c *Client) CheckWorkersLiveness(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -1355,7 +1355,7 @@ func (c *Client) CheckWorkersReadiness(ctx context.Context, reqEditors ...Reques
 
 // ExecuteWorkerTestGenericWithBody Test an unsaved script
 //
-// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1374,7 +1374,7 @@ func (c *Client) ExecuteWorkerTestGenericWithBody(ctx context.Context, params *E
 
 // ExecuteWorkerTestGeneric Test an unsaved script
 //
-// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1393,7 +1393,7 @@ func (c *Client) ExecuteWorkerTestGeneric(ctx context.Context, params *ExecuteWo
 
 // ExecuteWorkerTestWithBody Test a saved worker
 //
-// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1412,7 +1412,7 @@ func (c *Client) ExecuteWorkerTestWithBody(ctx context.Context, workerKey string
 
 // ExecuteWorkerTest Test a saved worker
 //
-// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2395,7 +2395,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExecuteHttpTriggeredWorkerWithBodyWithResponse Execute a worker
 	//
-	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2404,7 +2404,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExecuteHttpTriggeredWorkerWithResponse Execute a worker
 	//
-	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+	// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2413,7 +2413,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetWorkerExecutionHistoryWithResponse List recorded executions
 	//
-	// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+	// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2449,7 +2449,7 @@ type ClientWithResponsesInterface interface {
 
 	// CheckWorkersLivenessWithResponse Workers liveness
 	//
-	// Answers when the Workers service is running. No authentication. In artifactweave the service is part of the single process, so this mirrors the process liveness probe.
+	// Answers when the Workers service is running. No authentication. The service is part of the single process, so this mirrors the process liveness probe.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -2467,7 +2467,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExecuteWorkerTestGenericWithBodyWithResponse Test an unsaved script
 	//
-	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2476,7 +2476,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExecuteWorkerTestGenericWithResponse Test an unsaved script
 	//
-	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+	// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2485,7 +2485,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExecuteWorkerTestWithBodyWithResponse Test a saved worker
 	//
-	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2494,7 +2494,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExecuteWorkerTestWithResponse Test a saved worker
 	//
-	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+	// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -3430,7 +3430,7 @@ func (c *ClientWithResponses) GetWorkerActionsWithResponse(ctx context.Context, 
 
 // ExecuteHttpTriggeredWorkerWithBodyWithResponse Execute a worker
 //
-// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3445,7 +3445,7 @@ func (c *ClientWithResponses) ExecuteHttpTriggeredWorkerWithBodyWithResponse(ctx
 
 // ExecuteHttpTriggeredWorkerWithResponse Execute a worker
 //
-// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// Runs a GENERIC_EVENT worker synchronously with the given input and returns {data, executionStatus}. Administrators, or any authenticated user when the worker is shared. A worker for any other action is rejected with 400; a run that breaches a limit is terminated, recorded in the execution history with its errorCode, and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3460,7 +3460,7 @@ func (c *ClientWithResponses) ExecuteHttpTriggeredWorkerWithResponse(ctx context
 
 // GetWorkerExecutionHistoryWithResponse List recorded executions
 //
-// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+// Returns recorded executions, newest first. Successful runs are recorded only for workers with debug true; failures, including runs stopped by a limit, always are, with errorCode set. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3520,7 +3520,7 @@ func (c *ClientWithResponses) GetWorkerScaffoldTsConfigWithResponse(ctx context.
 
 // CheckWorkersLivenessWithResponse Workers liveness
 //
-// Answers when the Workers service is running. No authentication. In artifactweave the service is part of the single process, so this mirrors the process liveness probe.
+// Answers when the Workers service is running. No authentication. The service is part of the single process, so this mirrors the process liveness probe.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -3550,7 +3550,7 @@ func (c *ClientWithResponses) CheckWorkersReadinessWithResponse(ctx context.Cont
 
 // ExecuteWorkerTestGenericWithBodyWithResponse Test an unsaved script
 //
-// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3565,7 +3565,7 @@ func (c *ClientWithResponses) ExecuteWorkerTestGenericWithBodyWithResponse(ctx c
 
 // ExecuteWorkerTestGenericWithResponse Test an unsaved script
 //
-// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators only.
+// Transpiles and runs a script that is not saved, with the given action and input, and returns its outcome keyed by action. Nothing is stored. A run that breaches a limit is terminated and answered with 400, its errorCode in the message. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3580,7 +3580,7 @@ func (c *ClientWithResponses) ExecuteWorkerTestGenericWithResponse(ctx context.C
 
 // ExecuteWorkerTestWithBodyWithResponse Test a saved worker
 //
-// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -3595,7 +3595,7 @@ func (c *ClientWithResponses) ExecuteWorkerTestWithBodyWithResponse(ctx context.
 
 // ExecuteWorkerTestWithResponse Test a saved worker
 //
-// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. This is what jf worker test-run calls. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default). Platform administrators, or project administrators for the worker's project.
+// Runs the given script in the context of a saved worker: its secrets and properties apply, overlaid by any staged ones, and a BEFORE_ decision is returned without being applied to a real operation. A run that breaches a limit is terminated and answered with 400. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails. Platform administrators, or project administrators for the worker's project.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

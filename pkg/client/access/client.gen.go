@@ -477,7 +477,7 @@ func (e GetUserListParamsStatus) Valid() bool {
 
 // AccessVersion defines model for AccessVersion.
 type AccessVersion struct {
-	// Name Required within this object. The compatibility version; the platform provider reads this field, not version.
+	// Name Required within this object. The compatibility version.
 	Name string `json:"name"`
 
 	// Version Required within this object. The same value as name.
@@ -493,7 +493,7 @@ type Actions struct {
 	Users *map[string][]string `json:"users,omitempty"`
 }
 
-// AwsIamRoleAssignment Maps one user to the AWS IAM role their AWS credentials must assume. Not supported by artifactweave.
+// AwsIamRoleAssignment Maps one user to the AWS IAM role their AWS credentials must assume. Not supported.
 type AwsIamRoleAssignment struct {
 	// IamRole Required within this object. ARN of the AWS IAM role the user's AWS credentials must assume.
 	IamRole string `json:"iam_role"`
@@ -502,7 +502,7 @@ type AwsIamRoleAssignment struct {
 	Username string `json:"username"`
 }
 
-// CrowdConfiguration Atlassian Crowd integration settings. Not supported by artifactweave (decision 0019).
+// CrowdConfiguration Atlassian Crowd integration settings. Not supported.
 type CrowdConfiguration struct {
 	// AllowUserToAccessProfile Optional within this object. Whether users created through Crowd may open their own profile.
 	AllowUserToAccessProfile *bool `json:"allow_user_to_access_profile,omitempty"`
@@ -558,7 +558,7 @@ type EnvironmentRename struct {
 
 // ErrorResponse The Access error envelope used by every /access response.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error. The Terraform providers join every entry into one error message; jfrog-client-go reports the whole body after the status.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Code Required within this object. A symbolic code such as NOT_FOUND.
 		Code string `json:"code"`
@@ -577,7 +577,7 @@ type ExpandedPermissionsResponse struct {
 	Permissions []PermissionDetails `json:"permissions"`
 }
 
-// FederationTarget A federation target as stored on this instance: a peer artifactweave instance that receives this instance's identity changes over the peer protocol (decision 0021). Returned by every read; secrets of the trust relationship are never included.
+// FederationTarget A federation target as stored on this instance: a peer instance of this server that receives this instance's identity changes over the peer protocol (decision 0021). Returned by every read; secrets of the trust relationship are never included.
 type FederationTarget struct {
 	// Active Optional within this object. When false the target stays registered but receives no changes until reactivated; queued changes are kept and sent on reactivation.
 	Active *bool `json:"active,omitempty"`
@@ -621,7 +621,7 @@ type FederationTargetCreate struct {
 	// PermissionFilters Optional within this object. Limits which permissions, by name, are replicated. Omitted means all.
 	PermissionFilters *PatternFilter `json:"permission_filters,omitempty"`
 
-	// Url Required within this object. Base URL of the peer artifactweave instance, for example https://peer.example.com. Cannot be changed later; register a new target instead.
+	// Url Required within this object. Base URL of the peer instance, for example https://peer.example.com. Cannot be changed later; register a new target instead.
 	Url string `json:"url"`
 }
 
@@ -660,7 +660,7 @@ type FederationValidateRequest struct {
 
 // GlobalRole A global role as returned by reads.
 type GlobalRole struct {
-	// Actions Required within this object. Actions from the global vocabulary: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY, READ_POLICIES_SECURITY. Only the repository and build actions have an effect in artifactweave; the rest are stored and echoed.
+	// Actions Required within this object. Actions from the global vocabulary: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY, READ_POLICIES_SECURITY. Only the repository and build actions have an effect; the rest are stored and echoed.
 	Actions []string `json:"actions"`
 
 	// Description Optional within this object. Free text.
@@ -697,7 +697,7 @@ type GlobalRoleCreate struct {
 // GlobalRoleCreateType Required within this object. Must be CUSTOM_GLOBAL; built-in types cannot be created.
 type GlobalRoleCreateType string
 
-// GlobalRoleCreated The answer to a role creation, as JFrog documents it.
+// GlobalRoleCreated The answer to a role creation.
 type GlobalRoleCreated struct {
 	// Code Required within this object. OK on success.
 	Code string `json:"code"`
@@ -744,7 +744,7 @@ type GroupCreateRequest struct {
 	// ExternalId Optional within this object. Identifier of the group in an external identity provider; stored and echoed.
 	ExternalId *string `json:"external_id,omitempty"`
 
-	// ImportFromLdapGroupSetting Optional within this object. Name of an LDAP group setting to take members from. Mutually exclusive with members. Not available in artifactweave v1; a value answers 400.
+	// ImportFromLdapGroupSetting Optional within this object. Name of an LDAP group setting to take members from. Mutually exclusive with members. Not supported; a value answers 400.
 	ImportFromLdapGroupSetting *string `json:"import_from_ldap_group_setting,omitempty"`
 
 	// ManageResources Optional within this object. Members may manage repositories without being full admins. Defaults to false.
@@ -768,7 +768,7 @@ type GroupCreateRequest struct {
 	// ReportsManager Optional within this object. Stored and echoed; no effect.
 	ReportsManager *bool `json:"reports_manager,omitempty"`
 
-	// WatchManager Optional within this object. Stored and echoed; no effect in artifactweave.
+	// WatchManager Optional within this object. Stored and echoed; no effect.
 	WatchManager *bool `json:"watch_manager,omitempty"`
 }
 
@@ -804,7 +804,7 @@ type GroupDetails struct {
 	// PolicyViewer Optional within this object. Echo of the stored flag.
 	PolicyViewer *bool `json:"policy_viewer,omitempty"`
 
-	// Realm Required within this object. Server-owned. internal for groups stored by artifactweave.
+	// Realm Required within this object. Server-owned. internal for locally stored groups.
 	Realm string `json:"realm"`
 
 	// RealmAttributes Optional within this object. Server-owned. Realm-specific metadata; empty for internal groups.
@@ -951,7 +951,7 @@ type HashicorpVaultMount struct {
 // HashicorpVaultMountType Optional within this object. Secret engine version: KV1 or KV2.
 type HashicorpVaultMountType string
 
-// HttpSsoConfiguration HTTP single sign-on through an authenticating reverse proxy. Not supported by artifactweave (decision 0019).
+// HttpSsoConfiguration HTTP single sign-on through an authenticating reverse proxy. Not supported.
 type HttpSsoConfiguration struct {
 	// AllowUserToAccessProfile Optional within this object. Whether proxied users may open their own profile.
 	AllowUserToAccessProfile *bool `json:"allow_user_to_access_profile,omitempty"`
@@ -1172,7 +1172,7 @@ type OidcConfiguration struct {
 	// ProjectKey Optional within this object. Project the provider belongs to. Omitted or empty means a global provider.
 	ProjectKey *string `json:"project_key,omitempty"`
 
-	// ProviderType Optional within this object. Kind of identity provider, in the Access vocabulary: `Generic OpenID Connect`, `GitHub`, `GitHub Enterprise` or `Azure`. Generic covers any other OpenID Connect issuer, such as GitLab, Jenkins or Okta. The jfrog/platform Terraform provider sends exactly these values, mapping its own `generic` and `GitHubEnterprise` onto them. artifactweave also accepts the lower-case short names older JFrog examples use (`generic`, `github`, `github enterprise`, `azure`, any case) and stores and returns the canonical form.
+	// ProviderType Optional within this object. Kind of identity provider, in the Access vocabulary: `Generic OpenID Connect`, `GitHub`, `GitHub Enterprise` or `Azure`. Generic covers any other OpenID Connect issuer, such as GitLab, Jenkins or Okta. The lower-case short names `generic`, `github`, `github enterprise` and `azure` are also accepted in any case; the server stores and returns the canonical form.
 	ProviderType *string `json:"provider_type,omitempty"`
 
 	// TokenIssuer Optional within this object. For GitHub providers, the organisation or enterprise that issues the tokens.
@@ -1223,10 +1223,10 @@ type OidcIdentityMappingResponse struct {
 
 // OidcTokenExchangeRequest An RFC 8693 token exchange request carrying a provider's ID token.
 type OidcTokenExchangeRequest struct {
-	// ApplicationKey Optional within this object. AppTrust application key. Accepted and ignored, because AppTrust is out of scope.
+	// ApplicationKey Optional within this object. AppTrust application key. Accepted and ignored.
 	ApplicationKey *string `json:"application_key,omitempty"`
 
-	// Audience Optional within this object. The audience the caller requested the ID token for; the JFrog CLI sends its --oidc-audience here. Accepted and ignored, because the provider's configured audience decides which tokens verify.
+	// Audience Optional within this object. The audience the caller requested the ID token for. Accepted and ignored; the provider's configured audience decides which tokens verify.
 	Audience *string `json:"audience,omitempty"`
 
 	// Branch Optional within this object. Source branch of the CI run, recorded with the issued token for auditing.
@@ -1283,7 +1283,7 @@ type OidcTokenExchangeResult struct {
 	// ReferenceToken Optional within this object. Reference token for the issued token. Present only when include_reference_token was true.
 	ReferenceToken *string `json:"reference_token,omitempty"`
 
-	// Scope Optional within this object. Scope of the issued token, which the JFrog CLI prints.
+	// Scope Optional within this object. Scope of the issued token.
 	Scope *string `json:"scope,omitempty"`
 
 	// TokenType Optional within this object. Always Bearer.
@@ -1340,7 +1340,7 @@ type PermissionCreateRequest struct {
 	// Name Required within this object. Unique name, at most 64 characters.
 	Name string `json:"name"`
 
-	// Resources Optional within this object. One section per resource type. A permission with no sections grants nothing. The jfrog/platform provider also sends destination and pipeline_source sections, which artifactweave stores and echoes without effect.
+	// Resources Optional within this object. One section per resource type. A permission with no sections grants nothing. destination and pipeline_source sections are also accepted, stored and echoed without effect.
 	Resources *struct {
 		// Artifact Optional within this object. The grants for one resource type: which principals get which actions on which targets. Targets are repository keys (artifact), the build-info repository (build, exactly one target) or release bundle repositories, plus the special keys ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION for artifact. ANY REMOTE also covers the remote repositories' caches.
 		Artifact *PermissionResource `json:"artifact,omitempty"`
@@ -1426,7 +1426,7 @@ type Project struct {
 		// DeleteVirtualRepository Optional within this object. Granular flag: project admins may delete virtual repositories. Defaults to true when any granular flag is set on create.
 		DeleteVirtualRepository *bool `json:"delete_virtual_repository,omitempty"`
 
-		// IndexResources Optional within this object. Project admins may mark the project's resources for indexing. Stored and echoed; artifactweave has no indexing service. Defaults to true.
+		// IndexResources Optional within this object. Project admins may mark the project's resources for indexing. Stored and echoed; no effect. Defaults to true.
 		IndexResources *bool `json:"index_resources,omitempty"`
 
 		// ManageMembers Optional within this object. Project admins may add and remove members and change their roles. Defaults to true.
@@ -1480,7 +1480,7 @@ type ProjectCreateRequest struct {
 		// DeleteVirtualRepository Optional within this object. Granular flag: project admins may delete virtual repositories. Defaults to true when any granular flag is set on create.
 		DeleteVirtualRepository *bool `json:"delete_virtual_repository,omitempty"`
 
-		// IndexResources Optional within this object. Project admins may mark the project's resources for indexing. Stored and echoed; artifactweave has no indexing service. Defaults to true.
+		// IndexResources Optional within this object. Project admins may mark the project's resources for indexing. Stored and echoed; no effect. Defaults to true.
 		IndexResources *bool `json:"index_resources,omitempty"`
 
 		// ManageMembers Optional within this object. Project admins may add and remove members and change their roles. Defaults to true.
@@ -1550,7 +1550,7 @@ type ProjectRoleType string
 
 // ProjectRoleCreate Body for creating a custom project role.
 type ProjectRoleCreate struct {
-	// Actions Optional within this object. Actions the role grants. Project roles use the 32 project actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE, MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY, MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action and is rejected here. Pipeline and security actions are stored and echoed but grant nothing in artifactweave.
+	// Actions Optional within this object. Actions the role grants. Project roles use the 32 project actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE, MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY, MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action and is rejected here. Pipeline and security actions are stored and echoed but grant nothing.
 	Actions *[]string `json:"actions,omitempty"`
 
 	// Description Optional within this object. Free text describing the role.
@@ -1568,7 +1568,7 @@ type ProjectRoleCreate struct {
 
 // ProjectRoleUpdate Body for replacing a custom project role. Only CUSTOM roles can be changed.
 type ProjectRoleUpdate struct {
-	// Actions Optional within this object. Actions the role grants. Project roles use the 32 project actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE, MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY, MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action and is rejected here. Pipeline and security actions are stored and echoed but grant nothing in artifactweave.
+	// Actions Optional within this object. Actions the role grants. Project roles use the 32 project actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE, MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY, MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action and is rejected here. Pipeline and security actions are stored and echoed but grant nothing.
 	Actions *[]string `json:"actions,omitempty"`
 
 	// Description Optional within this object. Free text describing the role.
@@ -1603,7 +1603,7 @@ type ProjectUpdateRequest struct {
 		// DeleteVirtualRepository Optional within this object. Granular flag: project admins may delete virtual repositories. Defaults to true when any granular flag is set on create.
 		DeleteVirtualRepository *bool `json:"delete_virtual_repository,omitempty"`
 
-		// IndexResources Optional within this object. Project admins may mark the project's resources for indexing. Stored and echoed; artifactweave has no indexing service. Defaults to true.
+		// IndexResources Optional within this object. Project admins may mark the project's resources for indexing. Stored and echoed; no effect. Defaults to true.
 		IndexResources *bool `json:"index_resources,omitempty"`
 
 		// ManageMembers Optional within this object. Project admins may add and remove members and change their roles. Defaults to true.
@@ -1647,7 +1647,7 @@ type ProjectUserUpdate struct {
 	Roles *[]string `json:"roles,omitempty"`
 }
 
-// SamlGeneralSettings The instance-wide SAML switch. Not supported by artifactweave (decision 0019).
+// SamlGeneralSettings The instance-wide SAML switch. Not supported.
 type SamlGeneralSettings struct {
 	// CertificateIsPresent Optional within this object. Whether a service provider certificate is installed. Set by the server.
 	CertificateIsPresent *bool `json:"certificateIsPresent,omitempty"`
@@ -1656,7 +1656,7 @@ type SamlGeneralSettings struct {
 	Enable *bool `json:"enable,omitempty"`
 }
 
-// SamlSetting One SAML identity provider. Not supported by artifactweave (decision 0019).
+// SamlSetting One SAML identity provider. Not supported.
 type SamlSetting struct {
 	// AllowUserToAccessProfile Optional within this object. Whether users created through SAML may open their own profile.
 	AllowUserToAccessProfile *bool `json:"allow_user_to_access_profile,omitempty"`
@@ -1707,7 +1707,7 @@ type SamlSetting struct {
 	VerifyAudienceRestriction *bool `json:"verify_audience_restriction,omitempty"`
 }
 
-// SamlSettingCreate A new SAML identity provider. Not supported by artifactweave (decision 0019).
+// SamlSettingCreate A new SAML identity provider. Not supported.
 type SamlSettingCreate struct {
 	// AllowUserToAccessProfile Optional within this object. Whether users created through SAML may open their own profile.
 	AllowUserToAccessProfile *bool `json:"allow_user_to_access_profile,omitempty"`
@@ -1758,7 +1758,7 @@ type SamlSettingCreate struct {
 	VerifyAudienceRestriction *bool `json:"verify_audience_restriction,omitempty"`
 }
 
-// ScimGroupListResponse A SCIM 2.0 list response of groups (RFC 7644). Not supported by artifactweave.
+// ScimGroupListResponse A SCIM 2.0 list response of groups (RFC 7644). Not supported.
 type ScimGroupListResponse struct {
 	// Resources Optional within this object. Groups on this page.
 	Resources *[]struct {
@@ -1797,10 +1797,10 @@ type ScimGroupListResponse struct {
 	TotalResults *int `json:"totalResults,omitempty"`
 }
 
-// ScimResource A SCIM 2.0 resource or patch document (RFC 7643, RFC 7644), free-form. Not supported by artifactweave.
+// ScimResource A SCIM 2.0 resource or patch document (RFC 7643, RFC 7644), free-form. Not supported.
 type ScimResource map[string]interface{}
 
-// ScimResourceTypeListResponse A SCIM 2.0 list response of resource types. Not supported by artifactweave.
+// ScimResourceTypeListResponse A SCIM 2.0 list response of resource types. Not supported.
 type ScimResourceTypeListResponse struct {
 	// Resources Optional within this object. The resource types the endpoint supports, User and Group.
 	Resources *[]map[string]interface{} `json:"Resources,omitempty"`
@@ -1818,7 +1818,7 @@ type ScimResourceTypeListResponse struct {
 	TotalResults *int `json:"totalResults,omitempty"`
 }
 
-// ScimUserListResponse A SCIM 2.0 list response of users. Not supported by artifactweave.
+// ScimUserListResponse A SCIM 2.0 list response of users. Not supported.
 type ScimUserListResponse struct {
 	// Resources Optional within this object. Users on this page.
 	Resources *[]struct {
@@ -1889,7 +1889,7 @@ type TokenCreateRequest struct {
 	// IncludeReferenceToken Optional within this object. When true the response also carries a 64-character reference token that stands in for the JWT. Defaults to false.
 	IncludeReferenceToken *bool `json:"include_reference_token,omitempty"`
 
-	// ProjectKey Optional within this object. Scopes a token minted by a project admin to that project. The Terraform provider sends it as an empty string when unset, which is treated as absent.
+	// ProjectKey Optional within this object. Scopes a token minted by a project admin to that project. An empty string is treated as absent.
 	ProjectKey *string `json:"project_key,omitempty"`
 
 	// RefreshToken Optional within this object. Required when grant_type is refresh_token; the refresh token from the original response.
@@ -1944,7 +1944,7 @@ type TokenListResponse struct {
 	Tokens []TokenDetails `json:"tokens"`
 }
 
-// TokenResponse A freshly minted token. The documented schema omits token_id, but Artifactory returns it and the artifactory_scoped_token resource depends on it, so it is always present.
+// TokenResponse A freshly minted token.
 type TokenResponse struct {
 	// AccessToken Required within this object. The JWT; shown only in this response.
 	AccessToken string `json:"access_token"`
@@ -2018,16 +2018,16 @@ type UserCreateRequest struct {
 	// PlatformAuditor Optional within this object. Read-only access to audit information. Defaults to false.
 	PlatformAuditor *bool `json:"platform_auditor,omitempty"`
 
-	// PolicyManager Optional within this object. Xray policy management right. Stored and echoed; no effect in artifactweave.
+	// PolicyManager Optional within this object. Xray policy management right. Stored and echoed; no effect.
 	PolicyManager *bool `json:"policy_manager,omitempty"`
 
-	// PolicyViewer Optional within this object. Xray policy view right. Stored and echoed; no effect in artifactweave.
+	// PolicyViewer Optional within this object. Xray policy view right. Stored and echoed; no effect.
 	PolicyViewer *bool `json:"policy_viewer,omitempty"`
 
 	// ProfileUpdatable Optional within this object. Whether the user may change their own email and password. Defaults to true.
 	ProfileUpdatable *bool `json:"profile_updatable,omitempty"`
 
-	// ReportsManager Optional within this object. Xray reports right. Stored and echoed; no effect in artifactweave.
+	// ReportsManager Optional within this object. Xray reports right. Stored and echoed; no effect.
 	ReportsManager *bool `json:"reports_manager,omitempty"`
 
 	// ResourcesManager Optional within this object. Allows managing repositories without being a full admin.
@@ -2036,7 +2036,7 @@ type UserCreateRequest struct {
 	// Username Required within this object. The login name. Stored lower-case; at most 255 characters; must not be admin or anonymous.
 	Username string `json:"username"`
 
-	// WatchManager Optional within this object. Xray watch management right. Stored and echoed; has no effect in artifactweave.
+	// WatchManager Optional within this object. Xray watch management right. Stored and echoed; no effect.
 	WatchManager *bool `json:"watch_manager,omitempty"`
 }
 
@@ -2060,7 +2060,7 @@ type UserDetails struct {
 	// InternalPasswordDisabled Required within this object. Whether password login is disabled.
 	InternalPasswordDisabled bool `json:"internal_password_disabled"`
 
-	// LastLoggedIn Required within this object. Server-owned. RFC 3339 time of the last successful authentication; null when the user has never logged in, as Artifactory answers since 7.98.7.
+	// LastLoggedIn Required within this object. Server-owned. RFC 3339 time of the last successful authentication; null when the user has never logged in.
 	LastLoggedIn *time.Time `json:"last_logged_in"`
 
 	// ManageWebhook Optional within this object. Webhook management right.
@@ -2078,7 +2078,7 @@ type UserDetails struct {
 	// ProfileUpdatable Required within this object. Whether the user may edit their own profile.
 	ProfileUpdatable bool `json:"profile_updatable"`
 
-	// Realm Required within this object. Server-owned. internal for artifactweave-stored users.
+	// Realm Required within this object. Server-owned. internal for locally stored users.
 	Realm string `json:"realm"`
 
 	// ReportsManager Optional within this object. Echo of the stored flag.
@@ -2107,7 +2107,7 @@ type UserListResponse struct {
 
 	// Users Required within this object. The users in this page, possibly empty.
 	Users []struct {
-		// Realm Required within this object. Where the user is authenticated: internal for users stored by artifactweave, ldap once LDAP is supported.
+		// Realm Required within this object. Where the user is authenticated: internal for locally stored users.
 		Realm string `json:"realm"`
 
 		// Status Required within this object. The lifecycle state, one of invited, enabled, disabled, locked.
@@ -2121,12 +2121,12 @@ type UserListResponse struct {
 	} `json:"users"`
 }
 
-// UserLockPolicyConfig The Access user lock policy. One document over the same settings as the Artifactory user lock policy and password expiration policy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned only, so artifactweave does not yet unlock users after secondsToUnlock, delay logins, or exempt administrators from password expiry.
+// UserLockPolicyConfig The Access user lock policy. One document over the same settings as /artifactory/api/security/userLockPolicy and /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned only. Users are not unlocked after secondsToUnlock, logins are not delayed, and administrators are not exempt from password expiry.
 type UserLockPolicyConfig struct {
 	// AdminPasswordExpirable Optional within this object. Whether password expiry also applies to administrators. Stored and returned only. Default false.
 	AdminPasswordExpirable *bool `json:"adminPasswordExpirable,omitempty"`
 
-	// Attempts Optional within this object. Failed logins before a user is locked, from 0 through 100. 0 turns locking off and unlocks every locked user; the Artifactory policy then reports enabled false and keeps its previous loginAttempts. Default 0.
+	// Attempts Optional within this object. Failed logins before a user is locked, from 0 through 100. 0 turns locking off and unlocks every locked user; /artifactory/api/security/userLockPolicy then reports enabled false and keeps its previous loginAttempts. Default 0.
 	Attempts *int `json:"attempts,omitempty"`
 
 	// BaseLoginDelayMillis Optional within this object. Base delay, in milliseconds, for temporary login suspension after failed logins. Stored and returned only. Default 1000.
@@ -2141,7 +2141,7 @@ type UserLockPolicyConfig struct {
 	// MaxLoginDelayMillis Optional within this object. Upper bound, in milliseconds, on the temporary login suspension delay. Stored and returned only. Default 60000.
 	MaxLoginDelayMillis *int64 `json:"maxLoginDelayMillis,omitempty"`
 
-	// PasswordExpiryDays Optional within this object. Days after which an internal user's password expires; 0 means passwords do not expire. The Artifactory password expiration policy reads it as enabled with passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
+	// PasswordExpiryDays Optional within this object. Days after which an internal user's password expires; 0 means passwords do not expire. /artifactory/api/security/configuration/passwordExpirationPolicy reads it as enabled with passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
 	PasswordExpiryDays *int `json:"passwordExpiryDays,omitempty"`
 
 	// SecondsToUnlock Optional within this object. Seconds after which a locked user may sign in again; 0 keeps the user locked until an administrator unlocks them. Stored and returned only. Default 0.
@@ -2363,7 +2363,7 @@ type CreatePairingTokenParamsUseCase string
 
 // GetTokensParams defines parameters for GetTokens.
 type GetTokensParams struct {
-	// Scope Optional query parameter. Keeps only the tokens with this scope, as Artifactory 7.133.3 added it. A token matches when its whole scope, or one of its space-separated scopes, is exactly this string, such as applied-permissions/groups:readers. A scope no token has gives an empty list.
+	// Scope Optional query parameter. Keeps only the tokens with this scope. A token matches when its whole scope, or one of its space-separated scopes, is exactly this string, such as applied-permissions/groups:readers. A scope no token has gives an empty list.
 	Scope *string `form:"scope,omitempty" json:"scope,omitempty"`
 }
 
@@ -2971,7 +2971,7 @@ type ClientInterface interface {
 
 	// PutAwsIamRoleWithBody Assign an AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -2980,7 +2980,7 @@ type ClientInterface interface {
 
 	// PutAwsIamRole Assign an AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2989,14 +2989,14 @@ type ClientInterface interface {
 
 	// DeleteAwsIamRole Remove a user's AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with DELETE /api/v1/aws/iam_role/{username} (the `DeleteAwsIamRole` operationId).
 	DeleteAwsIamRole(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAwsIamRole Get a user's AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/aws/iam_role/{username} (the `GetAwsIamRole` operationId).
 	GetAwsIamRole(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3078,14 +3078,14 @@ type ClientInterface interface {
 
 	// GetAccessUserLockPolicy Get the user lock policy
 	//
-	// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+	// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and GET /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.
 	//
 	// Corresponds with GET /api/v1/config/security/user_lock_policy (the `GetAccessUserLockPolicy` operationId).
 	GetAccessUserLockPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ConfigureAccessUserLockPolicyWithBody Replace the user lock policy
 	//
-	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3094,7 +3094,7 @@ type ClientInterface interface {
 
 	// ConfigureAccessUserLockPolicy Replace the user lock policy
 	//
-	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3128,14 +3128,14 @@ type ClientInterface interface {
 
 	// GetCrowdConfiguration Get the Crowd configuration (not supported)
 	//
-	// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/crowd (the `GetCrowdConfiguration` operationId).
 	GetCrowdConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpsertCrowdConfigurationWithBody Set the Crowd configuration (not supported)
 	//
-	// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3144,7 +3144,7 @@ type ClientInterface interface {
 
 	// UpsertCrowdConfiguration Set the Crowd configuration (not supported)
 	//
-	// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3160,7 +3160,7 @@ type ClientInterface interface {
 
 	// CreateGlobalEnvironmentWithBody Create a global environment
 	//
-	// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3169,7 +3169,7 @@ type ClientInterface interface {
 
 	// CreateGlobalEnvironment Create a global environment
 	//
-	// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3203,14 +3203,14 @@ type ClientInterface interface {
 
 	// GetHttpSsoConfiguration Get the HTTP single sign-on configuration (not supported)
 	//
-	// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/httpsso (the `GetHttpSsoConfiguration` operationId).
 	GetHttpSsoConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpsertHttpSsoConfigurationWithBody Set the HTTP single sign-on configuration (not supported)
 	//
-	// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3219,7 +3219,7 @@ type ClientInterface interface {
 
 	// UpsertHttpSsoConfiguration Set the HTTP single sign-on configuration (not supported)
 	//
-	// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3410,7 +3410,7 @@ type ClientInterface interface {
 
 	// EnableCloudLogCollectionWithBody Switch cloud log collection (not supported)
 	//
-	// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3419,7 +3419,7 @@ type ClientInterface interface {
 
 	// EnableCloudLogCollection Switch cloud log collection (not supported)
 	//
-	// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3435,7 +3435,7 @@ type ClientInterface interface {
 
 	// CreateOidcConfigurationWithBody Create an OIDC provider
 	//
-	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3444,7 +3444,7 @@ type ClientInterface interface {
 
 	// CreateOidcConfiguration Create an OIDC provider
 	//
-	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3453,7 +3453,7 @@ type ClientInterface interface {
 
 	// OidcTokenExchangeWithBody Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3462,7 +3462,7 @@ type ClientInterface interface {
 
 	// OidcTokenExchange Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3510,7 +3510,7 @@ type ClientInterface interface {
 
 	// CreateOidcIdentityMappingWithBody Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3519,7 +3519,7 @@ type ClientInterface interface {
 
 	// CreateOidcIdentityMapping Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3592,7 +3592,7 @@ type ClientInterface interface {
 
 	// AttachRepositoryToProject Assign a repository to a project
 	//
-	// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey, because the jfrog/project Terraform provider polls that field right after this call. The repository key is not renamed. Requires a platform admin.
+	// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey. The repository key is not renamed. Requires a platform admin.
 	//
 	// Corresponds with PUT /api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey} (the `AttachRepositoryToProject` operationId).
 	AttachRepositoryToProject(ctx context.Context, repoName string, targetProjectKey string, params *AttachRepositoryToProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3858,7 +3858,7 @@ type ClientInterface interface {
 
 	// CreateGlobalRoleWithBody Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3867,7 +3867,7 @@ type ClientInterface interface {
 
 	// CreateGlobalRole Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3908,14 +3908,14 @@ type ClientInterface interface {
 
 	// GetAllSamlSettings List SAML settings (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/saml (the `GetAllSamlSettings` operationId).
 	GetAllSamlSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateSamlSettingWithBody Create a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3924,7 +3924,7 @@ type ClientInterface interface {
 
 	// CreateSamlSetting Create a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3933,14 +3933,14 @@ type ClientInterface interface {
 
 	// GetSamlGeneralSettings Get the SAML switch (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/saml/general_settings (the `GetSamlGeneralSettings` operationId).
 	GetSamlGeneralSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSamlGeneralSettingsWithBody Set the SAML switch (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3949,7 +3949,7 @@ type ClientInterface interface {
 
 	// UpdateSamlGeneralSettings Set the SAML switch (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3958,21 +3958,21 @@ type ClientInterface interface {
 
 	// DeleteSamlSetting Delete a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with DELETE /api/v1/saml/{name} (the `DeleteSamlSetting` operationId).
 	DeleteSamlSetting(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSamlSettingByName Get a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/saml/{name} (the `GetSamlSettingByName` operationId).
 	GetSamlSettingByName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSamlSettingWithBody Replace a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3981,7 +3981,7 @@ type ClientInterface interface {
 
 	// UpdateSamlSetting Replace a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3990,14 +3990,14 @@ type ClientInterface interface {
 
 	// GetScimGroups List SCIM groups (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/Groups (the `GetScimGroups` operationId).
 	GetScimGroups(ctx context.Context, params *GetScimGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateScimGroupWithBody Create a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4006,7 +4006,7 @@ type ClientInterface interface {
 
 	// CreateScimGroupWithApplicationScimPlusJSONBody Create a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type.
 	//
@@ -4015,21 +4015,21 @@ type ClientInterface interface {
 
 	// DeleteScimGroup Delete a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with DELETE /api/v1/scim/v2/Groups/{groupName} (the `DeleteScimGroup` operationId).
 	DeleteScimGroup(ctx context.Context, groupName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetScimGroupByName Get a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/Groups/{groupName} (the `GetScimGroupByName` operationId).
 	GetScimGroupByName(ctx context.Context, groupName string, params *GetScimGroupByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PatchScimGroupWithBody Patch a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4038,7 +4038,7 @@ type ClientInterface interface {
 
 	// PatchScimGroupWithApplicationScimPlusJSONBody Patch a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type.
 	//
@@ -4047,7 +4047,7 @@ type ClientInterface interface {
 
 	// UpdateScimGroupWithBody Replace a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4056,7 +4056,7 @@ type ClientInterface interface {
 
 	// UpdateScimGroupWithApplicationScimPlusJSONBody Replace a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type.
 	//
@@ -4065,42 +4065,42 @@ type ClientInterface interface {
 
 	// GetScimResourceTypes List SCIM resource types (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/ResourceTypes (the `GetScimResourceTypes` operationId).
 	GetScimResourceTypes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetScimSchemas List SCIM schemas (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/Schemas (the `GetScimSchemas` operationId).
 	GetScimSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetScimSchemaById Get a SCIM schema (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/Schemas/{schemaId} (the `GetScimSchemaById` operationId).
 	GetScimSchemaById(ctx context.Context, schemaId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetScimServiceProviderConfig Get the SCIM service provider configuration (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/ServiceProviderConfig (the `GetScimServiceProviderConfig` operationId).
 	GetScimServiceProviderConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetScimUsers List SCIM users (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/Users (the `GetScimUsers` operationId).
 	GetScimUsers(ctx context.Context, params *GetScimUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateScimUserWithBody Create a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4109,7 +4109,7 @@ type ClientInterface interface {
 
 	// CreateScimUserWithApplicationScimPlusJSONBody Create a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type.
 	//
@@ -4118,21 +4118,21 @@ type ClientInterface interface {
 
 	// DeleteScimUser Delete a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with DELETE /api/v1/scim/v2/Users/{username} (the `DeleteScimUser` operationId).
 	DeleteScimUser(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetScimUserByUsername Get a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with GET /api/v1/scim/v2/Users/{username} (the `GetScimUserByUsername` operationId).
 	GetScimUserByUsername(ctx context.Context, username string, params *GetScimUserByUsernameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PatchScimUserWithBody Patch a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4141,7 +4141,7 @@ type ClientInterface interface {
 
 	// PatchScimUserWithApplicationScimPlusJSONBody Patch a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type.
 	//
@@ -4150,7 +4150,7 @@ type ClientInterface interface {
 
 	// UpdateScimUserWithBody Replace a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4159,7 +4159,7 @@ type ClientInterface interface {
 
 	// UpdateScimUserWithApplicationScimPlusJSONBody Replace a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type.
 	//
@@ -4168,28 +4168,28 @@ type ClientInterface interface {
 
 	// CreatePairingToken Create a pairing token
 	//
-	// Issues a single-use pairing token on this instance so that another artifactweave instance can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (the JFrog pairing-token default; configurable). Only the platform-federation use case is supported: Mission Control and Bridge are not part of artifactweave, so mission-control and bridge answer 501. Pairing with JFrog Platform Deployments is not supported. Administrators only.
+	// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
 	//
 	// Corresponds with POST /api/v1/service_trust/pairing/{useCase} (the `CreatePairingToken` operationId).
 	CreatePairingToken(ctx context.Context, useCase CreatePairingTokenParamsUseCase, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExportAccessConfiguration Export the Access configuration (not supported)
 	//
-	// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with POST /api/v1/system/backup/export (the `ExportAccessConfiguration` operationId).
 	ExportAccessConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ImportAccessConfiguration Import the Access configuration (not supported)
 	//
-	// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Corresponds with POST /api/v1/system/backup/import (the `ImportAccessConfiguration` operationId).
 	ImportAccessConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllAccessFederations List federation targets
 	//
-	// Returns every Access federation target registered on this instance, active or paused. Administrators only. In artifactweave a target is always a peer artifactweave instance; federation with JFrog Access or Mission Control is not supported (decision 0025).
+	// Returns every Access federation target registered on this instance, active or paused. Administrators only. A target is always another instance of this server; no other kind of federation peer is supported (decision 0025).
 	//
 	// Corresponds with GET /api/v1/system/federation (the `GetAllAccessFederations` operationId).
 	GetAllAccessFederations(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4214,7 +4214,7 @@ type ClientInterface interface {
 
 	// ValidateFederationTargetWithBody Validate a candidate federation target
 	//
-	// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+	// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4223,7 +4223,7 @@ type ClientInterface interface {
 
 	// ValidateFederationTarget Validate a candidate federation target
 	//
-	// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+	// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4278,9 +4278,9 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v1/system/federation/{serverName}/full_broadcast (the `FullBroadcastAccessFederation` operationId).
 	FullBroadcastAccessFederation(ctx context.Context, serverName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetAccessVersion Access-compatible version
+	// GetAccessVersion Access compatibility version
 	//
-	// The jfrog/platform Terraform provider parses the name field as the Access version and gates lifecycle and OIDC features on it. artifactweave reports the same compatibility version as /artifactory/api/system/version.
+	// Returns the compatibility version in name and version, the same value as /artifactory/api/system/version reports.
 	//
 	// Corresponds with GET /api/v1/system/version (the `GetAccessVersion` operationId).
 	GetAccessVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4294,7 +4294,7 @@ type ClientInterface interface {
 
 	// CreateTokenWithBody Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4303,7 +4303,7 @@ type ClientInterface interface {
 
 	// CreateToken Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4312,7 +4312,7 @@ type ClientInterface interface {
 
 	// CreateTokenWithFormdataBody Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type.
 	//
@@ -4346,7 +4346,7 @@ type ClientInterface interface {
 
 	// GetTokenById Get a token's metadata
 	//
-	// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens. The jfrog/artifactory provider removes the artifactory_scoped_token resource from state when this answers 404.
+	// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens.
 	//
 	// Corresponds with GET /api/v1/tokens/{tokenId} (the `GetTokenById` operationId).
 	GetTokenById(ctx context.Context, tokenId TokenId, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4410,7 +4410,7 @@ type ClientInterface interface {
 
 	// CreateGroupWithBody Create a group
 	//
-	// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4419,7 +4419,7 @@ type ClientInterface interface {
 
 	// CreateGroup Create a group
 	//
-	// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4428,7 +4428,7 @@ type ClientInterface interface {
 
 	// DeleteGroup Delete a group
 	//
-	// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body, which the jfrog/platform provider requires.
+	// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body.
 	//
 	// Corresponds with DELETE /api/v2/groups/{name} (the `DeleteGroup` operationId).
 	DeleteGroup(ctx context.Context, name GroupName, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4485,7 +4485,7 @@ type ClientInterface interface {
 
 	// CreatePermissionWithBody Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4494,7 +4494,7 @@ type ClientInterface interface {
 
 	// CreatePermission Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4549,7 +4549,7 @@ type ClientInterface interface {
 
 	// ReplacePermissionResourceWithBody Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4558,7 +4558,7 @@ type ClientInterface interface {
 
 	// ReplacePermissionResource Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4581,7 +4581,7 @@ type ClientInterface interface {
 
 	// CreateUserWithBody Create a user
 	//
-	// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+	// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4590,7 +4590,7 @@ type ClientInterface interface {
 
 	// CreateUser Create a user
 	//
-	// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+	// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4613,7 +4613,7 @@ type ClientInterface interface {
 
 	// DeleteUser Delete a user
 	//
-	// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body; the jfrog/artifactory provider accepts any 2xx here.
+	// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.
 	//
 	// Corresponds with DELETE /api/v2/users/{username} (the `DeleteUser` operationId).
 	DeleteUser(ctx context.Context, username Username, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4645,7 +4645,7 @@ type ClientInterface interface {
 
 	// UpdateUserGroupsWithBody Add or remove group memberships
 	//
-	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4654,7 +4654,7 @@ type ClientInterface interface {
 
 	// UpdateUserGroups Add or remove group memberships
 	//
-	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4696,7 +4696,7 @@ type ClientInterface interface {
 
 // PutAwsIamRoleWithBody Assign an AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -4715,7 +4715,7 @@ func (c *Client) PutAwsIamRoleWithBody(ctx context.Context, contentType string, 
 
 // PutAwsIamRole Assign an AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -4734,7 +4734,7 @@ func (c *Client) PutAwsIamRole(ctx context.Context, body PutAwsIamRoleJSONReques
 
 // DeleteAwsIamRole Remove a user's AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with DELETE /api/v1/aws/iam_role/{username} (the `DeleteAwsIamRole` operationId).
 func (c *Client) DeleteAwsIamRole(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4751,7 +4751,7 @@ func (c *Client) DeleteAwsIamRole(ctx context.Context, username string, reqEdito
 
 // GetAwsIamRole Get a user's AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/aws/iam_role/{username} (the `GetAwsIamRole` operationId).
 func (c *Client) GetAwsIamRole(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4933,7 +4933,7 @@ func (c *Client) CreatePasswordPolicy(ctx context.Context, body CreatePasswordPo
 
 // GetAccessUserLockPolicy Get the user lock policy
 //
-// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and GET /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.
 //
 // Corresponds with GET /api/v1/config/security/user_lock_policy (the `GetAccessUserLockPolicy` operationId).
 func (c *Client) GetAccessUserLockPolicy(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -4950,7 +4950,7 @@ func (c *Client) GetAccessUserLockPolicy(ctx context.Context, reqEditors ...Requ
 
 // ConfigureAccessUserLockPolicyWithBody Replace the user lock policy
 //
-// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -4969,7 +4969,7 @@ func (c *Client) ConfigureAccessUserLockPolicyWithBody(ctx context.Context, cont
 
 // ConfigureAccessUserLockPolicy Replace the user lock policy
 //
-// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5043,7 +5043,7 @@ func (c *Client) SetTokenDefaultExpiry(ctx context.Context, body SetTokenDefault
 
 // GetCrowdConfiguration Get the Crowd configuration (not supported)
 //
-// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/crowd (the `GetCrowdConfiguration` operationId).
 func (c *Client) GetCrowdConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -5060,7 +5060,7 @@ func (c *Client) GetCrowdConfiguration(ctx context.Context, reqEditors ...Reques
 
 // UpsertCrowdConfigurationWithBody Set the Crowd configuration (not supported)
 //
-// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5079,7 +5079,7 @@ func (c *Client) UpsertCrowdConfigurationWithBody(ctx context.Context, contentTy
 
 // UpsertCrowdConfiguration Set the Crowd configuration (not supported)
 //
-// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5115,7 +5115,7 @@ func (c *Client) GetGlobalEnvironments(ctx context.Context, reqEditors ...Reques
 
 // CreateGlobalEnvironmentWithBody Create a global environment
 //
-// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5134,7 +5134,7 @@ func (c *Client) CreateGlobalEnvironmentWithBody(ctx context.Context, contentTyp
 
 // CreateGlobalEnvironment Create a global environment
 //
-// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5208,7 +5208,7 @@ func (c *Client) RenameGlobalEnvironment(ctx context.Context, environmentName En
 
 // GetHttpSsoConfiguration Get the HTTP single sign-on configuration (not supported)
 //
-// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/httpsso (the `GetHttpSsoConfiguration` operationId).
 func (c *Client) GetHttpSsoConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -5225,7 +5225,7 @@ func (c *Client) GetHttpSsoConfiguration(ctx context.Context, reqEditors ...Requ
 
 // UpsertHttpSsoConfigurationWithBody Set the HTTP single sign-on configuration (not supported)
 //
-// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5244,7 +5244,7 @@ func (c *Client) UpsertHttpSsoConfigurationWithBody(ctx context.Context, content
 
 // UpsertHttpSsoConfiguration Set the HTTP single sign-on configuration (not supported)
 //
-// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5665,7 +5665,7 @@ func (c *Client) GetLdapSettingsByKey(ctx context.Context, key string, reqEditor
 
 // EnableCloudLogCollectionWithBody Switch cloud log collection (not supported)
 //
-// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5684,7 +5684,7 @@ func (c *Client) EnableCloudLogCollectionWithBody(ctx context.Context, contentTy
 
 // EnableCloudLogCollection Switch cloud log collection (not supported)
 //
-// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5720,7 +5720,7 @@ func (c *Client) GetAllOidcConfigurations(ctx context.Context, reqEditors ...Req
 
 // CreateOidcConfigurationWithBody Create an OIDC provider
 //
-// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5739,7 +5739,7 @@ func (c *Client) CreateOidcConfigurationWithBody(ctx context.Context, contentTyp
 
 // CreateOidcConfiguration Create an OIDC provider
 //
-// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5758,7 +5758,7 @@ func (c *Client) CreateOidcConfiguration(ctx context.Context, body CreateOidcCon
 
 // OidcTokenExchangeWithBody Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5777,7 +5777,7 @@ func (c *Client) OidcTokenExchangeWithBody(ctx context.Context, contentType stri
 
 // OidcTokenExchange Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5885,7 +5885,7 @@ func (c *Client) GetOidcIdentityMappings(ctx context.Context, providerName strin
 
 // CreateOidcIdentityMappingWithBody Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5904,7 +5904,7 @@ func (c *Client) CreateOidcIdentityMappingWithBody(ctx context.Context, provider
 
 // CreateOidcIdentityMapping Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6067,7 +6067,7 @@ func (c *Client) UnassignProjectFromRepository(ctx context.Context, repoName str
 
 // AttachRepositoryToProject Assign a repository to a project
 //
-// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey, because the jfrog/project Terraform provider polls that field right after this call. The repository key is not renamed. Requires a platform admin.
+// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey. The repository key is not renamed. Requires a platform admin.
 //
 // Corresponds with PUT /api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey} (the `AttachRepositoryToProject` operationId).
 func (c *Client) AttachRepositoryToProject(ctx context.Context, repoName string, targetProjectKey string, params *AttachRepositoryToProjectParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6673,7 +6673,7 @@ func (c *Client) GetAllGlobalRoles(ctx context.Context, reqEditors ...RequestEdi
 
 // CreateGlobalRoleWithBody Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6692,7 +6692,7 @@ func (c *Client) CreateGlobalRoleWithBody(ctx context.Context, contentType strin
 
 // CreateGlobalRole Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6783,7 +6783,7 @@ func (c *Client) UpdateGlobalRole(ctx context.Context, role RoleName, body Updat
 
 // GetAllSamlSettings List SAML settings (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/saml (the `GetAllSamlSettings` operationId).
 func (c *Client) GetAllSamlSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6800,7 +6800,7 @@ func (c *Client) GetAllSamlSettings(ctx context.Context, reqEditors ...RequestEd
 
 // CreateSamlSettingWithBody Create a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6819,7 +6819,7 @@ func (c *Client) CreateSamlSettingWithBody(ctx context.Context, contentType stri
 
 // CreateSamlSetting Create a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6838,7 +6838,7 @@ func (c *Client) CreateSamlSetting(ctx context.Context, body CreateSamlSettingJS
 
 // GetSamlGeneralSettings Get the SAML switch (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/saml/general_settings (the `GetSamlGeneralSettings` operationId).
 func (c *Client) GetSamlGeneralSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6855,7 +6855,7 @@ func (c *Client) GetSamlGeneralSettings(ctx context.Context, reqEditors ...Reque
 
 // UpdateSamlGeneralSettingsWithBody Set the SAML switch (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6874,7 +6874,7 @@ func (c *Client) UpdateSamlGeneralSettingsWithBody(ctx context.Context, contentT
 
 // UpdateSamlGeneralSettings Set the SAML switch (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6893,7 +6893,7 @@ func (c *Client) UpdateSamlGeneralSettings(ctx context.Context, body UpdateSamlG
 
 // DeleteSamlSetting Delete a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with DELETE /api/v1/saml/{name} (the `DeleteSamlSetting` operationId).
 func (c *Client) DeleteSamlSetting(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6910,7 +6910,7 @@ func (c *Client) DeleteSamlSetting(ctx context.Context, name string, reqEditors 
 
 // GetSamlSettingByName Get a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/saml/{name} (the `GetSamlSettingByName` operationId).
 func (c *Client) GetSamlSettingByName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6927,7 +6927,7 @@ func (c *Client) GetSamlSettingByName(ctx context.Context, name string, reqEdito
 
 // UpdateSamlSettingWithBody Replace a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -6946,7 +6946,7 @@ func (c *Client) UpdateSamlSettingWithBody(ctx context.Context, name string, con
 
 // UpdateSamlSetting Replace a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6965,7 +6965,7 @@ func (c *Client) UpdateSamlSetting(ctx context.Context, name string, body Update
 
 // GetScimGroups List SCIM groups (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/Groups (the `GetScimGroups` operationId).
 func (c *Client) GetScimGroups(ctx context.Context, params *GetScimGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6982,7 +6982,7 @@ func (c *Client) GetScimGroups(ctx context.Context, params *GetScimGroupsParams,
 
 // CreateScimGroupWithBody Create a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7001,7 +7001,7 @@ func (c *Client) CreateScimGroupWithBody(ctx context.Context, contentType string
 
 // CreateScimGroupWithApplicationScimPlusJSONBody Create a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type.
 //
@@ -7020,7 +7020,7 @@ func (c *Client) CreateScimGroupWithApplicationScimPlusJSONBody(ctx context.Cont
 
 // DeleteScimGroup Delete a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with DELETE /api/v1/scim/v2/Groups/{groupName} (the `DeleteScimGroup` operationId).
 func (c *Client) DeleteScimGroup(ctx context.Context, groupName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7037,7 +7037,7 @@ func (c *Client) DeleteScimGroup(ctx context.Context, groupName string, reqEdito
 
 // GetScimGroupByName Get a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/Groups/{groupName} (the `GetScimGroupByName` operationId).
 func (c *Client) GetScimGroupByName(ctx context.Context, groupName string, params *GetScimGroupByNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7054,7 +7054,7 @@ func (c *Client) GetScimGroupByName(ctx context.Context, groupName string, param
 
 // PatchScimGroupWithBody Patch a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7073,7 +7073,7 @@ func (c *Client) PatchScimGroupWithBody(ctx context.Context, groupName string, c
 
 // PatchScimGroupWithApplicationScimPlusJSONBody Patch a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type.
 //
@@ -7092,7 +7092,7 @@ func (c *Client) PatchScimGroupWithApplicationScimPlusJSONBody(ctx context.Conte
 
 // UpdateScimGroupWithBody Replace a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7111,7 +7111,7 @@ func (c *Client) UpdateScimGroupWithBody(ctx context.Context, groupName string, 
 
 // UpdateScimGroupWithApplicationScimPlusJSONBody Replace a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type.
 //
@@ -7130,7 +7130,7 @@ func (c *Client) UpdateScimGroupWithApplicationScimPlusJSONBody(ctx context.Cont
 
 // GetScimResourceTypes List SCIM resource types (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/ResourceTypes (the `GetScimResourceTypes` operationId).
 func (c *Client) GetScimResourceTypes(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7147,7 +7147,7 @@ func (c *Client) GetScimResourceTypes(ctx context.Context, reqEditors ...Request
 
 // GetScimSchemas List SCIM schemas (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/Schemas (the `GetScimSchemas` operationId).
 func (c *Client) GetScimSchemas(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7164,7 +7164,7 @@ func (c *Client) GetScimSchemas(ctx context.Context, reqEditors ...RequestEditor
 
 // GetScimSchemaById Get a SCIM schema (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/Schemas/{schemaId} (the `GetScimSchemaById` operationId).
 func (c *Client) GetScimSchemaById(ctx context.Context, schemaId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7181,7 +7181,7 @@ func (c *Client) GetScimSchemaById(ctx context.Context, schemaId string, reqEdit
 
 // GetScimServiceProviderConfig Get the SCIM service provider configuration (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/ServiceProviderConfig (the `GetScimServiceProviderConfig` operationId).
 func (c *Client) GetScimServiceProviderConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7198,7 +7198,7 @@ func (c *Client) GetScimServiceProviderConfig(ctx context.Context, reqEditors ..
 
 // GetScimUsers List SCIM users (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/Users (the `GetScimUsers` operationId).
 func (c *Client) GetScimUsers(ctx context.Context, params *GetScimUsersParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7215,7 +7215,7 @@ func (c *Client) GetScimUsers(ctx context.Context, params *GetScimUsersParams, r
 
 // CreateScimUserWithBody Create a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7234,7 +7234,7 @@ func (c *Client) CreateScimUserWithBody(ctx context.Context, contentType string,
 
 // CreateScimUserWithApplicationScimPlusJSONBody Create a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type.
 //
@@ -7253,7 +7253,7 @@ func (c *Client) CreateScimUserWithApplicationScimPlusJSONBody(ctx context.Conte
 
 // DeleteScimUser Delete a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with DELETE /api/v1/scim/v2/Users/{username} (the `DeleteScimUser` operationId).
 func (c *Client) DeleteScimUser(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7270,7 +7270,7 @@ func (c *Client) DeleteScimUser(ctx context.Context, username string, reqEditors
 
 // GetScimUserByUsername Get a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with GET /api/v1/scim/v2/Users/{username} (the `GetScimUserByUsername` operationId).
 func (c *Client) GetScimUserByUsername(ctx context.Context, username string, params *GetScimUserByUsernameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7287,7 +7287,7 @@ func (c *Client) GetScimUserByUsername(ctx context.Context, username string, par
 
 // PatchScimUserWithBody Patch a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7306,7 +7306,7 @@ func (c *Client) PatchScimUserWithBody(ctx context.Context, username string, con
 
 // PatchScimUserWithApplicationScimPlusJSONBody Patch a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type.
 //
@@ -7325,7 +7325,7 @@ func (c *Client) PatchScimUserWithApplicationScimPlusJSONBody(ctx context.Contex
 
 // UpdateScimUserWithBody Replace a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7344,7 +7344,7 @@ func (c *Client) UpdateScimUserWithBody(ctx context.Context, username string, co
 
 // UpdateScimUserWithApplicationScimPlusJSONBody Replace a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type.
 //
@@ -7363,7 +7363,7 @@ func (c *Client) UpdateScimUserWithApplicationScimPlusJSONBody(ctx context.Conte
 
 // CreatePairingToken Create a pairing token
 //
-// Issues a single-use pairing token on this instance so that another artifactweave instance can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (the JFrog pairing-token default; configurable). Only the platform-federation use case is supported: Mission Control and Bridge are not part of artifactweave, so mission-control and bridge answer 501. Pairing with JFrog Platform Deployments is not supported. Administrators only.
+// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
 //
 // Corresponds with POST /api/v1/service_trust/pairing/{useCase} (the `CreatePairingToken` operationId).
 func (c *Client) CreatePairingToken(ctx context.Context, useCase CreatePairingTokenParamsUseCase, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7380,7 +7380,7 @@ func (c *Client) CreatePairingToken(ctx context.Context, useCase CreatePairingTo
 
 // ExportAccessConfiguration Export the Access configuration (not supported)
 //
-// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with POST /api/v1/system/backup/export (the `ExportAccessConfiguration` operationId).
 func (c *Client) ExportAccessConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7397,7 +7397,7 @@ func (c *Client) ExportAccessConfiguration(ctx context.Context, reqEditors ...Re
 
 // ImportAccessConfiguration Import the Access configuration (not supported)
 //
-// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Corresponds with POST /api/v1/system/backup/import (the `ImportAccessConfiguration` operationId).
 func (c *Client) ImportAccessConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7414,7 +7414,7 @@ func (c *Client) ImportAccessConfiguration(ctx context.Context, reqEditors ...Re
 
 // GetAllAccessFederations List federation targets
 //
-// Returns every Access federation target registered on this instance, active or paused. Administrators only. In artifactweave a target is always a peer artifactweave instance; federation with JFrog Access or Mission Control is not supported (decision 0025).
+// Returns every Access federation target registered on this instance, active or paused. Administrators only. A target is always another instance of this server; no other kind of federation peer is supported (decision 0025).
 //
 // Corresponds with GET /api/v1/system/federation (the `GetAllAccessFederations` operationId).
 func (c *Client) GetAllAccessFederations(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7469,7 +7469,7 @@ func (c *Client) RegisterAccessFederation(ctx context.Context, body RegisterAcce
 
 // ValidateFederationTargetWithBody Validate a candidate federation target
 //
-// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7488,7 +7488,7 @@ func (c *Client) ValidateFederationTargetWithBody(ctx context.Context, contentTy
 
 // ValidateFederationTarget Validate a candidate federation target
 //
-// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7613,9 +7613,9 @@ func (c *Client) FullBroadcastAccessFederation(ctx context.Context, serverName s
 	return c.Client.Do(req)
 }
 
-// GetAccessVersion Access-compatible version
+// GetAccessVersion Access compatibility version
 //
-// The jfrog/platform Terraform provider parses the name field as the Access version and gates lifecycle and OIDC features on it. artifactweave reports the same compatibility version as /artifactory/api/system/version.
+// Returns the compatibility version in name and version, the same value as /artifactory/api/system/version reports.
 //
 // Corresponds with GET /api/v1/system/version (the `GetAccessVersion` operationId).
 func (c *Client) GetAccessVersion(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7649,7 +7649,7 @@ func (c *Client) GetTokens(ctx context.Context, params *GetTokensParams, reqEdit
 
 // CreateTokenWithBody Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7668,7 +7668,7 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 
 // CreateToken Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7687,7 +7687,7 @@ func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBod
 
 // CreateTokenWithFormdataBody Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type.
 //
@@ -7761,7 +7761,7 @@ func (c *Client) RevokeTokenById(ctx context.Context, tokenId TokenId, reqEditor
 
 // GetTokenById Get a token's metadata
 //
-// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens. The jfrog/artifactory provider removes the artifactory_scoped_token resource from state when this answers 404.
+// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens.
 //
 // Corresponds with GET /api/v1/tokens/{tokenId} (the `GetTokenById` operationId).
 func (c *Client) GetTokenById(ctx context.Context, tokenId TokenId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7905,7 +7905,7 @@ func (c *Client) GetGroupList(ctx context.Context, params *GetGroupListParams, r
 
 // CreateGroupWithBody Create a group
 //
-// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7924,7 +7924,7 @@ func (c *Client) CreateGroupWithBody(ctx context.Context, contentType string, bo
 
 // CreateGroup Create a group
 //
-// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7943,7 +7943,7 @@ func (c *Client) CreateGroup(ctx context.Context, body CreateGroupJSONRequestBod
 
 // DeleteGroup Delete a group
 //
-// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body, which the jfrog/platform provider requires.
+// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body.
 //
 // Corresponds with DELETE /api/v2/groups/{name} (the `DeleteGroup` operationId).
 func (c *Client) DeleteGroup(ctx context.Context, name GroupName, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8070,7 +8070,7 @@ func (c *Client) GetPermissions(ctx context.Context, params *GetPermissionsParam
 
 // CreatePermissionWithBody Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8089,7 +8089,7 @@ func (c *Client) CreatePermissionWithBody(ctx context.Context, contentType strin
 
 // CreatePermission Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8214,7 +8214,7 @@ func (c *Client) UpdatePermissionResource(ctx context.Context, permissionName Pe
 
 // ReplacePermissionResourceWithBody Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8233,7 +8233,7 @@ func (c *Client) ReplacePermissionResourceWithBody(ctx context.Context, permissi
 
 // ReplacePermissionResource Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8286,7 +8286,7 @@ func (c *Client) GetUserList(ctx context.Context, params *GetUserListParams, req
 
 // CreateUserWithBody Create a user
 //
-// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8305,7 +8305,7 @@ func (c *Client) CreateUserWithBody(ctx context.Context, contentType string, bod
 
 // CreateUser Create a user
 //
-// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -8358,7 +8358,7 @@ func (c *Client) UnexpirePasswordForAllUsers(ctx context.Context, reqEditors ...
 
 // DeleteUser Delete a user
 //
-// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body; the jfrog/artifactory provider accepts any 2xx here.
+// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.
 //
 // Corresponds with DELETE /api/v2/users/{username} (the `DeleteUser` operationId).
 func (c *Client) DeleteUser(ctx context.Context, username Username, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -8430,7 +8430,7 @@ func (c *Client) UpdateUser(ctx context.Context, username Username, body UpdateU
 
 // UpdateUserGroupsWithBody Add or remove group memberships
 //
-// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -8449,7 +8449,7 @@ func (c *Client) UpdateUserGroupsWithBody(ctx context.Context, username Username
 
 // UpdateUserGroups Add or remove group memberships
 //
-// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14992,7 +14992,7 @@ type ClientWithResponsesInterface interface {
 
 	// PutAwsIamRoleWithBodyWithResponse Assign an AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15001,7 +15001,7 @@ type ClientWithResponsesInterface interface {
 
 	// PutAwsIamRoleWithResponse Assign an AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15010,7 +15010,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteAwsIamRoleWithResponse Remove a user's AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15019,7 +15019,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAwsIamRoleWithResponse Get a user's AWS IAM role (not supported)
 	//
-	// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15109,7 +15109,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAccessUserLockPolicyWithResponse Get the user lock policy
 	//
-	// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+	// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and GET /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15118,7 +15118,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConfigureAccessUserLockPolicyWithBodyWithResponse Replace the user lock policy
 	//
-	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15127,7 +15127,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConfigureAccessUserLockPolicyWithResponse Replace the user lock policy
 	//
-	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+	// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15163,7 +15163,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetCrowdConfigurationWithResponse Get the Crowd configuration (not supported)
 	//
-	// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15172,7 +15172,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpsertCrowdConfigurationWithBodyWithResponse Set the Crowd configuration (not supported)
 	//
-	// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15181,7 +15181,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpsertCrowdConfigurationWithResponse Set the Crowd configuration (not supported)
 	//
-	// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15199,7 +15199,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalEnvironmentWithBodyWithResponse Create a global environment
 	//
-	// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15208,7 +15208,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalEnvironmentWithResponse Create a global environment
 	//
-	// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+	// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15244,7 +15244,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetHttpSsoConfigurationWithResponse Get the HTTP single sign-on configuration (not supported)
 	//
-	// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15253,7 +15253,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpsertHttpSsoConfigurationWithBodyWithResponse Set the HTTP single sign-on configuration (not supported)
 	//
-	// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15262,7 +15262,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpsertHttpSsoConfigurationWithResponse Set the HTTP single sign-on configuration (not supported)
 	//
-	// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15469,7 +15469,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableCloudLogCollectionWithBodyWithResponse Switch cloud log collection (not supported)
 	//
-	// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15478,7 +15478,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableCloudLogCollectionWithResponse Switch cloud log collection (not supported)
 	//
-	// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15496,7 +15496,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOidcConfigurationWithBodyWithResponse Create an OIDC provider
 	//
-	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15505,7 +15505,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOidcConfigurationWithResponse Create an OIDC provider
 	//
-	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+	// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15514,7 +15514,7 @@ type ClientWithResponsesInterface interface {
 
 	// OidcTokenExchangeWithBodyWithResponse Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15523,7 +15523,7 @@ type ClientWithResponsesInterface interface {
 
 	// OidcTokenExchangeWithResponse Exchange an ID token for an access token
 	//
-	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+	// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15577,7 +15577,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOidcIdentityMappingWithBodyWithResponse Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15586,7 +15586,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOidcIdentityMappingWithResponse Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15667,7 +15667,7 @@ type ClientWithResponsesInterface interface {
 
 	// AttachRepositoryToProjectWithResponse Assign a repository to a project
 	//
-	// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey, because the jfrog/project Terraform provider polls that field right after this call. The repository key is not renamed. Requires a platform admin.
+	// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey. The repository key is not renamed. Requires a platform admin.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -15973,7 +15973,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalRoleWithBodyWithResponse Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15982,7 +15982,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGlobalRoleWithResponse Create a global role
 	//
-	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+	// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16027,7 +16027,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllSamlSettingsWithResponse List SAML settings (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16036,7 +16036,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSamlSettingWithBodyWithResponse Create a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16045,7 +16045,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSamlSettingWithResponse Create a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16054,7 +16054,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSamlGeneralSettingsWithResponse Get the SAML switch (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16063,7 +16063,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSamlGeneralSettingsWithBodyWithResponse Set the SAML switch (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16072,7 +16072,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSamlGeneralSettingsWithResponse Set the SAML switch (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16081,7 +16081,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteSamlSettingWithResponse Delete a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16090,7 +16090,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSamlSettingByNameWithResponse Get a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16099,7 +16099,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSamlSettingWithBodyWithResponse Replace a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16108,7 +16108,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateSamlSettingWithResponse Replace a SAML setting (not supported)
 	//
-	// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16117,7 +16117,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimGroupsWithResponse List SCIM groups (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16126,7 +16126,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateScimGroupWithBodyWithResponse Create a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16135,7 +16135,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateScimGroupWithApplicationScimPlusJSONBodyWithResponse Create a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16144,7 +16144,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteScimGroupWithResponse Delete a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16153,7 +16153,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimGroupByNameWithResponse Get a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16162,7 +16162,7 @@ type ClientWithResponsesInterface interface {
 
 	// PatchScimGroupWithBodyWithResponse Patch a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16171,7 +16171,7 @@ type ClientWithResponsesInterface interface {
 
 	// PatchScimGroupWithApplicationScimPlusJSONBodyWithResponse Patch a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16180,7 +16180,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateScimGroupWithBodyWithResponse Replace a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16189,7 +16189,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateScimGroupWithApplicationScimPlusJSONBodyWithResponse Replace a SCIM group (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16198,7 +16198,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimResourceTypesWithResponse List SCIM resource types (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16207,7 +16207,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimSchemasWithResponse List SCIM schemas (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16216,7 +16216,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimSchemaByIdWithResponse Get a SCIM schema (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16225,7 +16225,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimServiceProviderConfigWithResponse Get the SCIM service provider configuration (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16234,7 +16234,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimUsersWithResponse List SCIM users (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16243,7 +16243,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateScimUserWithBodyWithResponse Create a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16252,7 +16252,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateScimUserWithApplicationScimPlusJSONBodyWithResponse Create a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16261,7 +16261,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteScimUserWithResponse Delete a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16270,7 +16270,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetScimUserByUsernameWithResponse Get a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16279,7 +16279,7 @@ type ClientWithResponsesInterface interface {
 
 	// PatchScimUserWithBodyWithResponse Patch a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16288,7 +16288,7 @@ type ClientWithResponsesInterface interface {
 
 	// PatchScimUserWithApplicationScimPlusJSONBodyWithResponse Patch a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16297,7 +16297,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateScimUserWithBodyWithResponse Replace a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16306,7 +16306,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateScimUserWithApplicationScimPlusJSONBodyWithResponse Replace a SCIM user (not supported)
 	//
-	// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16315,7 +16315,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePairingTokenWithResponse Create a pairing token
 	//
-	// Issues a single-use pairing token on this instance so that another artifactweave instance can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (the JFrog pairing-token default; configurable). Only the platform-federation use case is supported: Mission Control and Bridge are not part of artifactweave, so mission-control and bridge answer 501. Pairing with JFrog Platform Deployments is not supported. Administrators only.
+	// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16324,7 +16324,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExportAccessConfigurationWithResponse Export the Access configuration (not supported)
 	//
-	// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16333,7 +16333,7 @@ type ClientWithResponsesInterface interface {
 
 	// ImportAccessConfigurationWithResponse Import the Access configuration (not supported)
 	//
-	// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+	// Not implemented; answers 501 in the Access error envelope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16342,7 +16342,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllAccessFederationsWithResponse List federation targets
 	//
-	// Returns every Access federation target registered on this instance, active or paused. Administrators only. In artifactweave a target is always a peer artifactweave instance; federation with JFrog Access or Mission Control is not supported (decision 0025).
+	// Returns every Access federation target registered on this instance, active or paused. Administrators only. A target is always another instance of this server; no other kind of federation peer is supported (decision 0025).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16369,7 +16369,7 @@ type ClientWithResponsesInterface interface {
 
 	// ValidateFederationTargetWithBodyWithResponse Validate a candidate federation target
 	//
-	// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+	// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16378,7 +16378,7 @@ type ClientWithResponsesInterface interface {
 
 	// ValidateFederationTargetWithResponse Validate a candidate federation target
 	//
-	// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+	// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16439,9 +16439,9 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/system/federation/{serverName}/full_broadcast (the `FullBroadcastAccessFederation` operationId).
 	FullBroadcastAccessFederationWithResponse(ctx context.Context, serverName string, reqEditors ...RequestEditorFn) (*FullBroadcastAccessFederationResponse, error)
 
-	// GetAccessVersionWithResponse Access-compatible version
+	// GetAccessVersionWithResponse Access compatibility version
 	//
-	// The jfrog/platform Terraform provider parses the name field as the Access version and gates lifecycle and OIDC features on it. artifactweave reports the same compatibility version as /artifactory/api/system/version.
+	// Returns the compatibility version in name and version, the same value as /artifactory/api/system/version reports.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16459,7 +16459,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithBodyWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16468,7 +16468,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16477,7 +16477,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithFormdataBodyWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16513,7 +16513,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTokenByIdWithResponse Get a token's metadata
 	//
-	// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens. The jfrog/artifactory provider removes the artifactory_scoped_token resource from state when this answers 404.
+	// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16585,7 +16585,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGroupWithBodyWithResponse Create a group
 	//
-	// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16594,7 +16594,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateGroupWithResponse Create a group
 	//
-	// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+	// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16603,7 +16603,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteGroupWithResponse Delete a group
 	//
-	// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body, which the jfrog/platform provider requires.
+	// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16666,7 +16666,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionWithBodyWithResponse Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16675,7 +16675,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionWithResponse Create a permission
 	//
-	// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+	// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16738,7 +16738,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplacePermissionResourceWithBodyWithResponse Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16747,7 +16747,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplacePermissionResourceWithResponse Replace one resource section
 	//
-	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+	// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16774,7 +16774,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateUserWithBodyWithResponse Create a user
 	//
-	// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+	// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16783,7 +16783,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateUserWithResponse Create a user
 	//
-	// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+	// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16810,7 +16810,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUserWithResponse Delete a user
 	//
-	// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body; the jfrog/artifactory provider accepts any 2xx here.
+	// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16846,7 +16846,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateUserGroupsWithBodyWithResponse Add or remove group memberships
 	//
-	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16855,7 +16855,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateUserGroupsWithResponse Add or remove group memberships
 	//
-	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+	// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -26252,7 +26252,7 @@ func (r UnlockUserResponse) ContentType() string {
 
 // PutAwsIamRoleWithBodyWithResponse Assign an AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26267,7 +26267,7 @@ func (c *ClientWithResponses) PutAwsIamRoleWithBodyWithResponse(ctx context.Cont
 
 // PutAwsIamRoleWithResponse Assign an AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26282,7 +26282,7 @@ func (c *ClientWithResponses) PutAwsIamRoleWithResponse(ctx context.Context, bod
 
 // DeleteAwsIamRoleWithResponse Remove a user's AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26297,7 +26297,7 @@ func (c *ClientWithResponses) DeleteAwsIamRoleWithResponse(ctx context.Context, 
 
 // GetAwsIamRoleWithResponse Get a user's AWS IAM role (not supported)
 //
-// AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26447,7 +26447,7 @@ func (c *ClientWithResponses) CreatePasswordPolicyWithResponse(ctx context.Conte
 
 // GetAccessUserLockPolicyWithResponse Get the user lock policy
 //
-// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped as JFrog documents. Requires a platform admin.
+// Returns the user lock policy. A setting never changed reports its default. Reads the same state as GET /artifactory/api/security/userLockPolicy and GET /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26462,7 +26462,7 @@ func (c *ClientWithResponses) GetAccessUserLockPolicyWithResponse(ctx context.Co
 
 // ConfigureAccessUserLockPolicyWithBodyWithResponse Replace the user lock policy
 //
-// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26477,7 +26477,7 @@ func (c *ClientWithResponses) ConfigureAccessUserLockPolicyWithBodyWithResponse(
 
 // ConfigureAccessUserLockPolicyWithResponse Replace the user lock policy
 //
-// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+// Replaces the user lock policy and returns what was stored. Send every field; an omitted field is stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26537,7 +26537,7 @@ func (c *ClientWithResponses) SetTokenDefaultExpiryWithResponse(ctx context.Cont
 
 // GetCrowdConfigurationWithResponse Get the Crowd configuration (not supported)
 //
-// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26552,7 +26552,7 @@ func (c *ClientWithResponses) GetCrowdConfigurationWithResponse(ctx context.Cont
 
 // UpsertCrowdConfigurationWithBodyWithResponse Set the Crowd configuration (not supported)
 //
-// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26567,7 +26567,7 @@ func (c *ClientWithResponses) UpsertCrowdConfigurationWithBodyWithResponse(ctx c
 
 // UpsertCrowdConfigurationWithResponse Set the Crowd configuration (not supported)
 //
-// Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26597,7 +26597,7 @@ func (c *ClientWithResponses) GetGlobalEnvironmentsWithResponse(ctx context.Cont
 
 // CreateGlobalEnvironmentWithBodyWithResponse Create a global environment
 //
-// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26612,7 +26612,7 @@ func (c *ClientWithResponses) CreateGlobalEnvironmentWithBodyWithResponse(ctx co
 
 // CreateGlobalEnvironmentWithResponse Create a global environment
 //
-// Creates an environment and returns it with status 201, which the artifactory_global_environment resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
+// Creates an environment and returns it with status 201. Names are case-insensitive and at most 32 characters; a name that differs from an existing one only by case answers 409. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26672,7 +26672,7 @@ func (c *ClientWithResponses) RenameGlobalEnvironmentWithResponse(ctx context.Co
 
 // GetHttpSsoConfigurationWithResponse Get the HTTP single sign-on configuration (not supported)
 //
-// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -26687,7 +26687,7 @@ func (c *ClientWithResponses) GetHttpSsoConfigurationWithResponse(ctx context.Co
 
 // UpsertHttpSsoConfigurationWithBodyWithResponse Set the HTTP single sign-on configuration (not supported)
 //
-// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -26702,7 +26702,7 @@ func (c *ClientWithResponses) UpsertHttpSsoConfigurationWithBodyWithResponse(ctx
 
 // UpsertHttpSsoConfigurationWithResponse Set the HTTP single sign-on configuration (not supported)
 //
-// HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27047,7 +27047,7 @@ func (c *ClientWithResponses) GetLdapSettingsByKeyWithResponse(ctx context.Conte
 
 // EnableCloudLogCollectionWithBodyWithResponse Switch cloud log collection (not supported)
 //
-// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27062,7 +27062,7 @@ func (c *ClientWithResponses) EnableCloudLogCollectionWithBodyWithResponse(ctx c
 
 // EnableCloudLogCollectionWithResponse Switch cloud log collection (not supported)
 //
-// Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27092,7 +27092,7 @@ func (c *ClientWithResponses) GetAllOidcConfigurationsWithResponse(ctx context.C
 
 // CreateOidcConfigurationWithBodyWithResponse Create an OIDC provider
 //
-// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27107,7 +27107,7 @@ func (c *ClientWithResponses) CreateOidcConfigurationWithBodyWithResponse(ctx co
 
 // CreateOidcConfigurationWithResponse Create an OIDC provider
 //
-// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
+// Registers an external identity provider, typically a CI system, whose signed ID tokens may be exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider type without organization is rejected with 400. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27122,7 +27122,7 @@ func (c *ClientWithResponses) CreateOidcConfigurationWithResponse(ctx context.Co
 
 // OidcTokenExchangeWithBodyWithResponse Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27137,7 +27137,7 @@ func (c *ClientWithResponses) OidcTokenExchangeWithBodyWithResponse(ctx context.
 
 // OidcTokenExchangeWithResponse Exchange an ID token for an access token
 //
-// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify. The jfrog/artifactory provider's oidc_provider_name setting and the JFrog CLI use this operation.
+// Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries the provider's identity mappings in priority order, and issues an access token shaped by the token_spec of the first mapping whose claims all match. Needs no authentication: the subject token is the credential. Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not verify.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27227,7 +27227,7 @@ func (c *ClientWithResponses) GetOidcIdentityMappingsWithResponse(ctx context.Co
 
 // CreateOidcIdentityMappingWithBodyWithResponse Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27242,7 +27242,7 @@ func (c *ClientWithResponses) CreateOidcIdentityMappingWithBodyWithResponse(ctx 
 
 // CreateOidcIdentityMappingWithResponse Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27377,7 +27377,7 @@ func (c *ClientWithResponses) UnassignProjectFromRepositoryWithResponse(ctx cont
 
 // AttachRepositoryToProjectWithResponse Assign a repository to a project
 //
-// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey, because the jfrog/project Terraform provider polls that field right after this call. The repository key is not renamed. Requires a platform admin.
+// Makes targetProjectKey the owner of the repository, moving it from its current project when force is true. The assignment is visible synchronously: when the call returns, the repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey. The repository key is not renamed. Requires a platform admin.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27887,7 +27887,7 @@ func (c *ClientWithResponses) GetAllGlobalRolesWithResponse(ctx context.Context,
 
 // CreateGlobalRoleWithBodyWithResponse Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27902,7 +27902,7 @@ func (c *ClientWithResponses) CreateGlobalRoleWithBodyWithResponse(ctx context.C
 
 // CreateGlobalRoleWithResponse Create a global role
 //
-// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back afterwards. Admin only. An existing name answers 409.
+// Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201 with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27977,7 +27977,7 @@ func (c *ClientWithResponses) UpdateGlobalRoleWithResponse(ctx context.Context, 
 
 // GetAllSamlSettingsWithResponse List SAML settings (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -27992,7 +27992,7 @@ func (c *ClientWithResponses) GetAllSamlSettingsWithResponse(ctx context.Context
 
 // CreateSamlSettingWithBodyWithResponse Create a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28007,7 +28007,7 @@ func (c *ClientWithResponses) CreateSamlSettingWithBodyWithResponse(ctx context.
 
 // CreateSamlSettingWithResponse Create a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28022,7 +28022,7 @@ func (c *ClientWithResponses) CreateSamlSettingWithResponse(ctx context.Context,
 
 // GetSamlGeneralSettingsWithResponse Get the SAML switch (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28037,7 +28037,7 @@ func (c *ClientWithResponses) GetSamlGeneralSettingsWithResponse(ctx context.Con
 
 // UpdateSamlGeneralSettingsWithBodyWithResponse Set the SAML switch (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28052,7 +28052,7 @@ func (c *ClientWithResponses) UpdateSamlGeneralSettingsWithBodyWithResponse(ctx 
 
 // UpdateSamlGeneralSettingsWithResponse Set the SAML switch (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28067,7 +28067,7 @@ func (c *ClientWithResponses) UpdateSamlGeneralSettingsWithResponse(ctx context.
 
 // DeleteSamlSettingWithResponse Delete a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28082,7 +28082,7 @@ func (c *ClientWithResponses) DeleteSamlSettingWithResponse(ctx context.Context,
 
 // GetSamlSettingByNameWithResponse Get a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28097,7 +28097,7 @@ func (c *ClientWithResponses) GetSamlSettingByNameWithResponse(ctx context.Conte
 
 // UpdateSamlSettingWithBodyWithResponse Replace a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28112,7 +28112,7 @@ func (c *ClientWithResponses) UpdateSamlSettingWithBodyWithResponse(ctx context.
 
 // UpdateSamlSettingWithResponse Replace a SAML setting (not supported)
 //
-// SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28127,7 +28127,7 @@ func (c *ClientWithResponses) UpdateSamlSettingWithResponse(ctx context.Context,
 
 // GetScimGroupsWithResponse List SCIM groups (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28142,7 +28142,7 @@ func (c *ClientWithResponses) GetScimGroupsWithResponse(ctx context.Context, par
 
 // CreateScimGroupWithBodyWithResponse Create a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28157,7 +28157,7 @@ func (c *ClientWithResponses) CreateScimGroupWithBodyWithResponse(ctx context.Co
 
 // CreateScimGroupWithApplicationScimPlusJSONBodyWithResponse Create a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28172,7 +28172,7 @@ func (c *ClientWithResponses) CreateScimGroupWithApplicationScimPlusJSONBodyWith
 
 // DeleteScimGroupWithResponse Delete a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28187,7 +28187,7 @@ func (c *ClientWithResponses) DeleteScimGroupWithResponse(ctx context.Context, g
 
 // GetScimGroupByNameWithResponse Get a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28202,7 +28202,7 @@ func (c *ClientWithResponses) GetScimGroupByNameWithResponse(ctx context.Context
 
 // PatchScimGroupWithBodyWithResponse Patch a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28217,7 +28217,7 @@ func (c *ClientWithResponses) PatchScimGroupWithBodyWithResponse(ctx context.Con
 
 // PatchScimGroupWithApplicationScimPlusJSONBodyWithResponse Patch a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28232,7 +28232,7 @@ func (c *ClientWithResponses) PatchScimGroupWithApplicationScimPlusJSONBodyWithR
 
 // UpdateScimGroupWithBodyWithResponse Replace a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28247,7 +28247,7 @@ func (c *ClientWithResponses) UpdateScimGroupWithBodyWithResponse(ctx context.Co
 
 // UpdateScimGroupWithApplicationScimPlusJSONBodyWithResponse Replace a SCIM group (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28262,7 +28262,7 @@ func (c *ClientWithResponses) UpdateScimGroupWithApplicationScimPlusJSONBodyWith
 
 // GetScimResourceTypesWithResponse List SCIM resource types (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28277,7 +28277,7 @@ func (c *ClientWithResponses) GetScimResourceTypesWithResponse(ctx context.Conte
 
 // GetScimSchemasWithResponse List SCIM schemas (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28292,7 +28292,7 @@ func (c *ClientWithResponses) GetScimSchemasWithResponse(ctx context.Context, re
 
 // GetScimSchemaByIdWithResponse Get a SCIM schema (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28307,7 +28307,7 @@ func (c *ClientWithResponses) GetScimSchemaByIdWithResponse(ctx context.Context,
 
 // GetScimServiceProviderConfigWithResponse Get the SCIM service provider configuration (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28322,7 +28322,7 @@ func (c *ClientWithResponses) GetScimServiceProviderConfigWithResponse(ctx conte
 
 // GetScimUsersWithResponse List SCIM users (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28337,7 +28337,7 @@ func (c *ClientWithResponses) GetScimUsersWithResponse(ctx context.Context, para
 
 // CreateScimUserWithBodyWithResponse Create a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28352,7 +28352,7 @@ func (c *ClientWithResponses) CreateScimUserWithBodyWithResponse(ctx context.Con
 
 // CreateScimUserWithApplicationScimPlusJSONBodyWithResponse Create a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28367,7 +28367,7 @@ func (c *ClientWithResponses) CreateScimUserWithApplicationScimPlusJSONBodyWithR
 
 // DeleteScimUserWithResponse Delete a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28382,7 +28382,7 @@ func (c *ClientWithResponses) DeleteScimUserWithResponse(ctx context.Context, us
 
 // GetScimUserByUsernameWithResponse Get a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28397,7 +28397,7 @@ func (c *ClientWithResponses) GetScimUserByUsernameWithResponse(ctx context.Cont
 
 // PatchScimUserWithBodyWithResponse Patch a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28412,7 +28412,7 @@ func (c *ClientWithResponses) PatchScimUserWithBodyWithResponse(ctx context.Cont
 
 // PatchScimUserWithApplicationScimPlusJSONBodyWithResponse Patch a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28427,7 +28427,7 @@ func (c *ClientWithResponses) PatchScimUserWithApplicationScimPlusJSONBodyWithRe
 
 // UpdateScimUserWithBodyWithResponse Replace a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28442,7 +28442,7 @@ func (c *ClientWithResponses) UpdateScimUserWithBodyWithResponse(ctx context.Con
 
 // UpdateScimUserWithApplicationScimPlusJSONBodyWithResponse Replace a SCIM user (not supported)
 //
-// SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Takes a body of the `application/scim+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28457,7 +28457,7 @@ func (c *ClientWithResponses) UpdateScimUserWithApplicationScimPlusJSONBodyWithR
 
 // CreatePairingTokenWithResponse Create a pairing token
 //
-// Issues a single-use pairing token on this instance so that another artifactweave instance can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (the JFrog pairing-token default; configurable). Only the platform-federation use case is supported: Mission Control and Bridge are not part of artifactweave, so mission-control and bridge answer 501. Pairing with JFrog Platform Deployments is not supported. Administrators only.
+// Issues a single-use pairing token on this instance so that another instance of this server can establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be trusted, hand the token to the administrator of the other instance, who redeems it there, for example when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable). Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be another instance of this server. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28472,7 +28472,7 @@ func (c *ClientWithResponses) CreatePairingTokenWithResponse(ctx context.Context
 
 // ExportAccessConfigurationWithResponse Export the Access configuration (not supported)
 //
-// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28487,7 +28487,7 @@ func (c *ClientWithResponses) ExportAccessConfigurationWithResponse(ctx context.
 
 // ImportAccessConfigurationWithResponse Import the Access configuration (not supported)
 //
-// Access backup export and import is not implemented in artifactweave (configuration as code replaces it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+// Not implemented; answers 501 in the Access error envelope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28502,7 +28502,7 @@ func (c *ClientWithResponses) ImportAccessConfigurationWithResponse(ctx context.
 
 // GetAllAccessFederationsWithResponse List federation targets
 //
-// Returns every Access federation target registered on this instance, active or paused. Administrators only. In artifactweave a target is always a peer artifactweave instance; federation with JFrog Access or Mission Control is not supported (decision 0025).
+// Returns every Access federation target registered on this instance, active or paused. Administrators only. A target is always another instance of this server; no other kind of federation peer is supported (decision 0025).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28547,7 +28547,7 @@ func (c *ClientWithResponses) RegisterAccessFederationWithResponse(ctx context.C
 
 // ValidateFederationTargetWithBodyWithResponse Validate a candidate federation target
 //
-// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28562,7 +28562,7 @@ func (c *ClientWithResponses) ValidateFederationTargetWithBodyWithResponse(ctx c
 
 // ValidateFederationTargetWithResponse Validate a candidate federation target
 //
-// Checks, without registering anything, that the peer at url is reachable, is an artifactweave instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
+// Checks, without registering anything, that the peer at url is reachable, is an instance of this server speaking a compatible peer protocol version, and trusts this instance through an existing pairing. Use it before registration to get a precise error. Administrators only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28665,9 +28665,9 @@ func (c *ClientWithResponses) FullBroadcastAccessFederationWithResponse(ctx cont
 	return ParseFullBroadcastAccessFederationResponse(rsp)
 }
 
-// GetAccessVersionWithResponse Access-compatible version
+// GetAccessVersionWithResponse Access compatibility version
 //
-// The jfrog/platform Terraform provider parses the name field as the Access version and gates lifecycle and OIDC features on it. artifactweave reports the same compatibility version as /artifactory/api/system/version.
+// Returns the compatibility version in name and version, the same value as /artifactory/api/system/version reports.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28697,7 +28697,7 @@ func (c *ClientWithResponses) GetTokensWithResponse(ctx context.Context, params 
 
 // CreateTokenWithBodyWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28712,7 +28712,7 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 
 // CreateTokenWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28727,7 +28727,7 @@ func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body 
 
 // CreateTokenWithFormdataBodyWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form, the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not 201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28787,7 +28787,7 @@ func (c *ClientWithResponses) RevokeTokenByIdWithResponse(ctx context.Context, t
 
 // GetTokenByIdWithResponse Get a token's metadata
 //
-// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens. The jfrog/artifactory provider removes the artifactory_scoped_token resource from state when this answers 404.
+// Returns the metadata of one token. The id me stands for the token used to authenticate the call. A non-admin may only read their own tokens.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28907,7 +28907,7 @@ func (c *ClientWithResponses) GetGroupListWithResponse(ctx context.Context, para
 
 // CreateGroupWithBodyWithResponse Create a group
 //
-// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28922,7 +28922,7 @@ func (c *ClientWithResponses) CreateGroupWithBodyWithResponse(ctx context.Contex
 
 // CreateGroupWithResponse Create a group
 //
-// Creates a group and returns its details with status 201, which the jfrog/platform provider requires. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin only. An existing name answers 409.
+// Creates a group and returns its details with status 201. members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import is not supported and answers 400). Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28937,7 +28937,7 @@ func (c *ClientWithResponses) CreateGroupWithResponse(ctx context.Context, body 
 
 // DeleteGroupWithResponse Delete a group
 //
-// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body, which the jfrog/platform provider requires.
+// Removes the group, its memberships and its entries in permission targets. The built-in readers group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers 204 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29042,7 +29042,7 @@ func (c *ClientWithResponses) GetPermissionsWithResponse(ctx context.Context, pa
 
 // CreatePermissionWithBodyWithResponse Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29057,7 +29057,7 @@ func (c *ClientWithResponses) CreatePermissionWithBodyWithResponse(ctx context.C
 
 // CreatePermissionWithResponse Create a permission
 //
-// Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
+// Creates a permission in the Access v2 model and returns it with status 201. The /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29162,7 +29162,7 @@ func (c *ClientWithResponses) UpdatePermissionResourceWithResponse(ctx context.C
 
 // ReplacePermissionResourceWithBodyWithResponse Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29177,7 +29177,7 @@ func (c *ClientWithResponses) ReplacePermissionResourceWithBodyWithResponse(ctx 
 
 // ReplacePermissionResourceWithResponse Replace one resource section
 //
-// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider uses this to update a single resource. Admin only.
+// Replaces the whole actions and targets section for the resource type, creating the section when the permission did not have one. Grants and targets not in the body are dropped. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29222,7 +29222,7 @@ func (c *ClientWithResponses) GetUserListWithResponse(ctx context.Context, param
 
 // CreateUserWithBodyWithResponse Create a user
 //
-// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29237,7 +29237,7 @@ func (c *ClientWithResponses) CreateUserWithBodyWithResponse(ctx context.Context
 
 // CreateUserWithResponse Create a user
 //
-// Creates an internal user and returns its details with status 201. The jfrog/artifactory provider calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint, so the same internal user record backs both. Admin only. A username that already exists answers 409.
+// Creates an internal user and returns its details with status 201. The same internal user record backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29282,7 +29282,7 @@ func (c *ClientWithResponses) UnexpirePasswordForAllUsersWithResponse(ctx contex
 
 // DeleteUserWithResponse Delete a user
 //
-// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body; the jfrog/artifactory provider accepts any 2xx here.
+// Removes the user, its group memberships, its tokens and its entries in permission targets. The built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29342,7 +29342,7 @@ func (c *ClientWithResponses) UpdateUserWithResponse(ctx context.Context, userna
 
 // UpdateUserGroupsWithBodyWithResponse Add or remove group memberships
 //
-// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -29357,7 +29357,7 @@ func (c *ClientWithResponses) UpdateUserGroupsWithBodyWithResponse(ctx context.C
 
 // UpdateUserGroupsWithResponse Add or remove group memberships
 //
-// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and later. Admin only.
+// Applies the add list then the remove list to the user's memberships and returns the resulting full membership. Names that are already present (add) or already absent (remove) are ignored; a name in both lists ends up removed. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

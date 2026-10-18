@@ -326,8 +326,8 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/LoggerLevel'
           description: Required within this object. Map from logger name to the level it should log at while the
-            override lasts. Logger names are the dotted package or component names the server logs under. At
-            most 100 entries; a larger map is rejected with 400. Names that match no logger are accepted and
+            override lasts. Logger names are the dotted package or component names the server logs under, such
+            as `artifactweave.remote`. At most 100 entries; a larger map is rejected with 400. Names that match no logger are accepted and
             have no effect.
           maxProperties: 100
           type: object
@@ -741,7 +741,7 @@ paths:
         A name that matches no logger returns the root level rather than 404. Requires an administrator.
       operationId: getLoggerDebugLevel
       parameters:
-      - description: Required path parameter. Dotted logger name. A single path segment; dots are not separators.
+      - description: Required path parameter. Dotted logger name, for example `artifactweave.remote`. A single path segment; dots are not separators.
         in: path
         name: className
         required: true

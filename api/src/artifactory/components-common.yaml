@@ -27,7 +27,7 @@ components:
           type: string
           x-unverified: true
           description: >-
-            Optional within this object. Always the server's product name.
+            Optional within this object. Always `artifactweave`.
     License:
       type: object
       additionalProperties: false
@@ -36,14 +36,14 @@ components:
         type:
           type: string
           description: >-
-            Required within this object. Always the server's product name; there is no
-            licence tier.
+            Required within this object. Always `artifactweave`; there is no licence
+            tier.
         validThrough:
           type: string
-          description: Required within this object. Always the literal never.
+          description: Required within this object. Always `never`.
         licensedTo:
           type: string
-          description: Required within this object. Always the server's product name.
+          description: Required within this object. Always `artifactweave`.
     Probe:
       type: object
       additionalProperties: false

@@ -58,14 +58,14 @@ type CreateFederationRequest struct {
 	// Description Optional within this object. Free text describing what the federation is for.
 	Description *string `json:"description,omitempty"`
 
-	// Entities Required within this object. The entity types to federate. Must list all four documented types, each once. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025).
+	// Entities Required within this object. The entity types to federate. Must list all four types of the EntityConfig type enum, each once. The federation and its membership are recorded, but these types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead.
 	Entities []EntityConfig `json:"entities"`
 
 	// Name Required within this object. Unique name of the federation on this instance.
 	Name string `json:"name"`
 }
 
-// CreateJpdRequest A follower instance to add to this controller. Obtain pairing_token on the follower with POST /access/api/v1/service_trust/pairing/platform-federation; the token is used once to establish mutual trust (decision 0021) and is not stored.
+// CreateJpdRequest A follower instance to add to this controller. Obtain pairing_token on the follower with POST /access/api/v1/service_trust/pairing/platform-federation; the token is used once to establish mutual trust and is not stored.
 type CreateJpdRequest struct {
 	// Id Required within this object. Label for the follower, unique on this controller; referenced from connection groups.
 	Id string `json:"id"`
@@ -73,17 +73,17 @@ type CreateJpdRequest struct {
 	// PairingToken Required within this object. Write-only. The pairing token issued by the follower for the platform-federation use case. Rejected with 400 when expired, already used or issued for another use case.
 	PairingToken *string `json:"pairing_token,omitempty"`
 
-	// Url Required within this object. Base URL of the follower artifactweave instance.
+	// Url Required within this object. Base URL of the follower instance.
 	Url string `json:"url"`
 }
 
 // EntityConfig One entity type a federation covers.
 type EntityConfig struct {
-	// Type Required within this object. Entity type identifier in <service>.<entityType> form. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025).
+	// Type Required within this object. Entity type identifier in <service>.<entityType> form. These types are recorded but carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead.
 	Type EntityConfigType `json:"type"`
 }
 
-// EntityConfigType Required within this object. Entity type identifier in <service>.<entityType> form. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly that list for wire compatibility and records the federation and its membership, but those types carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead (decision 0025).
+// EntityConfigType Required within this object. Entity type identifier in <service>.<entityType> form. These types are recorded but carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation instead.
 type EntityConfigType string
 
 // ErrorResponse The flat error envelope used by /pfed.
@@ -1608,58 +1608,55 @@ func (sh *strictHandler) UpdateFollowerJpd(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"LRKXKOMYk83/Z+GfXRnhHMrs9vPt/wYA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
