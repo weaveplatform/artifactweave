@@ -1869,7 +1869,7 @@ type ScimUserListResponse struct {
 	TotalResults *int `json:"totalResults,omitempty"`
 }
 
-// TokenCreateRequest An access token request. Accepted as JSON or form-encoded. Every field is optional; the defaults mint an identity token for the caller that expires after the configured default expiry (3600 seconds).
+// TokenCreateRequest An access token request. Accepted as JSON or form-encoded. Every field is optional; the defaults mint an identity token for the caller that expires after the configured default expiry (31536000 seconds, one year, until an admin changes it).
 type TokenCreateRequest struct {
 	// Audience Optional within this object. Which services accept the token, as <service type>@<service id> patterns. Defaults to *@*, every service.
 	Audience *string `json:"audience,omitempty"`
@@ -1877,7 +1877,7 @@ type TokenCreateRequest struct {
 	// Description Optional within this object. Free text stored with the token metadata.
 	Description *string `json:"description,omitempty"`
 
-	// ExpiresIn Optional within this object. Lifetime in seconds. Defaults to the default expiry setting (3600). 0 means the token never expires and is allowed for admins only. Tokens shorter than 21600 seconds are not revocable unless force_revocable is set.
+	// ExpiresIn Optional within this object. Lifetime in seconds. Defaults to the default expiry setting (31536000 until an admin changes it). 0 means the token never expires and is allowed for admins only; anyone else is answered 403. Tokens shorter than 21600 seconds are not revocable unless force_revocable or refreshable is set.
 	ExpiresIn *int `json:"expires_in,omitempty"`
 
 	// ForceRevocable Optional within this object. Makes a short-lived token revocable at the cost of a server-side record. Defaults to false.
@@ -1895,13 +1895,13 @@ type TokenCreateRequest struct {
 	// RefreshToken Optional within this object. Required when grant_type is refresh_token; the refresh token from the original response.
 	RefreshToken *string `json:"refresh_token,omitempty"`
 
-	// Refreshable Optional within this object. When true a refresh_token is issued alongside. Defaults to false.
+	// Refreshable Optional within this object. When true a refresh_token is issued alongside, and the token is revocable whatever its lifetime. Defaults to false.
 	Refreshable *bool `json:"refreshable,omitempty"`
 
-	// Scope Optional within this object. Space-separated scope terms. Forms: applied-permissions/user (the subject's own permissions, the default), applied-permissions/admin, applied-permissions/groups:"g1","g2", applied-permissions/roles:<project>:<role>, artifact:<repo or *>[/<ant path>]:<actions> with actions from r,w,d,a,x,s,m or *, repo:<key>:r, project:<key>/members/users:r, project:<key>/members/groups:r, project:<key>/roles:r, and system:* scopes such as system:identities:r. A scope never grants more than the subject already holds.
+	// Scope Optional within this object. Space-separated scope terms. Forms: applied-permissions/user (the subject's own permissions, the default), applied-permissions/admin, applied-permissions/groups:"g1","g2", applied-permissions/roles:<project>:<role>, artifact:<repo or *>[/<ant path>]:<actions> with actions from r,w,d,a,x,s,m or *, repo:<key>:r, project:<key>/members/users:r, project:<key>/members/groups:r, project:<key>/roles:r, and system:* scopes such as system:identities:r. applied-permissions/admin makes the token an admin token whatever its subject; only an admin may request it. Any other scope never grants more than the subject already holds.
 	Scope *string `json:"scope,omitempty"`
 
-	// Username Optional within this object. The subject of the new token. Defaults to the caller. Only admins may name another user; the name need not exist, which is how service tokens are minted.
+	// Username Optional within this object. The subject of the new token. Defaults to the caller. Only admins may name another user; the name need not exist, which is how service tokens are minted. A token for a name that is not a stored user authenticates as a transient user, of which nothing is stored. Its permissions are what its scope gives. applied-permissions/user gives grants to the name and to the groups new users join automatically, and a groups scope gives the named groups alone. Once a user of that name exists, the token acts as that user.
 	Username *string `json:"username,omitempty"`
 }
 
@@ -4287,7 +4287,7 @@ type ClientInterface interface {
 
 	// GetTokens List access tokens
 	//
-	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
+	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 	//
 	// Corresponds with GET /api/v1/tokens (the `GetTokens` operationId).
 	GetTokens(ctx context.Context, params *GetTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -4321,7 +4321,7 @@ type ClientInterface interface {
 
 	// RevokeTokenByValueWithBody Revoke a token by its value
 	//
-	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4330,7 +4330,7 @@ type ClientInterface interface {
 
 	// RevokeTokenByValue Revoke a token by its value
 	//
-	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4339,7 +4339,7 @@ type ClientInterface interface {
 
 	// RevokeTokenById Revoke a token by id
 	//
-	// Revokes the token with this id; me revokes the caller's own token. Subject to the same revocable threshold as revocation by value. A non-admin may only revoke their own tokens. Answers 200 with no body.
+	// Revokes the token with this id; me revokes the caller's own token. A token is revocable on the same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own tokens. Answers 200 with no body.
 	//
 	// Corresponds with DELETE /api/v1/tokens/{tokenId} (the `RevokeTokenById` operationId).
 	RevokeTokenById(ctx context.Context, tokenId TokenId, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -7632,7 +7632,7 @@ func (c *Client) GetAccessVersion(ctx context.Context, reqEditors ...RequestEdit
 
 // GetTokens List access tokens
 //
-// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
+// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 //
 // Corresponds with GET /api/v1/tokens (the `GetTokens` operationId).
 func (c *Client) GetTokens(ctx context.Context, params *GetTokensParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7706,7 +7706,7 @@ func (c *Client) CreateTokenWithFormdataBody(ctx context.Context, body CreateTok
 
 // RevokeTokenByValueWithBody Revoke a token by its value
 //
-// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7725,7 +7725,7 @@ func (c *Client) RevokeTokenByValueWithBody(ctx context.Context, contentType str
 
 // RevokeTokenByValue Revoke a token by its value
 //
-// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7744,7 +7744,7 @@ func (c *Client) RevokeTokenByValue(ctx context.Context, body RevokeTokenByValue
 
 // RevokeTokenById Revoke a token by id
 //
-// Revokes the token with this id; me revokes the caller's own token. Subject to the same revocable threshold as revocation by value. A non-admin may only revoke their own tokens. Answers 200 with no body.
+// Revokes the token with this id; me revokes the caller's own token. A token is revocable on the same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own tokens. Answers 200 with no body.
 //
 // Corresponds with DELETE /api/v1/tokens/{tokenId} (the `RevokeTokenById` operationId).
 func (c *Client) RevokeTokenById(ctx context.Context, tokenId TokenId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16450,7 +16450,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTokensWithResponse List access tokens
 	//
-	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
+	// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -16486,7 +16486,7 @@ type ClientWithResponsesInterface interface {
 
 	// RevokeTokenByValueWithBodyWithResponse Revoke a token by its value
 	//
-	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16495,7 +16495,7 @@ type ClientWithResponsesInterface interface {
 
 	// RevokeTokenByValueWithResponse Revoke a token by its value
 	//
-	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+	// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16504,7 +16504,7 @@ type ClientWithResponsesInterface interface {
 
 	// RevokeTokenByIdWithResponse Revoke a token by id
 	//
-	// Revokes the token with this id; me revokes the caller's own token. Subject to the same revocable threshold as revocation by value. A non-admin may only revoke their own tokens. Answers 200 with no body.
+	// Revokes the token with this id; me revokes the caller's own token. A token is revocable on the same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own tokens. Answers 200 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -17543,7 +17543,7 @@ type GetTokenDefaultExpiryResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *struct {
-		// DefaultTokenExpiration Optional within this object. Lifetime in seconds given to access tokens created without expires_in. 3600 unless an admin changed it.
+		// DefaultTokenExpiration Optional within this object. Lifetime in seconds given to access tokens created without expires_in. 31536000 (one year) unless an admin changed it.
 		DefaultTokenExpiration *int `json:"default_token_expiration,omitempty"`
 	}
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -17554,7 +17554,7 @@ type GetTokenDefaultExpiryResponse struct {
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetTokenDefaultExpiryResponse) GetJSON200() *struct {
-	// DefaultTokenExpiration Optional within this object. Lifetime in seconds given to access tokens created without expires_in. 3600 unless an admin changed it.
+	// DefaultTokenExpiration Optional within this object. Lifetime in seconds given to access tokens created without expires_in. 31536000 (one year) unless an admin changed it.
 	DefaultTokenExpiration *int `json:"default_token_expiration,omitempty"`
 } {
 	return r.JSON200
@@ -24198,12 +24198,19 @@ func (r RevokeTokenByValueResponse) ContentType() string {
 type RevokeTokenByIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ErrorResponse
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ErrorResponse
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ErrorResponse
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r RevokeTokenByIdResponse) GetJSON400() *ErrorResponse {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -28682,7 +28689,7 @@ func (c *ClientWithResponses) GetAccessVersionWithResponse(ctx context.Context, 
 
 // GetTokensWithResponse List access tokens
 //
-// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
+// A platform admin sees every token; any other caller sees only tokens whose subject is their own user. Expired tokens and tokens that are not revocable are omitted. The token values themselves are never returned, only their metadata. A token issued with a reference token is listed like any other.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -28742,7 +28749,7 @@ func (c *ClientWithResponses) CreateTokenWithFormdataBodyWithResponse(ctx contex
 
 // RevokeTokenByValueWithBodyWithResponse Revoke a token by its value
 //
-// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28757,7 +28764,7 @@ func (c *ClientWithResponses) RevokeTokenByValueWithBodyWithResponse(ctx context
 
 // RevokeTokenByValueWithResponse Revoke a token by its value
 //
-// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable only when its lifetime is at least the revocable threshold (21600 seconds) or it was created with force_revocable; other tokens answer 400. Admin only.
+// Revokes the token whose JWT or reference token is given in the body and returns its id. A token is revocable when it never expires, its lifetime is at least the revocable threshold (21600 seconds), or it was created with force_revocable or refreshable; any other token answers 404, as an unknown one does. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28772,7 +28779,7 @@ func (c *ClientWithResponses) RevokeTokenByValueWithResponse(ctx context.Context
 
 // RevokeTokenByIdWithResponse Revoke a token by id
 //
-// Revokes the token with this id; me revokes the caller's own token. Subject to the same revocable threshold as revocation by value. A non-admin may only revoke their own tokens. Answers 200 with no body.
+// Revokes the token with this id; me revokes the caller's own token. A token is revocable on the same terms as for revocation by value; any other token answers 400. A non-admin may only revoke their own tokens. Answers 200 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -29932,7 +29939,7 @@ func ParseGetTokenDefaultExpiryResponse(rsp *http.Response) (*GetTokenDefaultExp
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			// DefaultTokenExpiration Optional within this object. Lifetime in seconds given to access tokens created without expires_in. 3600 unless an admin changed it.
+			// DefaultTokenExpiration Optional within this object. Lifetime in seconds given to access tokens created without expires_in. 31536000 (one year) unless an admin changed it.
 			DefaultTokenExpiration *int `json:"default_token_expiration,omitempty"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -35038,6 +35045,13 @@ func ParseRevokeTokenByIdResponse(rsp *http.Response) (*RevokeTokenByIdResponse,
 	switch {
 	case rsp.StatusCode == 200:
 		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ErrorResponse

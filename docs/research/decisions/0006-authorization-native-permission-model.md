@@ -65,11 +65,12 @@ MANAGE. This is `exclude-manage`, the Permissions V2 default, under which "Users
 permissions can grant only permissions that they have, except for manage permissions", and
 "Users with the manage permission cannot grant or revoke the manage action"
 ([permissions](https://docs.jfrog.com/administration/docs/permissions)). The v2 PUT is the only
-write such a holder reaches; the v1 and Access writes need an administrator. These differ:
-- 7.x differs: `applied-permissions/admin` makes the token an admin token, even for a user
-  that does not exist
-  ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token));
-  fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
+write such a holder reaches; the v1 and Access writes need an administrator. So does the admin
+scope: `applied-permissions/admin` makes the token an admin token whatever its subject, a user
+who is no administrator or one that does not exist
+([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token):
+"the token will be granted admin permissions"), and only an administrator may mint it
+([#406](https://github.com/weaveplatform/artifactweave/issues/406)). These differ:
 - 7.x differs: the Access listing's `user` filter matches user names without case
   ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions)); fixed by
   [#408](https://github.com/weaveplatform/artifactweave/issues/408).
@@ -111,11 +112,12 @@ These are choices made where no source documents Artifactory's behaviour:
 - **Remote caches:** `<remote>-cache` resolves to the remote for target matching, so
   `ANY REMOTE` and the remote's own key cover its cache.
 - **Admin:** the subject's own flag or any of its groups' admin privileges. Under a token
-  scope, the subject acts as an administrator only when the scope keeps applied permissions:
-  `applied-permissions/user` or `admin` for its own flag, or a groups scope naming an admin
-  group.
-- **Token scopes** only remove, apart from the groups a groups scope names; the evaluator
-  never adds what the subject does not hold:
+  scope, `applied-permissions/admin` is an administrator whatever its subject. Otherwise the
+  subject acts as an administrator only when the scope keeps applied permissions:
+  `applied-permissions/user` for its own flag, or a groups scope naming an admin group.
+- **Token scopes** only remove, apart from the groups a groups scope names and
+  `applied-permissions/admin`; the evaluator never adds what the subject does not hold
+  otherwise:
   - `applied-permissions/user` and `applied-permissions/admin` keep the user's own and
     group grants.
   - `applied-permissions/groups:…` acts through every group it names, whether or not the

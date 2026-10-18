@@ -26,13 +26,15 @@ var (
 	// ErrInvalidRequest reports an issue request the service refuses.
 	ErrInvalidRequest = errors.New("invalid token request")
 	// ErrNeverExpiresAdminOnly refuses a token that never expires to a
-	// caller who is not an administrator.
+	// caller who is not an administrator. It wraps ErrInvalidRequest, which
+	// the OIDC exchange answers 400; the token API tests for it first and
+	// answers 403, as createtoken documents a refused expires_in.
 	ErrNeverExpiresAdminOnly = fmt.Errorf(
 		"%w: only an administrator may issue a token that never expires",
 		ErrInvalidRequest,
 	)
 	// ErrNotRevocable refuses to revoke a token shorter than the revocable
-	// threshold that was not forced revocable.
+	// threshold that was neither forced revocable nor refreshable.
 	ErrNotRevocable = errors.New("token is not revocable")
 	// ErrRefreshOtherUser refuses a refresh token of another user than the
 	// one refreshing: "The authenticated user must match the user of the
@@ -136,8 +138,9 @@ type Request struct {
 	// (types.TokenPurposeEncryptedPassword). Such a token always has a
 	// reference token, and keeps it sealed so it can be shown again.
 	Purpose string
-	// Identity is how the token's subject resolves to a user; only an OIDC
-	// token exchange issues a token for a user who need not be stored.
+	// Identity is how the token's subject resolves to a user. An OIDC token
+	// exchange, and an administrator minting for a name that is no stored
+	// user, issue a token for a user who need not be stored.
 	Identity types.TokenIdentity
 }
 
@@ -179,9 +182,11 @@ func (s *Service) Issue(ctx context.Context, r Request) (Issued, error) {
 		ProjectKey:  r.ProjectKey,
 		IssuedAt:    now,
 		Refreshable: r.Refreshable,
-		Revocable:   types.Revocable(expiresIn, types.DefaultRevocableThreshold, r.ForceRevocable),
-		Purpose:     r.Purpose,
-		Identity:    r.Identity,
+		Revocable: types.Revocable(
+			expiresIn, types.DefaultRevocableThreshold, r.ForceRevocable, r.Refreshable,
+		),
+		Purpose:  r.Purpose,
+		Identity: r.Identity,
 	}
 	if expiresIn > 0 {
 		rec.ExpiresAt = now.Add(expiresIn)
@@ -535,6 +540,9 @@ func (s *Service) RefreshAs(
 			ProjectKey: old.ProjectKey, IncludeReference: len(old.ReferenceDigest) > 0,
 			// The lifetime was allowed when the token was first issued.
 			ByAdmin: true,
+			// A transient user's token stays one: as a stored user's, the
+			// refreshed token would answer 401 for want of a user record.
+			Identity: old.Identity,
 		})
 		return err
 	})

@@ -137,7 +137,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, w.headerContains)
 	sc.Step(`^I keep the path of the response header "([^"]*)" as "([^"]*)"$`, w.keepHeaderPath)
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
-	sc.Step(`^I (PUT|POST|PATCH) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
+	sc.Step(`^I (PUT|POST|PATCH|DELETE) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
 	sc.Step(`^I create the RSA key pair "([^"]*)" with alias "([^"]*)" as admin$`, w.createKeyPair)
 	sc.Step(`^I add a generated client certificate "([^"]*)" as admin$`, w.addCertificate)
@@ -332,7 +332,7 @@ func (w *world) patchJSONAsAdmin(path string, body *godog.DocString) error {
 }
 
 func (w *world) deleteAsAdmin(path string) error {
-	return w.send(http.MethodDelete, path, "", func(r *http.Request) {
+	return w.send(http.MethodDelete, w.expand(path), "", func(r *http.Request) {
 		r.SetBasicAuth("admin", testAdminPassword)
 	})
 }

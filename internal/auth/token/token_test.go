@@ -131,10 +131,13 @@ func TestCLISafeProperty(t *testing.T) {
 func TestIssueAndVerify(t *testing.T) {
 	s, db, _ := world(t)
 	ctx := context.Background()
+	// Without expires_in or a stored default, a token lives a year
+	// (token.default-expiry), long enough to be revocable.
 	out := issue(t, s, Request{IncludeReference: true, Description: "ci"})
-	if out.ExpiresIn != 3600 || out.Record.Audience != DefaultAudience ||
+	if out.ExpiresIn != 31536000 || out.Record.Audience != DefaultAudience ||
 		out.Record.Subject != "jfac@01234567-89ab-4cde-8f01-23456789abcd/users/alice" ||
-		out.Record.Revocable || out.RefreshToken != "" || !types.IsReferenceToken(out.ReferenceToken) {
+		!out.Record.Revocable || out.RefreshToken != "" ||
+		!types.IsReferenceToken(out.ReferenceToken) {
 		t.Fatalf("issued %+v", out)
 	}
 	if s.Issuer() != "jfac@01234567-89ab-4cde-8f01-23456789abcd" {
@@ -157,7 +160,7 @@ func TestIssueAndVerify(t *testing.T) {
 	if err := db.Settings().Put(ctx, types.SettingDefaultTokenExpiry, -1); err != nil {
 		t.Fatal(err)
 	}
-	if out := issue(t, s, Request{}); out.ExpiresIn != 3600 {
+	if out := issue(t, s, Request{}); out.ExpiresIn != 31536000 {
 		t.Fatalf("a negative setting falls back: %d", out.ExpiresIn)
 	}
 	// A long-lived token is revocable; a scope is kept as given.
@@ -272,9 +275,29 @@ func TestRevoke(t *testing.T) {
 		t.Fatal(err)
 	}
 	invalid(t, s, byRef.AccessToken, "revoked by reference")
-	short := issue(t, s, Request{})
+	short := issue(t, s, Request{ExpiresIn: dur(time.Hour)})
 	if err := s.Revoke(ctx, short.Record.ID); !errors.Is(err, ErrNotRevocable) {
 		t.Fatalf("short-lived token revoked: %v", err)
+	}
+	if err := s.RevokeValue(ctx, short.AccessToken); !errors.Is(err, ErrNotRevocable) {
+		t.Fatalf("short-lived token revoked by value: %v", err)
+	}
+	// A refreshable token is revocable whatever its lifetime
+	// (revoketokenbyvalue: "force_revocable: true or refreshable: true").
+	refreshable := issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
+	if !refreshable.Record.Revocable {
+		t.Fatalf("a refreshable hour-long token is not revocable: %+v", refreshable.Record)
+	}
+	if err := s.Revoke(ctx, refreshable.Record.ID); err != nil {
+		t.Fatalf("revoke a refreshable token by id: %v", err)
+	}
+	invalid(t, s, refreshable.AccessToken, "a revoked refreshable token")
+	if _, err := s.Refresh(ctx, refreshable.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
+		t.Fatalf("the refresh token of a revoked token: %v", err)
+	}
+	refreshable = issue(t, s, Request{Refreshable: true, ExpiresIn: dur(time.Hour)})
+	if err := s.RevokeValue(ctx, refreshable.AccessToken); err != nil {
+		t.Fatalf("revoke a refreshable token by value: %v", err)
 	}
 	if err := s.Revoke(ctx, "missing"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("revoke missing: %v", err)
@@ -298,7 +321,7 @@ func TestRefresh(t *testing.T) {
 		t.Fatal(err)
 	}
 	if next.ExpiresIn != 7200 || next.RefreshToken == "" || next.ReferenceToken == "" ||
-		next.Record.Subject != first.Record.Subject {
+		next.Record.Subject != first.Record.Subject || !next.Record.Revocable {
 		t.Fatalf("refreshed %+v", next)
 	}
 	if _, err := s.Verify(ctx, next.AccessToken); err != nil {
@@ -310,6 +333,25 @@ func TestRefresh(t *testing.T) {
 	c.add(2*time.Hour + types.DefaultRefreshGrace)
 	if _, err := s.Refresh(ctx, next.RefreshToken); !errors.Is(err, auth.ErrInvalidToken) {
 		t.Fatalf("after the grace: %v", err)
+	}
+}
+
+// TestRefreshKeepsIdentity: the token a refresh issues resolves to a user
+// as the one it replaces did, so a transient user's token stays usable.
+func TestRefreshKeepsIdentity(t *testing.T) {
+	s, _, _ := world(t)
+	ctx := context.Background()
+	first := issue(t, s, Request{
+		Username: "ghost", Refreshable: true, ExpiresIn: dur(time.Hour), ByAdmin: true,
+		Identity: types.IdentityTransient,
+	})
+	next, err := s.Refresh(ctx, first.RefreshToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec, err := s.Verify(ctx, next.AccessToken)
+	if err != nil || rec.Identity != types.IdentityTransient {
+		t.Fatalf("refreshed record %+v, %v", rec, err)
 	}
 }
 

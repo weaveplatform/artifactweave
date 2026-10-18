@@ -1,7 +1,9 @@
 // Package authz evaluates Artifactory's permission model (decision 0006):
 // the admin flag, the union of grants to a user and their groups, permission
 // targets with Ant include and exclude patterns, the anonymous user, and
-// token scopes, which only ever remove actions. It is a library: handlers
+// token scopes, which only ever remove actions but for
+// applied-permissions/admin, an administrator's token whatever its subject.
+// It is a library: handlers
 // build a Decider per request and ask it questions.
 package authz
 
@@ -106,8 +108,8 @@ func New(ctx context.Context, src Sources, s Subject) (*Decider, error) {
 		return nil, err
 	}
 	d.user = user
-	d.every = (sc.user && s.Admin) || viaGroup
-	d.admin = sc.open && ((s.Admin && sc.adminAllowed) || viaGroup)
+	d.every = (sc.user && s.Admin) || viaGroup || sc.admin
+	d.admin = sc.admin || sc.open && ((s.Admin && sc.adminAllowed) || viaGroup)
 	perms, err := src.Permissions.ForPrincipal(ctx, user, groups)
 	if err != nil {
 		return nil, fmt.Errorf("authz: permissions of %s: %w", s.Name, err)
@@ -354,6 +356,11 @@ type scopeShape struct {
 	user bool
 	// adminAllowed: the subject's own admin flag survives the scope.
 	adminAllowed bool
+	// admin: applied-permissions/admin, which makes the token an
+	// administrator's whatever its subject, even a user that does not exist
+	// (create-scoped-token). Only an administrator may mint it, so it grants
+	// nothing its issuer lacked.
+	admin bool
 	// open: applied permissions exist, so resources other than artifacts
 	// and builds are reachable; false for a scope of resource entries
 	// only, where only artifact entries reach artifacts and build entries
@@ -375,8 +382,11 @@ func analyse(s *types.Scope) scopeShape {
 	var applied bool
 	for _, e := range s.Entries {
 		switch e.Kind {
-		case types.ScopeUser, types.ScopeAdmin:
+		case types.ScopeUser:
 			sh.user, sh.adminAllowed, sh.all, applied = true, true, true, true
+		case types.ScopeAdmin:
+			sh.user, sh.adminAllowed, sh.all, applied = true, true, true, true
+			sh.admin = true
 		case types.ScopeGroups:
 			sh.named = append(sh.named, e.Names...)
 			applied = true

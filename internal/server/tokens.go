@@ -116,6 +116,11 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 		Audience: m.audience, Description: m.description, ProjectKey: m.projectKey,
 		IncludeReference: m.includeReference, ByAdmin: p.Admin,
 	}
+	if p.Admin {
+		if req.Identity, err = t.identityOf(ctx, username); err != nil {
+			return token.Issued{}, err
+		}
+	}
 	if m.scope != "" {
 		raw := m.scope
 		if m.legacy {
@@ -131,15 +136,24 @@ func (t tokenAPI) mint(ctx context.Context, m mintRequest) (token.Issued, error)
 			)
 		}
 	}
-	if m.expiresIn != nil {
+	switch {
+	case m.expiresIn != nil:
 		if *m.expiresIn < 0 {
 			return token.Issued{}, badRequest("expires_in must not be negative")
 		}
 		d := time.Duration(*m.expiresIn) * time.Second
 		req.ExpiresIn = &d
+	case m.legacy:
+		// The legacy route has its own default, so the year-long
+		// token.default_expiry of the Access route does not reach it.
+		d := types.LegacyTokenExpiry
+		req.ExpiresIn = &d
 	}
 	issued, err := svc.Issue(ctx, req)
-	if errors.Is(err, token.ErrInvalidRequest) {
+	switch {
+	case errors.Is(err, token.ErrNeverExpiresAdminOnly):
+		return token.Issued{}, errNeverExpires
+	case errors.Is(err, token.ErrInvalidRequest):
 		return token.Issued{}, badRequest("%v", err)
 	}
 	if err != nil {
@@ -212,6 +226,35 @@ func (t tokenAPI) refresh(
 var errRefreshOtherUser = apierror.New(http.StatusForbidden,
 	"The authenticated user must match the user of the access token being refreshed")
 
+// errNeverExpires answers a non-administrator's token that would never
+// expire. createtoken documents 403, "The requested token details are
+// forbidden", for an expires_in the caller may not have, and marks 0 as
+// admin only. Whether 7.x refuses it at all while token.max-expiry is 0 is
+// on #216.
+var errNeverExpires = apierror.New(
+	http.StatusForbidden,
+	"The requested token details are forbidden: only an administrator can create a token that never expires",
+)
+
+// identityOf is how a token an administrator mints for username resolves
+// to a user: stored when username is a stored user, otherwise transient.
+// Access lets an administrator name a user that does not exist, and such a
+// token authenticates as a transient user, held in memory for the request
+// and never saved, with the permissions its scope gives (JFrog's
+// access-tokens page, "Support Authentication for Non-existing Users").
+// Only an administrator's token is marked: anyone else mints for
+// themselves alone.
+func (t tokenAPI) identityOf(ctx context.Context, username string) (types.TokenIdentity, error) {
+	_, err := t.cfg.Store.Users().Get(ctx, username)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return types.IdentityTransient, nil
+	case err != nil:
+		return "", t.internalError(ctx, "token user", err)
+	}
+	return types.IdentityStored, nil
+}
+
 // errBasicTokenCreation answers a password sent to the Access token API
 // while token.allow_basic_auth is off. The message is the one Access gives
 // Basic credentials it does not accept, with the error code UNAUTHORIZED
@@ -272,7 +315,8 @@ func legacyScope(s string) string {
 
 // visible lists the tokens the caller may see: every token for an
 // administrator, their own otherwise. Expired tokens are omitted, and so are
-// non-revocable ones, which Artifactory keeps no record of (see #79).
+// non-revocable ones, which Artifactory keeps no record of (see #79); a
+// refreshable token is revocable, and so listed.
 func (t tokenAPI) visible(ctx context.Context) ([]types.Token, *token.Service, error) {
 	svc, err := t.service()
 	if err != nil {
@@ -341,6 +385,10 @@ func (t tokenAPI) own(ctx context.Context, id string) (types.Token, *token.Servi
 func tokenNotFound() error {
 	return apierror.New(http.StatusNotFound, "Token not found")
 }
+
+// errNotRevocable is revocation by value's one 404, in revoketokenbyvalue's
+// words.
+var errNotRevocable = apierror.New(http.StatusNotFound, "Token not found or not revocable")
 
 func (s accessService) tokenAPI() tokenAPI { return tokenAPI{cfg: s.cfg} }
 
@@ -427,8 +475,10 @@ func (s accessService) GetTokenById(
 	return accessgen.GetTokenById200JSONResponse(tokenDetails(svc, rec)), nil
 }
 
-// RevokeTokenById revokes a token; a non-revocable one is 403, as the spec
-// documents for this route.
+// RevokeTokenById revokes a token. A non-revocable one is 400, as 7.x
+// answers it (JFrog KB 000005622, which shows the UI's DELETE of such a
+// token failing with 400); revoketokenbyid lists 403 only for a caller
+// without the permission.
 func (s accessService) RevokeTokenById(
 	ctx context.Context,
 	req accessgen.RevokeTokenByIdRequestObject,
@@ -440,7 +490,7 @@ func (s accessService) RevokeTokenById(
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
 	case errors.Is(err, token.ErrNotRevocable):
-		return nil, apierror.New(http.StatusForbidden, "Token is not revocable")
+		return nil, badRequest("Token is not revocable")
 	case errors.Is(err, store.ErrNotFound):
 		return nil, tokenNotFound()
 	case err != nil:
@@ -450,7 +500,9 @@ func (s accessService) RevokeTokenById(
 }
 
 // RevokeTokenByValue revokes the token whose JWT or reference token is
-// given. Admin only; a non-revocable token is 400, as the spec documents.
+// given. Admin only. An unknown token and a non-revocable one both answer
+// 404, which revoketokenbyvalue documents as "Token not found or not
+// revocable", so the answer does not tell which.
 func (s accessService) RevokeTokenByValue(
 	ctx context.Context,
 	req accessgen.RevokeTokenByValueRequestObject,
@@ -470,16 +522,14 @@ func (s accessService) RevokeTokenByValue(
 	// which the route answers 404.
 	rec, err := svc.Verify(ctx, *req.Body.Token)
 	if errors.Is(err, auth.ErrInvalidToken) {
-		return nil, tokenNotFound()
+		return nil, errNotRevocable
 	}
 	if err != nil {
 		return nil, t.internalError(ctx, "verify token", err)
 	}
 	switch err := svc.Revoke(ctx, rec.ID); {
-	case errors.Is(err, token.ErrNotRevocable):
-		return nil, badRequest("Token is not revocable")
-	case errors.Is(err, store.ErrNotFound):
-		return nil, tokenNotFound()
+	case errors.Is(err, token.ErrNotRevocable), errors.Is(err, store.ErrNotFound):
+		return nil, errNotRevocable
 	case err != nil:
 		return nil, t.internalError(ctx, "revoke token", err)
 	}

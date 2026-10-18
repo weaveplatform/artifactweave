@@ -231,7 +231,7 @@ Source: https://docs.jfrog.com/administration/docs/access-tokens and the per-end
 | GET | `/access/api/v1/tokens/{tokenId}` | 200 / 404 | `me` is the current token; the provider removes the resource from state on 404 |
 | DELETE | `/access/api/v1/tokens/{tokenId}` | 200 | revoke by id; `me` allowed; a token that is not revocable answers 400 **[KB]** ([000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui)) |
 | DELETE | `/access/api/v1/tokens/revoke` | 200 | admin; body `{"token":"<jwt or reference>"}` returns `{"revoked_token_id":"..."}`; 404 for a token "not found or not revocable" ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue)) |
-| GET / PUT | `/access/api/v1/config/token/default_expiry` | 200 | `{"default_token_expiration":3600}` |
+| GET / PUT | `/access/api/v1/config/token/default_expiry` | 200 | `{"default_token_expiration":31536000}`, one year until an administrator sets it (Defaults and limits below) |
 | POST | `/access/api/v1/service_trust/pairing/{useCase}` | 200 | `mission-control`, `bridge`, `platform-federation`; out of scope |
 
 Create request:
@@ -265,7 +265,11 @@ configuration reference gives one year (`token.default-expiry: 31536000`,
 as does the JFrog CLI, while the
 [access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens) says 3600 s;
 decision 0005's [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check)
-records the maintainer's choice of one year. `0` means never expires and is admin-only;
+records the maintainer's choice of one year. `0` means never expires: "0 for non-expirable
+(admin only)", and a refused `expires_in` is 403, "The requested token details are forbidden"
+([createtoken](https://docs.jfrog.com/administration/reference/createtoken)), although the
+[recommended configurations](https://docs.jfrog.com/administration/reference/recommended-configurations)
+page says users may set any value while `token.max-expiry` is 0;
 tokens with an expiry below the `revocable-expiry-threshold` (default 21600 s) are not
 revocable unless `force_revocable` or, for a JWT, `refreshable`
 ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue));
@@ -273,12 +277,22 @@ tokens below `persistent-expiry-threshold` (default 10800 s) are not stored at a
 grace `token.refresh-expiry` 24 h; `token.max-expiry` 0 means unlimited; `scope` at most 500
 characters, `username` at most 255, `description` at most 1024.
 
+Users that do not exist: an administrator may name any `username`, and "If the user specified
+does not exist, the system will create a corresponding transient user", which "exists only for
+the duration of that session and is not saved to the database"
+([access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens), "Support
+Authentication for Non-existing Users" and "Transient Users and Auto Join Groups"). A groups
+scope acts through "Explicitly mapped groups only", and `applied-permissions/user` through those
+"plus any local Auto Join groups". Non-administrators "can only create tokens with themselves as
+the Subject". [RTFACT-30181](https://jfrog.atlassian.net/browse/RTFACT-30181) shows a transient
+user's reference token working on 7.68.14.
+
 ### Scope grammar
 
 | Scope | Meaning |
 |---|---|
 | `applied-permissions/user` | the subject's own permissions (identity token, the default) |
-| `applied-permissions/admin` | platform admin |
+| `applied-permissions/admin` | platform admin, whatever the subject: "It is possible to provide a username that does not exist in the instance, and the token will be granted admin permissions" ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token)) |
 | `applied-permissions/groups:"g1","g 2"` | the union of the named groups' permissions |
 | `applied-permissions/roles:<project>:developer,"Project Admin"` | project roles |
 | `artifact:<repo or *>[/<ant path>]:<actions>` | actions `r,w,d,a,x,s,m` or `*` |
@@ -497,10 +511,21 @@ permission ones. The others:
 - Whether `token.allow-basic-auth` also governs the legacy `POST /api/security/token`.
   **[I]** It does not: the JFrog CLI's password configurations create their tokens there,
   which would fail on every default instance if it did.
+- The default lifetime of an Access token. **[D]** The configuration reference and the JFrog
+  CLI say one year, which artifactweave follows; the access-tokens page says 3600 s (Access
+  tokens v1).
+- Whether a non-administrator's `expires_in: 0` succeeds while `token.max-expiry` is at its
+  default 0. **[I]** It is refused 403, as createtoken's field note and its 403 describe;
+  recommended configurations says users may then set any value.
+- How the user API answers for a transient user, and how its tokens are revoked. **[I]**
+  `GET` and `DELETE /api/security/users/<name>` answer 404, deleting the name revokes nothing,
+  and its tokens are listed and revoked through the token API as any other; the access-tokens
+  page says only that the user is not saved.
 - The lifetime of a legacy `POST /api/security/token` without `expires_in`. **[J]**
   [RTFACT-29239](https://jfrog.atlassian.net/browse/RTFACT-29239) says it rose from one hour
   to one year in 7.46.x, but the issue is open and the statement is not a JFrog staff comment.
-  `jf rt atc` sends 3600 itself.
+  `jf rt atc` sends 3600 itself. artifactweave keeps 3600 s there, whatever `default_expiry`
+  says.
 - Whether token details carry `audience` and `project_key` (Access tokens v1).
 - Whether `unexpirePassword/{userName}` still exists (the legacy table).
 - Whether the legacy user has `lastLoggedInMillis` and `offlineMode`. The deprecated-APIs

@@ -1455,7 +1455,7 @@ paths:
                 properties:
                   default_token_expiration:
                     description: Optional within this object. Lifetime in seconds given to access tokens created
-                      without expires_in. 3600 unless an admin changed it.
+                      without expires_in. 31536000 (one year) unless an admin changed it.
                     type: integer
                 type: object
           description: The current default lifetime.

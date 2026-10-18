@@ -11,7 +11,7 @@ import (
 )
 
 // statusSecrets are the fixture's token values, which only its own signing
-// key can produce, by the name a row writes as {name}. Every token expired
+// key can produce, by the name a row writes as {name}. These tokens expired
 // an hour ago, within the refresh grace:
 //   - expired-access and expired-refresh: a refreshable token of admin's;
 //   - forged-access: expired-access with its signature altered;
@@ -19,6 +19,11 @@ import (
 //   - legacy-access and legacy-refresh: a third of admin's, for the legacy
 //     route;
 //   - user-refresh and user-2-refresh: refresh tokens of two of user's.
+//
+// These are admin's, live for an hour, below the revocable threshold:
+//   - short-access: neither refreshable nor forced, so not revocable;
+//   - refreshable-id and refreshable-2-access: two refreshable ones, which
+//     are revocable all the same.
 type statusSecrets map[string]string
 
 // seedTokens gives a fixture store an instance identity and a token service,
@@ -81,6 +86,18 @@ func seedTokens(t *testing.T, db store.Store) (*token.Service, statusSecrets) {
 	sig := []byte(secrets["expired-access"])
 	sig[len(sig)-3] ^= 1
 	secrets["forged-access"] = string(sig)
+	for _, r := range []struct {
+		name        string
+		refreshable bool
+	}{{"short", false}, {"refreshable", true}, {"refreshable-2", true}} {
+		issued, err := tokens.Issue(ctx, token.Request{
+			Username: "admin", Refreshable: r.refreshable, ExpiresIn: &hour, ByAdmin: true,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		secrets[r.name+"-access"], secrets[r.name+"-id"] = issued.AccessToken, issued.Record.ID
+	}
 	return tokens, secrets
 }
 
@@ -123,7 +140,9 @@ func tokenStatusRows() []statusCase {
 		{create, tokens, "user-token", `{"refreshable":true}`, 200},
 		{create, tokens, "user-token", `{"username":"admin"}`, 403},
 		{create, tokens, "user-token", `{"scope":"applied-permissions/admin"}`, 403},
-		{create, tokens, "user-token", `{"expires_in":0}`, 400},
+		// A token that never expires is the administrator's alone, and a
+		// refused expires_in is 403, as createtoken documents (#406).
+		{create, tokens, "user-token", `{"expires_in":0}`, 403},
 		{create, tokens, "admin-token", `{"scope":"nonsense"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"password"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"refresh_token"}`, 400},
@@ -198,13 +217,19 @@ func tokenStatusRows() []statusCase {
 		{get, tokens + "/me", "admin", "", 404},
 		{get, tokens + "/admin-token", "", "", 401},
 
-		{revoke, tokens + "/short-token", "admin", "", 403},
+		// A token below the revocable threshold is revocable only when
+		// refreshable or forced: by id the others are 400, by value 404
+		// (#406).
+		{revoke, tokens + "/short-token", "admin", "", 400},
+		{revoke, tokens + "/{refreshable-id}", "admin", "", 200},
 		{revoke, tokens + "/admin-token", "user", "", 403},
 		{revoke, tokens + "/missing", "admin", "", 404},
 		{revoke, tokens + "/admin-token", "", "", 401},
 		{revoke, tokens + "/admin-token", "admin", "", 200},
 
 		{byValue, revokeAt, "admin", `{"token":"not-a-token"}`, 404},
+		{byValue, revokeAt, "admin", `{"token":"{short-access}"}`, 404},
+		{byValue, revokeAt, "admin", `{"token":"{refreshable-2-access}"}`, 200},
 		{byValue, revokeAt, "admin", `{}`, 400},
 		{byValue, revokeAt, "user", `{"token":"x"}`, 403},
 		{byValue, revokeAt, "", `{"token":"x"}`, 401},

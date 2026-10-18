@@ -101,3 +101,54 @@ Feature: Access tokens
       grant_type=refresh_token&access_token={short}&refresh_token={refresh}
       """
     Then the response status is 401
+
+  Scenario: A token created without expires_in lives one year
+    When I GET "/access/api/v1/config/token/default_expiry" as admin
+    Then the response status is 200
+    And the response body contains "31536000"
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"description":"default lifetime"}
+      """
+    Then the response status is 200
+    And the response body contains "31536000"
+
+  Scenario: A refreshable token shorter than the revocable threshold is listed and revoked
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"refreshable":true,"expires_in":600,"description":"short refreshable"}
+      """
+    Then the response status is 200
+    And I keep the JSON field "token_id" of the response as "refreshable-id"
+    And I keep the JSON field "access_token" of the response as "refreshable-access"
+    When I GET "/access/api/v1/tokens" as admin
+    Then the response status is 200
+    And the response body contains "short refreshable"
+    When I DELETE "/access/api/v1/tokens/{refreshable-id}" as admin
+    Then the response status is 200
+    When I GET "/access/api/v1/tokens/me" with the kept token "refreshable-access"
+    Then the response status is 401
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"refreshable":true,"expires_in":600}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "by-value"
+    When I DELETE "/access/api/v1/tokens/revoke" as admin with body:
+      """
+      {"token":"{by-value}"}
+      """
+    Then the response status is 200
+    # Neither refreshable nor forced revocable: not revocable, so revoking it
+    # by value finds nothing to revoke.
+    When I POST "/access/api/v1/tokens" as admin with body:
+      """
+      {"expires_in":600}
+      """
+    Then the response status is 200
+    And I keep the JSON field "access_token" of the response as "short"
+    When I DELETE "/access/api/v1/tokens/revoke" as admin with body:
+      """
+      {"token":"{short}"}
+      """
+    Then the response status is 404

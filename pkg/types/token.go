@@ -13,9 +13,20 @@ var ErrInvalidSubject = errors.New("invalid token subject")
 
 // Token defaults from the Access configuration (research 05).
 const (
-	DefaultTokenExpiry        = time.Hour
+	// DefaultTokenExpiry is token.default-expiry, the lifetime of an Access
+	// token created without expires_in while no administrator has set one:
+	// one year, as the Access configuration reference and the JFrog CLI give
+	// it. JFrog's access-tokens page says 3600 s instead; decision 0005
+	// records the conflict, which the live check on #216 settles.
+	DefaultTokenExpiry        = 365 * 24 * time.Hour
 	DefaultRevocableThreshold = 6 * time.Hour
 	DefaultRefreshGrace       = 24 * time.Hour
+	// LegacyTokenExpiry is the lifetime of a token the legacy
+	// POST /api/security/token creates without expires_in. It is that
+	// route's own default, not token.default-expiry, so raising the Access
+	// default leaves the legacy route as it was (research 05 lists the 7.x
+	// value as unconfirmed).
+	LegacyTokenExpiry = time.Hour
 )
 
 // TokenPurposeEncryptedPassword marks the reference token that stands in for
@@ -33,12 +44,14 @@ type TokenIdentity string
 
 // Token identities.
 const (
-	// IdentityStored: the subject must be a stored, enabled user. Every token
-	// but an OIDC exchange's.
+	// IdentityStored: the subject must be a stored, enabled user. Every
+	// token whose subject was a stored user when it was issued, other than
+	// an OIDC exchange's.
 	IdentityStored TokenIdentity = ""
 	// IdentityTransient: a stored user of that name if there is one;
 	// otherwise a transient user for the request, a member of the groups new
-	// users join automatically.
+	// users join automatically. An OIDC exchange issues it, and so does an
+	// administrator minting a token for a name that is no stored user.
 	IdentityTransient TokenIdentity = "transient"
 	// IdentitySynthetic: never a stored user and in no group but those the
 	// scope names. An identity mapping without a user name issues it, so a
@@ -114,11 +127,13 @@ func (t Token) Expired(now time.Time) bool {
 }
 
 // Revocable applies Access's rule: a token is revocable when it never
-// expires, lives at least the revocable threshold, or the caller forced it.
-// Short-lived tokens are not tracked for revocation because they expire
-// before a revocation list would matter.
-func Revocable(expiresIn, threshold time.Duration, force bool) bool {
-	return force || expiresIn == 0 || expiresIn >= threshold
+// expires, lives at least the revocable threshold, the caller forced it, or
+// it is refreshable ("created with force_revocable: true or refreshable:
+// true", revoketokenbyvalue). Other short-lived tokens are not tracked for
+// revocation because they expire before a revocation list would matter; a
+// refreshable one outlives its expiry through its refresh token.
+func Revocable(expiresIn, threshold time.Duration, force, refreshable bool) bool {
+	return force || refreshable || expiresIn == 0 || expiresIn >= threshold
 }
 
 // Subject is a parsed Access token subject, jfac@<service id>/users/<name>.

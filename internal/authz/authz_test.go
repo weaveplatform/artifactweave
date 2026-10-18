@@ -222,8 +222,14 @@ func TestEvaluation(t *testing.T) {
 		{"roles scope grants nothing until projects", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/roles:proj:developer")}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, false),
 		}},
-		{"admin scope for a non-admin grants no admin", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/admin")}, false, false, []check{
-			art(ext, "x", r, false), art(libs, "org/acme/a.txt", r, true),
+		// applied-permissions/admin is an admin token whatever its subject
+		// (create-scoped-token): a user who is no administrator, and one
+		// who does not exist at all.
+		{"admin scope makes a non-admin an admin", Subject{Name: "bob", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/admin")}, false, true, []check{
+			art(ext, "x", r|w|d|m, true), art(libs, "org/acme/a.txt", r, true),
+		}},
+		{"admin scope makes an unknown user an admin", Subject{Name: "ghost", Scope: scope(t, "applied-permissions/admin")}, false, true, []check{
+			art(ext, "x", r|w|d|m, true), {types.ResourceBuild, builds, "lib/1", false, d, true},
 		}},
 		{"a membership in a deleted group", Subject{Name: "eve", Groups: []string{"ghosts", "devs"}}, false, false, []check{
 			art(libs, "org/acme/a.txt", r, true),

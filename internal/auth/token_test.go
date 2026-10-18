@@ -80,8 +80,9 @@ func TestTokenPrincipal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Authorize applies the scope: /admin is admin only for an admin, /groups
-	// acts through the named groups whether or not the user belongs to them,
+	// Authorize applies the scope: /admin is an admin token whatever its
+	// user, /groups acts through the named groups whether or not the user
+	// belongs to them,
 	// an admin-privilege group makes its members administrators, and a
 	// resource-only scope keeps the user's groups for the evaluator to narrow.
 	src := authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}
@@ -90,7 +91,7 @@ func TestTokenPrincipal(t *testing.T) {
 		"root-admin":  {Name: "root", Admin: true, Groups: []string{"ops"}},
 		"root-groups": {Name: "root", Groups: []string{"readers"}},
 		"dev-user":    {Name: "dev", Groups: []string{"devs", "readers"}},
-		"dev-admin":   {Name: "dev", Groups: []string{"devs", "readers"}},
+		"dev-admin":   {Name: "dev", Admin: true, Groups: []string{"devs", "readers"}},
 		"dev-repo":    {Name: "dev", Groups: []string{"devs", "readers"}},
 		"dev-ops":     {Name: "dev", Groups: []string{"ops"}},
 		"dev-admins":  {Name: "dev", Admin: true, Groups: []string{"admins"}},
@@ -367,6 +368,52 @@ func TestOIDCTokenIdentities(t *testing.T) {
 	if _, err := broken.Token(ctx, "transient-new", ""); err == nil ||
 		errors.Is(err, ErrBadCredentials) {
 		t.Errorf("an unreadable auto-join list is not a credential failure: %v", err)
+	}
+}
+
+// TestTransientTokenScopes: the transient user of a token minted for a name
+// that is no stored user has only what its scope gives, as JFrog's
+// access-tokens page tabulates it ("Transient Users and Auto Join Groups"):
+// applied-permissions/user acts through the auto-join groups, a groups
+// scope through the groups it names alone, and applied-permissions/admin is
+// an administrator.
+func TestTransientTokenScopes(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	for _, g := range []types.Group{{Name: "everyone", AutoJoin: true}, {Name: "ci"}} {
+		if err := db.Groups().Create(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const iss = "jfac@x/users/"
+	v := fakeVerifier{}
+	for raw, sc := range map[string]string{
+		"user":   "applied-permissions/user",
+		"groups": "applied-permissions/groups:ci",
+		"admin":  "applied-permissions/admin",
+	} {
+		v[raw] = types.Token{
+			Subject: iss + "ghost", Scope: scope(t, sc), Identity: types.IdentityTransient,
+		}
+	}
+	a, err := NewAuthenticator(db.Users(), db.Settings(), Options{Tokens: v, Groups: db.Groups()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := authz.Sources{Permissions: db.Permissions(), Groups: db.Groups()}
+	for raw, want := range map[string]Principal{
+		"user":   {Name: "ghost", Groups: []string{"everyone"}},
+		"groups": {Name: "ghost", Groups: []string{"ci"}},
+		"admin":  {Name: "ghost", Admin: true, Groups: []string{"everyone"}},
+	} {
+		p, err := a.Token(ctx, raw, "")
+		if err == nil {
+			p, err = Authorize(ctx, src, p)
+		}
+		if err != nil || p.Name != want.Name || p.Admin != want.Admin ||
+			!slices.Equal(p.Groups, want.Groups) || p.Identity != types.IdentityTransient {
+			t.Errorf("%s: %+v, %v; want %+v", raw, p, err, want)
+		}
 	}
 }
 
