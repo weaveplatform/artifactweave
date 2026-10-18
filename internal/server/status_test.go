@@ -460,6 +460,8 @@ func repositoryStatusRows() []statusCase {
 	return []statusCase{
 		{list, r, "admin", "", 200},
 		{list, r + "/?type=local", "admin", "", 200},
+		{list, r + "?packageType=Generic", "admin", "", 200},
+		{list, r + "?packageType=yum", "user", "", 200},
 		{list, r, "user", "", 200},
 		{list, r, "anonymous", "", 200},
 		{list, r, "", "", 401},

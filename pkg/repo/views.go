@@ -21,6 +21,8 @@ func Public(c Config) Config {
 // It also lists no environments as [] rather than leaving the key out, as
 // Artifactory does: the Terraform provider defaults project_environments to an
 // empty set and reads an absent key as null, so every plan would show a change.
+// It lists no property sets as [] too, as Artifactory's configuration samples
+// do, except on a virtual repository, whose configuration has no such field.
 func Masked(c Config) Config {
 	c.Password = ""
 	if c.Environments == nil {
@@ -31,6 +33,9 @@ func Masked(c Config) Config {
 	// members lists none as [].
 	if c.Class == Virtual && c.Repositories == nil {
 		c.Repositories = []string{}
+	}
+	if c.PropertySets == nil && c.Class != Virtual {
+		c.PropertySets = []string{}
 	}
 	if len(c.CustomHTTPHeaders) > 0 {
 		hs := slices.Clone(c.CustomHTTPHeaders)
@@ -64,12 +69,15 @@ func RestoreSecrets(stored Config, updated *Config) {
 // relevance names the package types each group of package-specific fields
 // applies to. No JFrog source lists the fields the v2 read keeps per
 // package type; the groups follow the per-ecosystem sections of research 03,
-// and fields shared by several ecosystems are always kept.
+// and fields shared by several ecosystems are always kept. checksumPolicyType
+// is a Maven field here because JFrog's generic local samples, the v2 read
+// and the configurations list alike, leave it out.
 var relevance = []struct {
 	types []PackageType
 	clear func(*Config)
 }{
 	{[]PackageType{Maven, Gradle, Ivy, SBT}, func(c *Config) {
+		c.ChecksumPolicyType = ""
 		c.HandleReleases, c.HandleSnapshots, c.MaxUniqueSnapshots = nil, nil, nil
 		c.SnapshotVersionBehavior, c.SuppressPomConsistencyChecks = "", nil
 		c.FetchJarsEagerly, c.FetchSourcesEagerly, c.RejectInvalidJars = nil, nil, nil
@@ -92,7 +100,9 @@ var relevance = []struct {
 	}},
 	{[]PackageType{Conan}, func(c *Config) { c.ForceConanAuthentication = nil }},
 	{[]PackageType{P2}, func(c *Config) { c.ForceP2Authentication = nil }},
-	{[]PackageType{Helm}, func(c *Config) { c.ForceNonDuplicateChart, c.ChartsBaseURL = nil, "" }},
+	{[]PackageType{Helm}, func(c *Config) {
+		c.ForceMetadataNameVersion, c.ForceNonDuplicateChart, c.ChartsBaseURL = nil, nil, ""
+	}},
 	{[]PackageType{PyPI}, func(c *Config) { c.PyPIRegistryURL, c.PyPIRepositorySuffix = "", "" }},
 	{[]PackageType{Go, VCS}, func(c *Config) {
 		c.VCSType, c.VCSGitProvider, c.VCSGitDownloadURL = "", "", ""

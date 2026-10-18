@@ -196,10 +196,32 @@ func TestListRepositories(t *testing.T) {
 	rec := w.do("GET", "/artifactory/api/repositories?type=local&packageType=MAVEN", "admin", "")
 	jsonBody(t, rec, &got)
 	if rec.Code != 200 || len(got) != 1 || got[0] != (entry{
-		Key: "maven-local", Type: "LOCAL", PackageType: "maven",
+		Key: "maven-local", Type: "LOCAL", PackageType: "Maven",
 		URL: "https://reg.example/artifactory/maven-local", Description: "jars",
 	}) {
 		t.Fatalf("filtered list %d %+v", rec.Code, got)
+	}
+	// The list spells each type as Artifactory's RepoType names it, rpm as
+	// YUM, and a filter matches either spelling without case.
+	w.create(repo.Config{Key: "rpm-local", Class: repo.Local, PackageType: repo.RPM})
+	for _, filter := range []string{"rpm", "yum", "YUM"} {
+		jsonBody(
+			t,
+			w.do("GET", "/artifactory/api/repositories?packageType="+filter, "admin", ""),
+			&got,
+		)
+		if len(got) != 1 || got[0].Key != "rpm-local" || got[0].PackageType != "YUM" {
+			t.Fatalf("packageType=%s: %+v", filter, got)
+		}
+	}
+	jsonBody(
+		t,
+		w.do("GET", "/artifactory/api/repositories?packageType=BuildInfo", "admin", ""),
+		&got,
+	)
+	if len(got) != 1 || got[0].Key != "artifactory-build-info" ||
+		got[0].PackageType != "BuildInfo" {
+		t.Fatalf("build-info: %+v", got)
 	}
 	jsonBody(t, w.do("GET", "/artifactory/api/repositories?project=proj", "admin", ""), &got)
 	if len(got) != 1 || got[0].Key != "npm-remote" {
@@ -215,7 +237,7 @@ func TestListRepositories(t *testing.T) {
 	}
 	rec = w.do("GET", "/artifactory/api/repositories", "reader", "", "Accept", mediaDetails)
 	jsonBody(t, rec, &got)
-	if rec.Header().Get("Content-Type") != mediaDetails || len(got) != 3 {
+	if rec.Header().Get("Content-Type") != mediaDetails || len(got) != 4 {
 		t.Fatalf("reader with vendor type: %s %+v", rec.Header().Get("Content-Type"), got)
 	}
 	w.fail["list"] = true
@@ -240,17 +262,27 @@ func TestGetRepository(t *testing.T) {
 	}
 	var public map[string]any
 	jsonBody(t, w.do("GET", "/artifactory/api/repositories/up", "reader", ""), &public)
-	if public["key"] != "up" || public["url"] != nil || public["username"] != nil {
+	if public["key"] != "up" || public["url"] != nil || public["username"] != nil ||
+		public["description"] != "" || public["notes"] != "" {
 		t.Fatalf("reader view %v", public)
 	}
 	// v2 keeps only the fields of the package type: generic has no Maven
-	// fields, which v1 fills by default.
+	// fields, which v1 fills by default. Both send an empty description,
+	// notes and property sets rather than leaving them out.
 	w.create(repo.Config{Key: "gen", Class: repo.Local})
 	var v1, v2 map[string]any
 	jsonBody(t, w.do("GET", "/artifactory/api/repositories/gen", "admin", ""), &v1)
 	jsonBody(t, w.do("GET", "/artifactory/api/v2/repositories/gen", "admin", ""), &v2)
-	if v1["handleReleases"] == nil || v2["handleReleases"] != nil || v2["key"] != "gen" {
+	if v1["handleReleases"] == nil || v2["handleReleases"] != nil || v2["key"] != "gen" ||
+		v1["checksumPolicyType"] == nil || v2["checksumPolicyType"] != nil ||
+		v1["forceMetadataNameVersion"] == nil || v2["forceMetadataNameVersion"] != nil {
 		t.Fatalf("v1 %v\nv2 %v", v1, v2)
+	}
+	for name, doc := range map[string]map[string]any{"v1": v1, "v2": v2} {
+		if sets, ok := doc["propertySets"].([]any); !ok || len(sets) != 0 ||
+			doc["description"] != "" || doc["notes"] != "" {
+			t.Fatalf("%s empty fields %v", name, doc)
+		}
 	}
 	for class, media := range map[repo.Class]string{
 		repo.Local: mediaLocal, repo.Remote: mediaRemote, repo.Virtual: mediaVirtual,
@@ -409,7 +441,9 @@ func TestBatchRead(t *testing.T) {
 		"",
 	)
 	jsonBody(t, rec, &got)
-	if len(got) != 2 || got["a"]["key"] != "a" || got["a"]["handleReleases"] != nil {
+	// JFrog's batchByName sample sends the empty description and notes.
+	if len(got) != 2 || got["a"]["key"] != "a" || got["a"]["handleReleases"] != nil ||
+		got["a"]["description"] != "" || got["a"]["notes"] != "" {
 		t.Fatalf("batch %s", rec.Body)
 	}
 	names := make([]string, 0, repoBatchLimit+1)
@@ -901,10 +935,11 @@ func TestHandlersCalledDirectly(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
+	// The re-encoded body always carries notes, so the batch repeats it.
 	if _, err := svc.UpdateMultipleRepositories(
 		admin,
 		artgen.UpdateMultipleRepositoriesRequestObject{
-			JSONBody: &[]repo.Config{{Key: "a", Description: "batch"}},
+			JSONBody: &[]repo.Config{{Key: "a", Description: "batch", Notes: "direct"}},
 		},
 	); err != nil {
 		t.Fatal(err)

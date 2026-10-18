@@ -192,6 +192,12 @@ type Member struct {
 // Config is the repository configuration document. Optional scalars are
 // pointers so that "not supplied" is distinguishable from the zero value: an
 // update is partial, and Defaults fills only what the caller left nil.
+//
+// description and notes have no omitempty: every read, the non-admin view
+// included, carries them as "" when unset, as Artifactory's reads do, and
+// stored documents carry them too. The non-admin view (Public) always shows
+// notes as "". An update encoded from a Config therefore sets both, so a
+// caller that means to leave them alone sends its own JSON without them.
 type Config struct {
 	// Common
 	Key                 string      `json:"key"`
@@ -199,8 +205,8 @@ type Config struct {
 	PackageType         PackageType `json:"packageType,omitempty"`
 	ProjectKey          string      `json:"projectKey,omitempty"`
 	Environments        []string    `json:"environments,omitempty"`
-	Description         string      `json:"description,omitempty"`
-	Notes               string      `json:"notes,omitempty"`
+	Description         string      `json:"description"`
+	Notes               string      `json:"notes"`
 	IncludesPattern     *string     `json:"includesPattern,omitempty"`
 	ExcludesPattern     *string     `json:"excludesPattern,omitempty"`
 	RepoLayoutRef       string      `json:"repoLayoutRef,omitempty"`
@@ -324,22 +330,27 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// MarshalJSON writes environments and repositories as [] when the slice is
-// empty but not nil, which omitempty would drop: Masked relies on that for
-// API responses, and a nil slice still leaves the key out. The outer fields
-// shadow the embedded ones because encoding/json prefers the shallower field.
+// MarshalJSON writes environments, repositories and propertySets as [] when
+// the slice is empty but not nil, which omitempty would drop: Masked relies
+// on that for API responses, and a nil slice still leaves the key out. The
+// outer fields shadow the embedded ones because encoding/json prefers the
+// shallower field.
 func (c Config) MarshalJSON() ([]byte, error) {
 	type plain Config
 	doc := struct {
 		plain
 		Environments *[]string `json:"environments,omitempty"`
 		Repositories *[]string `json:"repositories,omitempty"`
+		PropertySets *[]string `json:"propertySets,omitempty"`
 	}{plain: plain(c)}
 	if c.Environments != nil {
 		doc.Environments = &c.Environments
 	}
 	if c.Repositories != nil {
 		doc.Repositories = &c.Repositories
+	}
+	if c.PropertySets != nil {
+		doc.PropertySets = &c.PropertySets
 	}
 	b, err := json.Marshal(doc)
 	if err != nil {

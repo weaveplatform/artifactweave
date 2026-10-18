@@ -6892,7 +6892,7 @@ type GetRepositoriesByTypeAndProjectParams struct {
 	// Type Optional query parameter. Repository class to list. distribution is accepted and always yields an empty list.
 	Type *GetRepositoriesByTypeAndProjectParamsType `form:"type,omitempty" json:"type,omitempty"`
 
-	// PackageType Optional query parameter. Package type to list. Any package type the server knows is accepted, not only the enumerated values.
+	// PackageType Optional query parameter. Package type to list. Any package type the server knows is accepted, not only the enumerated values. It matches without regard to case either the configured package type or the name the list shows, so `yum` lists `rpm` repositories.
 	PackageType *GetRepositoriesByTypeAndProjectParamsPackageType `form:"packageType,omitempty" json:"packageType,omitempty"`
 
 	// Project Optional query parameter. Project key; only repositories assigned to that project are listed.
@@ -48858,7 +48858,7 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 		// Key Required within this object. The repository key.
 		Key string `json:"key"`
 
-		// PackageType Required within this object. The package type.
+		// PackageType Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
 		PackageType string `json:"packageType"`
 
 		// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
@@ -48875,7 +48875,7 @@ type GetRepositoriesByTypeAndProjectResponse struct {
 		// Key Required within this object. The repository key.
 		Key string `json:"key"`
 
-		// PackageType Required within this object. The package type.
+		// PackageType Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
 		PackageType string `json:"packageType"`
 
 		// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
@@ -48900,7 +48900,7 @@ func (r GetRepositoriesByTypeAndProjectResponse) GetJSON200() *[]struct {
 	// Key Required within this object. The repository key.
 	Key string `json:"key"`
 
-	// PackageType Required within this object. The package type.
+	// PackageType Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
 	PackageType string `json:"packageType"`
 
 	// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
@@ -48920,7 +48920,7 @@ func (r GetRepositoriesByTypeAndProjectResponse) GetApplicationvndOrgJfrogArtifa
 	// Key Required within this object. The repository key.
 	Key string `json:"key"`
 
-	// PackageType Required within this object. The package type.
+	// PackageType Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
 	PackageType string `json:"packageType"`
 
 	// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
@@ -74758,7 +74758,7 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 			// Key Required within this object. The repository key.
 			Key string `json:"key"`
 
-			// PackageType Required within this object. The package type.
+			// PackageType Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
 			PackageType string `json:"packageType"`
 
 			// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.
@@ -74780,7 +74780,7 @@ func ParseGetRepositoriesByTypeAndProjectResponse(rsp *http.Response) (*GetRepos
 			// Key Required within this object. The repository key.
 			Key string `json:"key"`
 
-			// PackageType Required within this object. The package type.
+			// PackageType Required within this object. The package type's enumeration name rather than the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for `helmoci` and `YUM` for `rpm`.
 			PackageType string `json:"packageType"`
 
 			// Type Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.

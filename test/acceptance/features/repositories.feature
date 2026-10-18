@@ -30,6 +30,32 @@ Feature: Repositories API
     When I GET "/artifactory/api/repositories/generic-local" as admin
     Then the response status is 404
 
+  Scenario: Reads spell package types and empty fields as Artifactory 7.x does
+    When I PUT "/artifactory/api/repositories/generic-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/rpm-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "rpm"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories?packageType=generic" as admin
+    Then the response status is 200
+    And the JSON field "0.key" equals "generic-local"
+    And the JSON field "0.packageType" equals "Generic"
+    When I GET "/artifactory/api/repositories?packageType=yum" as admin
+    Then the JSON field "0.key" equals "rpm-local"
+    And the JSON field "0.packageType" equals "YUM"
+    When I GET "/artifactory/api/v2/repositories/generic-local" as admin
+    Then the response status is 200
+    And the JSON field "description" equals ""
+    And the JSON field "notes" equals ""
+    And the JSON field "propertySets" has 0 entries
+    And the response body does not contain "checksumPolicyType"
+    And the response body does not contain "forceMetadataNameVersion"
+
   @jf
   Scenario: jf rt repo-create, repo-update and repo-delete from templates
     Given the JFrog CLI is available

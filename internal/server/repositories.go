@@ -254,9 +254,11 @@ func (s artifactoryService) GetRepositoriesByTypeAndProject(
 	out := artgen.GetRepositoriesByTypeAndProject200JSONResponse{}
 	for _, c := range all {
 		// The documented package type enumeration is stale, so any value
-		// filters, compared without case.
-		if req.Params.PackageType != nil &&
-			!strings.EqualFold(string(c.PackageType), string(*req.Params.PackageType)) {
+		// filters, compared without case. The listed spelling matches too,
+		// which is how the documented "yum" finds rpm repositories.
+		if f := req.Params.PackageType; f != nil &&
+			!strings.EqualFold(string(c.PackageType), string(*f)) &&
+			!strings.EqualFold(repo.PackageTypeName(string(c.PackageType)), string(*f)) {
 			continue
 		}
 		if !can(c) {
@@ -264,11 +266,8 @@ func (s artifactoryService) GetRepositoriesByTypeAndProject(
 		}
 		out = append(out, artgen.GetRepositoriesByTypeAndProject200JSONResponse{{}}[0])
 		e := &out[len(out)-1]
-		e.Key, e.Type, e.PackageType = c.Key, strings.ToUpper(
-			string(c.Class),
-		), string(
-			c.PackageType,
-		)
+		e.Key, e.Type = c.Key, strings.ToUpper(string(c.Class))
+		e.PackageType = repo.PackageTypeName(string(c.PackageType))
 		e.Url = base + "/artifactory/" + c.Key
 		if c.Description != "" {
 			d := c.Description
@@ -763,8 +762,9 @@ func batchSize(n int) error {
 }
 
 // updateBody returns the raw update the middleware saved, or, for a handler
-// reached without it, the decoded body re-encoded (which cannot express
-// null resets).
+// reached without it, the decoded body re-encoded. The re-encoding cannot
+// express null resets, and it always carries description and notes, so it
+// overwrites both; only the router supplies a body that leaves them out.
 func updateBody(ctx context.Context, decoded any) ([]byte, error) {
 	if b := rawBody(ctx); b != nil {
 		return b, nil

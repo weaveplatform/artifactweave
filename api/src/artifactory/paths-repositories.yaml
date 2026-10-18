@@ -76,6 +76,7 @@ components:
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+            Reads carry it, as an empty string when unset.
           type: string
         disableProxy:
           description: Optional within this object. When true the platform default proxy is not used even if one
@@ -188,6 +189,8 @@ components:
           type: array
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
+            Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows
+            an empty string.
           type: string
         optionalIndexCompressionFormats:
           description: Optional within this object. Additional compression formats generated for Debian index files, for
@@ -217,7 +220,8 @@ components:
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered
-            for items in this repository. Each name must exist in the property sets configuration.
+            for items in this repository. Each name must exist in the property sets configuration. An
+            administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. A property set name.
             type: string
@@ -349,6 +353,7 @@ components:
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+            Reads carry it, as an empty string when unset.
           type: string
         dockerApiVersion:
           description: Optional within this object. Docker registry API version served. Only V2 is accepted.
@@ -434,6 +439,8 @@ components:
           type: integer
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
+            Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows
+            an empty string.
           type: string
         optionalIndexCompressionFormats:
           description: Optional within this object. Additional compression formats generated for Debian index files, for
@@ -463,7 +470,8 @@ components:
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered
-            for items in this repository. Each name must exist in the property sets configuration.
+            for items in this repository. Each name must exist in the property sets configuration. An
+            administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. A property set name.
             type: string
@@ -795,6 +803,7 @@ components:
           type: array
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+            Reads carry it, as an empty string when unset.
           type: string
         disableProxy:
           description: Optional within this object. When true the platform default proxy is not used even if one
@@ -924,6 +933,8 @@ components:
           type: integer
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
+            Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows
+            an empty string.
           type: string
         offline:
           description: Optional within this object. When true the upstream is never contacted and only cached items
@@ -950,7 +961,8 @@ components:
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered
-            for items in this repository. Each name must exist in the property sets configuration.
+            for items in this repository. Each name must exist in the property sets configuration. An
+            administrator's read lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. A property set name.
             type: string
@@ -1234,6 +1246,7 @@ components:
           type: string
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
+            Reads carry it, as an empty string when unset.
           type: string
         dockerApiVersion:
           description: Optional within this object. Docker registry API version served. Only V2 is accepted.
@@ -1294,6 +1307,8 @@ components:
           type: string
         notes:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
+            Reads carry it, as an empty string when unset; a read by anyone but an administrator always shows
+            an empty string.
           type: string
         optionalIndexCompressionFormats:
           description: Optional within this object. Additional compression formats generated for Debian index files, for
@@ -1387,7 +1402,8 @@ paths:
           - distribution
           type: string
       - description: Optional query parameter. Package type to list. Any package type the server knows is accepted, not
-          only the enumerated values.
+          only the enumerated values. It matches without regard to case either the configured package type or the
+          name the list shows, so `yum` lists `rpm` repositories.
         in: query
         name: packageType
         schema:
@@ -1445,7 +1461,9 @@ paths:
                       description: Required within this object. The repository key.
                       type: string
                     packageType:
-                      description: Required within this object. The package type.
+                      description: Required within this object. The package type's enumeration name rather than
+                        the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for
+                        `helmoci` and `YUM` for `rpm`.
                       type: string
                     type:
                       description: 'Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.'
@@ -1475,7 +1493,9 @@ paths:
                       description: Required within this object. The repository key.
                       type: string
                     packageType:
-                      description: Required within this object. The package type.
+                      description: Required within this object. The package type's enumeration name rather than
+                        the configured value, such as `Generic` for `generic`, `Npm` for `npm`, `HelmOCI` for
+                        `helmoci` and `YUM` for `rpm`.
                       type: string
                     type:
                       description: 'Required within this object. Upper-case class: LOCAL, REMOTE, VIRTUAL or FEDERATED.'

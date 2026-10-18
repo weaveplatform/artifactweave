@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
@@ -66,16 +68,25 @@ func TestRelevant(t *testing.T) {
 		got.EnableFileListsIndexing != nil || got.ForceNugetAuthentication != nil {
 		t.Fatalf("generic kept package-specific fields: %+v", got)
 	}
-	if got.IncludesPattern == nil || got.ChecksumPolicyType == "" || got.BlackedOut == nil {
+	if got.IncludesPattern == nil || got.BlackedOut == nil || got.PriorityResolution == nil {
 		t.Fatalf("generic lost common fields: %+v", got)
+	}
+	if got.ChecksumPolicyType != "" || got.ForceMetadataNameVersion != nil {
+		t.Fatalf("generic kept a Maven or Helm field: %+v", got)
 	}
 	maven := *repo.Defaults(&repo.Config{Key: "m", Class: repo.Local, PackageType: repo.Maven})
 	got = repo.Relevant(maven)
-	if got.HandleReleases == nil || got.SnapshotVersionBehavior == "" {
+	if got.HandleReleases == nil || got.SnapshotVersionBehavior == "" ||
+		got.ChecksumPolicyType == "" {
 		t.Fatalf("maven lost its own fields: %+v", got)
 	}
 	if got.MaxUniqueTags != nil || got.DockerTagRetention != nil {
 		t.Fatalf("maven kept docker fields: %+v", got)
+	}
+	helm := *repo.Defaults(&repo.Config{Key: "h", Class: repo.Local, PackageType: repo.Helm})
+	if got := repo.Relevant(helm); got.ForceMetadataNameVersion == nil ||
+		got.ForceNonDuplicateChart == nil {
+		t.Fatalf("helm lost its own fields: %+v", got)
 	}
 	docker := *repo.Defaults(&repo.Config{Key: "d", Class: repo.Local, PackageType: repo.Docker})
 	if got := repo.Relevant(docker); got.DockerAPIVersion == "" || got.HandleSnapshots != nil {
@@ -110,5 +121,70 @@ func TestEnvironmentsRenderAsAnEmptyListOnlyInMasked(t *testing.T) {
 	shown, _ = json.Marshal(repo.Masked(c))
 	if !strings.Contains(string(shown), `"environments":["DEV"]`) {
 		t.Errorf("want environments [DEV] in %s", shown)
+	}
+}
+
+// The v2 read of a generic local repository with every default is JFrog's
+// genericLocalV2 sample (getrepositoryconfigurationv2.md), plus environments
+// and priorityResolution, which that sample predates and which stay until a
+// 7.x capture shows otherwise (#216).
+func TestGenericLocalV2MatchesTheDocumentedSample(t *testing.T) {
+	c := repo.Defaults(&repo.Config{Key: "generic-local", Class: repo.Local})
+	out, err := json.Marshal(repo.Relevant(repo.Masked(*c)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"key": "generic-local", "rclass": "local", "packageType": "generic",
+		"description": "", "notes": "", "includesPattern": "**/*", "excludesPattern": "",
+		"repoLayoutRef": "maven-2-default", "blackedOut": false, "propertySets": []any{},
+		"archiveBrowsingEnabled": false, "downloadRedirect": false, "xrayIndex": false,
+		"cdnRedirect": false, "environments": []any{}, "priorityResolution": false,
+	}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("v2 generic local (-want +got):\n%s", diff)
+	}
+}
+
+func TestReadsCarryEmptyDescriptionNotesAndPropertySets(t *testing.T) {
+	c := repo.Config{Key: "k", Class: repo.Local, Notes: "internal"}
+	fields := func(c repo.Config) map[string]any {
+		t.Helper()
+		b, err := json.Marshal(c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var m map[string]any
+		if err := json.Unmarshal(b, &m); err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	admin := fields(repo.Masked(c))
+	if admin["description"] != "" || admin["notes"] != "internal" ||
+		!cmp.Equal(admin["propertySets"], []any{}) {
+		t.Errorf("admin read %v", admin)
+	}
+	public := fields(repo.Public(c))
+	if public["description"] != "" || public["notes"] != "" || public["propertySets"] != nil {
+		t.Errorf("non-admin read %v", public)
+	}
+	// A stored document keeps no property sets as an absent key, like
+	// environments; Masked adds both on the way out.
+	stored := fields(c)
+	if _, ok := stored["propertySets"]; ok || stored["description"] != "" {
+		t.Errorf("stored document %v", stored)
+	}
+	virtual := fields(repo.Masked(repo.Config{Key: "v", Class: repo.Virtual}))
+	if _, ok := virtual["propertySets"]; ok || virtual["notes"] != "" {
+		t.Errorf("virtual read %v", virtual)
+	}
+	c.PropertySets = []string{"artifactory"}
+	if got := fields(repo.Masked(c)); !cmp.Equal(got["propertySets"], []any{"artifactory"}) {
+		t.Errorf("set property sets %v", got["propertySets"])
 	}
 }

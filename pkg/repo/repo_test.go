@@ -656,8 +656,9 @@ func TestMarshalOmitsUnsetAndNested(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := decode(t, out)
-	if len(got) != 5 {
-		t.Errorf("expected only the five set keys, got %v", got)
+	// The five set keys, and description and notes, which are always written.
+	if len(got) != 7 || got["description"] != "" || got["notes"] != "" {
+		t.Errorf("expected the five set keys with description and notes, got %v", got)
 	}
 	var back repo.Config
 	if err := json.Unmarshal(out, &back); err != nil {
