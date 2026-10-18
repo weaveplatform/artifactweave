@@ -10860,7 +10860,7 @@ type ClientInterface interface {
 
 	// DeletePermissionTarget Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
+	// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 	//
 	// Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
 	//
@@ -16923,7 +16923,7 @@ func (c *Client) GetPermissionTargets(ctx context.Context, reqEditors ...Request
 
 // DeletePermissionTarget Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
+// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 //
 // Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -37634,7 +37634,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePermissionTargetWithResponse Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
+	// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -64889,7 +64889,7 @@ func (c *ClientWithResponses) GetPermissionTargetsWithResponse(ctx context.Conte
 
 // DeletePermissionTargetWithResponse Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
+// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
