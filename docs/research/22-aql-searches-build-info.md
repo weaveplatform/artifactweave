@@ -448,6 +448,25 @@ The search APIs' rate limiting ([7.125.4](https://docs.jfrog.com/releases/docs/a
 - **Duplicate entries.** From 7.90.15 self-managed and 7.98.5 SaaS,
   `artifactory.build.block.duplicate.entries` (default `true`) fails a build-info publish that
   has duplicate entries ([known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), RTDEV-47671).
+  - **What the sources say.** The known issue describes the case as "the same artifact was
+    used in the build more than once", and the [7.90.13 note](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-79013-self-managed) as "duplicate artifacts"
+    making the publish fail "with an error". Neither defines a duplicate, or gives the status
+    or message. The [Build Upload reference](https://docs.jfrog.com/integrations/reference/uploadbuild.md) lists only 400 for a bad body, 401
+    and 403.
+  - **What is not a duplicate.** [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) fixed the Build Info UI
+    "incorrectly" deduplicating artifacts of one build "that shared the same hash sum but were
+    located in different paths" (RTDEV-71186), and 7.125.4 made release bundles keep "the same
+    artifact in multiple paths" from different modules. Files sharing a checksum, and a file
+    in several modules, are therefore legitimate.
+  - **[S] The client's own rule.** The JFrog CLI merges the partial records of one module
+    before publishing: artifacts with the same name and SHA-1 are one artifact, and
+    dependencies with the same id and SHA-1 are one dependency (`build-info-go`,
+    `entities/buildinfo.go`, `mergeArtifacts` and `mergeDependenciesLists`). It merged
+    artifacts by SHA-1 alone until a release that keeps files sharing content under
+    different names, such as a `.nupkg` and its `.snupkg`, apart (its `RELEASE.md`).
+  - **[I] artifactweave's rule** follows from these: within one module, two artifacts with
+    the same name, path and checksums, or two dependencies with the same id and checksums,
+    are a duplicate, answered with 400 (decision 0014).
 - **Same-checksum dependencies.** Promotion promotes every dependency, even when several share
   a SHA ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
 - **Folder entries.** Build-info entries that name a folder are ignored rather than failing
@@ -456,7 +475,9 @@ The search APIs' rate limiting ([7.125.4](https://docs.jfrog.com/releases/docs/a
   ([7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)).
 - **Empty statuses.** A publish with an empty `statuses` section is accepted ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
 
-artifactweave refuses no duplicate entry today, and the other points are untested: [#353](https://github.com/weaveplatform/artifactweave/issues/353).
+[#353](https://github.com/weaveplatform/artifactweave/issues/353) brought decision 0014 up to date with the duplicate entries, same-checksum and
+folder points; the build artifacts search already answered 400 to a request it could not
+run.
 
 **Unconfirmed for 7.x:** the **[S]** claims from Artifactory 6.20, which stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
 - the domain joins (section 1.1);

@@ -192,6 +192,7 @@ func (pr *promoter) promote(ctx context.Context) error {
 func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 	var out []located
 	seen := map[int64]bool{}
+	artifacts, dependencies := claims{}, claims{}
 	add := func(f located) {
 		if !seen[f.it.ID] {
 			seen[f.it.ID] = true
@@ -205,7 +206,8 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 	for _, m := range pr.run.Modules {
 		if pr.p.Artifacts {
 			for _, bf := range slices.DeleteFunc(slices.Clone(m.Artifacts), unsummed) {
-				f, ok, err := pr.s.findFile(ctx, bf, pr.s.artifactOf(pr.run, pr.fromSource))
+				f, ok, err := pr.s.findFile(ctx, bf, pr.s.artifactOf(pr.run, pr.fromSource),
+					artifacts, artifactKey(bf))
 				if err != nil {
 					return nil, err
 				}
@@ -229,7 +231,7 @@ func (pr *promoter) collect(ctx context.Context) ([]located, error) {
 				}) {
 				continue
 			}
-			f, ok, err := pr.s.findFile(ctx, bf, nil)
+			f, ok, err := pr.s.findFile(ctx, bf, nil, dependencies, dependencyKey(bf))
 			if err != nil {
 				return nil, err
 			}
@@ -252,14 +254,32 @@ func (pr *promoter) fromSource(it types.Item) bool {
 	return pr.p.SourceRepo == "" || it.ReportedRepoKey() == pr.p.SourceRepo
 }
 
+// claims records which build file each item was found for, by the file's
+// key (artifactKey or dependencyKey), so that files of one run sharing a
+// checksum find different items while there are enough. Artifactory 7.x
+// promotes every one of several dependencies with one SHA (7.125.4), and
+// one build may hold several artifacts with one checksum at different paths
+// (7.161.15). Artifacts and dependencies keep separate claims: a module's
+// dependency on another module's artifact is the same file.
+type claims map[int64]string
+
+// free reports whether the item id is unclaimed, or claimed by key.
+func (c claims) free(id int64, key string) bool {
+	owner, ok := c[id]
+	return !ok || owner == key
+}
+
 // findFile returns the item a build file is: of those holding its checksum
-// that keep passes, the one with its name, else the first. A promotion and
-// the build artifacts search both find files this way, as Artifactory's
-// getBuildArtifactsFileInfos does (research 22 §3.6).
+// that keep passes, one taken claims leaves free for key, then the one with
+// its name, else the first. A promotion and the build artifacts search both
+// find files this way, as Artifactory's getBuildArtifactsFileInfos does
+// (research 22 §3.6). The item found is claimed for key.
 func (s *Service) findFile(
 	ctx context.Context,
 	bf types.BuildFile,
 	keep func(context.Context, types.Item) (bool, error),
+	taken claims,
+	key string,
 ) (located, bool, error) {
 	found, err := collect(s.Page, func(pg store.Page) ([]types.Item, string, error) {
 		return s.Store.Items().FindByChecksum(ctx, bf.Checksums, pg)
@@ -278,18 +298,31 @@ func (s *Service) findFile(
 				continue
 			}
 		}
-		if match.ID == 0 || (match.Name != bf.Name && it.Name == bf.Name) {
+		if match.ID == 0 || better(taken, key, bf.Name, match, it) {
 			match = it
 		}
 	}
 	if match.ID == 0 {
 		return located{}, false, nil
 	}
+	if _, ok := taken[match.ID]; !ok {
+		taken[match.ID] = key
+	}
 	c, err := s.Store.Repos().Get(ctx, match.RepoKey)
 	if err != nil {
 		return located{}, false, fmt.Errorf("build: repository %s: %w", match.RepoKey, err)
 	}
 	return located{repo: c, it: match}, true, nil
+}
+
+// better reports whether it is a better match than match for the build file
+// key named name: free where match is taken, else named name where match
+// is not.
+func better(taken claims, key, name string, match, it types.Item) bool {
+	if m, i := taken.free(match.ID, key), taken.free(it.ID, key); m != i {
+		return i
+	}
+	return match.Name != name && it.Name == name
 }
 
 // artifactOf returns findFile's keep for run's artifacts as Artifactory

@@ -91,6 +91,10 @@ type Config struct {
 	// DockerSubdomainMatch turns on the Docker subdomain method
 	// (docker.subdomain_match): <repo>.<BaseURL host>/v2/... addresses repo.
 	DockerSubdomainMatch bool
+	// AllowDuplicateBuildEntries accepts a build-info publish whose module
+	// lists one file twice (build.block_duplicate_entries false); the zero
+	// value refuses it, as Artifactory 7.x does by default.
+	AllowDuplicateBuildEntries bool
 	// Work is the runtime's work queue, which formats ask for derived work
 	// (decision 0033). Nil writes that work to the store's queue directly,
 	// where the workers find it on their next poll.

@@ -181,7 +181,10 @@ func (s artifactoryService) items(st store.Store) *item.Service {
 // builds and registry return the services that write items on behalf of
 // builds and Docker promotion, with the same format hooks as items.
 func (s artifactoryService) builds(st store.Store) *build.Service {
-	svc := &build.Service{Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats}
+	svc := &build.Service{
+		Store: st, Blobs: s.cfg.Blobs, Formats: s.cfg.Formats,
+		AllowDuplicateEntries: s.cfg.AllowDuplicateBuildEntries,
+	}
 	if s.cfg.Work != nil {
 		svc.Work = s.cfg.Work
 	}

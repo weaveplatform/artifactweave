@@ -218,6 +218,27 @@ func TestBuildOverwrite(t *testing.T) {
 	}
 }
 
+// TestBuildDuplicateEntries answers 400 to a build-info publish whose
+// module lists one artifact twice, as Artifactory 7.x does by default, and
+// accepts it when build.block_duplicate_entries is false.
+func TestBuildDuplicateEntries(t *testing.T) {
+	a := fmt.Sprintf(`{"name":"a.bin","path":"app/a.bin","sha1":%q}`, sha1Hex("artifact"))
+	doc := fmt.Sprintf(`{"name":"app","number":"1","started":%q,`+
+		`"modules":[{"id":"m1","artifacts":[%s,%s]}]}`, testStarted, a, a)
+
+	w := newItemWorld(t, false)
+	rec := w.do(http.MethodPut, buildsPath, "admin", doc, "Content-Type", vendorJSON)
+	wantStatus(t, rec, 400)
+	if !strings.Contains(rec.Body.String(),
+		`"message":"the build-info module 'm1' lists the artifact 'a.bin' more than once"`) {
+		t.Errorf("body %s", rec.Body)
+	}
+	wantStatus(t, w.do(http.MethodGet, buildsPath+"/app", "admin", ""), 404)
+
+	w = newItemWorld(t, false, func(c *Config) { c.AllowDuplicateBuildEntries = true })
+	w.publish(doc)
+}
+
 // TestBuildAppend adds modules to a run's document and its item.
 func TestBuildAppend(t *testing.T) {
 	w := newItemWorld(t, false)

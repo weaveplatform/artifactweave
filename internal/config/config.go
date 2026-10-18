@@ -84,6 +84,15 @@ type Config struct {
 	Download          DownloadConfig  `yaml:"download"`
 	Search            SearchConfig    `yaml:"search"`
 	Work              WorkConfig      `yaml:"work"`
+	Build             BuildConfig     `yaml:"build"`
+}
+
+// BuildConfig holds the build-info settings (decision 0014).
+type BuildConfig struct {
+	// BlockDuplicateEntries refuses a build-info publish whose module lists
+	// one file twice, as Artifactory 7.x's
+	// artifactory.build.block.duplicate.entries does by default.
+	BlockDuplicateEntries bool `yaml:"block_duplicate_entries"`
 }
 
 // WorkConfig sizes the persistent work queue (decision 0033), which runs
@@ -229,6 +238,7 @@ func Default() Config {
 			Lease:       DefaultWorkLease,
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
+		Build: BuildConfig{BlockDuplicateEntries: true},
 	}
 }
 
@@ -297,6 +307,7 @@ var keys = append(append([]string{
 	"search.aql.max_results", "search.aql.non_admin_scan_factor",
 	"search.user_query_limit", "search.limit_anonymous_users_only",
 	"work.workers", "work.lease", "work.max_attempts",
+	"build.block_duplicate_entries",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -365,6 +376,8 @@ func set(cfg *Config, key, value string) error {
 		return setDuration(&cfg.Work.Lease, key, value)
 	case "work.max_attempts":
 		return setInt(&cfg.Work.MaxAttempts, key, value)
+	case "build.block_duplicate_entries":
+		return setBool(&cfg.Build.BlockDuplicateEntries, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}

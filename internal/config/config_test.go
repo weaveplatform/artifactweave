@@ -145,6 +145,8 @@ work:
   workers: 8
   lease: 5m
   max_attempts: 4
+build:
+  block_duplicate_entries: false
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -195,7 +197,8 @@ work:
 			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
 			UserQueryLimit: 50,
 		},
-		Work: WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
+		Work:  WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
+		Build: BuildConfig{BlockDuplicateEntries: false},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -808,6 +811,31 @@ func TestSearchLimitConfig(t *testing.T) {
 	})
 	if err != nil || got.Search.UserQueryLimit != 0 || !got.Search.LimitAnonymousUsersOnly {
 		t.Fatalf("load: %+v, %v", got.Search, err)
+	}
+}
+
+func TestBuildConfig(t *testing.T) {
+	if !Default().Build.BlockDuplicateEntries {
+		t.Fatal("duplicate build-info entries are allowed by default")
+	}
+	cfg := Default()
+	if err := set(&cfg, "build.block_duplicate_entries", "off"); !errors.Is(err,
+		ErrInvalidValue) {
+		t.Fatalf("bad boolean: %v", err)
+	}
+	// The flag beats the environment, which beats the file.
+	for _, tc := range []struct {
+		flags map[string]string
+		want  bool
+	}{{nil, false}, {map[string]string{"build.block_duplicate_entries": "true"}, true}} {
+		got, err := Load(LoadOptions{
+			File:  writeFile(t, "build:\n  block_duplicate_entries: true\n"),
+			Env:   envOf(map[string]string{"ARTIFACTWEAVE_BUILD_BLOCK_DUPLICATE_ENTRIES": "false"}),
+			Flags: tc.flags,
+		})
+		if err != nil || got.Build.BlockDuplicateEntries != tc.want {
+			t.Fatalf("flags %v: %+v, %v", tc.flags, got.Build, err)
+		}
 	}
 }
 

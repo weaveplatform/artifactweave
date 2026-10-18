@@ -43,6 +43,19 @@ Feature: Build-info
     When I GET "/artifactory/api/storage/artifactory-build-info/team%252Fservice" as admin
     Then the response status is 404
 
+  Scenario: A publish whose module lists one artifact twice is refused
+    When I PUT "/artifactory/api/build" as admin with body:
+      """
+      {"name": "dup", "number": "1", "started": "2026-10-15T09:30:00.000+0000",
+       "modules": [{"id": "m1", "type": "generic", "artifacts": [
+         {"name": "a.bin", "path": "app/a.bin", "sha1": "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"},
+         {"name": "a.bin", "path": "app/a.bin", "sha1": "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed"}]}]}
+      """
+    Then the response status is 400
+    And the JSON field "errors.0.message" equals "the build-info module 'm1' lists the artifact 'a.bin' more than once"
+    When I GET "/artifactory/api/build/dup" as admin
+    Then the response status is 404
+
   @jf
   Scenario: jf rt u with a build, jf rt bp, and jf rt bp --overwrite
     Given the JFrog CLI is available

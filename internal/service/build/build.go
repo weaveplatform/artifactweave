@@ -59,6 +59,19 @@ type Service struct {
 	// 0032); nil means formats.For and the store's queue.
 	Formats func(repo.PackageType) format.Handler
 	Work    item.Enqueuer
+	// AllowDuplicateEntries accepts a document whose module lists one file
+	// twice, which the zero value refuses as Artifactory 7.x does by default
+	// (build.block_duplicate_entries).
+	AllowDuplicateEntries bool
+}
+
+// checkDuplicates refuses modules that list one file twice, unless the
+// service allows it.
+func (s *Service) checkDuplicates(modules []types.BuildModule) error {
+	if s.AllowDuplicateEntries {
+		return nil
+	}
+	return duplicateEntry(modules)
 }
 
 func (s *Service) now() time.Time {
@@ -101,7 +114,8 @@ type Published struct {
 // (project, name, number and started) is replaced, which, like overwriting
 // an existing document item, needs delete as well. A buildRetention in the
 // document is kept as the build name's retention and applied once the run
-// is stored, as the publisher (decision 0014).
+// is stored, as the publisher (decision 0014). A module that lists one file
+// twice is ErrInvalid unless AllowDuplicateEntries.
 func (s *Service) Publish(
 	ctx context.Context,
 	projectKey string,
@@ -112,6 +126,9 @@ func (s *Service) Publish(
 	projectKey = ProjectKey(projectKey)
 	b, err := Parse(projectKey, doc)
 	if err != nil {
+		return Published{}, err
+	}
+	if err := s.checkDuplicates(b.Modules); err != nil {
 		return Published{}, err
 	}
 	retention, retains, err := documentRetention(doc)
@@ -258,7 +275,9 @@ type Append struct {
 
 // Append adds modules to the end of a run's modules. It rewrites the run's
 // document and its item, so, like a publish that replaces one, it needs
-// deploy and delete.
+// deploy and delete. The added modules are checked for duplicate entries as
+// a publish's are; the run's own are not, as it may have been published
+// while they were allowed.
 func (s *Service) Append(ctx context.Context, ap Append, a Access) error {
 	var added []json.RawMessage
 	if err := json.Unmarshal(ap.Modules, &added); err != nil {
@@ -294,6 +313,9 @@ func (s *Service) Append(ctx context.Context, ap Append, a Access) error {
 		}
 		merged, err := Parse(projectKey, doc)
 		if err != nil {
+			return err
+		}
+		if err := s.checkDuplicates(merged.Modules[len(cur.Modules):]); err != nil {
 			return err
 		}
 		b.Modules, b.Properties, b.Document = merged.Modules, merged.Properties, doc
@@ -490,14 +512,14 @@ func (s *Service) SearchArtifacts(
 	a Access,
 ) ([]types.Item, error) {
 	keep := s.artifactOf(b, in)
-	seen := map[int64]bool{}
+	seen, taken := map[int64]bool{}, claims{}
 	var out []types.Item
 	for _, m := range b.Modules {
 		for _, bf := range m.Artifacts {
 			if bf.Checksums == (types.Checksums{}) {
 				continue
 			}
-			f, ok, err := s.findFile(ctx, bf, keep)
+			f, ok, err := s.findFile(ctx, bf, keep, taken, artifactKey(bf))
 			if err != nil {
 				return nil, err
 			}
