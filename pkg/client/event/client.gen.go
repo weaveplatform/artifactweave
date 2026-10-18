@@ -193,7 +193,7 @@ type CustomWebhookHandlerCreate struct {
 	// Secrets Optional within this object. Named secrets the templates can reference.
 	Secrets *[]NamedSecretCreate `json:"secrets,omitempty"`
 
-	// Url Required within this object. Absolute http or https URL the event is delivered to. Failed deliveries are retried with backoff (decision 0011). The URL may reference secrets as {{.secrets.<name>}}.
+	// Url Required within this object. Absolute http or https URL the event is delivered to. Failed deliveries are retried with backoff. The URL may reference secrets as {{.secrets.<name>}}.
 	Url string `json:"url"`
 }
 
@@ -253,7 +253,7 @@ type CustomWebhookHandlerUpdate struct {
 	// Secrets Optional within this object. Named secrets the payload and header templates can reference. On replace, a listed name without a value keeps that secret, a value rotates it, an empty string wipes it, and a secret whose name is not listed is removed.
 	Secrets *[]NamedSecretUpdate `json:"secrets,omitempty"`
 
-	// Url Required within this object. Absolute http or https URL the event is delivered to. Failed deliveries are retried with backoff (decision 0011).
+	// Url Required within this object. Absolute http or https URL the event is delivered to. Failed deliveries are retried with backoff.
 	Url string `json:"url"`
 }
 
@@ -265,7 +265,7 @@ type CustomWebhookHandlerUpdateMethod string
 
 // ErrorResponse The error envelope used by every /event response.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error. The Terraform providers join every entry into one error message; jfrog-client-go reports the whole body after the status.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Code Required within this object. A symbolic code such as NOT_FOUND.
 		Code string `json:"code"`
@@ -280,10 +280,10 @@ type EventFilter struct {
 	// Criteria Optional within this object. Resource conditions for the domain. Required for every domain except user and curation.
 	Criteria *EventFilterCriteria `json:"criteria,omitempty"`
 
-	// Domain Required within this object. One of artifact, artifact_property, docker, build, user, release_bundle, distribution, artifactory_release_bundle, destination, release_bundle_v2, release_bundle_v2_promotion, artifact_lifecycle, xray_scan_status, app_trust or curation. Subscriptions are accepted for every domain so Terraform plans stay clean, but artifactweave only emits events for artifact, artifact_property, docker, build and user. Project admins may only use artifact, artifact_property, docker and build.
+	// Domain Required within this object. One of artifact, artifact_property, docker, build, user, release_bundle, distribution, artifactory_release_bundle, destination, release_bundle_v2, release_bundle_v2_promotion, artifact_lifecycle, xray_scan_status, app_trust or curation. Subscriptions are accepted for every domain, but events are emitted only for artifact, artifact_property, docker, build and user. Project admins may only use artifact, artifact_property, docker and build.
 	Domain string `json:"domain"`
 
-	// EventTypes Required within this object. Events of the domain that trigger the subscription, at least one, spelled exactly as listed here because clients compare them verbatim. artifact: deployed, deleted, moved, copied, cached. artifact_property: added, deleted. docker: pushed, deleted, promoted. build: uploaded, deleted, promoted. user: locked. release_bundle: created, signed, deleted. distribution: distribute_started, distribute_completed, distribute_aborted, distribute_failed, delete_started, delete_completed, delete_failed. artifactory_release_bundle and destination: received, delete_started, delete_completed, delete_failed. release_bundle_v2: release_bundle_v2_started, release_bundle_v2_failed, release_bundle_v2_completed. release_bundle_v2_promotion: release_bundle_v2_promotion_started, release_bundle_v2_promotion_failed, release_bundle_v2_promotion_completed. artifact_lifecycle: archive, restore. An event type that does not belong to the domain is rejected with 400.
+	// EventTypes Required within this object. Events of the domain that trigger the subscription, at least one, spelled exactly as listed here. artifact: deployed, deleted, moved, copied, cached. artifact_property: added, deleted. docker: pushed, deleted, promoted. build: uploaded, deleted, promoted. user: locked. release_bundle: created, signed, deleted. distribution: distribute_started, distribute_completed, distribute_aborted, distribute_failed, delete_started, delete_completed, delete_failed. artifactory_release_bundle and destination: received, delete_started, delete_completed, delete_failed. release_bundle_v2: release_bundle_v2_started, release_bundle_v2_failed, release_bundle_v2_completed. release_bundle_v2_promotion: release_bundle_v2_promotion_started, release_bundle_v2_promotion_failed, release_bundle_v2_promotion_completed. artifact_lifecycle: archive, restore. An event type that does not belong to the domain is rejected with 400.
 	EventTypes []string `json:"event_types"`
 }
 
@@ -377,13 +377,13 @@ type WebhookHandler struct {
 	// Proxy Optional within this object. Key of a configured outbound proxy to use for deliveries. Omitted means a direct connection, or the platform default proxy when one is set.
 	Proxy *string `json:"proxy,omitempty"`
 
-	// Secret Optional within this object. Shared secret for the X-JFrog-Event-Auth delivery header. Write-only: responses never echo it. On replace, omitting it keeps the stored secret, a new value rotates it, and an empty string removes it.
+	// Secret Optional within this object. Shared secret for the `X-JFrog-Event-Auth` delivery header. Write-only: responses never echo it. On replace, omitting it keeps the stored secret, a new value rotates it, and an empty string removes it.
 	Secret *string `json:"secret,omitempty"`
 
-	// Url Required within this object. Absolute http or https URL the event is delivered to. Failed deliveries are retried with backoff (decision 0011).
+	// Url Required within this object. Absolute http or https URL the event is delivered to. Failed deliveries are retried with backoff.
 	Url string `json:"url"`
 
-	// UseSecretForSigning Optional within this object. Selects what X-JFrog-Event-Auth carries: false (the default) sends the secret itself, true sends the lower-case hex HMAC-SHA256 of the request body keyed with the secret, so the receiver can verify the payload. Ignored when no secret is set.
+	// UseSecretForSigning Optional within this object. Selects what `X-JFrog-Event-Auth` carries: false (the default) sends the secret itself, true sends the lower-case hex HMAC-SHA256 of the request body keyed with the secret, so the receiver can verify the payload. Ignored when no secret is set.
 	UseSecretForSigning *bool `json:"use_secret_for_signing,omitempty"`
 }
 
@@ -1174,7 +1174,7 @@ type ClientInterface interface {
 
 	// CreateWebhookSubscriptionWithBody Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1183,7 +1183,7 @@ type ClientInterface interface {
 
 	// CreateWebhookSubscription Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1224,7 +1224,7 @@ type ClientInterface interface {
 
 	// UpdateWebhookSubscriptionWithBody Replace a webhook subscription
 	//
-	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -1233,7 +1233,7 @@ type ClientInterface interface {
 
 	// UpdateWebhookSubscription Replace a webhook subscription
 	//
-	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1267,7 +1267,7 @@ func (c *Client) GetWebhookSubscriptions(ctx context.Context, reqEditors ...Requ
 
 // CreateWebhookSubscriptionWithBody Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1286,7 +1286,7 @@ func (c *Client) CreateWebhookSubscriptionWithBody(ctx context.Context, contentT
 
 // CreateWebhookSubscription Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1377,7 +1377,7 @@ func (c *Client) GetWebhookSubscription(ctx context.Context, key string, reqEdit
 
 // UpdateWebhookSubscriptionWithBody Replace a webhook subscription
 //
-// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1396,7 +1396,7 @@ func (c *Client) UpdateWebhookSubscriptionWithBody(ctx context.Context, key stri
 
 // UpdateWebhookSubscription Replace a webhook subscription
 //
-// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -1809,7 +1809,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateWebhookSubscriptionWithBodyWithResponse Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1818,7 +1818,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateWebhookSubscriptionWithResponse Create a webhook subscription
 	//
-	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1863,7 +1863,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateWebhookSubscriptionWithBodyWithResponse Replace a webhook subscription
 	//
-	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -1872,7 +1872,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateWebhookSubscriptionWithResponse Replace a webhook subscription
 	//
-	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+	// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -2292,7 +2292,7 @@ type StreamWebhookTroubleshootingResponse struct {
 
 		// Response Optional within this object. The receiver's answer; absent when no response arrived.
 		Response *struct {
-			// Body Optional within this object. Body the receiver returned, as text. JFrog documents no size limit; artifactweave keeps at most the first 4 KiB.
+			// Body Optional within this object. Body the receiver returned, as text, truncated to the first 4 KiB.
 			Body *string `json:"body,omitempty"`
 
 			// Headers Optional within this object. Response headers.
@@ -2360,7 +2360,7 @@ func (r StreamWebhookTroubleshootingResponse) GetJSON200() *struct {
 
 	// Response Optional within this object. The receiver's answer; absent when no response arrived.
 	Response *struct {
-		// Body Optional within this object. Body the receiver returned, as text. JFrog documents no size limit; artifactweave keeps at most the first 4 KiB.
+		// Body Optional within this object. Body the receiver returned, as text, truncated to the first 4 KiB.
 		Body *string `json:"body,omitempty"`
 
 		// Headers Optional within this object. Response headers.
@@ -2432,7 +2432,7 @@ func (c *ClientWithResponses) GetWebhookSubscriptionsWithResponse(ctx context.Co
 
 // CreateWebhookSubscriptionWithBodyWithResponse Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2447,7 +2447,7 @@ func (c *ClientWithResponses) CreateWebhookSubscriptionWithBodyWithResponse(ctx 
 
 // CreateWebhookSubscriptionWithResponse Create a webhook subscription
 //
-// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201, which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Stores a new subscription and starts delivering matching events if it is enabled. Answers 201. A key that already exists is rejected with 400. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2522,7 +2522,7 @@ func (c *ClientWithResponses) GetWebhookSubscriptionWithResponse(ctx context.Con
 
 // UpdateWebhookSubscriptionWithBodyWithResponse Replace a webhook subscription
 //
-// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2537,7 +2537,7 @@ func (c *ClientWithResponses) UpdateWebhookSubscriptionWithBodyWithResponse(ctx 
 
 // UpdateWebhookSubscriptionWithResponse Replace a webhook subscription
 //
-// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
+// Replaces the subscription with the body. The key and project cannot change. Secrets follow the keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted) can send it back without erasing them. Answers 204 with no body. Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with w.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -2898,7 +2898,7 @@ func ParseStreamWebhookTroubleshootingResponse(rsp *http.Response) (*StreamWebho
 
 			// Response Optional within this object. The receiver's answer; absent when no response arrived.
 			Response *struct {
-				// Body Optional within this object. Body the receiver returned, as text. JFrog documents no size limit; artifactweave keeps at most the first 4 KiB.
+				// Body Optional within this object. Body the receiver returned, as text, truncated to the first 4 KiB.
 				Body *string `json:"body,omitempty"`
 
 				// Headers Optional within this object. Response headers.

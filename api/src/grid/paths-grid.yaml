@@ -5,9 +5,8 @@ components:
       properties:
         entity_types:
           description: 'Required within this object. One entry per monitored entity type: users, groups, permissions,
-            tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. artifactweave
-            replicates users, groups, permissions and tokens through Access federation (decision 0025); the other
-            types are accepted and report zero counts until their replication exists.'
+            tokens, projects, environments, roles, projectGroups, projectUsers and projectResources. Users, groups,
+            permissions and tokens are replicated through Access federation; the other types report zero counts.'
           items:
             $ref: '#/components/schemas/EntityTypeSummary'
           type: array
@@ -130,7 +129,7 @@ components:
           description: Optional within this object. Server-owned. The instance's service id.
           type: string
         licenses:
-          description: Optional within this object. Licence entries; one artifactweave entry.
+          description: Optional within this object. Licence entries; always one entry.
           items:
             $ref: '#/components/schemas/License'
           type: array
@@ -173,8 +172,7 @@ components:
       description: A licence entry reported for an instance.
       properties:
         type:
-          description: Optional within this object. Licence type. artifactweave has no licence tiers and always
-            reports artifactweave.
+          description: Optional within this object. Licence type; always `artifactweave`.
           type: string
       type: object
     SiteRequest:
@@ -208,8 +206,7 @@ components:
       - success
       type: object
     TargetSyncStatus:
-      description: Delivery state of one entity from one site to another, taken from the peer outbox acknowledgements
-        (decision 0021).
+      description: Delivery state of one entity from one site to another, taken from the peer outbox acknowledgements.
       properties:
         modified:
           description: Optional within this object. RFC 3339 time the status last changed.
@@ -370,9 +367,8 @@ components:
 paths:
   /api/v1/jpds:
     get:
-      description: 'Lists the instances this instance knows: itself and every paired peer artifactweave instance
-        (decision 0025). JFrog lists the deployments known to Mission Control; artifactweave has no Mission Control,
-        so the peer table is the source. Filters accept * wildcards. Administrators only.'
+      description: 'Lists the instances this instance knows: itself and every paired peer. Filters accept * wildcards.
+        Administrators only.'
       operationId: listJPDs
       parameters:
       - description: Optional query parameter. Filter on instance name; * matches any run of characters.
@@ -381,8 +377,8 @@ paths:
         required: false
         schema:
           type: string
-      - description: Optional query parameter. Filter on instance tag. artifactweave instances carry no tags, so
-          only * (or omitting the filter) matches anything.
+      - description: Optional query parameter. Filter on instance tag. Instances carry no tags, so only * (or
+          omitting the filter) matches anything.
         in: query
         name: tag
         required: false
@@ -478,10 +474,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/listgridtopologies.md
     post:
       description: Stores a topology and configures Access federation between every pair of its sites, so identity
-        changes made on any site reach the others. The key is derived from name. JFrog states only that it is derived;
-        artifactweave lowercases the name and replaces each run of characters other than letters and digits with
-        a hyphen, and answers 409 if that key exists. The topology is stored even when configuring a site fails
-        afterwards; check each site's status in the response. Administrators only.
+        changes made on any site reach the others. The key is derived from name by lowercasing it and replacing
+        each run of characters other than letters and digits with a hyphen; the call answers 409 if that key exists.
+        The topology is stored even when configuring a site fails afterwards; check each site's status in the response.
+        Administrators only.
       operationId: createGridTopology
       requestBody:
         content:
@@ -701,9 +697,8 @@ paths:
         schema:
           type: string
       - description: 'Required query parameter. Entity type public key: users, groups, permissions, tokens, projects,
-          environments, roles, projectGroups, projectUsers and projectResources. artifactweave replicates users,
-          groups, permissions and tokens through Access federation (decision 0025); the other types are accepted
-          and report zero counts until their replication exists.'
+          environments, roles, projectGroups, projectUsers and projectResources. Users, groups, permissions and
+          tokens are replicated through Access federation; the other types report zero counts.'
         in: query
         name: entity_type
         required: true

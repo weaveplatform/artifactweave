@@ -1,7 +1,7 @@
 components:
   schemas:
     FederationTarget:
-      description: 'A federation target as stored on this instance: a peer artifactweave instance that receives
+      description: 'A federation target as stored on this instance: a peer instance of this server that receives
         this instance''s identity changes over the peer protocol (decision 0021). Returned by every read; secrets
         of the trust relationship are never included.'
       properties:
@@ -86,7 +86,7 @@ components:
           description: Optional within this object. Limits which permissions, by name, are replicated. Omitted means
             all.
         url:
-          description: Required within this object. Base URL of the peer artifactweave instance, for example https://peer.example.com.
+          description: Required within this object. Base URL of the peer instance, for example https://peer.example.com.
             Cannot be changed later; register a new target instead.
           type: string
       required:
@@ -163,8 +163,8 @@ paths:
   /api/v1/system/federation:
     get:
       description: Returns every Access federation target registered on this instance, active or paused. Administrators
-        only. In artifactweave a target is always a peer artifactweave instance; federation with JFrog Access or
-        Mission Control is not supported (decision 0025).
+        only. A target is always another instance of this server; no other kind of federation peer is supported
+        (decision 0025).
       operationId: getAllAccessFederations
       responses:
         '200':
@@ -242,8 +242,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/registeraccessfederation.md
   /api/v1/system/federation/validate_server:
     post:
-      description: Checks, without registering anything, that the peer at url is reachable, is an artifactweave
-        instance speaking a compatible peer protocol version, and trusts this instance through an existing pairing.
+      description: Checks, without registering anything, that the peer at url is reachable, is an instance of this
+        server speaking a compatible peer protocol version, and trusts this instance through an existing pairing.
         Use it before registration to get a precise error. Administrators only.
       operationId: validateFederationTarget
       requestBody:

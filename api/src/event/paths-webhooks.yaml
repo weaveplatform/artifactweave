@@ -46,7 +46,7 @@ components:
           type: array
         url:
           description: Required within this object. Absolute http or https URL the event is delivered to. Failed
-            deliveries are retried with backoff (decision 0011). The URL may reference secrets as {{.secrets.<name>}}.
+            deliveries are retried with backoff. The URL may reference secrets as {{.secrets.<name>}}.
           format: uri
           type: string
       required:
@@ -136,7 +136,7 @@ components:
           type: array
         url:
           description: Required within this object. Absolute http or https URL the event is delivered to. Failed
-            deliveries are retried with backoff (decision 0011).
+            deliveries are retried with backoff.
           format: uri
           type: string
       required:
@@ -154,14 +154,14 @@ components:
         domain:
           description: Required within this object. One of artifact, artifact_property, docker, build, user, release_bundle,
             distribution, artifactory_release_bundle, destination, release_bundle_v2, release_bundle_v2_promotion,
-            artifact_lifecycle, xray_scan_status, app_trust or curation. Subscriptions are accepted for every domain
-            so Terraform plans stay clean, but artifactweave only emits events for artifact, artifact_property,
-            docker, build and user. Project admins may only use artifact, artifact_property, docker and build.
+            artifact_lifecycle, xray_scan_status, app_trust or curation. Subscriptions are accepted for every domain,
+            but events are emitted only for artifact, artifact_property, docker, build and user. Project admins
+            may only use artifact, artifact_property, docker and build.
           type: string
         event_types:
           description: 'Required within this object. Events of the domain that trigger the subscription, at least
-            one, spelled exactly as listed here because clients compare them verbatim. artifact: deployed, deleted,
-            moved, copied, cached. artifact_property: added, deleted. docker: pushed, deleted, promoted. build:
+            one, spelled exactly as listed here. artifact: deployed, deleted, moved, copied, cached. artifact_property:
+            added, deleted. docker: pushed, deleted, promoted. build:
             uploaded, deleted, promoted. user: locked. release_bundle: created, signed, deleted. distribution: distribute_started,
             distribute_completed, distribute_aborted, distribute_failed, delete_started, delete_completed, delete_failed.
             artifactory_release_bundle and destination: received, delete_started, delete_completed, delete_failed.
@@ -331,7 +331,7 @@ components:
             means a direct connection, or the platform default proxy when one is set.
           type: string
         secret:
-          description: 'Optional within this object. Shared secret for the X-JFrog-Event-Auth delivery header. Write-only:
+          description: 'Optional within this object. Shared secret for the `X-JFrog-Event-Auth` delivery header. Write-only:
             responses never echo it. On replace, omitting it keeps the stored secret, a new value rotates it, and
             an empty string removes it.'
           format: password
@@ -339,12 +339,12 @@ components:
           writeOnly: true
         url:
           description: Required within this object. Absolute http or https URL the event is delivered to. Failed
-            deliveries are retried with backoff (decision 0011).
+            deliveries are retried with backoff.
           format: uri
           type: string
         use_secret_for_signing:
           default: false
-          description: 'Optional within this object. Selects what X-JFrog-Event-Auth carries: false (the default)
+          description: 'Optional within this object. Selects what `X-JFrog-Event-Auth` carries: false (the default)
             sends the secret itself, true sends the lower-case hex HMAC-SHA256 of the request body keyed with the
             secret, so the receiver can verify the payload. Ignored when no secret is set.'
           type: boolean
@@ -563,8 +563,8 @@ paths:
       - webhooks
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getwebhooksubscriptions.md
     post:
-      description: Stores a new subscription and starts delivering matching events if it is enabled. Answers 201,
-        which the jfrog/artifactory Terraform provider requires. A key that already exists is rejected with 400.
+      description: Stores a new subscription and starts delivering matching events if it is enabled. Answers 201.
+        A key that already exists is rejected with 400.
         Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
         and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
         w.
@@ -736,7 +736,7 @@ paths:
     put:
       description: Replaces the subscription with the body. The key and project cannot change. Secrets follow the
         keep, rotate and wipe rules described on their fields, so a client that read the subscription (secrets redacted)
-        can send it back without erasing them. Answers 204 with no body, which the Terraform provider requires.
+        can send it back without erasing them. Answers 204 with no body.
         Requires a platform admin, a project admin (project subscriptions in the artifact, artifact_property, docker
         and build domains only), the Manage Webhooks role, or a token scoped system:webhooks@<project>/<url> with
         w.
@@ -899,8 +899,8 @@ paths:
                     description: Optional within this object. The receiver's answer; absent when no response arrived.
                     properties:
                       body:
-                        description: Optional within this object. Body the receiver returned, as text. JFrog documents
-                          no size limit; artifactweave keeps at most the first 4 KiB.
+                        description: Optional within this object. Body the receiver returned, as text, truncated
+                          to the first 4 KiB.
                         type: string
                         x-unverified: true
                       headers:

@@ -124,9 +124,8 @@ components:
           type: string
       type: object
     BuildInfo:
-      description: 'A build-info document: one run of a build, with its modules, artifacts and dependencies. artifactweave
-        stores the document as a JSON item in the build-info repository, at <name>/<number>-<started epoch milliseconds>.json
-        (decision 0014).'
+      description: 'A build-info document: one run of a build, with its modules, artifacts and dependencies. The document
+        is stored as a JSON item in the build-info repository, at <name>/<number>-<started epoch milliseconds>.json.'
       properties:
         agent:
           allOf:
@@ -177,8 +176,7 @@ components:
           type: object
         started:
           description: Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ,
-            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog
-            CLI writes.
+            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
           type: string
         type:
           description: Optional within this object. Legacy build type.
@@ -199,8 +197,7 @@ components:
             $ref: '#/components/schemas/VcsInfo'
           type: array
         version:
-          description: Optional within this object. Schema version of the document. The JFrog CLI does not send
-            it.
+          description: Optional within this object. Schema version of the document.
           type: string
       type: object
     BuildInfoResponse:
@@ -229,7 +226,7 @@ components:
           type: array
         id:
           description: Optional within this object. Module id in the build tool's notation. A module of type build
-            names another build as <name>/<number>; clients follow such modules when searching a build's artifacts.
+            names another build as <name>/<number>.
           type: string
         properties:
           additionalProperties: true
@@ -245,8 +242,7 @@ components:
       properties:
         started:
           description: Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ,
-            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog
-            CLI writes.
+            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
           type: string
         uri:
           description: Optional within this object. Path of the run relative to the build, a slash followed by the
@@ -254,9 +250,8 @@ components:
           type: string
       type: object
     BuildPromotionRequest:
-      description: Changes a build run's status and optionally moves or copies its files. JFrog's definition marks
-        ciUser, timestamp, copy, artifacts, dependencies and failFast required, but the JFrog CLI omits all but
-        failFast and Artifactory applies defaults, so artifactweave requires none of them.
+      description: Changes a build run's status and optionally moves or copies its files. Every field is optional,
+        and each field states what omitting it does.
       properties:
         artifacts:
           description: Optional within this object. Whether the run's artifacts are moved or copied. Defaults to
@@ -284,7 +279,7 @@ components:
         failFast:
           description: Optional within this object. When true, the first error or warning aborts the promotion,
             which then changes nothing and answers 400; when false it continues, reports every error and answers 200.
-            Defaults to true; the JFrog CLI always sends it.
+            Defaults to true.
           type: boolean
         properties:
           additionalProperties: true
@@ -301,11 +296,11 @@ components:
           type: array
         sourceRepo:
           description: Optional within this object. Only artifacts found in this repository are moved or copied.
-            Omitted means any repository. Dependencies are found in any repository either way, as in Artifactory.
+            Omitted means any repository. Dependencies are found in any repository either way.
           type: string
         status:
           description: Optional within this object. New status recorded for the run, for example staged or released.
-            Omitted records no promotion, as in Artifactory; files are still moved or copied and properties set.
+            Omitted records no promotion; files are still moved or copied and properties set.
           type: string
         targetRepo:
           description: Optional within this object. Repository the files are moved or copied to, each to the path
@@ -314,8 +309,8 @@ components:
           type: string
         timestamp:
           description: Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ,
-            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog
-            CLI writes. Omitted records the time the request arrived.
+            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700). Omitted records the
+            time the request arrived.
           type: string
       type: object
     BuildPromotionResponse:
@@ -364,9 +359,8 @@ components:
             type: string
           type: array
         count:
-          description: Optional within this object. Number of most recent runs to keep. JFrog documents an integer;
-            the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. 0 is refused, as
-            Artifactory refuses it; omitted or negative keeps every run.
+          description: Optional within this object. Number of most recent runs to keep, as a JSON integer or a JSON
+            string such as "10". 0 is refused; omitted or negative keeps every run.
           x-go-type: json.Number
         deleteBuildArtifacts:
           description: Optional within this object. Whether discarding a run also deletes its artifacts. Defaults
@@ -374,8 +368,8 @@ components:
           type: boolean
         minimumBuildDate:
           description: Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ,
-            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog
-            CLI writes; Unix epoch milliseconds are accepted too. Omitted keeps runs of any age.
+            for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700); Unix epoch milliseconds
+            are accepted too. Omitted keeps runs of any age.
           type: string
           x-go-type: json.RawMessage
       type: object
@@ -397,8 +391,7 @@ components:
       properties:
         lastStarted:
           description: Optional within this object. Started timestamp of the build's most recent run, in the layout
-            yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700),
-            the layout the JFrog CLI writes.
+            yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
           type: string
         uri:
           description: Optional within this object. Path of the build relative to /api/build, a slash followed by
@@ -413,8 +406,7 @@ components:
           type: string
         buildNumbers:
           description: Optional within this object. Build numbers to delete. A number deletes one run for each time
-            it is listed, the earliest-started first, which is how the JFrog CLI replaces a number's runs with
-            --overwrite. Ignored when deleteAll is true.
+            it is listed, the earliest-started first. Ignored when deleteAll is true.
           items:
             description: Build number.
             type: string
@@ -471,9 +463,8 @@ components:
           type: string
       type: object
     DockerPromotionRequest:
-      description: Which image to promote, where to, and whether it moves or is copied. The JFrog CLI sends every
-        field, with an empty string for each optional name or tag it was not given, so an empty string means the
-        same as an omitted field.
+      description: Which image to promote, where to, and whether it moves or is copied. An empty string in an optional
+        name or tag field means the same as an omitted field.
       properties:
         copy:
           description: Optional within this object. When true the image is copied and the source keeps it; when
@@ -524,8 +515,7 @@ components:
           description: Optional within this object. The tracker the issues come from.
       type: object
     LicenseControl:
-      description: License-check settings recorded with the build. artifactweave stores them and does not act on
-        them.
+      description: License-check settings recorded with the build. They are stored and not acted on.
       properties:
         autoDiscover:
           description: Optional within this object. Whether licenses were discovered automatically.
@@ -547,8 +537,7 @@ components:
       description: One line of a promotion report.
       properties:
         level:
-          description: Optional within this object. Severity of the message. JFrog documents the levels in lower
-            case; Artifactory sends its status levels' names, in upper case, and so does artifactweave.
+          description: Optional within this object. Severity of the message, in upper case.
           enum:
           - ERROR
           - WARNING
@@ -615,9 +604,9 @@ paths:
     put:
       description: Stores one run's build-info document. The artifacts in modules[].artifacts are not checked
         against stored files. Promotion and the build artifacts search later find each one as an item holding its
-        checksums and carrying build.name and build.number equal to the document's name and number, and
-        Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and
-        needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+        checksums and carrying build.name and build.number equal to the document's name and number. Uploading a
+        run that already exists overwrites it and needs delete permission as well as deploy. The body may use the
+        vendor media type or application/json.
       operationId: uploadBuild
       parameters:
       - description: Optional query parameter. Key of the project that owns the build. Omitted or default means
@@ -643,8 +632,7 @@ paths:
           description: Stored.
           headers:
             X-Checksum-Sha256:
-              description: SHA-256 of the stored build-info document, which the JFrog CLI reports in its detailed
-                summary.
+              description: SHA-256 of the stored build-info document.
               schema:
                 description: 64 lowercase hexadecimal characters.
                 type: string
@@ -664,7 +652,7 @@ paths:
       operationId: appendBuild
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -682,8 +670,8 @@ paths:
           minLength: 1
           type: string
       - description: Optional query parameter. Selects one run of the build number by its started timestamp, in
-          the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700),
-          the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+          the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
+          Omitted selects the most recent run with that number.
         in: query
         name: started
         schema:
@@ -762,11 +750,11 @@ paths:
       description: Records a status change for the latest run of a build number and optionally moves or copies
         its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission
         on the build; each file needs the repository permissions its move or copy needs, and a file that lacks
-        them is reported rather than refused. The JFrog CLI sends the vendor media type.
+        them is reported rather than refused. The body may use the vendor media type or application/json.
       operationId: promoteBuild
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -830,7 +818,7 @@ paths:
       operationId: renameBuild
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -880,7 +868,7 @@ paths:
       operationId: controlBuildRetention
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -889,8 +877,8 @@ paths:
           minLength: 1
           type: string
       - description: Optional query parameter. When true, the request is checked, then answers at once and the
-          runs are discarded in the background. JFrog documents true as the default, but Artifactory discards before
-          answering when the parameter is absent, and so does artifactweave; the JFrog CLI always sends it.
+          runs are discarded in the background. Defaults to false, so when the parameter is absent the runs are
+          discarded before the call answers.
         in: query
         name: async
         schema:
@@ -899,7 +887,7 @@ paths:
           type: boolean
       - description: Optional query parameter. Key of the project that owns the build. Omitted or default means
           builds outside any project, stored in the artifactory-build-info repository; a project key selects that
-          project's <project>-build-info repository. The JFrog CLI sends it; JFrog does not document it.
+          project's <project>-build-info repository.
         in: query
         name: project
         schema:
@@ -914,10 +902,9 @@ paths:
         required: true
       responses:
         '200':
-          description: Documented by JFrog for this operation; artifactweave answers 204 instead (deviation DV-031).
+          description: Not returned; a successful request answers 204.
         '204':
-          description: Discarded, or with async checked and discarding in the background. artifactweave answers 204,
-            the only status the JFrog CLI accepts (decision 0014).
+          description: Discarded, or with async checked and discarding in the background.
         '400':
           $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
         '401':
@@ -936,7 +923,7 @@ paths:
       operationId: deleteBuilds
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -995,7 +982,7 @@ paths:
       operationId: getBuildRuns
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -1033,7 +1020,7 @@ paths:
       operationId: getBuildInfo
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -1051,15 +1038,15 @@ paths:
           minLength: 1
           type: string
       - description: Optional query parameter. Selects one run of the build number by its started timestamp, in
-          the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700),
-          the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+          the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
+          Omitted selects the most recent run with that number.
         in: query
         name: started
         schema:
           description: Started timestamp of the run.
           type: string
-      - description: Optional query parameter. Another build number of the same build to compare with. artifactweave
-          accepts it and returns the run without a comparison.
+      - description: Optional query parameter. Another build number of the same build to compare with. It is accepted
+          and ignored; the run is returned without a comparison.
         in: query
         name: diff
         schema:
@@ -1091,13 +1078,11 @@ paths:
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildinfo.md
   /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo}:
     get:
-      description: Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog
-        CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go,
-        research 22). Needs read permission on the build.
+      description: Lists where each artifact of a run is stored. Needs read permission on the build.
       operationId: getBuildArtifacts
       parameters:
       - description: Required path parameter. Name of the build. A name containing / arrives with the slash escaped
-          as %2F, as the JFrog CLI sends it, and is matched as a single path segment.
+          as %2F and is matched as a single path segment.
         in: path
         name: buildName
         required: true
@@ -1148,11 +1133,9 @@ paths:
         repository of the same package type, either one tag or every tag of the image, optionally under a new image
         name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather
         than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci
-        repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200.
-        Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when
-        the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403
-        before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial
-        success; rt docker-promote fails on either status, and the 403 is a deviation registered by #378.
+        repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there
+        too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a
+        caller without Delete on the source answers 403 before anything is copied.
       operationId: promoteDockerImage
       parameters:
       - description: Required path parameter. Key of the local or federated Docker, OCI or Helm OCI repository
@@ -1176,7 +1159,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: A short confirmation for people; clients do not parse it.
+                description: A short human-readable confirmation with no fixed format.
                 type: string
           description: The image was promoted.
         '400':
@@ -1185,8 +1168,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The body was unreadable or lacked targetRepo or dockerRepository, or the source and target
-            are not local or federated repositories of one package type. Errors use the Artifactory envelope, not the
-            registry's, as for every JFrog REST operation under the Docker API path (decision 0031).
+            are not local or federated repositories of one package type. Errors use the standard error envelope, not
+            the registry's error format.
         '401':
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
@@ -1195,8 +1178,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks Read on the source, Deploy on the target, or the Delete that a move or an
-            overwritten target tag needs. Nothing is copied; Artifactory answers 206 to a move without Delete on the
-            source, after copying.
+            overwritten target tag needs. Nothing is copied.
         '404':
           content:
             application/json:

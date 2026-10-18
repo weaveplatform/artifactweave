@@ -5,39 +5,39 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: The request was malformed or failed validation. The body carries the Artifactory error envelope.
+      description: The request was malformed or failed validation. The body carries the standard error envelope.
     ArchiveConflict:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: A policy with this key already exists. The body carries the Artifactory error envelope.
+      description: A policy with this key already exists. The body carries the standard error envelope.
     ArchiveForbidden:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
       description: The caller is neither a platform administrator nor, for a project-scoped policy, an administrator
-        of that project. The body carries the Artifactory error envelope.
+        of that project. The body carries the standard error envelope.
     ArchiveInternalServerError:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: The server failed while handling the request. The body carries the Artifactory error envelope.
+      description: The server failed while handling the request. The body carries the standard error envelope.
     ArchiveNotFound:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: No policy, run or report matches the key or id given. The body carries the Artifactory error
+      description: No policy, run or report matches the key or id given. The body carries the standard error
         envelope.
     ArchiveUnauthorized:
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: Credentials were missing or rejected. The body carries the Artifactory error envelope.
+      description: Credentials were missing or rejected. The body carries the standard error envelope.
     ColdStorageBadRequest:
       content:
         application/json:
@@ -78,7 +78,7 @@ components:
       description: Credentials were missing or rejected. The body carries the cold storage error body.
   schemas:
     ArchiveCriterion:
-      description: A list of values with the and/or toggle JFrog's archive form shows for each criterion.
+      description: A list of values with an and/or toggle for the criterion.
       properties:
         operator:
           description: Optional within this object. OR (the default) selects items matching any value; AND only
@@ -359,16 +359,15 @@ components:
           type: array
       type: object
     ArchivePolicyRequest:
-      description: A cold storage archive policy as written by create and update. In artifactweave the cold store
-        is a second blob store configured on the same instance (for example an S3 bucket with an archive storage
-        class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+      description: A cold storage archive policy as written by create and update. The cold store is a second
+        blob store configured on the same instance, for example an S3 bucket with an archive storage class.
       properties:
         aqlQuery:
           description: Optional within this object. AQL items query selecting the artifacts to archive. Use either
             this or searchCriteriaForm; not valid with packageRetention.
           type: string
         cronExp:
-          description: Required within this object. Quartz cron expression for scheduled runs (decision 0010).
+          description: Required within this object. Quartz cron expression for scheduled runs.
           type: string
         description:
           description: Optional within this object. Free text shown with the policy.
@@ -412,16 +411,15 @@ components:
       - cronExp
       type: object
     ArchivePolicyResponse:
-      description: A cold storage archive policy as stored, with its run state. In artifactweave the cold store
-        is a second blob store configured on the same instance (for example an S3 bucket with an archive storage
-        class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+      description: A cold storage archive policy as stored, with its run state. The cold store is a second
+        blob store configured on the same instance, for example an S3 bucket with an archive storage class.
       properties:
         aqlQuery:
           description: Optional within this object. AQL items query selecting the artifacts to archive. Use either
             this or searchCriteriaForm; not valid with packageRetention.
           type: string
         cronExp:
-          description: Optional within this object. Quartz cron expression for scheduled runs (decision 0010).
+          description: Optional within this object. Quartz cron expression for scheduled runs.
           type: string
         description:
           description: Optional within this object. Free text shown with the policy.
@@ -661,9 +659,9 @@ components:
           type: integer
       type: object
     ArchiveSearchCriteria:
-      description: 'Which package versions a smart archiving policy selects. Selection runs over the package index
-        (decision 0018): a version qualifies when it matches every inclusion, no exclusion, and every age condition
-        given. The newest version of a package is never archived.'
+      description: 'Which package versions a smart archiving policy selects. Selection runs over the package index:
+        a version qualifies when it matches every inclusion, no exclusion, and every age condition given. The newest
+        version of a package is never archived.'
       properties:
         createdBeforeInDays:
           description: Optional within this object. Select versions created at least this many days before the run
@@ -761,11 +759,10 @@ components:
       type: object
     ArchiveSearchCriteriaForm:
       additionalProperties: true
-      description: Artifact selection for a non-package archive policy, the alternative to aqlQuery. JFrog documents
-        the form's fields (include and exclude repositories, path patterns, artifact name patterns and properties,
-        each with an and/or toggle, plus deployed-before and last-downloaded-before ages) but not their JSON names,
-        so the names below are artifactweave's and are unverified against Artifactory. Unknown keys are stored unchanged;
-        converting a form that contains one fails with 400 naming it.
+      description: Artifact selection for a non-package archive policy, the alternative to aqlQuery. It selects by
+        included and excluded repositories, path patterns, artifact name patterns and properties, each with an and/or
+        toggle, and by deployed-before and last-downloaded-before ages. Unknown keys are stored unchanged; converting
+        a form that contains one fails with 400 naming it.
       properties:
         deployedBeforeInDays:
           description: Optional within this object. Only artifacts deployed at least this many days ago. Omitted
@@ -839,17 +836,14 @@ components:
           type: array
       type: object
     ColdStorageErrorResponse:
-      description: Error body for the /api/retention operations. Artifactory's cold storage service documents a
-        flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added,
-        so clients written against either form read the same failure.
+      description: Error body for the /api/retention operations. It is the standard errors envelope with a flat
+        error and message pair added; both forms describe the same failure.
       properties:
         error:
-          description: Optional within this object. Short symbolic form of the failure, such as NOT_FOUND, for clients
-            of the cold storage envelope.
+          description: Optional within this object. Short symbolic form of the failure, such as NOT_FOUND.
           type: string
         errors:
-          description: Required within this object. One entry per error; clients of the standard envelope read the
-            first.
+          description: Required within this object. One entry per error.
           items:
             description: One error.
             properties:
@@ -877,7 +871,7 @@ components:
         jfrogColdStorageNamespaceId:
           description: Optional within this object. Identifier generated by this instance the first time content
             is archived and stable afterwards. Archived paths are reported as <namespace>/<repository>/<path>; restore
-            requests may omit it (see addNamespace). The field keeps JFrog's name for client compatibility.
+            requests may omit it (see addNamespace).
           type: string
       type: object
     ColdStorageRestoreAccepted:
@@ -929,14 +923,13 @@ components:
       type: object
     SmartArchivingPolicy:
       description: A package-level archiving policy. Each run moves the selected package versions from the hot blob
-        store to the cold tier and leaves a tombstone in the hot index so search and restore still find them. In
-        artifactweave the cold store is a second blob store configured on the same instance (for example an S3 bucket
-        with an archive storage class), not a separate cold instance (decision 0024); the API behaves as Artifactory
-        documents.
+        store to the cold tier and leaves a tombstone in the hot index so search and restore still find them. The
+        cold store is a second blob store configured on the same instance, for example an S3 bucket with an archive
+        storage class.
       properties:
         cronExp:
-          description: Optional within this object. Quartz cron expression for scheduled runs (decision 0010). Omit
-            to run the policy only on demand.
+          description: Optional within this object. Quartz cron expression for scheduled runs. Omit to run the policy
+            only on demand.
           type: string
         description:
           description: Optional within this object. Free text shown with the policy.
@@ -947,7 +940,7 @@ components:
           type: integer
         enabled:
           description: Optional within this object. Whether scheduled and manual runs are allowed. Must be false
-            or absent on create, as in Artifactory; switch it with the enablement operation.
+            or absent on create; switch it with the enablement operation.
           type: boolean
         key:
           description: 'Required within this object. Identifier of the policy: at least three characters of letters,
@@ -975,8 +968,7 @@ paths:
   /api/archive/v2/packages/policies:
     get:
       description: Returns every smart archiving policy, or with projectKey the policies of that project. Platform
-        administrators manage every policy; project administrators manage the policies of their own projects. In
-        Artifactory this API exists on Cloud from 7.111; artifactweave serves it on every install.
+        administrators manage every policy; project administrators manage the policies of their own projects.
       operationId: getAllSmartArchivingPolicies
       parameters:
       - description: Optional query parameter. Project whose policies are meant. Required for project administrators;
@@ -1249,7 +1241,7 @@ paths:
       - archive
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsmartarchivingpolicy.md
     post:
-      description: 'Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory.
+      description: 'Creates a policy. It must be created disabled: enabled true is rejected with 400.
         The key in the body must equal the path. Platform administrators manage every policy; project administrators
         manage the policies of their own projects.'
       operationId: createSmartArchivingPolicy
@@ -1497,9 +1489,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getarchivepolicystatus.md
   /api/retention/archive/policies:
     get:
-      description: Returns every cold storage archive policy with its run state. Platform administrators only. In
-        Artifactory this API needs an Enterprise licence and a separate cold instance; artifactweave serves it on
-        every install against its cold tier.
+      description: Returns every cold storage archive policy with its run state. Platform administrators only.
       operationId: getAllArchivePolicies
       responses:
         '200':
@@ -1522,7 +1512,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallarchivepolicies.md
   /api/retention/archive/policies/convertToAql:
     post:
-      description: Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based
+      description: Turns a search criteria form into the AQL items query the server would run for it, so a form-based
         policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's
         JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with
         400. Platform administrators only.
@@ -1534,7 +1524,7 @@ paths:
               description: JSON text of an ArchiveSearchCriteriaForm.
               type: string
         description: The search criteria form (the same document as searchCriteriaForm, ArchiveSearchCriteriaForm)
-          serialised as JSON and sent as text/plain, as JFrog's definition specifies.
+          serialised as JSON and sent as text/plain.
         required: true
       responses:
         '200':
@@ -1569,8 +1559,7 @@ paths:
                     Use either this or searchCriteriaForm; not valid with packageRetention.
                   type: string
                 cronExp:
-                  description: Optional within this object. Quartz cron expression for scheduled runs (decision
-                    0010).
+                  description: Optional within this object. Quartz cron expression for scheduled runs.
                   type: string
                 description:
                   description: Optional within this object. Free text shown with the policy.
@@ -1948,8 +1937,7 @@ paths:
   /api/retention/search:
     post:
       description: Runs an AQL items query against archived items only, with the same grammar and limits as the
-        AQL search (decision 0012). Platform administrators only. Served by the hand-written AQL handler because
-        the body is AQL text.
+        AQL search. Platform administrators only.
       operationId: searchArchives
       requestBody:
         content:

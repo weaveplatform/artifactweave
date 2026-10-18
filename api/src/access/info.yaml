@@ -1,14 +1,12 @@
 openapi: 3.0.3
 info:
-  title: artifactweave Access-compatible REST API
+  title: Access REST API
   version: 0.1.0
   description: >-
-    The identity, token and project surface served under /access. Paths and shapes
-    mirror the documented JFrog Access API (docs/research/05 and 07). Authored by
-    the artifactweave project; cites JFrog's documentation and copies nothing from it.
+    The identity, token and project surface served under /access.
 servers:
   - url: /access
-    description: The Access service prefix on the single artifactweave listener.
+    description: The /access prefix on the server's single listener.
 tags:
   - name: system
     description: Health and version endpoints that need no authentication.

@@ -9,20 +9,17 @@ components:
         version:
           type: string
           description: >-
-            Required within this object. The Artifactory version artifactweave is
-            compatible with, in major.minor.patch form. Configured by
-            compat.artifactory_version; defaults to 7.155.0.
+            Required within this object. The compatibility version, in major.minor.patch
+            form. Configured by compat.artifactory_version; defaults to 7.155.0.
         revision:
           type: string
           description: >-
-            Required within this object. The artifactweave build identifier (git
-            describe output), so operators can tell the real version apart from the
-            compatibility version.
+            Required within this object. The server's build identifier (git describe
+            output), distinct from the compatibility version in version.
         addons:
           type: array
           description: >-
-            Required within this object. Always empty; Artifactory lists licensed
-            add-ons here and no client depends on the contents.
+            Required within this object. Always empty.
           items:
             type: string
             description: Optional within this object. An add-on name.
@@ -30,10 +27,7 @@ components:
           type: string
           x-unverified: true
           description: >-
-            Optional within this object. Always the literal artifactweave. The 7.x
-            reference does not list this field. The Artifactory 6.20 source emits a
-            hash of the installed licence key here and leaves the field out when no
-            licence is installed; unverified for 7.x. No client parses it.
+            Optional within this object. Always `artifactweave`.
     License:
       type: object
       additionalProperties: false
@@ -42,14 +36,14 @@ components:
         type:
           type: string
           description: >-
-            Required within this object. Always artifactweave. Artifactory reports its
-            licence tier here; artifactweave has none.
+            Required within this object. Always `artifactweave`; there is no licence
+            tier.
         validThrough:
           type: string
-          description: Required within this object. Always the literal never.
+          description: Required within this object. Always `never`.
         licensedTo:
           type: string
-          description: Required within this object. Always artifactweave.
+          description: Required within this object. Always `artifactweave`.
     Probe:
       type: object
       additionalProperties: false
@@ -60,16 +54,13 @@ components:
           description: Required within this object. OK when the probe passes.
     ErrorResponse:
       type: object
-      description: The Artifactory error envelope used by every /artifactory response.
+      description: The error envelope used by every /artifactory response.
       required: [errors]
       properties:
         errors:
           type: array
           description: >-
-            Required within this object. One entry per error. jfrog-client-go
-            reports the whole body after the status, except release bundle import,
-            which reads the first entry's message; the Terraform providers join the
-            messages of every entry.
+            Required within this object. One entry per error.
           items:
             type: object
             required: [status, message]

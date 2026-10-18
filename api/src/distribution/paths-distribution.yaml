@@ -1,8 +1,8 @@
 paths:
   /api/v1/distribution/edge_nodes:
     get:
-      description: 'Lists the edges this instance can distribute to: artifactweave instances paired with it in the
-        edge role (decision 0021), with the name and service id each declared at pairing.'
+      description: 'Lists the edges this instance can distribute to: the instances paired with it in the edge
+        role, with the name and service id each declared at pairing.'
       operationId: getDistributionEdgeNodes
       parameters:
       - description: Optional query parameter. Maximum number of edges to return. Omitted returns all.
@@ -37,11 +37,10 @@ paths:
   /api/v1/distribution/{release_bundle_name}/{release_bundle_version}:
     post:
       description: 'Sends a signed version to the edges the distribution rules select and returns a tracker. The
-        transfer runs asynchronously over the artifactweave peer protocol (decision 0021): each edge receives the
-        signed manifest and the artifacts it does not already hold, verifies the signature against its trusted keys
-        and every checksum, and only then makes the version visible. Edges must be artifactweave instances paired
-        in the edge role; JFrog Edge nodes are not supported. With `dry_run` the selected edges are returned and
-        nothing is sent.'
+        transfer runs asynchronously over the peer protocol: each edge receives the signed manifest and the artifacts
+        it does not already hold, verifies the signature against its trusted keys and every checksum, and only then
+        makes the version visible. Edges must be instances paired in the edge role. With `dry_run` the selected
+        edges are returned and nothing is sent.'
       operationId: distributeReleaseBundleV1Version
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -217,10 +216,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributedynamicreleasebundlev1.md
   /api/v2/distribution/abort/{release_bundle_name}/{release_bundle_version}:
     put:
-      description: Aborts an in-progress Release Bundle v2 distribution. Release Bundles v2 are created by JFrog's
-        Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an
-        artifactweave instance. The operation is specified so the Distribution surface stays complete and answers
-        501.
+      description: Not implemented; answers 501.
       operationId: abortReleaseBundleV2Distribution
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -256,7 +252,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: Abort a Release Bundle v2 distribution
       tags:
       - distribution
@@ -264,9 +260,7 @@ paths:
       x-tier: stub
   /api/v2/distribution/distribute/{release_bundle_name}/{release_bundle_version}:
     post:
-      description: Distributes a Release Bundle v2 version to edges. Release Bundles v2 are created by JFrog's Lifecycle
-        service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave
-        instance. The operation is specified so the Distribution surface stays complete and answers 501.
+      description: Not implemented; answers 501.
       operationId: distributeReleaseBundleV2Version
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -317,7 +311,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: Distribute a Release Bundle v2 version
       tags:
       - distribution
@@ -325,9 +319,7 @@ paths:
       x-tier: stub
   /api/v2/distribution/remote_delete/{release_bundle_name}/{release_bundle_version}:
     post:
-      description: Removes a Release Bundle v2 version from edges. Release Bundles v2 are created by JFrog's Lifecycle
-        service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an artifactweave
-        instance. The operation is specified so the Distribution surface stays complete and answers 501.
+      description: Not implemented; answers 501.
       operationId: remoteDeleteReleaseBundleV2Distribution
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -372,7 +364,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: Delete a Release Bundle v2 version from edges
       tags:
       - distribution
@@ -380,10 +372,7 @@ paths:
       x-tier: stub
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}:
     get:
-      description: Lists the distribution trackers of a Release Bundle v2 version. Release Bundles v2 are created
-        by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can
-        exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete
-        and answers 501.
+      description: Not implemented; answers 501.
       operationId: getReleaseBundleV2DistributionTrackers
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -417,7 +406,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: List Release Bundle v2 distribution trackers
       tags:
       - distribution
@@ -425,10 +414,7 @@ paths:
       x-tier: stub
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}:
     get:
-      description: Returns one Release Bundle v2 distribution tracker. Release Bundles v2 are created by JFrog's
-        Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can exist on an
-        artifactweave instance. The operation is specified so the Distribution surface stays complete and answers
-        501.
+      description: Not implemented; answers 501.
       operationId: getDistributionStatusDetailsByTrackerId
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -459,7 +445,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: Get a Release Bundle v2 distribution tracker
       tags:
       - distribution
@@ -467,10 +453,7 @@ paths:
       x-tier: stub
   /api/v2/distribution/trackers/{release_bundle_name}/{release_bundle_version}/{distribution_tracker}/priority:
     put:
-      description: Changes the priority of an in-flight Release Bundle v2 distribution. Release Bundles v2 are created
-        by JFrog's Lifecycle service, which artifactweave does not implement (research 10), so no v2 bundle can
-        exist on an artifactweave instance. The operation is specified so the Distribution surface stays complete
-        and answers 501.
+      description: Not implemented; answers 501.
       operationId: updateReleaseBundleV2DistributionPriority
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -520,7 +503,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: Change the priority of a Release Bundle v2 distribution
       tags:
       - distribution

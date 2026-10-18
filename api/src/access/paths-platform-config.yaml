@@ -9,7 +9,7 @@
 components:
   schemas:
     AwsIamRoleAssignment:
-      description: Maps one user to the AWS IAM role their AWS credentials must assume. Not supported by artifactweave.
+      description: Maps one user to the AWS IAM role their AWS credentials must assume. Not supported.
       properties:
         iam_role:
           description: Required within this object. ARN of the AWS IAM role the user's AWS credentials must assume.
@@ -22,7 +22,7 @@ components:
       - iam_role
       type: object
     CrowdConfiguration:
-      description: Atlassian Crowd integration settings. Not supported by artifactweave (decision 0019).
+      description: Atlassian Crowd integration settings. Not supported.
       properties:
         allow_user_to_access_profile:
           description: Optional within this object. Whether users created through Crowd may open their own profile.
@@ -168,8 +168,7 @@ components:
           type: string
       type: object
     HttpSsoConfiguration:
-      description: HTTP single sign-on through an authenticating reverse proxy. Not supported by artifactweave (decision
-        0019).
+      description: HTTP single sign-on through an authenticating reverse proxy. Not supported.
       properties:
         allow_user_to_access_profile:
           description: Optional within this object. Whether proxied users may open their own profile.
@@ -451,10 +450,8 @@ components:
         provider_type:
           description: 'Optional within this object. Kind of identity provider, in the Access vocabulary: `Generic
             OpenID Connect`, `GitHub`, `GitHub Enterprise` or `Azure`. Generic covers any other OpenID Connect issuer,
-            such as GitLab, Jenkins or Okta. The jfrog/platform Terraform provider sends exactly these values, mapping
-            its own `generic` and `GitHubEnterprise` onto them. artifactweave also accepts the lower-case short
-            names older JFrog examples use (`generic`, `github`, `github enterprise`, `azure`, any case) and stores
-            and returns the canonical form.'
+            such as GitLab, Jenkins or Okta. The lower-case short names `generic`, `github`, `github enterprise` and
+            `azure` are also accepted in any case; the server stores and returns the canonical form.'
           type: string
         token_issuer:
           description: Optional within this object. For GitHub providers, the organisation or enterprise that issues
@@ -508,13 +505,11 @@ components:
       description: An RFC 8693 token exchange request carrying a provider's ID token.
       properties:
         application_key:
-          description: Optional within this object. AppTrust application key. Accepted and ignored, because AppTrust
-            is out of scope.
+          description: Optional within this object. AppTrust application key. Accepted and ignored.
           type: string
         audience:
-          description: Optional within this object. The audience the caller requested the ID token for; the JFrog
-            CLI sends its --oidc-audience here. Accepted and ignored, because the provider's configured audience
-            decides which tokens verify.
+          description: Optional within this object. The audience the caller requested the ID token for. Accepted
+            and ignored; the provider's configured audience decides which tokens verify.
           type: string
         branch:
           description: Optional within this object. Source branch of the CI run, recorded with the issued token
@@ -584,7 +579,7 @@ components:
             was true.
           type: string
         scope:
-          description: Optional within this object. Scope of the issued token, which the JFrog CLI prints.
+          description: Optional within this object. Scope of the issued token.
           type: string
         token_type:
           description: Optional within this object. Always Bearer.
@@ -620,7 +615,7 @@ components:
           type: integer
       type: object
     SamlGeneralSettings:
-      description: The instance-wide SAML switch. Not supported by artifactweave (decision 0019).
+      description: The instance-wide SAML switch. Not supported.
       properties:
         certificateIsPresent:
           description: Optional within this object. Whether a service provider certificate is installed. Set by
@@ -632,7 +627,7 @@ components:
           type: boolean
       type: object
     SamlSetting:
-      description: One SAML identity provider. Not supported by artifactweave (decision 0019).
+      description: One SAML identity provider. Not supported.
       properties:
         allow_user_to_access_profile:
           description: Optional within this object. Whether users created through SAML may open their own profile.
@@ -690,7 +685,7 @@ components:
           type: boolean
       type: object
     SamlSettingCreate:
-      description: A new SAML identity provider. Not supported by artifactweave (decision 0019).
+      description: A new SAML identity provider. Not supported.
       properties:
         allow_user_to_access_profile:
           description: Optional within this object. Whether users created through SAML may open their own profile.
@@ -754,7 +749,7 @@ components:
       - service_provider_name
       type: object
     ScimGroupListResponse:
-      description: A SCIM 2.0 list response of groups (RFC 7644). Not supported by artifactweave.
+      description: A SCIM 2.0 list response of groups (RFC 7644). Not supported.
       properties:
         Resources:
           description: Optional within this object. Groups on this page.
@@ -806,10 +801,10 @@ components:
       type: object
     ScimResource:
       additionalProperties: true
-      description: A SCIM 2.0 resource or patch document (RFC 7643, RFC 7644), free-form. Not supported by artifactweave.
+      description: A SCIM 2.0 resource or patch document (RFC 7643, RFC 7644), free-form. Not supported.
       type: object
     ScimResourceTypeListResponse:
-      description: A SCIM 2.0 list response of resource types. Not supported by artifactweave.
+      description: A SCIM 2.0 list response of resource types. Not supported.
       properties:
         Resources:
           description: Optional within this object. The resource types the endpoint supports, User and Group.
@@ -832,7 +827,7 @@ components:
           type: integer
       type: object
     ScimUserListResponse:
-      description: A SCIM 2.0 list response of users. Not supported by artifactweave.
+      description: A SCIM 2.0 list response of users. Not supported.
       properties:
         Resources:
           description: Optional within this object. Users on this page.
@@ -928,10 +923,12 @@ components:
           type: string
       type: object
     UserLockPolicyConfig:
-      description: The Access user lock policy. One document over the same settings as the Artifactory user lock
-        policy and password expiration policy, so a change through either API reads back through both. attempts
-        and passwordExpiryDays are enforced; the other fields are stored and returned only, so artifactweave does
-        not yet unlock users after secondsToUnlock, delay logins, or exempt administrators from password expiry.
+      description: The Access user lock policy. One document over the same settings as
+        /artifactory/api/security/userLockPolicy and
+        /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads
+        back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned
+        only. Users are not unlocked after secondsToUnlock, logins are not delayed, and administrators are not
+        exempt from password expiry.
       properties:
         adminPasswordExpirable:
           description: Optional within this object. Whether password expiry also applies to administrators. Stored
@@ -939,8 +936,8 @@ components:
           type: boolean
         attempts:
           description: Optional within this object. Failed logins before a user is locked, from 0 through 100. 0
-            turns locking off and unlocks every locked user; the Artifactory policy then reports enabled false and
-            keeps its previous loginAttempts. Default 0.
+            turns locking off and unlocks every locked user; /artifactory/api/security/userLockPolicy then reports
+            enabled false and keeps its previous loginAttempts. Default 0.
           maximum: 100
           minimum: 0
           type: integer
@@ -964,8 +961,8 @@ components:
           type: integer
         passwordExpiryDays:
           description: Optional within this object. Days after which an internal user's password expires; 0 means
-            passwords do not expire. The Artifactory password expiration policy reads it as enabled with
-            passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
+            passwords do not expire. /artifactory/api/security/configuration/passwordExpirationPolicy reads it as
+            enabled with passwordMaxAge, and keeps its previous passwordMaxAge while this is 0. Default 0.
           minimum: 0
           type: integer
         secondsToUnlock:
@@ -1018,8 +1015,7 @@ components:
 paths:
   /api/v1/aws/iam_role:
     put:
-      description: AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation
-        is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: putAwsIamRole
       requestBody:
         content:
@@ -1030,7 +1026,7 @@ paths:
         required: true
       responses:
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -1075,8 +1071,7 @@ paths:
       x-tier: stub
   /api/v1/aws/iam_role/{username}:
     delete:
-      description: AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation
-        is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: deleteAwsIamRole
       parameters:
       - description: Required path parameter. Username the operation applies to.
@@ -1087,7 +1082,7 @@ paths:
           type: string
       responses:
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -1119,8 +1114,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleteawsiamrole.md
       x-tier: stub
     get:
-      description: AWS IAM role mapping is not implemented in artifactweave (out of scope, research 10). The operation
-        is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getAwsIamRole
       parameters:
       - description: Required path parameter. Username the operation applies to.
@@ -1135,7 +1129,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AwsIamRoleAssignment'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -1381,8 +1375,8 @@ paths:
   /api/v1/config/security/user_lock_policy:
     get:
       description: Returns the user lock policy. A setting never changed reports its default. Reads the same state
-        as GET /artifactory/api/security/userLockPolicy and the Artifactory password expiration policy, mapped
-        as JFrog documents. Requires a platform admin.
+        as GET /artifactory/api/security/userLockPolicy and GET
+        /artifactory/api/security/configuration/passwordExpirationPolicy. Requires a platform admin.
       operationId: getAccessUserLockPolicy
       responses:
         '200':
@@ -1409,8 +1403,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.md
     put:
       description: Replaces the user lock policy and returns what was stored. Send every field; an omitted field is
-        stored as 0 or false, not as its default, as in Access. To change one setting, read the policy and send it
-        back with that field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
+        stored as 0 or false, not as its default. To change one setting, read the policy and send it back with that
+        field changed. Setting attempts to 0 unlocks every locked user. Requires a platform admin.
       operationId: configureAccessUserLockPolicy
       requestBody:
         content:
@@ -1520,8 +1514,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/settokendefaultexpiry.md
   /api/v1/crowd:
     get:
-      description: Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation
-        is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getCrowdConfiguration
       responses:
         '200':
@@ -1529,7 +1522,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CrowdConfiguration'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -1555,8 +1548,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getcrowdconfiguration.md
       x-tier: stub
     put:
-      description: Atlassian Crowd integration is not implemented in artifactweave (decision 0019). The operation
-        is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: upsertCrowdConfiguration
       requestBody:
         content:
@@ -1571,7 +1563,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CrowdConfiguration'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -1604,8 +1596,7 @@ paths:
       x-tier: stub
   /api/v1/httpsso:
     get:
-      description: HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getHttpSsoConfiguration
       responses:
         '200':
@@ -1613,7 +1604,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HttpSsoConfiguration'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -1639,8 +1630,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/gethttpssoconfiguration.md
       x-tier: stub
     put:
-      description: HTTP single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: upsertHttpSsoConfiguration
       requestBody:
         content:
@@ -1655,7 +1645,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HttpSsoConfiguration'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -2282,8 +2272,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getldapsettingsbykey.md
   /api/v1/logshipping/config:
     post:
-      description: Cloud log collection is not implemented in artifactweave (a JFrog Cloud feature, research 10).
-        The operation is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: enableCloudLogCollection
       requestBody:
         content:
@@ -2300,7 +2289,7 @@ paths:
         required: true
       responses:
         '200':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -2363,9 +2352,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getalloidcconfigurations.md
     post:
       description: Registers an external identity provider, typically a CI system, whose signed ID tokens may be
-        exchanged for access tokens. Answers 200, not 201, with the stored configuration; the jfrog/platform provider
-        expects exactly 200. A duplicate name or a GitHub provider type without organization is rejected with 400.
-        Requires a platform admin.
+        exchanged for access tokens. Answers 200 with the stored configuration. A duplicate name or a GitHub provider
+        type without organization is rejected with 400. Requires a platform admin.
       operationId: createOidcConfiguration
       requestBody:
         content:
@@ -2407,10 +2395,10 @@ paths:
     post:
       description: 'Implements the OAuth 2.0 token exchange of RFC 8693 for CI workload identity. The caller presents
         an ID token signed by a registered provider; the server verifies its signature, issuer and audience, tries
-        the provider''s identity mappings in priority order, and issues an access token shaped by the token_spec
-        of the first mapping whose claims all match. Needs no authentication: the subject token is the credential.
+        the provider''s identity mappings in priority order, and issues an access token shaped by the token_spec of
+        the first mapping whose claims all match. Needs no authentication: the subject token is the credential.
         Answers 400 when the request is malformed or no mapping matches, and 401 when the subject token does not
-        verify. The jfrog/artifactory provider''s oidc_provider_name setting and the JFrog CLI use this operation.'
+        verify.'
       operationId: oidcTokenExchange
       requestBody:
         content:
@@ -2618,8 +2606,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappings.md
     post:
       description: 'Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange
-        issues a token described by token_spec. Answers 200, not 201, with the stored mapping, including the project_key
-        derived from its scope. Requires a platform admin.'
+        issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived
+        from its scope. Requires a platform admin.'
       operationId: createOidcIdentityMapping
       parameters:
       - description: Required path parameter. Name of the OIDC provider the mappings belong to.
@@ -2812,8 +2800,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/updateoidcidentitymapping.md
   /api/v1/saml:
     get:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getAllSamlSettings
       responses:
         '200':
@@ -2823,7 +2810,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/SamlSetting'
                 type: array
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -2849,8 +2836,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallsamlsettings.md
       x-tier: stub
     post:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: createSamlSetting
       requestBody:
         content:
@@ -2865,7 +2851,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SamlSetting'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -2898,8 +2884,7 @@ paths:
       x-tier: stub
   /api/v1/saml/general_settings:
     get:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getSamlGeneralSettings
       responses:
         '200':
@@ -2907,7 +2892,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SamlGeneralSettings'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -2933,8 +2918,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlgeneralsettings.md
       x-tier: stub
     put:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateSamlGeneralSettings
       requestBody:
         content:
@@ -2951,7 +2935,7 @@ paths:
         required: true
       responses:
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -2984,8 +2968,7 @@ paths:
       x-tier: stub
   /api/v1/saml/{name}:
     delete:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: deleteSamlSetting
       parameters:
       - description: Required path parameter. Name of the SAML setting.
@@ -2996,7 +2979,7 @@ paths:
           type: string
       responses:
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3022,8 +3005,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletesamlsetting.md
       x-tier: stub
     get:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getSamlSettingByName
       parameters:
       - description: Required path parameter. Name of the SAML setting.
@@ -3038,7 +3020,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SamlSetting'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3070,8 +3052,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getsamlsettingbyname.md
       x-tier: stub
     put:
-      description: SAML single sign-on is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateSamlSetting
       parameters:
       - description: Required path parameter. Name of the SAML setting.
@@ -3093,7 +3074,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SamlSetting'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3126,8 +3107,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/Groups:
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimGroups
       parameters:
       - description: Optional query parameter. SCIM filter expression that selects resources.
@@ -3156,7 +3136,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimGroupListResponse'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3176,8 +3156,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroups.md
       x-tier: stub
     post:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: createScimGroup
       requestBody:
         content:
@@ -3192,7 +3171,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3225,8 +3204,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/Groups/{groupName}:
     delete:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: deleteScimGroup
       parameters:
       - description: Required path parameter. Name of the SCIM group.
@@ -3237,7 +3215,7 @@ paths:
           type: string
       responses:
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3263,8 +3241,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimgroup.md
       x-tier: stub
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimGroupByName
       parameters:
       - description: Required path parameter. Name of the SCIM group.
@@ -3284,7 +3261,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3310,8 +3287,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimgroupbyname.md
       x-tier: stub
     patch:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: patchScimGroup
       parameters:
       - description: Required path parameter. Name of the SCIM group.
@@ -3333,9 +3309,9 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3367,8 +3343,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimgroup.md
       x-tier: stub
     put:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateScimGroup
       parameters:
       - description: Required path parameter. Name of the SCIM group.
@@ -3390,7 +3365,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3423,8 +3398,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/ResourceTypes:
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimResourceTypes
       responses:
         '200':
@@ -3432,7 +3406,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResourceTypeListResponse'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3453,8 +3427,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/Schemas:
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimSchemas
       responses:
         '200':
@@ -3462,7 +3435,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3483,8 +3456,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/Schemas/{schemaId}:
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimSchemaById
       parameters:
       - description: Required path parameter. URN of the SCIM schema.
@@ -3499,7 +3471,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3526,8 +3498,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/ServiceProviderConfig:
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimServiceProviderConfig
       responses:
         '200':
@@ -3535,7 +3506,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3556,8 +3527,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/Users:
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimUsers
       parameters:
       - description: Optional query parameter. SCIM filter expression that selects resources.
@@ -3586,7 +3556,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimUserListResponse'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3606,8 +3576,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimusers.md
       x-tier: stub
     post:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: createScimUser
       requestBody:
         content:
@@ -3622,7 +3591,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3655,8 +3624,7 @@ paths:
       x-tier: stub
   /api/v1/scim/v2/Users/{username}:
     delete:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: deleteScimUser
       parameters:
       - description: Required path parameter. Username the operation applies to.
@@ -3667,7 +3635,7 @@ paths:
           type: string
       responses:
         '204':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3693,8 +3661,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletescimuser.md
       x-tier: stub
     get:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: getScimUserByUsername
       parameters:
       - description: Required path parameter. Username the operation applies to.
@@ -3714,7 +3681,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3740,8 +3707,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getscimuserbyusername.md
       x-tier: stub
     patch:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: patchScimUser
       parameters:
       - description: Required path parameter. Username the operation applies to.
@@ -3763,7 +3729,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3795,8 +3761,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/patchscimuser.md
       x-tier: stub
     put:
-      description: SCIM provisioning is not implemented in artifactweave (decision 0019). The operation is kept
-        for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: updateScimUser
       parameters:
       - description: Required path parameter. Username the operation applies to.
@@ -3818,7 +3783,7 @@ paths:
             application/scim+json:
               schema:
                 $ref: '#/components/schemas/ScimResource'
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:
@@ -3851,12 +3816,11 @@ paths:
       x-tier: stub
   /api/v1/system/backup/export:
     post:
-      description: Access backup export and import is not implemented in artifactweave (configuration as code replaces
-        it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: exportAccessConfiguration
       responses:
         '202':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -3883,12 +3847,11 @@ paths:
       x-tier: stub
   /api/v1/system/backup/import:
     post:
-      description: Access backup export and import is not implemented in artifactweave (configuration as code replaces
-        it, decision 0009). The operation is kept for parity and always answers 501 in the Access error envelope.
+      description: Not implemented; answers 501 in the Access error envelope.
       operationId: importAccessConfiguration
       responses:
         '200':
-          description: Never returned by artifactweave; documented for parity.
+          description: Not returned.
         '400':
           content:
             application/json:

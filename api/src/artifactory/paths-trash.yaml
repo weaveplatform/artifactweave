@@ -34,7 +34,7 @@ components:
       type: object
     ErrorDetails:
       description: One error entry as the trash can operations describe it; the same shape as the entries
-        of the Artifactory error envelope.
+        of the standard error envelope.
       properties:
         message:
           description: Optional within this object. Human readable explanation.
@@ -48,8 +48,7 @@ paths:
     post:
       description: Starts a background task that removes redundant directory records the trash can accumulates,
         which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued;
-        the body carries a confirmation message. On this server the task is a no-op that still reports
-        success, because the item model does not create redundant records.
+        the body carries a confirmation message. The task is a no-op that still reports success.
       operationId: deleteRedundantRecordsToTrashCanDirectories
       requestBody:
         content:
@@ -135,8 +134,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The path is malformed or the caller lacks permission (Artifactory reports permission
-            failures here as 400).
+          description: The path is malformed or the caller lacks permission.
         '401':
           content:
             application/json:
@@ -160,7 +158,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller is not an admin (Artifactory reports this as 400).
+          description: The caller is not an admin.
         '401':
           content:
             application/json:

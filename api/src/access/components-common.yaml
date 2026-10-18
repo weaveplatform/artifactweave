@@ -9,8 +9,7 @@ components:
         name:
           type: string
           description: >-
-            Required within this object. The compatibility version; the platform
-            provider reads this field, not version.
+            Required within this object. The compatibility version.
         version:
           type: string
           description: Required within this object. The same value as name.
@@ -22,9 +21,7 @@ components:
         errors:
           type: array
           description: >-
-            Required within this object. One entry per error. The Terraform
-            providers join every entry into one error message;
-            jfrog-client-go reports the whole body after the status.
+            Required within this object. One entry per error.
           items:
             type: object
             required: [code, message]

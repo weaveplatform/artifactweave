@@ -43,7 +43,7 @@ components:
       properties:
         distribution_rules:
           description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
-            Only artifactweave peers paired as edges can match.
+            Only peers paired as edges can match.
           items:
             $ref: '#/components/schemas/DistributionRule'
           type: array
@@ -278,7 +278,7 @@ components:
           type: boolean
         distribution_rules:
           description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
-            Only artifactweave peers paired as edges can match.
+            Only peers paired as edges can match.
           items:
             $ref: '#/components/schemas/DistributionRule'
           type: array
@@ -324,8 +324,7 @@ components:
           type: string
       type: object
     DistributionStatus:
-      description: One distribution (or remote delete) of a version and its per-target progress. Confirmed by jfrog-client-go
-        (DistributionStatusResponse, DistributionSiteStatus) and JFrog's Distribution REST reference.
+      description: One distribution (or remote delete) of a version and its per-target progress.
       properties:
         created_by:
           description: Optional within this object. User who created the version.
@@ -404,11 +403,11 @@ components:
                     description: Optional within this object. Name of the target as configured.
                     type: string
                   service_id:
-                    description: Optional within this object. Service id of the target, jfrt@<id>; for artifactweave
-                      the peer's instance id.
+                    description: Optional within this object. Service id of the target, the peer's instance id
+                      in the form `jfrt@<uuid>`.
                     type: string
                   type:
-                    description: Optional within this object. Role of the target; edge for every artifactweave target.
+                    description: Optional within this object. Role of the target; always `edge`.
                     type: string
                 type: object
               total_bytes:
@@ -492,7 +491,7 @@ components:
       properties:
         distribution_rules:
           description: Required within this object. Rules selecting the edges; an edge matching any rule is selected.
-            Only artifactweave peers paired as edges can match.
+            Only peers paired as edges can match.
           items:
             $ref: '#/components/schemas/DistributionRule'
           minItems: 1
@@ -599,7 +598,7 @@ components:
       - public_key
       type: object
     GpgKeyAlias:
-      description: One configured GPG signing key, as listed by the aliases operation (Distribution 2.8.1 and later).
+      description: One configured GPG signing key, as listed by the aliases operation.
       properties:
         alias:
           description: Required within this object. Alias of the key.
@@ -615,9 +614,9 @@ components:
       - alias
       type: object
     GpgKeyUpload:
-      description: 'Body of a GPG key upload. Two forms are accepted because JFrog documents both: the flat form
-        of its current OpenAPI definition (alias, public_key, private_key at the top level) and the wrapped form
-        of its 2.4 and later reference (key plus the propagation flags). A body must carry a key in one form.'
+      description: 'Body of a GPG key upload, in one of two forms: the flat form (alias, public_key and private_key
+        at the top level) or the wrapped form (key plus the propagation flags). A body must carry a key in one
+        form.'
       properties:
         alias:
           description: 'Optional within this object. Flat form: name for the key pair; must be unique.'
@@ -644,8 +643,8 @@ components:
               description: Optional within this object. ASCII-armoured public key. Not combined with vault_data.
               type: string
             vault_data:
-              description: Optional within this object. Where to read the pair from a vault instead. Vault integration
-                is not supported in v1 and is rejected with 400.
+              description: Optional within this object. Where to read the pair from a vault instead. A key sent
+                with vault_data is rejected with 400.
               properties:
                 private_key:
                   description: Optional within this object. Path and key of the private part.
@@ -668,7 +667,7 @@ components:
                       type: string
                   type: object
                 vault_id:
-                  description: Optional within this object. Vault name; hashicorp in JFrog.
+                  description: Optional within this object. Vault name, such as hashicorp.
                   type: string
               type: object
           type: object
@@ -714,7 +713,7 @@ components:
           description: Optional within this object. Service id of the instance.
           type: string
         type:
-          description: Optional within this object. edge for an edge peer, artifactory for this source instance.
+          description: Optional within this object. `edge` for an edge peer, `artifactory` for this source instance.
           type: string
       type: object
     PropagationReport:
@@ -729,8 +728,8 @@ components:
                 description: The outcome for one target and key.
                 properties:
                   jpd_id:
-                    description: Optional within this object. Id of the target instance; for artifactweave the peer's
-                      instance id.
+                    description: Optional within this object. Id of the target instance, the peer's instance
+                      id.
                     type: string
                   key_alias:
                     description: Optional within this object. Alias of the key pushed.
@@ -751,8 +750,8 @@ components:
               type: string
             status:
               description: Required within this object. Overall result. PROPAGATION_NOT_REQUESTED when the call
-                asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched, PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL
-                is JFrog-specific and never returned by artifactweave.
+                asked not to propagate, NO_GPG_KEY_TO_PROPAGATE when no key matched. PROPAGATION_NOT_SUPPORTED_BY_MISSION_CONTROL
+                is not returned.
               enum:
               - SUCCESS
               - PARTIAL_SUCCESS
@@ -776,7 +775,7 @@ components:
           type: boolean
         distribution_rules:
           description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
-            Only artifactweave peers paired as edges can match.
+            Only peers paired as edges can match.
           items:
             $ref: '#/components/schemas/DistributionRule'
           type: array
@@ -789,8 +788,8 @@ components:
           description: Optional within this object. When true evidence attached to the bundle is sent too.
           type: boolean
         insecure_tls:
-          description: Optional within this object. Skips TLS verification toward the edges. artifactweave always
-            verifies peers (decision 0021) and ignores it.
+          description: Optional within this object. Accepted and ignored; TLS toward the edges is always
+            verified.
           type: boolean
         modifications:
           description: Optional within this object. Path mappings the edges apply when storing the artifacts.
@@ -804,11 +803,11 @@ components:
       description: Which edges should remove a Release Bundle v2 version.
       properties:
         auto_create_missing_repositories:
-          description: Optional within this object. Accepted for symmetry with distribution; has no effect on deletion.
+          description: Optional within this object. Accepted; has no effect on deletion.
           type: boolean
         distribution_rules:
           description: Optional within this object. Rules selecting the edges; an edge matching any rule is selected.
-            Only artifactweave peers paired as edges can match.
+            Only peers paired as edges can match.
           items:
             $ref: '#/components/schemas/DistributionRule'
           type: array
@@ -823,8 +822,7 @@ components:
       type: object
     ReleaseBundleCreation:
       description: Body of a release bundle v1 create. The same body without name and version updates an unsigned
-        version (ReleaseBundleUpdate). Shape confirmed by jfrog-client-go (createReleaseBundleBody, ReleaseBundleBody)
-        and JFrog's Distribution REST reference.
+        version (ReleaseBundleUpdate).
       properties:
         description:
           description: Optional within this object. Free text describing the version.
@@ -901,8 +899,7 @@ components:
                     type: string
                   exclude_props_patterns:
                     description: Optional within this object. Patterns of property keys not copied with this query's
-                      artifacts. JFrog's field table places this list on spec rather than on a query, while its
-                      example places it here; both positions are accepted and combined.
+                      artifacts. Combined with spec.exclude_props_patterns.
                     items:
                       description: One key pattern; * matches any run.
                       type: string
@@ -941,7 +938,7 @@ components:
             source_artifactory_id:
               deprecated: true
               description: 'Optional within this object. Service id of the instance the queries run against. Deprecated
-                by JFrog and ignored: queries always run against this instance.'
+                and ignored: queries always run against this instance.'
               type: string
           required:
           - queries
@@ -1036,8 +1033,7 @@ components:
                     type: string
                   exclude_props_patterns:
                     description: Optional within this object. Patterns of property keys not copied with this query's
-                      artifacts. JFrog's field table places this list on spec rather than on a query, while its
-                      example places it here; both positions are accepted and combined.
+                      artifacts. Combined with spec.exclude_props_patterns.
                     items:
                       description: One key pattern; * matches any run.
                       type: string
@@ -1076,7 +1072,7 @@ components:
             source_artifactory_id:
               deprecated: true
               description: 'Optional within this object. Service id of the instance the queries run against. Deprecated
-                by JFrog and ignored: queries always run against this instance.'
+                and ignored: queries always run against this instance.'
               type: string
           required:
           - queries
@@ -1090,11 +1086,11 @@ components:
       - spec
       type: object
     ReleaseBundleV1Version:
-      description: A release bundle v1 version as Distribution reports it. Field names follow the documented examples
-        for create, sign, list and get. state and status both carry the version state; see status.
+      description: A release bundle v1 version, as create, sign, list and get return it. state and status both
+        carry the version state.
       properties:
         archived:
-          description: Optional within this object. Whether the version is archived. Always false in artifactweave.
+          description: Optional within this object. Whether the version is archived. Always false.
           type: boolean
         artifacts:
           description: Optional within this object. The artifacts the version pins.
@@ -1124,8 +1120,7 @@ components:
                 type: array
               repo_path:
                 description: Optional within this object. <repo>/<path> of the artifact on this instance; the same
-                  value as source_repo_path. JFrog's current OpenAPI definition uses this name, its documented examples
-                  the source and target pair, so both are sent.
+                  value as source_repo_path.
                 type: string
               source_repo_path:
                 description: Optional within this object. <repo>/<path> of the artifact on this instance.
@@ -1135,8 +1130,8 @@ components:
                   instance, after the query's mappings.
                 type: string
               xray_scan_info:
-                description: Optional within this object. Xray block state in JFrog. artifactweave has no Xray,
-                  so blocked is always false.
+                description: Optional within this object. Scan block state of the artifact; blocked is always
+                  false.
                 properties:
                   blocked:
                     description: Optional within this object. Whether a scan policy blocks the artifact.
@@ -1183,16 +1178,13 @@ components:
           type: object
         state:
           description: Required within this object. OPEN until the version is signed, then SIGNED; a SIGNED version
-            is immutable and can be distributed or exported. These are the two states JFrog documents and the only
-            ones artifactweave reports.
+            is immutable and can be distributed or exported.
           enum:
           - OPEN
           - SIGNED
           type: string
         status:
-          description: Optional within this object. JFrog's current OpenAPI definition names this field while its
-            documented examples use state; artifactweave sends both, with the same value, so clients reading either
-            work.
+          description: Optional within this object. The version state; always the same value as state.
           type: string
           x-unverified: true
         version:
@@ -1221,7 +1213,7 @@ components:
           format: int64
           type: integer
         releaseBundlesSchema:
-          description: 'Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1 on artifactweave.'
+          description: 'Optional within this object. Bundle format: RBV1, RBV2 or RBV2_ATW. Always RBV1.'
           enum:
           - RBV1
           - RBV2
@@ -1420,8 +1412,8 @@ components:
       description: Distribution settings.
       properties:
         call_home_enabled:
-          description: Optional within this object. Accepted and stored for compatibility. artifactweave never sends
-            usage data, so it has no effect.
+          description: Optional within this object. Accepted and stored. No usage data is sent, so it has no
+            effect.
           type: boolean
       type: object
     TokenInfo:

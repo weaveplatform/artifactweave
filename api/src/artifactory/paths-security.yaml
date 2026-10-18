@@ -17,7 +17,7 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: artifactweave failed while serving the request.
+      description: The server failed while serving the request.
     SecurityNotFound:
       content:
         application/json:
@@ -32,13 +32,11 @@ components:
       description: No credentials were supplied or they were rejected.
   schemas:
     ApiKeyResponse:
-      description: The API key of the calling user. API keys reached end of life in Artifactory at the end of 2024;
-        artifactweave never issues one.
+      description: The API key of the calling user. The server never issues API keys.
       properties:
         apiKey:
-          description: Optional within this object. The key value. Keys that clients recognise start with AKCp8
-            and are at least 73 characters long. artifactweave returns this field only from the shim responses that
-            report no key exists, so it is never populated.
+          description: Optional within this object. The key value, which starts with AKCp8 and is at least 73 characters
+            long. Never populated.
           type: string
       type: object
     CertificateInfo:
@@ -48,8 +46,8 @@ components:
           description: Optional within this object. Alias used as the identifier and referenced by repositories.
           type: string
         fingerPrint:
-          description: Optional within this object. SHA-256 fingerprint. The Terraform provider matches this key
-            case-insensitively, so the spelling is kept as documented.
+          description: Optional within this object. SHA-256 fingerprint. The key is spelled fingerPrint, with a capital
+            P.
           type: string
         issuedBy:
           description: Optional within this object. Issuer of the certificate.
@@ -153,12 +151,11 @@ components:
           type: string
         vaultKey:
           description: Optional within this object. Name of an external vault key to use instead of privateKey.
-            Accepted for wire compatibility; artifactweave has no vault integration in v1 and rejects a pair that
-            sets it without privateKey with 400.
+            Accepted but not used; a pair that sets it without privateKey is rejected with 400.
           type: string
         vaultPublicKey:
           description: Optional within this object. Location of the public key in an external vault when vaultKey
-            is used. Accepted and ignored in v1.
+            is used. Accepted and ignored.
           properties:
             key:
               description: Optional within this object. Field name inside the vault entry.
@@ -242,9 +239,8 @@ components:
           type: string
       type: object
     PasswordExpirationPolicy:
-      description: Platform-wide password expiry. JFrog's documentation shows the values as quoted strings, but
-        the artifactory_password_expiration_policy Terraform resource decodes enabled as a boolean and passwordMaxAge
-        as an integer, so artifactweave emits real JSON types and accepts either form on input.
+      description: Platform-wide password expiry. Responses carry enabled as a JSON boolean and passwordMaxAge as
+        a JSON integer; requests may send either as a quoted string.
       properties:
         enabled:
           description: Optional within this object. Whether internal passwords expire. Defaults to false. Accepted
@@ -261,8 +257,8 @@ components:
       type: object
     PermissionTarget:
       description: 'A version 1 permission target: repository targets plus include and exclude patterns and per-principal
-        action codes. Virtual repositories cannot be targets. artifactweave stores every target in the Access v2
-        shape and converts on the wire (decision 0006).'
+        action codes. Virtual repositories cannot be targets. Every target is stored in the Access v2 shape and
+        converted on the wire (decision 0006).'
       properties:
         excludesPattern:
           description: Optional within this object. Comma-separated Ant patterns excluded from the target. Defaults
@@ -341,13 +337,12 @@ components:
       type: object
     PermissionTargetV2:
       description: A version 2 permission target with separate sections for repositories, builds and release bundles.
-        This is the shape the JFrog CLI and the artifactory_permission_target resource send. Keys mix kebab-case
-        and camelCase exactly as Artifactory does.
+        Keys mix kebab-case and camelCase.
       properties:
         build:
           allOf:
           - $ref: '#/components/schemas/PermissionTargetV2Section'
-          description: Optional within this object. Grants on build-info. Its repositories list is fixed to artifactory-build-info;
+          description: Optional within this object. Grants on build-info. Its repositories list is fixed to `artifactory-build-info`;
             any other value is a 400. A PUT that omits this section deletes it.
         name:
           description: Optional within this object. Target name, at most 64 characters. The path parameter wins;
@@ -356,8 +351,8 @@ components:
         releaseBundle:
           allOf:
           - $ref: '#/components/schemas/PermissionTargetV2Section'
-          description: Optional within this object. Grants on release bundles. Accepted and stored for compatibility;
-            release bundles are out of scope in v1, so the section has no effect. A PUT that omits it deletes it.
+          description: Optional within this object. Grants on release bundles. Stored without effect; release bundles
+            are not served. A PUT that omits it deletes it.
         repo:
           allOf:
           - $ref: '#/components/schemas/PermissionTargetV2Section'
@@ -391,7 +386,7 @@ components:
                 description: Action names granted to one user.
                 items:
                   description: One action name. managedXrayMeta and distribute are accepted and stored but have
-                    no effect in artifactweave.
+                    no effect.
                   enum:
                   - read
                   - write
@@ -431,8 +426,8 @@ components:
       description: A confirmation message returned by several mutating operations.
       properties:
         info:
-          description: Optional within this object. Human-readable confirmation of what changed. Clients do not
-            parse it.
+          description: Optional within this object. Human-readable confirmation of what changed, as free text without
+            a fixed format.
           type: string
       type: object
     SecurityStatusMessage:
@@ -505,8 +500,7 @@ components:
             user cannot be demoted while it is the last admin.
           type: boolean
         disableUIAccess:
-          description: Optional within this object. Stored for compatibility; artifactweave has no UI, so it has
-            no effect. Defaults to false.
+          description: Optional within this object. Stored without effect; no UI is served. Defaults to false.
           type: boolean
         email:
           description: Optional within this object. Email address. Required on PUT.
@@ -528,8 +522,7 @@ components:
           format: date-time
           type: string
         mfaStatus:
-          description: Optional within this object. Server-owned multi-factor state. Always NONE in artifactweave,
-            which has no MFA.
+          description: Optional within this object. Server-owned multi-factor state. Always NONE.
           enum:
           - NONE
           - ENABLED
@@ -725,8 +718,7 @@ paths:
     delete:
       deprecated: true
       description: Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are
-        no keys to revoke, so artifactweave answers 200 with an informational message for compatibility with scripts
-        that call it unconditionally.
+        no keys to revoke, so the operation always answers 200 with an informational message.
       operationId: revokeApiKey
       parameters:
       - description: Optional query parameter. 1 revokes every user's key and requires the admin role; 0 or absent
@@ -760,8 +752,8 @@ paths:
       x-tier: shim
     get:
       deprecated: true
-      description: Returns the caller's API key. Because artifactweave never issues keys this always answers 404,
-        which is the documented response when no key exists; the JFrog CLI treats it as "no key".
+      description: Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the
+        response for a user without a key.
       operationId: getApiKey
       responses:
         '200':
@@ -769,7 +761,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiKeyResponse'
-          description: Documented success shape; artifactweave never returns it.
+          description: Not returned.
         '401':
           $ref: '#/components/responses/SecurityUnauthorized'
         '403':
@@ -785,10 +777,8 @@ paths:
       x-tier: shim
     post:
       deprecated: true
-      description: Legacy API-key creation. Artifactory disables it by default since 7.98 and the keys reached end
-        of life; artifactweave always answers 400 with the message "API key creation is disabled". Use an access
-        token or a reference token from /access/api/v1/tokens instead. jfrog-client-go expects 201 on success, which
-        never happens here.
+      description: Legacy API-key creation, which is disabled. Always answers 400 with the message "API key creation
+        is disabled". Use an access token or a reference token from /access/api/v1/tokens instead.
       operationId: createApiKey
       responses:
         '200':
@@ -796,7 +786,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiKeyResponse'
-          description: Documented success shape; artifactweave never returns it.
+          description: Not returned.
         '400':
           $ref: '#/components/responses/SecurityBadRequest'
         '401':
@@ -812,8 +802,8 @@ paths:
       x-tier: shim
     put:
       deprecated: true
-      description: Legacy key rotation. artifactweave answers 400 "API key creation is disabled" because no user
-        ever holds a key.
+      description: Legacy key rotation, which is disabled. Always answers 400 "API key creation is disabled"; no
+        user holds a key.
       operationId: regenerateApiKey
       responses:
         '200':
@@ -821,7 +811,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiKeyResponse'
-          description: Documented success shape; artifactweave never returns it.
+          description: Not returned.
         '400':
           $ref: '#/components/responses/SecurityBadRequest'
         '401':
@@ -873,7 +863,7 @@ paths:
     get:
       deprecated: true
       description: Returns the platform-wide password expiry settings. Admin only. The same policy is visible in
-        the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
+        the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.
       operationId: getPasswordExpirationPolicy
       responses:
         '200':
@@ -894,9 +884,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpasswordexpirationpolicy.md
     put:
       deprecated: true
-      description: Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values,
-        because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types.
-        Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+      description: Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults,
+        not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour
+        of PUT /api/security/userLockPolicy.
       operationId: setPasswordExpirationPolicy
       requestBody:
         content:
@@ -927,9 +917,8 @@ paths:
   /api/security/encryptedPassword:
     get:
       deprecated: true
-      description: Artifactory returns an opaque encrypted password that clients can use in place of the clear-text
-        one. artifactweave returns a reference token bound to the caller instead, which every client accepts wherever
-        the encrypted password was accepted. The caller must authenticate with Basic credentials; token authentication
+      description: Returns a reference token bound to the caller, usable in place of the clear-text password wherever
+        an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication
         is a 400.
       operationId: getUserEncryptedPassword
       responses:
@@ -954,8 +943,7 @@ paths:
   /api/security/groups:
     get:
       deprecated: true
-      description: Lists every group with its detail URL. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/groups;
-        kept for the JFrog CLI. Not in the oracle; from docs/research/05.
+      description: Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.
       operationId: getGroups
       responses:
         '200':
@@ -986,7 +974,6 @@ paths:
     delete:
       deprecated: true
       description: Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
-        Not in the oracle; from docs/research/05.
       operationId: deleteGroup
       parameters:
       - description: Required path parameter. The group name.
@@ -1019,8 +1006,7 @@ paths:
       - security
     get:
       deprecated: true
-      description: Returns the legacy group document. Admin only. Members are included only when includeUsers=true;
-        the Terraform provider always sends the parameter. Not in the oracle; from docs/research/05.
+      description: Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
       operationId: getGroupDetails
       parameters:
       - description: Required path parameter. The group name.
@@ -1061,7 +1047,7 @@ paths:
     post:
       deprecated: true
       description: Changes only the fields present in the body; userNames, when present, replaces the membership.
-        Admin only. Not in the oracle; from docs/research/05.
+        Admin only.
       operationId: updateGroup
       parameters:
       - description: Required path parameter. The group name.
@@ -1100,9 +1086,7 @@ paths:
     put:
       deprecated: true
       description: Creates the group or replaces every field of an existing one, including the membership when userNames
-        is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on
-        create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from
-        docs/research/05.
+        is present. Admin only. Always answers 201, both on create and on replace.
       operationId: createOrReplaceGroup
       parameters:
       - description: Required path parameter. The group name; must equal name in the body.
@@ -1162,8 +1146,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getallkeypairs.md
     post:
       description: Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private
-        and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform
-        resource requires.
+        and public keys must match (400). Answers 201 with an empty object.
       operationId: createKeyPair
       requestBody:
         content:
@@ -1325,8 +1308,7 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletekeypair.md
     get:
-      description: Returns the readable projection of one pair. Admin only. The Terraform provider reads this after
-        every create.
+      description: Returns the readable projection of one pair. Admin only.
       operationId: getKeyPair
       parameters:
       - description: Required path parameter. The pair name.
@@ -1357,9 +1339,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getkeypair.md
   /api/security/keys/trusted:
     get:
-      description: Lists the public keys trusted for release-bundle signature verification. Admin only. Served so
-        the artifactory_distribution_public_key resource can read back what it created; release bundles themselves
-        are out of scope in v1. Not in the oracle; shape from docs/research/05 and the provider source.
+      description: Lists the public keys trusted for release-bundle signature verification. Admin only. Release
+        bundles themselves are not served.
       operationId: getTrustedKeys
       responses:
         '200':
@@ -1378,8 +1359,8 @@ paths:
       tags:
       - security
     post:
-      description: Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key
-        resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+      description: Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a
+        400.
       operationId: setDistributionPublicGpgKey
       requestBody:
         content:
@@ -1394,7 +1375,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TrustedKey'
-          description: Documented success shape; artifactweave answers 201 instead.
+          description: Not returned.
         '201':
           content:
             application/json:
@@ -1415,8 +1396,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/setdistributionpublicgpgkey.md
   /api/security/keys/trusted/{keyId}:
     delete:
-      description: Removes a trusted key by its kid. Admin only. Answers 204; the provider accepts 200 or 204. Not
-        in the oracle; from docs/research/05.
+      description: Removes a trusted key by its kid. Admin only. Answers 204.
       operationId: deleteTrustedKey
       parameters:
       - description: Required path parameter. The kid returned when the key was stored.
@@ -1442,8 +1422,7 @@ paths:
       - security
   /api/security/lockedUsers:
     get:
-      description: Returns the names of users locked by the user lock policy. Admin only. The JFrog CLI prints this
-        list for jf rt users-locked style commands.
+      description: Returns the names of users locked by the user lock policy. Admin only.
       operationId: getLockedOutUsers
       responses:
         '200':
@@ -1470,7 +1449,7 @@ paths:
     get:
       deprecated: true
       description: Lists every target by name and detail URL, including targets created through the v2 or Access
-        APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
+        APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
       operationId: getPermissionTargets
       responses:
         '200':
@@ -1502,8 +1481,8 @@ paths:
     delete:
       deprecated: true
       description: Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote
-        targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog
-        in favour of DELETE /access/api/v2/permissions/{name}.
+        targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour
+        of DELETE /access/api/v2/permissions/{name}.
       operationId: deletePermissionTarget
       parameters:
       - description: Required path parameter. The target name.
@@ -1536,7 +1515,7 @@ paths:
     get:
       deprecated: true
       description: 'Returns the target projected to the v1 shape: only its repository section, with action names
-        mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.'
+        mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.'
       operationId: getPermissionTargetDetails
       parameters:
       - description: Required path parameter. The target name.
@@ -1572,7 +1551,7 @@ paths:
       deprecated: true
       description: Creates the target or replaces its repository section; build and release bundle sections set
         through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories
-        are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+        are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
       operationId: createOrReplacePermissionTarget
       parameters:
       - description: Required path parameter. The target name; wins over name in the body.
@@ -1634,11 +1613,9 @@ paths:
       - security
     post:
       deprecated: true
-      description: The form-encoded predecessor of POST /access/api/v1/tokens, still implemented by the JFrog CLI
-        and not on JFrog's deprecation page. Issues the same JWT the Access endpoint issues. Admins may mint tokens
-        for any username and scope; other users only an identity token for themselves. Legacy scope forms member-of-groups:<g>,
-        api:* and jfrt@<id>:admin are translated to their Access equivalents. Hand-written because the body is form-encoded.
-        Not in the oracle; from docs/research/05 and 09.
+      description: The form-encoded predecessor of POST /access/api/v1/tokens. Issues the same JWT the Access endpoint
+        issues. Admins may mint tokens for any username and scope; other users only an identity token for themselves.
+        Legacy scope forms member-of-groups:<g>, api:* and jfrt@<id>:admin are translated to their Access equivalents.
       operationId: createLegacyToken
       requestBody:
         content:
@@ -1803,8 +1780,8 @@ paths:
   /api/security/unlockUsers/{userName}:
     post:
       deprecated: true
-      description: The older form the JFrog CLI still sends, with the user in the path and no body. Behaves like
-        the array form for one user. Not in the oracle; from docs/research/09.
+      description: The older form, with the user in the path and no body. Behaves like the array form for one
+        user.
       operationId: unlockLockedOutUser
       parameters:
       - description: Required path parameter. The user to unlock.
@@ -1887,8 +1864,8 @@ paths:
   /api/security/users:
     get:
       deprecated: true
-      description: Lists every user with its detail URL and realm. Admin only. Deprecated by JFrog in favour of
-        GET /access/api/v2/users; kept because the JFrog CLI calls it. Not in the oracle; from docs/research/05.
+      description: Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET
+        /access/api/v2/users.
       operationId: getUsers
       responses:
         '200':
@@ -1951,8 +1928,7 @@ paths:
   /api/security/users/authorization/unexpirePassword/{userName}:
     post:
       deprecated: true
-      description: Clears the forced password change for one user. Admin only. JFrog marks it slated for removal;
-        kept for script compatibility.
+      description: Clears the forced password change for one user. Admin only.
       operationId: unexpirePasswordForSingleUser
       parameters:
       - description: Required path parameter. The user name.
@@ -1986,7 +1962,7 @@ paths:
     delete:
       deprecated: true
       description: Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users
-        cannot be deleted (400). Not in the oracle; from docs/research/05.
+        cannot be deleted (400).
       operationId: deleteUser
       parameters:
       - description: Required path parameter. The user name.
@@ -2020,8 +1996,7 @@ paths:
     get:
       deprecated: true
       description: Returns the legacy user document without the password. Admin only. The seeded anonymous user
-        is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour
-        of GET /access/api/v2/users/{username}.
+        is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.
       operationId: getUserDetails
       parameters:
       - description: Required path parameter. The user name.
@@ -2056,7 +2031,7 @@ paths:
     post:
       deprecated: true
       description: Changes only the fields present in the body. Admin only. groups, when present, replaces the membership.
-        Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+        Deprecated in favour of PATCH /access/api/v2/users/{name}.
       operationId: updateUser
       parameters:
       - description: Required path parameter. The user name.
@@ -2096,8 +2071,7 @@ paths:
       deprecated: true
       description: Creates the user, or replaces every field of an existing one. Admin only. name, email and password
         are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the
-        user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour
-        of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+        user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
       operationId: createOrReplaceUser
       parameters:
       - description: Required path parameter. The user name; must equal name in the body.
@@ -2133,9 +2107,8 @@ paths:
       - security
   /api/system/decrypt:
     post:
-      description: In Artifactory this rewrites the configuration descriptor with clear-text secrets. artifactweave
-        keeps secrets sealed at all times (decision 0017), so the call is accepted and answers DONE without changing
-        anything; the descriptor export masks secrets regardless.
+      description: Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision
+        0017), and the descriptor export masks them regardless.
       operationId: deactivateArtifactoryKeyEncryption
       responses:
         '200':
@@ -2181,8 +2154,7 @@ paths:
       x-tier: shim
   /api/system/security/certificates:
     get:
-      description: Lists the client certificates remote repositories can present to upstreams. Admin only. The artifactory_certificate
-        resource reads the list after every create and matches fingerPrint case-insensitively.
+      description: Lists the client certificates remote repositories can present to upstreams. Admin only.
       operationId: getCertificates
       responses:
         '200':
@@ -2247,8 +2219,7 @@ paths:
     post:
       description: Stores a PEM bundle holding the certificate and its private key under the alias. Admin only.
         The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an
-        existing alias is replaced. The documented request media type is application/text; text/plain is accepted
-        as well.
+        existing alias is replaced. The request media type is application/text; text/plain is accepted as well.
       operationId: addCertificate
       parameters:
       - description: Required path parameter. Alias that repositories reference in clientTlsCertificate.
@@ -2805,8 +2776,7 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetdetailsv2.md
     head:
-      description: 200 when the target exists, 404 when it does not, with no body. The artifactory_permission_target
-        resource uses it before every create.
+      description: 200 when the target exists, 404 when it does not, with no body.
       operationId: permissionTargetExistenceCheckV2
       parameters:
       - description: Required path parameter. The target name.
@@ -2832,10 +2802,9 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/permissiontargetexistencecheckv2.md
     post:
-      description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409, which
-        jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build
-        section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64
-        characters are a 400.'
+      description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin
+        only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`,
+        a virtual repository target or a name over 64 characters are a 400.'
       operationId: createPermissionTargetV2
       parameters:
       - description: Required path parameter. The target name; wins over name in the body.
@@ -2878,8 +2847,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpermissiontargetv2.md
     put:
       description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept.
-        Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an
-        existing target may call it. Validation is the same as for create.'
+        Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it.
+        Validation is the same as for create.'
       operationId: createOrReplacePermissionTargetV2
       parameters:
       - description: Required path parameter. The target name; wins over name in the body.

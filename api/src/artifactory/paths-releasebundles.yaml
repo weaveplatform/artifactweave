@@ -3,7 +3,7 @@ paths:
     get:
       description: Lists the release bundles v1 held on this instance, grouped by bundle name with every version.
         `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default,
-        lists bundles this instance received as an edge (decision 0023). Only bundles the caller may read are returned.
+        lists bundles this instance received as an edge. Only bundles the caller may read are returned.
       operationId: getAllBundles
       parameters:
       - description: 'Optional query parameter. Which side of distribution to list: `target` for received bundles
@@ -36,9 +36,9 @@ paths:
                             format: date-time
                             type: string
                           status:
-                            description: Optional within this object. State of the version on this instance. JFrog
-                              documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS
-                              while a received version is still arriving and FAILED when receiving or storing failed.
+                            description: Optional within this object. State of the version on this instance. COMPLETE
+                              means the version is fully stored, IN_PROGRESS that a received version is still arriving,
+                              and FAILED that receiving or storing failed.
                             type: string
                           version:
                             description: Optional within this object. The bundle version string.
@@ -164,9 +164,9 @@ paths:
                           format: date-time
                           type: string
                         status:
-                          description: Optional within this object. State of the version on this instance. JFrog
-                            documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS
-                            while a received version is still arriving and FAILED when receiving or storing failed.
+                          description: Optional within this object. State of the version on this instance. COMPLETE
+                            means the version is fully stored, IN_PROGRESS that a received version is still arriving,
+                            and FAILED that receiving or storing failed.
                           type: string
                         version:
                           description: Optional within this object. The bundle version string.
@@ -208,8 +208,7 @@ paths:
     get:
       description: Returns one release bundle version. With `format=json`, or without `format`, the response is
         the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`),
-        which an edge verifies against the distributing instance's public signing key before accepting any content
-        (decision 0023).
+        which an edge verifies against the distributing instance's public signing key before accepting any content.
       operationId: getReleaseBundleVersion
       parameters:
       - description: Required path parameter. Name of the release bundle.
@@ -229,8 +228,7 @@ paths:
           minLength: 1
           type: string
       - description: Optional query parameter. json returns the decoded manifest; jws returns the signed manifest
-          as a compact JWS string, which the JFrog CLI verifies against the distributing key. Omitted is treated
-          as json.
+          as a compact JWS string. Omitted is treated as json.
         in: query
         name: format
         schema:
@@ -248,7 +246,7 @@ paths:
               schema:
                 description: The signed manifest as a compact JWS (header.payload.signature). The payload claims
                   are id, name, version, created, description, release_notes {content, syntax}, type, signature
-                  and artifacts [{repo_path, checksum, download_token}]; jfrog-client-go parses exactly these (ReleaseBundleModel).
+                  and artifacts [{repo_path, checksum, download_token}].
                 type: string
             application/json:
               schema:
@@ -586,7 +584,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getretentionoperationshistory.md
   /api/v1/bundle/retention/config:
     get:
-      description: Returns the release bundle v1 retention configuration (decision 0023).
+      description: Returns the release bundle v1 retention configuration.
       operationId: getRetentionPolicyConfiguration
       responses:
         '200':
@@ -600,8 +598,7 @@ paths:
                       the configured limits.
                     type: boolean
                   cron_pattern:
-                    description: Optional within this object. Quartz cron expression for the scheduled job (decision
-                      0010).
+                    description: Optional within this object. Quartz cron expression for the scheduled job.
                     type: string
                   max_days_to_keep:
                     description: Optional within this object. Versions older than this many days become deletion

@@ -5,8 +5,7 @@ paths:
         archive must already be in the instance's release bundle import directory. The signature is verified against
         this instance's trusted keys (so the signing key's public part must have been propagated or added first),
         every artifact checksum is verified, the artifacts are deployed to the repositories the manifest names,
-        and the version is recorded. With `dry_run` all checks run and nothing is written. JFrog documents this
-        path under the Distribution prefix although Artifactory serves it; artifactweave serves it here.
+        and the version is recorded. With `dry_run` all checks run and nothing is written.
       operationId: importReleaseBundleV1Version
       parameters:
       - description: Required query parameter. Name of the exported zip, which must already be in the instance's
@@ -194,8 +193,7 @@ paths:
         When `sign_immediately` is true, or the X-GPG-PASSPHRASE header is sent, the version is also signed with
         the default GPG key in the same call. With `dry_run` the queries are evaluated and the would-be version
         is returned without storing anything. A name and version pair is unique; creating an existing pair answers
-        400. artifactweave keeps bundles in the instance itself rather than in a separate Distribution service (decision
-        0023), and the artifacts stay in their repositories.'
+        400. The artifacts stay in their repositories.'
       operationId: createReleaseBundleV1Version
       parameters:
       - description: Optional header parameter. Passphrase protecting the signing key's private part. Needed only
@@ -283,8 +281,7 @@ paths:
       operationId: deleteAllReleaseBundleV1Versions
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
-      - description: Optional query parameter. Accepted for compatibility with JFrog, where true archives the version
-          instead of deleting it. artifactweave deletes the version either way.
+      - description: Optional query parameter. Accepted and ignored; the version is deleted either way.
         in: query
         name: archive
         schema:
@@ -421,8 +418,7 @@ paths:
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
       - $ref: '#/components/parameters/releaseBundleVersionPath'
-      - description: Optional query parameter. Accepted for compatibility with JFrog, where true archives the version
-          instead of deleting it. artifactweave deletes the version either way.
+      - description: Optional query parameter. Accepted and ignored; the version is deleted either way.
         in: query
         name: archive
         schema:
@@ -696,8 +692,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/signreleasebundlev1version.md
   /api/v1/release_bundle/{release_bundle_name}/{release_bundle_version}/trigger_xray_scan:
     post:
-      description: Asks Xray to scan the version's artifacts. artifactweave has no Xray (research 10), so this operation
-        answers 501.
+      description: Not implemented; answers 501.
       operationId: triggerXrayScanReleaseBundleV1Version
       parameters:
       - $ref: '#/components/parameters/releaseBundleNamePath'
@@ -707,9 +702,9 @@ paths:
           content:
             application/json:
               schema:
-                description: Not returned by artifactweave.
+                description: Not returned.
                 type: object
-          description: Not returned by artifactweave; JFrog answers 200 when the scan is queued.
+          description: Not returned.
         '401':
           content:
             application/json:
@@ -728,7 +723,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: Not implemented by artifactweave; see the operation description.
+          description: Not implemented.
       summary: Scan a release bundle v1 version with Xray
       tags:
       - release-bundles

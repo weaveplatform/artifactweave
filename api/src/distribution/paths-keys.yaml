@@ -23,8 +23,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getgpgsigningkey.md
     post:
       description: Adds a GPG key pair and makes it the default signing key. The private key is stored sealed in
-        the instance's keypair store (decisions 0017 and 0023), the same store the Artifactory keypair API manages,
-        so a key added here is visible there and the reverse.
+        the instance's keypair store, the same store `/artifactory/api/security/keypair` manages, so a key added
+        here is visible there and the reverse.
       operationId: setGpgSigningKey
       requestBody:
         content:
@@ -191,15 +191,13 @@ paths:
         content:
           application/json:
             schema:
-              description: The new alias. JFrog's current OpenAPI definition names the field alias and its 2.8.1
-                reference new_alias; either is accepted, and one must be present.
+              description: The new alias, in alias or new_alias; one must be present.
               properties:
                 alias:
                   description: Optional within this object. The new alias; must not be taken.
                   type: string
                 new_alias:
-                  description: Optional within this object. The new alias, older field name; used when alias is
-                    absent.
+                  description: Optional within this object. The new alias; used when alias is absent.
                   type: string
               type: object
         description: The new alias.

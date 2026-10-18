@@ -135,8 +135,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setdistributionpermission.md
   /api/v1/security/token:
     get:
-      description: Lists the tokens issued through the Distribution token operations. They are ordinary artifactweave
-        access tokens (decision 0005), so the Access token list shows them too. Administrators only.
+      description: Lists the tokens issued through the Distribution token operations. They are ordinary access
+        tokens, so the Access token list shows them too. Administrators only.
       operationId: getTokenInfos
       responses:
         '200':
@@ -162,9 +162,9 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/gettokeninfos.md
     post:
-      description: JFrog's legacy Distribution token endpoint, taking a form body. `grant_type=client_credentials`
-        issues a token for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token
-        for a new pair. artifactweave issues ordinary access tokens (decision 0005).
+      description: Issues or refreshes a token from a form body. `grant_type=client_credentials` issues a token
+        for `username`; `grant_type=refresh_token` exchanges a refresh token and its access token for a new pair.
+        The tokens are ordinary access tokens.
       operationId: createOrRefreshToken
       requestBody:
         content:
@@ -219,7 +219,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DistributionTokenResponse'
-          description: Documented by JFrog for creation; artifactweave answers 200.
+          description: Not returned; an issued token answers 200.
         '400':
           content:
             application/json:

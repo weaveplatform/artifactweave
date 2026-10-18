@@ -109,8 +109,7 @@ paths:
   /api/v1/maintenance/generate_token/{actionType}:
     get:
       description: Issues a single-use token for one maintenance action. The token expires after 3 minutes and must
-        be sent as the body of the execute operation, which makes running a destructive action a deliberate two-step
-        process. Administrators only.
+        be sent as the body of the execute operation. Administrators only.
       operationId: generateMaintenanceExecutionToken
       parameters:
       - description: 'Required path parameter. The maintenance action: UNLOCK_STUCK or STOP_ALL.'
@@ -191,8 +190,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstuckdistributions.md
   /api/v1/metrics:
     get:
-      description: Returns the release bundle and distribution counters in OpenMetrics text, using JFrog's `jfds_`
-        metric names so existing dashboards keep working. Administrators only.
+      description: Returns the release bundle and distribution counters in OpenMetrics text, under `jfds_` metric
+        names. Administrators only.
       operationId: getOpenMetricsForDistribution
       responses:
         '200':
@@ -242,8 +241,8 @@ paths:
   /api/v1/system/ping:
     get:
       description: Answers 200 with message OK when the instance's distribution features are usable, meaning the
-        database and blob store are reachable. In artifactweave the distribution service is the instance itself.
-        Anonymous callers may use it unless anonymous access is disabled.
+        database and blob store are reachable. The distribution service is the instance itself. Anonymous callers
+        may use it unless anonymous access is disabled.
       operationId: distributionPing
       responses:
         '200':

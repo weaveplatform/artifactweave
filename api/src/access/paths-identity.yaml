@@ -31,7 +31,7 @@ components:
     resourceType:
       description: 'Required path parameter. Which section of the permission to address: artifact for repositories,
         build for build-info, release_bundle for release bundles. release_bundle sections are stored but have no
-        effect in artifactweave.'
+        effect.'
       in: path
       name: resourceType
       required: true
@@ -135,13 +135,14 @@ components:
       description: A global role as returned by reads.
       properties:
         actions:
-          description: 'Required within this object. Actions from the global vocabulary: READ_REPOSITORY, ANNOTATE_REPOSITORY,
-            DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE,
-            ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE,
-            READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE,
-            TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY,
-            POLICIES_SECURITY, RULES_SECURITY, READ_POLICIES_SECURITY. Only the repository and build actions have
-            an effect in artifactweave; the rest are stored and echoed.'
+          description: 'Required within this object. Actions from the global vocabulary: READ_REPOSITORY,
+            ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY, MANAGE_XRAY_MD_REPOSITORY,
+            READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE, DISTRIBUTE_RELEASE_BUNDLE,
+            DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD, ANNOTATE_BUILD, DEPLOY_BUILD,
+            DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE, TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE,
+            READ_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY, POLICIES_SECURITY, RULES_SECURITY,
+            READ_POLICIES_SECURITY. Only the repository and build actions have an effect; the rest are stored and
+            echoed.'
           items:
             description: An action name.
             type: string
@@ -202,7 +203,7 @@ components:
       - type
       type: object
     GlobalRoleCreated:
-      description: The answer to a role creation, as JFrog documents it.
+      description: The answer to a role creation.
       properties:
         code:
           description: Required within this object. OK on success.
@@ -278,7 +279,7 @@ components:
           type: string
         import_from_ldap_group_setting:
           description: Optional within this object. Name of an LDAP group setting to take members from. Mutually
-            exclusive with members. Not available in artifactweave v1; a value answers 400.
+            exclusive with members. Not supported; a value answers 400.
           type: string
         manage_resources:
           default: false
@@ -313,7 +314,7 @@ components:
           type: boolean
         watch_manager:
           default: false
-          description: Optional within this object. Stored and echoed; no effect in artifactweave.
+          description: Optional within this object. Stored and echoed; no effect.
           type: boolean
       required:
       - name
@@ -355,7 +356,7 @@ components:
           description: Optional within this object. Echo of the stored flag.
           type: boolean
         realm:
-          description: Required within this object. Server-owned. internal for groups stored by artifactweave.
+          description: Required within this object. Server-owned. internal for locally stored groups.
           type: string
         realm_attributes:
           description: Optional within this object. Server-owned. Realm-specific metadata; empty for internal groups.
@@ -464,8 +465,8 @@ components:
           type: string
         resources:
           description: Optional within this object. One section per resource type. A permission with no sections
-            grants nothing. The jfrog/platform provider also sends destination and pipeline_source sections, which
-            artifactweave stores and echoes without effect.
+            grants nothing. destination and pipeline_source sections are also accepted, stored and echoed without
+            effect.
           properties:
             artifact:
               allOf:
@@ -625,8 +626,8 @@ components:
             token that stands in for the JWT. Defaults to false.
           type: boolean
         project_key:
-          description: Optional within this object. Scopes a token minted by a project admin to that project. The
-            Terraform provider sends it as an empty string when unset, which is treated as absent.
+          description: Optional within this object. Scopes a token minted by a project admin to that project. An
+            empty string is treated as absent.
           type: string
         refresh_token:
           description: Optional within this object. Required when grant_type is refresh_token; the refresh token
@@ -704,8 +705,7 @@ components:
       - tokens
       type: object
     TokenResponse:
-      description: A freshly minted token. The documented schema omits token_id, but Artifactory returns it and
-        the artifactory_scoped_token resource depends on it, so it is always present.
+      description: A freshly minted token.
       properties:
         access_token:
           description: Required within this object. The JWT; shown only in this response.
@@ -778,11 +778,10 @@ components:
           description: Optional within this object. Read-only access to audit information. Defaults to false.
           type: boolean
         policy_manager:
-          description: Optional within this object. Xray policy management right. Stored and echoed; no effect in
-            artifactweave.
+          description: Optional within this object. Xray policy management right. Stored and echoed; no effect.
           type: boolean
         policy_viewer:
-          description: Optional within this object. Xray policy view right. Stored and echoed; no effect in artifactweave.
+          description: Optional within this object. Xray policy view right. Stored and echoed; no effect.
           type: boolean
         profile_updatable:
           default: true
@@ -790,7 +789,7 @@ components:
             to true.
           type: boolean
         reports_manager:
-          description: Optional within this object. Xray reports right. Stored and echoed; no effect in artifactweave.
+          description: Optional within this object. Xray reports right. Stored and echoed; no effect.
           type: boolean
         resources_manager:
           description: Optional within this object. Allows managing repositories without being a full admin.
@@ -800,8 +799,7 @@ components:
             not be admin or anonymous.
           type: string
         watch_manager:
-          description: Optional within this object. Xray watch management right. Stored and echoed; has no effect
-            in artifactweave.
+          description: Optional within this object. Xray watch management right. Stored and echoed; no effect.
           type: boolean
       required:
       - email
@@ -834,7 +832,7 @@ components:
           type: boolean
         last_logged_in:
           description: Required within this object. Server-owned. RFC 3339 time of the last successful authentication;
-            null when the user has never logged in, as Artifactory answers since 7.98.7.
+            null when the user has never logged in.
           format: date-time
           nullable: true
           type: string
@@ -854,7 +852,7 @@ components:
           description: Required within this object. Whether the user may edit their own profile.
           type: boolean
         realm:
-          description: Required within this object. Server-owned. internal for artifactweave-stored users.
+          description: Required within this object. Server-owned. internal for locally stored users.
           type: string
         reports_manager:
           description: Optional within this object. Echo of the stored flag.
@@ -903,8 +901,8 @@ components:
             description: A user summary.
             properties:
               realm:
-                description: 'Required within this object. Where the user is authenticated: internal for users stored
-                  by artifactweave, ldap once LDAP is supported.'
+                description: 'Required within this object. Where the user is authenticated: internal for locally
+                  stored users.'
                 type: string
               status:
                 description: Required within this object. The lifecycle state, one of invited, enabled, disabled,
@@ -1005,9 +1003,8 @@ paths:
       tags:
       - environments
     post:
-      description: Creates an environment and returns it with status 201, which the artifactory_global_environment
-        resource requires. Names are case-insensitive and at most 32 characters; a name that differs from an existing
-        one only by case answers 409. Admin only.
+      description: Creates an environment and returns it with status 201. Names are case-insensitive and at most 32
+        characters; a name that differs from an existing one only by case answers 409. Admin only.
       operationId: createGlobalEnvironment
       requestBody:
         content:
@@ -1335,8 +1332,7 @@ paths:
       - roles
     post:
       description: Creates a CUSTOM_GLOBAL role that project admins can assign in any project. The response is 201
-        with {"code":"OK","message":"Role '<name>' created"}; the platform_global_role resource reads the role back
-        afterwards. Admin only. An existing name answers 409.
+        with {"code":"OK","message":"Role '<name>' created"}. Admin only. An existing name answers 409.
       operationId: createGlobalRole
       requestBody:
         content:
@@ -1495,20 +1491,19 @@ paths:
       - roles
   /api/v1/service_trust/pairing/{useCase}:
     post:
-      description: 'Issues a single-use pairing token on this instance so that another artifactweave instance can
-        establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to
-        be trusted, hand the token to the administrator of the other instance, who redeems it there, for example
-        when adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation
-        target. Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never
-        stored in clear and stops working once redeemed or when it expires, 300 seconds after issue by default (the JFrog pairing-token default; configurable).
-        Only the platform-federation use case is supported: Mission Control and Bridge are not part of artifactweave,
-        so mission-control and bridge answer 501. Pairing with JFrog Platform Deployments is not supported. Administrators
-        only.'
+      description: Issues a single-use pairing token on this instance so that another instance of this server can
+        establish mutual trust with it over the peer protocol (decision 0021). Run it on the instance that is to be
+        trusted, hand the token to the administrator of the other instance, who redeems it there, for example when
+        adding this instance as a follower (POST /pfed/api/v1/jpd) or registering it as an Access federation target.
+        Redeeming exchanges per-peer keys that are sealed at rest (decision 0017); the token itself is never stored in
+        clear and stops working once redeemed or when it expires, 300 seconds after issue by default (configurable).
+        Only the platform-federation use case is supported; mission-control and bridge answer 501. The peer must be
+        another instance of this server. Administrators only.
       operationId: createPairingToken
       parameters:
-      - description: Required path parameter. What the trust is for. platform-federation pairs two artifactweave
-          instances for platform federation, Access federation and topology membership. mission-control and bridge
-          are accepted for compatibility and answer 501.
+      - description: Required path parameter. What the trust is for. platform-federation pairs two instances of
+          this server for platform federation, Access federation and topology membership. mission-control and
+          bridge are accepted and answer 501.
         in: path
         name: useCase
         required: true
@@ -1556,7 +1551,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The use case is mission-control or bridge, which artifactweave does not implement.
+          description: The use case is mission-control or bridge, which are not implemented.
       summary: Create a pairing token
       tags:
       - tokens
@@ -1567,9 +1562,9 @@ paths:
         issued with a reference token is listed like any other.
       operationId: getTokens
       parameters:
-      - description: Optional query parameter. Keeps only the tokens with this scope, as Artifactory 7.133.3 added
-          it. A token matches when its whole scope, or one of its space-separated scopes, is exactly this string, such
-          as applied-permissions/groups:readers. A scope no token has gives an empty list.
+      - description: Optional query parameter. Keeps only the tokens with this scope. A token matches when its whole
+          scope, or one of its space-separated scopes, is exactly this string, such as
+          applied-permissions/groups:readers. A scope no token has gives an empty list.
         in: query
         name: scope
         schema:
@@ -1597,12 +1592,11 @@ paths:
       tags:
       - tokens
     post:
-      description: 'With grant_type client_credentials (the default) mints a new access token for username, or for
-        the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access
-        token with the same scope and audience. The body may be JSON or form-encoded; the jf CLI sends the form,
-        the Terraform provider sends JSON. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user).
-        Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200, not
-        201: the artifactory_scoped_token resource hard-checks it and reads token_id to manage the token afterwards.'
+      description: With grant_type client_credentials (the default) mints a new access token for username, or for the
+        caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token
+        with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity
+        tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds;
+        scopes only narrow. The response status is 200 and the body always carries token_id.
       operationId: createToken
       requestBody:
         content:
@@ -1732,9 +1726,8 @@ paths:
       tags:
       - tokens
     get:
-      description: Returns the metadata of one token. The id me stands for the token used to authenticate the call.
-        A non-admin may only read their own tokens. The jfrog/artifactory provider removes the artifactory_scoped_token
-        resource from state when this answers 404.
+      description: Returns the metadata of one token. The id me stands for the token used to authenticate the call. A
+        non-admin may only read their own tokens.
       operationId: getTokenById
       parameters:
       - $ref: '#/components/parameters/tokenId'
@@ -1846,10 +1839,9 @@ paths:
       tags:
       - groups
     post:
-      description: 'Creates a group and returns its details with status 201, which the jfrog/platform provider requires.
-        members and import_from_ldap_group_setting are mutually exclusive: a group either lists its members or takes
-        them from an LDAP group setting (LDAP import is not available in artifactweave v1 and answers 400). Admin
-        only. An existing name answers 409.'
+      description: 'Creates a group and returns its details with status 201. members and import_from_ldap_group_setting
+        are mutually exclusive: a group either lists its members or takes them from an LDAP group setting (LDAP import
+        is not supported and answers 400). Admin only. An existing name answers 409.'
       operationId: createGroup
       requestBody:
         content:
@@ -1903,7 +1895,7 @@ paths:
     delete:
       description: Removes the group, its memberships and its entries in permission targets. The built-in readers
         group can be deleted; a group that is the sole admin grant for the last admin cannot. Admin only. Answers
-        204 with no body, which the jfrog/platform provider requires.
+        204 with no body.
       operationId: deleteGroup
       parameters:
       - $ref: '#/components/parameters/groupName'
@@ -2183,11 +2175,10 @@ paths:
       tags:
       - permissions
     post:
-      description: Creates a permission in the Access v2 model and returns it with status 201, which the jfrog/platform
-        provider requires. This model is artifactweave's internal representation; the legacy /artifactory/api/security/permissions
-        and /artifactory/api/v2/security/permissions endpoints are views of the same record. Every principal, repository
-        and build target named in the body must exist, except the special targets ANY, ANY LOCAL, ANY REMOTE and
-        ANY DISTRIBUTION. Admin only. An existing name answers 409.
+      description: Creates a permission in the Access v2 model and returns it with status 201. The
+        /artifactory/api/security/permissions and /artifactory/api/v2/security/permissions endpoints are views of the
+        same record. Every principal, repository and build target named in the body must exist, except the special
+        targets ANY, ANY LOCAL, ANY REMOTE and ANY DISTRIBUTION. Admin only. An existing name answers 409.
       operationId: createPermission
       requestBody:
         content:
@@ -2437,8 +2428,7 @@ paths:
       - permissions
     put:
       description: Replaces the whole actions and targets section for the resource type, creating the section when
-        the permission did not have one. Grants and targets not in the body are dropped. The jfrog/platform provider
-        uses this to update a single resource. Admin only.
+        the permission did not have one. Grants and targets not in the body are dropped. Admin only.
       operationId: replacePermissionResource
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2585,9 +2575,8 @@ paths:
       tags:
       - users
     post:
-      description: Creates an internal user and returns its details with status 201. The jfrog/artifactory provider
-        calls this on Artifactory 7.84.3 and later instead of the legacy /artifactory/api/security/users endpoint,
-        so the same internal user record backs both. Admin only. A username that already exists answers 409.
+      description: Creates an internal user and returns its details with status 201. The same internal user record
+        backs the /artifactory/api/security/users endpoint. Admin only. A username that already exists answers 409.
       operationId: createUser
       requestBody:
         content:
@@ -2690,8 +2679,7 @@ paths:
   /api/v2/users/{username}:
     delete:
       description: Removes the user, its group memberships, its tokens and its entries in permission targets. The
-        built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body; the jfrog/artifactory
-        provider accepts any 2xx here.
+        built-in admin and anonymous users cannot be deleted. Admin only. Answers 204 with no body.
       operationId: deleteUser
       parameters:
       - $ref: '#/components/parameters/username'
@@ -2813,8 +2801,7 @@ paths:
     patch:
       description: Applies the add list then the remove list to the user's memberships and returns the resulting
         full membership. Names that are already present (add) or already absent (remove) are ignored; a name in
-        both lists ends up removed. The jfrog/artifactory provider uses this after creating a user on 7.84.3 and
-        later. Admin only.
+        both lists ends up removed. Admin only.
       operationId: updateUserGroups
       parameters:
       - $ref: '#/components/parameters/username'

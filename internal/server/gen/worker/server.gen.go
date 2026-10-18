@@ -422,7 +422,7 @@ func (e WorkerUpdateRequestAction) Valid() bool {
 type ActionMetadata struct {
 	// Action Optional within this object. Identity of the action.
 	Action *struct {
-		// Application Optional within this object. Service that raises the action, such as artifactory or access.
+		// Application Optional within this object. Service that raises the action, such as `artifactory` or `access`.
 		Application *string `json:"application,omitempty"`
 
 		// Name Optional within this object. Action name, one of the values accepted by action on create.
@@ -456,7 +456,7 @@ type ActionMetadata struct {
 	// SupportProjects Optional within this object. Whether project administrators may create workers for this action.
 	SupportProjects *bool `json:"supportProjects,omitempty"`
 
-	// TypesDefinitions Optional within this object. TypeScript declarations of the input and result types. Status enums are numeric (for example DOWNLOAD_PROCEED = 1); workers may return either the number or the member name as a string, and artifactweave accepts both.
+	// TypesDefinitions Optional within this object. TypeScript declarations of the input and result types. Status enums are numeric (for example DOWNLOAD_PROCEED = 1); workers may return either the number or the member name as a string; both are accepted.
 	TypesDefinitions *string `json:"typesDefinitions,omitempty"`
 
 	// WikiUrl Optional within this object. Link to documentation for the action.
@@ -466,9 +466,9 @@ type ActionMetadata struct {
 // ActionMetadataFilterType Optional within this object. Which filterCriteria member applies: FILTER_REPO for artifactFilterCriteria, SCHEDULE for schedule. Absent for actions that take no filter.
 type ActionMetadataFilterType string
 
-// ErrorResponse The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// ErrorResponse The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error; clients read the first.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Code Required within this object. A symbolic code such as NOT_FOUND.
 		Code string `json:"code"`
@@ -478,7 +478,7 @@ type ErrorResponse struct {
 	} `json:"errors"`
 }
 
-// Worker A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine (decision 0026). Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// Worker A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 type Worker struct {
 	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400.
 	Action *string `json:"action,omitempty"`
@@ -514,9 +514,9 @@ type Worker struct {
 	SourceCode *string `json:"sourceCode,omitempty"`
 }
 
-// WorkerCreateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine (decision 0026). Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// WorkerCreateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 type WorkerCreateRequest struct {
-	// Action Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+	// Action Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 	Action WorkerCreateRequestAction `json:"action"`
 
 	// Debug Optional within this object. When true every run is recorded in the execution history; when false, the default, only failed runs are.
@@ -550,7 +550,7 @@ type WorkerCreateRequest struct {
 	SourceCode string `json:"sourceCode"`
 }
 
-// WorkerCreateRequestAction Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+// WorkerCreateRequestAction Required within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 type WorkerCreateRequestAction string
 
 // WorkerExecutionHistoryEntry One recorded run.
@@ -558,7 +558,7 @@ type WorkerExecutionHistoryEntry struct {
 	// EndTimeMillis Optional within this object. When the run ended, epoch milliseconds.
 	EndTimeMillis *int64 `json:"endTimeMillis,omitempty"`
 
-	// ErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+	// ErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 	ErrorCode *WorkerExecutionHistoryEntryErrorCode `json:"errorCode,omitempty"`
 
 	// ErrorMessage Optional within this object. Human readable reason for a failed run.
@@ -592,7 +592,7 @@ type WorkerExecutionHistoryEntry struct {
 	WorkerType *string `json:"workerType,omitempty"`
 }
 
-// WorkerExecutionHistoryEntryErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+// WorkerExecutionHistoryEntryErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 type WorkerExecutionHistoryEntryErrorCode string
 
 // WorkerExecutionPayload Input handed to the worker as its data argument. Its shape depends on the action; GET /api/v2/actions gives a sample payload and TypeScript types for each one.
@@ -603,18 +603,18 @@ type WorkerExecutionResult struct {
 	// Data Optional within this object. What the script returned, unchanged. For BEFORE_ actions it carries the decision (status and message) in the shape the action's types define.
 	Data *map[string]interface{} `json:"data,omitempty"`
 
-	// ErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+	// ErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 	ErrorCode *WorkerExecutionResultErrorCode `json:"errorCode,omitempty"`
 
 	// ErrorMessage Optional within this object. Human readable reason for a failed run; see errorCode.
 	ErrorMessage *string `json:"errorMessage,omitempty"`
 
-	// ExecutionStatus Optional within this object. STATUS_SUCCESS when the script completed. artifactweave writes STATUS_FAILURE for a failed run; JFrog's failure value is not published.
+	// ExecutionStatus Optional within this object. STATUS_SUCCESS when the script completed, STATUS_FAILURE for a failed run.
 	ExecutionStatus      *string                `json:"executionStatus,omitempty"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// WorkerExecutionResultErrorCode Optional within this object. Set when the run failed. Codes are artifactweave's; the matching errorMessage reuses JFrog's wording so existing alerting keeps matching: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'); WORKER_SCRIPT_ERROR for an exception thrown by the script and WORKER_PAYLOAD_TOO_LARGE for input or result over 100 KiB have no JFrog message.
+// WorkerExecutionResultErrorCode Optional within this object. Set when the run failed. These codes come with a fixed errorMessage: WORKER_MEMORY_LIMIT ('Worker used too much memory'), WORKER_CPU_LIMIT ('Worker used too much cpu time'), WORKER_EXECUTION_TIMEOUT ('Worker execution timeout'), WORKER_QUEUE_TIMEOUT ('Worker waited for too long in the queue'), WORKER_KILLED ('The worker has been killed unexpectedly'), WORKER_FLOATING_PROMISE ('Floating promises are not allowed. Make sure to await all promises'). WORKER_SCRIPT_ERROR marks an exception thrown by the script, and WORKER_PAYLOAD_TOO_LARGE an input or result over 100 KiB.
 type WorkerExecutionResultErrorCode string
 
 // WorkerFilterCriteria Selects the events that trigger a worker: artifactFilterCriteria for repository actions whose metadata filterType is FILTER_REPO, schedule for SCHEDULED_EVENT (filterType SCHEDULE). Repository keys and the any* switches combine with OR.
@@ -674,7 +674,7 @@ type WorkerScaffoldTsConfig struct {
 	Include *[]string `json:"include,omitempty"`
 }
 
-// WorkerSecret A named secret available to the worker as context.secrets.get(key). Values are sealed at rest (decision 0017) and never returned.
+// WorkerSecret A named secret available to the worker as context.secrets.get(key). Values are sealed at rest and never returned.
 type WorkerSecret struct {
 	// Key Required within this object. Secret name, unique within the worker.
 	Key string `json:"key"`
@@ -707,9 +707,9 @@ type WorkerTestRequest struct {
 // WorkerTestResult Test run outcome keyed by the action name in lower camel case, for example {"genericEvent": {"data": ..., "executionStatus": "STATUS_SUCCESS"}} for GENERIC_EVENT or beforeDownload for BEFORE_DOWNLOAD.
 type WorkerTestResult map[string]WorkerExecutionResult
 
-// WorkerUpdateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine (decision 0026). Each execution runs alone in a helper process (the artifactweave binary's hidden worker-host subcommand) under JFrog's documented default limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails (JFrog's maxWaitingInQueueMillis default).
+// WorkerUpdateRequest A worker definition. Source is TypeScript or JavaScript, sent as plain text or as base64:<encoded>, transpiled by esbuild when saved and run by the embedded goja engine. Each execution runs alone in a helper process under these limits: 64 MiB of memory (the run is interrupted on breach and the helper replaced at twice that), 1 s of CPU time, 5 s per platform or HTTP call, 20 s overall, a call stack depth of 100, 100 KiB of JSON input and of result, and source of at most 100,000 characters. Helpers form a pool of min(4, GOMAXPROCS); a run that waits longer than 30 s for a helper fails.
 type WorkerUpdateRequest struct {
-	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+	// Action Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 	Action *WorkerUpdateRequestAction `json:"action,omitempty"`
 
 	// Debug Optional within this object. When true every run is recorded in the execution history; when false, the default, only failed runs are.
@@ -743,19 +743,19 @@ type WorkerUpdateRequest struct {
 	SourceCode *string `json:"sourceCode,omitempty"`
 }
 
-// WorkerUpdateRequestAction Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. The enum is the union of JFrog's documented list and the names a live catalogue and JFrog's samples use (BEFORE_REMOTE_INFO, AFTER_WORKLOAD_STATE_CHANGE, SCHEDULED_EVENT); AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST appear only in the reference list and are accepted as aliases.
+// WorkerUpdateRequestAction Optional within this object. The event that runs the worker. BEFORE_ actions run synchronously inside the operation and can veto or alter it; AFTER_ actions run after it has committed; GENERIC_EVENT workers run only when called through the execute operation. SCHEDULED_EVENT workers run on the cron schedule in filterCriteria.schedule. The server accepts only the actions it can trigger, which GET /api/v2/actions lists; any other value is rejected with 400. AFTER_SAVE, BEFORE_UPLOAD_REQUEST, BEFORE_REMOTE_INFO_REQUEST and AFTER_WORKLOAD_STATE_CHANGE_REQUEST are accepted as aliases.
 type WorkerUpdateRequestAction string
 
-// WorkerBadRequest The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerBadRequest The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerBadRequest = ErrorResponse
 
-// WorkerForbidden The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerForbidden The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerForbidden = ErrorResponse
 
-// WorkerNotFound The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerNotFound The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerNotFound = ErrorResponse
 
-// WorkerUnauthorized The error envelope for /worker. No JFrog source shows a Workers error body: the JFrog CLI prints error bodies verbatim and the platform Terraform provider reports them as text, so clients do not depend on its fields. JFrog's own MCP client reads errors[0].message and falls back to message. artifactweave answers with the Access shape below; for a run stopped by a limit, code carries the errorCode and message JFrog's wording.
+// WorkerUnauthorized The error envelope for /worker. For a run stopped by a limit, code carries the errorCode and message the matching errorMessage.
 type WorkerUnauthorized = ErrorResponse
 
 // GetWorkerExecutionHistoryParams defines parameters for GetWorkerExecutionHistory.
@@ -3083,127 +3083,119 @@ func (sh *strictHandler) GetWorkerActionsMetadata(w http.ResponseWriter, r *http
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"8L8DAA==",
+	"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",
+	"rRbW4gp8vP+/AQA=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
