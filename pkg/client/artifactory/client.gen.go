@@ -2505,12 +2505,12 @@ func (e DownloadVcsTagAlternativeParamsExt) Valid() bool {
 	}
 }
 
-// AdminLegacyErrorResponse The error body Artifactory documents for its import and export operations: the usual envelope plus an older single-message field. These statuses are documented for parity only; artifactweave answers every import and export call with 501 in the standard envelope.
+// AdminLegacyErrorResponse The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
 type AdminLegacyErrorResponse struct {
-	// Error Optional within this object. Older single-string form of the error message that some Artifactory versions send alongside or instead of errors.
+	// Error Optional within this object. Single-string form of the error message, sent alongside or instead of errors.
 	Error *string `json:"error,omitempty"`
 
-	// Errors Optional within this object. One entry per error. No JFrog client in scope parses this body.
+	// Errors Optional within this object. One entry per error.
 	Errors *[]struct {
 		// Message Optional within this object. Human-readable explanation.
 		Message *string `json:"message,omitempty"`
@@ -2553,9 +2553,9 @@ type AllBuildsResponse struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// ApiKeyResponse The API key of the calling user. API keys reached end of life in Artifactory at the end of 2024; artifactweave never issues one.
+// ApiKeyResponse The API key of the calling user. The server never issues API keys.
 type ApiKeyResponse struct {
-	// ApiKey Optional within this object. The key value. Keys that clients recognise start with AKCp8 and are at least 73 characters long. artifactweave returns this field only from the shim responses that report no key exists, so it is never populated.
+	// ApiKey Optional within this object. The key value, which starts with AKCp8 and is at least 73 characters long. Never populated.
 	ApiKey *string `json:"apiKey,omitempty"`
 }
 
@@ -2577,7 +2577,7 @@ type AqlRange struct {
 	Total *int `json:"total,omitempty"`
 }
 
-// ArchiveCriterion A list of values with the and/or toggle JFrog's archive form shows for each criterion.
+// ArchiveCriterion A list of values with an and/or toggle for the criterion.
 type ArchiveCriterion struct {
 	// Operator Optional within this object. OR (the default) selects items matching any value; AND only items matching all of them.
 	Operator *ArchiveCriterionOperator `json:"operator,omitempty"`
@@ -2796,12 +2796,12 @@ type ArchivePoliciesView struct {
 	} `json:"policies,omitempty"`
 }
 
-// ArchivePolicyRequest A cold storage archive policy as written by create and update. In artifactweave the cold store is a second blob store configured on the same instance (for example an S3 bucket with an archive storage class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+// ArchivePolicyRequest A cold storage archive policy as written by create and update. The cold store is a second blob store configured on the same instance, for example an S3 bucket with an archive storage class.
 type ArchivePolicyRequest struct {
 	// AqlQuery Optional within this object. AQL items query selecting the artifacts to archive. Use either this or searchCriteriaForm; not valid with packageRetention.
 	AqlQuery *string `json:"aqlQuery,omitempty"`
 
-	// CronExp Required within this object. Quartz cron expression for scheduled runs (decision 0010).
+	// CronExp Required within this object. Quartz cron expression for scheduled runs.
 	CronExp string `json:"cronExp"`
 
 	// Description Optional within this object. Free text shown with the policy.
@@ -2832,12 +2832,12 @@ type ArchivePolicyRequest struct {
 	SkipTrashcan *bool `json:"skipTrashcan,omitempty"`
 }
 
-// ArchivePolicyResponse A cold storage archive policy as stored, with its run state. In artifactweave the cold store is a second blob store configured on the same instance (for example an S3 bucket with an archive storage class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+// ArchivePolicyResponse A cold storage archive policy as stored, with its run state. The cold store is a second blob store configured on the same instance, for example an S3 bucket with an archive storage class.
 type ArchivePolicyResponse struct {
 	// AqlQuery Optional within this object. AQL items query selecting the artifacts to archive. Use either this or searchCriteriaForm; not valid with packageRetention.
 	AqlQuery *string `json:"aqlQuery,omitempty"`
 
-	// CronExp Optional within this object. Quartz cron expression for scheduled runs (decision 0010).
+	// CronExp Optional within this object. Quartz cron expression for scheduled runs.
 	CronExp *string `json:"cronExp,omitempty"`
 
 	// Description Optional within this object. Free text shown with the policy.
@@ -3024,7 +3024,7 @@ type ArchiveRunTriggered struct {
 	TriggerId *int `json:"triggerId,omitempty"`
 }
 
-// ArchiveSearchCriteria Which package versions a smart archiving policy selects. Selection runs over the package index (decision 0018): a version qualifies when it matches every inclusion, no exclusion, and every age condition given. The newest version of a package is never archived.
+// ArchiveSearchCriteria Which package versions a smart archiving policy selects. Selection runs over the package index: a version qualifies when it matches every inclusion, no exclusion, and every age condition given. The newest version of a package is never archived.
 type ArchiveSearchCriteria struct {
 	// CreatedBeforeInDays Optional within this object. Select versions created at least this many days before the run starts. A day is 24 hours counted back from the run.
 	CreatedBeforeInDays *int `json:"createdBeforeInDays,omitempty"`
@@ -3069,7 +3069,7 @@ type ArchiveSearchCriteria struct {
 	Repos []string `json:"repos"`
 }
 
-// ArchiveSearchCriteriaForm Artifact selection for a non-package archive policy, the alternative to aqlQuery. JFrog documents the form's fields (include and exclude repositories, path patterns, artifact name patterns and properties, each with an and/or toggle, plus deployed-before and last-downloaded-before ages) but not their JSON names, so the names below are artifactweave's and are unverified against Artifactory. Unknown keys are stored unchanged; converting a form that contains one fails with 400 naming it.
+// ArchiveSearchCriteriaForm Artifact selection for a non-package archive policy, the alternative to aqlQuery. It selects by included and excluded repositories, path patterns, artifact name patterns and properties, each with an and/or toggle, and by deployed-before and last-downloaded-before ages. Unknown keys are stored unchanged; converting a form that contains one fails with 400 naming it.
 type ArchiveSearchCriteriaForm struct {
 	// DeployedBeforeInDays Optional within this object. Only artifacts deployed at least this many days ago. Omitted means no age condition.
 	DeployedBeforeInDays *int `json:"deployedBeforeInDays,omitempty"`
@@ -3103,7 +3103,7 @@ type ArchiveSearchCriteriaForm struct {
 	AdditionalProperties       map[string]interface{} `json:"-"`
 }
 
-// ArchiveSearchResult Result of the archive entry search, which Artifactory removed in 7.90.5. Kept for parity with JFrog's definition; artifactweave never returns it, because the search always answers 501.
+// ArchiveSearchResult Result of the archive entry search. Not returned; the search always answers 501.
 type ArchiveSearchResult struct {
 	// Results Optional within this object. One entry per archive member name that matched.
 	Results *[]struct {
@@ -3166,7 +3166,7 @@ type ArtifactDeleteFailure struct {
 	Status int `json:"status"`
 }
 
-// ArtifactoryArtifactsStorageApiBuildArtifactsRequest Selects the artifacts of one build run and the archive format to pack them in. artifactweave serves this once build-info lands (P5); until then it answers 501.
+// ArtifactoryArtifactsStorageApiBuildArtifactsRequest Selects the artifacts of one build run and the archive format to pack them in. Not implemented; the operation answers 501.
 type ArtifactoryArtifactsStorageApiBuildArtifactsRequest struct {
 	// ArchiveType Required within this object. Archive container to produce: `zip`, `tar`, `tar.gz` or `tgz` (`tgz` is `tar.gz` with a different extension).
 	ArchiveType ArtifactoryArtifactsStorageApiBuildArtifactsRequestArchiveType `json:"archiveType"`
@@ -3192,7 +3192,7 @@ type ArtifactoryArtifactsStorageApiBuildArtifactsRequestArchiveType string
 
 // ArtifactorySearchesApiBuildArtifactsRequest Selects the build run whose artifacts should be listed, and narrows them.
 type ArtifactorySearchesApiBuildArtifactsRequest struct {
-	// BuildName Required within this object. Name of the build as published with jf rt build-publish.
+	// BuildName Required within this object. Name of a published build.
 	BuildName string `json:"buildName"`
 
 	// BuildNumber Optional within this object. Build number, or LATEST for the most recently started run of the build. A number with several runs selects its most recently started run. Give either buildNumber or buildStatus, not both.
@@ -3219,7 +3219,7 @@ type BackgroundTask struct {
 	// Id Optional within this object. Server-assigned task identifier, unique for the lifetime of the process.
 	Id *string `json:"id,omitempty"`
 
-	// NodeId Optional within this object. Identifier of the node executing the task. artifactweave runs a single process in v1 and reports its configured node id.
+	// NodeId Optional within this object. Identifier of the node executing the task, which is the configured node id of this instance.
 	NodeId *string `json:"nodeId,omitempty"`
 
 	// Started Optional within this object. RFC 3339 time the current execution started. Absent while the task is only scheduled.
@@ -3228,7 +3228,7 @@ type BackgroundTask struct {
 	// State Optional within this object. Lifecycle state: `scheduled` (waiting for its trigger), `running`, `stopped` (completed or stopped by an operator) or `cancelled`.
 	State *BackgroundTaskState `json:"state,omitempty"`
 
-	// Type Optional within this object. Fully qualified task type name. artifactweave uses its own task names and clients should treat the value as opaque.
+	// Type Optional within this object. Fully qualified task type name. Treat the value as opaque.
 	Type *string `json:"type,omitempty"`
 }
 
@@ -3259,7 +3259,7 @@ type BadChecksumSearchResult struct {
 // BatchRepositoryConfigurationArray Request body of the batch create and update operations: one configuration per repository, mixed classes and package types allowed.
 type BatchRepositoryConfigurationArray = []RepositoryConfiguration
 
-// BinariesSummary Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory emits and what the JFrog CLI prints verbatim.
+// BinariesSummary Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string, such as `3.48 GB` or `125,726`.
 type BinariesSummary struct {
 	// ArtifactsCount Optional within this object. Number of file items, formatted with thousands separators.
 	ArtifactsCount *string `json:"artifactsCount,omitempty"`
@@ -3312,7 +3312,7 @@ type BuildArtifactsSearchResult struct {
 
 // BuildCleanupPolicyRequest Body for creating or replacing a build cleanup policy, which deletes build-info records (and optionally their artifacts) by build name and age.
 type BuildCleanupPolicyRequest struct {
-	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone (decision 0010). Omitted or empty means the policy only runs when triggered through the run operation.
+	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone. Omitted or empty means the policy only runs when triggered through the run operation.
 	CronExp *string `json:"cronExp,omitempty"`
 
 	// DeleteArtifacts Optional within this object. When true the artifacts recorded in each deleted build are deleted as well. Defaults to false, which deletes only the build-info record.
@@ -3387,7 +3387,7 @@ type BuildCleanupSearchCriteria struct {
 	// CreatedBeforeInDays Optional within this object. Only items created at least this many 24-hour days before the run are selected. Omitted or 0 means creation age is not a condition.
 	CreatedBeforeInDays *int `json:"createdBeforeInDays,omitempty"`
 
-	// CreatedBeforeInMonths Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays is set.
+	// CreatedBeforeInMonths Optional within this object. Month-based form of createdBeforeInDays; a month counts as 30 days. Ignored when createdBeforeInDays is set.
 	CreatedBeforeInMonths *int `json:"createdBeforeInMonths,omitempty"`
 
 	// ExcludeBuildsWithReleaseBundles Optional within this object. When true, builds referenced by a release bundle are never deleted.
@@ -3412,7 +3412,7 @@ type BuildDependencySearchResult struct {
 	} `json:"results,omitempty"`
 }
 
-// BuildInfo A build-info document: one run of a build, with its modules, artifacts and dependencies. artifactweave stores the document as a JSON item in the build-info repository, at <name>/<number>-<started epoch milliseconds>.json (decision 0014).
+// BuildInfo A build-info document: one run of a build, with its modules, artifacts and dependencies. The document is stored as a JSON item in the build-info repository, at <name>/<number>-<started epoch milliseconds>.json.
 type BuildInfo struct {
 	// Agent Optional within this object. The CI server or tool that ran the build.
 	Agent *Agent `json:"agent,omitempty"`
@@ -3450,7 +3450,7 @@ type BuildInfo struct {
 	// Properties Optional within this object. Free-form string properties of the run, for example environment variables the client chose to record.
 	Properties *map[string]interface{} `json:"properties,omitempty"`
 
-	// Started Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+	// Started Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
 	Started *string `json:"started,omitempty"`
 
 	// Type Optional within this object. Legacy build type.
@@ -3462,7 +3462,7 @@ type BuildInfo struct {
 	// Vcs Optional within this object. Version-control state the build was made from, one entry per repository.
 	Vcs *[]VcsInfo `json:"vcs,omitempty"`
 
-	// Version Optional within this object. Schema version of the document. The JFrog CLI does not send it.
+	// Version Optional within this object. Schema version of the document.
 	Version *string `json:"version,omitempty"`
 }
 
@@ -3486,7 +3486,7 @@ type BuildModule struct {
 	// Dependencies Optional within this object. Dependencies the module consumed.
 	Dependencies *[]Dependency `json:"dependencies,omitempty"`
 
-	// Id Optional within this object. Module id in the build tool's notation. A module of type build names another build as <name>/<number>; clients follow such modules when searching a build's artifacts.
+	// Id Optional within this object. Module id in the build tool's notation. A module of type build names another build as <name>/<number>.
 	Id *string `json:"id,omitempty"`
 
 	// Properties Optional within this object. Free-form string properties of the module.
@@ -3498,14 +3498,14 @@ type BuildModule struct {
 
 // BuildNumber One run of a build.
 type BuildNumber struct {
-	// Started Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+	// Started Optional within this object. When the run started, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
 	Started *string `json:"started,omitempty"`
 
 	// Uri Optional within this object. Path of the run relative to the build, a slash followed by the build number.
 	Uri *string `json:"uri,omitempty"`
 }
 
-// BuildPromotionRequest Changes a build run's status and optionally moves or copies its files. JFrog's definition marks ciUser, timestamp, copy, artifacts, dependencies and failFast required, but the JFrog CLI omits all but failFast and Artifactory applies defaults, so artifactweave requires none of them.
+// BuildPromotionRequest Changes a build run's status and optionally moves or copies its files. Every field is optional, and each field states what omitting it does.
 type BuildPromotionRequest struct {
 	// Artifacts Optional within this object. Whether the run's artifacts are moved or copied. Defaults to true.
 	Artifacts *bool `json:"artifacts,omitempty"`
@@ -3525,7 +3525,7 @@ type BuildPromotionRequest struct {
 	// DryRun Optional within this object. When true, reports what would happen without changing anything. Defaults to false.
 	DryRun *bool `json:"dryRun,omitempty"`
 
-	// FailFast Optional within this object. When true, the first error or warning aborts the promotion, which then changes nothing and answers 400; when false it continues, reports every error and answers 200. Defaults to true; the JFrog CLI always sends it.
+	// FailFast Optional within this object. When true, the first error or warning aborts the promotion, which then changes nothing and answers 400; when false it continues, reports every error and answers 200. Defaults to true.
 	FailFast *bool `json:"failFast,omitempty"`
 
 	// Properties Optional within this object. Properties set on every promoted file, as a map from key to an array of values or a single value; each replaces the key's values. They are set on the files where they land, or where they are when no targetRepo is given.
@@ -3534,16 +3534,16 @@ type BuildPromotionRequest struct {
 	// Scopes Optional within this object. Dependency scopes to include; omitted means every scope. Scopes add to each other.
 	Scopes *[]string `json:"scopes,omitempty"`
 
-	// SourceRepo Optional within this object. Only artifacts found in this repository are moved or copied. Omitted means any repository. Dependencies are found in any repository either way, as in Artifactory.
+	// SourceRepo Optional within this object. Only artifacts found in this repository are moved or copied. Omitted means any repository. Dependencies are found in any repository either way.
 	SourceRepo *string `json:"sourceRepo,omitempty"`
 
-	// Status Optional within this object. New status recorded for the run, for example staged or released. Omitted records no promotion, as in Artifactory; files are still moved or copied and properties set.
+	// Status Optional within this object. New status recorded for the run, for example staged or released. Omitted records no promotion; files are still moved or copied and properties set.
 	Status *string `json:"status,omitempty"`
 
 	// TargetRepo Optional within this object. Repository the files are moved or copied to, each to the path it had. Omitted means no files move; only the status and properties change. May name a virtual repository, which deploys to its default deployment repository.
 	TargetRepo *string `json:"targetRepo,omitempty"`
 
-	// Timestamp Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted records the time the request arrived.
+	// Timestamp Optional within this object. When the promotion was requested, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700). Omitted records the time the request arrived.
 	Timestamp *string `json:"timestamp,omitempty"`
 }
 
@@ -3573,13 +3573,13 @@ type BuildRetentionRequest struct {
 	// BuildNumbersNotToBeDiscarded Optional within this object. Build numbers kept whatever the other settings say.
 	BuildNumbersNotToBeDiscarded *[]string `json:"buildNumbersNotToBeDiscarded,omitempty"`
 
-	// Count Optional within this object. Number of most recent runs to keep. JFrog documents an integer; the JFrog CLI sends a JSON string such as "10", and artifactweave accepts either. 0 is refused, as Artifactory refuses it; omitted or negative keeps every run.
+	// Count Optional within this object. Number of most recent runs to keep, as a JSON integer or a JSON string such as "10". 0 is refused; omitted or negative keeps every run.
 	Count *json.Number `json:"count,omitempty"`
 
 	// DeleteBuildArtifacts Optional within this object. Whether discarding a run also deletes its artifacts. Defaults to false.
 	DeleteBuildArtifacts *bool `json:"deleteBuildArtifacts,omitempty"`
 
-	// MinimumBuildDate Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes; Unix epoch milliseconds are accepted too. Omitted keeps runs of any age.
+	// MinimumBuildDate Optional within this object. Runs started before this time are discarded, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700); Unix epoch milliseconds are accepted too. Omitted keeps runs of any age.
 	MinimumBuildDate *json.RawMessage `json:"minimumBuildDate,omitempty"`
 }
 
@@ -3594,7 +3594,7 @@ type BuildRunsResponse struct {
 
 // BuildSummary One build name in the list of all builds.
 type BuildSummary struct {
-	// LastStarted Optional within this object. Started timestamp of the build's most recent run, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes.
+	// LastStarted Optional within this object. Started timestamp of the build's most recent run, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700).
 	LastStarted *string `json:"lastStarted,omitempty"`
 
 	// Uri Optional within this object. Path of the build relative to /api/build, a slash followed by the build name.
@@ -3606,7 +3606,7 @@ type CertificateInfo struct {
 	// CertificateAlias Optional within this object. Alias used as the identifier and referenced by repositories.
 	CertificateAlias *string `json:"certificateAlias,omitempty"`
 
-	// FingerPrint Optional within this object. SHA-256 fingerprint. The Terraform provider matches this key case-insensitively, so the spelling is kept as documented.
+	// FingerPrint Optional within this object. SHA-256 fingerprint. The key is spelled fingerPrint, with a capital P.
 	FingerPrint *string `json:"fingerPrint,omitempty"`
 
 	// IssuedBy Optional within this object. Issuer of the certificate.
@@ -3625,7 +3625,7 @@ type CertificateInfo struct {
 // ChecksumPolicyType How a client-supplied checksum that disagrees with the uploaded bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
 type ChecksumPolicyType string
 
-// ChecksumReplicationConfig Settings for checksum-only replication, where artifact content moves through storage-level replication and artifactweave only replicates metadata. Not supported in v1: the operation that takes this body answers 501.
+// ChecksumReplicationConfig Settings for checksum-only replication, where artifact content moves through storage-level replication and only metadata is replicated. Not implemented: the operation that takes this body answers 501.
 type ChecksumReplicationConfig struct {
 	// CheckBinaryExistenceAllowed Required within this object. Permits replications on this instance to set checkBinaryExistenceInFilestore and skip transferring content that already exists in the target filestore.
 	CheckBinaryExistenceAllowed bool `json:"checkBinaryExistenceAllowed"`
@@ -3639,7 +3639,7 @@ type ChecksumReplicationStatus struct {
 	// CheckBinaryExistenceAllowed Optional within this object. Whether checkBinaryExistenceInFilestore may be used against this instance.
 	CheckBinaryExistenceAllowed *bool `json:"checkBinaryExistenceAllowed,omitempty"`
 
-	// TrustUntil Optional within this object. Instant after which trusted checksums are no longer accepted without content. The format is not fixed by the upstream documentation.
+	// TrustUntil Optional within this object. Instant after which trusted checksums are no longer accepted without content. The format is unspecified.
 	TrustUntil *string `json:"trustUntil,omitempty"`
 }
 
@@ -3651,7 +3651,7 @@ type Checksums struct {
 	// Sha1 Optional within this object. Lowercase hex SHA-1 digest, 40 characters.
 	Sha1 *string `json:"sha1,omitempty"`
 
-	// Sha256 Optional within this object. Lowercase hex SHA-256 digest, 64 characters. This is the blob store key in artifactweave.
+	// Sha256 Optional within this object. Lowercase hex SHA-256 digest, 64 characters. This is the blob store key.
 	Sha256 *string `json:"sha256,omitempty"`
 }
 
@@ -3789,7 +3789,7 @@ type CleanupPolicyRunViewEntry struct {
 	// StartTime Optional within this object. Start as epoch milliseconds.
 	StartTime *int64 `json:"startTime,omitempty"`
 
-	// Status Optional within this object. Run status. IN_PROGRESS and IN_PROGRESS_WITH_ERRORS are running; COMPLETED, COMPLETED_WITH_ERRORS, STOPPED and FAILED are final; STOPPING is a stop in progress. PENDING_WARM, PARTIAL_WARMED and WARMED describe Artifactory's index warm-up before a run and are never reported by artifactweave, whose package index is always current.
+	// Status Optional within this object. Run status. IN_PROGRESS and IN_PROGRESS_WITH_ERRORS are running; COMPLETED, COMPLETED_WITH_ERRORS, STOPPED and FAILED are final; STOPPING is a stop in progress. PENDING_WARM, PARTIAL_WARMED and WARMED are not returned.
 	Status *CleanupPolicyRunViewEntryStatus `json:"status,omitempty"`
 
 	// TotalItems Optional within this object. Number of items selected.
@@ -3802,7 +3802,7 @@ type CleanupPolicyRunViewEntry struct {
 // CleanupPolicyRunViewEntryItemType Optional within this object. Item type of the policy.
 type CleanupPolicyRunViewEntryItemType string
 
-// CleanupPolicyRunViewEntryStatus Optional within this object. Run status. IN_PROGRESS and IN_PROGRESS_WITH_ERRORS are running; COMPLETED, COMPLETED_WITH_ERRORS, STOPPED and FAILED are final; STOPPING is a stop in progress. PENDING_WARM, PARTIAL_WARMED and WARMED describe Artifactory's index warm-up before a run and are never reported by artifactweave, whose package index is always current.
+// CleanupPolicyRunViewEntryStatus Optional within this object. Run status. IN_PROGRESS and IN_PROGRESS_WITH_ERRORS are running; COMPLETED, COMPLETED_WITH_ERRORS, STOPPED and FAILED are final; STOPPING is a stop in progress. PENDING_WARM, PARTIAL_WARMED and WARMED are not returned.
 type CleanupPolicyRunViewEntryStatus string
 
 // CleanupPolicySummary Identity and outcome of the run the summary describes.
@@ -3964,12 +3964,12 @@ type CleanupTarget struct {
 	ReposIncluded *[]string `json:"reposIncluded,omitempty"`
 }
 
-// ClusterLocksResponse A snapshot of the locks artifactweave currently holds, grouped by process. Artifactory reports PostgreSQL advisory locks across HA nodes here; artifactweave reports the leases in its own database lease table, and because v1 runs as a single process the report always has exactly one node. The shape follows Artifactory so tooling that parses it keeps working.
+// ClusterLocksResponse A snapshot of the leases the server currently holds in its database lease table, grouped by process. The report always has exactly one node.
 type ClusterLocksResponse struct {
 	// Meta Required within this object. When and where the snapshot was taken.
 	Meta LocksResponseMeta `json:"meta"`
 
-	// Nodes Required within this object. One entry per process that was asked for its locks. Always one entry in v1.
+	// Nodes Required within this object. One entry per process that was asked for its locks. Always one entry.
 	Nodes []NodeLocks `json:"nodes"`
 
 	// Summary Required within this object. Totals across every reported process.
@@ -3979,12 +3979,12 @@ type ClusterLocksResponse struct {
 	Warnings *[]LocksResponseWarning `json:"warnings,omitempty"`
 }
 
-// ColdStorageErrorResponse Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageErrorResponse Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageErrorResponse struct {
-	// Error Optional within this object. Short symbolic form of the failure, such as NOT_FOUND, for clients of the cold storage envelope.
+	// Error Optional within this object. Short symbolic form of the failure, such as NOT_FOUND.
 	Error *string `json:"error,omitempty"`
 
-	// Errors Required within this object. One entry per error; clients of the standard envelope read the first.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Message Required within this object. Human readable explanation.
 		Message string `json:"message"`
@@ -3999,7 +3999,7 @@ type ColdStorageErrorResponse struct {
 
 // ColdStorageNamespace The namespace that prefixes archived paths.
 type ColdStorageNamespace struct {
-	// JfrogColdStorageNamespaceId Optional within this object. Identifier generated by this instance the first time content is archived and stable afterwards. Archived paths are reported as <namespace>/<repository>/<path>; restore requests may omit it (see addNamespace). The field keeps JFrog's name for client compatibility.
+	// JfrogColdStorageNamespaceId Optional within this object. Identifier generated by this instance the first time content is archived and stable afterwards. Archived paths are reported as <namespace>/<repository>/<path>; restore requests may omit it (see addNamespace).
 	JfrogColdStorageNamespaceId *string `json:"jfrogColdStorageNamespaceId,omitempty"`
 }
 
@@ -4054,7 +4054,7 @@ type CopyOrMoveResult struct {
 	Messages *[]CopyOrMoveMessage `json:"messages,omitempty"`
 }
 
-// CreateSignedUrlRequest Request for a time-limited download URL for one artifact. Not supported by artifactweave v1 (Enterprise feature in Artifactory); declared for parity.
+// CreateSignedUrlRequest Request for a time-limited download URL for one artifact. Not implemented; the operation answers 501.
 type CreateSignedUrlRequest struct {
 	// Expiry Optional within this object. Absolute expiry as Unix epoch milliseconds. Mutually exclusive with `valid_for_secs`.
 	Expiry *int64 `json:"expiry,omitempty"`
@@ -4078,9 +4078,9 @@ type CreationSearchResult struct {
 	} `json:"results,omitempty"`
 }
 
-// CurationInterfaceSettings Settings of JFrog Curation, which artifactweave does not implement. Kept so the operations that carry it have a typed body.
+// CurationInterfaceSettings Curation settings. The operations that carry this body answer 501.
 type CurationInterfaceSettings struct {
-	// AllowDownloadWhenUnavailable Optional within this object. In Artifactory, whether downloads proceed when the curation service cannot be reached. Ignored by artifactweave.
+	// AllowDownloadWhenUnavailable Optional within this object. Whether downloads proceed when the curation service cannot be reached. Ignored.
 	AllowDownloadWhenUnavailable *bool `json:"allowDownloadWhenUnavailable,omitempty"`
 }
 
@@ -4107,7 +4107,7 @@ type DeleteBuildsRequest struct {
 	// BuildName Required within this object. Name of the build.
 	BuildName string `json:"buildName"`
 
-	// BuildNumbers Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, the earliest-started first, which is how the JFrog CLI replaces a number's runs with --overwrite. Ignored when deleteAll is true.
+	// BuildNumbers Optional within this object. Build numbers to delete. A number deletes one run for each time it is listed, the earliest-started first. Ignored when deleteAll is true.
 	BuildNumbers *[]string `json:"buildNumbers,omitempty"`
 
 	// DeleteAll Optional within this object. When true, every run of the build is deleted. Defaults to false.
@@ -4162,7 +4162,7 @@ type Dependency struct {
 	Type *string `json:"type,omitempty"`
 }
 
-// DistributeArtifactRequest Legacy Bintray distribution request. Bintray was retired in 2021; artifactweave answers 501.
+// DistributeArtifactRequest Bintray distribution request. Not implemented; the operation answers 501.
 type DistributeArtifactRequest struct {
 	// Async Optional within this object. Whether to return before distribution completes. Default false.
 	Async *bool `json:"async,omitempty"`
@@ -4186,7 +4186,7 @@ type DistributeArtifactRequest struct {
 	TargetRepo string `json:"targetRepo"`
 }
 
-// DockerPromotionRequest Which image to promote, where to, and whether it moves or is copied. The JFrog CLI sends every field, with an empty string for each optional name or tag it was not given, so an empty string means the same as an omitted field.
+// DockerPromotionRequest Which image to promote, where to, and whether it moves or is copied. An empty string in an optional name or tag field means the same as an omitted field.
 type DockerPromotionRequest struct {
 	// Copy Optional within this object. When true the image is copied and the source keeps it; when false it is moved and leaves the source. Defaults to false.
 	Copy *bool `json:"copy,omitempty"`
@@ -4207,7 +4207,7 @@ type DockerPromotionRequest struct {
 	TargetTag *string `json:"targetTag,omitempty"`
 }
 
-// ErrorDetail One entry of the Artifactory error envelope.
+// ErrorDetail One entry of the standard error envelope.
 type ErrorDetail struct {
 	// Message Required within this object. Human-readable reason.
 	Message string `json:"message"`
@@ -4216,7 +4216,7 @@ type ErrorDetail struct {
 	Status *int `json:"status,omitempty"`
 }
 
-// ErrorDetails One error entry as the trash can operations describe it; the same shape as the entries of the Artifactory error envelope.
+// ErrorDetails One error entry as the trash can operations describe it; the same shape as the entries of the standard error envelope.
 type ErrorDetails struct {
 	// Message Optional within this object. Human readable explanation.
 	Message *string `json:"message,omitempty"`
@@ -4225,9 +4225,9 @@ type ErrorDetails struct {
 	Status *int `json:"status,omitempty"`
 }
 
-// ErrorResponse The Artifactory error envelope used by every /artifactory response.
+// ErrorResponse The error envelope used by every /artifactory response.
 type ErrorResponse struct {
-	// Errors Required within this object. One entry per error. jfrog-client-go reports the whole body after the status, except release bundle import, which reads the first entry's message; the Terraform providers join the messages of every entry.
+	// Errors Required within this object. One entry per error.
 	Errors []struct {
 		// Message Required within this object. Human readable explanation.
 		Message string `json:"message"`
@@ -4237,40 +4237,40 @@ type ErrorResponse struct {
 	} `json:"errors"`
 }
 
-// ExportSettings Options of a full system export. artifactweave does not implement import or export in v1; the schema is kept so the stubbed operations keep their documented shape.
+// ExportSettings Options of a full system export. The operations that take this body answer 501.
 type ExportSettings struct {
-	// BypassFiltering Optional within this object. In Artifactory, export files without applying content filters.
+	// BypassFiltering Optional within this object. Export files without applying content filters.
 	BypassFiltering *bool `json:"bypassFiltering,omitempty"`
 
-	// CreateArchive Optional within this object. In Artifactory, write a single zip archive instead of a directory tree.
+	// CreateArchive Optional within this object. Write a single zip archive instead of a directory tree.
 	CreateArchive *bool `json:"createArchive,omitempty"`
 
-	// ExcludeContent Optional within this object. In Artifactory, export configuration and metadata without binaries.
+	// ExcludeContent Optional within this object. Export configuration and metadata without binaries.
 	ExcludeContent *bool `json:"excludeContent,omitempty"`
 
 	// ExportPath Required within this object. Server-side directory the export would be written to.
 	ExportPath string `json:"exportPath"`
 
-	// FailIfEmpty Optional within this object. In Artifactory, fail when there is nothing to export.
+	// FailIfEmpty Optional within this object. Fail when there is nothing to export.
 	FailIfEmpty *bool `json:"failIfEmpty,omitempty"`
 
-	// FailOnError Optional within this object. In Artifactory, stop at the first error instead of continuing.
+	// FailOnError Optional within this object. Stop at the first error instead of continuing.
 	FailOnError *bool `json:"failOnError,omitempty"`
 
-	// IncludeMetadata Optional within this object. In Artifactory, include item properties and statistics.
+	// IncludeMetadata Optional within this object. Include item properties and statistics.
 	IncludeMetadata *bool `json:"includeMetadata,omitempty"`
 
-	// Incremental Optional within this object. In Artifactory, write only what changed since the previous export to the same path.
+	// Incremental Optional within this object. Write only what changed since the previous export to the same path.
 	Incremental *bool `json:"incremental,omitempty"`
 
-	// M2 Optional within this object. In Artifactory, also write Maven 2 compatible metadata files.
+	// M2 Optional within this object. Also write Maven 2 compatible metadata files.
 	M2 *bool `json:"m2,omitempty"`
 
-	// Verbose Optional within this object. In Artifactory, log every exported item.
+	// Verbose Optional within this object. Log every exported item.
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
-// FederatedRepositoryConfiguration Configuration of a federated repository: a local repository whose content and metadata are kept in sync with copies on other artifactweave instances (decision 0022). Members are artifactweave peers that trust each other through pairing (decision 0021); JFrog Artifactory instances cannot be members. Deploys, deletes, moves, copies and property changes on any member are sent to the others as ordered events; where two members change the same item, the change with the later event time wins and the originating instance id breaks ties. A full sync repairs members that missed events.
+// FederatedRepositoryConfiguration Configuration of a federated repository: a local repository whose content and metadata are kept in sync with copies on other instances of this server (decision 0022). Members are instances of this server that trust each other through pairing (decision 0021). Deploys, deletes, moves, copies and property changes on any member are sent to the others as ordered events; where two members change the same item, the change with the later event time wins and the originating instance id breaks ties. A full sync repairs members that missed events.
 type FederatedRepositoryConfiguration = repo.Config
 
 // FileInfo Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
@@ -4311,7 +4311,7 @@ type FileInfo struct {
 	// Repo Optional within this object. Repository key the item lives in. Cached remote content reports the `<key>-cache` alias.
 	Repo *string `json:"repo,omitempty"`
 
-	// Size Optional within this object. Content length in bytes rendered as a decimal string, not a number, because clients parse it as a string.
+	// Size Optional within this object. Content length in bytes rendered as a decimal string, not a number.
 	Size *string `json:"size,omitempty"`
 
 	// Uri Optional within this object. Absolute URL of this storage API resource, built from the resolved base URL (decision 0002).
@@ -4366,7 +4366,7 @@ type FileStatistics struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// FileStoreSummary Capacity figures of the blob store. Space values are human-formatted strings with a unit, as Artifactory emits them.
+// FileStoreSummary Capacity figures of the blob store. Space values are human-formatted strings with a unit.
 type FileStoreSummary struct {
 	// FreeSpace Optional within this object. Free space on the volume, with the percentage in parentheses.
 	FreeSpace *string `json:"freeSpace,omitempty"`
@@ -4495,21 +4495,21 @@ type GroupListItem struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// ImportSettings Options of a full system import. artifactweave does not implement import or export in v1; the schema is kept so the stubbed operations keep their documented shape.
+// ImportSettings Options of a full system import. The operations that take this body answer 501.
 type ImportSettings struct {
-	// FailIfEmpty Optional within this object. In Artifactory, fail when the source holds nothing to import.
+	// FailIfEmpty Optional within this object. Fail when the source holds nothing to import.
 	FailIfEmpty *bool `json:"failIfEmpty,omitempty"`
 
-	// FailOnError Optional within this object. In Artifactory, stop at the first error instead of continuing.
+	// FailOnError Optional within this object. Stop at the first error instead of continuing.
 	FailOnError *bool `json:"failOnError,omitempty"`
 
 	// ImportPath Required within this object. Server-side directory or archive to import from.
 	ImportPath string `json:"importPath"`
 
-	// IncludeMetadata Optional within this object. In Artifactory, import item properties and statistics as well as binaries.
+	// IncludeMetadata Optional within this object. Import item properties and statistics as well as binaries.
 	IncludeMetadata *bool `json:"includeMetadata,omitempty"`
 
-	// Verbose Optional within this object. In Artifactory, log every imported item.
+	// Verbose Optional within this object. Log every imported item.
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
@@ -4614,10 +4614,10 @@ type KeyPairInput struct {
 	// PublicKey Required within this object. PEM or ASCII-armored public key. This is the only key material a read returns.
 	PublicKey string `json:"publicKey"`
 
-	// VaultKey Optional within this object. Name of an external vault key to use instead of privateKey. Accepted for wire compatibility; artifactweave has no vault integration in v1 and rejects a pair that sets it without privateKey with 400.
+	// VaultKey Optional within this object. Name of an external vault key to use instead of privateKey. Accepted but not used; a pair that sets it without privateKey is rejected with 400.
 	VaultKey *string `json:"vaultKey,omitempty"`
 
-	// VaultPublicKey Optional within this object. Location of the public key in an external vault when vaultKey is used. Accepted and ignored in v1.
+	// VaultPublicKey Optional within this object. Location of the public key in an external vault when vaultKey is used. Accepted and ignored.
 	VaultPublicKey *struct {
 		// Key Optional within this object. Field name inside the vault entry.
 		Key *string `json:"key,omitempty"`
@@ -4704,13 +4704,13 @@ type LegacyTokenResponse struct {
 
 // License defines model for License.
 type License struct {
-	// LicensedTo Required within this object. Always artifactweave.
+	// LicensedTo Required within this object. Always `artifactweave`.
 	LicensedTo string `json:"licensedTo"`
 
-	// Type Required within this object. Always artifactweave. Artifactory reports its licence tier here; artifactweave has none.
+	// Type Required within this object. Always `artifactweave`; there is no licence tier.
 	Type string `json:"type"`
 
-	// ValidThrough Required within this object. Always the literal never.
+	// ValidThrough Required within this object. Always `never`.
 	ValidThrough string `json:"validThrough"`
 }
 
@@ -4723,7 +4723,7 @@ type LicenseBatchResult struct {
 	Status *int `json:"status,omitempty"`
 }
 
-// LicenseControl License-check settings recorded with the build. artifactweave stores them and does not act on them.
+// LicenseControl License-check settings recorded with the build. They are stored and not acted on.
 type LicenseControl struct {
 	// AutoDiscover Optional within this object. Whether licenses were discovered automatically.
 	AutoDiscover *bool `json:"autoDiscover,omitempty"`
@@ -4747,11 +4747,11 @@ type LicenseKey struct {
 	LicenseKey *string `json:"licenseKey,omitempty"`
 }
 
-// LicenseSearchResult Items tagged with licence information. artifactweave stores licence tags as ordinary properties and this search reads them; automatic discovery is not supported.
+// LicenseSearchResult Items tagged with licence information. Licence tags are stored as ordinary properties and this search reads them; automatic discovery is not supported.
 type LicenseSearchResult struct {
 	// Results Optional within this object. One entry per item and licence.
 	Results *[]struct {
-		// Found Optional within this object. Licence name discovered by automatic detection. Always empty in artifactweave because autofind is not implemented.
+		// Found Optional within this object. Licence name discovered by automatic detection. Always empty; automatic discovery is not supported.
 		Found *string `json:"found,omitempty"`
 
 		// License Optional within this object. Licence name stored on the item.
@@ -4785,7 +4785,7 @@ type LockEntry struct {
 	// LockedSinceIso Required within this object. When the lease was acquired, as an RFC 3339 UTC timestamp. Same instant as lockedSinceEpochMs.
 	LockedSinceIso time.Time `json:"lockedSinceIso"`
 
-	// ThreadId Required within this object. Artifactory reports the JVM thread that holds the lock. artifactweave has no threads to name and reports a stable numeric identifier of the task holding the lease instead.
+	// ThreadId Required within this object. A stable numeric identifier of the task holding the lease.
 	ThreadId int64 `json:"threadId"`
 
 	// ThreadName Optional within this object. Human-readable name of the holding task, such as the cleanup policy run it belongs to. Null when the task has no name.
@@ -4794,13 +4794,13 @@ type LockEntry struct {
 
 // LocksFanOutMeta How the report was gathered across processes.
 type LocksFanOutMeta struct {
-	// Enabled Required within this object. Whether the responding process asked other processes for their locks. Always false in v1, which runs one process.
+	// Enabled Required within this object. Whether the responding process asked other processes for their locks. Always false; the server runs one process.
 	Enabled bool `json:"enabled"`
 
-	// Responded Required within this object. How many other processes answered. Always 0 in v1.
+	// Responded Required within this object. How many other processes answered. Always 0.
 	Responded int `json:"responded"`
 
-	// Unreachable Required within this object. How many other processes did not answer. Always 0 in v1.
+	// Unreachable Required within this object. How many other processes did not answer. Always 0.
 	Unreachable int `json:"unreachable"`
 }
 
@@ -4818,10 +4818,10 @@ type LocksResponseMeta struct {
 
 // LocksResponseSummary Totals across every reported process.
 type LocksResponseSummary struct {
-	// NodesOk Required within this object. Processes that reported their locks. Always 1 in v1.
+	// NodesOk Required within this object. Processes that reported their locks. Always 1.
 	NodesOk int `json:"nodesOk"`
 
-	// NodesUnreachable Required within this object. Processes that did not answer. Always 0 in v1.
+	// NodesUnreachable Required within this object. Processes that did not answer. Always 0.
 	NodesUnreachable int `json:"nodesUnreachable"`
 
 	// TotalHeldLocks Required within this object. Number of leases held across all reported processes.
@@ -4830,22 +4830,22 @@ type LocksResponseSummary struct {
 
 // LocksResponseWarning A condition that makes the snapshot partial.
 type LocksResponseWarning struct {
-	// Code Required within this object. Machine-readable reason. The only value Artifactory defines reports that cross-node collection was skipped; artifactweave never emits it in v1.
+	// Code Required within this object. Machine-readable reason. The only defined value reports that cross-node collection was skipped; it is never emitted.
 	Code LocksResponseWarningCode `json:"code"`
 
 	// Message Required within this object. Human-readable explanation of the warning.
 	Message string `json:"message"`
 }
 
-// LocksResponseWarningCode Required within this object. Machine-readable reason. The only value Artifactory defines reports that cross-node collection was skipped; artifactweave never emits it in v1.
+// LocksResponseWarningCode Required within this object. Machine-readable reason. The only defined value reports that cross-node collection was skipped; it is never emitted.
 type LocksResponseWarningCode string
 
-// LoggerLevel A logback level name. artifactweave maps these onto its slog levels: trace and debug enable debug output, info is the default, warn and error raise the threshold, and fatal is treated as error.
+// LoggerLevel A log level name. The server maps these onto its own levels: trace and debug enable debug output, info is the default, warn and error raise the threshold, and fatal is treated as error.
 type LoggerLevel string
 
 // LoggerLevelsRequest A temporary override of log levels for named loggers. The override lives only in memory and is never written to configuration.
 type LoggerLevelsRequest struct {
-	// Classes Required within this object. Map from logger name to the level it should log at while the override lasts. Logger names are the dotted package or component names artifactweave logs under (for example artifactweave.remote or artifactweave.server). At most 100 entries; a larger map is rejected with 400. Names that match no logger are accepted and have no effect.
+	// Classes Required within this object. Map from logger name to the level it should log at while the override lasts. Logger names are the dotted package or component names the server logs under, such as `artifactweave.remote`. At most 100 entries; a larger map is rejected with 400. Names that match no logger are accepted and have no effect.
 	Classes map[string]LoggerLevel `json:"classes"`
 
 	// Timer Required within this object. How long the override lasts, in seconds. When it expires every listed logger returns to the level it had before the request. Must be positive.
@@ -4879,7 +4879,7 @@ type MultipartUploadToken struct {
 	Token *string `json:"token,omitempty"`
 }
 
-// MultipleReplicationConfigRequest Multi-push replication configuration: one schedule fanning out to several targets. Not supported in v1; the operations that take this body answer 501. Use one single-target configuration per repository instead.
+// MultipleReplicationConfigRequest Multi-push replication configuration: one schedule fanning out to several targets. Not implemented; the operations that take this body answer 501. Use one single-target configuration per repository instead.
 type MultipleReplicationConfigRequest struct {
 	// CronExp Required within this object. Schedule in Quartz cron syntax shared by every target.
 	CronExp string `json:"cronExp"`
@@ -4891,9 +4891,9 @@ type MultipleReplicationConfigRequest struct {
 	Replications []ReplicationConfigRequest `json:"replications"`
 }
 
-// NodeLicense The licence of one cluster node. artifactweave reports a single node.
+// NodeLicense The licence of one node. This instance reports itself as the only node.
 type NodeLicense struct {
-	// Expired Optional within this object. Whether the licence has expired; always false here.
+	// Expired Optional within this object. Whether the licence has expired; always false.
 	Expired *bool `json:"expired,omitempty"`
 
 	// LicenseHash Optional within this object. The hash that identifies the licence in delete requests.
@@ -4902,16 +4902,16 @@ type NodeLicense struct {
 	// LicensedTo Optional within this object. The licensee name.
 	LicensedTo *string `json:"licensedTo,omitempty"`
 
-	// NodeId Optional within this object. The node identifier; the configured service id here.
+	// NodeId Optional within this object. The node identifier, which is the configured service id.
 	NodeId *string `json:"nodeId,omitempty"`
 
 	// NodeUrl Optional within this object. The node's base URL as resolved by the base URL resolver.
 	NodeUrl *string `json:"nodeUrl,omitempty"`
 
-	// Type Optional within this object. The licence type; always artifactweave here.
+	// Type Optional within this object. The licence type; a fixed value naming this server.
 	Type *string `json:"type,omitempty"`
 
-	// ValidThrough Optional within this object. Expiry as a display string; never for artifactweave.
+	// ValidThrough Optional within this object. Expiry as a display string; always the literal never.
 	ValidThrough *string `json:"validThrough,omitempty"`
 }
 
@@ -4932,7 +4932,7 @@ type NodeLocksStatus string
 
 // PackageCleanupPolicyRequest Body for creating or replacing a package cleanup policy. A policy selects package versions by package type, repository, package name, age, download age, version count and properties, and deletes them on a schedule or on demand.
 type PackageCleanupPolicyRequest struct {
-	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone (decision 0010). Omitted or empty means the policy only runs when triggered through the run operation.
+	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone. Omitted or empty means the policy only runs when triggered through the run operation.
 	CronExp *string `json:"cronExp,omitempty"`
 
 	// Description Optional within this object. Free text shown with the policy, at most 256 characters.
@@ -4995,7 +4995,7 @@ type PackageCleanupSearchCriteria struct {
 	// CreatedBeforeInDays Optional within this object. Only items created at least this many 24-hour days before the run are selected. Omitted or 0 means creation age is not a condition.
 	CreatedBeforeInDays *int `json:"createdBeforeInDays,omitempty"`
 
-	// CreatedBeforeInMonths Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays is set.
+	// CreatedBeforeInMonths Optional within this object. Month-based form of createdBeforeInDays; a month counts as 30 days. Ignored when createdBeforeInDays is set.
 	CreatedBeforeInMonths *int `json:"createdBeforeInMonths,omitempty"`
 
 	// ExcludedPackageVersions Optional within this object. Version strings or wildcard patterns (for example *.0) that are never deleted.
@@ -5013,7 +5013,7 @@ type PackageCleanupSearchCriteria struct {
 	// IncludeAllProjects Optional within this object. When true the policy covers every project, and includedProjects is ignored. Only meaningful on global policies created by a platform admin. Defaults to false.
 	IncludeAllProjects *bool `json:"includeAllProjects,omitempty"`
 
-	// IncludeAllStages Optional within this object. When true the policy covers repositories in every environment and includedStages must be empty. Defaults to true in artifactweave, which has no lifecycle stages beyond environments.
+	// IncludeAllStages Optional within this object. When true the policy covers repositories in every environment and includedStages must be empty. Defaults to true.
 	IncludeAllStages *bool `json:"includeAllStages,omitempty"`
 
 	// IncludedPackageVersions Optional within this object. Version strings or wildcard patterns (for example 1.*) to clean up. Omitted means every version that meets the other conditions.
@@ -5037,10 +5037,10 @@ type PackageCleanupSearchCriteria struct {
 	// LastDownloadedBeforeInDays Optional within this object. Only versions whose most recent download is at least this many days before the run are selected; a version never downloaded counts from its creation time. Omitted or 0 means download age is not a condition.
 	LastDownloadedBeforeInDays *int `json:"lastDownloadedBeforeInDays,omitempty"`
 
-	// LastDownloadedBeforeInMonths Optional within this object. Legacy month-based form of lastDownloadedBeforeInDays (30-day months). Ignored when the day form is set.
+	// LastDownloadedBeforeInMonths Optional within this object. Month-based form of lastDownloadedBeforeInDays (30-day months). Ignored when the day form is set.
 	LastDownloadedBeforeInMonths *int `json:"lastDownloadedBeforeInMonths,omitempty"`
 
-	// PackageTypes Required within this object. Package types the policy applies to, at least one, using the repository packageType names (for example npm, docker, maven). Versions are identified and ordered with each type's own rules through the package index (decision 0018).
+	// PackageTypes Required within this object. Package types the policy applies to, at least one, using the repository packageType names (for example npm, docker, maven). Versions are identified and ordered with each type's own rules through the package index.
 	PackageTypes []string `json:"packageTypes"`
 
 	// Repos Required within this object. Repository keys or wildcard patterns the policy runs on, at least one. ** selects every repository of the listed types. Only local repositories and remote caches hold packages that can be deleted; virtual repositories are skipped.
@@ -5050,16 +5050,16 @@ type PackageCleanupSearchCriteria struct {
 // PackageTypeFederated Package types a federated repository may serve. terraformbackend and swift are not allowed.
 type PackageTypeFederated string
 
-// PackageTypeLocal Package types a local repository may serve. The server additionally accepts bazelmodules, which the documentation lists but the crawled schema omits.
+// PackageTypeLocal Package types a local repository may serve. The server also accepts bazelmodules, which the enumeration omits.
 type PackageTypeLocal string
 
-// PackageTypeRemote Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2 are accepted for compatibility but not served.
+// PackageTypeRemote Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2 are accepted but not served.
 type PackageTypeRemote string
 
 // PackageTypeVirtual Package types a virtual repository may serve. cargo, cocoapods, opkg, vagrant and terraformbackend cannot be aggregated.
 type PackageTypeVirtual string
 
-// PasswordExpirationPolicy Platform-wide password expiry. JFrog's documentation shows the values as quoted strings, but the artifactory_password_expiration_policy Terraform resource decodes enabled as a boolean and passwordMaxAge as an integer, so artifactweave emits real JSON types and accepts either form on input.
+// PasswordExpirationPolicy Platform-wide password expiry. Responses carry enabled as a JSON boolean and passwordMaxAge as a JSON integer; requests may send either as a quoted string.
 type PasswordExpirationPolicy struct {
 	// Enabled Optional within this object. Whether internal passwords expire. Defaults to false. Accepted as true or "true".
 	Enabled *bool `json:"enabled,omitempty"`
@@ -5083,7 +5083,7 @@ type PatternSearchResult struct {
 	SourcePattern *string `json:"sourcePattern,omitempty"`
 }
 
-// PermissionTarget A version 1 permission target: repository targets plus include and exclude patterns and per-principal action codes. Virtual repositories cannot be targets. artifactweave stores every target in the Access v2 shape and converts on the wire (decision 0006).
+// PermissionTarget A version 1 permission target: repository targets plus include and exclude patterns and per-principal action codes. Virtual repositories cannot be targets. Every target is stored in the Access v2 shape and converted on the wire (decision 0006).
 type PermissionTarget struct {
 	// ExcludesPattern Optional within this object. Comma-separated Ant patterns excluded from the target. Defaults to the empty string.
 	ExcludesPattern *string `json:"excludesPattern,omitempty"`
@@ -5122,15 +5122,15 @@ type PermissionTargetListItem struct {
 	Uri *string `json:"uri,omitempty"`
 }
 
-// PermissionTargetV2 A version 2 permission target with separate sections for repositories, builds and release bundles. This is the shape the JFrog CLI and the artifactory_permission_target resource send. Keys mix kebab-case and camelCase exactly as Artifactory does.
+// PermissionTargetV2 A version 2 permission target with separate sections for repositories, builds and release bundles. Keys mix kebab-case and camelCase.
 type PermissionTargetV2 struct {
-	// Build Optional within this object. Grants on build-info. Its repositories list is fixed to artifactory-build-info; any other value is a 400. A PUT that omits this section deletes it.
+	// Build Optional within this object. Grants on build-info. Its repositories list is fixed to `artifactory-build-info`; any other value is a 400. A PUT that omits this section deletes it.
 	Build *PermissionTargetV2Section `json:"build,omitempty"`
 
 	// Name Optional within this object. Target name, at most 64 characters. The path parameter wins; a mismatch is a 400.
 	Name *string `json:"name,omitempty"`
 
-	// ReleaseBundle Optional within this object. Grants on release bundles. Accepted and stored for compatibility; release bundles are out of scope in v1, so the section has no effect. A PUT that omits it deletes it.
+	// ReleaseBundle Optional within this object. Grants on release bundles. Stored without effect; release bundles are not served. A PUT that omits it deletes it.
 	ReleaseBundle *PermissionTargetV2Section `json:"releaseBundle,omitempty"`
 
 	// Repo Optional within this object. One section of a version 2 target: targets, patterns and grants.
@@ -5161,7 +5161,7 @@ type PermissionTargetV2Section struct {
 // PermissionTargetV2SectionActionsGroups One action name; see users.
 type PermissionTargetV2SectionActionsGroups string
 
-// PermissionTargetV2SectionActionsUsers One action name. managedXrayMeta and distribute are accepted and stored but have no effect in artifactweave.
+// PermissionTargetV2SectionActionsUsers One action name. managedXrayMeta and distribute are accepted and stored but have no effect.
 type PermissionTargetV2SectionActionsUsers string
 
 // PomRepositoryReferencesCleanupPolicy What a virtual repository does to repository references inside served POMs.
@@ -5175,14 +5175,14 @@ type Probe struct {
 
 // PromotionMessage One line of a promotion report.
 type PromotionMessage struct {
-	// Level Optional within this object. Severity of the message. JFrog documents the levels in lower case; Artifactory sends its status levels' names, in upper case, and so does artifactweave.
+	// Level Optional within this object. Severity of the message, in upper case.
 	Level *PromotionMessageLevel `json:"level,omitempty"`
 
 	// Message Optional within this object. What happened to one file or to the run.
 	Message *string `json:"message,omitempty"`
 }
 
-// PromotionMessageLevel Optional within this object. Severity of the message. JFrog documents the levels in lower case; Artifactory sends its status levels' names, in upper case, and so does artifactweave.
+// PromotionMessageLevel Optional within this object. Severity of the message, in upper case.
 type PromotionMessageLevel string
 
 // PudDirectoryInfo Progress of the prune process within one blob store directory.
@@ -5215,7 +5215,7 @@ type PudProcessResponse struct {
 	Info *string `json:"info,omitempty"`
 }
 
-// PudProcessStatus Current state of the prune unreferenced data process. artifactweave runs blob garbage collection as this process, so the figures are the GC run's figures.
+// PudProcessStatus Current state of the prune unreferenced data process. The process runs blob garbage collection, so the figures are the GC run's figures.
 type PudProcessStatus struct {
 	// DryRun Optional within this object. True when the run only reports what it would delete.
 	DryRun *bool `json:"dryRun,omitempty"`
@@ -5277,7 +5277,7 @@ type PudTiming struct {
 
 // ReleaseBundleCleanupPolicyRequest Body for creating or replacing a release bundle cleanup policy, which deletes release bundle (v2) versions by name and age, optionally sparing promoted ones.
 type ReleaseBundleCleanupPolicyRequest struct {
-	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone (decision 0010). Omitted or empty means the policy only runs when triggered through the run operation.
+	// CronExp Optional within this object. Quartz cron expression (six or seven fields with seconds, ?, L, W, # and an optional year) for scheduled runs, evaluated in the server's time zone. Omitted or empty means the policy only runs when triggered through the run operation.
 	CronExp *string `json:"cronExp,omitempty"`
 
 	// Description Optional within this object. Free text shown with the policy, at most 256 characters.
@@ -5337,7 +5337,7 @@ type ReleaseBundleCleanupSearchCriteria struct {
 	// CreatedBeforeInDays Optional within this object. Only items created at least this many 24-hour days before the run are selected. Omitted or 0 means creation age is not a condition.
 	CreatedBeforeInDays *int `json:"createdBeforeInDays,omitempty"`
 
-	// CreatedBeforeInMonths Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays is set.
+	// CreatedBeforeInMonths Optional within this object. Month-based form of createdBeforeInDays; a month counts as 30 days. Ignored when createdBeforeInDays is set.
 	CreatedBeforeInMonths *int `json:"createdBeforeInMonths,omitempty"`
 
 	// ExcludeAllPromotedEnvironments Optional within this object. When true, a bundle version promoted to any environment is never deleted.
@@ -5406,7 +5406,7 @@ type RemoveRepositorySuccessReportSuccess bool
 
 // ReplicationConfigRequest Configuration of one replication for a repository. On a local repository it is a push to another instance's local repository; on a remote repository it is a pull from the upstream into the cache. The same shape is returned by the read operation, where replicationKey and repoKey are filled in by the server.
 type ReplicationConfigRequest struct {
-	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds, as allowed by the target's checksum replication settings. Accepted and ignored in v1.
+	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds, as allowed by the target's checksum replication settings. Accepted and ignored.
 	CheckBinaryExistenceInFilestore *bool `json:"checkBinaryExistenceInFilestore,omitempty"`
 
 	// CronExp Optional within this object. Schedule in Quartz cron syntax, for example 0 0 2 * * ?. Omitted on create leaves the replication unscheduled and only runnable on demand. When an array of configurations is set, the first element's value applies to all.
@@ -5415,7 +5415,7 @@ type ReplicationConfigRequest struct {
 	// DisableProxy Optional within this object. True ignores the instance-wide default proxy for this replication. Defaults to false.
 	DisableProxy *bool `json:"disableProxy,omitempty"`
 
-	// EnableEventReplication Optional within this object. True replicates each write as it happens in addition to the schedule. Defaults to false. Event-based replication is accepted and stored but not acted on in v1.
+	// EnableEventReplication Optional within this object. True replicates each write as it happens in addition to the schedule. Defaults to false. Event-based replication is accepted and stored but not acted on.
 	EnableEventReplication *bool `json:"enableEventReplication,omitempty"`
 
 	// Enabled Optional within this object. False keeps the configuration but stops the schedule. Defaults to true.
@@ -5433,7 +5433,7 @@ type ReplicationConfigRequest struct {
 	// Proxy Optional within this object. Key of a configured proxy to route the replication through.
 	Proxy *string `json:"proxy,omitempty"`
 
-	// ReplicationKey Optional within this object. Server-owned identifier of this configuration; ignored on input. Whether Artifactory keeps it stable across updates is not documented, so clients should not depend on it.
+	// ReplicationKey Optional within this object. Server-owned identifier of this configuration; ignored on input. It is not guaranteed to stay the same across updates, so clients should not depend on it.
 	ReplicationKey *string `json:"replicationKey,omitempty"`
 
 	// RepoKey Optional within this object. Server-owned; the repository the configuration belongs to, taken from the path. Ignored on input.
@@ -5481,7 +5481,7 @@ type ReplicationRepositoryStatusStatus string
 
 // ReplicationRequest Per-target options for a replication started on demand. For a pull the array holds at most one element and url may be omitted; for a push each element names a target.
 type ReplicationRequest struct {
-	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds. Accepted and ignored in v1.
+	// CheckBinaryExistenceInFilestore Optional within this object. Skip transferring content the target already holds. Accepted and ignored.
 	CheckBinaryExistenceInFilestore *bool `json:"checkBinaryExistenceInFilestore,omitempty"`
 
 	// Delete Optional within this object. True also deletes items at the destination that are absent at the source. Defaults to false.
@@ -5598,27 +5598,27 @@ type RepositorySummary struct {
 	UsedSpace *string `json:"usedSpace,omitempty"`
 }
 
-// ReverseProxyConfig Reverse proxy settings, stored as the reverseProxies section of the descriptor. Field names follow Artifactory; both sslPort and httpsPort are accepted and returned.
+// ReverseProxyConfig Reverse proxy settings, stored as the reverseProxies section of the descriptor. Both sslPort and httpsPort are accepted and returned.
 type ReverseProxyConfig struct {
-	// ArtifactoryAppContext Optional within this object. The context path under which the proxy reaches the registry. Fixed to artifactory in artifactweave; stored as sent.
+	// ArtifactoryAppContext Optional within this object. The context path under which the proxy reaches the registry. The server always serves under `artifactory`; the value is stored as sent.
 	ArtifactoryAppContext *string `json:"artifactoryAppContext,omitempty"`
 
-	// ArtifactoryPort Optional within this object. The listener port the proxy forwards to. The Terraform resource never sends it; artifactweave fills it from its own listen address.
+	// ArtifactoryPort Optional within this object. The listener port the proxy forwards to. When omitted, the server fills it from its own listen address.
 	ArtifactoryPort *int `json:"artifactoryPort,omitempty"`
 
 	// ArtifactoryServerName Optional within this object. The host the proxy forwards to, usually localhost.
 	ArtifactoryServerName *string `json:"artifactoryServerName,omitempty"`
 
-	// DockerReverseProxyMethod Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is sent by the Terraform resource and treated like REPOPATHPREFIX.
+	// DockerReverseProxyMethod Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is treated like REPOPATHPREFIX.
 	DockerReverseProxyMethod *ReverseProxyConfigDockerReverseProxyMethod `json:"dockerReverseProxyMethod,omitempty"`
 
 	// HttpPort Optional within this object. The plain HTTP listener port.
 	HttpPort *int `json:"httpPort,omitempty"`
 
-	// HttpsPort Optional within this object. The TLS listener port as the Terraform resource names it. Alias of sslPort.
+	// HttpsPort Optional within this object. The TLS listener port. Alias of sslPort.
 	HttpsPort *int `json:"httpsPort,omitempty"`
 
-	// Key Optional within this object. The configuration name. Artifactory keeps exactly one; artifactweave stores whatever is sent and defaults to nginx.
+	// Key Optional within this object. The configuration name. Stored as sent; defaults to nginx.
 	Key *string `json:"key,omitempty"`
 
 	// PublicAppContext Optional within this object. The context path clients use. Must match artifactoryAppContext unless the proxy rewrites paths.
@@ -5627,7 +5627,7 @@ type ReverseProxyConfig struct {
 	// ServerName Optional within this object. The public host name the proxy answers for.
 	ServerName *string `json:"serverName,omitempty"`
 
-	// ServerNameExpression Optional within this object. A wildcard host expression for the Docker subdomain method, for example *.example.com. The Terraform resource never sends it.
+	// ServerNameExpression Optional within this object. A wildcard host expression for the Docker subdomain method, for example *.example.com.
 	ServerNameExpression *string `json:"serverNameExpression,omitempty"`
 
 	// SslCertificate Optional within this object. Path to the TLS certificate on the proxy host.
@@ -5645,17 +5645,17 @@ type ReverseProxyConfig struct {
 	// UseHttps Optional within this object. Whether the proxy listens on TLS.
 	UseHttps *bool `json:"useHttps,omitempty"`
 
-	// WebServerType Optional within this object. The proxy software. Only NGINX renders a snippet in v1.
+	// WebServerType Optional within this object. The proxy software. Only NGINX renders a snippet.
 	WebServerType *ReverseProxyConfigWebServerType `json:"webServerType,omitempty"`
 }
 
-// ReverseProxyConfigDockerReverseProxyMethod Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is sent by the Terraform resource and treated like REPOPATHPREFIX.
+// ReverseProxyConfigDockerReverseProxyMethod Optional within this object. How Docker clients address repositories. REPOPATHPREFIX is the native method; SUBDOMAIN enables host matching; PORTPERREPO is accepted but not served; DIRECT is treated like REPOPATHPREFIX.
 type ReverseProxyConfigDockerReverseProxyMethod string
 
-// ReverseProxyConfigWebServerType Optional within this object. The proxy software. Only NGINX renders a snippet in v1.
+// ReverseProxyConfigWebServerType Optional within this object. The proxy software. Only NGINX renders a snippet.
 type ReverseProxyConfigWebServerType string
 
-// RubyGemVersion One version of a RubyGem as the rubygems.org versions API describes it. Gems are outside the artifactweave v1 ecosystem scope (research 10); the operation answers 501.
+// RubyGemVersion One version of a RubyGem as the rubygems.org versions API describes it. Not implemented; the operation answers 501.
 type RubyGemVersion struct {
 	// Authors Optional within this object. Comma-separated author names from the gemspec.
 	Authors *string `json:"authors,omitempty"`
@@ -5702,7 +5702,7 @@ type RubyGemVersion struct {
 
 // SecurityInfoMessage A confirmation message returned by several mutating operations.
 type SecurityInfoMessage struct {
-	// Info Optional within this object. Human-readable confirmation of what changed. Clients do not parse it.
+	// Info Optional within this object. Human-readable confirmation of what changed, as free text without a fixed format.
 	Info *string `json:"info,omitempty"`
 }
 
@@ -5715,7 +5715,7 @@ type SecurityStatusMessage struct {
 	Status *string `json:"status,omitempty"`
 }
 
-// Sha256ChecksumRequest Names the item whose `sha256` property should be computed. Kept for compatibility with clients written before SHA-256 was native; artifactweave always records SHA-256, so the call only re-attaches the property.
+// Sha256ChecksumRequest Names the item whose `sha256` property should be computed. SHA-256 is recorded on every deploy, so the call only re-attaches the property.
 type Sha256ChecksumRequest struct {
 	// Path Required within this object. Item path without a leading `/`. A folder path applies the operation to every file below it.
 	Path string `json:"path"`
@@ -5734,9 +5734,9 @@ type SharedRemoteRepositoryConfiguration struct {
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
 
-// SmartArchivingPolicy A package-level archiving policy. Each run moves the selected package versions from the hot blob store to the cold tier and leaves a tombstone in the hot index so search and restore still find them. In artifactweave the cold store is a second blob store configured on the same instance (for example an S3 bucket with an archive storage class), not a separate cold instance (decision 0024); the API behaves as Artifactory documents.
+// SmartArchivingPolicy A package-level archiving policy. Each run moves the selected package versions from the hot blob store to the cold tier and leaves a tombstone in the hot index so search and restore still find them. The cold store is a second blob store configured on the same instance, for example an S3 bucket with an archive storage class.
 type SmartArchivingPolicy struct {
-	// CronExp Optional within this object. Quartz cron expression for scheduled runs (decision 0010). Omit to run the policy only on demand.
+	// CronExp Optional within this object. Quartz cron expression for scheduled runs. Omit to run the policy only on demand.
 	CronExp *string `json:"cronExp,omitempty"`
 
 	// Description Optional within this object. Free text shown with the policy.
@@ -5745,7 +5745,7 @@ type SmartArchivingPolicy struct {
 	// DurationInMinutes Optional within this object. Longest a run may take before it is stopped, at most 300. Versions already moved stay archived.
 	DurationInMinutes *int `json:"durationInMinutes,omitempty"`
 
-	// Enabled Optional within this object. Whether scheduled and manual runs are allowed. Must be false or absent on create, as in Artifactory; switch it with the enablement operation.
+	// Enabled Optional within this object. Whether scheduled and manual runs are allowed. Must be false or absent on create; switch it with the enablement operation.
 	Enabled *bool `json:"enabled,omitempty"`
 
 	// Key Required within this object. Identifier of the policy: at least three characters of letters, digits, underscore and hyphen. Must equal the policyKey path parameter on create and update.
@@ -5785,22 +5785,22 @@ type StatusMessage struct {
 	Status *int `json:"status,omitempty"`
 }
 
-// StorageSummaryInfo Snapshot of storage usage. artifactweave computes the figures on every request, so they never lag writes; Artifactory serves the result of its last calculation.
+// StorageSummaryInfo Snapshot of storage usage. The figures are computed on every request, so they never lag writes.
 type StorageSummaryInfo struct {
-	// BinariesSummary Optional within this object. Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory emits and what the JFrog CLI prints verbatim.
+	// BinariesSummary Optional within this object. Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string, such as `3.48 GB` or `125,726`.
 	BinariesSummary *BinariesSummary `json:"binariesSummary,omitempty"`
 
-	// BlobMirrors Optional within this object. artifactweave's addition (decision 0028), sent only when a blob tier is a mirror. Artifactory reports nothing per shard, and JFrog clients ignore the field. One entry per mirrored tier.
+	// BlobMirrors Optional within this object. Sent only when a blob tier is a mirror (decision 0028). One entry per mirrored tier.
 	BlobMirrors *[]wire.BlobMirror `json:"-"`
 
-	// FileStoreSummary Optional within this object. Capacity figures of the blob store. Space values are human-formatted strings with a unit, as Artifactory emits them.
+	// FileStoreSummary Optional within this object. Capacity figures of the blob store. Space values are human-formatted strings with a unit.
 	FileStoreSummary *FileStoreSummary `json:"fileStoreSummary,omitempty"`
 
 	// RepositoriesSummaryList Optional within this object. One row per repository plus the `TOTAL` row, sorted by key.
 	RepositoriesSummaryList *[]RepositorySummary `json:"repositoriesSummaryList,omitempty"`
 }
 
-// SupportBundleConfig What a support bundle should contain. Accepted for parity; not implemented.
+// SupportBundleConfig What a support bundle should contain. Support bundles are not implemented.
 type SupportBundleConfig struct {
 	// Description Optional within this object. Free text about why the bundle was made.
 	Description *string `json:"description,omitempty"`
@@ -5808,11 +5808,11 @@ type SupportBundleConfig struct {
 	// Name Optional within this object. A display name for the bundle.
 	Name *string `json:"name,omitempty"`
 
-	// Parameters Optional within this object. Which collectors a support bundle runs. Accepted for parity; not implemented.
+	// Parameters Optional within this object. Which collectors a support bundle runs. Support bundles are not implemented.
 	Parameters *SupportBundleParameters `json:"parameters,omitempty"`
 }
 
-// SupportBundleCreated The identifier of a created bundle. Never produced by artifactweave.
+// SupportBundleCreated The identifier of a created bundle. Not returned.
 type SupportBundleCreated struct {
 	// Artifactory Optional within this object. Where the bundle was written.
 	Artifactory *struct {
@@ -5827,7 +5827,7 @@ type SupportBundleCreated struct {
 	Id *string `json:"id,omitempty"`
 }
 
-// SupportBundleList A page of bundles. Never produced by artifactweave.
+// SupportBundleList A page of bundles. Not returned.
 type SupportBundleList struct {
 	// Bundles Optional within this object. The bundles.
 	Bundles *[]struct {
@@ -5851,7 +5851,7 @@ type SupportBundleList struct {
 	Count *int `json:"count,omitempty"`
 }
 
-// SupportBundleMetadata Metadata of one bundle. Never produced by artifactweave.
+// SupportBundleMetadata Metadata of one bundle. Not returned.
 type SupportBundleMetadata struct {
 	// Artifactory Optional within this object. Where the bundle was written.
 	Artifactory *struct {
@@ -5874,14 +5874,14 @@ type SupportBundleMetadata struct {
 	// Name Optional within this object. The display name.
 	Name *string `json:"name,omitempty"`
 
-	// Parameters Optional within this object. Which collectors a support bundle runs. Accepted for parity; not implemented.
+	// Parameters Optional within this object. Which collectors a support bundle runs. Support bundles are not implemented.
 	Parameters *SupportBundleParameters `json:"parameters,omitempty"`
 
 	// Status Optional within this object. Collection state, for example success.
 	Status *string `json:"status,omitempty"`
 }
 
-// SupportBundleParameters Which collectors a support bundle runs. Accepted for parity; not implemented.
+// SupportBundleParameters Which collectors a support bundle runs. Support bundles are not implemented.
 type SupportBundleParameters struct {
 	// CollectSlowQueriesFromDatabase Optional within this object. Include slow database queries.
 	CollectSlowQueriesFromDatabase *bool `json:"collectSlowQueriesFromDatabase,omitempty"`
@@ -5916,16 +5916,16 @@ type SupportBundleParameters struct {
 
 // SystemVersion defines model for SystemVersion.
 type SystemVersion struct {
-	// Addons Required within this object. Always empty; Artifactory lists licensed add-ons here and no client depends on the contents.
+	// Addons Required within this object. Always empty.
 	Addons []string `json:"addons"`
 
-	// License Optional within this object. Always the literal artifactweave. The 7.x reference does not list this field. The Artifactory 6.20 source emits a hash of the installed licence key here and leaves the field out when no licence is installed; unverified for 7.x. No client parses it.
+	// License Optional within this object. Always `artifactweave`.
 	License *string `json:"license,omitempty"`
 
-	// Revision Required within this object. The artifactweave build identifier (git describe output), so operators can tell the real version apart from the compatibility version.
+	// Revision Required within this object. The server's build identifier (git describe output), distinct from the compatibility version in version.
 	Revision string `json:"revision"`
 
-	// Version Required within this object. The Artifactory version artifactweave is compatible with, in major.minor.patch form. Configured by compat.artifactory_version; defaults to 7.155.0.
+	// Version Required within this object. The compatibility version, in major.minor.patch form. Configured by compat.artifactory_version; defaults to 7.155.0.
 	Version string `json:"version"`
 }
 
@@ -5994,9 +5994,9 @@ type UpdatePropertiesRequest_Props_AdditionalProperties struct {
 	union json.RawMessage
 }
 
-// UploadsConfig Whether the server accepts the JFrog CLI's multipart upload protocol.
+// UploadsConfig Whether the server accepts multipart uploads.
 type UploadsConfig struct {
-	// Supported Optional within this object. True when the server can stage parts, which it can whenever a blob store is configured; the JFrog CLI then uploads files of 200 MiB or more in parts.
+	// Supported Optional within this object. True when the server can stage parts, which it can whenever a blob store is configured.
 	Supported *bool `json:"supported,omitempty"`
 }
 
@@ -6026,7 +6026,7 @@ type UserConfiguration struct {
 	// Admin Optional within this object. Grants every permission. Defaults to false. The seeded admin user cannot be demoted while it is the last admin.
 	Admin *bool `json:"admin,omitempty"`
 
-	// DisableUIAccess Optional within this object. Stored for compatibility; artifactweave has no UI, so it has no effect. Defaults to false.
+	// DisableUIAccess Optional within this object. Stored without effect; no UI is served. Defaults to false.
 	DisableUIAccess *bool `json:"disableUIAccess,omitempty"`
 
 	// Email Optional within this object. Email address. Required on PUT.
@@ -6041,7 +6041,7 @@ type UserConfiguration struct {
 	// LastLoggedIn Optional within this object. Server-owned time of the last successful authentication in ISO-8601 with milliseconds. Absent until the user has logged in.
 	LastLoggedIn *time.Time `json:"lastLoggedIn,omitempty"`
 
-	// MfaStatus Optional within this object. Server-owned multi-factor state. Always NONE in artifactweave, which has no MFA.
+	// MfaStatus Optional within this object. Server-owned multi-factor state. Always NONE.
 	MfaStatus *UserConfigurationMfaStatus `json:"mfaStatus,omitempty"`
 
 	// Name Optional within this object. User name, the identifier. Must equal the path parameter on PUT and POST.
@@ -6072,7 +6072,7 @@ type UserConfiguration struct {
 	WatchManager *bool `json:"watchManager,omitempty"`
 }
 
-// UserConfigurationMfaStatus Optional within this object. Server-owned multi-factor state. Always NONE in artifactweave, which has no MFA.
+// UserConfigurationMfaStatus Optional within this object. Server-owned multi-factor state. Always NONE.
 type UserConfigurationMfaStatus string
 
 // UserConfigurationStatus Optional within this object. Server-owned account state in the upper-case legacy spelling; Access v2 reports the same state in lower case.
@@ -6132,7 +6132,7 @@ type VirtualRepositoryConfiguration = repo.Config
 // BundleId defines model for BundleId.
 type BundleId = string
 
-// DockerImageName Image name as the Docker client sends it, for example library/nginx.
+// DockerImageName Image name, for example library/nginx.
 type DockerImageName = string
 
 // DockerRepoKey Repository key.
@@ -6150,112 +6150,112 @@ type XResultDetail string
 // RepoKey The repository key.
 type RepoKey = string
 
-// AdminBadRequest The Artifactory error envelope used by every /artifactory response.
+// AdminBadRequest The error envelope used by every /artifactory response.
 type AdminBadRequest = ErrorResponse
 
-// AdminForbidden The Artifactory error envelope used by every /artifactory response.
+// AdminForbidden The error envelope used by every /artifactory response.
 type AdminForbidden = ErrorResponse
 
-// AdminInternalServerError The Artifactory error envelope used by every /artifactory response.
+// AdminInternalServerError The error envelope used by every /artifactory response.
 type AdminInternalServerError = ErrorResponse
 
-// AdminLegacyBadRequest The error body Artifactory documents for its import and export operations: the usual envelope plus an older single-message field. These statuses are documented for parity only; artifactweave answers every import and export call with 501 in the standard envelope.
+// AdminLegacyBadRequest The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
 type AdminLegacyBadRequest = AdminLegacyErrorResponse
 
-// AdminLegacyForbidden The error body Artifactory documents for its import and export operations: the usual envelope plus an older single-message field. These statuses are documented for parity only; artifactweave answers every import and export call with 501 in the standard envelope.
+// AdminLegacyForbidden The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
 type AdminLegacyForbidden = AdminLegacyErrorResponse
 
-// AdminLegacyInternalServerError The error body Artifactory documents for its import and export operations: the usual envelope plus an older single-message field. These statuses are documented for parity only; artifactweave answers every import and export call with 501 in the standard envelope.
+// AdminLegacyInternalServerError The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
 type AdminLegacyInternalServerError = AdminLegacyErrorResponse
 
-// AdminLegacyUnauthorized The error body Artifactory documents for its import and export operations: the usual envelope plus an older single-message field. These statuses are documented for parity only; artifactweave answers every import and export call with 501 in the standard envelope.
+// AdminLegacyUnauthorized The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
 type AdminLegacyUnauthorized = AdminLegacyErrorResponse
 
-// AdminNotFound The Artifactory error envelope used by every /artifactory response.
+// AdminNotFound The error envelope used by every /artifactory response.
 type AdminNotFound = ErrorResponse
 
-// AdminNotImplemented The Artifactory error envelope used by every /artifactory response.
+// AdminNotImplemented The error envelope used by every /artifactory response.
 type AdminNotImplemented = ErrorResponse
 
-// AdminUnauthorized The Artifactory error envelope used by every /artifactory response.
+// AdminUnauthorized The error envelope used by every /artifactory response.
 type AdminUnauthorized = ErrorResponse
 
-// ArchiveBadRequest The Artifactory error envelope used by every /artifactory response.
+// ArchiveBadRequest The error envelope used by every /artifactory response.
 type ArchiveBadRequest = ErrorResponse
 
-// ArchiveConflict The Artifactory error envelope used by every /artifactory response.
+// ArchiveConflict The error envelope used by every /artifactory response.
 type ArchiveConflict = ErrorResponse
 
-// ArchiveForbidden The Artifactory error envelope used by every /artifactory response.
+// ArchiveForbidden The error envelope used by every /artifactory response.
 type ArchiveForbidden = ErrorResponse
 
-// ArchiveInternalServerError The Artifactory error envelope used by every /artifactory response.
+// ArchiveInternalServerError The error envelope used by every /artifactory response.
 type ArchiveInternalServerError = ErrorResponse
 
-// ArchiveNotFound The Artifactory error envelope used by every /artifactory response.
+// ArchiveNotFound The error envelope used by every /artifactory response.
 type ArchiveNotFound = ErrorResponse
 
-// ArchiveUnauthorized The Artifactory error envelope used by every /artifactory response.
+// ArchiveUnauthorized The error envelope used by every /artifactory response.
 type ArchiveUnauthorized = ErrorResponse
 
-// ArtifactoryBuildsApiBadRequest The Artifactory error envelope used by every /artifactory response.
+// ArtifactoryBuildsApiBadRequest The error envelope used by every /artifactory response.
 type ArtifactoryBuildsApiBadRequest = ErrorResponse
 
-// ArtifactoryBuildsApiForbidden The Artifactory error envelope used by every /artifactory response.
+// ArtifactoryBuildsApiForbidden The error envelope used by every /artifactory response.
 type ArtifactoryBuildsApiForbidden = ErrorResponse
 
-// ArtifactoryBuildsApiNotFound The Artifactory error envelope used by every /artifactory response.
+// ArtifactoryBuildsApiNotFound The error envelope used by every /artifactory response.
 type ArtifactoryBuildsApiNotFound = ErrorResponse
 
-// ArtifactoryBuildsApiUnauthorized The Artifactory error envelope used by every /artifactory response.
+// ArtifactoryBuildsApiUnauthorized The error envelope used by every /artifactory response.
 type ArtifactoryBuildsApiUnauthorized = ErrorResponse
 
-// ArtifactorySearchesApiBadRequest The Artifactory error envelope used by every /artifactory response.
+// ArtifactorySearchesApiBadRequest The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiBadRequest = ErrorResponse
 
-// ArtifactorySearchesApiForbidden The Artifactory error envelope used by every /artifactory response.
+// ArtifactorySearchesApiForbidden The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiForbidden = ErrorResponse
 
-// ArtifactorySearchesApiInternalServerError The Artifactory error envelope used by every /artifactory response.
+// ArtifactorySearchesApiInternalServerError The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiInternalServerError = ErrorResponse
 
-// ArtifactorySearchesApiNotFound The Artifactory error envelope used by every /artifactory response.
+// ArtifactorySearchesApiNotFound The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiNotFound = ErrorResponse
 
-// ArtifactorySearchesApiUnauthorized The Artifactory error envelope used by every /artifactory response.
+// ArtifactorySearchesApiUnauthorized The error envelope used by every /artifactory response.
 type ArtifactorySearchesApiUnauthorized = ErrorResponse
 
-// ColdStorageBadRequest Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageBadRequest Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageBadRequest = ColdStorageErrorResponse
 
-// ColdStorageConflict Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageConflict Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageConflict = ColdStorageErrorResponse
 
-// ColdStorageForbidden Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageForbidden Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageForbidden = ColdStorageErrorResponse
 
-// ColdStorageInternalServerError Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageInternalServerError Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageInternalServerError = ColdStorageErrorResponse
 
-// ColdStorageNotFound Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageNotFound Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageNotFound = ColdStorageErrorResponse
 
-// ColdStorageUnauthorized Error body for the /api/retention operations. Artifactory's cold storage service documents a flat error and message pair; artifactweave sends the standard errors envelope with both flat fields added, so clients written against either form read the same failure.
+// ColdStorageUnauthorized Error body for the /api/retention operations. It is the standard errors envelope with a flat error and message pair added; both forms describe the same failure.
 type ColdStorageUnauthorized = ColdStorageErrorResponse
 
-// SecurityBadRequest The Artifactory error envelope used by every /artifactory response.
+// SecurityBadRequest The error envelope used by every /artifactory response.
 type SecurityBadRequest = ErrorResponse
 
-// SecurityForbidden The Artifactory error envelope used by every /artifactory response.
+// SecurityForbidden The error envelope used by every /artifactory response.
 type SecurityForbidden = ErrorResponse
 
-// SecurityInternalServerError The Artifactory error envelope used by every /artifactory response.
+// SecurityInternalServerError The error envelope used by every /artifactory response.
 type SecurityInternalServerError = ErrorResponse
 
-// SecurityNotFound The Artifactory error envelope used by every /artifactory response.
+// SecurityNotFound The error envelope used by every /artifactory response.
 type SecurityNotFound = ErrorResponse
 
-// SecurityUnauthorized The Artifactory error envelope used by every /artifactory response.
+// SecurityUnauthorized The error envelope used by every /artifactory response.
 type SecurityUnauthorized = ErrorResponse
 
 // GetAllSmartArchivingPoliciesParams defines parameters for GetAllSmartArchivingPolicies.
@@ -6311,10 +6311,10 @@ type ExportRepositoryWithMetadataJSONBody struct {
 	// Action Required within this object. Always repository.
 	Action ExportRepositoryWithMetadataJSONBodyAction `json:"action"`
 
-	// ExcludeMetadata Optional within this object. In Artifactory, export binaries without properties and statistics.
+	// ExcludeMetadata Optional within this object. Export binaries without properties and statistics.
 	ExcludeMetadata *bool `json:"excludeMetadata,omitempty"`
 
-	// M2 Optional within this object. In Artifactory, also write Maven 2 compatible metadata files.
+	// M2 Optional within this object. Also write Maven 2 compatible metadata files.
 	M2 *bool `json:"m2,omitempty"`
 
 	// Path Required within this object. Server-side directory to export to.
@@ -6323,7 +6323,7 @@ type ExportRepositoryWithMetadataJSONBody struct {
 	// Repository Required within this object. Key of the repository to export.
 	Repository string `json:"repository"`
 
-	// Verbose Optional within this object. In Artifactory, log every exported item.
+	// Verbose Optional within this object. Log every exported item.
 	Verbose *bool `json:"verbose,omitempty"`
 }
 
@@ -6347,7 +6347,7 @@ type AppendBuildJSONBody = []BuildModule
 
 // AppendBuildParams defines parameters for AppendBuild.
 type AppendBuildParams struct {
-	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700). Omitted selects the most recent run with that number.
 	Started *string `form:"started,omitempty" json:"started,omitempty"`
 
 	// BuildRepo Optional query parameter. Key of the build-info repository holding the run. Omitted derives it from project.
@@ -6374,10 +6374,10 @@ type RenameBuildParams struct {
 
 // ControlBuildRetentionParams defines parameters for ControlBuildRetention.
 type ControlBuildRetentionParams struct {
-	// Async Optional query parameter. When true, the request is checked, then answers at once and the runs are discarded in the background. JFrog documents true as the default, but Artifactory discards before answering when the parameter is absent, and so does artifactweave; the JFrog CLI always sends it.
+	// Async Optional query parameter. When true, the request is checked, then answers at once and the runs are discarded in the background. Defaults to false, so when the parameter is absent the runs are discarded before the call answers.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
-	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository. The JFrog CLI sends it; JFrog does not document it.
+	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
 	Project *string `form:"project,omitempty" json:"project,omitempty"`
 }
 
@@ -6407,10 +6407,10 @@ type GetBuildRunsParams struct {
 
 // GetBuildInfoParams defines parameters for GetBuildInfo.
 type GetBuildInfoParams struct {
-	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700), the layout the JFrog CLI writes. Omitted selects the most recent run with that number.
+	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700). Omitted selects the most recent run with that number.
 	Started *string `form:"started,omitempty" json:"started,omitempty"`
 
-	// Diff Optional query parameter. Another build number of the same build to compare with. artifactweave accepts it and returns the run without a comparison.
+	// Diff Optional query parameter. Another build number of the same build to compare with. It is accepted and ignored; the run is returned without a comparison.
 	Diff *string `form:"diff,omitempty" json:"diff,omitempty"`
 
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
@@ -6419,7 +6419,7 @@ type GetBuildInfoParams struct {
 
 // CalculateCargoRepositoryMetadataParams defines parameters for CalculateCargoRepositoryMetadata.
 type CalculateCargoRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -6455,7 +6455,7 @@ type GetAllPackageCleanupPoliciesParams struct {
 
 // GetPackageCleanupPolicyParams defines parameters for GetPackageCleanupPolicy.
 type GetPackageCleanupPolicyParams struct {
-	// CheckRepoAvailability Optional query parameter. When true the server also resolves the repository keys named explicitly in searchCriteria.repos and excludedRepos against the repositories that exist now. JFrog documents only the name and the default, and its response has no field for the result, so artifactweave leaves keys that no longer resolve out of the returned searchCriteria (patterns are returned as stored) and never changes the stored policy. Defaults to false, which returns the policy exactly as stored.
+	// CheckRepoAvailability Optional query parameter. When true the server also resolves the repository keys named explicitly in searchCriteria.repos and excludedRepos against the repositories that exist now, and leaves keys that no longer resolve out of the returned searchCriteria (patterns are returned as stored). The stored policy never changes. Defaults to false, which returns the policy exactly as stored.
 	CheckRepoAvailability *bool `form:"checkRepoAvailability,omitempty" json:"checkRepoAvailability,omitempty"`
 }
 
@@ -6509,10 +6509,10 @@ type GetCleanupPolicyRunsViewParams struct {
 	// Page Optional query parameter. Page to return, counting from 1. Defaults to 1. The response's pagination object reports currentPage, lastPage, pageSize and total, so a client can walk the pages.
 	Page *int `form:"page,omitempty" json:"page,omitempty"`
 
-	// PageSize Optional query parameter. Runs per page. JFrog documents no default or maximum; artifactweave defaults to 25, caps the value at 500 and reports the size it applied in pagination.pageSize.
+	// PageSize Optional query parameter. Runs per page. Defaults to 25 and is capped at 500; pagination.pageSize reports the size applied.
 	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 
-	// SortBy Optional query parameter. Run field to order by. Defaults to startTime which, with the default sortOrder desc, puts the newest run first as JFrog's Runs tab does. Any other field name is rejected with 400.
+	// SortBy Optional query parameter. Run field to order by. Defaults to startTime which, with the default sortOrder desc, puts the newest run first. Any other field name is rejected with 400.
 	SortBy *GetCleanupPolicyRunsViewParamsSortBy `form:"sortBy,omitempty" json:"sortBy,omitempty"`
 
 	// SortOrder Optional query parameter. asc or desc. Defaults to desc, newest first.
@@ -6551,28 +6551,28 @@ type GetCleanupPoliciesViewParamsItemTypes string
 
 // CalculateConanRepositoryMetadataParams defines parameters for CalculateConanRepositoryMetadata.
 type CalculateConanRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
 // CalculateCondaRepositoryMetadataParams defines parameters for CalculateCondaRepositoryMetadata.
 type CalculateCondaRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
 // CalculateCranRepositoryMetadataParams defines parameters for CalculateCranRepositoryMetadata.
 type CalculateCranRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
 // CalculateDebianRepositoryMetadataParams defines parameters for CalculateDebianRepositoryMetadata.
 type CalculateDebianRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
-	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored by artifactweave, which answers 501 for this ecosystem.
+	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
 	WriteProps *CalculateDebianRepositoryMetadataParamsWriteProps `form:"writeProps,omitempty" json:"writeProps,omitempty"`
 }
 
@@ -6593,7 +6593,7 @@ type CreateDebianSnapshotJSONBody struct {
 
 // CreateDebianSnapshotParams defines parameters for CreateDebianSnapshot.
 type CreateDebianSnapshotParams struct {
-	// Async Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for it to finish. Ignored by artifactweave, which answers 501 for this ecosystem.
+	// Async Optional query parameter. 1 queues the work and returns at once; 0 or omitted waits for it to finish. Ignored; the operation answers 501.
 	Async *CreateDebianSnapshotParamsAsync `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -6700,7 +6700,7 @@ type FederationRecoveryParams struct {
 	// RepoKey Optional query parameter. Key of the federated repository to recover. Omitted means every federated repository.
 	RepoKey *string `form:"repoKey,omitempty" json:"repoKey,omitempty"`
 
-	// Force Optional query parameter. When true, recovery runs even for queues that are not exhausted: every outgoing queue in scope has its error counters cleared and is retried at once. Artifactory documents only that the flag forces the operation; this behaviour is artifactweave's reading of it. Defaults to false.
+	// Force Optional query parameter. When true, recovery runs even for queues that are not exhausted: every outgoing queue in scope has its error counters cleared and is retried at once. Defaults to false.
 	Force *bool `form:"force,omitempty" json:"force,omitempty"`
 }
 
@@ -6790,10 +6790,10 @@ type ReindexMetadataServerParams struct {
 
 // CalculateOpkgRepositoryMetadataParams defines parameters for CalculateOpkgRepositoryMetadata.
 type CalculateOpkgRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 
-	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored by artifactweave, which answers 501 for this ecosystem.
+	// WriteProps Optional query parameter. 1 writes package coordinates as item properties during the rebuild, 0 skips them. Ignored; the operation answers 501.
 	WriteProps *CalculateOpkgRepositoryMetadataParamsWriteProps `form:"writeProps,omitempty" json:"writeProps,omitempty"`
 }
 
@@ -6802,13 +6802,13 @@ type CalculateOpkgRepositoryMetadataParamsWriteProps int
 
 // CalculatePubRepositoryMetadataParams defines parameters for CalculatePubRepositoryMetadata.
 type CalculatePubRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
 // CalculatePypiRepositoryMetadataParams defines parameters for CalculatePypiRepositoryMetadata.
 type CalculatePypiRepositoryMetadataParams struct {
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -6823,7 +6823,7 @@ type GetAllBundlesParamsType string
 
 // GetReleaseBundleVersionParams defines parameters for GetReleaseBundleVersion.
 type GetReleaseBundleVersionParams struct {
-	// Format Optional query parameter. json returns the decoded manifest; jws returns the signed manifest as a compact JWS string, which the JFrog CLI verifies against the distributing key. Omitted is treated as json.
+	// Format Optional query parameter. json returns the decoded manifest; jws returns the signed manifest as a compact JWS string. Omitted is treated as json.
 	Format *GetReleaseBundleVersionParamsFormat `form:"format,omitempty" json:"format,omitempty"`
 }
 
@@ -6883,10 +6883,10 @@ type SetRepositoryReplicationConfigurationJSONBody1 = []ReplicationConfigRequest
 
 // GetRepositoriesByTypeAndProjectParams defines parameters for GetRepositoriesByTypeAndProject.
 type GetRepositoriesByTypeAndProjectParams struct {
-	// Type Optional query parameter. Repository class to list. distribution is accepted for compatibility and always yields an empty list.
+	// Type Optional query parameter. Repository class to list. distribution is accepted and always yields an empty list.
 	Type *GetRepositoriesByTypeAndProjectParamsType `form:"type,omitempty" json:"type,omitempty"`
 
-	// PackageType Optional query parameter. Package type to list. Any package type the server knows is accepted, not only the enumerated values, because the documented enumeration is stale.
+	// PackageType Optional query parameter. Package type to list. Any package type the server knows is accepted, not only the enumerated values.
 	PackageType *GetRepositoriesByTypeAndProjectParamsPackageType `form:"packageType,omitempty" json:"packageType,omitempty"`
 
 	// Project Optional query parameter. Project key; only repositories assigned to that project are listed.
@@ -6940,7 +6940,7 @@ type PreviewArchivePolicyByModelJSONBody struct {
 	// AqlQuery Optional within this object. AQL items query selecting the artifacts to archive. Use either this or searchCriteriaForm; not valid with packageRetention.
 	AqlQuery *string `json:"aqlQuery,omitempty"`
 
-	// CronExp Optional within this object. Quartz cron expression for scheduled runs (decision 0010).
+	// CronExp Optional within this object. Quartz cron expression for scheduled runs.
 	CronExp *string `json:"cronExp,omitempty"`
 
 	// Description Optional within this object. Free text shown with the policy.
@@ -7114,7 +7114,7 @@ type SearchLatestVersionParams struct {
 	// V Optional query parameter. A version pattern with * or ? wildcards, matched against every version; or a module version such as 1.0-SNAPSHOT, whose latest integration version is returned.
 	V *string `form:"v,omitempty" json:"v,omitempty"`
 
-	// Remote Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
+	// Remote Optional query parameter. 1 asks for the upstream of remote repositories too; it is answered as 0 (the default), from local repositories and caches.
 	Remote *SearchLatestVersionParamsRemote `form:"remote,omitempty" json:"remote,omitempty"`
 
 	// Repos Optional query parameter. Comma-separated repository keys that limit the search. Omitted means every repository the caller may read. Which classes are searched depends on the operation: most searches cover local repositories and remote caches, and only those that say so include virtual repositories.
@@ -7141,7 +7141,7 @@ type SearchLicenseParams struct {
 	// Approved Optional query parameter. 1 includes items with an approved licence. Defaults to 0.
 	Approved *SearchLicenseParamsApproved `form:"approved,omitempty" json:"approved,omitempty"`
 
-	// Autofind Optional query parameter. Accepted for compatibility and ignored: artifactweave does not discover licences. Defaults to 0.
+	// Autofind Optional query parameter. Accepted and ignored; licences are not discovered automatically. Defaults to 0.
 	Autofind *SearchLicenseParamsAutofind `form:"autofind,omitempty" json:"autofind,omitempty"`
 
 	// Repos Optional query parameter. Comma-separated repository keys that limit the search. Omitted means every repository the caller may read. Which classes are searched depends on the operation: most searches cover local repositories and remote caches, and only those that say so include virtual repositories.
@@ -7207,7 +7207,7 @@ type SearchVersionsParams struct {
 	// V Optional query parameter. A version pattern with * or ? wildcards, which filters the versions; or a module version such as 1.0-SNAPSHOT, whose integration versions are listed.
 	V *string `form:"v,omitempty" json:"v,omitempty"`
 
-	// Remote Optional query parameter. 1 asks for the upstream of remote repositories too; artifactweave answers it as 0 (default), from local repositories and caches, until remote repositories proxy.
+	// Remote Optional query parameter. 1 asks for the upstream of remote repositories too; it is answered as 0 (the default), from local repositories and caches.
 	Remote *SearchVersionsParamsRemote `form:"remote,omitempty" json:"remote,omitempty"`
 
 	// Repos Optional query parameter. Comma-separated repository keys that limit the search. Omitted means every repository the caller may read. Which classes are searched depends on the operation: most searches cover local repositories and remote caches, and only those that say so include virtual repositories.
@@ -7240,7 +7240,7 @@ type ExpirePasswordForMultipleUsersJSONBody = []string
 
 // InstallLicenseJSONBody defines parameters for InstallLicense.
 type InstallLicenseJSONBody struct {
-	// LicenseKey Optional within this object. The licence key text. Ignored by artifactweave; an empty or missing key is still accepted.
+	// LicenseKey Optional within this object. The licence key text. Ignored; an empty or missing key is still accepted.
 	LicenseKey *string `json:"licenseKey,omitempty"`
 }
 
@@ -7335,7 +7335,7 @@ type VerifyConnectionJSONBody struct {
 
 // GetSystemVersionParams defines parameters for GetSystemVersion.
 type GetSystemVersionParams struct {
-	// Accept Optional header parameter. Clients that send the vendor media type application/vnd.org.jfrog.artifactory.system.Version+json receive it back as the response content type; any other value yields application/json.
+	// Accept Optional header parameter. Clients that send the vendor media type `application/vnd.org.jfrog.artifactory.system.Version+json` receive it back as the response content type; any other value yields application/json.
 	Accept *string `json:"Accept,omitempty"`
 }
 
@@ -7493,10 +7493,10 @@ type SetSecondaryKeyTextBody = string
 
 // DownloadVcsBranchAlternativeParams defines parameters for DownloadVcsBranchAlternative.
 type DownloadVcsBranchAlternativeParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
 	Ext *DownloadVcsBranchAlternativeParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
@@ -7505,16 +7505,16 @@ type DownloadVcsBranchAlternativeParamsExt string
 
 // DownloadVcsBranchFromSubgroupRepositoryParams defines parameters for DownloadVcsBranchFromSubgroupRepository.
 type DownloadVcsBranchFromSubgroupRepositoryParams struct {
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
 // DownloadVcsBranchParams defines parameters for DownloadVcsBranch.
 type DownloadVcsBranchParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
 	Ext *DownloadVcsBranchParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
@@ -7523,7 +7523,7 @@ type DownloadVcsBranchParamsExt string
 
 // DownloadVcsCommitParams defines parameters for DownloadVcsCommit.
 type DownloadVcsCommitParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
 	Ext *DownloadVcsCommitParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7532,7 +7532,7 @@ type DownloadVcsCommitParamsExt string
 
 // DownloadVcsReleaseParams defines parameters for DownloadVcsRelease.
 type DownloadVcsReleaseParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
 	Ext *DownloadVcsReleaseParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7541,13 +7541,13 @@ type DownloadVcsReleaseParamsExt string
 
 // DownloadVcsTagFromSubgroupRepositoryParams defines parameters for DownloadVcsTagFromSubgroupRepository.
 type DownloadVcsTagFromSubgroupRepositoryParams struct {
-	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Properties Optional query parameter. Properties to attach to the downloaded archive in key=value form. Ignored; the operation answers 501.
 	Properties *string `form:"properties,omitempty" json:"properties,omitempty"`
 }
 
 // DownloadVcsTagParams defines parameters for DownloadVcsTag.
 type DownloadVcsTagParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
 	Ext *DownloadVcsTagParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7556,7 +7556,7 @@ type DownloadVcsTagParamsExt string
 
 // DownloadVcsTagAlternativeParams defines parameters for DownloadVcsTagAlternative.
 type DownloadVcsTagAlternativeParams struct {
-	// Ext Optional query parameter. Archive format to produce. Ignored by artifactweave, which answers 501 for the VCS ecosystem.
+	// Ext Optional query parameter. Archive format to produce. Ignored; the operation answers 501.
 	Ext *DownloadVcsTagAlternativeParamsExt `form:"ext,omitempty" json:"ext,omitempty"`
 }
 
@@ -7565,10 +7565,10 @@ type DownloadVcsTagAlternativeParamsExt string
 
 // CalculateYumRepositoryMetadataParams defines parameters for CalculateYumRepositoryMetadata.
 type CalculateYumRepositoryMetadataParams struct {
-	// Path Optional query parameter. Sub-path to limit the calculation to. Ignored by artifactweave, which answers 501 for this ecosystem.
+	// Path Optional query parameter. Sub-path to limit the calculation to. Ignored; the operation answers 501.
 	Path *string `form:"path,omitempty" json:"path,omitempty"`
 
-	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish. Artifactory defaults to synchronous.
+	// Async Optional query parameter. When true the server queues the work and returns at once; when false or omitted the response waits for the work to finish.
 	Async *bool `form:"async,omitempty" json:"async,omitempty"`
 }
 
@@ -8802,12 +8802,12 @@ type ClientInterface interface {
 
 	// CalculateAlpineRepositoryMetadata performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Alpine ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Alpine ecosystem; answers 501.
 	CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RetrieveBuildArtifactsArchiveWithBody Build artifacts archive
 	//
-	// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+	// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8816,7 +8816,7 @@ type ClientInterface interface {
 
 	// RetrieveBuildArtifactsArchive Build artifacts archive
 	//
-	// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+	// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8825,7 +8825,7 @@ type ClientInterface interface {
 
 	// RetrieveBuildArtifactsArchiveWithApplicationVndOrgJfrogArtifactoryBuildBuildArtifactsRequestPlusJSONBody Build artifacts archive
 	//
-	// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+	// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.BuildArtifactsRequest+json` content type.
 	//
@@ -8834,7 +8834,7 @@ type ClientInterface interface {
 
 	// GetAllSmartArchivingPolicies List smart archiving policies
 	//
-	// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects. In Artifactory this API exists on Cloud from 7.111; artifactweave serves it on every install.
+	// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 	//
 	// Corresponds with GET /api/archive/v2/packages/policies (the `GetAllSmartArchivingPolicies` operationId).
 	GetAllSmartArchivingPolicies(ctx context.Context, params *GetAllSmartArchivingPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8908,7 +8908,7 @@ type ClientInterface interface {
 
 	// CreateSmartArchivingPolicyWithBody Create a smart archiving policy
 	//
-	// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+	// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8917,7 +8917,7 @@ type ClientInterface interface {
 
 	// CreateSmartArchivingPolicy Create a smart archiving policy
 	//
-	// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+	// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -8987,7 +8987,7 @@ type ClientInterface interface {
 
 	// ExportRepositoryWithMetadataWithBody Export a repository (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -8996,7 +8996,7 @@ type ClientInterface interface {
 
 	// ExportRepositoryWithMetadata Export a repository (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9005,7 +9005,7 @@ type ClientInterface interface {
 
 	// CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Bower ecosystem; answers 501.
 	CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllBuilds performs a GET /api/build (the `GetAllBuilds` operationId) request.
@@ -9016,19 +9016,19 @@ type ClientInterface interface {
 	// UploadBuildWithBody performs a PUT /api/build (the `UploadBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 	UploadBuildWithBody(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadBuild performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 	UploadBuild(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type.
 	//
-	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 	UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AppendBuildWithBody performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
@@ -9058,19 +9058,19 @@ type ClientInterface interface {
 	// PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 	PromoteBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteBuild performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 	PromoteBuild(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type.
 	//
-	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 	PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RenameBuild performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
@@ -9107,17 +9107,17 @@ type ClientInterface interface {
 
 	// GetBuildArtifacts performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
 	//
-	// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+	// Lists where each artifact of a run is stored. Needs read permission on the build.
 	GetBuildArtifacts(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Cargo ecosystem; answers 501.
 	CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetItemSha256ChecksumWithBody Attach the sha256 property
 	//
-	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9126,7 +9126,7 @@ type ClientInterface interface {
 
 	// SetItemSha256Checksum Attach the sha256 property
 	//
-	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9135,28 +9135,28 @@ type ClientInterface interface {
 
 	// GetAllBuildCleanupPolicies List build cleanup policies
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every build cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/cleanup/builds/policies (the `GetAllBuildCleanupPolicies` operationId).
 	GetAllBuildCleanupPolicies(ctx context.Context, params *GetAllBuildCleanupPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteBuildCleanupPolicy Delete a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with DELETE /api/cleanup/builds/policies/{policyKey} (the `DeleteBuildCleanupPolicy` operationId).
 	DeleteBuildCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetBuildCleanupPolicy Get a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one build cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/cleanup/builds/policies/{policyKey} (the `GetBuildCleanupPolicy` operationId).
 	GetBuildCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateBuildCleanupPolicyWithBody Create a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9165,7 +9165,7 @@ type ClientInterface interface {
 
 	// CreateBuildCleanupPolicy Create a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9174,7 +9174,7 @@ type ClientInterface interface {
 
 	// UpdateBuildCleanupPolicyWithBody Replace a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9183,7 +9183,7 @@ type ClientInterface interface {
 
 	// UpdateBuildCleanupPolicy Replace a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9192,7 +9192,7 @@ type ClientInterface interface {
 
 	// EnableDisableBuildCleanupPolicyWithBody Enable or disable a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9201,7 +9201,7 @@ type ClientInterface interface {
 
 	// EnableDisableBuildCleanupPolicy Enable or disable a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9210,35 +9210,35 @@ type ClientInterface interface {
 
 	// RunBuildCleanupPolicy Run a build cleanup policy now
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects builds and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with PUT /api/cleanup/builds/policies/{policyKey}/run (the `RunBuildCleanupPolicy` operationId).
 	RunBuildCleanupPolicy(ctx context.Context, policyKey string, params *RunBuildCleanupPolicyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllReleaseBundleCleanupPolicies List release bundle cleanup policies
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every release bundle cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/cleanup/bundles/policies (the `GetAllReleaseBundleCleanupPolicies` operationId).
 	GetAllReleaseBundleCleanupPolicies(ctx context.Context, params *GetAllReleaseBundleCleanupPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteReleaseBundleCleanupPolicy Delete a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with DELETE /api/cleanup/bundles/policies/{policyKey} (the `DeleteReleaseBundleCleanupPolicy` operationId).
 	DeleteReleaseBundleCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetReleaseBundleCleanupPolicy Get a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one release bundle cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/cleanup/bundles/policies/{policyKey} (the `GetReleaseBundleCleanupPolicy` operationId).
 	GetReleaseBundleCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateReleaseBundleCleanupPolicyWithBody Create a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9247,7 +9247,7 @@ type ClientInterface interface {
 
 	// CreateReleaseBundleCleanupPolicy Create a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9256,7 +9256,7 @@ type ClientInterface interface {
 
 	// UpdateReleaseBundleCleanupPolicyWithBody Replace a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9265,7 +9265,7 @@ type ClientInterface interface {
 
 	// UpdateReleaseBundleCleanupPolicy Replace a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9274,7 +9274,7 @@ type ClientInterface interface {
 
 	// EnableDisableReleaseBundleCleanupPolicyWithBody Enable or disable a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9283,7 +9283,7 @@ type ClientInterface interface {
 
 	// EnableDisableReleaseBundleCleanupPolicy Enable or disable a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9292,21 +9292,21 @@ type ClientInterface interface {
 
 	// RunReleaseBundleCleanupPolicy Run a release bundle cleanup policy now
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects release bundle versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with PUT /api/cleanup/bundles/policies/{policyKey}/run (the `RunReleaseBundleCleanupPolicy` operationId).
 	RunReleaseBundleCleanupPolicy(ctx context.Context, policyKey string, params *RunReleaseBundleCleanupPolicyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAllPackageCleanupPolicies List package cleanup policies
 	//
-	// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by artifactweave's in-process scheduler over the package index (decisions 0010 and 0018).
+	// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by the in-process scheduler over the package index.
 	//
 	// Corresponds with GET /api/cleanup/packages/policies (the `GetAllPackageCleanupPolicies` operationId).
 	GetAllPackageCleanupPolicies(ctx context.Context, params *GetAllPackageCleanupPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeletePackageCleanupPolicy Delete a package cleanup policy
 	//
-	// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Corresponds with DELETE /api/cleanup/packages/policies/{policyKey} (the `DeletePackageCleanupPolicy` operationId).
 	DeletePackageCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9320,7 +9320,7 @@ type ClientInterface interface {
 
 	// CreatePackageCleanupPolicyWithBody Create a package cleanup policy
 	//
-	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9329,7 +9329,7 @@ type ClientInterface interface {
 
 	// CreatePackageCleanupPolicy Create a package cleanup policy
 	//
-	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9448,56 +9448,56 @@ type ClientInterface interface {
 
 	// CalculateCocoaPodsIndex performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the CocoaPods ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the CocoaPods ecosystem; answers 501.
 	CalculateCocoaPodsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Conan ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Conan ecosystem; answers 501.
 	CalculateConanRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Conda ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Conda ecosystem; answers 501.
 	CalculateCondaRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetChecksumReplication performs a GET /api/config/storage/checksumReplication (the `GetChecksumReplication` operationId) request.
 	//
-	// Reads the checksum replication settings of this instance. Not supported in v1: artifactweave has no storage-level replication, so the operation answers 501.
+	// Not implemented; answers 501. It would read the checksum replication settings of this instance.
 	GetChecksumReplication(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ConfigureChecksumReplicationWithBody performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Configures checksum replication on this instance. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would configure checksum replication on this instance.
 	ConfigureChecksumReplicationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ConfigureChecksumReplication performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Configures checksum replication on this instance. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would configure checksum replication on this instance.
 	ConfigureChecksumReplication(ctx context.Context, body ConfigureChecksumReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateCranRepositoryMetadata performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the CRAN ecosystem; answers 501.
 	CalculateCranRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// MoveCranArchives performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the CRAN ecosystem; answers 501.
 	MoveCranArchives(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetCurationInterfaceSettings Curation settings (not supported)
 	//
-	// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/curation/interfaceSettings (the `GetCurationInterfaceSettings` operationId).
 	GetCurationInterfaceSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateCurationInterfaceSettingsWithBody Update Curation settings (not supported)
 	//
-	// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9506,7 +9506,7 @@ type ClientInterface interface {
 
 	// UpdateCurationInterfaceSettings Update Curation settings (not supported)
 	//
-	// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9515,29 +9515,29 @@ type ClientInterface interface {
 
 	// CalculateCachedRemoteDebianRepositoryCoordinates performs a POST /api/deb/indexCached/{repoKey} (the `CalculateCachedRemoteDebianRepositoryCoordinates` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	CalculateCachedRemoteDebianRepositoryCoordinates(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateDebianRepositoryMetadata performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	CalculateDebianRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateDebianSnapshotWithBody performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	CreateDebianSnapshotWithBody(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateDebianSnapshot performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	CreateDebianSnapshot(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteRedundantRecordsToTrashCanDirectoriesWithBody Compact trash can directory records
 	//
-	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9546,16 +9546,16 @@ type ClientInterface interface {
 
 	// DeleteRedundantRecordsToTrashCanDirectories Compact trash can directory records
 	//
-	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/deleteDirectoryTrashProperty/start (the `DeleteRedundantRecordsToTrashCanDirectories` operationId).
 	DeleteRedundantRecordsToTrashCanDirectories(ctx context.Context, body DeleteRedundantRecordsToTrashCanDirectoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DistributeArtifactWithBody Distribute to Bintray (retired)
+	// DistributeArtifactWithBody Distribute to Bintray
 	//
-	// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9564,9 +9564,9 @@ type ClientInterface interface {
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	DistributeArtifactWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DistributeArtifact Distribute to Bintray (retired)
+	// DistributeArtifact Distribute to Bintray
 	//
-	// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9578,49 +9578,49 @@ type ClientInterface interface {
 	// FindParentManifestListsWithBody performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 	FindParentManifestListsWithBody(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FindParentManifestLists performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 	FindParentManifestLists(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteDockerImageWithBody performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 	PromoteDockerImageWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PromoteDockerImage performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 	PromoteDockerImage(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteDockerTagWithBody performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+	// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 	DeleteDockerTagWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteDockerTag performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+	// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 	DeleteDockerTag(ctx context.Context, repoKey string, body DeleteDockerTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetExportSystemSettingsExample Export settings example (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/export/system (the `GetExportSystemSettingsExample` operationId).
 	GetExportSystemSettingsExample(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ExportSystemWithBody Export the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9629,7 +9629,7 @@ type ClientInterface interface {
 
 	// ExportSystem Export the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9638,7 +9638,7 @@ type ClientInterface interface {
 
 	// ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONBody Export the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.system.ExportSettings+json` content type.
 	//
@@ -9735,14 +9735,14 @@ type ClientInterface interface {
 
 	// ReconnectToFederationClient Reconnect the federation sync worker
 	//
-	// Re-establishes the link between the repository service and the federation sync worker. In Artifactory the worker is the separate Artifactory Federation Service (RTFS), reached over gRPC; a health-check job reconnects it automatically (every 80 seconds by default) and this call does it on demand, for example when the service was unavailable at startup. artifactweave runs the sync worker inside the server process, so the call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
+	// Re-establishes the link between the repository service and the federation sync worker, which runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
 	//
 	// Corresponds with POST /api/federation/reconnect (the `ReconnectToFederationClient` operationId).
 	ReconnectToFederationClient(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FederationRecovery Recover exhausted federation queues
 	//
-	// Clears the error state of outgoing event queues that exhausted their retries (six attempts by default in Artifactory), so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
+	// Clears the error state of outgoing event queues that exhausted their retries, so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
 	//
 	// Corresponds with POST /api/federation/recovery (the `FederationRecovery` operationId).
 	FederationRecovery(ctx context.Context, params *FederationRecoveryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9776,7 +9776,7 @@ type ClientInterface interface {
 
 	// GetFederationConnectionDetails Get federated repository connection state
 	//
-	// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring. Artifactory serves this operation only when its standalone Federation Service (RTFS) is enabled and answers 405 otherwise; artifactweave always serves it.
+	// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring.
 	//
 	// Corresponds with GET /api/federation/status/connectionStates/{repoKey} (the `GetFederationConnectionDetails` operationId).
 	GetFederationConnectionDetails(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9792,7 +9792,7 @@ type ClientInterface interface {
 
 	// GetFederatedRepositoryStatus Get federated repository sync status
 	//
-	// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+	// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
 	//
 	// Corresponds with GET /api/federation/status/repo/{repoKey} (the `GetFederatedRepositoryStatus` operationId).
 	//
@@ -9824,12 +9824,12 @@ type ClientInterface interface {
 
 	// CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the RubyGems ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the RubyGems ecosystem; answers 501.
 	CalculateRubyGemsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRubyGemVersionList List gem versions
 	//
-	// Returns the versions of one gem in the rubygems.org versions format. Gems are outside the v1 ecosystem scope (research 10). artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
 	//
 	// Corresponds with GET /api/gems/{repoName}/api/v1/versions/{gemName} (the `GetRubyGemVersionList` operationId).
 	GetRubyGemVersionList(ctx context.Context, repoName string, gemName string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -9891,21 +9891,21 @@ type ClientInterface interface {
 
 	// ImportRepositoryContent Import repository content (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Upload content with the deploy API or the JFrog CLI instead.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with POST /api/import/repositories (the `ImportRepositoryContent` operationId).
 	ImportRepositoryContent(ctx context.Context, params *ImportRepositoryContentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetImportSystemSettingsExample Import settings example (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/import/system (the `GetImportSystemSettingsExample` operationId).
 	GetImportSystemSettingsExample(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// FullSystemImportWithBody Import the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9914,7 +9914,7 @@ type ClientInterface interface {
 
 	// FullSystemImport Import the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9923,7 +9923,7 @@ type ClientInterface interface {
 
 	// FullSystemImportWithApplicationVndOrgJfrogArtifactorySystemImportSettingsPlusJSONBody Import the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.system.ImportSettings+json` content type.
 	//
@@ -9937,7 +9937,7 @@ type ClientInterface interface {
 
 	// ReindexMetadataServerWithBody Reindex the metadata service
 	//
-	// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+	// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -9946,7 +9946,7 @@ type ClientInterface interface {
 
 	// ReindexMetadataServer Reindex the metadata service
 	//
-	// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+	// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -9955,17 +9955,17 @@ type ClientInterface interface {
 
 	// GetNpmAuth performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
 	//
-	// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent, as Artifactory stopped sending both in 7.161.26. Needs an authenticated caller. JFrog's 7.x documentation, as archived in 2025, showed the operation with an example answer whose _auth encodes the user name and the user's encrypted password rather than the password sent. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent. Needs an authenticated caller.
 	GetNpmAuth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetNpmScopeAuth performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
 	//
-	// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog's 7.x documentation, as archived in 2025, showed the operation with the scope given without its @ and an example answer whose credential lines are _password and username rather than _auth, with the email and always-auth lines that 7.161.26 dropped. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.
 	GetNpmScopeAuth(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateNpmRepositoryMetadata performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
+	// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Package metadata is derived from the index, so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 	CalculateNpmRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateNuGetRepositoryMetadata performs a POST /api/nuget/{repoKey}/reindex (the `CalculateNuGetRepositoryMetadata` operationId) request.
@@ -9975,32 +9975,32 @@ type ClientInterface interface {
 
 	// CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Opkg ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Opkg ecosystem; answers 501.
 	CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Pub ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Pub ecosystem; answers 501.
 	CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	GetPuppetModules(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetModuleInfo performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	GetPuppetModuleInfo(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetReleases performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	GetPuppetReleases(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPuppetReleaseInfo performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	GetPuppetReleaseInfo(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculatePypiRepositoryMetadata performs a POST /api/pypi/{repoKey}/reindex (the `CalculatePypiRepositoryMetadata` operationId) request.
@@ -10020,7 +10020,7 @@ type ClientInterface interface {
 
 	// GetAllBundles List release bundles
 	//
-	// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge (decision 0023). Only bundles the caller may read are returned.
+	// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge. Only bundles the caller may read are returned.
 	//
 	// Corresponds with GET /api/release/bundles (the `GetAllBundles` operationId).
 	GetAllBundles(ctx context.Context, params *GetAllBundlesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10041,7 +10041,7 @@ type ClientInterface interface {
 
 	// GetReleaseBundleVersion Get a release bundle version
 	//
-	// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content (decision 0023).
+	// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content.
 	//
 	// Corresponds with GET /api/release/bundles/{bundleName}/{bundleVersion} (the `GetReleaseBundleVersion` operationId).
 	GetReleaseBundleVersion(ctx context.Context, bundleName string, bundleVersion string, params *GetReleaseBundleVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10073,36 +10073,36 @@ type ClientInterface interface {
 
 	// CloseEventBasedPullReplicationChannels performs a POST /api/replications/channels/release (the `CloseEventBasedPullReplicationChannels` operationId) request.
 	//
-	// Closes every event-based pull replication channel other instances hold open against this one, forcing them to reconnect. Event-based replication is not supported in v1; the operation answers 501.
+	// Not implemented; answers 501. It would close every event-based pull replication channel other instances hold open against this one, forcing them to reconnect.
 	CloseEventBasedPullReplicationChannels(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRemoteRepositoriesRegisteredForReplication performs a GET /api/replications/channels/{repoKey} (the `GetRemoteRepositoriesRegisteredForReplication` operationId) request.
 	//
-	// Lists the remote instances subscribed to a local repository for event-based pull replication. Event-based replication is not supported in v1; the operation answers 501.
+	// Not implemented; answers 501. It would list the remote instances subscribed to a local repository for event-based pull replication.
 	GetRemoteRepositoriesRegisteredForReplication(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateMultiPushReplicationWithBody performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+	// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 	UpdateMultiPushReplicationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateMultiPushReplication performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+	// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 	UpdateMultiPushReplication(ctx context.Context, repoKey string, body UpdateMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrReplaceMultiPushReplicationWithBody performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 	CreateOrReplaceMultiPushReplicationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateOrReplaceMultiPushReplication performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 	CreateOrReplaceMultiPushReplication(ctx context.Context, repoKey string, body CreateOrReplaceMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteRepositoryReplicationConfiguration performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
@@ -10118,25 +10118,25 @@ type ClientInterface interface {
 	// UpdateRepositoryReplicationConfigurationWithBody performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 	UpdateRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateRepositoryReplicationConfiguration performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 	UpdateRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetRepositoryReplicationConfigurationWithBody performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetRepositoryReplicationConfiguration performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetRepositoriesByTypeAndProject List repositories
@@ -10162,7 +10162,7 @@ type ClientInterface interface {
 
 	// GetRemoteRepositoryConfiguration Shared remote repository configuration (deprecated)
 	//
-	// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated by Artifactory in favour of the ordinary read; kept so old clients keep working. Non-admin callers get the sanitised view only.
+	// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
 	//
 	// Corresponds with GET /api/repositories/{remoteRepoName}/configuration (the `GetRemoteRepositoryConfiguration` operationId).
 	//
@@ -10185,7 +10185,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10194,7 +10194,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfiguration Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10203,7 +10203,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10212,7 +10212,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -10221,7 +10221,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -10230,7 +10230,7 @@ type ClientInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -10239,7 +10239,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10248,7 +10248,7 @@ type ClientInterface interface {
 
 	// CreateRepository Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10257,7 +10257,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 	//
@@ -10266,7 +10266,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 	//
@@ -10275,7 +10275,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 	//
@@ -10284,7 +10284,7 @@ type ClientInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 	//
@@ -10300,14 +10300,14 @@ type ClientInterface interface {
 
 	// GetAllArchivePolicies List cold storage archive policies
 	//
-	// Returns every cold storage archive policy with its run state. Platform administrators only. In Artifactory this API needs an Enterprise licence and a separate cold instance; artifactweave serves it on every install against its cold tier.
+	// Returns every cold storage archive policy with its run state. Platform administrators only.
 	//
 	// Corresponds with GET /api/retention/archive/policies (the `GetAllArchivePolicies` operationId).
 	GetAllArchivePolicies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ConvertSearchCriteriaToAqlWithBody Convert a search criteria form to AQL
 	//
-	// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+	// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10316,7 +10316,7 @@ type ClientInterface interface {
 
 	// ConvertSearchCriteriaToAqlWithTextBody Convert a search criteria form to AQL
 	//
-	// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+	// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 	//
 	// Takes a body of the `text/plain` content type.
 	//
@@ -10464,7 +10464,7 @@ type ClientInterface interface {
 
 	// SearchArchive performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 	//
-	// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
+	// Not implemented; answers 501. It would find entries inside archives by member name; use AQL instead.
 	SearchArchive(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchArtifact performs a GET /api/search/artifact (the `SearchArtifact` operationId) request.
@@ -10522,12 +10522,12 @@ type ClientInterface interface {
 
 	// SearchLatestVersion performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 	//
-	// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
+	// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury version ordering to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. The response is the bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 	SearchLatestVersion(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchLicense performs a GET /api/search/license (the `SearchLicense` operationId) request.
 	//
-	// Finds items whose licence properties match the requested statuses. artifactweave reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
+	// Finds items whose licence properties match the requested statuses. The search reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
 	SearchLicense(ctx context.Context, params *SearchLicenseParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchPattern performs a GET /api/search/pattern (the `SearchPattern` operationId) request.
@@ -10547,12 +10547,12 @@ type ClientInterface interface {
 
 	// SearchVersions performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 	//
-	// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
+	// Lists every version of a module found through the repository layout, newest first in the Mercury version ordering. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 	SearchVersions(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RevokeApiKey Revoke the caller's API key
 	//
-	// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so artifactweave answers 200 with an informational message for compatibility with scripts that call it unconditionally.
+	// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.
 	//
 	// Corresponds with DELETE /api/security/apiKey (the `RevokeApiKey` operationId).
 	//
@@ -10561,7 +10561,7 @@ type ClientInterface interface {
 
 	// GetApiKey Get the caller's API key (always absent)
 	//
-	// Returns the caller's API key. Because artifactweave never issues keys this always answers 404, which is the documented response when no key exists; the JFrog CLI treats it as "no key".
+	// Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the response for a user without a key.
 	//
 	// Corresponds with GET /api/security/apiKey (the `GetApiKey` operationId).
 	//
@@ -10570,7 +10570,7 @@ type ClientInterface interface {
 
 	// CreateApiKey Create an API key (disabled)
 	//
-	// Legacy API-key creation. Artifactory disables it by default since 7.98 and the keys reached end of life; artifactweave always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead. jfrog-client-go expects 201 on success, which never happens here.
+	// Legacy API-key creation, which is disabled. Always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead.
 	//
 	// Corresponds with POST /api/security/apiKey (the `CreateApiKey` operationId).
 	//
@@ -10579,7 +10579,7 @@ type ClientInterface interface {
 
 	// RegenerateApiKey Regenerate an API key (disabled)
 	//
-	// Legacy key rotation. artifactweave answers 400 "API key creation is disabled" because no user ever holds a key.
+	// Legacy key rotation, which is disabled. Always answers 400 "API key creation is disabled"; no user holds a key.
 	//
 	// Corresponds with PUT /api/security/apiKey (the `RegenerateApiKey` operationId).
 	//
@@ -10597,7 +10597,7 @@ type ClientInterface interface {
 
 	// GetPasswordExpirationPolicy Get the password expiration policy
 	//
-	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
+	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.
 	//
 	// Corresponds with GET /api/security/configuration/passwordExpirationPolicy (the `GetPasswordExpirationPolicy` operationId).
 	//
@@ -10606,7 +10606,7 @@ type ClientInterface interface {
 
 	// SetPasswordExpirationPolicyWithBody Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+	// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10617,7 +10617,7 @@ type ClientInterface interface {
 
 	// SetPasswordExpirationPolicy Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+	// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10628,7 +10628,7 @@ type ClientInterface interface {
 
 	// GetUserEncryptedPassword Get an encrypted form of the caller's password
 	//
-	// Artifactory returns an opaque encrypted password that clients can use in place of the clear-text one. artifactweave returns a reference token bound to the caller instead, which every client accepts wherever the encrypted password was accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
+	// Returns a reference token bound to the caller, usable in place of the clear-text password wherever an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
 	//
 	// Corresponds with GET /api/security/encryptedPassword (the `GetUserEncryptedPassword` operationId).
 	//
@@ -10637,7 +10637,7 @@ type ClientInterface interface {
 
 	// GetGroups List groups (legacy)
 	//
-	// Lists every group with its detail URL. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/groups; kept for the JFrog CLI. Not in the oracle; from docs/research/05.
+	// Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.
 	//
 	// Corresponds with GET /api/security/groups (the `GetGroups` operationId).
 	//
@@ -10646,7 +10646,7 @@ type ClientInterface interface {
 
 	// DeleteGroup Delete a group (legacy)
 	//
-	// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400). Not in the oracle; from docs/research/05.
+	// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
 	//
 	// Corresponds with DELETE /api/security/groups/{groupName} (the `DeleteGroup` operationId).
 	//
@@ -10655,7 +10655,7 @@ type ClientInterface interface {
 
 	// GetGroupDetails Get a group (legacy)
 	//
-	// Returns the legacy group document. Admin only. Members are included only when includeUsers=true; the Terraform provider always sends the parameter. Not in the oracle; from docs/research/05.
+	// Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
 	//
 	// Corresponds with GET /api/security/groups/{groupName} (the `GetGroupDetails` operationId).
 	//
@@ -10664,7 +10664,7 @@ type ClientInterface interface {
 
 	// UpdateGroupWithBody Update a group (legacy)
 	//
-	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10675,7 +10675,7 @@ type ClientInterface interface {
 
 	// UpdateGroup Update a group (legacy)
 	//
-	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10686,7 +10686,7 @@ type ClientInterface interface {
 
 	// UpdateGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBody Update a group (legacy)
 	//
-	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type.
 	//
@@ -10697,7 +10697,7 @@ type ClientInterface interface {
 
 	// CreateOrReplaceGroupWithBody Create or replace a group (legacy)
 	//
-	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10708,7 +10708,7 @@ type ClientInterface interface {
 
 	// CreateOrReplaceGroup Create or replace a group (legacy)
 	//
-	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10719,7 +10719,7 @@ type ClientInterface interface {
 
 	// CreateOrReplaceGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBody Create or replace a group (legacy)
 	//
-	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type.
 	//
@@ -10737,7 +10737,7 @@ type ClientInterface interface {
 
 	// CreateKeyPairWithBody Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10746,7 +10746,7 @@ type ClientInterface interface {
 
 	// CreateKeyPair Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10805,21 +10805,21 @@ type ClientInterface interface {
 
 	// GetKeyPair Get a key pair
 	//
-	// Returns the readable projection of one pair. Admin only. The Terraform provider reads this after every create.
+	// Returns the readable projection of one pair. Admin only.
 	//
 	// Corresponds with GET /api/security/keypair/{keyPairName} (the `GetKeyPair` operationId).
 	GetKeyPair(ctx context.Context, keyPairName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetTrustedKeys List trusted public keys
 	//
-	// Lists the public keys trusted for release-bundle signature verification. Admin only. Served so the artifactory_distribution_public_key resource can read back what it created; release bundles themselves are out of scope in v1. Not in the oracle; shape from docs/research/05 and the provider source.
+	// Lists the public keys trusted for release-bundle signature verification. Admin only. Release bundles themselves are not served.
 	//
 	// Corresponds with GET /api/security/keys/trusted (the `GetTrustedKeys` operationId).
 	GetTrustedKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SetDistributionPublicGpgKeyWithBody Add a trusted public key
 	//
-	// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+	// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10828,7 +10828,7 @@ type ClientInterface interface {
 
 	// SetDistributionPublicGpgKey Add a trusted public key
 	//
-	// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+	// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10837,21 +10837,21 @@ type ClientInterface interface {
 
 	// DeleteTrustedKey Delete a trusted public key
 	//
-	// Removes a trusted key by its kid. Admin only. Answers 204; the provider accepts 200 or 204. Not in the oracle; from docs/research/05.
+	// Removes a trusted key by its kid. Admin only. Answers 204.
 	//
 	// Corresponds with DELETE /api/security/keys/trusted/{keyId} (the `DeleteTrustedKey` operationId).
 	DeleteTrustedKey(ctx context.Context, keyId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetLockedOutUsers List locked-out users
 	//
-	// Returns the names of users locked by the user lock policy. Admin only. The JFrog CLI prints this list for jf rt users-locked style commands.
+	// Returns the names of users locked by the user lock policy. Admin only.
 	//
 	// Corresponds with GET /api/security/lockedUsers (the `GetLockedOutUsers` operationId).
 	GetLockedOutUsers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionTargets List permission targets (v1)
 	//
-	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
+	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
 	//
 	// Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
 	//
@@ -10860,7 +10860,7 @@ type ClientInterface interface {
 
 	// DeletePermissionTarget Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
+	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
 	//
 	// Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
 	//
@@ -10869,7 +10869,7 @@ type ClientInterface interface {
 
 	// GetPermissionTargetDetails Get a permission target (v1)
 	//
-	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
+	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 	//
 	// Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
 	//
@@ -10878,7 +10878,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetWithBody Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10889,7 +10889,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTarget Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10900,7 +10900,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type.
 	//
@@ -10945,7 +10945,7 @@ type ClientInterface interface {
 
 	// UnlockLockedOutUser Unlock one user (path form)
 	//
-	// The older form the JFrog CLI still sends, with the user in the path and no body. Behaves like the array form for one user. Not in the oracle; from docs/research/09.
+	// The older form, with the user in the path and no body. Behaves like the array form for one user.
 	//
 	// Corresponds with POST /api/security/unlockUsers/{userName} (the `UnlockLockedOutUser` operationId).
 	//
@@ -10979,7 +10979,7 @@ type ClientInterface interface {
 
 	// GetUsers List users (legacy)
 	//
-	// Lists every user with its detail URL and realm. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/users; kept because the JFrog CLI calls it. Not in the oracle; from docs/research/05.
+	// Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET /access/api/v2/users.
 	//
 	// Corresponds with GET /api/security/users (the `GetUsers` operationId).
 	//
@@ -11006,7 +11006,7 @@ type ClientInterface interface {
 
 	// UnexpirePasswordForSingleUser Unexpire a password
 	//
-	// Clears the forced password change for one user. Admin only. JFrog marks it slated for removal; kept for script compatibility.
+	// Clears the forced password change for one user. Admin only.
 	//
 	// Corresponds with POST /api/security/users/authorization/unexpirePassword/{userName} (the `UnexpirePasswordForSingleUser` operationId).
 	//
@@ -11015,7 +11015,7 @@ type ClientInterface interface {
 
 	// DeleteUser Delete a user (legacy)
 	//
-	// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400). Not in the oracle; from docs/research/05.
+	// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).
 	//
 	// Corresponds with DELETE /api/security/users/{userName} (the `DeleteUser` operationId).
 	//
@@ -11024,7 +11024,7 @@ type ClientInterface interface {
 
 	// GetUserDetails Get a user (legacy)
 	//
-	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
+	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.
 	//
 	// Corresponds with GET /api/security/users/{userName} (the `GetUserDetails` operationId).
 	//
@@ -11033,7 +11033,7 @@ type ClientInterface interface {
 
 	// UpdateUserWithBody Update a user (legacy)
 	//
-	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11044,7 +11044,7 @@ type ClientInterface interface {
 
 	// UpdateUser Update a user (legacy)
 	//
-	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11055,7 +11055,7 @@ type ClientInterface interface {
 
 	// UpdateUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody Update a user (legacy)
 	//
-	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type.
 	//
@@ -11066,7 +11066,7 @@ type ClientInterface interface {
 
 	// CreateOrReplaceUserWithBody Create or replace a user (legacy)
 	//
-	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11077,7 +11077,7 @@ type ClientInterface interface {
 
 	// CreateOrReplaceUser Create or replace a user (legacy)
 	//
-	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11088,7 +11088,7 @@ type ClientInterface interface {
 
 	// CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody Create or replace a user (legacy)
 	//
-	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type.
 	//
@@ -11099,7 +11099,7 @@ type ClientInterface interface {
 
 	// CreateSignedUrlWithBody Create a signed download URL
 	//
-	// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11108,7 +11108,7 @@ type ClientInterface interface {
 
 	// CreateSignedUrl Create a signed download URL
 	//
-	// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11117,14 +11117,14 @@ type ClientInterface interface {
 
 	// ReplaceSignedUrlKey Rotate the signed URL key
 	//
-	// Invalidates every signed URL by replacing the signing key. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would invalidate every signed URL by replacing the signing key.
 	//
 	// Corresponds with POST /api/signed/url/key (the `ReplaceSignedUrlKey` operationId).
 	ReplaceSignedUrlKey(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetStorageSummaryInfo Storage summary
 	//
-	// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
+	// Returns the storage usage snapshot, computed on every request. Admin only.
 	//
 	// Corresponds with GET /api/storageinfo (the `GetStorageSummaryInfo` operationId).
 	GetStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11138,26 +11138,26 @@ type ClientInterface interface {
 
 	// CalculateSwiftIndex performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Swift ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Swift ecosystem; answers 501.
 	CalculateSwiftIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSystemInfo System information
 	//
-	// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. Artifactory prints JVM and host details here; the format is free text and no client parses it. Admin only.
+	// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. The format is free text. Admin only.
 	//
 	// Corresponds with GET /api/system (the `GetSystemInfo` operationId).
 	GetSystemInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetReverseProxySnippet Generate an nginx snippet
 	//
-	// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered in v1; APACHE answers 400. Admin only.
+	// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
 	//
 	// Corresponds with GET /api/system/configuration/reverseProxy/nginx (the `GetReverseProxySnippet` operationId).
 	GetReverseProxySnippet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetReverseProxyConfiguration Read the reverse proxy configuration
 	//
-	// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
 	//
 	// Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 	GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11214,7 +11214,7 @@ type ClientInterface interface {
 
 	// DeactivateArtifactoryKeyEncryption Deactivate key encryption
 	//
-	// In Artifactory this rewrites the configuration descriptor with clear-text secrets. artifactweave keeps secrets sealed at all times (decision 0017), so the call is accepted and answers DONE without changing anything; the descriptor export masks secrets regardless.
+	// Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision 0017), and the descriptor export masks them regardless.
 	//
 	// Corresponds with POST /api/system/decrypt (the `DeactivateArtifactoryKeyEncryption` operationId).
 	DeactivateArtifactoryKeyEncryption(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11228,14 +11228,14 @@ type ClientInterface interface {
 
 	// GetSystemLicense Licence information
 	//
-	// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
+	// Returns the licence details of this server, which has no licence tiers. Admin only.
 	//
 	// Corresponds with GET /api/system/license (the `GetSystemLicense` operationId).
 	GetSystemLicense(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// InstallLicenseWithBody Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+	// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11244,7 +11244,7 @@ type ClientInterface interface {
 
 	// InstallLicense Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+	// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11253,21 +11253,21 @@ type ClientInterface interface {
 
 	// DeleteHALicense Remove node licences
 	//
-	// Artifactory removes the licences whose hashes are listed. artifactweave has none to remove and answers with a per-hash message saying so, with status 200, so removal scripts do not fail. Admin only.
+	// Removes the licences whose hashes are listed. The server holds none, so it answers 200 with a per-hash message saying so. Admin only.
 	//
 	// Corresponds with DELETE /api/system/licenses (the `DeleteHALicense` operationId).
 	DeleteHALicense(ctx context.Context, params *DeleteHALicenseParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetHALicenseInfo List node licences
 	//
-	// Artifactory lists one licence per cluster node. artifactweave is a single process and returns a one-element list describing itself, so tooling that iterates the list keeps working. Admin or a token scoped system:info/licenses:r.
+	// Lists one licence per node. This instance is a single process and returns a one-element list describing itself. Admin or a token scoped system:info/licenses:r.
 	//
 	// Corresponds with GET /api/system/licenses (the `GetHALicenseInfo` operationId).
 	GetHALicenseInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// InstallHALicensesWithBody Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+	// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11276,7 +11276,7 @@ type ClientInterface interface {
 
 	// InstallHALicenses Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+	// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11285,35 +11285,35 @@ type ClientInterface interface {
 
 	// GetClusterLocks List held locks
 	//
-	// Returns a snapshot of the leases artifactweave holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. In v1 the report covers the single running process; the response keeps Artifactory's multi-node shape. The snapshot is best effort, not transactional. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+	// Returns a snapshot of the leases the server holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. The report covers the single running process in the multi-node shape. The snapshot is best effort, not transactional. Requires an administrator.
 	//
 	// Corresponds with GET /api/system/locks (the `GetClusterLocks` operationId).
 	GetClusterLocks(ctx context.Context, params *GetClusterLocksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetNodeLocks List locks held by this process
 	//
-	// Same as the lock snapshot but limited to the process that answers, without asking any other process. In v1 the two operations report the same leases. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+	// Same as the lock snapshot but limited to the process that answers, without asking any other process. The two operations report the same leases. Requires an administrator.
 	//
 	// Corresponds with GET /api/system/locks/local (the `GetNodeLocks` operationId).
 	GetNodeLocks(ctx context.Context, params *GetNodeLocksParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetLiveLogsConfig Live Logs configuration (not supported)
 	//
-	// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/system/logs/config (the `GetLiveLogsConfig` operationId).
 	GetLiveLogsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetLiveLogsData Live Logs data (not supported)
 	//
-	// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/system/logs/data (the `GetLiveLogsData` operationId).
 	GetLiveLogsData(ctx context.Context, params *GetLiveLogsDataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StartSha256MigrationWithBody Start the SHA-256 migration
 	//
-	// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+	// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11322,7 +11322,7 @@ type ClientInterface interface {
 
 	// StartSha256Migration Start the SHA-256 migration
 	//
-	// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+	// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11331,7 +11331,7 @@ type ClientInterface interface {
 
 	// StopSha256Migration Stop the SHA-256 migration
 	//
-	// Pair of the start operation; there is no migration to stop and the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with POST /api/system/migration/sha2/stop (the `StopSha256Migration` operationId).
 	StopSha256Migration(ctx context.Context, params *StopSha256MigrationParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11353,7 +11353,7 @@ type ClientInterface interface {
 
 	// GetCertificates List client certificates
 	//
-	// Lists the client certificates remote repositories can present to upstreams. Admin only. The artifactory_certificate resource reads the list after every create and matches fingerPrint case-insensitively.
+	// Lists the client certificates remote repositories can present to upstreams. Admin only.
 	//
 	// Corresponds with GET /api/system/security/certificates (the `GetCertificates` operationId).
 	GetCertificates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11367,7 +11367,7 @@ type ClientInterface interface {
 
 	// AddCertificateWithBody Add a client certificate
 	//
-	// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The documented request media type is application/text; text/plain is accepted as well.
+	// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The request media type is application/text; text/plain is accepted as well.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11390,14 +11390,14 @@ type ClientInterface interface {
 
 	// OptimizeSystemStorage Optimise storage
 	//
-	// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
+	// Starts a repair pass on every blob mirror (decision 0028). Admin only. Returns a plain-text acknowledgement.
 	//
 	// Corresponds with POST /api/system/storage/optimize (the `OptimizeSystemStorage` operationId).
 	OptimizeSystemStorage(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// StartPudProcessWithBody Start pruning unreferenced blobs
 	//
-	// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+	// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11406,7 +11406,7 @@ type ClientInterface interface {
 
 	// StartPudProcess Start pruning unreferenced blobs
 	//
-	// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+	// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11429,7 +11429,7 @@ type ClientInterface interface {
 
 	// CreateSupportBundleWithBody Create a support bundle
 	//
-	// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+	// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11438,7 +11438,7 @@ type ClientInterface interface {
 
 	// CreateSupportBundle Create a support bundle
 	//
-	// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+	// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11447,35 +11447,35 @@ type ClientInterface interface {
 
 	// DeleteSupportBundle Delete a support bundle
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with DELETE /api/system/support/bundle/{bundleId} (the `DeleteSupportBundle` operationId).
 	DeleteSupportBundle(ctx context.Context, bundleId BundleId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSupportBundleMetadata Read support bundle metadata
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/system/support/bundle/{bundleId} (the `GetSupportBundleMetadata` operationId).
 	GetSupportBundleMetadata(ctx context.Context, bundleId BundleId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSupportBundle Download a support bundle
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/system/support/bundle/{bundleId}/archive (the `GetSupportBundle` operationId).
 	GetSupportBundle(ctx context.Context, bundleId BundleId, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSupportBundles List support bundles
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Corresponds with GET /api/system/support/bundles (the `ListSupportBundles` operationId).
 	ListSupportBundles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// VerifyConnectionWithBody Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11484,14 +11484,14 @@ type ClientInterface interface {
 
 	// VerifyConnection Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /api/system/verifyconnection (the `VerifyConnection` operationId).
 	VerifyConnection(ctx context.Context, body VerifyConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSystemVersion Artifactory-compatible version
+	// GetSystemVersion Compatibility version
 	//
 	// Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 	//
@@ -11540,7 +11540,7 @@ type ClientInterface interface {
 
 	// GetRetentionPolicyConfiguration Get release bundle retention configuration
 	//
-	// Returns the release bundle v1 retention configuration (decision 0023).
+	// Returns the release bundle v1 retention configuration.
 	//
 	// Corresponds with GET /api/v1/bundle/retention/config (the `GetRetentionPolicyConfiguration` operationId).
 	GetRetentionPolicyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11644,26 +11644,26 @@ type ClientInterface interface {
 
 	// GetOpenMetricsForArtifactory Prometheus metrics
 	//
-	// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope. artifactweave serves this regardless of licence tier.
+	// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope.
 	//
 	// Corresponds with GET /api/v1/metrics (the `GetOpenMetricsForArtifactory` operationId).
 	GetOpenMetricsForArtifactory(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetArtifactoryApplicationMetrics Application metrics (cloud)
+	// GetArtifactoryApplicationMetrics Application metrics
 	//
-	// Artifactory Cloud exposes application-level metrics here. artifactweave serves the same metrics as `/api/v1/metrics` so dashboards written for either path work.
+	// Exposes the same metrics as `/api/v1/metrics`, in the OpenMetrics text format.
 	//
 	// Corresponds with GET /api/v1/metrics/application (the `GetArtifactoryApplicationMetrics` operationId).
 	GetArtifactoryApplicationMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// MigrateNpmRepositoryToStrictLayout performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
 	//
-	// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 	MigrateNpmRepositoryToStrictLayout(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ResumeNpmRepositoryMigration performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
 	//
-	// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. A conversion cannot be cancelled, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 	ResumeNpmRepositoryMigration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSystemLiveness Liveness probe
@@ -11682,14 +11682,14 @@ type ClientInterface interface {
 
 	// GetUploadsConfig Multipart upload configuration
 	//
-	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+	// Reports whether multipart upload is available. With `supported` true a file is uploaded in parts through create, urlPart, complete and status; with false it is deployed in one request.
 	//
 	// Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
 	GetUploadsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetFederatedRepositoryStatusV2 Get federated repository sync status (version 2)
 	//
-	// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+	// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
 	//
 	// Corresponds with GET /api/v2/federation/status/repo/{repoKey} (the `GetFederatedRepositoryStatusV2` operationId).
 	//
@@ -11969,14 +11969,14 @@ type ClientInterface interface {
 
 	// PermissionTargetExistenceCheckV2 Check that a permission target exists (v2)
 	//
-	// 200 when the target exists, 404 when it does not, with no body. The artifactory_permission_target resource uses it before every create.
+	// 200 when the target exists, 404 when it does not, with no body.
 	//
 	// Corresponds with HEAD /api/v2/security/permissions/{permissionTargetName} (the `PermissionTargetExistenceCheckV2` operationId).
 	PermissionTargetExistenceCheckV2(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreatePermissionTargetV2WithBody Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -11985,7 +11985,7 @@ type ClientInterface interface {
 
 	// CreatePermissionTargetV2 Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -11994,7 +11994,7 @@ type ClientInterface interface {
 
 	// CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 	//
@@ -12003,7 +12003,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithBody Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12012,7 +12012,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2 Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12021,7 +12021,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 	//
@@ -12030,98 +12030,98 @@ type ClientInterface interface {
 
 	// GetVcsBranches performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	GetVcsBranches(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsBranchAlternative performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsBranchFromSubgroupRepository performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsBranchFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsBranch performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsBranchAlternative performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileInVcsBranchInSubgroupRepository performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsBranch performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsCommit performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsCommit(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsRelease performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsRelease(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsTagFromSubgroupRepository performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsTagFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsTag performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadVcsTagAlternative performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileInVcsTagInSubgroupRepository performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsTag performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadFileWithinVcsTagAlternative performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetVcsRefs performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	GetVcsRefs(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetVcsTags performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	GetVcsTags(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the RPM/YUM ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the RPM/YUM ecosystem; answers 501.
 	CalculateYumRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // CalculateAlpineRepositoryMetadata performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Alpine ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Alpine ecosystem; answers 501.
 func (c *Client) CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateAlpineRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -12136,7 +12136,7 @@ func (c *Client) CalculateAlpineRepositoryMetadata(ctx context.Context, repoKey 
 
 // RetrieveBuildArtifactsArchiveWithBody Build artifacts archive
 //
-// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12155,7 +12155,7 @@ func (c *Client) RetrieveBuildArtifactsArchiveWithBody(ctx context.Context, cont
 
 // RetrieveBuildArtifactsArchive Build artifacts archive
 //
-// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -12174,7 +12174,7 @@ func (c *Client) RetrieveBuildArtifactsArchive(ctx context.Context, body Retriev
 
 // RetrieveBuildArtifactsArchiveWithApplicationVndOrgJfrogArtifactoryBuildBuildArtifactsRequestPlusJSONBody Build artifacts archive
 //
-// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.build.BuildArtifactsRequest+json` content type.
 //
@@ -12193,7 +12193,7 @@ func (c *Client) RetrieveBuildArtifactsArchiveWithApplicationVndOrgJfrogArtifact
 
 // GetAllSmartArchivingPolicies List smart archiving policies
 //
-// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects. In Artifactory this API exists on Cloud from 7.111; artifactweave serves it on every install.
+// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 //
 // Corresponds with GET /api/archive/v2/packages/policies (the `GetAllSmartArchivingPolicies` operationId).
 func (c *Client) GetAllSmartArchivingPolicies(ctx context.Context, params *GetAllSmartArchivingPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12367,7 +12367,7 @@ func (c *Client) GetSmartArchivingPolicy(ctx context.Context, policyKey string, 
 
 // CreateSmartArchivingPolicyWithBody Create a smart archiving policy
 //
-// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12386,7 +12386,7 @@ func (c *Client) CreateSmartArchivingPolicyWithBody(ctx context.Context, policyK
 
 // CreateSmartArchivingPolicy Create a smart archiving policy
 //
-// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -12536,7 +12536,7 @@ func (c *Client) RestoreArchivedPackages(ctx context.Context, params *RestoreArc
 
 // ExportRepositoryWithMetadataWithBody Export a repository (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12555,7 +12555,7 @@ func (c *Client) ExportRepositoryWithMetadataWithBody(ctx context.Context, conte
 
 // ExportRepositoryWithMetadata Export a repository (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -12574,7 +12574,7 @@ func (c *Client) ExportRepositoryWithMetadata(ctx context.Context, body ExportRe
 
 // CalculateBowerIndex performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Bower ecosystem; answers 501.
 func (c *Client) CalculateBowerIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateBowerIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -12605,7 +12605,7 @@ func (c *Client) GetAllBuilds(ctx context.Context, params *GetAllBuildsParams, r
 // UploadBuildWithBody performs a PUT /api/build (the `UploadBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 func (c *Client) UploadBuildWithBody(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadBuildRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -12621,7 +12621,7 @@ func (c *Client) UploadBuildWithBody(ctx context.Context, params *UploadBuildPar
 // UploadBuild performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 func (c *Client) UploadBuild(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadBuildRequest(c.Server, params, body)
 	if err != nil {
@@ -12637,7 +12637,7 @@ func (c *Client) UploadBuild(ctx context.Context, params *UploadBuildParams, bod
 // UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type.
 //
-// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 func (c *Client) UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadBuildRequestWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(c.Server, params, body)
 	if err != nil {
@@ -12717,7 +12717,7 @@ func (c *Client) DeleteBuildsMultiple(ctx context.Context, body DeleteBuildsMult
 // PromoteBuildWithBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 func (c *Client) PromoteBuildWithBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteBuildRequestWithBody(c.Server, buildName, buildNumber, params, contentType, body)
 	if err != nil {
@@ -12733,7 +12733,7 @@ func (c *Client) PromoteBuildWithBody(ctx context.Context, buildName string, bui
 // PromoteBuild performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 func (c *Client) PromoteBuild(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteBuildRequest(c.Server, buildName, buildNumber, params, body)
 	if err != nil {
@@ -12749,7 +12749,7 @@ func (c *Client) PromoteBuild(ctx context.Context, buildName string, buildNumber
 // PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type.
 //
-// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 func (c *Client) PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteBuildRequestWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(c.Server, buildName, buildNumber, params, body)
 	if err != nil {
@@ -12856,7 +12856,7 @@ func (c *Client) GetBuildInfo(ctx context.Context, buildName string, buildNumber
 
 // GetBuildArtifacts performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
 //
-// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+// Lists where each artifact of a run is stored. Needs read permission on the build.
 func (c *Client) GetBuildArtifacts(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetBuildArtifactsRequest(c.Server, buildName, buildNumber, buildRepo)
 	if err != nil {
@@ -12871,7 +12871,7 @@ func (c *Client) GetBuildArtifacts(ctx context.Context, buildName string, buildN
 
 // CalculateCargoRepositoryMetadata performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Cargo ecosystem; answers 501.
 func (c *Client) CalculateCargoRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCargoRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -12886,7 +12886,7 @@ func (c *Client) CalculateCargoRepositoryMetadata(ctx context.Context, repoKey s
 
 // SetItemSha256ChecksumWithBody Attach the sha256 property
 //
-// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12905,7 +12905,7 @@ func (c *Client) SetItemSha256ChecksumWithBody(ctx context.Context, contentType 
 
 // SetItemSha256Checksum Attach the sha256 property
 //
-// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -12924,7 +12924,7 @@ func (c *Client) SetItemSha256Checksum(ctx context.Context, body SetItemSha256Ch
 
 // GetAllBuildCleanupPolicies List build cleanup policies
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every build cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/cleanup/builds/policies (the `GetAllBuildCleanupPolicies` operationId).
 func (c *Client) GetAllBuildCleanupPolicies(ctx context.Context, params *GetAllBuildCleanupPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12941,7 +12941,7 @@ func (c *Client) GetAllBuildCleanupPolicies(ctx context.Context, params *GetAllB
 
 // DeleteBuildCleanupPolicy Delete a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with DELETE /api/cleanup/builds/policies/{policyKey} (the `DeleteBuildCleanupPolicy` operationId).
 func (c *Client) DeleteBuildCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12958,7 +12958,7 @@ func (c *Client) DeleteBuildCleanupPolicy(ctx context.Context, policyKey string,
 
 // GetBuildCleanupPolicy Get a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one build cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/cleanup/builds/policies/{policyKey} (the `GetBuildCleanupPolicy` operationId).
 func (c *Client) GetBuildCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -12975,7 +12975,7 @@ func (c *Client) GetBuildCleanupPolicy(ctx context.Context, policyKey string, re
 
 // CreateBuildCleanupPolicyWithBody Create a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -12994,7 +12994,7 @@ func (c *Client) CreateBuildCleanupPolicyWithBody(ctx context.Context, policyKey
 
 // CreateBuildCleanupPolicy Create a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13013,7 +13013,7 @@ func (c *Client) CreateBuildCleanupPolicy(ctx context.Context, policyKey string,
 
 // UpdateBuildCleanupPolicyWithBody Replace a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13032,7 +13032,7 @@ func (c *Client) UpdateBuildCleanupPolicyWithBody(ctx context.Context, policyKey
 
 // UpdateBuildCleanupPolicy Replace a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13051,7 +13051,7 @@ func (c *Client) UpdateBuildCleanupPolicy(ctx context.Context, policyKey string,
 
 // EnableDisableBuildCleanupPolicyWithBody Enable or disable a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13070,7 +13070,7 @@ func (c *Client) EnableDisableBuildCleanupPolicyWithBody(ctx context.Context, po
 
 // EnableDisableBuildCleanupPolicy Enable or disable a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13089,7 +13089,7 @@ func (c *Client) EnableDisableBuildCleanupPolicy(ctx context.Context, policyKey 
 
 // RunBuildCleanupPolicy Run a build cleanup policy now
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects builds and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with PUT /api/cleanup/builds/policies/{policyKey}/run (the `RunBuildCleanupPolicy` operationId).
 func (c *Client) RunBuildCleanupPolicy(ctx context.Context, policyKey string, params *RunBuildCleanupPolicyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13106,7 +13106,7 @@ func (c *Client) RunBuildCleanupPolicy(ctx context.Context, policyKey string, pa
 
 // GetAllReleaseBundleCleanupPolicies List release bundle cleanup policies
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every release bundle cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/cleanup/bundles/policies (the `GetAllReleaseBundleCleanupPolicies` operationId).
 func (c *Client) GetAllReleaseBundleCleanupPolicies(ctx context.Context, params *GetAllReleaseBundleCleanupPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13123,7 +13123,7 @@ func (c *Client) GetAllReleaseBundleCleanupPolicies(ctx context.Context, params 
 
 // DeleteReleaseBundleCleanupPolicy Delete a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with DELETE /api/cleanup/bundles/policies/{policyKey} (the `DeleteReleaseBundleCleanupPolicy` operationId).
 func (c *Client) DeleteReleaseBundleCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13140,7 +13140,7 @@ func (c *Client) DeleteReleaseBundleCleanupPolicy(ctx context.Context, policyKey
 
 // GetReleaseBundleCleanupPolicy Get a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one release bundle cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/cleanup/bundles/policies/{policyKey} (the `GetReleaseBundleCleanupPolicy` operationId).
 func (c *Client) GetReleaseBundleCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13157,7 +13157,7 @@ func (c *Client) GetReleaseBundleCleanupPolicy(ctx context.Context, policyKey st
 
 // CreateReleaseBundleCleanupPolicyWithBody Create a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13176,7 +13176,7 @@ func (c *Client) CreateReleaseBundleCleanupPolicyWithBody(ctx context.Context, p
 
 // CreateReleaseBundleCleanupPolicy Create a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13195,7 +13195,7 @@ func (c *Client) CreateReleaseBundleCleanupPolicy(ctx context.Context, policyKey
 
 // UpdateReleaseBundleCleanupPolicyWithBody Replace a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13214,7 +13214,7 @@ func (c *Client) UpdateReleaseBundleCleanupPolicyWithBody(ctx context.Context, p
 
 // UpdateReleaseBundleCleanupPolicy Replace a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13233,7 +13233,7 @@ func (c *Client) UpdateReleaseBundleCleanupPolicy(ctx context.Context, policyKey
 
 // EnableDisableReleaseBundleCleanupPolicyWithBody Enable or disable a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13252,7 +13252,7 @@ func (c *Client) EnableDisableReleaseBundleCleanupPolicyWithBody(ctx context.Con
 
 // EnableDisableReleaseBundleCleanupPolicy Enable or disable a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13271,7 +13271,7 @@ func (c *Client) EnableDisableReleaseBundleCleanupPolicy(ctx context.Context, po
 
 // RunReleaseBundleCleanupPolicy Run a release bundle cleanup policy now
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects release bundle versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Corresponds with PUT /api/cleanup/bundles/policies/{policyKey}/run (the `RunReleaseBundleCleanupPolicy` operationId).
 func (c *Client) RunReleaseBundleCleanupPolicy(ctx context.Context, policyKey string, params *RunReleaseBundleCleanupPolicyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13288,7 +13288,7 @@ func (c *Client) RunReleaseBundleCleanupPolicy(ctx context.Context, policyKey st
 
 // GetAllPackageCleanupPolicies List package cleanup policies
 //
-// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by artifactweave's in-process scheduler over the package index (decisions 0010 and 0018).
+// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by the in-process scheduler over the package index.
 //
 // Corresponds with GET /api/cleanup/packages/policies (the `GetAllPackageCleanupPolicies` operationId).
 func (c *Client) GetAllPackageCleanupPolicies(ctx context.Context, params *GetAllPackageCleanupPoliciesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13305,7 +13305,7 @@ func (c *Client) GetAllPackageCleanupPolicies(ctx context.Context, params *GetAl
 
 // DeletePackageCleanupPolicy Delete a package cleanup policy
 //
-// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Corresponds with DELETE /api/cleanup/packages/policies/{policyKey} (the `DeletePackageCleanupPolicy` operationId).
 func (c *Client) DeletePackageCleanupPolicy(ctx context.Context, policyKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13339,7 +13339,7 @@ func (c *Client) GetPackageCleanupPolicy(ctx context.Context, policyKey string, 
 
 // CreatePackageCleanupPolicyWithBody Create a package cleanup policy
 //
-// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13358,7 +13358,7 @@ func (c *Client) CreatePackageCleanupPolicyWithBody(ctx context.Context, policyK
 
 // CreatePackageCleanupPolicy Create a package cleanup policy
 //
-// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13627,7 +13627,7 @@ func (c *Client) GetCleanupPoliciesView(ctx context.Context, params *GetCleanupP
 
 // CalculateCocoaPodsIndex performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the CocoaPods ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the CocoaPods ecosystem; answers 501.
 func (c *Client) CalculateCocoaPodsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCocoaPodsIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -13642,7 +13642,7 @@ func (c *Client) CalculateCocoaPodsIndex(ctx context.Context, repoKey string, re
 
 // CalculateConanRepositoryMetadata performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Conan ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Conan ecosystem; answers 501.
 func (c *Client) CalculateConanRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateConanRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -13657,7 +13657,7 @@ func (c *Client) CalculateConanRepositoryMetadata(ctx context.Context, repoKey s
 
 // CalculateCondaRepositoryMetadata performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Conda ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Conda ecosystem; answers 501.
 func (c *Client) CalculateCondaRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCondaRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -13672,7 +13672,7 @@ func (c *Client) CalculateCondaRepositoryMetadata(ctx context.Context, repoKey s
 
 // GetChecksumReplication performs a GET /api/config/storage/checksumReplication (the `GetChecksumReplication` operationId) request.
 //
-// Reads the checksum replication settings of this instance. Not supported in v1: artifactweave has no storage-level replication, so the operation answers 501.
+// Not implemented; answers 501. It would read the checksum replication settings of this instance.
 func (c *Client) GetChecksumReplication(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetChecksumReplicationRequest(c.Server)
 	if err != nil {
@@ -13688,7 +13688,7 @@ func (c *Client) GetChecksumReplication(ctx context.Context, reqEditors ...Reque
 // ConfigureChecksumReplicationWithBody performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request,
 // with any type of body and a specified content type.
 //
-// Configures checksum replication on this instance. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would configure checksum replication on this instance.
 func (c *Client) ConfigureChecksumReplicationWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewConfigureChecksumReplicationRequestWithBody(c.Server, contentType, body)
 	if err != nil {
@@ -13704,7 +13704,7 @@ func (c *Client) ConfigureChecksumReplicationWithBody(ctx context.Context, conte
 // ConfigureChecksumReplication performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Configures checksum replication on this instance. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would configure checksum replication on this instance.
 func (c *Client) ConfigureChecksumReplication(ctx context.Context, body ConfigureChecksumReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewConfigureChecksumReplicationRequest(c.Server, body)
 	if err != nil {
@@ -13719,7 +13719,7 @@ func (c *Client) ConfigureChecksumReplication(ctx context.Context, body Configur
 
 // CalculateCranRepositoryMetadata performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the CRAN ecosystem; answers 501.
 func (c *Client) CalculateCranRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCranRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -13734,7 +13734,7 @@ func (c *Client) CalculateCranRepositoryMetadata(ctx context.Context, repoKey st
 
 // MoveCranArchives performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the CRAN ecosystem; answers 501.
 func (c *Client) MoveCranArchives(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMoveCranArchivesRequest(c.Server, repoKey)
 	if err != nil {
@@ -13749,7 +13749,7 @@ func (c *Client) MoveCranArchives(ctx context.Context, repoKey string, reqEditor
 
 // GetCurationInterfaceSettings Curation settings (not supported)
 //
-// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/curation/interfaceSettings (the `GetCurationInterfaceSettings` operationId).
 func (c *Client) GetCurationInterfaceSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -13766,7 +13766,7 @@ func (c *Client) GetCurationInterfaceSettings(ctx context.Context, reqEditors ..
 
 // UpdateCurationInterfaceSettingsWithBody Update Curation settings (not supported)
 //
-// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13785,7 +13785,7 @@ func (c *Client) UpdateCurationInterfaceSettingsWithBody(ctx context.Context, co
 
 // UpdateCurationInterfaceSettings Update Curation settings (not supported)
 //
-// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13804,7 +13804,7 @@ func (c *Client) UpdateCurationInterfaceSettings(ctx context.Context, body Updat
 
 // CalculateCachedRemoteDebianRepositoryCoordinates performs a POST /api/deb/indexCached/{repoKey} (the `CalculateCachedRemoteDebianRepositoryCoordinates` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 func (c *Client) CalculateCachedRemoteDebianRepositoryCoordinates(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateCachedRemoteDebianRepositoryCoordinatesRequest(c.Server, repoKey)
 	if err != nil {
@@ -13819,7 +13819,7 @@ func (c *Client) CalculateCachedRemoteDebianRepositoryCoordinates(ctx context.Co
 
 // CalculateDebianRepositoryMetadata performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 func (c *Client) CalculateDebianRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateDebianRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -13835,7 +13835,7 @@ func (c *Client) CalculateDebianRepositoryMetadata(ctx context.Context, repoKey 
 // CreateDebianSnapshotWithBody performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 // with any type of body and a specified content type.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 func (c *Client) CreateDebianSnapshotWithBody(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDebianSnapshotRequestWithBody(c.Server, repoKey, params, contentType, body)
 	if err != nil {
@@ -13851,7 +13851,7 @@ func (c *Client) CreateDebianSnapshotWithBody(ctx context.Context, repoKey strin
 // CreateDebianSnapshot performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 func (c *Client) CreateDebianSnapshot(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateDebianSnapshotRequest(c.Server, repoKey, params, body)
 	if err != nil {
@@ -13866,7 +13866,7 @@ func (c *Client) CreateDebianSnapshot(ctx context.Context, repoKey string, param
 
 // DeleteRedundantRecordsToTrashCanDirectoriesWithBody Compact trash can directory records
 //
-// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13885,7 +13885,7 @@ func (c *Client) DeleteRedundantRecordsToTrashCanDirectoriesWithBody(ctx context
 
 // DeleteRedundantRecordsToTrashCanDirectories Compact trash can directory records
 //
-// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13902,9 +13902,9 @@ func (c *Client) DeleteRedundantRecordsToTrashCanDirectories(ctx context.Context
 	return c.Client.Do(req)
 }
 
-// DistributeArtifactWithBody Distribute to Bintray (retired)
+// DistributeArtifactWithBody Distribute to Bintray
 //
-// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 //
 // Takes any type of body and a specified content type.
 //
@@ -13922,9 +13922,9 @@ func (c *Client) DistributeArtifactWithBody(ctx context.Context, contentType str
 	return c.Client.Do(req)
 }
 
-// DistributeArtifact Distribute to Bintray (retired)
+// DistributeArtifact Distribute to Bintray
 //
-// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -13945,7 +13945,7 @@ func (c *Client) DistributeArtifact(ctx context.Context, body DistributeArtifact
 // FindParentManifestListsWithBody performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 // with any type of body and a specified content type.
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 func (c *Client) FindParentManifestListsWithBody(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewFindParentManifestListsRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -13961,7 +13961,7 @@ func (c *Client) FindParentManifestListsWithBody(ctx context.Context, repoKey Do
 // FindParentManifestLists performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 func (c *Client) FindParentManifestLists(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewFindParentManifestListsRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -13977,7 +13977,7 @@ func (c *Client) FindParentManifestLists(ctx context.Context, repoKey DockerRepo
 // PromoteDockerImageWithBody performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
 // with any type of body and a specified content type.
 //
-// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 func (c *Client) PromoteDockerImageWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteDockerImageRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -13993,7 +13993,7 @@ func (c *Client) PromoteDockerImageWithBody(ctx context.Context, repoKey string,
 // PromoteDockerImage performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 func (c *Client) PromoteDockerImage(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPromoteDockerImageRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -14009,7 +14009,7 @@ func (c *Client) PromoteDockerImage(ctx context.Context, repoKey string, body Pr
 // DeleteDockerTagWithBody performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request,
 // with any type of body and a specified content type.
 //
-// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 func (c *Client) DeleteDockerTagWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteDockerTagRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -14025,7 +14025,7 @@ func (c *Client) DeleteDockerTagWithBody(ctx context.Context, repoKey string, co
 // DeleteDockerTag performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 func (c *Client) DeleteDockerTag(ctx context.Context, repoKey string, body DeleteDockerTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteDockerTagRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -14040,7 +14040,7 @@ func (c *Client) DeleteDockerTag(ctx context.Context, repoKey string, body Delet
 
 // GetExportSystemSettingsExample Export settings example (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/export/system (the `GetExportSystemSettingsExample` operationId).
 func (c *Client) GetExportSystemSettingsExample(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14057,7 +14057,7 @@ func (c *Client) GetExportSystemSettingsExample(ctx context.Context, reqEditors 
 
 // ExportSystemWithBody Export the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -14076,7 +14076,7 @@ func (c *Client) ExportSystemWithBody(ctx context.Context, contentType string, b
 
 // ExportSystem Export the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14095,7 +14095,7 @@ func (c *Client) ExportSystem(ctx context.Context, body ExportSystemJSONRequestB
 
 // ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONBody Export the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.system.ExportSettings+json` content type.
 //
@@ -14322,7 +14322,7 @@ func (c *Client) PropagateCreationTimeMetadataDuringFullSync(ctx context.Context
 
 // ReconnectToFederationClient Reconnect the federation sync worker
 //
-// Re-establishes the link between the repository service and the federation sync worker. In Artifactory the worker is the separate Artifactory Federation Service (RTFS), reached over gRPC; a health-check job reconnects it automatically (every 80 seconds by default) and this call does it on demand, for example when the service was unavailable at startup. artifactweave runs the sync worker inside the server process, so the call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
+// Re-establishes the link between the repository service and the federation sync worker, which runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
 //
 // Corresponds with POST /api/federation/reconnect (the `ReconnectToFederationClient` operationId).
 func (c *Client) ReconnectToFederationClient(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14339,7 +14339,7 @@ func (c *Client) ReconnectToFederationClient(ctx context.Context, reqEditors ...
 
 // FederationRecovery Recover exhausted federation queues
 //
-// Clears the error state of outgoing event queues that exhausted their retries (six attempts by default in Artifactory), so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
+// Clears the error state of outgoing event queues that exhausted their retries, so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
 //
 // Corresponds with POST /api/federation/recovery (the `FederationRecovery` operationId).
 func (c *Client) FederationRecovery(ctx context.Context, params *FederationRecoveryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14412,7 +14412,7 @@ func (c *Client) GetFederationSyncState(ctx context.Context, reqEditors ...Reque
 
 // GetFederationConnectionDetails Get federated repository connection state
 //
-// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring. Artifactory serves this operation only when its standalone Federation Service (RTFS) is enabled and answers 405 otherwise; artifactweave always serves it.
+// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring.
 //
 // Corresponds with GET /api/federation/status/connectionStates/{repoKey} (the `GetFederationConnectionDetails` operationId).
 func (c *Client) GetFederationConnectionDetails(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14447,7 +14447,7 @@ func (c *Client) GetFederationMirrorLagTime(ctx context.Context, params *GetFede
 
 // GetFederatedRepositoryStatus Get federated repository sync status
 //
-// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
 //
 // Corresponds with GET /api/federation/status/repo/{repoKey} (the `GetFederatedRepositoryStatus` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -14517,7 +14517,7 @@ func (c *Client) GetUnavailableMirrors(ctx context.Context, reqEditors ...Reques
 
 // CalculateRubyGemsIndex performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the RubyGems ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the RubyGems ecosystem; answers 501.
 func (c *Client) CalculateRubyGemsIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateRubyGemsIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -14532,7 +14532,7 @@ func (c *Client) CalculateRubyGemsIndex(ctx context.Context, repoKey string, req
 
 // GetRubyGemVersionList List gem versions
 //
-// Returns the versions of one gem in the rubygems.org versions format. Gems are outside the v1 ecosystem scope (research 10). artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
 //
 // Corresponds with GET /api/gems/{repoName}/api/v1/versions/{gemName} (the `GetRubyGemVersionList` operationId).
 func (c *Client) GetRubyGemVersionList(ctx context.Context, repoName string, gemName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14674,7 +14674,7 @@ func (c *Client) CalculateHelmChartIndex(ctx context.Context, repoKey string, re
 
 // ImportRepositoryContent Import repository content (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Upload content with the deploy API or the JFrog CLI instead.
+// Not implemented; answers 501.
 //
 // Corresponds with POST /api/import/repositories (the `ImportRepositoryContent` operationId).
 func (c *Client) ImportRepositoryContent(ctx context.Context, params *ImportRepositoryContentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14691,7 +14691,7 @@ func (c *Client) ImportRepositoryContent(ctx context.Context, params *ImportRepo
 
 // GetImportSystemSettingsExample Import settings example (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/import/system (the `GetImportSystemSettingsExample` operationId).
 func (c *Client) GetImportSystemSettingsExample(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -14708,7 +14708,7 @@ func (c *Client) GetImportSystemSettingsExample(ctx context.Context, reqEditors 
 
 // FullSystemImportWithBody Import the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type.
 //
@@ -14727,7 +14727,7 @@ func (c *Client) FullSystemImportWithBody(ctx context.Context, contentType strin
 
 // FullSystemImport Import the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14746,7 +14746,7 @@ func (c *Client) FullSystemImport(ctx context.Context, body FullSystemImportJSON
 
 // FullSystemImportWithApplicationVndOrgJfrogArtifactorySystemImportSettingsPlusJSONBody Import the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.system.ImportSettings+json` content type.
 //
@@ -14780,7 +14780,7 @@ func (c *Client) CalculateMavenIndex(ctx context.Context, params *CalculateMaven
 
 // ReindexMetadataServerWithBody Reindex the metadata service
 //
-// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 //
 // Takes any type of body and a specified content type.
 //
@@ -14799,7 +14799,7 @@ func (c *Client) ReindexMetadataServerWithBody(ctx context.Context, params *Rein
 
 // ReindexMetadataServer Reindex the metadata service
 //
-// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -14818,7 +14818,7 @@ func (c *Client) ReindexMetadataServer(ctx context.Context, params *ReindexMetad
 
 // GetNpmAuth performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
 //
-// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent, as Artifactory stopped sending both in 7.161.26. Needs an authenticated caller. JFrog's 7.x documentation, as archived in 2025, showed the operation with an example answer whose _auth encodes the user name and the user's encrypted password rather than the password sent. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent. Needs an authenticated caller.
 func (c *Client) GetNpmAuth(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNpmAuthRequest(c.Server)
 	if err != nil {
@@ -14833,7 +14833,7 @@ func (c *Client) GetNpmAuth(ctx context.Context, reqEditors ...RequestEditorFn) 
 
 // GetNpmScopeAuth performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
 //
-// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog's 7.x documentation, as archived in 2025, showed the operation with the scope given without its @ and an example answer whose credential lines are _password and username rather than _auth, with the email and always-auth lines that 7.161.26 dropped. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.
 func (c *Client) GetNpmScopeAuth(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetNpmScopeAuthRequest(c.Server, repoKey, scope)
 	if err != nil {
@@ -14848,7 +14848,7 @@ func (c *Client) GetNpmScopeAuth(ctx context.Context, repoKey string, scope stri
 
 // CalculateNpmRepositoryMetadata performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 //
-// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
+// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Package metadata is derived from the index, so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 func (c *Client) CalculateNpmRepositoryMetadata(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateNpmRepositoryMetadataRequest(c.Server, repoKey)
 	if err != nil {
@@ -14878,7 +14878,7 @@ func (c *Client) CalculateNuGetRepositoryMetadata(ctx context.Context, repoKey s
 
 // CalculateOpkgRepositoryMetadata performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Opkg ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Opkg ecosystem; answers 501.
 func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateOpkgRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14893,7 +14893,7 @@ func (c *Client) CalculateOpkgRepositoryMetadata(ctx context.Context, repoKey st
 
 // CalculatePubRepositoryMetadata performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Pub ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Pub ecosystem; answers 501.
 func (c *Client) CalculatePubRepositoryMetadata(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculatePubRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -14908,7 +14908,7 @@ func (c *Client) CalculatePubRepositoryMetadata(ctx context.Context, repoKey str
 
 // GetPuppetModules performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 func (c *Client) GetPuppetModules(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetModulesRequest(c.Server, repoKey)
 	if err != nil {
@@ -14923,7 +14923,7 @@ func (c *Client) GetPuppetModules(ctx context.Context, repoKey string, reqEditor
 
 // GetPuppetModuleInfo performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 func (c *Client) GetPuppetModuleInfo(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetModuleInfoRequest(c.Server, repoKey, userModule)
 	if err != nil {
@@ -14938,7 +14938,7 @@ func (c *Client) GetPuppetModuleInfo(ctx context.Context, repoKey string, userMo
 
 // GetPuppetReleases performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 func (c *Client) GetPuppetReleases(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetReleasesRequest(c.Server, repoKey)
 	if err != nil {
@@ -14953,7 +14953,7 @@ func (c *Client) GetPuppetReleases(ctx context.Context, repoKey string, reqEdito
 
 // GetPuppetReleaseInfo performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 func (c *Client) GetPuppetReleaseInfo(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetPuppetReleaseInfoRequest(c.Server, repoKey, userModuleVersion)
 	if err != nil {
@@ -15013,7 +15013,7 @@ func (c *Client) GetPypiPackageVersionMetadataInJson(ctx context.Context, reposi
 
 // GetAllBundles List release bundles
 //
-// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge (decision 0023). Only bundles the caller may read are returned.
+// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge. Only bundles the caller may read are returned.
 //
 // Corresponds with GET /api/release/bundles (the `GetAllBundles` operationId).
 func (c *Client) GetAllBundles(ctx context.Context, params *GetAllBundlesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15064,7 +15064,7 @@ func (c *Client) GetAllBundleVersions(ctx context.Context, bundleName string, re
 
 // GetReleaseBundleVersion Get a release bundle version
 //
-// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content (decision 0023).
+// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content.
 //
 // Corresponds with GET /api/release/bundles/{bundleName}/{bundleVersion} (the `GetReleaseBundleVersion` operationId).
 func (c *Client) GetReleaseBundleVersion(ctx context.Context, bundleName string, bundleVersion string, params *GetReleaseBundleVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15136,7 +15136,7 @@ func (c *Client) GetReleaseBundleVersionImportStatus(ctx context.Context, name s
 
 // CloseEventBasedPullReplicationChannels performs a POST /api/replications/channels/release (the `CloseEventBasedPullReplicationChannels` operationId) request.
 //
-// Closes every event-based pull replication channel other instances hold open against this one, forcing them to reconnect. Event-based replication is not supported in v1; the operation answers 501.
+// Not implemented; answers 501. It would close every event-based pull replication channel other instances hold open against this one, forcing them to reconnect.
 func (c *Client) CloseEventBasedPullReplicationChannels(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCloseEventBasedPullReplicationChannelsRequest(c.Server)
 	if err != nil {
@@ -15151,7 +15151,7 @@ func (c *Client) CloseEventBasedPullReplicationChannels(ctx context.Context, req
 
 // GetRemoteRepositoriesRegisteredForReplication performs a GET /api/replications/channels/{repoKey} (the `GetRemoteRepositoriesRegisteredForReplication` operationId) request.
 //
-// Lists the remote instances subscribed to a local repository for event-based pull replication. Event-based replication is not supported in v1; the operation answers 501.
+// Not implemented; answers 501. It would list the remote instances subscribed to a local repository for event-based pull replication.
 func (c *Client) GetRemoteRepositoriesRegisteredForReplication(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetRemoteRepositoriesRegisteredForReplicationRequest(c.Server, repoKey)
 	if err != nil {
@@ -15167,7 +15167,7 @@ func (c *Client) GetRemoteRepositoriesRegisteredForReplication(ctx context.Conte
 // UpdateMultiPushReplicationWithBody performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request,
 // with any type of body and a specified content type.
 //
-// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 func (c *Client) UpdateMultiPushReplicationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateMultiPushReplicationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -15183,7 +15183,7 @@ func (c *Client) UpdateMultiPushReplicationWithBody(ctx context.Context, repoKey
 // UpdateMultiPushReplication performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 func (c *Client) UpdateMultiPushReplication(ctx context.Context, repoKey string, body UpdateMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateMultiPushReplicationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -15199,7 +15199,7 @@ func (c *Client) UpdateMultiPushReplication(ctx context.Context, repoKey string,
 // CreateOrReplaceMultiPushReplicationWithBody performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 func (c *Client) CreateOrReplaceMultiPushReplicationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateOrReplaceMultiPushReplicationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -15215,7 +15215,7 @@ func (c *Client) CreateOrReplaceMultiPushReplicationWithBody(ctx context.Context
 // CreateOrReplaceMultiPushReplication performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 func (c *Client) CreateOrReplaceMultiPushReplication(ctx context.Context, repoKey string, body CreateOrReplaceMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateOrReplaceMultiPushReplicationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -15261,7 +15261,7 @@ func (c *Client) GetRepositoryReplicationConfiguration(ctx context.Context, repo
 // UpdateRepositoryReplicationConfigurationWithBody performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 func (c *Client) UpdateRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateRepositoryReplicationConfigurationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -15277,7 +15277,7 @@ func (c *Client) UpdateRepositoryReplicationConfigurationWithBody(ctx context.Co
 // UpdateRepositoryReplicationConfiguration performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 func (c *Client) UpdateRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateRepositoryReplicationConfigurationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -15293,7 +15293,7 @@ func (c *Client) UpdateRepositoryReplicationConfiguration(ctx context.Context, r
 // SetRepositoryReplicationConfigurationWithBody performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 func (c *Client) SetRepositoryReplicationConfigurationWithBody(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetRepositoryReplicationConfigurationRequestWithBody(c.Server, repoKey, contentType, body)
 	if err != nil {
@@ -15309,7 +15309,7 @@ func (c *Client) SetRepositoryReplicationConfigurationWithBody(ctx context.Conte
 // SetRepositoryReplicationConfiguration performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 func (c *Client) SetRepositoryReplicationConfiguration(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetRepositoryReplicationConfigurationRequest(c.Server, repoKey, body)
 	if err != nil {
@@ -15375,7 +15375,7 @@ func (c *Client) CheckIfRepositoryExists(ctx context.Context, params *CheckIfRep
 
 // GetRemoteRepositoryConfiguration Shared remote repository configuration (deprecated)
 //
-// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated by Artifactory in favour of the ordinary read; kept so old clients keep working. Non-admin callers get the sanitised view only.
+// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
 //
 // Corresponds with GET /api/repositories/{remoteRepoName}/configuration (the `GetRemoteRepositoryConfiguration` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -15427,7 +15427,7 @@ func (c *Client) GetRepositoryConfiguration(ctx context.Context, repoKey RepoKey
 
 // UpdateRepositoryConfigurationWithBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15446,7 +15446,7 @@ func (c *Client) UpdateRepositoryConfigurationWithBody(ctx context.Context, repo
 
 // UpdateRepositoryConfiguration Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15465,7 +15465,7 @@ func (c *Client) UpdateRepositoryConfiguration(ctx context.Context, repoKey Repo
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -15484,7 +15484,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -15503,7 +15503,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -15522,7 +15522,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -15541,7 +15541,7 @@ func (c *Client) UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15560,7 +15560,7 @@ func (c *Client) CreateRepositoryWithBody(ctx context.Context, repoKey RepoKey, 
 
 // CreateRepository Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15579,7 +15579,7 @@ func (c *Client) CreateRepository(ctx context.Context, repoKey RepoKey, body Cre
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type.
 //
@@ -15598,7 +15598,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type.
 //
@@ -15617,7 +15617,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type.
 //
@@ -15636,7 +15636,7 @@ func (c *Client) CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositori
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBody Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type.
 //
@@ -15672,7 +15672,7 @@ func (c *Client) GetArchivePolicyStatus(ctx context.Context, params *GetArchiveP
 
 // GetAllArchivePolicies List cold storage archive policies
 //
-// Returns every cold storage archive policy with its run state. Platform administrators only. In Artifactory this API needs an Enterprise licence and a separate cold instance; artifactweave serves it on every install against its cold tier.
+// Returns every cold storage archive policy with its run state. Platform administrators only.
 //
 // Corresponds with GET /api/retention/archive/policies (the `GetAllArchivePolicies` operationId).
 func (c *Client) GetAllArchivePolicies(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -15689,7 +15689,7 @@ func (c *Client) GetAllArchivePolicies(ctx context.Context, reqEditors ...Reques
 
 // ConvertSearchCriteriaToAqlWithBody Convert a search criteria form to AQL
 //
-// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -15708,7 +15708,7 @@ func (c *Client) ConvertSearchCriteriaToAqlWithBody(ctx context.Context, content
 
 // ConvertSearchCriteriaToAqlWithTextBody Convert a search criteria form to AQL
 //
-// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 //
 // Takes a body of the `text/plain` content type.
 //
@@ -16036,7 +16036,7 @@ func (c *Client) SearchPackageArchives(ctx context.Context, params *SearchPackag
 
 // SearchArchive performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 //
-// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
+// Not implemented; answers 501. It would find entries inside archives by member name; use AQL instead.
 func (c *Client) SearchArchive(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchArchiveRequest(c.Server, params)
 	if err != nil {
@@ -16204,7 +16204,7 @@ func (c *Client) SearchGavc(ctx context.Context, params *SearchGavcParams, reqEd
 
 // SearchLatestVersion performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 //
-// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
+// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury version ordering to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. The response is the bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 func (c *Client) SearchLatestVersion(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchLatestVersionRequest(c.Server, params)
 	if err != nil {
@@ -16219,7 +16219,7 @@ func (c *Client) SearchLatestVersion(ctx context.Context, params *SearchLatestVe
 
 // SearchLicense performs a GET /api/search/license (the `SearchLicense` operationId) request.
 //
-// Finds items whose licence properties match the requested statuses. artifactweave reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
+// Finds items whose licence properties match the requested statuses. The search reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
 func (c *Client) SearchLicense(ctx context.Context, params *SearchLicenseParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchLicenseRequest(c.Server, params)
 	if err != nil {
@@ -16279,7 +16279,7 @@ func (c *Client) SearchUsage(ctx context.Context, params *SearchUsageParams, req
 
 // SearchVersions performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 //
-// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
+// Lists every version of a module found through the repository layout, newest first in the Mercury version ordering. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 func (c *Client) SearchVersions(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchVersionsRequest(c.Server, params)
 	if err != nil {
@@ -16294,7 +16294,7 @@ func (c *Client) SearchVersions(ctx context.Context, params *SearchVersionsParam
 
 // RevokeApiKey Revoke the caller's API key
 //
-// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so artifactweave answers 200 with an informational message for compatibility with scripts that call it unconditionally.
+// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.
 //
 // Corresponds with DELETE /api/security/apiKey (the `RevokeApiKey` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16312,7 +16312,7 @@ func (c *Client) RevokeApiKey(ctx context.Context, params *RevokeApiKeyParams, r
 
 // GetApiKey Get the caller's API key (always absent)
 //
-// Returns the caller's API key. Because artifactweave never issues keys this always answers 404, which is the documented response when no key exists; the JFrog CLI treats it as "no key".
+// Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the response for a user without a key.
 //
 // Corresponds with GET /api/security/apiKey (the `GetApiKey` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16330,7 +16330,7 @@ func (c *Client) GetApiKey(ctx context.Context, reqEditors ...RequestEditorFn) (
 
 // CreateApiKey Create an API key (disabled)
 //
-// Legacy API-key creation. Artifactory disables it by default since 7.98 and the keys reached end of life; artifactweave always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead. jfrog-client-go expects 201 on success, which never happens here.
+// Legacy API-key creation, which is disabled. Always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead.
 //
 // Corresponds with POST /api/security/apiKey (the `CreateApiKey` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16348,7 +16348,7 @@ func (c *Client) CreateApiKey(ctx context.Context, reqEditors ...RequestEditorFn
 
 // RegenerateApiKey Regenerate an API key (disabled)
 //
-// Legacy key rotation. artifactweave answers 400 "API key creation is disabled" because no user ever holds a key.
+// Legacy key rotation, which is disabled. Always answers 400 "API key creation is disabled"; no user holds a key.
 //
 // Corresponds with PUT /api/security/apiKey (the `RegenerateApiKey` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16384,7 +16384,7 @@ func (c *Client) RevokeUserApiKey(ctx context.Context, username string, reqEdito
 
 // GetPasswordExpirationPolicy Get the password expiration policy
 //
-// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
+// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.
 //
 // Corresponds with GET /api/security/configuration/passwordExpirationPolicy (the `GetPasswordExpirationPolicy` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16402,7 +16402,7 @@ func (c *Client) GetPasswordExpirationPolicy(ctx context.Context, reqEditors ...
 
 // SetPasswordExpirationPolicyWithBody Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16422,7 +16422,7 @@ func (c *Client) SetPasswordExpirationPolicyWithBody(ctx context.Context, conten
 
 // SetPasswordExpirationPolicy Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16442,7 +16442,7 @@ func (c *Client) SetPasswordExpirationPolicy(ctx context.Context, body SetPasswo
 
 // GetUserEncryptedPassword Get an encrypted form of the caller's password
 //
-// Artifactory returns an opaque encrypted password that clients can use in place of the clear-text one. artifactweave returns a reference token bound to the caller instead, which every client accepts wherever the encrypted password was accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
+// Returns a reference token bound to the caller, usable in place of the clear-text password wherever an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
 //
 // Corresponds with GET /api/security/encryptedPassword (the `GetUserEncryptedPassword` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16460,7 +16460,7 @@ func (c *Client) GetUserEncryptedPassword(ctx context.Context, reqEditors ...Req
 
 // GetGroups List groups (legacy)
 //
-// Lists every group with its detail URL. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/groups; kept for the JFrog CLI. Not in the oracle; from docs/research/05.
+// Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.
 //
 // Corresponds with GET /api/security/groups (the `GetGroups` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16478,7 +16478,7 @@ func (c *Client) GetGroups(ctx context.Context, reqEditors ...RequestEditorFn) (
 
 // DeleteGroup Delete a group (legacy)
 //
-// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400). Not in the oracle; from docs/research/05.
+// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
 //
 // Corresponds with DELETE /api/security/groups/{groupName} (the `DeleteGroup` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16496,7 +16496,7 @@ func (c *Client) DeleteGroup(ctx context.Context, groupName string, reqEditors .
 
 // GetGroupDetails Get a group (legacy)
 //
-// Returns the legacy group document. Admin only. Members are included only when includeUsers=true; the Terraform provider always sends the parameter. Not in the oracle; from docs/research/05.
+// Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
 //
 // Corresponds with GET /api/security/groups/{groupName} (the `GetGroupDetails` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16514,7 +16514,7 @@ func (c *Client) GetGroupDetails(ctx context.Context, groupName string, params *
 
 // UpdateGroupWithBody Update a group (legacy)
 //
-// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16534,7 +16534,7 @@ func (c *Client) UpdateGroupWithBody(ctx context.Context, groupName string, cont
 
 // UpdateGroup Update a group (legacy)
 //
-// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16554,7 +16554,7 @@ func (c *Client) UpdateGroup(ctx context.Context, groupName string, body UpdateG
 
 // UpdateGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBody Update a group (legacy)
 //
-// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type.
 //
@@ -16574,7 +16574,7 @@ func (c *Client) UpdateGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPl
 
 // CreateOrReplaceGroupWithBody Create or replace a group (legacy)
 //
-// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16594,7 +16594,7 @@ func (c *Client) CreateOrReplaceGroupWithBody(ctx context.Context, groupName str
 
 // CreateOrReplaceGroup Create or replace a group (legacy)
 //
-// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16614,7 +16614,7 @@ func (c *Client) CreateOrReplaceGroup(ctx context.Context, groupName string, bod
 
 // CreateOrReplaceGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBody Create or replace a group (legacy)
 //
-// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type.
 //
@@ -16651,7 +16651,7 @@ func (c *Client) GetAllKeyPairs(ctx context.Context, reqEditors ...RequestEditor
 
 // CreateKeyPairWithBody Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16670,7 +16670,7 @@ func (c *Client) CreateKeyPairWithBody(ctx context.Context, contentType string, 
 
 // CreateKeyPair Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16799,7 +16799,7 @@ func (c *Client) DeleteKeyPair(ctx context.Context, keyPairName string, reqEdito
 
 // GetKeyPair Get a key pair
 //
-// Returns the readable projection of one pair. Admin only. The Terraform provider reads this after every create.
+// Returns the readable projection of one pair. Admin only.
 //
 // Corresponds with GET /api/security/keypair/{keyPairName} (the `GetKeyPair` operationId).
 func (c *Client) GetKeyPair(ctx context.Context, keyPairName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16816,7 +16816,7 @@ func (c *Client) GetKeyPair(ctx context.Context, keyPairName string, reqEditors 
 
 // GetTrustedKeys List trusted public keys
 //
-// Lists the public keys trusted for release-bundle signature verification. Admin only. Served so the artifactory_distribution_public_key resource can read back what it created; release bundles themselves are out of scope in v1. Not in the oracle; shape from docs/research/05 and the provider source.
+// Lists the public keys trusted for release-bundle signature verification. Admin only. Release bundles themselves are not served.
 //
 // Corresponds with GET /api/security/keys/trusted (the `GetTrustedKeys` operationId).
 func (c *Client) GetTrustedKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16833,7 +16833,7 @@ func (c *Client) GetTrustedKeys(ctx context.Context, reqEditors ...RequestEditor
 
 // SetDistributionPublicGpgKeyWithBody Add a trusted public key
 //
-// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16852,7 +16852,7 @@ func (c *Client) SetDistributionPublicGpgKeyWithBody(ctx context.Context, conten
 
 // SetDistributionPublicGpgKey Add a trusted public key
 //
-// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16871,7 +16871,7 @@ func (c *Client) SetDistributionPublicGpgKey(ctx context.Context, body SetDistri
 
 // DeleteTrustedKey Delete a trusted public key
 //
-// Removes a trusted key by its kid. Admin only. Answers 204; the provider accepts 200 or 204. Not in the oracle; from docs/research/05.
+// Removes a trusted key by its kid. Admin only. Answers 204.
 //
 // Corresponds with DELETE /api/security/keys/trusted/{keyId} (the `DeleteTrustedKey` operationId).
 func (c *Client) DeleteTrustedKey(ctx context.Context, keyId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16888,7 +16888,7 @@ func (c *Client) DeleteTrustedKey(ctx context.Context, keyId string, reqEditors 
 
 // GetLockedOutUsers List locked-out users
 //
-// Returns the names of users locked by the user lock policy. Admin only. The JFrog CLI prints this list for jf rt users-locked style commands.
+// Returns the names of users locked by the user lock policy. Admin only.
 //
 // Corresponds with GET /api/security/lockedUsers (the `GetLockedOutUsers` operationId).
 func (c *Client) GetLockedOutUsers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16905,7 +16905,7 @@ func (c *Client) GetLockedOutUsers(ctx context.Context, reqEditors ...RequestEdi
 
 // GetPermissionTargets List permission targets (v1)
 //
-// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
+// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
 //
 // Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16923,7 +16923,7 @@ func (c *Client) GetPermissionTargets(ctx context.Context, reqEditors ...Request
 
 // DeletePermissionTarget Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
+// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
 //
 // Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16941,7 +16941,7 @@ func (c *Client) DeletePermissionTarget(ctx context.Context, permissionTargetNam
 
 // GetPermissionTargetDetails Get a permission target (v1)
 //
-// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
+// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 //
 // Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -16959,7 +16959,7 @@ func (c *Client) GetPermissionTargetDetails(ctx context.Context, permissionTarge
 
 // CreateOrReplacePermissionTargetWithBody Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16979,7 +16979,7 @@ func (c *Client) CreateOrReplacePermissionTargetWithBody(ctx context.Context, pe
 
 // CreateOrReplacePermissionTarget Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16999,7 +16999,7 @@ func (c *Client) CreateOrReplacePermissionTarget(ctx context.Context, permission
 
 // CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type.
 //
@@ -17092,7 +17092,7 @@ func (c *Client) UnlockLockedOutUsers(ctx context.Context, body UnlockLockedOutU
 
 // UnlockLockedOutUser Unlock one user (path form)
 //
-// The older form the JFrog CLI still sends, with the user in the path and no body. Behaves like the array form for one user. Not in the oracle; from docs/research/09.
+// The older form, with the user in the path and no body. Behaves like the array form for one user.
 //
 // Corresponds with POST /api/security/unlockUsers/{userName} (the `UnlockLockedOutUser` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17165,7 +17165,7 @@ func (c *Client) ConfigureUserLockPolicy(ctx context.Context, body ConfigureUser
 
 // GetUsers List users (legacy)
 //
-// Lists every user with its detail URL and realm. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/users; kept because the JFrog CLI calls it. Not in the oracle; from docs/research/05.
+// Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET /access/api/v2/users.
 //
 // Corresponds with GET /api/security/users (the `GetUsers` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17221,7 +17221,7 @@ func (c *Client) ExpirePasswordForMultipleUsers(ctx context.Context, body Expire
 
 // UnexpirePasswordForSingleUser Unexpire a password
 //
-// Clears the forced password change for one user. Admin only. JFrog marks it slated for removal; kept for script compatibility.
+// Clears the forced password change for one user. Admin only.
 //
 // Corresponds with POST /api/security/users/authorization/unexpirePassword/{userName} (the `UnexpirePasswordForSingleUser` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17239,7 +17239,7 @@ func (c *Client) UnexpirePasswordForSingleUser(ctx context.Context, userName str
 
 // DeleteUser Delete a user (legacy)
 //
-// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400). Not in the oracle; from docs/research/05.
+// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).
 //
 // Corresponds with DELETE /api/security/users/{userName} (the `DeleteUser` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17257,7 +17257,7 @@ func (c *Client) DeleteUser(ctx context.Context, userName string, reqEditors ...
 
 // GetUserDetails Get a user (legacy)
 //
-// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
+// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.
 //
 // Corresponds with GET /api/security/users/{userName} (the `GetUserDetails` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17275,7 +17275,7 @@ func (c *Client) GetUserDetails(ctx context.Context, userName string, reqEditors
 
 // UpdateUserWithBody Update a user (legacy)
 //
-// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17295,7 +17295,7 @@ func (c *Client) UpdateUserWithBody(ctx context.Context, userName string, conten
 
 // UpdateUser Update a user (legacy)
 //
-// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17315,7 +17315,7 @@ func (c *Client) UpdateUser(ctx context.Context, userName string, body UpdateUse
 
 // UpdateUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody Update a user (legacy)
 //
-// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type.
 //
@@ -17335,7 +17335,7 @@ func (c *Client) UpdateUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlus
 
 // CreateOrReplaceUserWithBody Create or replace a user (legacy)
 //
-// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17355,7 +17355,7 @@ func (c *Client) CreateOrReplaceUserWithBody(ctx context.Context, userName strin
 
 // CreateOrReplaceUser Create or replace a user (legacy)
 //
-// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17375,7 +17375,7 @@ func (c *Client) CreateOrReplaceUser(ctx context.Context, userName string, body 
 
 // CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBody Create or replace a user (legacy)
 //
-// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type.
 //
@@ -17395,7 +17395,7 @@ func (c *Client) CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurit
 
 // CreateSignedUrlWithBody Create a signed download URL
 //
-// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17414,7 +17414,7 @@ func (c *Client) CreateSignedUrlWithBody(ctx context.Context, contentType string
 
 // CreateSignedUrl Create a signed download URL
 //
-// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17433,7 +17433,7 @@ func (c *Client) CreateSignedUrl(ctx context.Context, body CreateSignedUrlJSONRe
 
 // ReplaceSignedUrlKey Rotate the signed URL key
 //
-// Invalidates every signed URL by replacing the signing key. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would invalidate every signed URL by replacing the signing key.
 //
 // Corresponds with POST /api/signed/url/key (the `ReplaceSignedUrlKey` operationId).
 func (c *Client) ReplaceSignedUrlKey(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17450,7 +17450,7 @@ func (c *Client) ReplaceSignedUrlKey(ctx context.Context, reqEditors ...RequestE
 
 // GetStorageSummaryInfo Storage summary
 //
-// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
+// Returns the storage usage snapshot, computed on every request. Admin only.
 //
 // Corresponds with GET /api/storageinfo (the `GetStorageSummaryInfo` operationId).
 func (c *Client) GetStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17484,7 +17484,7 @@ func (c *Client) RefreshStorageSummaryInfo(ctx context.Context, reqEditors ...Re
 
 // CalculateSwiftIndex performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Swift ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Swift ecosystem; answers 501.
 func (c *Client) CalculateSwiftIndex(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateSwiftIndexRequest(c.Server, repoKey)
 	if err != nil {
@@ -17499,7 +17499,7 @@ func (c *Client) CalculateSwiftIndex(ctx context.Context, repoKey string, reqEdi
 
 // GetSystemInfo System information
 //
-// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. Artifactory prints JVM and host details here; the format is free text and no client parses it. Admin only.
+// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. The format is free text. Admin only.
 //
 // Corresponds with GET /api/system (the `GetSystemInfo` operationId).
 func (c *Client) GetSystemInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17516,7 +17516,7 @@ func (c *Client) GetSystemInfo(ctx context.Context, reqEditors ...RequestEditorF
 
 // GetReverseProxySnippet Generate an nginx snippet
 //
-// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered in v1; APACHE answers 400. Admin only.
+// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
 //
 // Corresponds with GET /api/system/configuration/reverseProxy/nginx (the `GetReverseProxySnippet` operationId).
 func (c *Client) GetReverseProxySnippet(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17533,7 +17533,7 @@ func (c *Client) GetReverseProxySnippet(ctx context.Context, reqEditors ...Reque
 
 // GetReverseProxyConfiguration Read the reverse proxy configuration
 //
-// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
 //
 // Corresponds with GET /api/system/configuration/webServer (the `GetReverseProxyConfiguration` operationId).
 func (c *Client) GetReverseProxyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17660,7 +17660,7 @@ func (c *Client) GetLoggerDebugLevel(ctx context.Context, className string, reqE
 
 // DeactivateArtifactoryKeyEncryption Deactivate key encryption
 //
-// In Artifactory this rewrites the configuration descriptor with clear-text secrets. artifactweave keeps secrets sealed at all times (decision 0017), so the call is accepted and answers DONE without changing anything; the descriptor export masks secrets regardless.
+// Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision 0017), and the descriptor export masks them regardless.
 //
 // Corresponds with POST /api/system/decrypt (the `DeactivateArtifactoryKeyEncryption` operationId).
 func (c *Client) DeactivateArtifactoryKeyEncryption(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17694,7 +17694,7 @@ func (c *Client) ActivateArtifactoryKeyEncryption(ctx context.Context, reqEditor
 
 // GetSystemLicense Licence information
 //
-// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
+// Returns the licence details of this server, which has no licence tiers. Admin only.
 //
 // Corresponds with GET /api/system/license (the `GetSystemLicense` operationId).
 func (c *Client) GetSystemLicense(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17711,7 +17711,7 @@ func (c *Client) GetSystemLicense(ctx context.Context, reqEditors ...RequestEdit
 
 // InstallLicenseWithBody Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17730,7 +17730,7 @@ func (c *Client) InstallLicenseWithBody(ctx context.Context, contentType string,
 
 // InstallLicense Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17749,7 +17749,7 @@ func (c *Client) InstallLicense(ctx context.Context, body InstallLicenseJSONRequ
 
 // DeleteHALicense Remove node licences
 //
-// Artifactory removes the licences whose hashes are listed. artifactweave has none to remove and answers with a per-hash message saying so, with status 200, so removal scripts do not fail. Admin only.
+// Removes the licences whose hashes are listed. The server holds none, so it answers 200 with a per-hash message saying so. Admin only.
 //
 // Corresponds with DELETE /api/system/licenses (the `DeleteHALicense` operationId).
 func (c *Client) DeleteHALicense(ctx context.Context, params *DeleteHALicenseParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17766,7 +17766,7 @@ func (c *Client) DeleteHALicense(ctx context.Context, params *DeleteHALicensePar
 
 // GetHALicenseInfo List node licences
 //
-// Artifactory lists one licence per cluster node. artifactweave is a single process and returns a one-element list describing itself, so tooling that iterates the list keeps working. Admin or a token scoped system:info/licenses:r.
+// Lists one licence per node. This instance is a single process and returns a one-element list describing itself. Admin or a token scoped system:info/licenses:r.
 //
 // Corresponds with GET /api/system/licenses (the `GetHALicenseInfo` operationId).
 func (c *Client) GetHALicenseInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17783,7 +17783,7 @@ func (c *Client) GetHALicenseInfo(ctx context.Context, reqEditors ...RequestEdit
 
 // InstallHALicensesWithBody Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17802,7 +17802,7 @@ func (c *Client) InstallHALicensesWithBody(ctx context.Context, contentType stri
 
 // InstallHALicenses Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17821,7 +17821,7 @@ func (c *Client) InstallHALicenses(ctx context.Context, body InstallHALicensesJS
 
 // GetClusterLocks List held locks
 //
-// Returns a snapshot of the leases artifactweave holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. In v1 the report covers the single running process; the response keeps Artifactory's multi-node shape. The snapshot is best effort, not transactional. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+// Returns a snapshot of the leases the server holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. The report covers the single running process in the multi-node shape. The snapshot is best effort, not transactional. Requires an administrator.
 //
 // Corresponds with GET /api/system/locks (the `GetClusterLocks` operationId).
 func (c *Client) GetClusterLocks(ctx context.Context, params *GetClusterLocksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17838,7 +17838,7 @@ func (c *Client) GetClusterLocks(ctx context.Context, params *GetClusterLocksPar
 
 // GetNodeLocks List locks held by this process
 //
-// Same as the lock snapshot but limited to the process that answers, without asking any other process. In v1 the two operations report the same leases. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+// Same as the lock snapshot but limited to the process that answers, without asking any other process. The two operations report the same leases. Requires an administrator.
 //
 // Corresponds with GET /api/system/locks/local (the `GetNodeLocks` operationId).
 func (c *Client) GetNodeLocks(ctx context.Context, params *GetNodeLocksParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17855,7 +17855,7 @@ func (c *Client) GetNodeLocks(ctx context.Context, params *GetNodeLocksParams, r
 
 // GetLiveLogsConfig Live Logs configuration (not supported)
 //
-// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/system/logs/config (the `GetLiveLogsConfig` operationId).
 func (c *Client) GetLiveLogsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17872,7 +17872,7 @@ func (c *Client) GetLiveLogsConfig(ctx context.Context, reqEditors ...RequestEdi
 
 // GetLiveLogsData Live Logs data (not supported)
 //
-// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/system/logs/data (the `GetLiveLogsData` operationId).
 func (c *Client) GetLiveLogsData(ctx context.Context, params *GetLiveLogsDataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17889,7 +17889,7 @@ func (c *Client) GetLiveLogsData(ctx context.Context, params *GetLiveLogsDataPar
 
 // StartSha256MigrationWithBody Start the SHA-256 migration
 //
-// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17908,7 +17908,7 @@ func (c *Client) StartSha256MigrationWithBody(ctx context.Context, contentType s
 
 // StartSha256Migration Start the SHA-256 migration
 //
-// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17927,7 +17927,7 @@ func (c *Client) StartSha256Migration(ctx context.Context, body StartSha256Migra
 
 // StopSha256Migration Stop the SHA-256 migration
 //
-// Pair of the start operation; there is no migration to stop and the operation answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with POST /api/system/migration/sha2/stop (the `StopSha256Migration` operationId).
 func (c *Client) StopSha256Migration(ctx context.Context, params *StopSha256MigrationParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17989,7 +17989,7 @@ func (c *Client) UnblockSystemReplication(ctx context.Context, params *UnblockSy
 
 // GetCertificates List client certificates
 //
-// Lists the client certificates remote repositories can present to upstreams. Admin only. The artifactory_certificate resource reads the list after every create and matches fingerPrint case-insensitively.
+// Lists the client certificates remote repositories can present to upstreams. Admin only.
 //
 // Corresponds with GET /api/system/security/certificates (the `GetCertificates` operationId).
 func (c *Client) GetCertificates(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18023,7 +18023,7 @@ func (c *Client) DeleteCertificate(ctx context.Context, certificateAlias string,
 
 // AddCertificateWithBody Add a client certificate
 //
-// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The documented request media type is application/text; text/plain is accepted as well.
+// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The request media type is application/text; text/plain is accepted as well.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18076,7 +18076,7 @@ func (c *Client) RunGarbageCollection(ctx context.Context, reqEditors ...Request
 
 // OptimizeSystemStorage Optimise storage
 //
-// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
+// Starts a repair pass on every blob mirror (decision 0028). Admin only. Returns a plain-text acknowledgement.
 //
 // Corresponds with POST /api/system/storage/optimize (the `OptimizeSystemStorage` operationId).
 func (c *Client) OptimizeSystemStorage(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18093,7 +18093,7 @@ func (c *Client) OptimizeSystemStorage(ctx context.Context, reqEditors ...Reques
 
 // StartPudProcessWithBody Start pruning unreferenced blobs
 //
-// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18112,7 +18112,7 @@ func (c *Client) StartPudProcessWithBody(ctx context.Context, contentType string
 
 // StartPudProcess Start pruning unreferenced blobs
 //
-// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -18165,7 +18165,7 @@ func (c *Client) StopPudProcess(ctx context.Context, reqEditors ...RequestEditor
 
 // CreateSupportBundleWithBody Create a support bundle
 //
-// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18184,7 +18184,7 @@ func (c *Client) CreateSupportBundleWithBody(ctx context.Context, contentType st
 
 // CreateSupportBundle Create a support bundle
 //
-// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -18203,7 +18203,7 @@ func (c *Client) CreateSupportBundle(ctx context.Context, body CreateSupportBund
 
 // DeleteSupportBundle Delete a support bundle
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with DELETE /api/system/support/bundle/{bundleId} (the `DeleteSupportBundle` operationId).
 func (c *Client) DeleteSupportBundle(ctx context.Context, bundleId BundleId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18220,7 +18220,7 @@ func (c *Client) DeleteSupportBundle(ctx context.Context, bundleId BundleId, req
 
 // GetSupportBundleMetadata Read support bundle metadata
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/system/support/bundle/{bundleId} (the `GetSupportBundleMetadata` operationId).
 func (c *Client) GetSupportBundleMetadata(ctx context.Context, bundleId BundleId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18237,7 +18237,7 @@ func (c *Client) GetSupportBundleMetadata(ctx context.Context, bundleId BundleId
 
 // GetSupportBundle Download a support bundle
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/system/support/bundle/{bundleId}/archive (the `GetSupportBundle` operationId).
 func (c *Client) GetSupportBundle(ctx context.Context, bundleId BundleId, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18254,7 +18254,7 @@ func (c *Client) GetSupportBundle(ctx context.Context, bundleId BundleId, reqEdi
 
 // ListSupportBundles List support bundles
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Corresponds with GET /api/system/support/bundles (the `ListSupportBundles` operationId).
 func (c *Client) ListSupportBundles(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18271,7 +18271,7 @@ func (c *Client) ListSupportBundles(ctx context.Context, reqEditors ...RequestEd
 
 // VerifyConnectionWithBody Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes any type of body and a specified content type.
 //
@@ -18290,7 +18290,7 @@ func (c *Client) VerifyConnectionWithBody(ctx context.Context, contentType strin
 
 // VerifyConnection Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -18307,7 +18307,7 @@ func (c *Client) VerifyConnection(ctx context.Context, body VerifyConnectionJSON
 	return c.Client.Do(req)
 }
 
-// GetSystemVersion Artifactory-compatible version
+// GetSystemVersion Compatibility version
 //
 // Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 //
@@ -18426,7 +18426,7 @@ func (c *Client) GetRetentionOperationsHistory(ctx context.Context, params *GetR
 
 // GetRetentionPolicyConfiguration Get release bundle retention configuration
 //
-// Returns the release bundle v1 retention configuration (decision 0023).
+// Returns the release bundle v1 retention configuration.
 //
 // Corresponds with GET /api/v1/bundle/retention/config (the `GetRetentionPolicyConfiguration` operationId).
 func (c *Client) GetRetentionPolicyConfiguration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18650,7 +18650,7 @@ func (c *Client) GetConfiguredRetentionPoliciesList(ctx context.Context, params 
 
 // GetOpenMetricsForArtifactory Prometheus metrics
 //
-// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope. artifactweave serves this regardless of licence tier.
+// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope.
 //
 // Corresponds with GET /api/v1/metrics (the `GetOpenMetricsForArtifactory` operationId).
 func (c *Client) GetOpenMetricsForArtifactory(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18665,9 +18665,9 @@ func (c *Client) GetOpenMetricsForArtifactory(ctx context.Context, reqEditors ..
 	return c.Client.Do(req)
 }
 
-// GetArtifactoryApplicationMetrics Application metrics (cloud)
+// GetArtifactoryApplicationMetrics Application metrics
 //
-// Artifactory Cloud exposes application-level metrics here. artifactweave serves the same metrics as `/api/v1/metrics` so dashboards written for either path work.
+// Exposes the same metrics as `/api/v1/metrics`, in the OpenMetrics text format.
 //
 // Corresponds with GET /api/v1/metrics/application (the `GetArtifactoryApplicationMetrics` operationId).
 func (c *Client) GetArtifactoryApplicationMetrics(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18684,7 +18684,7 @@ func (c *Client) GetArtifactoryApplicationMetrics(ctx context.Context, reqEditor
 
 // MigrateNpmRepositoryToStrictLayout performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
 //
-// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 func (c *Client) MigrateNpmRepositoryToStrictLayout(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMigrateNpmRepositoryToStrictLayoutRequest(c.Server, repoKey)
 	if err != nil {
@@ -18699,7 +18699,7 @@ func (c *Client) MigrateNpmRepositoryToStrictLayout(ctx context.Context, repoKey
 
 // ResumeNpmRepositoryMigration performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
 //
-// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. A conversion cannot be cancelled, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 func (c *Client) ResumeNpmRepositoryMigration(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewResumeNpmRepositoryMigrationRequest(c.Server, repoKey)
 	if err != nil {
@@ -18748,7 +18748,7 @@ func (c *Client) GetSystemReadiness(ctx context.Context, reqEditors ...RequestEd
 
 // GetUploadsConfig Multipart upload configuration
 //
-// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+// Reports whether multipart upload is available. With `supported` true a file is uploaded in parts through create, urlPart, complete and status; with false it is deployed in one request.
 //
 // Corresponds with GET /api/v1/uploads/config (the `GetUploadsConfig` operationId).
 func (c *Client) GetUploadsConfig(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18765,7 +18765,7 @@ func (c *Client) GetUploadsConfig(ctx context.Context, reqEditors ...RequestEdit
 
 // GetFederatedRepositoryStatusV2 Get federated repository sync status (version 2)
 //
-// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
 //
 // Corresponds with GET /api/v2/federation/status/repo/{repoKey} (the `GetFederatedRepositoryStatusV2` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -19384,7 +19384,7 @@ func (c *Client) GetPermissionTargetDetailsV2(ctx context.Context, permissionTar
 
 // PermissionTargetExistenceCheckV2 Check that a permission target exists (v2)
 //
-// 200 when the target exists, 404 when it does not, with no body. The artifactory_permission_target resource uses it before every create.
+// 200 when the target exists, 404 when it does not, with no body.
 //
 // Corresponds with HEAD /api/v2/security/permissions/{permissionTargetName} (the `PermissionTargetExistenceCheckV2` operationId).
 func (c *Client) PermissionTargetExistenceCheckV2(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19401,7 +19401,7 @@ func (c *Client) PermissionTargetExistenceCheckV2(ctx context.Context, permissio
 
 // CreatePermissionTargetV2WithBody Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19420,7 +19420,7 @@ func (c *Client) CreatePermissionTargetV2WithBody(ctx context.Context, permissio
 
 // CreatePermissionTargetV2 Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19439,7 +19439,7 @@ func (c *Client) CreatePermissionTargetV2(ctx context.Context, permissionTargetN
 
 // CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 //
@@ -19458,7 +19458,7 @@ func (c *Client) CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySe
 
 // CreateOrReplacePermissionTargetV2WithBody Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19477,7 +19477,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2WithBody(ctx context.Context, 
 
 // CreateOrReplacePermissionTargetV2 Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19496,7 +19496,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2(ctx context.Context, permissi
 
 // CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 //
@@ -19515,7 +19515,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArti
 
 // GetVcsBranches performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) GetVcsBranches(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVcsBranchesRequest(c.Server, repoKey, userOrg, repo)
 	if err != nil {
@@ -19530,7 +19530,7 @@ func (c *Client) GetVcsBranches(ctx context.Context, repoKey string, userOrg str
 
 // DownloadVcsBranchAlternative performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsBranchAlternativeRequest(c.Server, repoKey, userOrg, branchName, params)
 	if err != nil {
@@ -19545,7 +19545,7 @@ func (c *Client) DownloadVcsBranchAlternative(ctx context.Context, repoKey strin
 
 // DownloadVcsBranchFromSubgroupRepository performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsBranchFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsBranchFromSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, branchName, params)
 	if err != nil {
@@ -19560,7 +19560,7 @@ func (c *Client) DownloadVcsBranchFromSubgroupRepository(ctx context.Context, re
 
 // DownloadVcsBranch performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsBranchRequest(c.Server, repoKey, userOrg, repo, branchName, params)
 	if err != nil {
@@ -19575,7 +19575,7 @@ func (c *Client) DownloadVcsBranch(ctx context.Context, repoKey string, userOrg 
 
 // DownloadFileWithinVcsBranchAlternative performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsBranchAlternativeRequest(c.Server, repoKey, userOrg, branchName)
 	if err != nil {
@@ -19590,7 +19590,7 @@ func (c *Client) DownloadFileWithinVcsBranchAlternative(ctx context.Context, rep
 
 // DownloadFileInVcsBranchInSubgroupRepository performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileInVcsBranchInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, branchName)
 	if err != nil {
@@ -19605,7 +19605,7 @@ func (c *Client) DownloadFileInVcsBranchInSubgroupRepository(ctx context.Context
 
 // DownloadFileWithinVcsBranch performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadFileWithinVcsBranch(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsBranchRequest(c.Server, repoKey, userOrg, repo, branchName)
 	if err != nil {
@@ -19620,7 +19620,7 @@ func (c *Client) DownloadFileWithinVcsBranch(ctx context.Context, repoKey string
 
 // DownloadVcsCommit performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsCommit(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsCommitRequest(c.Server, repoKey, userOrg, repo, commitId, params)
 	if err != nil {
@@ -19635,7 +19635,7 @@ func (c *Client) DownloadVcsCommit(ctx context.Context, repoKey string, userOrg 
 
 // DownloadVcsRelease performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsRelease(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsReleaseRequest(c.Server, repoKey, userOrg, repo, releaseName, params)
 	if err != nil {
@@ -19650,7 +19650,7 @@ func (c *Client) DownloadVcsRelease(ctx context.Context, repoKey string, userOrg
 
 // DownloadVcsTagFromSubgroupRepository performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsTagFromSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsTagFromSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, tagName, params)
 	if err != nil {
@@ -19665,7 +19665,7 @@ func (c *Client) DownloadVcsTagFromSubgroupRepository(ctx context.Context, repoK
 
 // DownloadVcsTag performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsTagRequest(c.Server, repoKey, userOrg, repo, tagName, params)
 	if err != nil {
@@ -19680,7 +19680,7 @@ func (c *Client) DownloadVcsTag(ctx context.Context, repoKey string, userOrg str
 
 // DownloadVcsTagAlternative performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadVcsTagAlternativeRequest(c.Server, repoKey, userOrg, tagName, params)
 	if err != nil {
@@ -19695,7 +19695,7 @@ func (c *Client) DownloadVcsTagAlternative(ctx context.Context, repoKey string, 
 
 // DownloadFileInVcsTagInSubgroupRepository performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileInVcsTagInSubgroupRepositoryRequest(c.Server, repoKey, userOrg, repo, tagName)
 	if err != nil {
@@ -19710,7 +19710,7 @@ func (c *Client) DownloadFileInVcsTagInSubgroupRepository(ctx context.Context, r
 
 // DownloadFileWithinVcsTag performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsTagRequest(c.Server, repoKey, userOrg, repo, tagName)
 	if err != nil {
@@ -19725,7 +19725,7 @@ func (c *Client) DownloadFileWithinVcsTag(ctx context.Context, repoKey string, u
 
 // DownloadFileWithinVcsTagAlternative performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDownloadFileWithinVcsTagAlternativeRequest(c.Server, repoKey, userOrg, tagName)
 	if err != nil {
@@ -19740,7 +19740,7 @@ func (c *Client) DownloadFileWithinVcsTagAlternative(ctx context.Context, repoKe
 
 // GetVcsRefs performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) GetVcsRefs(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVcsRefsRequest(c.Server, repoKey, userOrg, repo)
 	if err != nil {
@@ -19755,7 +19755,7 @@ func (c *Client) GetVcsRefs(ctx context.Context, repoKey string, userOrg string,
 
 // GetVcsTags performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 func (c *Client) GetVcsTags(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetVcsTagsRequest(c.Server, repoKey, userOrg, repo)
 	if err != nil {
@@ -19770,7 +19770,7 @@ func (c *Client) GetVcsTags(ctx context.Context, repoKey string, userOrg string,
 
 // CalculateYumRepositoryMetadata performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the RPM/YUM ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the RPM/YUM ecosystem; answers 501.
 func (c *Client) CalculateYumRepositoryMetadata(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateYumRepositoryMetadataRequest(c.Server, repoKey, params)
 	if err != nil {
@@ -35260,14 +35260,14 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateAlpineRepositoryMetadataWithResponse performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Alpine ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Alpine ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateAlpineRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateAlpineRepositoryMetadataResponse, error)
 
 	// RetrieveBuildArtifactsArchiveWithBodyWithResponse Build artifacts archive
 	//
-	// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+	// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35276,7 +35276,7 @@ type ClientWithResponsesInterface interface {
 
 	// RetrieveBuildArtifactsArchiveWithResponse Build artifacts archive
 	//
-	// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+	// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35285,7 +35285,7 @@ type ClientWithResponsesInterface interface {
 
 	// RetrieveBuildArtifactsArchiveWithApplicationVndOrgJfrogArtifactoryBuildBuildArtifactsRequestPlusJSONBodyWithResponse Build artifacts archive
 	//
-	// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+	// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.BuildArtifactsRequest+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35294,7 +35294,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllSmartArchivingPoliciesWithResponse List smart archiving policies
 	//
-	// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects. In Artifactory this API exists on Cloud from 7.111; artifactweave serves it on every install.
+	// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35384,7 +35384,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSmartArchivingPolicyWithBodyWithResponse Create a smart archiving policy
 	//
-	// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+	// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35393,7 +35393,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSmartArchivingPolicyWithResponse Create a smart archiving policy
 	//
-	// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+	// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35465,7 +35465,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExportRepositoryWithMetadataWithBodyWithResponse Export a repository (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35474,7 +35474,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExportRepositoryWithMetadataWithResponse Export a repository (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35483,7 +35483,7 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Bower ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error)
@@ -35498,7 +35498,7 @@ type ClientWithResponsesInterface interface {
 	// UploadBuildWithBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UploadBuildWithBodyWithResponse(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
@@ -35506,13 +35506,13 @@ type ClientWithResponsesInterface interface {
 	// UploadBuildWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 	UploadBuildWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
 
 	// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 	UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
 
 	// AppendBuildWithBodyWithResponse performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
@@ -35546,7 +35546,7 @@ type ClientWithResponsesInterface interface {
 	// PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	PromoteBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
@@ -35554,13 +35554,13 @@ type ClientWithResponsesInterface interface {
 	// PromoteBuildWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 	PromoteBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
 
 	// PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+	// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 	PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error)
 
 	// RenameBuildWithResponse performs a POST /api/build/rename/{buildName} (the `RenameBuild` operationId) request.
@@ -35607,21 +35607,21 @@ type ClientWithResponsesInterface interface {
 
 	// GetBuildArtifactsWithResponse performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
 	//
-	// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+	// Lists where each artifact of a run is stored. Needs read permission on the build.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetBuildArtifactsWithResponse(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*GetBuildArtifactsResponse, error)
 
 	// CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Cargo ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error)
 
 	// SetItemSha256ChecksumWithBodyWithResponse Attach the sha256 property
 	//
-	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35630,7 +35630,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetItemSha256ChecksumWithResponse Attach the sha256 property
 	//
-	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+	// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35639,7 +35639,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllBuildCleanupPoliciesWithResponse List build cleanup policies
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every build cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35648,7 +35648,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteBuildCleanupPolicyWithResponse Delete a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35657,7 +35657,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetBuildCleanupPolicyWithResponse Get a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one build cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35666,7 +35666,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateBuildCleanupPolicyWithBodyWithResponse Create a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35675,7 +35675,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateBuildCleanupPolicyWithResponse Create a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35684,7 +35684,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateBuildCleanupPolicyWithBodyWithResponse Replace a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35693,7 +35693,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateBuildCleanupPolicyWithResponse Replace a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35702,7 +35702,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableDisableBuildCleanupPolicyWithBodyWithResponse Enable or disable a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35711,7 +35711,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableDisableBuildCleanupPolicyWithResponse Enable or disable a build cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35720,7 +35720,7 @@ type ClientWithResponsesInterface interface {
 
 	// RunBuildCleanupPolicyWithResponse Run a build cleanup policy now
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects builds and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35729,7 +35729,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllReleaseBundleCleanupPoliciesWithResponse List release bundle cleanup policies
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every release bundle cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35738,7 +35738,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteReleaseBundleCleanupPolicyWithResponse Delete a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35747,7 +35747,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReleaseBundleCleanupPolicyWithResponse Get a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one release bundle cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35756,7 +35756,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateReleaseBundleCleanupPolicyWithBodyWithResponse Create a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35765,7 +35765,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateReleaseBundleCleanupPolicyWithResponse Create a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35774,7 +35774,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateReleaseBundleCleanupPolicyWithBodyWithResponse Replace a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35783,7 +35783,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateReleaseBundleCleanupPolicyWithResponse Replace a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35792,7 +35792,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableDisableReleaseBundleCleanupPolicyWithBodyWithResponse Enable or disable a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35801,7 +35801,7 @@ type ClientWithResponsesInterface interface {
 
 	// EnableDisableReleaseBundleCleanupPolicyWithResponse Enable or disable a release bundle cleanup policy
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35810,7 +35810,7 @@ type ClientWithResponsesInterface interface {
 
 	// RunReleaseBundleCleanupPolicyWithResponse Run a release bundle cleanup policy now
 	//
-	// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects release bundle versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35819,7 +35819,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllPackageCleanupPoliciesWithResponse List package cleanup policies
 	//
-	// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by artifactweave's in-process scheduler over the package index (decisions 0010 and 0018).
+	// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by the in-process scheduler over the package index.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35828,7 +35828,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePackageCleanupPolicyWithResponse Delete a package cleanup policy
 	//
-	// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -35846,7 +35846,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePackageCleanupPolicyWithBodyWithResponse Create a package cleanup policy
 	//
-	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35855,7 +35855,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePackageCleanupPolicyWithResponse Create a package cleanup policy
 	//
-	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+	// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -35990,28 +35990,28 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCocoaPodsIndexWithResponse performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the CocoaPods ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the CocoaPods ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCocoaPodsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCocoaPodsIndexResponse, error)
 
 	// CalculateConanRepositoryMetadataWithResponse performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Conan ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Conan ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateConanRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateConanRepositoryMetadataResponse, error)
 
 	// CalculateCondaRepositoryMetadataWithResponse performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Conda ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Conda ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCondaRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCondaRepositoryMetadataResponse, error)
 
 	// GetChecksumReplicationWithResponse performs a GET /api/config/storage/checksumReplication (the `GetChecksumReplication` operationId) request.
 	//
-	// Reads the checksum replication settings of this instance. Not supported in v1: artifactweave has no storage-level replication, so the operation answers 501.
+	// Not implemented; answers 501. It would read the checksum replication settings of this instance.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetChecksumReplicationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetChecksumReplicationResponse, error)
@@ -36019,7 +36019,7 @@ type ClientWithResponsesInterface interface {
 	// ConfigureChecksumReplicationWithBodyWithResponse performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Configures checksum replication on this instance. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would configure checksum replication on this instance.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	ConfigureChecksumReplicationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfigureChecksumReplicationResponse, error)
@@ -36027,26 +36027,26 @@ type ClientWithResponsesInterface interface {
 	// ConfigureChecksumReplicationWithResponse performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Configures checksum replication on this instance. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would configure checksum replication on this instance.
 	ConfigureChecksumReplicationWithResponse(ctx context.Context, body ConfigureChecksumReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfigureChecksumReplicationResponse, error)
 
 	// CalculateCranRepositoryMetadataWithResponse performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the CRAN ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCranRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCranRepositoryMetadataResponse, error)
 
 	// MoveCranArchivesWithResponse performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the CRAN ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	MoveCranArchivesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MoveCranArchivesResponse, error)
 
 	// GetCurationInterfaceSettingsWithResponse Curation settings (not supported)
 	//
-	// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36055,7 +36055,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCurationInterfaceSettingsWithBodyWithResponse Update Curation settings (not supported)
 	//
-	// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36064,7 +36064,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateCurationInterfaceSettingsWithResponse Update Curation settings (not supported)
 	//
-	// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36073,14 +36073,14 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateCachedRemoteDebianRepositoryCoordinatesWithResponse performs a POST /api/deb/indexCached/{repoKey} (the `CalculateCachedRemoteDebianRepositoryCoordinates` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateCachedRemoteDebianRepositoryCoordinatesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCachedRemoteDebianRepositoryCoordinatesResponse, error)
 
 	// CalculateDebianRepositoryMetadataWithResponse performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateDebianRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateDebianRepositoryMetadataResponse, error)
@@ -36088,7 +36088,7 @@ type ClientWithResponsesInterface interface {
 	// CreateDebianSnapshotWithBodyWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CreateDebianSnapshotWithBodyWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error)
@@ -36096,12 +36096,12 @@ type ClientWithResponsesInterface interface {
 	// CreateDebianSnapshotWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Debian ecosystem; answers 501.
 	CreateDebianSnapshotWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error)
 
 	// DeleteRedundantRecordsToTrashCanDirectoriesWithBodyWithResponse Compact trash can directory records
 	//
-	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36110,16 +36110,16 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRedundantRecordsToTrashCanDirectoriesWithResponse Compact trash can directory records
 	//
-	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+	// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/deleteDirectoryTrashProperty/start (the `DeleteRedundantRecordsToTrashCanDirectories` operationId).
 	DeleteRedundantRecordsToTrashCanDirectoriesWithResponse(ctx context.Context, body DeleteRedundantRecordsToTrashCanDirectoriesJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteRedundantRecordsToTrashCanDirectoriesResponse, error)
 
-	// DistributeArtifactWithBodyWithResponse Distribute to Bintray (retired)
+	// DistributeArtifactWithBodyWithResponse Distribute to Bintray
 	//
-	// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36128,9 +36128,9 @@ type ClientWithResponsesInterface interface {
 	// Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
 	DistributeArtifactWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DistributeArtifactResponse, error)
 
-	// DistributeArtifactWithResponse Distribute to Bintray (retired)
+	// DistributeArtifactWithResponse Distribute to Bintray
 	//
-	// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36142,7 +36142,7 @@ type ClientWithResponsesInterface interface {
 	// FindParentManifestListsWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	FindParentManifestListsWithBodyWithResponse(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error)
@@ -36150,13 +36150,13 @@ type ClientWithResponsesInterface interface {
 	// FindParentManifestListsWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+	// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 	FindParentManifestListsWithResponse(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error)
 
 	// PromoteDockerImageWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	PromoteDockerImageWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error)
@@ -36164,13 +36164,13 @@ type ClientWithResponsesInterface interface {
 	// PromoteDockerImageWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+	// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 	PromoteDockerImageWithResponse(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error)
 
 	// DeleteDockerTagWithBodyWithResponse performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+	// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DeleteDockerTagWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteDockerTagResponse, error)
@@ -36178,12 +36178,12 @@ type ClientWithResponsesInterface interface {
 	// DeleteDockerTagWithResponse performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+	// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 	DeleteDockerTagWithResponse(ctx context.Context, repoKey string, body DeleteDockerTagJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteDockerTagResponse, error)
 
 	// GetExportSystemSettingsExampleWithResponse Export settings example (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36192,7 +36192,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExportSystemWithBodyWithResponse Export the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36201,7 +36201,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExportSystemWithResponse Export the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36210,7 +36210,7 @@ type ClientWithResponsesInterface interface {
 
 	// ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONBodyWithResponse Export the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.system.ExportSettings+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36327,7 +36327,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReconnectToFederationClientWithResponse Reconnect the federation sync worker
 	//
-	// Re-establishes the link between the repository service and the federation sync worker. In Artifactory the worker is the separate Artifactory Federation Service (RTFS), reached over gRPC; a health-check job reconnects it automatically (every 80 seconds by default) and this call does it on demand, for example when the service was unavailable at startup. artifactweave runs the sync worker inside the server process, so the call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
+	// Re-establishes the link between the repository service and the federation sync worker, which runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36336,7 +36336,7 @@ type ClientWithResponsesInterface interface {
 
 	// FederationRecoveryWithResponse Recover exhausted federation queues
 	//
-	// Clears the error state of outgoing event queues that exhausted their retries (six attempts by default in Artifactory), so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
+	// Clears the error state of outgoing event queues that exhausted their retries, so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36374,7 +36374,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetFederationConnectionDetailsWithResponse Get federated repository connection state
 	//
-	// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring. Artifactory serves this operation only when its standalone Federation Service (RTFS) is enabled and answers 405 otherwise; artifactweave always serves it.
+	// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36394,7 +36394,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetFederatedRepositoryStatusWithResponse Get federated repository sync status
 	//
-	// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+	// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36434,14 +36434,14 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the RubyGems ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the RubyGems ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateRubyGemsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateRubyGemsIndexResponse, error)
 
 	// GetRubyGemVersionListWithResponse List gem versions
 	//
-	// Returns the versions of one gem in the rubygems.org versions format. Gems are outside the v1 ecosystem scope (research 10). artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36511,7 +36511,7 @@ type ClientWithResponsesInterface interface {
 
 	// ImportRepositoryContentWithResponse Import repository content (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Upload content with the deploy API or the JFrog CLI instead.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36520,7 +36520,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetImportSystemSettingsExampleWithResponse Import settings example (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36529,7 +36529,7 @@ type ClientWithResponsesInterface interface {
 
 	// FullSystemImportWithBodyWithResponse Import the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36538,7 +36538,7 @@ type ClientWithResponsesInterface interface {
 
 	// FullSystemImportWithResponse Import the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36547,7 +36547,7 @@ type ClientWithResponsesInterface interface {
 
 	// FullSystemImportWithApplicationVndOrgJfrogArtifactorySystemImportSettingsPlusJSONBodyWithResponse Import the system (not supported)
 	//
-	// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+	// Not implemented; answers 501.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.system.ImportSettings+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36563,7 +36563,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReindexMetadataServerWithBodyWithResponse Reindex the metadata service
 	//
-	// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+	// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36572,7 +36572,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReindexMetadataServerWithResponse Reindex the metadata service
 	//
-	// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+	// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36581,21 +36581,21 @@ type ClientWithResponsesInterface interface {
 
 	// GetNpmAuthWithResponse performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
 	//
-	// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent, as Artifactory stopped sending both in 7.161.26. Needs an authenticated caller. JFrog's 7.x documentation, as archived in 2025, showed the operation with an example answer whose _auth encodes the user name and the user's encrypted password rather than the password sent. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent. Needs an authenticated caller.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetNpmAuthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNpmAuthResponse, error)
 
 	// GetNpmScopeAuthWithResponse performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
 	//
-	// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog's 7.x documentation, as archived in 2025, showed the operation with the scope given without its @ and an example answer whose credential lines are _password and username rather than _auth, with the email and always-auth lines that 7.161.26 dropped. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+	// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetNpmScopeAuthWithResponse(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*GetNpmScopeAuthResponse, error)
 
 	// CalculateNpmRepositoryMetadataWithResponse performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 	//
-	// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
+	// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Package metadata is derived from the index, so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateNpmRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNpmRepositoryMetadataResponse, error)
@@ -36609,42 +36609,42 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateOpkgRepositoryMetadataWithResponse performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Opkg ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Opkg ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateOpkgRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateOpkgRepositoryMetadataResponse, error)
 
 	// CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Pub ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Pub ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error)
 
 	// GetPuppetModulesWithResponse performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetModulesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetModulesResponse, error)
 
 	// GetPuppetModuleInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetModuleInfoWithResponse(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*GetPuppetModuleInfoResponse, error)
 
 	// GetPuppetReleasesWithResponse performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetReleasesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetReleasesResponse, error)
 
 	// GetPuppetReleaseInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Puppet ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetPuppetReleaseInfoWithResponse(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*GetPuppetReleaseInfoResponse, error)
@@ -36672,7 +36672,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllBundlesWithResponse List release bundles
 	//
-	// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge (decision 0023). Only bundles the caller may read are returned.
+	// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge. Only bundles the caller may read are returned.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36699,7 +36699,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReleaseBundleVersionWithResponse Get a release bundle version
 	//
-	// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content (decision 0023).
+	// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36735,14 +36735,14 @@ type ClientWithResponsesInterface interface {
 
 	// CloseEventBasedPullReplicationChannelsWithResponse performs a POST /api/replications/channels/release (the `CloseEventBasedPullReplicationChannels` operationId) request.
 	//
-	// Closes every event-based pull replication channel other instances hold open against this one, forcing them to reconnect. Event-based replication is not supported in v1; the operation answers 501.
+	// Not implemented; answers 501. It would close every event-based pull replication channel other instances hold open against this one, forcing them to reconnect.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CloseEventBasedPullReplicationChannelsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CloseEventBasedPullReplicationChannelsResponse, error)
 
 	// GetRemoteRepositoriesRegisteredForReplicationWithResponse performs a GET /api/replications/channels/{repoKey} (the `GetRemoteRepositoriesRegisteredForReplication` operationId) request.
 	//
-	// Lists the remote instances subscribed to a local repository for event-based pull replication. Event-based replication is not supported in v1; the operation answers 501.
+	// Not implemented; answers 501. It would list the remote instances subscribed to a local repository for event-based pull replication.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetRemoteRepositoriesRegisteredForReplicationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetRemoteRepositoriesRegisteredForReplicationResponse, error)
@@ -36750,7 +36750,7 @@ type ClientWithResponsesInterface interface {
 	// UpdateMultiPushReplicationWithBodyWithResponse performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+	// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UpdateMultiPushReplicationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMultiPushReplicationResponse, error)
@@ -36758,13 +36758,13 @@ type ClientWithResponsesInterface interface {
 	// UpdateMultiPushReplicationWithResponse performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+	// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 	UpdateMultiPushReplicationWithResponse(ctx context.Context, repoKey string, body UpdateMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMultiPushReplicationResponse, error)
 
 	// CreateOrReplaceMultiPushReplicationWithBodyWithResponse performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CreateOrReplaceMultiPushReplicationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrReplaceMultiPushReplicationResponse, error)
@@ -36772,7 +36772,7 @@ type ClientWithResponsesInterface interface {
 	// CreateOrReplaceMultiPushReplicationWithResponse performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+	// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 	CreateOrReplaceMultiPushReplicationWithResponse(ctx context.Context, repoKey string, body CreateOrReplaceMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplaceMultiPushReplicationResponse, error)
 
 	// DeleteRepositoryReplicationConfigurationWithResponse performs a DELETE /api/replications/{repoKey} (the `DeleteRepositoryReplicationConfiguration` operationId) request.
@@ -36792,7 +36792,7 @@ type ClientWithResponsesInterface interface {
 	// UpdateRepositoryReplicationConfigurationWithBodyWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UpdateRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error)
@@ -36800,13 +36800,13 @@ type ClientWithResponsesInterface interface {
 	// UpdateRepositoryReplicationConfigurationWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+	// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 	UpdateRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error)
 
 	// SetRepositoryReplicationConfigurationWithBodyWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SetRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error)
@@ -36814,7 +36814,7 @@ type ClientWithResponsesInterface interface {
 	// SetRepositoryReplicationConfigurationWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+	// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 	SetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error)
 
 	// GetRepositoriesByTypeAndProjectWithResponse List repositories
@@ -36846,7 +36846,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRemoteRepositoryConfigurationWithResponse Shared remote repository configuration (deprecated)
 	//
-	// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated by Artifactory in favour of the ordinary read; kept so old clients keep working. Non-admin callers get the sanitised view only.
+	// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -36875,7 +36875,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36884,7 +36884,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36893,7 +36893,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36902,7 +36902,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36911,7 +36911,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36920,7 +36920,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 	//
-	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+	// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36929,7 +36929,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36938,7 +36938,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36947,7 +36947,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36956,7 +36956,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36965,7 +36965,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36974,7 +36974,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 	//
-	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+	// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -36992,7 +36992,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetAllArchivePoliciesWithResponse List cold storage archive policies
 	//
-	// Returns every cold storage archive policy with its run state. Platform administrators only. In Artifactory this API needs an Enterprise licence and a separate cold instance; artifactweave serves it on every install against its cold tier.
+	// Returns every cold storage archive policy with its run state. Platform administrators only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37001,7 +37001,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConvertSearchCriteriaToAqlWithBodyWithResponse Convert a search criteria form to AQL
 	//
-	// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+	// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37010,7 +37010,7 @@ type ClientWithResponsesInterface interface {
 
 	// ConvertSearchCriteriaToAqlWithTextBodyWithResponse Convert a search criteria form to AQL
 	//
-	// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+	// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 	//
 	// Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37172,7 +37172,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchArchiveWithResponse performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 	//
-	// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
+	// Not implemented; answers 501. It would find entries inside archives by member name; use AQL instead.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchArchiveWithResponse(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*SearchArchiveResponse, error)
@@ -37248,14 +37248,14 @@ type ClientWithResponsesInterface interface {
 
 	// SearchLatestVersionWithResponse performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 	//
-	// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
+	// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury version ordering to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. The response is the bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchLatestVersionWithResponse(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*SearchLatestVersionResponse, error)
 
 	// SearchLicenseWithResponse performs a GET /api/search/license (the `SearchLicense` operationId) request.
 	//
-	// Finds items whose licence properties match the requested statuses. artifactweave reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
+	// Finds items whose licence properties match the requested statuses. The search reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchLicenseWithResponse(ctx context.Context, params *SearchLicenseParams, reqEditors ...RequestEditorFn) (*SearchLicenseResponse, error)
@@ -37283,14 +37283,14 @@ type ClientWithResponsesInterface interface {
 
 	// SearchVersionsWithResponse performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 	//
-	// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
+	// Lists every version of a module found through the repository layout, newest first in the Mercury version ordering. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchVersionsWithResponse(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*SearchVersionsResponse, error)
 
 	// RevokeApiKeyWithResponse Revoke the caller's API key
 	//
-	// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so artifactweave answers 200 with an informational message for compatibility with scripts that call it unconditionally.
+	// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37301,7 +37301,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetApiKeyWithResponse Get the caller's API key (always absent)
 	//
-	// Returns the caller's API key. Because artifactweave never issues keys this always answers 404, which is the documented response when no key exists; the JFrog CLI treats it as "no key".
+	// Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the response for a user without a key.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37312,7 +37312,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateApiKeyWithResponse Create an API key (disabled)
 	//
-	// Legacy API-key creation. Artifactory disables it by default since 7.98 and the keys reached end of life; artifactweave always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead. jfrog-client-go expects 201 on success, which never happens here.
+	// Legacy API-key creation, which is disabled. Always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37323,7 +37323,7 @@ type ClientWithResponsesInterface interface {
 
 	// RegenerateApiKeyWithResponse Regenerate an API key (disabled)
 	//
-	// Legacy key rotation. artifactweave answers 400 "API key creation is disabled" because no user ever holds a key.
+	// Legacy key rotation, which is disabled. Always answers 400 "API key creation is disabled"; no user holds a key.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37345,7 +37345,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPasswordExpirationPolicyWithResponse Get the password expiration policy
 	//
-	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
+	// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37356,7 +37356,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetPasswordExpirationPolicyWithBodyWithResponse Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+	// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37367,7 +37367,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetPasswordExpirationPolicyWithResponse Set the password expiration policy
 	//
-	// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+	// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37378,7 +37378,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUserEncryptedPasswordWithResponse Get an encrypted form of the caller's password
 	//
-	// Artifactory returns an opaque encrypted password that clients can use in place of the clear-text one. artifactweave returns a reference token bound to the caller instead, which every client accepts wherever the encrypted password was accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
+	// Returns a reference token bound to the caller, usable in place of the clear-text password wherever an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37389,7 +37389,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetGroupsWithResponse List groups (legacy)
 	//
-	// Lists every group with its detail URL. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/groups; kept for the JFrog CLI. Not in the oracle; from docs/research/05.
+	// Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37400,7 +37400,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteGroupWithResponse Delete a group (legacy)
 	//
-	// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400). Not in the oracle; from docs/research/05.
+	// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37411,7 +37411,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetGroupDetailsWithResponse Get a group (legacy)
 	//
-	// Returns the legacy group document. Admin only. Members are included only when includeUsers=true; the Terraform provider always sends the parameter. Not in the oracle; from docs/research/05.
+	// Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37422,7 +37422,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGroupWithBodyWithResponse Update a group (legacy)
 	//
-	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37433,7 +37433,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGroupWithResponse Update a group (legacy)
 	//
-	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37444,7 +37444,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBodyWithResponse Update a group (legacy)
 	//
-	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37455,7 +37455,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplaceGroupWithBodyWithResponse Create or replace a group (legacy)
 	//
-	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37466,7 +37466,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplaceGroupWithResponse Create or replace a group (legacy)
 	//
-	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37477,7 +37477,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplaceGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBodyWithResponse Create or replace a group (legacy)
 	//
-	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+	// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37497,7 +37497,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateKeyPairWithBodyWithResponse Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37506,7 +37506,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateKeyPairWithResponse Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37569,7 +37569,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetKeyPairWithResponse Get a key pair
 	//
-	// Returns the readable projection of one pair. Admin only. The Terraform provider reads this after every create.
+	// Returns the readable projection of one pair. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37578,7 +37578,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetTrustedKeysWithResponse List trusted public keys
 	//
-	// Lists the public keys trusted for release-bundle signature verification. Admin only. Served so the artifactory_distribution_public_key resource can read back what it created; release bundles themselves are out of scope in v1. Not in the oracle; shape from docs/research/05 and the provider source.
+	// Lists the public keys trusted for release-bundle signature verification. Admin only. Release bundles themselves are not served.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37587,7 +37587,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDistributionPublicGpgKeyWithBodyWithResponse Add a trusted public key
 	//
-	// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+	// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37596,7 +37596,7 @@ type ClientWithResponsesInterface interface {
 
 	// SetDistributionPublicGpgKeyWithResponse Add a trusted public key
 	//
-	// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+	// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37605,7 +37605,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteTrustedKeyWithResponse Delete a trusted public key
 	//
-	// Removes a trusted key by its kid. Admin only. Answers 204; the provider accepts 200 or 204. Not in the oracle; from docs/research/05.
+	// Removes a trusted key by its kid. Admin only. Answers 204.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37614,7 +37614,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetLockedOutUsersWithResponse List locked-out users
 	//
-	// Returns the names of users locked by the user lock policy. Admin only. The JFrog CLI prints this list for jf rt users-locked style commands.
+	// Returns the names of users locked by the user lock policy. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37623,7 +37623,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetsWithResponse List permission targets (v1)
 	//
-	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
+	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37634,7 +37634,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePermissionTargetWithResponse Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
+	// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37645,7 +37645,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetDetailsWithResponse Get a permission target (v1)
 	//
-	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
+	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37656,7 +37656,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetWithBodyWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37667,7 +37667,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37678,7 +37678,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37727,7 +37727,7 @@ type ClientWithResponsesInterface interface {
 
 	// UnlockLockedOutUserWithResponse Unlock one user (path form)
 	//
-	// The older form the JFrog CLI still sends, with the user in the path and no body. Behaves like the array form for one user. Not in the oracle; from docs/research/09.
+	// The older form, with the user in the path and no body. Behaves like the array form for one user.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37765,7 +37765,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUsersWithResponse List users (legacy)
 	//
-	// Lists every user with its detail URL and realm. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/users; kept because the JFrog CLI calls it. Not in the oracle; from docs/research/05.
+	// Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET /access/api/v2/users.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37794,7 +37794,7 @@ type ClientWithResponsesInterface interface {
 
 	// UnexpirePasswordForSingleUserWithResponse Unexpire a password
 	//
-	// Clears the forced password change for one user. Admin only. JFrog marks it slated for removal; kept for script compatibility.
+	// Clears the forced password change for one user. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37805,7 +37805,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteUserWithResponse Delete a user (legacy)
 	//
-	// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400). Not in the oracle; from docs/research/05.
+	// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37816,7 +37816,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUserDetailsWithResponse Get a user (legacy)
 	//
-	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
+	// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37827,7 +37827,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateUserWithBodyWithResponse Update a user (legacy)
 	//
-	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37838,7 +37838,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateUserWithResponse Update a user (legacy)
 	//
-	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37849,7 +37849,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBodyWithResponse Update a user (legacy)
 	//
-	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+	// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37860,7 +37860,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplaceUserWithBodyWithResponse Create or replace a user (legacy)
 	//
-	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37871,7 +37871,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplaceUserWithResponse Create or replace a user (legacy)
 	//
-	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37882,7 +37882,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBodyWithResponse Create or replace a user (legacy)
 	//
-	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+	// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37893,7 +37893,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSignedUrlWithBodyWithResponse Create a signed download URL
 	//
-	// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37902,7 +37902,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSignedUrlWithResponse Create a signed download URL
 	//
-	// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37911,7 +37911,7 @@ type ClientWithResponsesInterface interface {
 
 	// ReplaceSignedUrlKeyWithResponse Rotate the signed URL key
 	//
-	// Invalidates every signed URL by replacing the signing key. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+	// Not implemented; answers 501. It would invalidate every signed URL by replacing the signing key.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37920,7 +37920,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetStorageSummaryInfoWithResponse Storage summary
 	//
-	// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
+	// Returns the storage usage snapshot, computed on every request. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37938,14 +37938,14 @@ type ClientWithResponsesInterface interface {
 
 	// CalculateSwiftIndexWithResponse performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the Swift ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the Swift ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateSwiftIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateSwiftIndexResponse, error)
 
 	// GetSystemInfoWithResponse System information
 	//
-	// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. Artifactory prints JVM and host details here; the format is free text and no client parses it. Admin only.
+	// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. The format is free text. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37954,7 +37954,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReverseProxySnippetWithResponse Generate an nginx snippet
 	//
-	// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered in v1; APACHE answers 400. Admin only.
+	// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37963,7 +37963,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 	//
-	// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+	// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38026,7 +38026,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeactivateArtifactoryKeyEncryptionWithResponse Deactivate key encryption
 	//
-	// In Artifactory this rewrites the configuration descriptor with clear-text secrets. artifactweave keeps secrets sealed at all times (decision 0017), so the call is accepted and answers DONE without changing anything; the descriptor export masks secrets regardless.
+	// Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision 0017), and the descriptor export masks them regardless.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38044,7 +38044,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSystemLicenseWithResponse Licence information
 	//
-	// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
+	// Returns the licence details of this server, which has no licence tiers. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38053,7 +38053,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallLicenseWithBodyWithResponse Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+	// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38062,7 +38062,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallLicenseWithResponse Install a licence key
 	//
-	// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+	// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38071,7 +38071,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteHALicenseWithResponse Remove node licences
 	//
-	// Artifactory removes the licences whose hashes are listed. artifactweave has none to remove and answers with a per-hash message saying so, with status 200, so removal scripts do not fail. Admin only.
+	// Removes the licences whose hashes are listed. The server holds none, so it answers 200 with a per-hash message saying so. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38080,7 +38080,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetHALicenseInfoWithResponse List node licences
 	//
-	// Artifactory lists one licence per cluster node. artifactweave is a single process and returns a one-element list describing itself, so tooling that iterates the list keeps working. Admin or a token scoped system:info/licenses:r.
+	// Lists one licence per node. This instance is a single process and returns a one-element list describing itself. Admin or a token scoped system:info/licenses:r.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38089,7 +38089,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallHALicensesWithBodyWithResponse Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+	// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38098,7 +38098,7 @@ type ClientWithResponsesInterface interface {
 
 	// InstallHALicensesWithResponse Install node licences
 	//
-	// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+	// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38107,7 +38107,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetClusterLocksWithResponse List held locks
 	//
-	// Returns a snapshot of the leases artifactweave holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. In v1 the report covers the single running process; the response keeps Artifactory's multi-node shape. The snapshot is best effort, not transactional. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+	// Returns a snapshot of the leases the server holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. The report covers the single running process in the multi-node shape. The snapshot is best effort, not transactional. Requires an administrator.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38116,7 +38116,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetNodeLocksWithResponse List locks held by this process
 	//
-	// Same as the lock snapshot but limited to the process that answers, without asking any other process. In v1 the two operations report the same leases. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+	// Same as the lock snapshot but limited to the process that answers, without asking any other process. The two operations report the same leases. Requires an administrator.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38125,7 +38125,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetLiveLogsConfigWithResponse Live Logs configuration (not supported)
 	//
-	// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38134,7 +38134,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetLiveLogsDataWithResponse Live Logs data (not supported)
 	//
-	// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38143,7 +38143,7 @@ type ClientWithResponsesInterface interface {
 
 	// StartSha256MigrationWithBodyWithResponse Start the SHA-256 migration
 	//
-	// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+	// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38152,7 +38152,7 @@ type ClientWithResponsesInterface interface {
 
 	// StartSha256MigrationWithResponse Start the SHA-256 migration
 	//
-	// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+	// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38161,7 +38161,7 @@ type ClientWithResponsesInterface interface {
 
 	// StopSha256MigrationWithResponse Stop the SHA-256 migration
 	//
-	// Pair of the start operation; there is no migration to stop and the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38191,7 +38191,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetCertificatesWithResponse List client certificates
 	//
-	// Lists the client certificates remote repositories can present to upstreams. Admin only. The artifactory_certificate resource reads the list after every create and matches fingerPrint case-insensitively.
+	// Lists the client certificates remote repositories can present to upstreams. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38209,7 +38209,7 @@ type ClientWithResponsesInterface interface {
 
 	// AddCertificateWithBodyWithResponse Add a client certificate
 	//
-	// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The documented request media type is application/text; text/plain is accepted as well.
+	// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The request media type is application/text; text/plain is accepted as well.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38236,7 +38236,7 @@ type ClientWithResponsesInterface interface {
 
 	// OptimizeSystemStorageWithResponse Optimise storage
 	//
-	// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
+	// Starts a repair pass on every blob mirror (decision 0028). Admin only. Returns a plain-text acknowledgement.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38245,7 +38245,7 @@ type ClientWithResponsesInterface interface {
 
 	// StartPudProcessWithBodyWithResponse Start pruning unreferenced blobs
 	//
-	// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+	// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38254,7 +38254,7 @@ type ClientWithResponsesInterface interface {
 
 	// StartPudProcessWithResponse Start pruning unreferenced blobs
 	//
-	// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+	// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38281,7 +38281,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSupportBundleWithBodyWithResponse Create a support bundle
 	//
-	// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+	// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38290,7 +38290,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateSupportBundleWithResponse Create a support bundle
 	//
-	// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+	// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38299,7 +38299,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteSupportBundleWithResponse Delete a support bundle
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38308,7 +38308,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSupportBundleMetadataWithResponse Read support bundle metadata
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38317,7 +38317,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSupportBundleWithResponse Download a support bundle
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38326,7 +38326,7 @@ type ClientWithResponsesInterface interface {
 
 	// ListSupportBundlesWithResponse List support bundles
 	//
-	// Support bundles are not implemented; the operation answers 501.
+	// Not implemented; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38335,7 +38335,7 @@ type ClientWithResponsesInterface interface {
 
 	// VerifyConnectionWithBodyWithResponse Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38344,14 +38344,14 @@ type ClientWithResponsesInterface interface {
 
 	// VerifyConnectionWithResponse Verify an outbound connection
 	//
-	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+	// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/system/verifyconnection (the `VerifyConnection` operationId).
 	VerifyConnectionWithResponse(ctx context.Context, body VerifyConnectionJSONRequestBody, reqEditors ...RequestEditorFn) (*VerifyConnectionResponse, error)
 
-	// GetSystemVersionWithResponse Artifactory-compatible version
+	// GetSystemVersionWithResponse Compatibility version
 	//
 	// Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 	//
@@ -38414,7 +38414,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetRetentionPolicyConfigurationWithResponse Get release bundle retention configuration
 	//
-	// Returns the release bundle v1 retention configuration (decision 0023).
+	// Returns the release bundle v1 retention configuration.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38522,16 +38522,16 @@ type ClientWithResponsesInterface interface {
 
 	// GetOpenMetricsForArtifactoryWithResponse Prometheus metrics
 	//
-	// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope. artifactweave serves this regardless of licence tier.
+	// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/metrics (the `GetOpenMetricsForArtifactory` operationId).
 	GetOpenMetricsForArtifactoryWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenMetricsForArtifactoryResponse, error)
 
-	// GetArtifactoryApplicationMetricsWithResponse Application metrics (cloud)
+	// GetArtifactoryApplicationMetricsWithResponse Application metrics
 	//
-	// Artifactory Cloud exposes application-level metrics here. artifactweave serves the same metrics as `/api/v1/metrics` so dashboards written for either path work.
+	// Exposes the same metrics as `/api/v1/metrics`, in the OpenMetrics text format.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38540,14 +38540,14 @@ type ClientWithResponsesInterface interface {
 
 	// MigrateNpmRepositoryToStrictLayoutWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
 	//
-	// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	MigrateNpmRepositoryToStrictLayoutWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MigrateNpmRepositoryToStrictLayoutResponse, error)
 
 	// ResumeNpmRepositoryMigrationWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
 	//
-	// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+	// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. A conversion cannot be cancelled, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	ResumeNpmRepositoryMigrationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ResumeNpmRepositoryMigrationResponse, error)
@@ -38572,7 +38572,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetUploadsConfigWithResponse Multipart upload configuration
 	//
-	// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+	// Reports whether multipart upload is available. With `supported` true a file is uploaded in parts through create, urlPart, complete and status; with false it is deployed in one request.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38581,7 +38581,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetFederatedRepositoryStatusV2WithResponse Get federated repository sync status (version 2)
 	//
-	// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+	// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38889,7 +38889,7 @@ type ClientWithResponsesInterface interface {
 
 	// PermissionTargetExistenceCheckV2WithResponse Check that a permission target exists (v2)
 	//
-	// 200 when the target exists, 404 when it does not, with no body. The artifactory_permission_target resource uses it before every create.
+	// 200 when the target exists, 404 when it does not, with no body.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38898,7 +38898,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionTargetV2WithBodyWithResponse Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38907,7 +38907,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionTargetV2WithResponse Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38916,7 +38916,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38925,7 +38925,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithBodyWithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38934,7 +38934,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38943,7 +38943,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38952,126 +38952,126 @@ type ClientWithResponsesInterface interface {
 
 	// GetVcsBranchesWithResponse performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetVcsBranchesWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsBranchesResponse, error)
 
 	// DownloadVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchAlternativeResponse, error)
 
 	// DownloadVcsBranchFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsBranchFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchFromSubgroupRepositoryResponse, error)
 
 	// DownloadVcsBranchWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchResponse, error)
 
 	// DownloadFileWithinVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error)
 
 	// DownloadFileInVcsBranchInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error)
 
 	// DownloadFileWithinVcsBranchWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error)
 
 	// DownloadVcsCommitWithResponse performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsCommitWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*DownloadVcsCommitResponse, error)
 
 	// DownloadVcsReleaseWithResponse performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsReleaseWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*DownloadVcsReleaseResponse, error)
 
 	// DownloadVcsTagFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsTagFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagFromSubgroupRepositoryResponse, error)
 
 	// DownloadVcsTagWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagResponse, error)
 
 	// DownloadVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagAlternativeResponse, error)
 
 	// DownloadFileInVcsTagInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error)
 
 	// DownloadFileWithinVcsTagWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error)
 
 	// DownloadFileWithinVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error)
 
 	// GetVcsRefsWithResponse performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetVcsRefsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsRefsResponse, error)
 
 	// GetVcsTagsWithResponse performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	GetVcsTagsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsTagsResponse, error)
 
 	// CalculateYumRepositoryMetadataWithResponse performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 	//
-	// Not supported: artifactweave answers 501 for the RPM/YUM ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+	// Not implemented for the RPM/YUM ecosystem; answers 501.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	CalculateYumRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateYumRepositoryMetadataResponse, error)
@@ -45517,7 +45517,7 @@ type GetFederationConnectionDetailsResponse struct {
 			// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
 			Status *GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus `json:"status,omitempty"`
 
-			// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. In artifactweave this is false when the peer speaks a protocol major version this instance does not (decision 0021).
+			// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
 			Supported *bool `json:"supported,omitempty"`
 		} `json:"memberConnections,omitempty"`
 	}
@@ -45561,7 +45561,7 @@ func (r GetFederationConnectionDetailsResponse) GetJSON200() *struct {
 		// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
 		Status *GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus `json:"status,omitempty"`
 
-		// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. In artifactweave this is false when the peer speaks a protocol major version this instance does not (decision 0021).
+		// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
 		Supported *bool `json:"supported,omitempty"`
 	} `json:"memberConnections,omitempty"`
 } {
@@ -45735,7 +45735,7 @@ type GetFederatedRepositoryStatusResponse struct {
 			InProgressTasks *int `json:"inProgressTasks,omitempty"`
 		} `json:"binariesTasksInfo,omitempty"`
 
-		// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance, as the legacy repository status window shows them: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
+		// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
 		FederatedArtifactStatus *struct {
 			// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
 			FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
@@ -45773,7 +45773,7 @@ type GetFederatedRepositoryStatusResponse struct {
 			// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
 			RemoteUrl *string `json:"remoteUrl,omitempty"`
 
-			// Status Optional within this object. Whether the mirror is in sync. Version 1 reports a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED or OUT_OF_SYNC there.
+			// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
 			Status *string `json:"status,omitempty"`
 
 			// UpdateEvents Optional within this object. Update events waiting to be sent.
@@ -45803,7 +45803,7 @@ func (r GetFederatedRepositoryStatusResponse) GetJSON200() *struct {
 		InProgressTasks *int `json:"inProgressTasks,omitempty"`
 	} `json:"binariesTasksInfo,omitempty"`
 
-	// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance, as the legacy repository status window shows them: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
+	// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
 	FederatedArtifactStatus *struct {
 		// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
 		FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
@@ -45841,7 +45841,7 @@ func (r GetFederatedRepositoryStatusResponse) GetJSON200() *struct {
 		// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
 		RemoteUrl *string `json:"remoteUrl,omitempty"`
 
-		// Status Optional within this object. Whether the mirror is in sync. Version 1 reports a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED or OUT_OF_SYNC there.
+		// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
 		Status *string `json:"status,omitempty"`
 
 		// UpdateEvents Optional within this object. Update events waiting to be sent.
@@ -47888,7 +47888,7 @@ type GetAllBundlesResponse struct {
 			// Created Optional within this object. RFC 3339 time the version was created on the instance that signed it.
 			Created *time.Time `json:"created,omitempty"`
 
-			// Status Optional within this object. State of the version on this instance. JFrog documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS while a received version is still arriving and FAILED when receiving or storing failed.
+			// Status Optional within this object. State of the version on this instance. COMPLETE means the version is fully stored, IN_PROGRESS that a received version is still arriving, and FAILED that receiving or storing failed.
 			Status *string `json:"status,omitempty"`
 
 			// Version Optional within this object. The bundle version string.
@@ -47910,7 +47910,7 @@ func (r GetAllBundlesResponse) GetJSON200() *struct {
 		// Created Optional within this object. RFC 3339 time the version was created on the instance that signed it.
 		Created *time.Time `json:"created,omitempty"`
 
-		// Status Optional within this object. State of the version on this instance. JFrog documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS while a received version is still arriving and FAILED when receiving or storing failed.
+		// Status Optional within this object. State of the version on this instance. COMPLETE means the version is fully stored, IN_PROGRESS that a received version is still arriving, and FAILED that receiving or storing failed.
 		Status *string `json:"status,omitempty"`
 
 		// Version Optional within this object. The bundle version string.
@@ -48036,7 +48036,7 @@ type GetAllBundleVersionsResponse struct {
 			// Created Optional within this object. RFC 3339 time the version was created on the instance that signed it.
 			Created *time.Time `json:"created,omitempty"`
 
-			// Status Optional within this object. State of the version on this instance. JFrog documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS while a received version is still arriving and FAILED when receiving or storing failed.
+			// Status Optional within this object. State of the version on this instance. COMPLETE means the version is fully stored, IN_PROGRESS that a received version is still arriving, and FAILED that receiving or storing failed.
 			Status *string `json:"status,omitempty"`
 
 			// Version Optional within this object. The bundle version string.
@@ -48060,7 +48060,7 @@ func (r GetAllBundleVersionsResponse) GetJSON200() *struct {
 		// Created Optional within this object. RFC 3339 time the version was created on the instance that signed it.
 		Created *time.Time `json:"created,omitempty"`
 
-		// Status Optional within this object. State of the version on this instance. JFrog documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS while a received version is still arriving and FAILED when receiving or storing failed.
+		// Status Optional within this object. State of the version on this instance. COMPLETE means the version is fully stored, IN_PROGRESS that a received version is still arriving, and FAILED that receiving or storing failed.
 		Status *string `json:"status,omitempty"`
 
 		// Version Optional within this object. The bundle version string.
@@ -57149,7 +57149,7 @@ type GetRetentionPolicyConfigurationResponse struct {
 		// Automatic Optional within this object. When true a scheduled job deletes versions that exceed the configured limits.
 		Automatic *bool `json:"automatic,omitempty"`
 
-		// CronPattern Optional within this object. Quartz cron expression for the scheduled job (decision 0010).
+		// CronPattern Optional within this object. Quartz cron expression for the scheduled job.
 		CronPattern *string `json:"cron_pattern,omitempty"`
 
 		// MaxDaysToKeep Optional within this object. Versions older than this many days become deletion candidates. Zero means no age limit.
@@ -57174,7 +57174,7 @@ func (r GetRetentionPolicyConfigurationResponse) GetJSON200() *struct {
 	// Automatic Optional within this object. When true a scheduled job deletes versions that exceed the configured limits.
 	Automatic *bool `json:"automatic,omitempty"`
 
-	// CronPattern Optional within this object. Quartz cron expression for the scheduled job (decision 0010).
+	// CronPattern Optional within this object. Quartz cron expression for the scheduled job.
 	CronPattern *string `json:"cron_pattern,omitempty"`
 
 	// MaxDaysToKeep Optional within this object. Versions older than this many days become deletion candidates. Zero means no age limit.
@@ -58059,7 +58059,7 @@ type GetFederatedRepositoryStatusV2Response struct {
 			InProgressTasks *int `json:"inProgressTasks,omitempty"`
 		} `json:"binariesTasksInfo,omitempty"`
 
-		// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance, as the legacy repository status window shows them: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
+		// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
 		FederatedArtifactStatus *struct {
 			// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
 			FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
@@ -58097,7 +58097,7 @@ type GetFederatedRepositoryStatusV2Response struct {
 			// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
 			RemoteUrl *string `json:"remoteUrl,omitempty"`
 
-			// Status Optional within this object. Whether the mirror is in sync. Version 1 reports a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED or OUT_OF_SYNC there.
+			// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
 			Status *string `json:"status,omitempty"`
 
 			// UpdateEvents Optional within this object. Update events waiting to be sent.
@@ -58127,7 +58127,7 @@ func (r GetFederatedRepositoryStatusV2Response) GetJSON200() *struct {
 		InProgressTasks *int `json:"inProgressTasks,omitempty"`
 	} `json:"binariesTasksInfo,omitempty"`
 
-	// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance, as the legacy repository status window shows them: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
+	// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
 	FederatedArtifactStatus *struct {
 		// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
 		FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
@@ -58165,7 +58165,7 @@ func (r GetFederatedRepositoryStatusV2Response) GetJSON200() *struct {
 		// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
 		RemoteUrl *string `json:"remoteUrl,omitempty"`
 
-		// Status Optional within this object. Whether the mirror is in sync. Version 1 reports a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED or OUT_OF_SYNC there.
+		// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
 		Status *string `json:"status,omitempty"`
 
 		// UpdateEvents Optional within this object. Update events waiting to be sent.
@@ -60859,7 +60859,7 @@ func (r CalculateYumRepositoryMetadataResponse) ContentType() string {
 
 // CalculateAlpineRepositoryMetadataWithResponse performs a POST /api/alpine/{repoKey}/reindex (the `CalculateAlpineRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Alpine ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Alpine ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateAlpineRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateAlpineRepositoryMetadataResponse, error) {
@@ -60872,7 +60872,7 @@ func (c *ClientWithResponses) CalculateAlpineRepositoryMetadataWithResponse(ctx 
 
 // RetrieveBuildArtifactsArchiveWithBodyWithResponse Build artifacts archive
 //
-// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -60887,7 +60887,7 @@ func (c *ClientWithResponses) RetrieveBuildArtifactsArchiveWithBodyWithResponse(
 
 // RetrieveBuildArtifactsArchiveWithResponse Build artifacts archive
 //
-// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -60902,7 +60902,7 @@ func (c *ClientWithResponses) RetrieveBuildArtifactsArchiveWithResponse(ctx cont
 
 // RetrieveBuildArtifactsArchiveWithApplicationVndOrgJfrogArtifactoryBuildBuildArtifactsRequestPlusJSONBodyWithResponse Build artifacts archive
 //
-// Packs the artifacts of one build run into a single archive. Served once build-info lands in P5; until then artifactweave answers 501 in the Artifactory envelope.
+// Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.build.BuildArtifactsRequest+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -60917,7 +60917,7 @@ func (c *ClientWithResponses) RetrieveBuildArtifactsArchiveWithApplicationVndOrg
 
 // GetAllSmartArchivingPoliciesWithResponse List smart archiving policies
 //
-// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects. In Artifactory this API exists on Cloud from 7.111; artifactweave serves it on every install.
+// Returns every smart archiving policy, or with projectKey the policies of that project. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61067,7 +61067,7 @@ func (c *ClientWithResponses) GetSmartArchivingPolicyWithResponse(ctx context.Co
 
 // CreateSmartArchivingPolicyWithBodyWithResponse Create a smart archiving policy
 //
-// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61082,7 +61082,7 @@ func (c *ClientWithResponses) CreateSmartArchivingPolicyWithBodyWithResponse(ctx
 
 // CreateSmartArchivingPolicyWithResponse Create a smart archiving policy
 //
-// Creates a policy. It must be created disabled: enabled true is rejected with 400, as in Artifactory. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
+// Creates a policy. It must be created disabled: enabled true is rejected with 400. The key in the body must equal the path. Platform administrators manage every policy; project administrators manage the policies of their own projects.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61202,7 +61202,7 @@ func (c *ClientWithResponses) RestoreArchivedPackagesWithResponse(ctx context.Co
 
 // ExportRepositoryWithMetadataWithBodyWithResponse Export a repository (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61217,7 +61217,7 @@ func (c *ClientWithResponses) ExportRepositoryWithMetadataWithBodyWithResponse(c
 
 // ExportRepositoryWithMetadataWithResponse Export a repository (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61232,7 +61232,7 @@ func (c *ClientWithResponses) ExportRepositoryWithMetadataWithResponse(ctx conte
 
 // CalculateBowerIndexWithResponse performs a POST /api/bower/{repoKey}/reindex (the `CalculateBowerIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Bower ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Bower ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateBowerIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateBowerIndexResponse, error) {
@@ -61259,7 +61259,7 @@ func (c *ClientWithResponses) GetAllBuildsWithResponse(ctx context.Context, para
 // UploadBuildWithBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UploadBuildWithBodyWithResponse(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
@@ -61273,7 +61273,7 @@ func (c *ClientWithResponses) UploadBuildWithBodyWithResponse(ctx context.Contex
 // UploadBuildWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 func (c *ClientWithResponses) UploadBuildWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
 	rsp, err := c.UploadBuild(ctx, params, body, reqEditors...)
 	if err != nil {
@@ -61285,7 +61285,7 @@ func (c *ClientWithResponses) UploadBuildWithResponse(ctx context.Context, param
 // UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
 func (c *ClientWithResponses) UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
 	rsp, err := c.UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx, params, body, reqEditors...)
 	if err != nil {
@@ -61349,7 +61349,7 @@ func (c *ClientWithResponses) DeleteBuildsMultipleWithResponse(ctx context.Conte
 // PromoteBuildWithBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) PromoteBuildWithBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
@@ -61363,7 +61363,7 @@ func (c *ClientWithResponses) PromoteBuildWithBodyWithResponse(ctx context.Conte
 // PromoteBuildWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 func (c *ClientWithResponses) PromoteBuildWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
 	rsp, err := c.PromoteBuild(ctx, buildName, buildNumber, params, body, reqEditors...)
 	if err != nil {
@@ -61375,7 +61375,7 @@ func (c *ClientWithResponses) PromoteBuildWithResponse(ctx context.Context, buil
 // PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse performs a POST /api/build/promote/{buildName}/{buildNumber} (the `PromoteBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The JFrog CLI sends the vendor media type.
+// Records a status change for the latest run of a build number and optionally moves or copies its artifacts and dependencies to a target repository, setting properties on them. Needs deploy permission on the build; each file needs the repository permissions its move or copy needs, and a file that lacks them is reported rather than refused. The body may use the vendor media type or application/json.
 func (c *ClientWithResponses) PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBodyWithResponse(ctx context.Context, buildName string, buildNumber string, params *PromoteBuildParams, body PromoteBuildApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteBuildResponse, error) {
 	rsp, err := c.PromoteBuildWithApplicationVndOrgJfrogArtifactoryBuildPromotionRequestPlusJSONBody(ctx, buildName, buildNumber, params, body, reqEditors...)
 	if err != nil {
@@ -61464,7 +61464,7 @@ func (c *ClientWithResponses) GetBuildInfoWithResponse(ctx context.Context, buil
 
 // GetBuildArtifactsWithResponse performs a GET /api/builds/buildArtifacts/{buildName}/{buildNumber}/{buildRepo} (the `GetBuildArtifacts` operationId) request.
 //
-// Lists where each artifact of a run is stored. JFrog does not document this operation; the JFrog CLI calls it to find a build's artifacts and falls back to AQL on any error (jfrog-client-go artifactory/services/utils/artifactoryutils.go, research 22). Needs read permission on the build.
+// Lists where each artifact of a run is stored. Needs read permission on the build.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetBuildArtifactsWithResponse(ctx context.Context, buildName string, buildNumber string, buildRepo string, reqEditors ...RequestEditorFn) (*GetBuildArtifactsResponse, error) {
@@ -61477,7 +61477,7 @@ func (c *ClientWithResponses) GetBuildArtifactsWithResponse(ctx context.Context,
 
 // CalculateCargoRepositoryMetadataWithResponse performs a POST /api/cargo/{repoKey}/reindex (the `CalculateCargoRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Cargo ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Cargo ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCargoRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCargoRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCargoRepositoryMetadataResponse, error) {
@@ -61490,7 +61490,7 @@ func (c *ClientWithResponses) CalculateCargoRepositoryMetadataWithResponse(ctx c
 
 // SetItemSha256ChecksumWithBodyWithResponse Attach the sha256 property
 //
-// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61505,7 +61505,7 @@ func (c *ClientWithResponses) SetItemSha256ChecksumWithBodyWithResponse(ctx cont
 
 // SetItemSha256ChecksumWithResponse Attach the sha256 property
 //
-// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory 5.5.
+// Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61520,7 +61520,7 @@ func (c *ClientWithResponses) SetItemSha256ChecksumWithResponse(ctx context.Cont
 
 // GetAllBuildCleanupPoliciesWithResponse List build cleanup policies
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every build cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61535,7 +61535,7 @@ func (c *ClientWithResponses) GetAllBuildCleanupPoliciesWithResponse(ctx context
 
 // DeleteBuildCleanupPolicyWithResponse Delete a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61550,7 +61550,7 @@ func (c *ClientWithResponses) DeleteBuildCleanupPolicyWithResponse(ctx context.C
 
 // GetBuildCleanupPolicyWithResponse Get a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one build cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61565,7 +61565,7 @@ func (c *ClientWithResponses) GetBuildCleanupPolicyWithResponse(ctx context.Cont
 
 // CreateBuildCleanupPolicyWithBodyWithResponse Create a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61580,7 +61580,7 @@ func (c *ClientWithResponses) CreateBuildCleanupPolicyWithBodyWithResponse(ctx c
 
 // CreateBuildCleanupPolicyWithResponse Create a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61595,7 +61595,7 @@ func (c *ClientWithResponses) CreateBuildCleanupPolicyWithResponse(ctx context.C
 
 // UpdateBuildCleanupPolicyWithBodyWithResponse Replace a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61610,7 +61610,7 @@ func (c *ClientWithResponses) UpdateBuildCleanupPolicyWithBodyWithResponse(ctx c
 
 // UpdateBuildCleanupPolicyWithResponse Replace a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61625,7 +61625,7 @@ func (c *ClientWithResponses) UpdateBuildCleanupPolicyWithResponse(ctx context.C
 
 // EnableDisableBuildCleanupPolicyWithBodyWithResponse Enable or disable a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61640,7 +61640,7 @@ func (c *ClientWithResponses) EnableDisableBuildCleanupPolicyWithBodyWithRespons
 
 // EnableDisableBuildCleanupPolicyWithResponse Enable or disable a build cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61655,7 +61655,7 @@ func (c *ClientWithResponses) EnableDisableBuildCleanupPolicyWithResponse(ctx co
 
 // RunBuildCleanupPolicyWithResponse Run a build cleanup policy now
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects builds and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61670,7 +61670,7 @@ func (c *ClientWithResponses) RunBuildCleanupPolicyWithResponse(ctx context.Cont
 
 // GetAllReleaseBundleCleanupPoliciesWithResponse List release bundle cleanup policies
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns every release bundle cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61685,7 +61685,7 @@ func (c *ClientWithResponses) GetAllReleaseBundleCleanupPoliciesWithResponse(ctx
 
 // DeleteReleaseBundleCleanupPolicyWithResponse Delete a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61700,7 +61700,7 @@ func (c *ClientWithResponses) DeleteReleaseBundleCleanupPolicyWithResponse(ctx c
 
 // GetReleaseBundleCleanupPolicyWithResponse Get a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Returns one release bundle cleanup policy. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61715,7 +61715,7 @@ func (c *ClientWithResponses) GetReleaseBundleCleanupPolicyWithResponse(ctx cont
 
 // CreateReleaseBundleCleanupPolicyWithBodyWithResponse Create a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61730,7 +61730,7 @@ func (c *ClientWithResponses) CreateReleaseBundleCleanupPolicyWithBodyWithRespon
 
 // CreateReleaseBundleCleanupPolicyWithResponse Create a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61745,7 +61745,7 @@ func (c *ClientWithResponses) CreateReleaseBundleCleanupPolicyWithResponse(ctx c
 
 // UpdateReleaseBundleCleanupPolicyWithBodyWithResponse Replace a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61760,7 +61760,7 @@ func (c *ClientWithResponses) UpdateReleaseBundleCleanupPolicyWithBodyWithRespon
 
 // UpdateReleaseBundleCleanupPolicyWithResponse Replace a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Replaces the policy's configuration with the body. The key, item type and project cannot change. The enablement state is kept; change it with the enablement operation. A run already in progress continues with the configuration it started with. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61775,7 +61775,7 @@ func (c *ClientWithResponses) UpdateReleaseBundleCleanupPolicyWithResponse(ctx c
 
 // EnableDisableReleaseBundleCleanupPolicyWithBodyWithResponse Enable or disable a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61790,7 +61790,7 @@ func (c *ClientWithResponses) EnableDisableReleaseBundleCleanupPolicyWithBodyWit
 
 // EnableDisableReleaseBundleCleanupPolicyWithResponse Enable or disable a release bundle cleanup policy
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Sets whether the policy's schedule fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61805,7 +61805,7 @@ func (c *ClientWithResponses) EnableDisableReleaseBundleCleanupPolicyWithRespons
 
 // RunReleaseBundleCleanupPolicyWithResponse Run a release bundle cleanup policy now
 //
-// Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope. The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside its schedule and returns at once with the run's identifier. The policy must be enabled. Only one run per policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run selects release bundle versions and writes its report without deleting anything. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61820,7 +61820,7 @@ func (c *ClientWithResponses) RunReleaseBundleCleanupPolicyWithResponse(ctx cont
 
 // GetAllPackageCleanupPoliciesWithResponse List package cleanup policies
 //
-// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by artifactweave's in-process scheduler over the package index (decisions 0010 and 0018).
+// Returns every package cleanup policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project. Package policies are evaluated by the in-process scheduler over the package index.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61835,7 +61835,7 @@ func (c *ClientWithResponses) GetAllPackageCleanupPoliciesWithResponse(ctx conte
 
 // DeletePackageCleanupPolicyWithResponse Delete a package cleanup policy
 //
-// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -61865,7 +61865,7 @@ func (c *ClientWithResponses) GetPackageCleanupPolicyWithResponse(ctx context.Co
 
 // CreatePackageCleanupPolicyWithBodyWithResponse Create a package cleanup policy
 //
-// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -61880,7 +61880,7 @@ func (c *ClientWithResponses) CreatePackageCleanupPolicyWithBodyWithResponse(ctx
 
 // CreatePackageCleanupPolicyWithResponse Create a package cleanup policy
 //
-// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy belongs to their project.
+// Stores a new package cleanup policy under policyKey, disabled. The body's key must match the path, and enabled must be false or omitted: a policy is always created inactive and switched on with the enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62105,7 +62105,7 @@ func (c *ClientWithResponses) GetCleanupPoliciesViewWithResponse(ctx context.Con
 
 // CalculateCocoaPodsIndexWithResponse performs a POST /api/cocoapods/{repoKey}/reindex (the `CalculateCocoaPodsIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the CocoaPods ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the CocoaPods ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCocoaPodsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCocoaPodsIndexResponse, error) {
@@ -62118,7 +62118,7 @@ func (c *ClientWithResponses) CalculateCocoaPodsIndexWithResponse(ctx context.Co
 
 // CalculateConanRepositoryMetadataWithResponse performs a POST /api/conan/{repoKey}/reindex (the `CalculateConanRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Conan ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Conan ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateConanRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateConanRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateConanRepositoryMetadataResponse, error) {
@@ -62131,7 +62131,7 @@ func (c *ClientWithResponses) CalculateConanRepositoryMetadataWithResponse(ctx c
 
 // CalculateCondaRepositoryMetadataWithResponse performs a POST /api/conda/{repoKey}/reindex (the `CalculateCondaRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Conda ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Conda ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCondaRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCondaRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCondaRepositoryMetadataResponse, error) {
@@ -62144,7 +62144,7 @@ func (c *ClientWithResponses) CalculateCondaRepositoryMetadataWithResponse(ctx c
 
 // GetChecksumReplicationWithResponse performs a GET /api/config/storage/checksumReplication (the `GetChecksumReplication` operationId) request.
 //
-// Reads the checksum replication settings of this instance. Not supported in v1: artifactweave has no storage-level replication, so the operation answers 501.
+// Not implemented; answers 501. It would read the checksum replication settings of this instance.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetChecksumReplicationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetChecksumReplicationResponse, error) {
@@ -62158,7 +62158,7 @@ func (c *ClientWithResponses) GetChecksumReplicationWithResponse(ctx context.Con
 // ConfigureChecksumReplicationWithBodyWithResponse performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request,
 // with any type of body and a specified content type.
 //
-// Configures checksum replication on this instance. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would configure checksum replication on this instance.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) ConfigureChecksumReplicationWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ConfigureChecksumReplicationResponse, error) {
@@ -62172,7 +62172,7 @@ func (c *ClientWithResponses) ConfigureChecksumReplicationWithBodyWithResponse(c
 // ConfigureChecksumReplicationWithResponse performs a PUT /api/config/storage/checksumReplication (the `ConfigureChecksumReplication` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Configures checksum replication on this instance. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would configure checksum replication on this instance.
 func (c *ClientWithResponses) ConfigureChecksumReplicationWithResponse(ctx context.Context, body ConfigureChecksumReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*ConfigureChecksumReplicationResponse, error) {
 	rsp, err := c.ConfigureChecksumReplication(ctx, body, reqEditors...)
 	if err != nil {
@@ -62183,7 +62183,7 @@ func (c *ClientWithResponses) ConfigureChecksumReplicationWithResponse(ctx conte
 
 // CalculateCranRepositoryMetadataWithResponse performs a POST /api/cran/reindex/{repoKey} (the `CalculateCranRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the CRAN ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCranRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateCranRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateCranRepositoryMetadataResponse, error) {
@@ -62196,7 +62196,7 @@ func (c *ClientWithResponses) CalculateCranRepositoryMetadataWithResponse(ctx co
 
 // MoveCranArchivesWithResponse performs a GET /api/cran/{repoKey}/move-archives (the `MoveCranArchives` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the CRAN ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the CRAN ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) MoveCranArchivesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MoveCranArchivesResponse, error) {
@@ -62209,7 +62209,7 @@ func (c *ClientWithResponses) MoveCranArchivesWithResponse(ctx context.Context, 
 
 // GetCurationInterfaceSettingsWithResponse Curation settings (not supported)
 //
-// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62224,7 +62224,7 @@ func (c *ClientWithResponses) GetCurationInterfaceSettingsWithResponse(ctx conte
 
 // UpdateCurationInterfaceSettingsWithBodyWithResponse Update Curation settings (not supported)
 //
-// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62239,7 +62239,7 @@ func (c *ClientWithResponses) UpdateCurationInterfaceSettingsWithBodyWithRespons
 
 // UpdateCurationInterfaceSettingsWithResponse Update Curation settings (not supported)
 //
-// Not supported: artifactweave answers 501 because JFrog Curation is out of scope (research 10).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62254,7 +62254,7 @@ func (c *ClientWithResponses) UpdateCurationInterfaceSettingsWithResponse(ctx co
 
 // CalculateCachedRemoteDebianRepositoryCoordinatesWithResponse performs a POST /api/deb/indexCached/{repoKey} (the `CalculateCachedRemoteDebianRepositoryCoordinates` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateCachedRemoteDebianRepositoryCoordinatesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateCachedRemoteDebianRepositoryCoordinatesResponse, error) {
@@ -62267,7 +62267,7 @@ func (c *ClientWithResponses) CalculateCachedRemoteDebianRepositoryCoordinatesWi
 
 // CalculateDebianRepositoryMetadataWithResponse performs a POST /api/deb/reindex/{repoKey} (the `CalculateDebianRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateDebianRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateDebianRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateDebianRepositoryMetadataResponse, error) {
@@ -62281,7 +62281,7 @@ func (c *ClientWithResponses) CalculateDebianRepositoryMetadataWithResponse(ctx 
 // CreateDebianSnapshotWithBodyWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request,
 // with any type of body and a specified content type.
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CreateDebianSnapshotWithBodyWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error) {
@@ -62295,7 +62295,7 @@ func (c *ClientWithResponses) CreateDebianSnapshotWithBodyWithResponse(ctx conte
 // CreateDebianSnapshotWithResponse performs a POST /api/deb/{repoKey}/snapshot (the `CreateDebianSnapshot` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Not supported: artifactweave answers 501 for the Debian ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Debian ecosystem; answers 501.
 func (c *ClientWithResponses) CreateDebianSnapshotWithResponse(ctx context.Context, repoKey string, params *CreateDebianSnapshotParams, body CreateDebianSnapshotJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateDebianSnapshotResponse, error) {
 	rsp, err := c.CreateDebianSnapshot(ctx, repoKey, params, body, reqEditors...)
 	if err != nil {
@@ -62306,7 +62306,7 @@ func (c *ClientWithResponses) CreateDebianSnapshotWithResponse(ctx context.Conte
 
 // DeleteRedundantRecordsToTrashCanDirectoriesWithBodyWithResponse Compact trash can directory records
 //
-// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62321,7 +62321,7 @@ func (c *ClientWithResponses) DeleteRedundantRecordsToTrashCanDirectoriesWithBod
 
 // DeleteRedundantRecordsToTrashCanDirectoriesWithResponse Compact trash can directory records
 //
-// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. On this server the task is a no-op that still reports success, because the item model does not create redundant records.
+// Starts a background task that removes redundant directory records the trash can accumulates, which otherwise slow garbage collection. Admin only. Returns 202 as soon as the task is queued; the body carries a confirmation message. The task is a no-op that still reports success.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62334,9 +62334,9 @@ func (c *ClientWithResponses) DeleteRedundantRecordsToTrashCanDirectoriesWithRes
 	return ParseDeleteRedundantRecordsToTrashCanDirectoriesResponse(rsp)
 }
 
-// DistributeArtifactWithBodyWithResponse Distribute to Bintray (retired)
+// DistributeArtifactWithBodyWithResponse Distribute to Bintray
 //
-// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62351,9 +62351,9 @@ func (c *ClientWithResponses) DistributeArtifactWithBodyWithResponse(ctx context
 	return ParseDistributeArtifactResponse(rsp)
 }
 
-// DistributeArtifactWithResponse Distribute to Bintray (retired)
+// DistributeArtifactWithResponse Distribute to Bintray
 //
-// Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62370,7 +62370,7 @@ func (c *ClientWithResponses) DistributeArtifactWithResponse(ctx context.Context
 // FindParentManifestListsWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request,
 // with any type of body and a specified content type.
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) FindParentManifestListsWithBodyWithResponse(ctx context.Context, repoKey DockerRepoKey, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error) {
@@ -62384,7 +62384,7 @@ func (c *ClientWithResponses) FindParentManifestListsWithBodyWithResponse(ctx co
 // FindParentManifestListsWithResponse performs a POST /api/docker/{repo-key}/v2/parentManifests (the `FindParentManifestLists` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image (decision 0031). Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path.
+// Finds the multi-platform manifest lists that reference a given image manifest, so a caller can learn which fat tags would change if the platform image were deleted. Only indexes in the same repository are found. Needs Read on the image. Errors use the standard error envelope, not the registry's error format.
 func (c *ClientWithResponses) FindParentManifestListsWithResponse(ctx context.Context, repoKey DockerRepoKey, body FindParentManifestListsJSONRequestBody, reqEditors ...RequestEditorFn) (*FindParentManifestListsResponse, error) {
 	rsp, err := c.FindParentManifestLists(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -62396,7 +62396,7 @@ func (c *ClientWithResponses) FindParentManifestListsWithResponse(ctx context.Co
 // PromoteDockerImageWithBodyWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request,
 // with any type of body and a specified content type.
 //
-// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) PromoteDockerImageWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error) {
@@ -62410,7 +62410,7 @@ func (c *ClientWithResponses) PromoteDockerImageWithBodyWithResponse(ctx context
 // PromoteDockerImageWithResponse performs a POST /api/docker/{repo-key}/v2/promote (the `PromoteDockerImage` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by
+// Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a caller without Delete on the source answers 403 before anything is copied.
 func (c *ClientWithResponses) PromoteDockerImageWithResponse(ctx context.Context, repoKey string, body PromoteDockerImageJSONRequestBody, reqEditors ...RequestEditorFn) (*PromoteDockerImageResponse, error) {
 	rsp, err := c.PromoteDockerImage(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -62422,7 +62422,7 @@ func (c *ClientWithResponses) PromoteDockerImageWithResponse(ctx context.Context
 // DeleteDockerTagWithBodyWithResponse performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request,
 // with any type of body and a specified content type.
 //
-// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DeleteDockerTagWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*DeleteDockerTagResponse, error) {
@@ -62436,7 +62436,7 @@ func (c *ClientWithResponses) DeleteDockerTagWithBodyWithResponse(ctx context.Co
 // DeleteDockerTagWithResponse performs a DELETE /api/docker/{repoKey}/v2/delete (the `DeleteDockerTag` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
+// Deletes a tag of a Docker, OCI or Helm OCI image, including a multi-architecture tag. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay. A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the error envelope, as for every REST operation under the Docker API path.
 func (c *ClientWithResponses) DeleteDockerTagWithResponse(ctx context.Context, repoKey string, body DeleteDockerTagJSONRequestBody, reqEditors ...RequestEditorFn) (*DeleteDockerTagResponse, error) {
 	rsp, err := c.DeleteDockerTag(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -62447,7 +62447,7 @@ func (c *ClientWithResponses) DeleteDockerTagWithResponse(ctx context.Context, r
 
 // GetExportSystemSettingsExampleWithResponse Export settings example (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62462,7 +62462,7 @@ func (c *ClientWithResponses) GetExportSystemSettingsExampleWithResponse(ctx con
 
 // ExportSystemWithBodyWithResponse Export the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62477,7 +62477,7 @@ func (c *ClientWithResponses) ExportSystemWithBodyWithResponse(ctx context.Conte
 
 // ExportSystemWithResponse Export the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62492,7 +62492,7 @@ func (c *ClientWithResponses) ExportSystemWithResponse(ctx context.Context, body
 
 // ExportSystemWithApplicationVndOrgJfrogArtifactorySystemExportSettingsPlusJSONBodyWithResponse Export the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Back up the database and blob store instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.system.ExportSettings+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -62687,7 +62687,7 @@ func (c *ClientWithResponses) PropagateCreationTimeMetadataDuringFullSyncWithRes
 
 // ReconnectToFederationClientWithResponse Reconnect the federation sync worker
 //
-// Re-establishes the link between the repository service and the federation sync worker. In Artifactory the worker is the separate Artifactory Federation Service (RTFS), reached over gRPC; a health-check job reconnects it automatically (every 80 seconds by default) and this call does it on demand, for example when the service was unavailable at startup. artifactweave runs the sync worker inside the server process, so the call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
+// Re-establishes the link between the repository service and the federation sync worker, which runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once the worker is running. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62702,7 +62702,7 @@ func (c *ClientWithResponses) ReconnectToFederationClientWithResponse(ctx contex
 
 // FederationRecoveryWithResponse Recover exhausted federation queues
 //
-// Clears the error state of outgoing event queues that exhausted their retries (six attempts by default in Artifactory), so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
+// Clears the error state of outgoing event queues that exhausted their retries, so delivery to members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted. A member whose missing events were already purged stays out of sync and needs a full sync.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62764,7 +62764,7 @@ func (c *ClientWithResponses) GetFederationSyncStateWithResponse(ctx context.Con
 
 // GetFederationConnectionDetailsWithResponse Get federated repository connection state
 //
-// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring. Artifactory serves this operation only when its standalone Federation Service (RTFS) is enabled and answers 405 otherwise; artifactweave always serves it.
+// Shows, for each member of one federated repository, whether events are flowing and how far behind delivery is. The cheapest status operation, suited to routine monitoring.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62796,7 +62796,7 @@ func (c *ClientWithResponses) GetFederationMirrorLagTimeWithResponse(ctx context
 
 // GetFederatedRepositoryStatusWithResponse Get federated repository sync status
 //
-// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+// Detailed sync status of one federated repository: binary transfer tasks, event delivery per member and artifact counts. Expensive on large repositories; use the connection state operation for routine monitoring.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62860,7 +62860,7 @@ func (c *ClientWithResponses) GetUnavailableMirrorsWithResponse(ctx context.Cont
 
 // CalculateRubyGemsIndexWithResponse performs a POST /api/gems/{repoKey}/reindex (the `CalculateRubyGemsIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the RubyGems ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the RubyGems ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateRubyGemsIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateRubyGemsIndexResponse, error) {
@@ -62873,7 +62873,7 @@ func (c *ClientWithResponses) CalculateRubyGemsIndexWithResponse(ctx context.Con
 
 // GetRubyGemVersionListWithResponse List gem versions
 //
-// Returns the versions of one gem in the rubygems.org versions format. Gems are outside the v1 ecosystem scope (research 10). artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions format.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -62991,7 +62991,7 @@ func (c *ClientWithResponses) CalculateHelmChartIndexWithResponse(ctx context.Co
 
 // ImportRepositoryContentWithResponse Import repository content (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Upload content with the deploy API or the JFrog CLI instead.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63006,7 +63006,7 @@ func (c *ClientWithResponses) ImportRepositoryContentWithResponse(ctx context.Co
 
 // GetImportSystemSettingsExampleWithResponse Import settings example (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63021,7 +63021,7 @@ func (c *ClientWithResponses) GetImportSystemSettingsExampleWithResponse(ctx con
 
 // FullSystemImportWithBodyWithResponse Import the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63036,7 +63036,7 @@ func (c *ClientWithResponses) FullSystemImportWithBodyWithResponse(ctx context.C
 
 // FullSystemImportWithResponse Import the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63051,7 +63051,7 @@ func (c *ClientWithResponses) FullSystemImportWithResponse(ctx context.Context, 
 
 // FullSystemImportWithApplicationVndOrgJfrogArtifactorySystemImportSettingsPlusJSONBodyWithResponse Import the system (not supported)
 //
-// Not supported: artifactweave answers 501 because import and export are cut from v1. Restore a database and blob store backup instead (docs/operations/backup-restore.md).
+// Not implemented; answers 501.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.system.ImportSettings+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63079,7 +63079,7 @@ func (c *ClientWithResponses) CalculateMavenIndexWithResponse(ctx context.Contex
 
 // ReindexMetadataServerWithBodyWithResponse Reindex the metadata service
 //
-// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63094,7 +63094,7 @@ func (c *ClientWithResponses) ReindexMetadataServerWithBodyWithResponse(ctx cont
 
 // ReindexMetadataServerWithResponse Reindex the metadata service
 //
-// Artifactory's package metadata runs in a separate service that can be reindexed from these paths. artifactweave keeps the package index in its own store and maintains it on every write and on the per-ecosystem reindex operations, so this operation answers 501.
+// Not implemented; answers 501. The package index is maintained on every write and by the per-ecosystem reindex operations.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63109,7 +63109,7 @@ func (c *ClientWithResponses) ReindexMetadataServerWithResponse(ctx context.Cont
 
 // GetNpmAuthWithResponse performs a GET /api/npm/auth (the `GetNpmAuth` operationId) request.
 //
-// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. The JFrog CLI calls it when its server configuration holds a username and password, or when the npm it runs is too old for a token, and writes the body into .npmrc unchanged. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent, as Artifactory stopped sending both in 7.161.26. Needs an authenticated caller. JFrog's 7.x documentation, as archived in 2025, showed the operation with an example answer whose _auth encodes the user name and the user's encrypted password rather than the password sent. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+// Returns .npmrc lines that authenticate npm to this server with the caller's own credentials. A caller with Basic credentials gets _auth (the base64 of the credentials it sent); a caller with a Bearer token gets _authToken with that token. No always-auth or email line is sent. Needs an authenticated caller.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetNpmAuthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetNpmAuthResponse, error) {
@@ -63122,7 +63122,7 @@ func (c *ClientWithResponses) GetNpmAuthWithResponse(ctx context.Context, reqEdi
 
 // GetNpmScopeAuthWithResponse performs a GET /api/npm/{repoKey}/auth/{scope} (the `GetNpmScopeAuth` operationId) request.
 //
-// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected. JFrog's 7.x documentation, as archived in 2025, showed the operation with the scope given without its @ and an example answer whose credential lines are _password and username rather than _auth, with the email and always-auth lines that 7.161.26 dropped. The lines follow decision 0034 and stay unverified until compared with a live Artifactory.
+// Returns .npmrc lines that point an npm scope at one npm repository and authenticate the caller to it. The first line maps @<scope> to the repository's registry URL, <base>/artifactory/api/npm/<repoKey>/. The credential lines are those of the unscoped operation (_auth for Basic credentials, _authToken for a Bearer token), each prefixed with that registry URL without its scheme, so npm sends them to this registry only. Any npm repository can be named, local, remote or virtual. Needs an authenticated caller. Because this operation owns GET <registry>/auth/<scope>, a package named auth cannot have its version manifests read through the registry; its packument and tarballs are unaffected.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetNpmScopeAuthWithResponse(ctx context.Context, repoKey string, scope string, reqEditors ...RequestEditorFn) (*GetNpmScopeAuthResponse, error) {
@@ -63135,7 +63135,7 @@ func (c *ClientWithResponses) GetNpmScopeAuthWithResponse(ctx context.Context, r
 
 // CalculateNpmRepositoryMetadataWithResponse performs a POST /api/npm/{repoKey}/reindex (the `CalculateNpmRepositoryMetadata` operationId) request.
 //
-// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Artifactory keeps package metadata as files under .npm/, while artifactweave derives it from the index (decision 0034), so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
+// Rebuilds the package index of a local npm repository from the tarballs it holds and their properties. Each tarball on its canonical path is read again for its package.json, and its npm.disttag and npm.deprecated properties give the dist-tags and deprecations; packuments and version manifests are then served from the rebuilt index. Package metadata is derived from the index, so a reindex rewrites index entries and never files. Tarballs off their canonical path, or without a readable package.json, stay unindexed until the strict-layout conversion moves them. The rebuild is queued on the persistent work queue and runs in the background; the 200 says it was queued, not that it finished. Needs the Manage permission on the repository. Only npm local repositories are reindexed; any other repository, npm remote and virtual ones included, is rejected with 400.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateNpmRepositoryMetadataWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateNpmRepositoryMetadataResponse, error) {
@@ -63161,7 +63161,7 @@ func (c *ClientWithResponses) CalculateNuGetRepositoryMetadataWithResponse(ctx c
 
 // CalculateOpkgRepositoryMetadataWithResponse performs a POST /api/opkg/reindex/{repoKey} (the `CalculateOpkgRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Opkg ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Opkg ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateOpkgRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateOpkgRepositoryMetadataResponse, error) {
@@ -63174,7 +63174,7 @@ func (c *ClientWithResponses) CalculateOpkgRepositoryMetadataWithResponse(ctx co
 
 // CalculatePubRepositoryMetadataWithResponse performs a POST /api/pub/{repoKey}/reindex (the `CalculatePubRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Pub ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Pub ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculatePubRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculatePubRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculatePubRepositoryMetadataResponse, error) {
@@ -63187,7 +63187,7 @@ func (c *ClientWithResponses) CalculatePubRepositoryMetadataWithResponse(ctx con
 
 // GetPuppetModulesWithResponse performs a GET /api/puppet/{repoKey}/v3/modules (the `GetPuppetModules` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetModulesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetModulesResponse, error) {
@@ -63200,7 +63200,7 @@ func (c *ClientWithResponses) GetPuppetModulesWithResponse(ctx context.Context, 
 
 // GetPuppetModuleInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/modules/{userModule} (the `GetPuppetModuleInfo` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetModuleInfoWithResponse(ctx context.Context, repoKey string, userModule string, reqEditors ...RequestEditorFn) (*GetPuppetModuleInfoResponse, error) {
@@ -63213,7 +63213,7 @@ func (c *ClientWithResponses) GetPuppetModuleInfoWithResponse(ctx context.Contex
 
 // GetPuppetReleasesWithResponse performs a GET /api/puppet/{repoKey}/v3/releases (the `GetPuppetReleases` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetReleasesWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetPuppetReleasesResponse, error) {
@@ -63226,7 +63226,7 @@ func (c *ClientWithResponses) GetPuppetReleasesWithResponse(ctx context.Context,
 
 // GetPuppetReleaseInfoWithResponse performs a GET /api/puppet/{repoKey}/v3/releases/{userModuleVersion} (the `GetPuppetReleaseInfo` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Puppet ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Puppet ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetPuppetReleaseInfoWithResponse(ctx context.Context, repoKey string, userModuleVersion string, reqEditors ...RequestEditorFn) (*GetPuppetReleaseInfoResponse, error) {
@@ -63278,7 +63278,7 @@ func (c *ClientWithResponses) GetPypiPackageVersionMetadataInJsonWithResponse(ct
 
 // GetAllBundlesWithResponse List release bundles
 //
-// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge (decision 0023). Only bundles the caller may read are returned.
+// Lists the release bundles v1 held on this instance, grouped by bundle name with every version. `type=source` lists bundles created and signed here for distribution to edges; `type=target`, the default, lists bundles this instance received as an edge. Only bundles the caller may read are returned.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63323,7 +63323,7 @@ func (c *ClientWithResponses) GetAllBundleVersionsWithResponse(ctx context.Conte
 
 // GetReleaseBundleVersionWithResponse Get a release bundle version
 //
-// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content (decision 0023).
+// Returns one release bundle version. With `format=json`, or without `format`, the response is the decoded manifest. With `format=jws` it is the signed manifest as a compact JSON Web Signature (`application/jose`), which an edge verifies against the distributing instance's public signing key before accepting any content.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63383,7 +63383,7 @@ func (c *ClientWithResponses) GetReleaseBundleVersionImportStatusWithResponse(ct
 
 // CloseEventBasedPullReplicationChannelsWithResponse performs a POST /api/replications/channels/release (the `CloseEventBasedPullReplicationChannels` operationId) request.
 //
-// Closes every event-based pull replication channel other instances hold open against this one, forcing them to reconnect. Event-based replication is not supported in v1; the operation answers 501.
+// Not implemented; answers 501. It would close every event-based pull replication channel other instances hold open against this one, forcing them to reconnect.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CloseEventBasedPullReplicationChannelsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*CloseEventBasedPullReplicationChannelsResponse, error) {
@@ -63396,7 +63396,7 @@ func (c *ClientWithResponses) CloseEventBasedPullReplicationChannelsWithResponse
 
 // GetRemoteRepositoriesRegisteredForReplicationWithResponse performs a GET /api/replications/channels/{repoKey} (the `GetRemoteRepositoriesRegisteredForReplication` operationId) request.
 //
-// Lists the remote instances subscribed to a local repository for event-based pull replication. Event-based replication is not supported in v1; the operation answers 501.
+// Not implemented; answers 501. It would list the remote instances subscribed to a local repository for event-based pull replication.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetRemoteRepositoriesRegisteredForReplicationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*GetRemoteRepositoriesRegisteredForReplicationResponse, error) {
@@ -63410,7 +63410,7 @@ func (c *ClientWithResponses) GetRemoteRepositoriesRegisteredForReplicationWithR
 // UpdateMultiPushReplicationWithBodyWithResponse performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request,
 // with any type of body and a specified content type.
 //
-// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UpdateMultiPushReplicationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateMultiPushReplicationResponse, error) {
@@ -63424,7 +63424,7 @@ func (c *ClientWithResponses) UpdateMultiPushReplicationWithBodyWithResponse(ctx
 // UpdateMultiPushReplicationWithResponse performs a POST /api/replications/multiple/{repoKey} (the `UpdateMultiPushReplication` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Updates a multi-push replication configuration. Not supported in v1; answers 501. Configure one single-target replication per repository instead.
+// Not implemented; answers 501. It would update a multi-push replication configuration. Configure one single-target replication per repository instead.
 func (c *ClientWithResponses) UpdateMultiPushReplicationWithResponse(ctx context.Context, repoKey string, body UpdateMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateMultiPushReplicationResponse, error) {
 	rsp, err := c.UpdateMultiPushReplication(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -63436,7 +63436,7 @@ func (c *ClientWithResponses) UpdateMultiPushReplicationWithResponse(ctx context
 // CreateOrReplaceMultiPushReplicationWithBodyWithResponse performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CreateOrReplaceMultiPushReplicationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateOrReplaceMultiPushReplicationResponse, error) {
@@ -63450,7 +63450,7 @@ func (c *ClientWithResponses) CreateOrReplaceMultiPushReplicationWithBodyWithRes
 // CreateOrReplaceMultiPushReplicationWithResponse performs a PUT /api/replications/multiple/{repoKey} (the `CreateOrReplaceMultiPushReplication` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Creates or replaces a multi-push replication configuration. Not supported in v1; answers 501.
+// Not implemented; answers 501. It would create or replace a multi-push replication configuration.
 func (c *ClientWithResponses) CreateOrReplaceMultiPushReplicationWithResponse(ctx context.Context, repoKey string, body CreateOrReplaceMultiPushReplicationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateOrReplaceMultiPushReplicationResponse, error) {
 	rsp, err := c.CreateOrReplaceMultiPushReplication(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -63488,7 +63488,7 @@ func (c *ClientWithResponses) GetRepositoryReplicationConfigurationWithResponse(
 // UpdateRepositoryReplicationConfigurationWithBodyWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error) {
@@ -63502,7 +63502,7 @@ func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithBodyWi
 // UpdateRepositoryReplicationConfigurationWithResponse performs a POST /api/replications/{repoKey} (the `UpdateRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Updates fields of an existing replication configuration; omitted fields keep their values. Artifactory routes two reserved keys through the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
+// Updates fields of an existing replication configuration; omitted fields keep their values. Two reserved keys share the same path: when repoKey is `enable` or `disable` the body is an enable/disable request and the call switches many replications on or off at once, selected by wildcard patterns over their target URLs. Repositories named `enable` or `disable` therefore cannot have their replication updated through this path. Administrators only.
 func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body UpdateRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateRepositoryReplicationConfigurationResponse, error) {
 	rsp, err := c.UpdateRepositoryReplicationConfiguration(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -63514,7 +63514,7 @@ func (c *ClientWithResponses) UpdateRepositoryReplicationConfigurationWithRespon
 // SetRepositoryReplicationConfigurationWithBodyWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request,
 // with any type of body and a specified content type.
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithBodyWithResponse(ctx context.Context, repoKey string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error) {
@@ -63528,7 +63528,7 @@ func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithBodyWithR
 // SetRepositoryReplicationConfigurationWithResponse performs a PUT /api/replications/{repoKey} (the `SetRepositoryReplicationConfiguration` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is not supported in v1 and is rejected with 400. Administrators only. Artifactory answers 201 and the JFrog Terraform provider accepts any 2xx.
+// Creates or replaces the replication configuration of a local or remote repository. The body is one configuration or an array of them; with an array, cronExp and enableEventReplication are taken from the first element for all. Several targets in the array amount to multi-push, which is rejected with 400. Administrators only. Answers 201 when the configuration is stored.
 func (c *ClientWithResponses) SetRepositoryReplicationConfigurationWithResponse(ctx context.Context, repoKey string, body SetRepositoryReplicationConfigurationJSONRequestBody, reqEditors ...RequestEditorFn) (*SetRepositoryReplicationConfigurationResponse, error) {
 	rsp, err := c.SetRepositoryReplicationConfiguration(ctx, repoKey, body, reqEditors...)
 	if err != nil {
@@ -63584,7 +63584,7 @@ func (c *ClientWithResponses) CheckIfRepositoryExistsWithResponse(ctx context.Co
 
 // GetRemoteRepositoryConfigurationWithResponse Shared remote repository configuration (deprecated)
 //
-// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated by Artifactory in favour of the ordinary read; kept so old clients keep working. Non-admin callers get the sanitised view only.
+// Returns the sanitised configuration of a remote repository that has shareConfiguration enabled. Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63631,7 +63631,7 @@ func (c *ClientWithResponses) GetRepositoryConfigurationWithResponse(ctx context
 
 // UpdateRepositoryConfigurationWithBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63646,7 +63646,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithBodyWithResponse(
 
 // UpdateRepositoryConfigurationWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63661,7 +63661,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithResponse(ctx cont
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63676,7 +63676,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63691,7 +63691,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63706,7 +63706,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // UpdateRepositoryConfigurationWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Update a repository configuration
 //
-// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.
+// Merges the body into the stored configuration: fields present are replaced, fields absent keep their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with a plain-text confirmation.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63721,7 +63721,7 @@ func (c *ClientWithResponses) UpdateRepositoryConfigurationWithApplicationVndOrg
 
 // CreateRepositoryWithBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63736,7 +63736,7 @@ func (c *ClientWithResponses) CreateRepositoryWithBodyWithResponse(ctx context.C
 
 // CreateRepositoryWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63751,7 +63751,7 @@ func (c *ClientWithResponses) CreateRepositoryWithResponse(ctx context.Context, 
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesFederatedRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.FederatedRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63766,7 +63766,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesLocalRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.LocalRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63781,7 +63781,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesRemoteRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.RemoteRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63796,7 +63796,7 @@ func (c *ClientWithResponses) CreateRepositoryWithApplicationVndOrgJfrogArtifact
 
 // CreateRepositoryWithApplicationVndOrgJfrogArtifactoryRepositoriesVirtualRepositoryConfigurationPlusJSONBodyWithResponse Create a repository
 //
-// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
+// Creates a repository with the configuration in the body. The key in the path wins over the body. Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted as the request content type.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.repositories.VirtualRepositoryConfiguration+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63826,7 +63826,7 @@ func (c *ClientWithResponses) GetArchivePolicyStatusWithResponse(ctx context.Con
 
 // GetAllArchivePoliciesWithResponse List cold storage archive policies
 //
-// Returns every cold storage archive policy with its run state. Platform administrators only. In Artifactory this API needs an Enterprise licence and a separate cold instance; artifactweave serves it on every install against its cold tier.
+// Returns every cold storage archive policy with its run state. Platform administrators only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -63841,7 +63841,7 @@ func (c *ClientWithResponses) GetAllArchivePoliciesWithResponse(ctx context.Cont
 
 // ConvertSearchCriteriaToAqlWithBodyWithResponse Convert a search criteria form to AQL
 //
-// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -63856,7 +63856,7 @@ func (c *ClientWithResponses) ConvertSearchCriteriaToAqlWithBodyWithResponse(ctx
 
 // ConvertSearchCriteriaToAqlWithTextBodyWithResponse Convert a search criteria form to AQL
 //
-// Turns a search criteria form into the AQL items query artifactweave would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
+// Turns a search criteria form into the AQL items query the server would run for it, so a form-based policy can be inspected or rewritten as an aqlQuery policy. The request is text/plain carrying the form's JSON and the response is a JSON string. A form with an unknown key or an invalid pattern is rejected with 400. Platform administrators only.
 //
 // Takes a body of the `text/plain` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64126,7 +64126,7 @@ func (c *ClientWithResponses) SearchPackageArchivesWithResponse(ctx context.Cont
 
 // SearchArchiveWithResponse performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 //
-// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
+// Not implemented; answers 501. It would find entries inside archives by member name; use AQL instead.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchArchiveWithResponse(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*SearchArchiveResponse, error) {
@@ -64268,7 +64268,7 @@ func (c *ClientWithResponses) SearchGavcWithResponse(ctx context.Context, params
 
 // SearchLatestVersionWithResponse performs a GET /api/search/latestVersion (the `SearchLatestVersion` operationId) request.
 //
-// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury ordering Artifactory uses to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. The response is the bare version string, not JSON. Returns 404 with Artifactory's message when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
+// Returns the latest version of a module as plain text, using the repository layout to extract versions and the Mercury version ordering to compare them; integration versions are given by file version, such as 1.0-20260101.120000-1. Without v the latest release is returned. A v with * or ? returns the latest version of either kind that matches it; any other v, such as 1.0-SNAPSHOT, returns the latest integration version of that module version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. The response is the bare version string, not JSON. Returns 404 when the module has no versions, no release, or no matching version. Anonymous callers may search when anonymous access is enabled.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchLatestVersionWithResponse(ctx context.Context, params *SearchLatestVersionParams, reqEditors ...RequestEditorFn) (*SearchLatestVersionResponse, error) {
@@ -64281,7 +64281,7 @@ func (c *ClientWithResponses) SearchLatestVersionWithResponse(ctx context.Contex
 
 // SearchLicenseWithResponse performs a GET /api/search/license (the `SearchLicense` operationId) request.
 //
-// Finds items whose licence properties match the requested statuses. artifactweave reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
+// Finds items whose licence properties match the requested statuses. The search reads the licence tags stored as properties and does not run automatic licence discovery, so autofind is accepted but has no effect and found stays empty. Flags default to unapproved=1, unknown=1 and all others 0.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchLicenseWithResponse(ctx context.Context, params *SearchLicenseParams, reqEditors ...RequestEditorFn) (*SearchLicenseResponse, error) {
@@ -64333,7 +64333,7 @@ func (c *ClientWithResponses) SearchUsageWithResponse(ctx context.Context, param
 
 // SearchVersionsWithResponse performs a GET /api/search/versions (the `SearchVersions` operationId) request.
 //
-// Lists every version of a module found through the repository layout, newest first in the Mercury ordering Artifactory uses. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too, until remote repositories proxy their upstream. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
+// Lists every version of a module found through the repository layout, newest first in the Mercury version ordering. Without v both release and integration versions are returned, a folder of unique snapshots as one module version such as 1.0-SNAPSHOT. A v with * or ? keeps the versions it matches; any other v, such as 1.0-SNAPSHOT, lists only the integration versions of that module version, by file version. Local repositories, remote caches and virtual repositories' members are consulted; remote=1 is accepted and answered from them too. Returns 404 when there is no version to list. Anonymous callers may search when anonymous access is enabled.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchVersionsWithResponse(ctx context.Context, params *SearchVersionsParams, reqEditors ...RequestEditorFn) (*SearchVersionsResponse, error) {
@@ -64346,7 +64346,7 @@ func (c *ClientWithResponses) SearchVersionsWithResponse(ctx context.Context, pa
 
 // RevokeApiKeyWithResponse Revoke the caller's API key
 //
-// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so artifactweave answers 200 with an informational message for compatibility with scripts that call it unconditionally.
+// Revokes the caller's key, or every key when deleteAll=1 and the caller is an admin. There are no keys to revoke, so the operation always answers 200 with an informational message.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64363,7 +64363,7 @@ func (c *ClientWithResponses) RevokeApiKeyWithResponse(ctx context.Context, para
 
 // GetApiKeyWithResponse Get the caller's API key (always absent)
 //
-// Returns the caller's API key. Because artifactweave never issues keys this always answers 404, which is the documented response when no key exists; the JFrog CLI treats it as "no key".
+// Returns the caller's API key. No keys are ever issued, so the operation always answers 404, the response for a user without a key.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64380,7 +64380,7 @@ func (c *ClientWithResponses) GetApiKeyWithResponse(ctx context.Context, reqEdit
 
 // CreateApiKeyWithResponse Create an API key (disabled)
 //
-// Legacy API-key creation. Artifactory disables it by default since 7.98 and the keys reached end of life; artifactweave always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead. jfrog-client-go expects 201 on success, which never happens here.
+// Legacy API-key creation, which is disabled. Always answers 400 with the message "API key creation is disabled". Use an access token or a reference token from /access/api/v1/tokens instead.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64397,7 +64397,7 @@ func (c *ClientWithResponses) CreateApiKeyWithResponse(ctx context.Context, reqE
 
 // RegenerateApiKeyWithResponse Regenerate an API key (disabled)
 //
-// Legacy key rotation. artifactweave answers 400 "API key creation is disabled" because no user ever holds a key.
+// Legacy key rotation, which is disabled. Always answers 400 "API key creation is disabled"; no user holds a key.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64431,7 +64431,7 @@ func (c *ClientWithResponses) RevokeUserApiKeyWithResponse(ctx context.Context, 
 
 // GetPasswordExpirationPolicyWithResponse Get the password expiration policy
 //
-// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated by JFrog in favour of GET /api/security/userLockPolicy.
+// Returns the platform-wide password expiry settings. Admin only. The same policy is visible in the security section of the YAML descriptor. Deprecated in favour of GET /api/security/userLockPolicy.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64448,7 +64448,7 @@ func (c *ClientWithResponses) GetPasswordExpirationPolicyWithResponse(ctx contex
 
 // SetPasswordExpirationPolicyWithBodyWithResponse Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64465,7 +64465,7 @@ func (c *ClientWithResponses) SetPasswordExpirationPolicyWithBodyWithResponse(ct
 
 // SetPasswordExpirationPolicyWithResponse Set the password expiration policy
 //
-// Replaces the policy. Admin only. Omitted fields keep their defaults, not their previous values, because Artifactory treats the body as the whole policy. Returns the stored policy with real JSON types. Deprecated by JFrog in favour of PUT /api/security/userLockPolicy.
+// Replaces the policy. Admin only. The body is the whole policy, so omitted fields take their defaults, not their previous values. Returns the stored policy with JSON boolean and integer types. Deprecated in favour of PUT /api/security/userLockPolicy.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64481,7 +64481,7 @@ func (c *ClientWithResponses) SetPasswordExpirationPolicyWithResponse(ctx contex
 
 // GetUserEncryptedPasswordWithResponse Get an encrypted form of the caller's password
 //
-// Artifactory returns an opaque encrypted password that clients can use in place of the clear-text one. artifactweave returns a reference token bound to the caller instead, which every client accepts wherever the encrypted password was accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
+// Returns a reference token bound to the caller, usable in place of the clear-text password wherever an encrypted password is accepted. The caller must authenticate with Basic credentials; token authentication is a 400.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64498,7 +64498,7 @@ func (c *ClientWithResponses) GetUserEncryptedPasswordWithResponse(ctx context.C
 
 // GetGroupsWithResponse List groups (legacy)
 //
-// Lists every group with its detail URL. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/groups; kept for the JFrog CLI. Not in the oracle; from docs/research/05.
+// Lists every group with its detail URL. Admin only. Deprecated in favour of GET /access/api/v2/groups.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64515,7 +64515,7 @@ func (c *ClientWithResponses) GetGroupsWithResponse(ctx context.Context, reqEdit
 
 // DeleteGroupWithResponse Delete a group (legacy)
 //
-// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400). Not in the oracle; from docs/research/05.
+// Removes the group and its grants. Admin only. The seeded readers group cannot be deleted (400).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64532,7 +64532,7 @@ func (c *ClientWithResponses) DeleteGroupWithResponse(ctx context.Context, group
 
 // GetGroupDetailsWithResponse Get a group (legacy)
 //
-// Returns the legacy group document. Admin only. Members are included only when includeUsers=true; the Terraform provider always sends the parameter. Not in the oracle; from docs/research/05.
+// Returns the legacy group document. Admin only. Members are included only when includeUsers=true.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64549,7 +64549,7 @@ func (c *ClientWithResponses) GetGroupDetailsWithResponse(ctx context.Context, g
 
 // UpdateGroupWithBodyWithResponse Update a group (legacy)
 //
-// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64566,7 +64566,7 @@ func (c *ClientWithResponses) UpdateGroupWithBodyWithResponse(ctx context.Contex
 
 // UpdateGroupWithResponse Update a group (legacy)
 //
-// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64582,7 +64582,7 @@ func (c *ClientWithResponses) UpdateGroupWithResponse(ctx context.Context, group
 
 // UpdateGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBodyWithResponse Update a group (legacy)
 //
-// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body; userNames, when present, replaces the membership. Admin only.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64598,7 +64598,7 @@ func (c *ClientWithResponses) UpdateGroupWithApplicationVndOrgJfrogArtifactorySe
 
 // CreateOrReplaceGroupWithBodyWithResponse Create or replace a group (legacy)
 //
-// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64615,7 +64615,7 @@ func (c *ClientWithResponses) CreateOrReplaceGroupWithBodyWithResponse(ctx conte
 
 // CreateOrReplaceGroupWithResponse Create or replace a group (legacy)
 //
-// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64631,7 +64631,7 @@ func (c *ClientWithResponses) CreateOrReplaceGroupWithResponse(ctx context.Conte
 
 // CreateOrReplaceGroupWithApplicationVndOrgJfrogArtifactorySecurityGroupPlusJSONBodyWithResponse Create or replace a group (legacy)
 //
-// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, because the artifactory_group resource requires 201 both on create and on an update that carries members; the JFrog CLI accepts 200 or 201. Not in the oracle; from docs/research/05.
+// Creates the group or replaces every field of an existing one, including the membership when userNames is present. Admin only. Always answers 201, both on create and on replace.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.Group+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64662,7 +64662,7 @@ func (c *ClientWithResponses) GetAllKeyPairsWithResponse(ctx context.Context, re
 
 // CreateKeyPairWithBodyWithResponse Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64677,7 +64677,7 @@ func (c *ClientWithResponses) CreateKeyPairWithBodyWithResponse(ctx context.Cont
 
 // CreateKeyPairWithResponse Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object, which the artifactory_keypair Terraform resource requires.
+// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64782,7 +64782,7 @@ func (c *ClientWithResponses) DeleteKeyPairWithResponse(ctx context.Context, key
 
 // GetKeyPairWithResponse Get a key pair
 //
-// Returns the readable projection of one pair. Admin only. The Terraform provider reads this after every create.
+// Returns the readable projection of one pair. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64797,7 +64797,7 @@ func (c *ClientWithResponses) GetKeyPairWithResponse(ctx context.Context, keyPai
 
 // GetTrustedKeysWithResponse List trusted public keys
 //
-// Lists the public keys trusted for release-bundle signature verification. Admin only. Served so the artifactory_distribution_public_key resource can read back what it created; release bundles themselves are out of scope in v1. Not in the oracle; shape from docs/research/05 and the provider source.
+// Lists the public keys trusted for release-bundle signature verification. Admin only. Release bundles themselves are not served.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64812,7 +64812,7 @@ func (c *ClientWithResponses) GetTrustedKeysWithResponse(ctx context.Context, re
 
 // SetDistributionPublicGpgKeyWithBodyWithResponse Add a trusted public key
 //
-// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64827,7 +64827,7 @@ func (c *ClientWithResponses) SetDistributionPublicGpgKeyWithBodyWithResponse(ct
 
 // SetDistributionPublicGpgKeyWithResponse Add a trusted public key
 //
-// Stores a public GPG key. Admin only. The documented response is 200 but the artifactory_distribution_public_key resource hard-checks 201, so artifactweave answers 201 with the stored key; a duplicate alias is a 400.
+// Stores a public GPG key. Admin only. Answers 201 with the stored key; a duplicate alias is a 400.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64842,7 +64842,7 @@ func (c *ClientWithResponses) SetDistributionPublicGpgKeyWithResponse(ctx contex
 
 // DeleteTrustedKeyWithResponse Delete a trusted public key
 //
-// Removes a trusted key by its kid. Admin only. Answers 204; the provider accepts 200 or 204. Not in the oracle; from docs/research/05.
+// Removes a trusted key by its kid. Admin only. Answers 204.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64857,7 +64857,7 @@ func (c *ClientWithResponses) DeleteTrustedKeyWithResponse(ctx context.Context, 
 
 // GetLockedOutUsersWithResponse List locked-out users
 //
-// Returns the names of users locked by the user lock policy. Admin only. The JFrog CLI prints this list for jf rt users-locked style commands.
+// Returns the names of users locked by the user lock policy. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64872,7 +64872,7 @@ func (c *ClientWithResponses) GetLockedOutUsersWithResponse(ctx context.Context,
 
 // GetPermissionTargetsWithResponse List permission targets (v1)
 //
-// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions.
+// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64889,7 +64889,7 @@ func (c *ClientWithResponses) GetPermissionTargetsWithResponse(ctx context.Conte
 
 // DeletePermissionTargetWithResponse Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated by JFrog in favour of DELETE /access/api/v2/permissions/{name}.
+// Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64906,7 +64906,7 @@ func (c *ClientWithResponses) DeletePermissionTargetWithResponse(ctx context.Con
 
 // GetPermissionTargetDetailsWithResponse Get a permission target (v1)
 //
-// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/permissions/{name}.
+// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64923,7 +64923,7 @@ func (c *ClientWithResponses) GetPermissionTargetDetailsWithResponse(ctx context
 
 // CreateOrReplacePermissionTargetWithBodyWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64940,7 +64940,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithBodyWithRespons
 
 // CreateOrReplacePermissionTargetWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64956,7 +64956,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithResponse(ctx co
 
 // CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated by JFrog in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65034,7 +65034,7 @@ func (c *ClientWithResponses) UnlockLockedOutUsersWithResponse(ctx context.Conte
 
 // UnlockLockedOutUserWithResponse Unlock one user (path form)
 //
-// The older form the JFrog CLI still sends, with the user in the path and no body. Behaves like the array form for one user. Not in the oracle; from docs/research/09.
+// The older form, with the user in the path and no body. Behaves like the array form for one user.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65096,7 +65096,7 @@ func (c *ClientWithResponses) ConfigureUserLockPolicyWithResponse(ctx context.Co
 
 // GetUsersWithResponse List users (legacy)
 //
-// Lists every user with its detail URL and realm. Admin only. Deprecated by JFrog in favour of GET /access/api/v2/users; kept because the JFrog CLI calls it. Not in the oracle; from docs/research/05.
+// Lists every user with its detail URL and realm. Admin only. Deprecated in favour of GET /access/api/v2/users.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65143,7 +65143,7 @@ func (c *ClientWithResponses) ExpirePasswordForMultipleUsersWithResponse(ctx con
 
 // UnexpirePasswordForSingleUserWithResponse Unexpire a password
 //
-// Clears the forced password change for one user. Admin only. JFrog marks it slated for removal; kept for script compatibility.
+// Clears the forced password change for one user. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65160,7 +65160,7 @@ func (c *ClientWithResponses) UnexpirePasswordForSingleUserWithResponse(ctx cont
 
 // DeleteUserWithResponse Delete a user (legacy)
 //
-// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400). Not in the oracle; from docs/research/05.
+// Removes the user and its tokens and membership. Admin only. The seeded admin and anonymous users cannot be deleted (400).
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65177,7 +65177,7 @@ func (c *ClientWithResponses) DeleteUserWithResponse(ctx context.Context, userNa
 
 // GetUserDetailsWithResponse Get a user (legacy)
 //
-// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here, which is how artifactory_anonymous_user works. Deprecated by JFrog from 7.49.3 in favour of GET /access/api/v2/users/{username}.
+// Returns the legacy user document without the password. Admin only. The seeded anonymous user is readable here. Deprecated in favour of GET /access/api/v2/users/{username}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65194,7 +65194,7 @@ func (c *ClientWithResponses) GetUserDetailsWithResponse(ctx context.Context, us
 
 // UpdateUserWithBodyWithResponse Update a user (legacy)
 //
-// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65211,7 +65211,7 @@ func (c *ClientWithResponses) UpdateUserWithBodyWithResponse(ctx context.Context
 
 // UpdateUserWithResponse Update a user (legacy)
 //
-// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65227,7 +65227,7 @@ func (c *ClientWithResponses) UpdateUserWithResponse(ctx context.Context, userNa
 
 // UpdateUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBodyWithResponse Update a user (legacy)
 //
-// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated by JFrog in favour of PATCH /access/api/v2/users/{name}. Not in the oracle; from docs/research/05.
+// Changes only the fields present in the body. Admin only. groups, when present, replaces the membership. Deprecated in favour of PATCH /access/api/v2/users/{name}.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65243,7 +65243,7 @@ func (c *ClientWithResponses) UpdateUserWithApplicationVndOrgJfrogArtifactorySec
 
 // CreateOrReplaceUserWithBodyWithResponse Create or replace a user (legacy)
 //
-// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65260,7 +65260,7 @@ func (c *ClientWithResponses) CreateOrReplaceUserWithBodyWithResponse(ctx contex
 
 // CreateOrReplaceUserWithResponse Create or replace a user (legacy)
 //
-// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65276,7 +65276,7 @@ func (c *ClientWithResponses) CreateOrReplaceUserWithResponse(ctx context.Contex
 
 // CreateOrReplaceUserWithApplicationVndOrgJfrogArtifactorySecurityUserPlusJSONBodyWithResponse Create or replace a user (legacy)
 //
-// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced, which the artifactory_user resource relies on. Deprecated by JFrog in favour of POST /access/api/v2/users. Not in the oracle; from docs/research/05.
+// Creates the user, or replaces every field of an existing one. Admin only. name, email and password are required (password may be omitted only with internalPasswordDisabled true). Answers 201 whether the user was created or replaced. Deprecated in favour of POST /access/api/v2/users.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.User+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65292,7 +65292,7 @@ func (c *ClientWithResponses) CreateOrReplaceUserWithApplicationVndOrgJfrogArtif
 
 // CreateSignedUrlWithBodyWithResponse Create a signed download URL
 //
-// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65307,7 +65307,7 @@ func (c *ClientWithResponses) CreateSignedUrlWithBodyWithResponse(ctx context.Co
 
 // CreateSignedUrlWithResponse Create a signed download URL
 //
-// Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would return a time-limited URL that downloads one artifact without credentials.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65322,7 +65322,7 @@ func (c *ClientWithResponses) CreateSignedUrlWithResponse(ctx context.Context, b
 
 // ReplaceSignedUrlKeyWithResponse Rotate the signed URL key
 //
-// Invalidates every signed URL by replacing the signing key. artifactweave does not implement this operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+// Not implemented; answers 501. It would invalidate every signed URL by replacing the signing key.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65337,7 +65337,7 @@ func (c *ClientWithResponses) ReplaceSignedUrlKeyWithResponse(ctx context.Contex
 
 // GetStorageSummaryInfoWithResponse Storage summary
 //
-// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
+// Returns the storage usage snapshot, computed on every request. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65367,7 +65367,7 @@ func (c *ClientWithResponses) RefreshStorageSummaryInfoWithResponse(ctx context.
 
 // CalculateSwiftIndexWithResponse performs a POST /api/swift/{repoKey}/reindex (the `CalculateSwiftIndex` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the Swift ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the Swift ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateSwiftIndexWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*CalculateSwiftIndexResponse, error) {
@@ -65380,7 +65380,7 @@ func (c *ClientWithResponses) CalculateSwiftIndexWithResponse(ctx context.Contex
 
 // GetSystemInfoWithResponse System information
 //
-// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. Artifactory prints JVM and host details here; the format is free text and no client parses it. Admin only.
+// A plain text dump of runtime facts: build version and revision, Go runtime, operating system, uptime, configured database driver and blob backend, and the compatibility version. The format is free text. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65395,7 +65395,7 @@ func (c *ClientWithResponses) GetSystemInfoWithResponse(ctx context.Context, req
 
 // GetReverseProxySnippetWithResponse Generate an nginx snippet
 //
-// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered in v1; APACHE answers 400. Admin only.
+// Renders an nginx server block from the stored reverse proxy configuration: the server name, the HTTP and HTTPS listeners that are enabled, the certificate paths, the location blocks for every service prefix and, for the Docker repository-path method, the /v2 location. Only the NGINX web server type is rendered; APACHE answers 400. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65410,7 +65410,7 @@ func (c *ClientWithResponses) GetReverseProxySnippetWithResponse(ctx context.Con
 
 // GetReverseProxyConfigurationWithResponse Read the reverse proxy configuration
 //
-// Returns the reverse proxy settings. Until they can be stored, artifactweave answers with its own, which the Docker access method needs. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Once stored, both sslPort and httpsPort are emitted with the same value because the documentation names the former and the platform_reverse_proxy Terraform resource reads the latter. Admin only.
+// Returns the reverse proxy settings. Without stored settings, the response describes this server. dockerReverseProxyMethod is SUBDOMAIN when docker.subdomain_match is on and REPOPATHPREFIX otherwise, serverName is the base URL's host and, with subdomains, serverNameExpression is its wildcard. Stored settings return both sslPort and httpsPort with the same value. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65515,7 +65515,7 @@ func (c *ClientWithResponses) GetLoggerDebugLevelWithResponse(ctx context.Contex
 
 // DeactivateArtifactoryKeyEncryptionWithResponse Deactivate key encryption
 //
-// In Artifactory this rewrites the configuration descriptor with clear-text secrets. artifactweave keeps secrets sealed at all times (decision 0017), so the call is accepted and answers DONE without changing anything; the descriptor export masks secrets regardless.
+// Accepted and answers DONE without changing anything. Secrets stay sealed at all times (decision 0017), and the descriptor export masks them regardless.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65545,7 +65545,7 @@ func (c *ClientWithResponses) ActivateArtifactoryKeyEncryptionWithResponse(ctx c
 
 // GetSystemLicenseWithResponse Licence information
 //
-// Artifactory reports its licence here. artifactweave has no licence tiers and answers honestly; no client is known to gate behaviour on this value. The platform_license Terraform resource installs a key through POST /api/system/licenses and then reads this document back. Admin only.
+// Returns the licence details of this server, which has no licence tiers. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65560,7 +65560,7 @@ func (c *ClientWithResponses) GetSystemLicenseWithResponse(ctx context.Context, 
 
 // InstallLicenseWithBodyWithResponse Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65575,7 +65575,7 @@ func (c *ClientWithResponses) InstallLicenseWithBodyWithResponse(ctx context.Con
 
 // InstallLicenseWithResponse Install a licence key
 //
-// Artifactory installs a licence from the posted key. artifactweave has no licences; it validates that the body is a JSON object, stores nothing and answers 200 so licence-installation scripts complete without error. The platform_license Terraform resource installs through POST /api/system/licenses instead, and no jf command posts a licence. Admin only.
+// Accepts a licence key. The server has no licences; it validates that the body is a JSON object, stores nothing and answers 200. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65590,7 +65590,7 @@ func (c *ClientWithResponses) InstallLicenseWithResponse(ctx context.Context, bo
 
 // DeleteHALicenseWithResponse Remove node licences
 //
-// Artifactory removes the licences whose hashes are listed. artifactweave has none to remove and answers with a per-hash message saying so, with status 200, so removal scripts do not fail. Admin only.
+// Removes the licences whose hashes are listed. The server holds none, so it answers 200 with a per-hash message saying so. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65605,7 +65605,7 @@ func (c *ClientWithResponses) DeleteHALicenseWithResponse(ctx context.Context, p
 
 // GetHALicenseInfoWithResponse List node licences
 //
-// Artifactory lists one licence per cluster node. artifactweave is a single process and returns a one-element list describing itself, so tooling that iterates the list keeps working. Admin or a token scoped system:info/licenses:r.
+// Lists one licence per node. This instance is a single process and returns a one-element list describing itself. Admin or a token scoped system:info/licenses:r.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65620,7 +65620,7 @@ func (c *ClientWithResponses) GetHALicenseInfoWithResponse(ctx context.Context, 
 
 // InstallHALicensesWithBodyWithResponse Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65635,7 +65635,7 @@ func (c *ClientWithResponses) InstallHALicensesWithBodyWithResponse(ctx context.
 
 // InstallHALicensesWithResponse Install node licences
 //
-// Artifactory installs one licence per posted key and reports a status per key. JFrog documents an array of key objects, but the platform_license Terraform resource posts a single key object, so both forms are accepted; that resource fails on any error status except a 400 whose messages map its key to "License already exists.". artifactweave stores nothing and reports every key as installed. Admin only.
+// Accepts one licence key object, or an array of them, and reports a status per key. Nothing is stored, and every key is reported as installed. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65650,7 +65650,7 @@ func (c *ClientWithResponses) InstallHALicensesWithResponse(ctx context.Context,
 
 // GetClusterLocksWithResponse List held locks
 //
-// Returns a snapshot of the leases artifactweave holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. In v1 the report covers the single running process; the response keeps Artifactory's multi-node shape. The snapshot is best effort, not transactional. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+// Returns a snapshot of the leases the server holds in its database, so an operator can find a stuck scheduler job, cleanup run or replication without querying the database directly. The report covers the single running process in the multi-node shape. The snapshot is best effort, not transactional. Requires an administrator.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65665,7 +65665,7 @@ func (c *ClientWithResponses) GetClusterLocksWithResponse(ctx context.Context, p
 
 // GetNodeLocksWithResponse List locks held by this process
 //
-// Same as the lock snapshot but limited to the process that answers, without asking any other process. In v1 the two operations report the same leases. Requires an administrator. The response shape matches Artifactory's documented lock snapshot field for field; Artifactory serves it from 7.161, above the compatibility version artifactweave reports, and artifactweave serves it regardless.
+// Same as the lock snapshot but limited to the process that answers, without asking any other process. The two operations report the same leases. Requires an administrator.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65680,7 +65680,7 @@ func (c *ClientWithResponses) GetNodeLocksWithResponse(ctx context.Context, para
 
 // GetLiveLogsConfigWithResponse Live Logs configuration (not supported)
 //
-// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65695,7 +65695,7 @@ func (c *ClientWithResponses) GetLiveLogsConfigWithResponse(ctx context.Context,
 
 // GetLiveLogsDataWithResponse Live Logs data (not supported)
 //
-// Not supported: artifactweave answers 501 for Live Logs. Read the process logs from standard error or the log collector instead.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65710,7 +65710,7 @@ func (c *ClientWithResponses) GetLiveLogsDataWithResponse(ctx context.Context, p
 
 // StartSha256MigrationWithBodyWithResponse Start the SHA-256 migration
 //
-// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65725,7 +65725,7 @@ func (c *ClientWithResponses) StartSha256MigrationWithBodyWithResponse(ctx conte
 
 // StartSha256MigrationWithResponse Start the SHA-256 migration
 //
-// Artifactory back-fills SHA-256 checksums for binaries stored before 5.5. artifactweave records SHA-256 for every binary from the first write, so there is nothing to migrate; the operation answers 501 (research 10).
+// Not implemented; answers 501. The server records SHA-256 for every binary on write.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65740,7 +65740,7 @@ func (c *ClientWithResponses) StartSha256MigrationWithResponse(ctx context.Conte
 
 // StopSha256MigrationWithResponse Stop the SHA-256 migration
 //
-// Pair of the start operation; there is no migration to stop and the operation answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65794,7 +65794,7 @@ func (c *ClientWithResponses) UnblockSystemReplicationWithResponse(ctx context.C
 
 // GetCertificatesWithResponse List client certificates
 //
-// Lists the client certificates remote repositories can present to upstreams. Admin only. The artifactory_certificate resource reads the list after every create and matches fingerPrint case-insensitively.
+// Lists the client certificates remote repositories can present to upstreams. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65824,7 +65824,7 @@ func (c *ClientWithResponses) DeleteCertificateWithResponse(ctx context.Context,
 
 // AddCertificateWithBodyWithResponse Add a client certificate
 //
-// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The documented request media type is application/text; text/plain is accepted as well.
+// Stores a PEM bundle holding the certificate and its private key under the alias. Admin only. The private key is sealed at rest. A bundle without a private key or with a mismatched pair is a 400; an existing alias is replaced. The request media type is application/text; text/plain is accepted as well.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65869,7 +65869,7 @@ func (c *ClientWithResponses) RunGarbageCollectionWithResponse(ctx context.Conte
 
 // OptimizeSystemStorageWithResponse Optimise storage
 //
-// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
+// Starts a repair pass on every blob mirror (decision 0028). Admin only. Returns a plain-text acknowledgement.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65884,7 +65884,7 @@ func (c *ClientWithResponses) OptimizeSystemStorageWithResponse(ctx context.Cont
 
 // StartPudProcessWithBodyWithResponse Start pruning unreferenced blobs
 //
-// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65899,7 +65899,7 @@ func (c *ClientWithResponses) StartPudProcessWithBodyWithResponse(ctx context.Co
 
 // StartPudProcessWithResponse Start pruning unreferenced blobs
 //
-// Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is already in progress.
+// Starts the prune unreferenced data process, which deletes blobs no item references. The process runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65944,7 +65944,7 @@ func (c *ClientWithResponses) StopPudProcessWithResponse(ctx context.Context, re
 
 // CreateSupportBundleWithBodyWithResponse Create a support bundle
 //
-// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65959,7 +65959,7 @@ func (c *ClientWithResponses) CreateSupportBundleWithBodyWithResponse(ctx contex
 
 // CreateSupportBundleWithResponse Create a support bundle
 //
-// Artifactory packages logs, configuration and thread dumps for JFrog support. artifactweave has no support organisation to send bundles to and answers 501; operators collect logs from the process directly (docs/operations).
+// Not implemented; answers 501. A support bundle would package logs, configuration and thread dumps.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65974,7 +65974,7 @@ func (c *ClientWithResponses) CreateSupportBundleWithResponse(ctx context.Contex
 
 // DeleteSupportBundleWithResponse Delete a support bundle
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65989,7 +65989,7 @@ func (c *ClientWithResponses) DeleteSupportBundleWithResponse(ctx context.Contex
 
 // GetSupportBundleMetadataWithResponse Read support bundle metadata
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66004,7 +66004,7 @@ func (c *ClientWithResponses) GetSupportBundleMetadataWithResponse(ctx context.C
 
 // GetSupportBundleWithResponse Download a support bundle
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66019,7 +66019,7 @@ func (c *ClientWithResponses) GetSupportBundleWithResponse(ctx context.Context, 
 
 // ListSupportBundlesWithResponse List support bundles
 //
-// Support bundles are not implemented; the operation answers 501.
+// Not implemented; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66034,7 +66034,7 @@ func (c *ClientWithResponses) ListSupportBundlesWithResponse(ctx context.Context
 
 // VerifyConnectionWithBodyWithResponse Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -66049,7 +66049,7 @@ func (c *ClientWithResponses) VerifyConnectionWithBodyWithResponse(ctx context.C
 
 // VerifyConnectionWithResponse Verify an outbound connection
 //
-// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success, as Artifactory documents; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
+// Performs a GET against the given endpoint from the server, using the global proxy settings and the optional credentials, and reports whether the connection succeeded. Used before creating remote repositories. Only a 200 from the endpoint counts as success; any other status, a connection failure or a timeout is reported as 400 with the reason. Admin only.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -66062,7 +66062,7 @@ func (c *ClientWithResponses) VerifyConnectionWithResponse(ctx context.Context, 
 	return ParseVerifyConnectionResponse(rsp)
 }
 
-// GetSystemVersionWithResponse Artifactory-compatible version
+// GetSystemVersionWithResponse Compatibility version
 //
 // Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 //
@@ -66167,7 +66167,7 @@ func (c *ClientWithResponses) GetRetentionOperationsHistoryWithResponse(ctx cont
 
 // GetRetentionPolicyConfigurationWithResponse Get release bundle retention configuration
 //
-// Returns the release bundle v1 retention configuration (decision 0023).
+// Returns the release bundle v1 retention configuration.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66347,7 +66347,7 @@ func (c *ClientWithResponses) GetConfiguredRetentionPoliciesListWithResponse(ctx
 
 // GetOpenMetricsForArtifactoryWithResponse Prometheus metrics
 //
-// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope. artifactweave serves this regardless of licence tier.
+// Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r` token scope.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66360,9 +66360,9 @@ func (c *ClientWithResponses) GetOpenMetricsForArtifactoryWithResponse(ctx conte
 	return ParseGetOpenMetricsForArtifactoryResponse(rsp)
 }
 
-// GetArtifactoryApplicationMetricsWithResponse Application metrics (cloud)
+// GetArtifactoryApplicationMetricsWithResponse Application metrics
 //
-// Artifactory Cloud exposes application-level metrics here. artifactweave serves the same metrics as `/api/v1/metrics` so dashboards written for either path work.
+// Exposes the same metrics as `/api/v1/metrics`, in the OpenMetrics text format.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66377,7 +66377,7 @@ func (c *ClientWithResponses) GetArtifactoryApplicationMetricsWithResponse(ctx c
 
 // MigrateNpmRepositoryToStrictLayoutWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/migrate (the `MigrateNpmRepositoryToStrictLayout` operationId) request.
 //
-// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on (decision 0034), so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+// Starts converting a local npm repository to strict layout. Every npm local repository here already behaves as one with "Enforce strict layout" on, so the conversion only moves tarballs: each .tgz that is stored but not indexed because it sits off its canonical path is moved to the canonical path its package.json gives, and indexed there. A tarball whose canonical path is already taken is skipped and left where it is, as is one without a readable package.json. The conversion is queued on the persistent work queue under the repository's key and runs in the background: asking again while one is pending joins it, and running it again after it finished changes nothing. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) MigrateNpmRepositoryToStrictLayoutWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*MigrateNpmRepositoryToStrictLayoutResponse, error) {
@@ -66390,7 +66390,7 @@ func (c *ClientWithResponses) MigrateNpmRepositoryToStrictLayoutWithResponse(ctx
 
 // ResumeNpmRepositoryMigrationWithResponse performs a POST /api/v1/migrations/npm/repositories/{repoKey}/resume (the `ResumeNpmRepositoryMigration` operationId) request.
 //
-// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. Artifactory also resumes a conversion an administrator cancelled; artifactweave has no way to cancel one, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. JFrog documents the path and the permission but not the response body; artifactweave answers 202 with none.
+// Resumes a strict-layout conversion of a local npm repository that failed. The conversion, parked on the persistent work queue once its retries ran out, is queued again with a fresh set of attempts and carries on with the tarballs still off their canonical paths. A conversion cannot be cancelled, so a failed conversion is the only one to resume, and a repository without one is rejected with 400. Needs the Manage permission on the repository. Only npm local repositories convert; any other repository is rejected with 400. Answers 202 with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) ResumeNpmRepositoryMigrationWithResponse(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*ResumeNpmRepositoryMigrationResponse, error) {
@@ -66433,7 +66433,7 @@ func (c *ClientWithResponses) GetSystemReadinessWithResponse(ctx context.Context
 
 // GetUploadsConfigWithResponse Multipart upload configuration
 //
-// Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart, complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The endpoint is not in JFrog's published reference.
+// Reports whether multipart upload is available. With `supported` true a file is uploaded in parts through create, urlPart, complete and status; with false it is deployed in one request.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66448,7 +66448,7 @@ func (c *ClientWithResponses) GetUploadsConfigWithResponse(ctx context.Context, 
 
 // GetFederatedRepositoryStatusV2WithResponse Get federated repository sync status (version 2)
 //
-// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked unverified until captured.
+// Version 2 of the repository sync status, which reports a wider set of member states. The fields are those of version 1.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66960,7 +66960,7 @@ func (c *ClientWithResponses) GetPermissionTargetDetailsV2WithResponse(ctx conte
 
 // PermissionTargetExistenceCheckV2WithResponse Check that a permission target exists (v2)
 //
-// 200 when the target exists, 404 when it does not, with no body. The artifactory_permission_target resource uses it before every create.
+// 200 when the target exists, 404 when it does not, with no body.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66975,7 +66975,7 @@ func (c *ClientWithResponses) PermissionTargetExistenceCheckV2WithResponse(ctx c
 
 // CreatePermissionTargetV2WithBodyWithResponse Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -66990,7 +66990,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithBodyWithResponse(ctx c
 
 // CreatePermissionTargetV2WithResponse Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67005,7 +67005,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithResponse(ctx context.C
 
 // CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409, which jfrog-client-go interprets as "already exists". Admin only. Unknown users, groups or repositories, a build section whose repositories is not artifactory-build-info, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67020,7 +67020,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithApplicationVndOrgJfrog
 
 // CreateOrReplacePermissionTargetV2WithBodyWithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67035,7 +67035,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithBodyWithRespo
 
 // CreateOrReplacePermissionTargetV2WithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67050,7 +67050,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithResponse(ctx 
 
 // CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases, which the JFrog CLI expects. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67065,7 +67065,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithApplicationVn
 
 // GetVcsBranchesWithResponse performs a GET /api/vcs/branches/{repoKey}/{userOrg}/{repo} (the `GetVcsBranches` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetVcsBranchesWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsBranchesResponse, error) {
@@ -67078,7 +67078,7 @@ func (c *ClientWithResponses) GetVcsBranchesWithResponse(ctx context.Context, re
 
 // DownloadVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{branchName} (the `DownloadVcsBranchAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, params *DownloadVcsBranchAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchAlternativeResponse, error) {
@@ -67091,7 +67091,7 @@ func (c *ClientWithResponses) DownloadVcsBranchAlternativeWithResponse(ctx conte
 
 // DownloadVcsBranchFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadVcsBranchFromSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsBranchFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchFromSubgroupRepositoryResponse, error) {
@@ -67104,7 +67104,7 @@ func (c *ClientWithResponses) DownloadVcsBranchFromSubgroupRepositoryWithRespons
 
 // DownloadVcsBranchWithResponse performs a GET /api/vcs/downloadBranch/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadVcsBranch` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, params *DownloadVcsBranchParams, reqEditors ...RequestEditorFn) (*DownloadVcsBranchResponse, error) {
@@ -67117,7 +67117,7 @@ func (c *ClientWithResponses) DownloadVcsBranchWithResponse(ctx context.Context,
 
 // DownloadFileWithinVcsBranchAlternativeWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{branchName} (the `DownloadFileWithinVcsBranchAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchAlternativeResponse, error) {
@@ -67130,7 +67130,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsBranchAlternativeWithResponse
 
 // DownloadFileInVcsBranchInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/archive/refs/{branchName} (the `DownloadFileInVcsBranchInSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsBranchInSubgroupRepositoryResponse, error) {
@@ -67143,7 +67143,7 @@ func (c *ClientWithResponses) DownloadFileInVcsBranchInSubgroupRepositoryWithRes
 
 // DownloadFileWithinVcsBranchWithResponse performs a GET /api/vcs/downloadBranchFile/{repoKey}/{userOrg}/{repo}/{branchName} (the `DownloadFileWithinVcsBranch` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsBranchWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, branchName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsBranchResponse, error) {
@@ -67156,7 +67156,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsBranchWithResponse(ctx contex
 
 // DownloadVcsCommitWithResponse performs a GET /api/vcs/downloadCommit/{repoKey}/{userOrg}/{repo}/{commitId} (the `DownloadVcsCommit` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsCommitWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, commitId string, params *DownloadVcsCommitParams, reqEditors ...RequestEditorFn) (*DownloadVcsCommitResponse, error) {
@@ -67169,7 +67169,7 @@ func (c *ClientWithResponses) DownloadVcsCommitWithResponse(ctx context.Context,
 
 // DownloadVcsReleaseWithResponse performs a GET /api/vcs/downloadRelease/{repoKey}/{userOrg}/{repo}/{releaseName} (the `DownloadVcsRelease` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsReleaseWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, releaseName string, params *DownloadVcsReleaseParams, reqEditors ...RequestEditorFn) (*DownloadVcsReleaseResponse, error) {
@@ -67182,7 +67182,7 @@ func (c *ClientWithResponses) DownloadVcsReleaseWithResponse(ctx context.Context
 
 // DownloadVcsTagFromSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadVcsTagFromSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsTagFromSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagFromSubgroupRepositoryParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagFromSubgroupRepositoryResponse, error) {
@@ -67195,7 +67195,7 @@ func (c *ClientWithResponses) DownloadVcsTagFromSubgroupRepositoryWithResponse(c
 
 // DownloadVcsTagWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadVcsTag` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, params *DownloadVcsTagParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagResponse, error) {
@@ -67208,7 +67208,7 @@ func (c *ClientWithResponses) DownloadVcsTagWithResponse(ctx context.Context, re
 
 // DownloadVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTag/{repoKey}/{userOrg}/{tagName} (the `DownloadVcsTagAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, params *DownloadVcsTagAlternativeParams, reqEditors ...RequestEditorFn) (*DownloadVcsTagAlternativeResponse, error) {
@@ -67221,7 +67221,7 @@ func (c *ClientWithResponses) DownloadVcsTagAlternativeWithResponse(ctx context.
 
 // DownloadFileInVcsTagInSubgroupRepositoryWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/archive/refs/{tagName} (the `DownloadFileInVcsTagInSubgroupRepository` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileInVcsTagInSubgroupRepositoryResponse, error) {
@@ -67234,7 +67234,7 @@ func (c *ClientWithResponses) DownloadFileInVcsTagInSubgroupRepositoryWithRespon
 
 // DownloadFileWithinVcsTagWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{repo}/{tagName} (the `DownloadFileWithinVcsTag` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagResponse, error) {
@@ -67247,7 +67247,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsTagWithResponse(ctx context.C
 
 // DownloadFileWithinVcsTagAlternativeWithResponse performs a GET /api/vcs/downloadTagFile/{repoKey}/{userOrg}/{tagName} (the `DownloadFileWithinVcsTagAlternative` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) DownloadFileWithinVcsTagAlternativeWithResponse(ctx context.Context, repoKey string, userOrg string, tagName string, reqEditors ...RequestEditorFn) (*DownloadFileWithinVcsTagAlternativeResponse, error) {
@@ -67260,7 +67260,7 @@ func (c *ClientWithResponses) DownloadFileWithinVcsTagAlternativeWithResponse(ct
 
 // GetVcsRefsWithResponse performs a GET /api/vcs/refs/{repoKey}/{userOrg}/{repo} (the `GetVcsRefs` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetVcsRefsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsRefsResponse, error) {
@@ -67273,7 +67273,7 @@ func (c *ClientWithResponses) GetVcsRefsWithResponse(ctx context.Context, repoKe
 
 // GetVcsTagsWithResponse performs a GET /api/vcs/tags/{repoKey}/{userOrg}/{repo} (the `GetVcsTags` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the VCS (Git archive proxy) ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the VCS (Git archive proxy) ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) GetVcsTagsWithResponse(ctx context.Context, repoKey string, userOrg string, repo string, reqEditors ...RequestEditorFn) (*GetVcsTagsResponse, error) {
@@ -67286,7 +67286,7 @@ func (c *ClientWithResponses) GetVcsTagsWithResponse(ctx context.Context, repoKe
 
 // CalculateYumRepositoryMetadataWithResponse performs a POST /api/yum/{repoKey} (the `CalculateYumRepositoryMetadata` operationId) request.
 //
-// Not supported: artifactweave answers 501 for the RPM/YUM ecosystem. The operation is kept in the specification so the API surface matches Artifactory and clients get the Artifactory error envelope rather than a 404.
+// Not implemented for the RPM/YUM ecosystem; answers 501.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) CalculateYumRepositoryMetadataWithResponse(ctx context.Context, repoKey string, params *CalculateYumRepositoryMetadataParams, reqEditors ...RequestEditorFn) (*CalculateYumRepositoryMetadataResponse, error) {
@@ -72335,7 +72335,7 @@ func ParseGetFederationConnectionDetailsResponse(rsp *http.Response) (*GetFedera
 				// Status Optional within this object. Dashboard state of the connection from the local member to the remote one. HEALTHY: events flow promptly. DELAYED: HEALTHY with lag above the threshold. ERROR: any underlying error state (generic, inactive target, out of sync). PENDING_FS: waiting for a full sync. FULL_SYNC_RUNNING: a full sync is preparing or running. DISABLED: the member is disabled. UNSUPPORTED: the remote member cannot report status. READONLY: the member is receiving-only. N/A: the state cannot be determined because a side is unreachable.
 				Status *GetFederationConnectionDetails200JSONResponseBodyMemberConnectionsStatus `json:"status,omitempty"`
 
-				// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. In artifactweave this is false when the peer speaks a protocol major version this instance does not (decision 0021).
+				// Supported Optional within this object. False when the remote member cannot report federation status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks a protocol major version this instance does not (decision 0021).
 				Supported *bool `json:"supported,omitempty"`
 			} `json:"memberConnections,omitempty"`
 		}
@@ -72478,7 +72478,7 @@ func ParseGetFederatedRepositoryStatusResponse(rsp *http.Response) (*GetFederate
 				InProgressTasks *int `json:"inProgressTasks,omitempty"`
 			} `json:"binariesTasksInfo,omitempty"`
 
-			// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance, as the legacy repository status window shows them: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
+			// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
 			FederatedArtifactStatus *struct {
 				// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
 				FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
@@ -72516,7 +72516,7 @@ func ParseGetFederatedRepositoryStatusResponse(rsp *http.Response) (*GetFederate
 				// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
 				RemoteUrl *string `json:"remoteUrl,omitempty"`
 
-				// Status Optional within this object. Whether the mirror is in sync. Version 1 reports a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED or OUT_OF_SYNC there.
+				// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
 				Status *string `json:"status,omitempty"`
 
 				// UpdateEvents Optional within this object. Update events waiting to be sent.
@@ -74031,7 +74031,7 @@ func ParseGetAllBundlesResponse(rsp *http.Response) (*GetAllBundlesResponse, err
 				// Created Optional within this object. RFC 3339 time the version was created on the instance that signed it.
 				Created *time.Time `json:"created,omitempty"`
 
-				// Status Optional within this object. State of the version on this instance. JFrog documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS while a received version is still arriving and FAILED when receiving or storing failed.
+				// Status Optional within this object. State of the version on this instance. COMPLETE means the version is fully stored, IN_PROGRESS that a received version is still arriving, and FAILED that receiving or storing failed.
 				Status *string `json:"status,omitempty"`
 
 				// Version Optional within this object. The bundle version string.
@@ -74137,7 +74137,7 @@ func ParseGetAllBundleVersionsResponse(rsp *http.Response) (*GetAllBundleVersion
 				// Created Optional within this object. RFC 3339 time the version was created on the instance that signed it.
 				Created *time.Time `json:"created,omitempty"`
 
-				// Status Optional within this object. State of the version on this instance. JFrog documents COMPLETE for a version fully stored; artifactweave also reports IN_PROGRESS while a received version is still arriving and FAILED when receiving or storing failed.
+				// Status Optional within this object. State of the version on this instance. COMPLETE means the version is fully stored, IN_PROGRESS that a received version is still arriving, and FAILED that receiving or storing failed.
 				Status *string `json:"status,omitempty"`
 
 				// Version Optional within this object. The bundle version string.
@@ -81099,7 +81099,7 @@ func ParseGetRetentionPolicyConfigurationResponse(rsp *http.Response) (*GetReten
 			// Automatic Optional within this object. When true a scheduled job deletes versions that exceed the configured limits.
 			Automatic *bool `json:"automatic,omitempty"`
 
-			// CronPattern Optional within this object. Quartz cron expression for the scheduled job (decision 0010).
+			// CronPattern Optional within this object. Quartz cron expression for the scheduled job.
 			CronPattern *string `json:"cron_pattern,omitempty"`
 
 			// MaxDaysToKeep Optional within this object. Versions older than this many days become deletion candidates. Zero means no age limit.
@@ -81775,7 +81775,7 @@ func ParseGetFederatedRepositoryStatusV2Response(rsp *http.Response) (*GetFedera
 				InProgressTasks *int `json:"inProgressTasks,omitempty"`
 			} `json:"binariesTasksInfo,omitempty"`
 
-			// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance, as the legacy repository status window shows them: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
+			// FederatedArtifactStatus Optional within this object. Artifact replication counts on this instance: artifacts replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has not.
 			FederatedArtifactStatus *struct {
 				// FullyReplicatedArtifacts Optional within this object. Artifacts with both metadata and binary present.
 				FullyReplicatedArtifacts *int64 `json:"fullyReplicatedArtifacts,omitempty"`
@@ -81813,7 +81813,7 @@ func ParseGetFederatedRepositoryStatusV2Response(rsp *http.Response) (*GetFedera
 				// RemoteUrl Optional within this object. Base URL of the target mirror's instance.
 				RemoteUrl *string `json:"remoteUrl,omitempty"`
 
-				// Status Optional within this object. Whether the mirror is in sync. Version 1 reports a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED or OUT_OF_SYNC there.
+				// Status Optional within this object. Whether the mirror is in sync. Version 1 reports SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY, IMPORT_IN_PROGRESS).
 				Status *string `json:"status,omitempty"`
 
 				// UpdateEvents Optional within this object. Update events waiting to be sent.
