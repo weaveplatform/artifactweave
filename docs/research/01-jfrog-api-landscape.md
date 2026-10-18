@@ -128,15 +128,27 @@ password), `BearerAuth` (an access token or reference token), and `ApiKeyAuth` (
 `X-JFrog-Art-Api`, historically an API key, now a reference token since API keys reached
 end of life; creation is disabled from 7.98.7, and from 7.111.4 an administrator blocks
 existing keys with a platform setting that is off by default, per the
-[7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed) and [7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)). Anonymous access is permitted only for ping, version, readiness, liveness,
+[7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed) and [7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)). Anonymous access is permitted only for ping, readiness, liveness,
 health and the OIDC token exchange unless anonymous access is enabled in the security
 configuration. Details are in [05-platform-identity-and-security-apis.md](05-platform-identity-and-security-apis.md).
 
-7.x differs: version requires a valid user. From 7.35.1 anonymous callers cannot read it
-even with anonymous access enabled, although the reference page still says "Requires a valid
-user (can be anonymous)" (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414),
-fixed in 7.35.1; [Get Artifactory Version](https://docs.jfrog.com/administration/reference/getartifactoryversion.md));
-fixed by [#384](https://github.com/weaveplatform/artifactweave/issues/384).
+`GET /artifactory/api/system/version` requires a valid user, so a caller without
+credentials is refused while anonymous access is off (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414),
+"Anonymous users should not be able to access api/system/version end points", fixed in
+7.35.1; [Get Artifactory Version](https://docs.jfrog.com/administration/reference/getartifactoryversion.md),
+"Requires a valid user (can be anonymous)"). artifactweave answers 401 there, as it does on
+every route outside the probes. Ping stays open: RTFACT-26414 names only version in its
+summary and expected behaviour, and the
+[ping reference](https://docs.jfrog.com/administration/reference/artifactoryping.md)
+declares no security. While anonymous access is on, the sources disagree. The reference page
+says "can be anonymous" and its OpenAPI block declares `security: []`; RTFACT-26414 asks that
+anonymous users be refused even then; and the
+[7.125.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)
+fix "inconsistent token validation behavior ... when calling the system/version API with
+anonymous access enabled". artifactweave answers the anonymous user there, as the
+reference page says. That choice and the exact status for a caller without credentials are
+**[I]** until the live comparison
+([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 
 Sources: <https://docs.jfrog.com/administration/docs/access-tokens>,
 <https://docs.jfrog.com/user-management/docs/api-key>,

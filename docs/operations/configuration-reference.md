@@ -127,9 +127,10 @@ Later starts change none of them, so a principal an administrator removed stays 
 Changing `bootstrap.admin_password` after the first start has no effect.
 
 Requests authenticate with HTTP Basic. Wrong credentials answer `401` on every route.
-Without credentials, only the probes and version reads (`system/ping`, `system/version`,
-readiness, liveness, router health) and the usage sinks answer, until anonymous access is
-turned on. Token authentication (`Bearer`, `X-JFrog-Art-Api`) arrives with P4; until then
+Without credentials, only the probes (`system/ping`, readiness, liveness, router health),
+the Access version and the usage sinks answer, until anonymous access is turned on. The
+Artifactory version (`/artifactory/api/system/version`) is not among them; the JFrog CLI
+and the Terraform providers send their credentials with it. Token authentication (`Bearer`, `X-JFrog-Art-Api`) arrives with P4; until then
 those headers are refused.
 
 ## Configuration as code

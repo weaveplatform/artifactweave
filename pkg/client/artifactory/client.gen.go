@@ -11493,7 +11493,7 @@ type ClientInterface interface {
 
 	// GetSystemVersion Artifactory-compatible version
 	//
-	// Reports the Artifactory version artifactweave is compatible with. The JFrog Terraform providers parse only the version field and gate features on it; the JFrog CLI reads it before uploads to decide on multipart. The real artifactweave build is in revision.
+	// Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 	//
 	// Corresponds with GET /api/system/version (the `GetSystemVersion` operationId).
 	GetSystemVersion(ctx context.Context, params *GetSystemVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -18309,7 +18309,7 @@ func (c *Client) VerifyConnection(ctx context.Context, body VerifyConnectionJSON
 
 // GetSystemVersion Artifactory-compatible version
 //
-// Reports the Artifactory version artifactweave is compatible with. The JFrog Terraform providers parse only the version field and gate features on it; the JFrog CLI reads it before uploads to decide on multipart. The real artifactweave build is in revision.
+// Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 //
 // Corresponds with GET /api/system/version (the `GetSystemVersion` operationId).
 func (c *Client) GetSystemVersion(ctx context.Context, params *GetSystemVersionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -38353,7 +38353,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetSystemVersionWithResponse Artifactory-compatible version
 	//
-	// Reports the Artifactory version artifactweave is compatible with. The JFrog Terraform providers parse only the version field and gate features on it; the JFrog CLI reads it before uploads to decide on multipart. The real artifactweave build is in revision.
+	// Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -66064,7 +66064,7 @@ func (c *ClientWithResponses) VerifyConnectionWithResponse(ctx context.Context, 
 
 // GetSystemVersionWithResponse Artifactory-compatible version
 //
-// Reports the Artifactory version artifactweave is compatible with. The JFrog Terraform providers parse only the version field and gate features on it; the JFrog CLI reads it before uploads to decide on multipart. The real artifactweave build is in revision.
+// Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 //
 // Returns a wrapper object for the known response body format(s).
 //

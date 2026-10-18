@@ -15,11 +15,17 @@ import (
 )
 
 // publicRoutes answer without credentials even when anonymous access is off:
-// the probes and version reads clients make before they authenticate, and the
-// telemetry sinks every jf command posts to (research 05).
+// the probes clients make before they authenticate, the Access version, and
+// the telemetry sinks every jf command posts to (research 05).
+//
+// GET /artifactory/api/system/version is deliberately absent: Artifactory
+// requires a valid user for it and has refused anonymous callers since
+// 7.35.1 (RTFACT-26414), so it answers as any other route does, anonymous
+// only while anonymous access is on (research 01). The JFrog CLI and the
+// Terraform providers send their credentials with it; the CLI's usage
+// report, which sends none when none are configured, only logs the 401.
 var publicRoutes = map[string]bool{
 	"GET /artifactory/api/system/ping":              true,
-	"GET /artifactory/api/system/version":           true,
 	"GET /artifactory/api/v1/system/readiness":      true,
 	"GET /artifactory/api/v1/system/liveness":       true,
 	"GET /access/api/v1/system/ping":                true,

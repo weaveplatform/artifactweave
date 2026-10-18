@@ -32,7 +32,7 @@ where the source matters:
 | GET | `/artifactory/api/system/ping` | anonymous | 200 | `text/plain` body `OK` |
 | GET | `/artifactory/api/v1/system/readiness` | anonymous | 200 | `{"code":"OK"}` |
 | GET | `/artifactory/api/v1/system/liveness` | anonymous | 200 / 500 | `{"code":"OK"}` |
-| GET | `/artifactory/api/system/version` | anonymous | 200 | `{"version":"...","revision":"...","addons":[]}`; also served as `application/vnd.org.jfrog.artifactory.system.Version+json`. The 7.x reference has no `license` field; the 6.20 source (`VersionResource.java`) adds the licence key hash there when a licence is installed, **[I]** for 7.x; no client parses it |
+| GET | `/artifactory/api/system/version` | any user; anonymous only while anonymous access is on | 200 / 401 | 401 without credentials while anonymous access is off (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414), fixed in 7.35.1; the status and the anonymous-on case are **[I]**, see [research 01](01-jfrog-api-landscape.md#authentication-schemes)). `{"version":"...","revision":"...","addons":[]}`; also served as `application/vnd.org.jfrog.artifactory.system.Version+json`. The 7.x reference has no `license` field; the 6.20 source (`VersionResource.java`) adds the licence key hash there when a licence is installed, **[I]** for 7.x; no client parses it |
 | GET | `/artifactory/api/system` | admin | 200 | `text/plain` system info |
 | POST | `/artifactory/api/system/verifyconnection` | admin | 200 | `{endpoint,username,password}` |
 | GET | `/artifactory/api/system/license` | admin | 200 | `{"type":"...","validThrough":"...","licensedTo":"..."}`; read only by `platform_license` |
@@ -69,9 +69,6 @@ where the source matters:
 | POST | `/artifactory/api/artifactexport/repository` | admin | 200 | `{action:"repository",path,repository,excludeMetadata,m2,verbose}`; deferred |
 
 Where artifactweave does not yet serve these endpoints as 7.x does:
-- 7.x differs: version requires a valid user, and from 7.35.1 anonymous callers cannot read
-  it even with anonymous access enabled (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414),
-  fixed in 7.35.1); fixed by [#384](https://github.com/weaveplatform/artifactweave/issues/384).
 - 7.x differs: ping answers 500 when Artifactory is not working, and readiness and liveness
   answer an error status with the reason
   ([ping](https://docs.jfrog.com/administration/reference/artifactoryping.md),

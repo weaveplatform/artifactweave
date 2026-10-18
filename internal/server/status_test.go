@@ -75,7 +75,24 @@ func statusTable() []statusCase {
 
 func systemStatusRows() []statusCase {
 	return []statusCase{
-		{"GET /artifactory/api/system/version", "/artifactory/api/system/version", "", "", 200},
+		// Version answers any caller but anonymous while anonymous access is
+		// off, unlike ping and the probes (RTFACT-26414).
+		{"GET /artifactory/api/system/version", "/artifactory/api/system/version", "", "", 401},
+		{
+			"GET /artifactory/api/system/version",
+			"/artifactory/api/system/version",
+			"anonymous",
+			"",
+			200,
+		},
+		{"GET /artifactory/api/system/version", "/artifactory/api/system/version", "user", "", 200},
+		{
+			"GET /artifactory/api/system/version",
+			"/artifactory/api/system/version",
+			"admin",
+			"",
+			200,
+		},
 		{
 			"GET /artifactory/api/system/license",
 			"/artifactory/api/system/license",

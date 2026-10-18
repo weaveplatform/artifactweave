@@ -362,9 +362,12 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    From 7.111.4 an administrator blocks existing API keys with a platform setting that is
    off by default ([7.111.4 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)); artifactweave never holds API keys, so none exist to
    block.
-4. **Anonymous** for ping, version, readiness, liveness, router health and the OIDC token
-   exchange. Everything else needs `security.anonAccessEnabled` and a permission that grants
-   the `anonymous` user.
+4. **Anonymous** for ping, the Access version, readiness, liveness, router health and the
+   OIDC token exchange. Everything else needs `security.anonAccessEnabled` and a permission
+   that grants the `anonymous` user. `GET /artifactory/api/system/version` is not among
+   them: since 7.35.1 it refuses callers without credentials
+   (**[J]** [RTFACT-26414](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26414);
+   [research 01](01-jfrog-api-landscape.md#authentication-schemes)).
 5. Basic auth can be disabled platform-wide through
    `/access/api/v1/config/security/authentication/basic_authentication_enabled`.
 6. The Docker token flow is described in [04-package-protocols.md](04-package-protocols.md);

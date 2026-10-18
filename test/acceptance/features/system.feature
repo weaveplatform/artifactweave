@@ -1,7 +1,8 @@
 Feature: System endpoints
   The probes and version endpoints that every JFrog client calls before doing
   anything else. The exact bodies and status codes are what the JFrog CLI and
-  the Terraform providers parse (research 06 and 09).
+  the Terraform providers parse (research 06 and 09). The Artifactory version
+  needs credentials while anonymous access is off; the clients send theirs.
 
   Background:
     Given the registry is running
@@ -12,11 +13,20 @@ Feature: System endpoints
     And the response body is "OK"
 
   Scenario: Artifactory version reports the compatibility version and a revision
-    When I GET "/artifactory/api/system/version"
+    When I GET "/artifactory/api/system/version" as admin
     Then the response status is 200
     And the JSON field "version" equals "7.155.0"
     And the JSON field "revision" is not empty
     And the JSON field "addons" exists
+
+  Scenario: Artifactory version is refused without credentials while ping is not
+    When I GET "/artifactory/api/system/version"
+    Then the response status is 401
+    And the response header "WWW-Authenticate" contains "Artifactory Realm"
+    And the JSON field "errors.0.message" equals "Authentication is required"
+    When I GET "/artifactory/api/system/ping"
+    Then the response status is 200
+    And the response body is "OK"
 
   Scenario: Readiness and liveness
     When I GET "/artifactory/api/v1/system/readiness"
