@@ -2,6 +2,7 @@ package build
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -110,6 +111,67 @@ func Parse(projectKey string, raw []byte) (types.Build, error) {
 	}
 	return b, nil
 }
+
+// duplicateEntry is ErrInvalid naming the first file one of modules lists
+// twice: an artifact with the name, path and checksums of another of the
+// module's artifacts, or a dependency with the id and checksums of another
+// of its dependencies. Artifactory 7.x refuses such a publish by default
+// (RTDEV-47671). Only repeats within one list of one module count: a
+// multi-module build lists a shared dependency in every module that uses
+// it, and one build may hold several files with one checksum at different
+// paths (7.161.15). An entry without checksums is never matched to a file,
+// so it is not checked either.
+func duplicateEntry(modules []types.BuildModule) error {
+	type entry struct {
+		name string
+		sums types.Checksums
+	}
+	for _, m := range modules {
+		for _, list := range []struct {
+			kind  string
+			files []types.BuildFile
+			name  func(types.BuildFile) string
+		}{
+			{"artifact", m.Artifacts, artifactKey},
+			{"dependency", m.Dependencies, dependencyKey},
+		} {
+			seen := map[entry]bool{}
+			for _, f := range list.files {
+				if f.Checksums == (types.Checksums{}) {
+					continue
+				}
+				e := entry{list.name(f), lowerSums(f.Checksums)}
+				if seen[e] {
+					return fmt.Errorf(
+						"%w: the build-info module '%s' lists the %s '%s' more than once",
+						ErrInvalid,
+						m.ID,
+						list.kind,
+						cmp.Or(f.ID, f.Name, f.Path),
+					)
+				}
+				seen[e] = true
+			}
+		}
+	}
+	return nil
+}
+
+// lowerSums is c with its hex digits in lower case, as clients send either.
+func lowerSums(c types.Checksums) types.Checksums {
+	return types.Checksums{
+		SHA1:   strings.ToLower(c.SHA1),
+		SHA256: strings.ToLower(c.SHA256),
+		MD5:    strings.ToLower(c.MD5),
+	}
+}
+
+// artifactKey and dependencyKey say which file a build file names, apart
+// from its checksums: an artifact by its name and path, a dependency by its
+// id, which is all build-info gives it.
+func artifactKey(f types.BuildFile) string { return f.Name + "\x00" + f.Path }
+
+func dependencyKey(f types.BuildFile) string { return f.ID }
 
 func (f file) build() types.BuildFile {
 	return types.BuildFile{

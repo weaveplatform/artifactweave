@@ -42,6 +42,20 @@ the status codes and headers the CLI checks:
 - `jf rt bp --overwrite` relies on this: it sends a number once per existing run, and each
   occurrence deletes one run.
 
+**Duplicate entries.** A publish whose module lists one file twice is refused with 400, as
+Artifactory 7.x refuses it by default from 7.90.15 (RTDEV-47671).
+- **What counts.** Two artifacts of one module with the same name, path and checksums, or
+  two dependencies of one module with the same id and checksums. Checksums compare without
+  regard to case.
+- **What does not.** The same file in two modules, an artifact the same module also lists as
+  a dependency, and files that share a checksum under another name, path or id. An entry
+  without checksums names no file (a folder, say), so it is not checked.
+- **The answer.** 400 with `the build-info module '<id>' lists the <artifact|dependency>
+  '<name>' more than once`, before anything is stored.
+- **Append** checks the modules it adds, not those the run already has.
+- **The switch.** `build.block_duplicate_entries` (default `true`) is Artifactory's
+  `artifactory.build.block.duplicate.entries`; `false` accepts such a publish.
+
 **The document as an item.**
 - **Where it lives.** Each run's document is also written as the item
   `<project>-build-info/<encoded name>/<encoded number>-<started epoch ms>.json`. The project
@@ -90,6 +104,15 @@ its folder:
   item named like the artifact is preferred. Dependencies are found by checksum in any
   repository, limited by `scopes`. `artifacts` defaults to true, `dependencies` to false.
   An artifact or dependency that is nowhere is an error line.
+- **Files sharing a checksum.** Each artifact or dependency takes an item no other entry of
+  the run has taken while one is left, so several dependencies with one SHA move several
+  files (7.125.4), as do a run's artifacts held at different paths with one checksum. An
+  entry for the same file (an artifact's name and path, a dependency's id) takes the same
+  item, and artifacts and dependencies are matched apart, so a dependency on another
+  module's artifact is that artifact's file. The build artifacts search finds files the same
+  way.
+- **Folder entries.** An entry without checksums, such as one naming a folder, is found
+  nowhere and reported nowhere (7.161.15).
 - **Where it goes.** Each file is copied or moved to `targetRepo` at the path it had,
   through the item API's copy and move, with its conflict and overwrite rules. A virtual
   target resolves to its default deployment repository; a missing target is 404 and one that
@@ -119,6 +142,8 @@ of that run would: its document goes, and its artifacts too with `deleteBuildArt
   for a build with no runs is 404.
 - **Values.** `count` of 0 is 400, as in Artifactory; absent or negative keeps any number.
   `minimumBuildDate` is a timestamp or epoch milliseconds.
+- **Folder entries.** Artifacts are found by checksum, so an entry naming a folder deletes
+  nothing (7.161.15).
 - **`async`** absent or false discards before answering. True checks the request and the
   caller's delete permission, answers 204, and discards in the background, planning again
   then; a failure there is logged.
@@ -153,6 +178,15 @@ promotion leaves a build's files split between two repositories, which the JFrog
 own help warns of. One transaction makes fail-fast mean "all or nothing", which is what a
 pipeline that stops on the error assumes.
 
+**Duplicate entries are counted per module and list,** by what names one file: build-info
+gives an artifact a name and a path, and a dependency an id. Artifactory documents only
+"the same artifact" used more than once. Counting across modules would refuse every
+multi-module build, which lists a shared dependency in each module, and counting by
+checksum alone would refuse a build holding one file at two paths, which 7.161.15 says one
+build may (RTDEV-71186). The JFrog CLI merges its own records the same way, artifacts by
+name and SHA-1 and dependencies by id and SHA-1 (`build-info-go`, `mergeArtifacts`), so a
+CLI publish never meets the refusal.
+
 **Alternatives considered:**
 - *Storing build-info only as items:* build queries would need JSON parsing per query.
 - *A unique key of project, name and number:* rejects a second run of the same number,
@@ -160,14 +194,23 @@ pipeline that stops on the error assumes.
 
 ## Artifactory 7.x check
 
-7.x changes four points this decision does not yet follow
-([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check)); [#353](https://github.com/weaveplatform/artifactweave/issues/353)
-brings them in and amends this record:
+7.x changed four points ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check)). [#353](https://github.com/weaveplatform/artifactweave/issues/353)
+brought this record up to date:
 - A publish with duplicate entries fails by default, unless
-  `artifactory.build.block.duplicate.entries` is false (7.90.15).
-- Promotion promotes every dependency, even those that share a checksum (7.125.4).
-- Entries that name a folder are ignored (7.161.15).
-- A failed build-info search by artifact answers 400 (7.161.15).
+  `artifactory.build.block.duplicate.entries` is false (7.90.15): **Duplicate entries**
+  above.
+- Promotion promotes every dependency, even those that share a checksum (7.125.4): **Files
+  sharing a checksum** above.
+- Entries that name a folder are ignored (7.161.15): **Folder entries** above.
+- A failed build-info search by artifact answers 400 (7.161.15). The build artifacts search
+  already answers 400 to every request it cannot run (no build name, no number or status,
+  both, a mapping that is not a regular expression) and 404 when it finds nothing; only a
+  store failure is 500.
+
+What 7.x documents of the duplicate rule is "the same artifact used in the build more than
+once", with no status or message, so the rule above, its 400 and its message are inferred,
+as are the claim rule for files sharing a checksum and the check on append
+([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 
 ## Constraints
 
@@ -184,6 +227,10 @@ brings them in and amends this record:
 - Service tests for every promotion line, the fail-fast rollback, the retention arithmetic
   and a publish's `buildRetention`; handler tests for the media types, the 400 report and
   the background discard.
+- `TestDuplicateEntries` and `TestAppendDuplicateEntries` for what counts as a duplicate
+  and the switch, `TestBuildDuplicateEntries` for the 400;
+  `TestPromoteFilesSharingAChecksum` and `TestFolderEntries` for promotion, the build
+  artifacts search and retention.
 - Store tests with several runs of one number, and the encoded item path.
 - `TestBuildRoutesKeepEscapedSlash`: an escaped `/` in a build name or number reaches the
   operation intact.
