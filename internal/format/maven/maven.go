@@ -36,15 +36,19 @@ func Serves(t repo.PackageType) bool {
 }
 
 // Handler is the Maven format: its deploy rules (admit.go), its download
-// policy (policy.go) and the package index. Snapshot naming and derived
-// metadata come with #279 to #283.
+// policy and version tokens (policy.go, resolve.go), the package index, and
+// maven-metadata.xml derived through the work queue (work.go, #279).
+// Snapshot naming comes with #280.
 type Handler struct {
 	// The generic format's hooks, which Admit's own checks replace.
 	generic.Handler
 }
 
 // Deployed indexes a file stored in a version: the version is synced with
-// the tree, so its date and files are what a reindex would read.
+// the tree, so its date and files are what a reindex would read. It queues
+// the package's metadata, whose run rebuilds the group's plugin metadata
+// too, and a plugin POM queues its group's plugin metadata of its own, which
+// a read of that file waits for.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -54,15 +58,58 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		return err
 	}
 	co, ok := r.read(it.FullPath())
-	if !ok {
-		return nil
+	if ok {
+		if err := syncVersion(ctx, env, c, r, it.Cached, co); err != nil {
+			return err
+		}
 	}
-	return syncVersion(ctx, env, c, r, it.Cached, co)
+	if err := queueWrite(ctx, env, c, it.Cached, it.FullPath(), co, ok); err != nil {
+		return err
+	}
+	return queueMarked(ctx, env, c, it)
 }
 
 // Deleting runs before a file is removed. The item service drops the file's
-// version link with it; Deleted settles the rest.
-func (Handler) Deleting(context.Context, format.Env, repo.Config, types.Item) error { return nil }
+// version link with it; Deleted settles the rest. A plugin POM, whose mark
+// goes with it, queues its group's plugin metadata here.
+func (Handler) Deleting(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+	if it.Folder {
+		return nil
+	}
+	return queueMarked(ctx, env, c, it)
+}
+
+// queueMarked queues the plugin metadata of the group of a POM marked as a
+// plugin.
+func queueMarked(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+	if !IsPom(it.Name) || !queued(c, it.Cached) {
+		return nil
+	}
+	props, err := env.Store.Items().Properties(ctx, it.ID)
+	if err != nil {
+		return fmt.Errorf("maven: properties of %s: %w", it.FullPath(), err)
+	}
+	if !isPlugin(props) {
+		return nil
+	}
+	return queuePlugin(ctx, env, c, it.Cached, it.FullPath())
+}
+
+// Annotated queues a group's plugin metadata when a POM in it gains or
+// loses PluginProperty, by a deploy's properties or later.
+func (Handler) Annotated(
+	ctx context.Context,
+	env format.Env,
+	c repo.Config,
+	it types.Item,
+	a format.Annotation,
+) error {
+	_, set := a.Set[PluginProperty]
+	if it.Folder || !set && !slices.Contains(a.Removed, PluginProperty) {
+		return nil
+	}
+	return queuePlugin(ctx, env, c, it.Cached, it.FullPath())
+}
 
 // Deleted syncs every version a removal touched with the tree: a version
 // that kept files may have lost its earliest, which dates it.
@@ -89,7 +136,11 @@ func (Handler) Deleted(
 	}
 	// In key order, so the index changes the same way on every store.
 	for _, k := range slices.Sorted(maps.Keys(touched)) {
-		if err := syncVersion(ctx, env, c, r, cached, touched[k]); err != nil {
+		co := touched[k]
+		if err := syncVersion(ctx, env, c, r, cached, co); err != nil {
+			return err
+		}
+		if err := queueWrite(ctx, env, c, cached, "", co, true); err != nil {
 			return err
 		}
 	}
@@ -107,13 +158,13 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 }
 
 // Classify reports maven-metadata.xml as derived, since #279 writes it
-// from the index and a replica recomputes it, except a snapshot folder's
-// under deployer, which is the client's own; a non-unique snapshot and a
-// Nexus index file as metadata, since a later deploy changes them under the
-// same path; and every other file as unique.
+// from the index and a replica recomputes it, except under deployer, which
+// leaves every level to the client; a non-unique snapshot and a Nexus index
+// file as metadata, since a later deploy changes them under the same path;
+// and every other file as unique.
 func (Handler) Classify(c repo.Config, p string) format.Class {
 	switch {
-	case IsMetadata(p) && IsSnapshotMetadata(p) && c.SnapshotVersionBehavior == repo.Deployer:
+	case IsMetadata(p) && c.SnapshotVersionBehavior == repo.Deployer:
 		return format.ClassMetadata
 	case IsMetadata(p):
 		return format.ClassDerived

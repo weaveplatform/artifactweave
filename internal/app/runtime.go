@@ -13,6 +13,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
 	"github.com/weaveplatform/artifactweave/internal/service/registry"
 	"github.com/weaveplatform/artifactweave/internal/service/usage"
@@ -117,6 +118,12 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 		Log:         log,
 	})
 	if err != nil {
+		return nil, errors.Join(err, st.Close())
+	}
+	// The formats' derived work runs through the same item service the
+	// server writes with, and its kinds must be known before Run leases.
+	derived := &item.Service{Store: st, Blobs: hot.store, Work: queue}
+	if err := derived.RegisterWork(queue); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}
 	// The loops outlive startup's context and stop only through close, after

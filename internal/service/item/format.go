@@ -11,6 +11,7 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -34,11 +35,12 @@ func (s *Service) format(t repo.PackageType) format.Handler {
 // env is the environment of one operation's hooks.
 func (s *Service) env() format.Env {
 	env := format.Env{
-		Store:   s.Store,
-		Now:     s.now,
-		Layouts: &layouts{s: s, seen: map[string]*layout.Layout{}},
-		Derive:  s.derive,
-		Enqueue: s.enqueue,
+		Store:    s.Store,
+		Now:      s.now,
+		Layouts:  &layouts{s: s, seen: map[string]*layout.Layout{}},
+		Derive:   s.derive,
+		Underive: s.underive,
+		Enqueue:  s.enqueue,
 	}
 	// A nil blob.Store must not become a non-nil format.Blobs.
 	if s.Blobs != nil {
@@ -111,6 +113,38 @@ func (s *Service) derive(ctx context.Context, d format.Derived) (types.Item, err
 		return types.Item{}, err //nolint:wrapcheck // the transaction returns ours
 	}
 	return out, nil
+}
+
+// underive removes a file a format derived, in ctx's transaction or one of
+// its own, with no hook and no trash, and releases its content.
+func (s *Service) underive(ctx context.Context, c repo.Config, cached bool, p string) error {
+	full := strings.Trim(p, "/")
+	err := s.Store.Tx(ctx, func(ctx context.Context) error {
+		it, err := s.Store.Items().Get(ctx, c.Key, cached, full)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			return nil
+		case err != nil:
+			return fmt.Errorf("item: get %s: %w", full, err)
+		case it.Folder:
+			// A folder would take everything below it.
+			return fmt.Errorf("%w: %s is a folder", ErrConflict, full)
+		}
+		res, err := s.Store.Items().Delete(ctx, c.Key, cached, full)
+		if err != nil {
+			return fmt.Errorf("item: delete %s: %w", full, err)
+		}
+		for sha, n := range res.BlobRefs {
+			if _, err := s.Store.Blobs().Unref(ctx, sha, n); err != nil {
+				return fmt.Errorf("item: release blob %s: %w", sha, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return err //nolint:wrapcheck // the transaction returns ours
+	}
+	return nil
 }
 
 // inspect runs the format's Inspect on a write whose content is stored,
@@ -202,17 +236,23 @@ func (s *Service) Annotate(
 }
 
 // Resolve returns the path a download d from c, a repository that is not
-// virtual, reads: the format's resolution of it, or d.Path itself.
+// virtual, reads: the format's resolution of it, or d.Path itself. The
+// derived work the format owes that path is done first (EnsureFresh).
 func (s *Service) Resolve(ctx context.Context, c repo.Config, d format.Download) (string, error) {
-	r, ok := s.format(c.PackageType).(format.Resolver)
-	if !ok {
-		return d.Path, nil
+	h := s.format(c.PackageType)
+	out := d.Path
+	if r, ok := h.(format.Resolver); ok {
+		var err error
+		out, err = r.Resolve(ctx, s.env(), c, d)
+		if err != nil {
+			return "", err //nolint:wrapcheck // the format's own error
+		}
+		out = strings.Trim(out, "/")
 	}
-	out, err := r.Resolve(ctx, s.env(), c, d)
-	if err != nil {
-		return "", err //nolint:wrapcheck // the format's own error
+	if err := s.fresh(ctx, h, c, d.Cached, out); err != nil {
+		return "", err
 	}
-	return strings.Trim(out, "/"), nil
+	return out, nil
 }
 
 // Reindex rebuilds c's package index from its item tree through its

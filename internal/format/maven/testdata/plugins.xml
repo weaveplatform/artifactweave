@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <plugins>
+    <plugin>
+      <name>Unnamed - com.acme.plugins:bar-maven-plugin:maven-plugin:2.0</name>
+      <prefix>bar</prefix>
+      <artifactId>bar-maven-plugin</artifactId>
+    </plugin>
+    <plugin>
+      <name>Foo &amp; more</name>
+      <prefix>foo</prefix>
+      <artifactId>maven-foo-plugin</artifactId>
+    </plugin>
+    <plugin>
+      <name>Plugin Plugin</name>
+      <prefix>plugin</prefix>
+      <artifactId>maven-plugin-plugin</artifactId>
+    </plugin>
+  </plugins>
+</metadata>
