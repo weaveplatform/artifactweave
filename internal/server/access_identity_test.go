@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
@@ -191,6 +192,46 @@ func TestManagedUserFlow(t *testing.T) {
 	w.call(t, http.MethodGet, "/access/api/v2/users/alice", admin, "", http.StatusNotFound, nil)
 	// The legacy API sees the same record.
 	w.call(t, http.MethodGet, "/artifactory/api/security/users/bob", admin, "", http.StatusOK, nil)
+}
+
+// TestLastLoggedIn: a user who never logged in has "last_logged_in": null,
+// as Artifactory answers since 7.98.7, on create and on read; after a login
+// the field is the login's RFC 3339 time.
+func TestLastLoggedIn(t *testing.T) {
+	w := newIdentityWorld(t)
+	field := func(d map[string]json.RawMessage) json.RawMessage {
+		t.Helper()
+		v, ok := d["last_logged_in"]
+		if !ok {
+			t.Fatalf("no last_logged_in in %v", d)
+		}
+		return v
+	}
+	read := func() json.RawMessage {
+		t.Helper()
+		var d map[string]json.RawMessage
+		w.call(t, http.MethodGet, "/access/api/v2/users/erin", admin, "", http.StatusOK, &d)
+		return field(d)
+	}
+	var created map[string]json.RawMessage
+	w.call(t, http.MethodPost, "/access/api/v2/users", admin,
+		`{"username":"erin","email":"erin@example.com","password":"Secret-1"}`,
+		http.StatusCreated, &created)
+	if v := field(created); string(v) != "null" {
+		t.Fatalf("created: last_logged_in %s", v)
+	}
+	if v := read(); string(v) != "null" {
+		t.Fatalf("never logged in: last_logged_in %s", v)
+	}
+	w.call(t, http.MethodGet, "/access/api/v2/users/erin", basic("erin", "Secret-1"), "",
+		http.StatusOK, nil)
+	var at string
+	if err := json.Unmarshal(read(), &at); err != nil {
+		t.Fatalf("after login: %v", err)
+	}
+	if _, err := time.Parse(time.RFC3339, at); err != nil {
+		t.Fatalf("after login: %v", err)
+	}
 }
 
 // TestPlatformGroupFlow follows the jfrog/platform provider's

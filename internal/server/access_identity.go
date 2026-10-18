@@ -461,6 +461,8 @@ func (s accessService) userDetails(
 		ManageWebhook:            &r.ManageWebhook,
 		PlatformAuditor:          &r.PlatformAuditor,
 	}
+	// Left nil for a user who never logged in, it encodes as null, as
+	// Artifactory answers since 7.98.7.
 	if !u.LastLoggedIn.IsZero() {
 		t := u.LastLoggedIn
 		d.LastLoggedIn = &t
