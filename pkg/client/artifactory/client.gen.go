@@ -5779,7 +5779,7 @@ type StatusMessage struct {
 	Status *int `json:"status,omitempty"`
 }
 
-// StorageSummaryInfo Snapshot of storage usage. The figures are computed by the last `calculate` run, not on every request, so they can lag writes.
+// StorageSummaryInfo Snapshot of storage usage. artifactweave computes the figures on every request, so they never lag writes; Artifactory serves the result of its last calculation.
 type StorageSummaryInfo struct {
 	// BinariesSummary Optional within this object. Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory emits and what the JFrog CLI prints verbatim.
 	BinariesSummary *BinariesSummary `json:"binariesSummary,omitempty"`
@@ -11028,14 +11028,14 @@ type ClientInterface interface {
 
 	// GetStorageSummaryInfo Storage summary
 	//
-	// Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r` token scope.
+	// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
 	//
 	// Corresponds with GET /api/storageinfo (the `GetStorageSummaryInfo` operationId).
 	GetStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// RefreshStorageSummaryInfo Recalculate the storage summary
 	//
-	// Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+	// Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.
 	//
 	// Corresponds with POST /api/storageinfo/calculate (the `RefreshStorageSummaryInfo` operationId).
 	RefreshStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11294,7 +11294,7 @@ type ClientInterface interface {
 
 	// OptimizeSystemStorage Optimise storage
 	//
-	// Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin only. Returns a plain-text acknowledgement.
+	// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
 	//
 	// Corresponds with POST /api/system/storage/optimize (the `OptimizeSystemStorage` operationId).
 	OptimizeSystemStorage(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -17344,7 +17344,7 @@ func (c *Client) ReplaceSignedUrlKey(ctx context.Context, reqEditors ...RequestE
 
 // GetStorageSummaryInfo Storage summary
 //
-// Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r` token scope.
+// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
 //
 // Corresponds with GET /api/storageinfo (the `GetStorageSummaryInfo` operationId).
 func (c *Client) GetStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17361,7 +17361,7 @@ func (c *Client) GetStorageSummaryInfo(ctx context.Context, reqEditors ...Reques
 
 // RefreshStorageSummaryInfo Recalculate the storage summary
 //
-// Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+// Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.
 //
 // Corresponds with POST /api/storageinfo/calculate (the `RefreshStorageSummaryInfo` operationId).
 func (c *Client) RefreshStorageSummaryInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -17970,7 +17970,7 @@ func (c *Client) RunGarbageCollection(ctx context.Context, reqEditors ...Request
 
 // OptimizeSystemStorage Optimise storage
 //
-// Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin only. Returns a plain-text acknowledgement.
+// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
 //
 // Corresponds with POST /api/system/storage/optimize (the `OptimizeSystemStorage` operationId).
 func (c *Client) OptimizeSystemStorage(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37794,7 +37794,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetStorageSummaryInfoWithResponse Storage summary
 	//
-	// Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r` token scope.
+	// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37803,7 +37803,7 @@ type ClientWithResponsesInterface interface {
 
 	// RefreshStorageSummaryInfoWithResponse Recalculate the storage summary
 	//
-	// Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+	// Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38110,7 +38110,7 @@ type ClientWithResponsesInterface interface {
 
 	// OptimizeSystemStorageWithResponse Optimise storage
 	//
-	// Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin only. Returns a plain-text acknowledgement.
+	// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -65187,7 +65187,7 @@ func (c *ClientWithResponses) ReplaceSignedUrlKeyWithResponse(ctx context.Contex
 
 // GetStorageSummaryInfoWithResponse Storage summary
 //
-// Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r` token scope.
+// Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65202,7 +65202,7 @@ func (c *ClientWithResponses) GetStorageSummaryInfoWithResponse(ctx context.Cont
 
 // RefreshStorageSummaryInfoWithResponse Recalculate the storage summary
 //
-// Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+// Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65719,7 +65719,7 @@ func (c *ClientWithResponses) RunGarbageCollectionWithResponse(ctx context.Conte
 
 // OptimizeSystemStorageWithResponse Optimise storage
 //
-// Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin only. Returns a plain-text acknowledgement.
+// Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
 //
 // Returns a wrapper object for the known response body format(s).
 //

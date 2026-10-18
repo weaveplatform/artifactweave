@@ -11551,7 +11551,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemproperties.md
   /api/storageinfo:
     get:
-      description: Returns the storage usage snapshot computed by the last `calculate` run. Needs admin or the `system:info/storage:r` token scope.
+      description: Returns the storage usage snapshot, computed on every request. Artifactory also admits the `system:info/storage:r` token scope; artifactweave answers administrators only until #390.
       operationId: getStorageSummaryInfo
       responses:
         '200':
@@ -11578,7 +11578,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md
   /api/storageinfo/calculate:
     post:
-      description: Starts a background recalculation of the storage summary and returns 202 immediately. Admin only.
+      description: Acknowledges a recalculation of the storage summary with 202. The summary is computed on every request, so there is nothing to recalculate. Admin only.
       operationId: refreshStorageSummaryInfo
       responses:
         '202':
@@ -12638,7 +12638,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/rungarbagecollection.md
   /api/system/storage/optimize:
     post:
-      description: Runs blob store housekeeping (compaction of the content-addressed store) in the background. Admin only. Returns a plain-text acknowledgement.
+      description: Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text acknowledgement.
       operationId: optimizeSystemStorage
       responses:
         '200':
@@ -22591,7 +22591,7 @@ components:
           type: integer
       type: object
     StorageSummaryInfo:
-      description: Snapshot of storage usage. The figures are computed by the last `calculate` run, not on every request, so they can lag writes.
+      description: Snapshot of storage usage. artifactweave computes the figures on every request, so they never lag writes; Artifactory serves the result of its last calculation.
       properties:
         binariesSummary:
           allOf:
