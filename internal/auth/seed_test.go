@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -37,15 +38,19 @@ func checkSeeded(t *testing.T, st store.Store, password string) {
 	if g, err := st.Groups().Get(ctx, ReadersGroup); err != nil || !g.AutoJoin {
 		t.Fatalf("readers = %+v, %v", g, err)
 	}
+	// Since 7.84.3 neither seeded permission grants anonymous (#383):
+	// Anything grants readers alone, and Any Remote no one.
 	anything, err := st.Permissions().Get(ctx, AnythingPermission)
-	if err != nil ||
-		anything.Resources[types.ResourceArtifact].Actions.Groups[ReadersGroup] != types.ActionRead ||
-		len(anything.Resources[types.ResourceArtifact].Targets[types.TargetAny].Include) != 1 {
+	if a := anything.Resources[types.ResourceArtifact]; err != nil ||
+		len(a.Actions.Users) != 0 || len(a.Actions.Groups) != 1 ||
+		a.Actions.Groups[ReadersGroup] != types.ActionRead ||
+		len(a.Targets[types.TargetAny].Include) != 1 {
 		t.Fatalf("Anything = %+v, %v", anything, err)
 	}
 	remote, err := st.Permissions().Get(ctx, AnyRemotePermission)
-	if err != nil || remote.Resources[types.ResourceArtifact].Actions.Users[AnonymousUser] !=
-		types.ActionRead|types.ActionWrite {
+	if r := remote.Resources[types.ResourceArtifact]; err != nil || len(remote.Resources) != 1 ||
+		len(r.Actions.Users) != 0 || len(r.Actions.Groups) != 0 ||
+		!slices.Equal(r.Targets[types.TargetAnyRemote].Include, []string{"**"}) {
 		t.Fatalf("Any Remote = %+v, %v", remote, err)
 	}
 	bi, err := st.Repos().Get(ctx, types.BuildInfoRepository)

@@ -60,6 +60,10 @@ func (b signingBlobs) SignURL(_ context.Context, sha string, o blob.SignOptions)
 	return "https://" + o.Via.String() + ".example/" + sha + "?" + q.Encode(), nil
 }
 
+// anonymousRemotes is the permission newItemWorld gives anonymous when
+// anonymous access is on: read on every remote repository.
+const anonymousRemotes = "anonymous-remotes"
+
 // newItemWorld builds the world; tune adjusts the router's configuration,
 // for tests that need another blob store or a logger they can read.
 func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorld {
@@ -90,6 +94,19 @@ func newItemWorld(t *testing.T, anonymous bool, tune ...func(*Config)) *itemWorl
 	}
 	if anonymous {
 		if err := db.Settings().Put(ctx, types.SettingAnonymousAccess, true); err != nil {
+			t.Fatal(err)
+		}
+		// The seeded Any Remote grants anonymous nothing (#383), so anonymous
+		// reads remotes through a permission of its own, as JFrog advises.
+		if err := db.Permissions().Create(ctx, types.Permission{
+			Name: anonymousRemotes,
+			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+				Actions: types.Grants{Users: map[string]types.Actions{
+					auth.AnonymousUser: types.ActionRead,
+				}},
+				Targets: map[string]types.Target{types.TargetAnyRemote: {Include: []string{"**"}}},
+			}},
+		}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -596,8 +613,14 @@ func TestItemPermissions(t *testing.T) {
 	wantStatus(t, anon.do("PUT", "/artifactory/libs-local/a.txt", "admin", "x"), http.StatusCreated)
 	wantStatus(t, anon.do("GET", "/artifactory/libs-local/a.txt", "", ""), http.StatusUnauthorized)
 	wantStatus(t, anon.do("PUT", "/artifactory/libs-local/b.txt", "", "x"), http.StatusUnauthorized)
-	// Any Remote lets anonymous read remote repositories.
+	// anonymousRemotes lets anonymous read remote repositories.
 	wantStatus(t, anon.do("GET", "/artifactory/up/absent", "", ""), http.StatusNotFound)
+	// Without it, the seeded permissions leave anonymous nothing, remotes
+	// included: since 7.84.3 Any Remote does not grant it (#383).
+	if err := anon.db.Permissions().Delete(context.Background(), anonymousRemotes); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, anon.do("GET", "/artifactory/up/absent", "", ""), http.StatusUnauthorized)
 }
 
 func TestSearchAQL(t *testing.T) {

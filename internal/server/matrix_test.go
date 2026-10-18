@@ -103,15 +103,9 @@ var matrixPrincipals = []matrixPrincipal{
 		{types.BuildInfoRepository, "", rwd},
 		{dockerA, "", rawd},
 	}, formatGrants("", rawd))},
-	// The seeded Any Remote permission: anonymous reads and deploys to
-	// remote repositories while anonymous access is on.
-	{
-		name: "anon-on", user: auth.AnonymousUser, anonymous: true, anonymousOn: true,
-		grants: slices.Concat([]matrixGrant{
-			{"remote-shared", "", types.ActionRead | types.ActionWrite},
-			{"remote-private", "", types.ActionRead | types.ActionWrite},
-		}, formatRemoteGrants(types.ActionRead|types.ActionWrite)),
-	},
+	// Anonymous with anonymous access on holds nothing: since 7.84.3
+	// neither seeded permission grants it, Any Remote included (#383).
+	{name: "anon-on", user: auth.AnonymousUser, anonymous: true, anonymousOn: true},
 	{name: "anon-off", user: auth.AnonymousUser, anonymous: true},
 	// member's token scoped to A: what member holds in A, nothing in B.
 	{
@@ -532,6 +526,8 @@ func repositoryMatrix() []matrixRow {
 		),
 		row("GET "+r+"/{repoKey}", r+"/libs-local", "", sees("libs-local"), 200),
 		row("GET "+r+"/{repoKey}", r+"/libs-b", "", sees("libs-b"), 200),
+		// Covered by the seeded Any Remote alone, which grants no one.
+		row("GET "+r+"/{repoKey}", r+"/remote-private", "", sees("remote-private"), 200),
 		row("PUT "+r+"/{repoKey}", r+"/new-{p}", `{"rclass":"local"}`, administrators, 200),
 		row("POST "+r+"/{repoKey}", r+"/libs-local", `{"description":"{p}"}`, administrators, 200),
 		row("DELETE "+r+"/{repoKey}", r+"/r-{p}", "", administrators, 200),

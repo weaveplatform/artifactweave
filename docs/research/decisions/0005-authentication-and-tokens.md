@@ -340,7 +340,10 @@ lookup answers `404`, and `X-JFrog-Art-Api` accepts reference tokens.
 
 **Seeded principals.** First start creates `admin` (password from configuration),
 `anonymous`, the `readers` group and the `Anything` and `Any Remote` permission targets,
-and the `artifactory-build-info` repository.
+and the `artifactory-build-info` repository. Neither permission grants `anonymous`, as
+Artifactory ships them since 7.84.3: `Anything` grants `readers` read on every repository,
+and `Any Remote` grants no one
+([0006](0006-authorization-native-permission-model.md#seeded-permissions-383)).
 
 **Compatibility version strings.** `/artifactory/api/system/version` returns a
 configurable Artifactory-compatible `version`, default 7.155.0 or newer, with the real
@@ -452,9 +455,11 @@ reference and the CLI.
   "Temporary Login Suspension";
   [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations));
   fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
-- 7.x differs: from 7.84.3 `anonymous` is no longer in the `Anything` and `Any Remote`
-  permissions ([permissions](https://docs.jfrog.com/administration/docs/permissions)); fixed by
-  [#383](https://github.com/weaveplatform/artifactweave/issues/383).
+- Since 7.84.3 `anonymous` is in neither the `Anything` nor the `Any Remote` permission
+  ([permissions](https://docs.jfrog.com/administration/docs/permissions)), and artifactweave
+  seeds both that way. Decision
+  [0006](0006-authorization-native-permission-model.md#seeded-permissions-383) records what
+  the seed grants.
 
 **OIDC token exchange** ([research 21](../21-oidc-token-exchange.md#3-matching-and-the-token-issued)
 section 3 describes each point, from

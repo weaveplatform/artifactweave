@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/weaveplatform/artifactweave/internal/auth"
 )
 
 func adminJSON() map[string]string {
@@ -121,16 +123,24 @@ func TestPermissionAcrossFormats(t *testing.T) {
 }
 
 // TestSeededPermissionsInEveryFormat reads the seeded Anything and Any
-// Remote through each API.
+// Remote through each API. Since 7.84.3 neither names anonymous (#383).
 func TestSeededPermissionsInEveryFormat(t *testing.T) {
 	h := statusFixture(t, false)
 	for _, name := range []string{"Anything", "Any%20Remote"} {
 		for _, path := range []string{permV1, permV2, permAcc} {
 			rec := do(t, h, http.MethodGet, path+"/"+name, basic("admin", "pw"), "")
 			mustStatus(t, rec, 200, path+"/"+name)
+			if strings.Contains(rec.Body.String(), auth.AnonymousUser) {
+				t.Errorf("%s/%s grants anonymous: %s", path, name, rec.Body)
+			}
 		}
 	}
-	rec := do(t, h, http.MethodGet, permV1+"/Anything", basic("admin", "pw"), "")
+	rec := do(t, h, http.MethodGet, permV1+"/Any%20Remote", basic("admin", "pw"), "")
+	if !strings.Contains(rec.Body.String(), `"repositories":["ANY REMOTE"]`) ||
+		strings.Contains(rec.Body.String(), "principals") {
+		t.Fatalf("Any Remote in v1: %s", rec.Body)
+	}
+	rec = do(t, h, http.MethodGet, permV1+"/Anything", basic("admin", "pw"), "")
 	if !strings.Contains(rec.Body.String(), `"ANY"`) ||
 		!strings.Contains(rec.Body.String(), `"readers":["r"]`) {
 		t.Fatalf("Anything in v1: %s", rec.Body)

@@ -10583,7 +10583,7 @@ paths:
   /api/security/permissions/{permissionTargetName}:
     delete:
       deprecated: true
-      description: Removes the whole target, every section included. Admin only. The seeded Anything and Any Remote targets can be deleted; anonymous access then grants nothing until they are recreated. Deprecated in favour of DELETE /access/api/v2/permissions/{name}.
+      description: Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
       operationId: deletePermissionTarget
       parameters:
         - description: Required path parameter. The target name.

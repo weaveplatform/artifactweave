@@ -186,7 +186,7 @@ func TestSearchResultDetail(t *testing.T) {
 
 func TestSearchAnonymous(t *testing.T) {
 	w := searchWorld(t, true)
-	// Anonymous reads remote caches only (the seeded Any Remote permission).
+	// Anonymous reads remote caches only (newItemWorld's anonymousRemotes).
 	wantURIs(t, w.do("GET", "/artifactory/api/search/artifact?name=c", "", ""),
 		"up-cache/cached.txt")
 	wantURIs(t, w.do("GET", "/artifactory/api/search/checksum?sha1="+sha1Hex("jar"), "", ""))

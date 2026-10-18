@@ -16,9 +16,10 @@ const (
 	AdminUser          = "admin"
 	ReadersGroup       = "readers"
 	AnythingPermission = "Anything"
-	// AnyRemotePermission lets anonymous read remote repositories and cache
-	// what it reads (Artifactory's "Deploy/Cache", WRITE in the Access
-	// vocabulary). It matters only once anonymous access is turned on.
+	// AnyRemotePermission covers every remote repository and grants no one
+	// anything. Artifactory has shipped it without anonymous since 7.84.3, so
+	// a request without credentials reaches remote content only through a
+	// permission an administrator writes for anonymous.
 	AnyRemotePermission = "Any Remote"
 )
 
@@ -131,9 +132,10 @@ func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) 
 		{
 			Name: AnyRemotePermission,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					AnonymousUser: types.ActionRead | types.ActionWrite,
-				}},
+				// No grants, as Artifactory ships it since 7.84.3: anonymous
+				// here would let anyone fetch through every remote, and fill
+				// its cache, once anonymous access is on.
+				Actions: types.Grants{},
 				Targets: map[string]types.Target{
 					types.TargetAnyRemote: {Include: everything, Exclude: []string{}},
 				},
