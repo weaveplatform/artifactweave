@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -67,10 +67,16 @@ resolve against the configured repositories before the query runs, on every engi
   when `$match` does not. So `"libs-*"` reaches what `libs-virtual` stands for under
   `$match`, and excludes it under `$nmatch`. The ordering operators compare the reported
   key, like any text field.
-- **`.transitive()`** adds items found on Smart Remote members, through the remote client
-  ([0007](0007-remote-repositories.md)), for the first five remote members, as in
-  Artifactory. A query against a repository with no such member gets the same rows as
-  without it.
+- **`.transitive()`** is accepted and has no effect, so a query gets the same rows as
+  without it (`pkg/aql/aql.go`, `Query.Transitive`). artifactweave has no Smart Remote
+  search to make it transitive: Smart Remote configuration is accepted and ignored
+  ([0007](0007-remote-repositories.md)). In Artifactory it adds items found on Smart Remote
+  members, for the first five remote members of a virtual repository, and restricts the
+  query: no `.sort()` or `.offset()`, an `.include()` of item and item property fields
+  only, and a single repository named with `$eq`
+  ([aql-repository-queries](https://docs.jfrog.com/artifactory/docs/aql-repository-queries.md),
+  "Transitive Query Limitations"; research 22 §1.4). artifactweave enforces none of these
+  restrictions, since the suffix changes nothing.
 
 **Output.** The include, sort, offset and limit rules follow research 22 §1.2:
 - naming an item field replaces the defaults, and property or statistic fields add to them;
@@ -107,7 +113,7 @@ resolve against the configured repositories before the query runs, on every engi
 | 400 | an empty query, a body over the size limit (`AQL query is too long`, 6,000 characters), or a syntax or validation error |
 | 403 | an anonymous caller |
 | 408 | the database timeout cancels the query |
-| 429 | the concurrent-query limit is reached |
+| 429 | the concurrent-query limit is reached. Not sent, and unconfirmed for 7.x: artifactweave sets no such limit. [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed) added "concurrency limits at both global and per-user levels", but the documented switch, `artifactory.aql.queries.limit.enabled`, has defaulted to `false` since 7.84.16 ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md), "How Do I Configure AQL Rate Limiting?"), so a default 7.x instance may not throttle at all ([#216](https://github.com/weaveplatform/artifactweave/issues/216)) |
 
 **Actions.**
 - **`items.delete(<criteria>).dryRun(...)`** and
@@ -122,8 +128,13 @@ resolve against the configured repositories before the query runs, on every engi
   `$or`, and adds no implicit type, because folders carry properties too. The properties
   domain's own `key` and `value` fields answer 400 as unsupported.
 - **Suffixes.** `items.delete` takes only `.dryRun()`, and `properties.update` takes
-  `.keys()`, `.newValue()` and `.dryRun()`, the first two required. `include`, `sort`,
-  `offset` and `limit` answer 400, as JFrog documents for delete.
+  `.keys()`, `.newValue()` and `.dryRun()`, the first two required. `sort`, `offset` and
+  `limit` answer 400, as JFrog documents for delete
+  ([aql-syntax](https://docs.jfrog.com/artifactory/docs/aql-syntax.md), "Limitations").
+  `include` answers 400 too, which JFrog does not document: Artifactory 6.20's grammar
+  accepts `.include()` after both actions (`DomainElement.getChainByDomain`), and whether
+  7.x does is to verify against a live Artifactory
+  ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 - **Limits.** The result cap and the scan factor apply as for `find`. A capped action
   changes only the rows it returns, with the cap's notification, and running it again
   reaches the rest.
@@ -283,11 +294,15 @@ file is cached, which JFrog documents as the way to download from a remote (#68)
 **Actions answering in the `find` shape**, with per-item permissions, keeps AQL consistent
 with the operations it batches. A dry run shows exactly what would be touched, and an AQL
 delete or update can do nothing that `DELETE` or set-properties would refuse. JFrog
-documents neither choice (research 22 §4).
+documents neither choice (research 22 §4). Artifactory 6.20 answers in the `find` shape
+too, and leaves out the rows whose action failed (`AqlJsonStreamer.actOnRow`, research 22
+§1.5).
 
-**A dry run by default** follows from JFrog documenting no default: of the two, only a dry
-run leaves a mistyped or forgotten suffix harmless. Read permission is required beside
-delete or annotate because every row the response lists is one the caller then sees.
+**A dry run by default** is what Artifactory 6.20 does: `AqlDeleteItemAction` and
+`AqlUpdateItemPropertyAction` both start with `dryRun = true` (research 22 §1.5). JFrog's
+7.x pages document no default, and of the two only a dry run leaves a mistyped or
+forgotten suffix harmless. Read permission is required beside delete or annotate because
+every row the response lists is one the caller then sees.
 
 **Coordinates through the layout**, rather than parsing Maven paths, is what JFrog
 describes: the search works for any layout with the tokens it needs. Narrowing by the
@@ -327,7 +342,8 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 - *A real run when `.dryRun()` is left out:* one forgotten suffix would delete or rewrite
   everything the criteria match.
 - *`properties.update` adding keys an item lacks:* the update would then reach every item
-  the criteria match, which no JFrog example asks for.
+  the criteria match, which no JFrog example asks for. Artifactory 6.20 updates only a key
+  the item already has (`PropertiesServiceImpl.editProperty`, research 22 §1.5).
 - *No default result cap:* matches self-managed Artifactory, but leaves memory unbounded.
 - *GAVC and versions only on Maven paths:* simpler, but wrong for Gradle, Ivy and custom
   layouts, which JFrog says the searches support.
@@ -342,11 +358,68 @@ Artifactory's behaviour set `search.aql.max_results: 0`.
 ## Artifactory 7.x check
 
 The decision stands against 7.161.32
-([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check)). Its limits,
-statuses and `scan-factor` come from the 7.x pages. The pattern rule for non-admins
-matches 7.146.7, which made AQL honour repository include and exclude patterns "so AQL
-results align with ... other search methods". The handlers this decision read from 6.20
-(References) remain unconfirmed for 7.x.
+([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check)), except
+where a line below says 7.x differs. Its limits, statuses and `scan-factor` come from the
+7.x pages. The pattern rule for non-admins matches 7.146.7, which made AQL honour
+repository include and exclude patterns "so AQL results align with ... other search
+methods". The handlers this decision read from 6.20 (References) remain unconfirmed for
+7.x.
+
+The audit against KB, Jira and client sources on 2026-10-18
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found these
+differences. Each issue named fixes the code, and corrects this record's text when it
+lands:
+- 7.x differs: it accepts `sort`, `offset` or `limit` beside a property or statistic
+  include, where they "will not work", rather than refusing the query; `pkg/aql` answers
+  400, so `jf rt s --offset N` and `jf rt dl --offset N` fail
+  ([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md); the
+  jfrog-client-go `includePropertiesInAqlForSpec` includes `property` when a spec has
+  neither a sort nor a limit, so an offset alone meets it;
+  [RTFACT-26346](https://jfrog.atlassian.net/browse/RTFACT-26346), a 7.21.7 user report);
+  fixed by [#386](https://github.com/weaveplatform/artifactweave/issues/386).
+- 7.x differs: a query over the size limit answers 400 `AQL query is too long; please
+  reduce the query length to less than 6000 chars`, the number being the configured limit
+  ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md)); fixed by
+  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
+- 7.x differs: the database cancels a REST query after
+  `artifactory.aql.query.timeout.seconds` (900 s; 7,200 s with `stream: true`) and
+  Artifactory answers 408, where artifactweave sets no timeout and never sends the 408 in
+  **Errors** ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md),
+  "What Are the Query Timeout Defaults?"); fixed by
+  [#411](https://github.com/weaveplatform/artifactweave/issues/411).
+- 7.x differs: `$before` and `$last` also take the long units `mills`, `seconds`, `days`,
+  `weeks`, `months` and `years`, where `pkg/aql` takes only `ms`, `s`, `minutes`, `d`, `w`,
+  `mo` and `y` ([aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md),
+  "Relative Time Operators in AQL"); fixed by
+  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
+- 7.x differs: `find(...)` takes several criteria objects separated by commas, as an
+  implicit `$and`, where `pkg/aql` answers a syntax error
+  ([aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md),
+  "Compounding Criteria"); fixed by
+  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
+- 7.x differs: an `items` query may include fields of any related domain, such as
+  `artifact.module.build.*`, and results nest them, where `pkg/aql` answers 400 for such an
+  include on every domain, not only the two **Constraints** names
+  ([aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md);
+  [aql-query-execution](https://docs.jfrog.com/artifactory/docs/aql-query-execution.md):
+  "you may include any other accessible field from any domain"); fixed by
+  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
+- 7.x differs: `item.infos.find(...)` is a primary domain
+  ([aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md),
+  "Item Info Domain Fields"), where `pkg/aql` answers the syntax error `unknown domain
+  "item"`, not the unsupported-domain 400 **Domains** promises; fixed by
+  [#410](https://github.com/weaveplatform/artifactweave/issues/410).
+
+Two differences are kept on purpose, because **Build searches** follows Artifactory 6.20's
+`BuildArtifactsSearchResource`. Each is a deviation registered by #378, to verify against a
+live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/216)):
+- 7.x differs: the build artifacts search's schema requires `buildNumber` and makes
+  `buildStatus` an optional filter beside it, and its example sends `"buildNumber":
+  "LATEST"` with `"buildStatus": "Released"`, where artifactweave answers 400 to both
+  ([searchbuildartifacts](https://docs.jfrog.com/artifactory/reference/searchbuildartifacts.md)).
+- 7.x differs: the same page says the search "Requires a privileged user (can be
+  anonymous)", where artifactweave answers an anonymous caller 401
+  ([searchbuildartifacts](https://docs.jfrog.com/artifactory/reference/searchbuildartifacts.md)).
 
 ## Constraints
 

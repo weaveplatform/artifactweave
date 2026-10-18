@@ -3102,7 +3102,7 @@ type ArchiveSearchCriteriaForm struct {
 	AdditionalProperties       map[string]interface{} `json:"-"`
 }
 
-// ArchiveSearchResult Result of the deprecated archive entry search. Kept for parity; artifactweave answers it only until AQL covers the use case and may remove it when Artifactory does.
+// ArchiveSearchResult Result of the archive entry search, which Artifactory removed in 7.90.5. Kept for parity with JFrog's definition; artifactweave never returns it, because the search always answers 501.
 type ArchiveSearchResult struct {
 	// Results Optional within this object. One entry per archive member name that matched.
 	Results *[]struct {
@@ -3132,9 +3132,9 @@ type ArchiveSearchResults struct {
 	Results *[]map[string]interface{} `json:"results,omitempty"`
 }
 
-// Artifact One artifact a module produced. It must already exist in Artifactory before the build is uploaded.
+// Artifact One artifact a module produced. The upload does not check that the file exists; promotion and the build artifacts search find it later by its checksums and its build.name and build.number properties.
 type Artifact struct {
-	// Md5 Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Upload requires it to match the stored file.
+	// Md5 Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Used to find the stored file; the upload does not check it.
 	Md5 *string `json:"md5,omitempty"`
 
 	// Name Optional within this object. File name, without the path.
@@ -3146,7 +3146,7 @@ type Artifact struct {
 	// Path Optional within this object. Repository-relative path of the file, including its name, without the repository key.
 	Path *string `json:"path,omitempty"`
 
-	// Sha1 Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Upload requires it to match the stored file.
+	// Sha1 Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Used to find the stored file; the upload does not check it.
 	Sha1 *string `json:"sha1,omitempty"`
 
 	// Sha256 Optional within this object. SHA-256 of the file, 64 lowercase hexadecimal characters.
@@ -8936,19 +8936,19 @@ type ClientInterface interface {
 	// UploadBuildWithBody performs a PUT /api/build (the `UploadBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 	UploadBuildWithBody(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadBuild performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/json` content type.
 	//
-	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 	UploadBuild(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type.
 	//
-	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 	UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// AppendBuildWithBody performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
@@ -10384,7 +10384,7 @@ type ClientInterface interface {
 
 	// SearchArchive performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 	//
-	// Deprecated search for entries inside archives by member name. Artifactory has scheduled it for removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the next major release; prefer AQL.
+	// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
 	SearchArchive(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SearchArtifact performs a GET /api/search/artifact (the `SearchArtifact` operationId) request.
@@ -12505,7 +12505,7 @@ func (c *Client) GetAllBuilds(ctx context.Context, params *GetAllBuildsParams, r
 // UploadBuildWithBody performs a PUT /api/build (the `UploadBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 func (c *Client) UploadBuildWithBody(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadBuildRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -12521,7 +12521,7 @@ func (c *Client) UploadBuildWithBody(ctx context.Context, params *UploadBuildPar
 // UploadBuild performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/json` content type.
 //
-// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 func (c *Client) UploadBuild(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadBuildRequest(c.Server, params, body)
 	if err != nil {
@@ -12537,7 +12537,7 @@ func (c *Client) UploadBuild(ctx context.Context, params *UploadBuildParams, bod
 // UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type.
 //
-// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 func (c *Client) UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadBuildRequestWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(c.Server, params, body)
 	if err != nil {
@@ -15936,7 +15936,7 @@ func (c *Client) SearchPackageArchives(ctx context.Context, params *SearchPackag
 
 // SearchArchive performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 //
-// Deprecated search for entries inside archives by member name. Artifactory has scheduled it for removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the next major release; prefer AQL.
+// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
 func (c *Client) SearchArchive(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSearchArchiveRequest(c.Server, params)
 	if err != nil {
@@ -35388,7 +35388,7 @@ type ClientWithResponsesInterface interface {
 	// UploadBuildWithBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request,
 	// with any type of body and a specified content type.
 	//
-	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	UploadBuildWithBodyWithResponse(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
@@ -35396,13 +35396,13 @@ type ClientWithResponsesInterface interface {
 	// UploadBuildWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 	UploadBuildWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
 
 	// UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 	// Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type, and returns a wrapper object for the known response body format(s).
 	//
-	// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+	// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 	UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error)
 
 	// AppendBuildWithBodyWithResponse performs a POST /api/build/append/{buildName}/{buildNumber} (the `AppendBuild` operationId) request,
@@ -37062,7 +37062,7 @@ type ClientWithResponsesInterface interface {
 
 	// SearchArchiveWithResponse performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 	//
-	// Deprecated search for entries inside archives by member name. Artifactory has scheduled it for removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the next major release; prefer AQL.
+	// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	SearchArchiveWithResponse(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*SearchArchiveResponse, error)
@@ -61122,7 +61122,7 @@ func (c *ClientWithResponses) GetAllBuildsWithResponse(ctx context.Context, para
 // UploadBuildWithBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request,
 // with any type of body and a specified content type.
 //
-// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) UploadBuildWithBodyWithResponse(ctx context.Context, params *UploadBuildParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
@@ -61136,7 +61136,7 @@ func (c *ClientWithResponses) UploadBuildWithBodyWithResponse(ctx context.Contex
 // UploadBuildWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 func (c *ClientWithResponses) UploadBuildWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
 	rsp, err := c.UploadBuild(ctx, params, body, reqEditors...)
 	if err != nil {
@@ -61148,7 +61148,7 @@ func (c *ClientWithResponses) UploadBuildWithResponse(ctx context.Context, param
 // UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse performs a PUT /api/build (the `UploadBuild` operationId) request.
 // Takes a body of the `application/vnd.org.jfrog.artifactory+json` content type, and returns a wrapper object for the known response body format(s).
 //
-// Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+// Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
 func (c *ClientWithResponses) UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBodyWithResponse(ctx context.Context, params *UploadBuildParams, body UploadBuildApplicationVndOrgJfrogArtifactoryPlusJSONRequestBody, reqEditors ...RequestEditorFn) (*UploadBuildResponse, error) {
 	rsp, err := c.UploadBuildWithApplicationVndOrgJfrogArtifactoryPlusJSONBody(ctx, params, body, reqEditors...)
 	if err != nil {
@@ -63989,7 +63989,7 @@ func (c *ClientWithResponses) SearchPackageArchivesWithResponse(ctx context.Cont
 
 // SearchArchiveWithResponse performs a GET /api/search/archive (the `SearchArchive` operationId) request.
 //
-// Deprecated search for entries inside archives by member name. Artifactory has scheduled it for removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the next major release; prefer AQL.
+// Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
 //
 // Returns a wrapper object for the known response body format(s).
 func (c *ClientWithResponses) SearchArchiveWithResponse(ctx context.Context, params *SearchArchiveParams, reqEditors ...RequestEditorFn) (*SearchArchiveResponse, error) {

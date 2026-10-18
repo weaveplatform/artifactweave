@@ -101,8 +101,8 @@ components:
           type: integer
       type: object
     ArchiveSearchResult:
-      description: Result of the deprecated archive entry search. Kept for parity; artifactweave answers it only
-        until AQL covers the use case and may remove it when Artifactory does.
+      description: Result of the archive entry search, which Artifactory removed in 7.90.5. Kept for parity with
+        JFrog's definition; artifactweave never returns it, because the search always answers 501.
       properties:
         results:
           description: Optional within this object. One entry per archive member name that matched.
@@ -703,9 +703,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchaql.md
   /api/search/archive:
     get:
-      description: Deprecated search for entries inside archives by member name. Artifactory has scheduled it for
-        removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the
-        next major release; prefer AQL.
+      description: Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5.
+        artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL
+        instead.
       operationId: searchArchive
       parameters:
       - description: Optional query parameter. Member name or fragment to look for inside archives; * and ? wildcards

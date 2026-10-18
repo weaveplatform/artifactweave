@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 22 section 6](../22-aql-searches-build-info.md#6-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -211,6 +211,32 @@ What 7.x documents of the duplicate rule is "the same artifact used in the build
 once", with no status or message, so the rule above, its 400 and its message are inferred,
 as are the claim rule for files sharing a checksum and the check on append
 ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+
+The audit against KB, Jira and client sources on 2026-10-18
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where the Builds
+API differs from 7.x. [#412](https://github.com/weaveplatform/artifactweave/issues/412)
+fixes each, and corrects this record's text when it lands:
+- 7.x differs: `PUT /api/build` answers 204 with `X-Checksum-Sha256`
+  ([uploadbuild-1](https://docs.jfrog.com/integrations/reference/uploadbuild-1.md); its twin
+  [uploadbuild](https://docs.jfrog.com/integrations/reference/uploadbuild.md) still says
+  200), as Artifactory 6.20's `BuildResource.addBuild` does, where artifactweave answers
+  200; the JFrog CLI accepts 200, 201 or 204; fixed by #412.
+- 7.x differs: `PUT /api/build` takes an optional `buildRepo` query parameter, "the
+  build-info repository key that stores the build", where artifactweave ignores it and
+  stores the run in the project's build-info repository
+  ([uploadbuild-1](https://docs.jfrog.com/integrations/reference/uploadbuild-1.md)); fixed
+  by #412.
+- 7.x differs: `GET /api/build/{name}/{number}?diff=<older number>` answers the Builds Diff
+  of the two runs, where artifactweave ignores `diff` and answers the run
+  ([getbuildinfo](https://docs.jfrog.com/integrations/reference/getbuildinfo.md)); fixed by
+  #412.
+- 7.x differs: rename answers `Build renaming of '<from>' to '<to>' was successfully
+  started.` ([renamebuild](https://docs.jfrog.com/integrations/reference/renamebuild.md));
+  fixed by #412.
+- 7.x differs: both delete forms answer `The following builds has been deleted
+  successfully: '<name>#<number>', ...`
+  ([deletebuilds](https://docs.jfrog.com/integrations/reference/deletebuilds.md)); fixed by
+  #412.
 
 ## Constraints
 
