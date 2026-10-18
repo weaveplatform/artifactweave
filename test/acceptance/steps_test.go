@@ -157,6 +157,8 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the response status is (\d+)$`, w.statusIs)
 	sc.Step(`^the response body is "([^"]*)"$`, w.bodyIs)
 	sc.Step(`^the response body contains "([^"]*)"$`, w.bodyContains)
+	// The response and a command's output share one buffer.
+	sc.Step(`^the response body does not contain "([^"]*)"$`, w.outputLacks)
 	sc.Step(`^the JSON field "([^"]*)" equals "([^"]*)"$`, w.jsonFieldEquals)
 	sc.Step(`^the JSON field "([^"]*)" is not empty$`, w.jsonFieldNotEmpty)
 	sc.Step(`^the JSON field "([^"]*)" exists$`, w.jsonFieldExists)

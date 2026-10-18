@@ -404,7 +404,13 @@ Anonymous Access" in the
 `anonAccessEnabled` lets requests without credentials act as `anonymous`, which then reads
 only what a permission target grants it. JFrog's advice is a new permission target that
 gives `anonymous` read access to the repositories it needs.
-- 7.x differs: `Any Remote` ships without `anonymous` ([permissions](https://docs.jfrog.com/administration/docs/permissions)), while artifactweave's seed (`internal/auth/seed.go`) grants `anonymous` read and deploy/cache on every remote repository; fixed by [#383](https://github.com/weaveplatform/artifactweave/issues/383).
+
+artifactweave seeds both without `anonymous` (`internal/auth/seed.go`). `Anything` grants the
+`readers` group read on `ANY`. `Any Remote` targets `ANY REMOTE` with the include pattern
+`**` and grants no one. **[I]** The pages say only that `anonymous` is removed; that no other
+user or group takes its place is inferred. A store an earlier artifactweave seeded loses the
+grant at its next start, as decision
+[0006](decisions/0006-authorization-native-permission-model.md#seeded-permissions-383) records.
 
 ## Tier notes
 
@@ -510,3 +516,6 @@ permission ones. The others:
   list.
 - How an exclude pattern meets an include pattern in a permission target.
 - The characters allowed in environment names; only the length and case are documented.
+- What the seeded `Any Remote` grants on a fresh 7.x instance, which the pages describe only
+  as without `anonymous`, and whether an upgrade to 7.84.3 or later removes `anonymous` from
+  an older instance's `Anything` and `Any Remote`, which the pages do not say.

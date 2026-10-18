@@ -121,11 +121,15 @@ The first start against an empty store creates the principals Artifactory ships,
 | `anonymous` | What a request without credentials acts as when anonymous access is on; it has no password |
 | `readers` | Group that new users join automatically |
 | `Anything` | Permission: `readers` may read every repository |
-| `Any Remote` | Permission: `anonymous` may read remote repositories and cache what it reads. Artifactory has shipped it without `anonymous` since 7.84.3 ([permissions](https://docs.jfrog.com/administration/docs/permissions)); [#383](https://github.com/weaveplatform/artifactweave/issues/383) changes the seed to match |
+| `Any Remote` | Permission on every remote repository that grants no one, as Artifactory ships it since 7.84.3 ([permissions](https://docs.jfrog.com/administration/docs/permissions)). Add users or groups to it, or write a permission of its own, to let them read remote repositories |
 | `artifactory-build-info` | Local repository for build-info |
 
-Later starts change none of them, so a principal an administrator removed stays removed.
+Later starts recreate none of them, so a principal an administrator removed stays removed.
 Changing `bootstrap.admin_password` after the first start has no effect.
+
+Neither permission grants `anonymous`. With anonymous access on, a request without
+credentials reads only what a permission naming `anonymous` grants, so give `anonymous` a
+permission of its own on the repositories it should read.
 
 Requests authenticate with HTTP Basic, using a password or an access or reference token as
 the password; with `Authorization: Bearer` and an access or reference token; or with

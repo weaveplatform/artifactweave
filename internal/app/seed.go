@@ -26,8 +26,10 @@ var authHash auth.HashParams
 const InitialPasswordFile = "initial-admin-password"
 
 // seedPrincipals creates the built-in principals on first start (decision
-// 0005). The admin password is bootstrap.admin_password, or a generated one
-// written to InitialPasswordFile.
+// 0005), and on a later start brings a store an earlier version seeded up to
+// the current seed (auth.UpgradeSeed). The admin password is
+// bootstrap.admin_password, or a generated one written to
+// InitialPasswordFile.
 func seedPrincipals(
 	ctx context.Context,
 	cfg config.Config,
@@ -39,6 +41,19 @@ func seedPrincipals(
 		return fmt.Errorf("seed: %w", err)
 	}
 	if seeded {
+		removed, err := auth.UpgradeSeed(ctx, st, time.Now())
+		if err != nil {
+			return err //nolint:wrapcheck // auth wraps its own errors
+		}
+		if removed {
+			// A warning, not an info line: requests without credentials
+			// that read remote repositories through it are refused from now.
+			log.Warn(
+				"removed anonymous from the seeded Any Remote permission, as Artifactory does "+
+					"since 7.84.3; grant anonymous a permission of its own where it needs one",
+				"permission", auth.AnyRemotePermission,
+			)
+		}
 		return nil
 	}
 	password, generated := cfg.Bootstrap.AdminPassword, false

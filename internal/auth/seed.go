@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -16,11 +17,17 @@ const (
 	AdminUser          = "admin"
 	ReadersGroup       = "readers"
 	AnythingPermission = "Anything"
-	// AnyRemotePermission lets anonymous read remote repositories and cache
-	// what it reads (Artifactory's "Deploy/Cache", WRITE in the Access
-	// vocabulary). It matters only once anonymous access is turned on.
+	// AnyRemotePermission covers every remote repository and grants no one
+	// anything. Artifactory has shipped it without anonymous since 7.84.3, so
+	// a request without credentials reaches remote content only through a
+	// permission an administrator writes for anonymous.
 	AnyRemotePermission = "Any Remote"
 )
+
+// seedVersion is the seed this code writes. Version 1 also granted anonymous
+// read and deploy/cache (WRITE) through Any Remote, which UpgradeSeed takes
+// away from a store seeded at version 1.
+const seedVersion = 2
 
 // seedMarker is the SettingSeeded value.
 type seedMarker struct {
@@ -28,17 +35,84 @@ type seedMarker struct {
 	At      time.Time `json:"at"`
 }
 
-// Seeded reports whether the built-in principals have been created.
-func Seeded(ctx context.Context, st store.Store) (bool, error) {
+// readMarker returns the seeded marker, and whether there is one.
+func readMarker(ctx context.Context, st store.Store) (seedMarker, bool, error) {
 	var m seedMarker
 	err := st.Settings().Get(ctx, types.SettingSeeded, &m)
 	if errors.Is(err, store.ErrNotFound) {
-		return false, nil
+		return m, false, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("auth: seeded marker: %w", err)
+		return m, false, fmt.Errorf("auth: seeded marker: %w", err)
 	}
-	return true, nil
+	return m, true, nil
+}
+
+// Seeded reports whether the built-in principals have been created.
+func Seeded(ctx context.Context, st store.Store) (bool, error) {
+	_, seeded, err := readMarker(ctx, st)
+	return seeded, err
+}
+
+// UpgradeSeed brings a store that an earlier version seeded up to the
+// current seed, and reports whether it removed anonymous from Any Remote. A
+// store not yet seeded, or seeded by this version, is left alone.
+//
+// From version 1 it removes the anonymous grant only while Any Remote is
+// exactly as version 1 seeded it. An administrator who edited the permission
+// chose its grants, and one who deleted it does not get it back. Anything
+// never granted anonymous, so it is not touched: an anonymous grant there
+// was an administrator's.
+func UpgradeSeed(ctx context.Context, st store.Store, now time.Time) (bool, error) {
+	m, seeded, err := readMarker(ctx, st)
+	if err != nil || !seeded || m.Version >= seedVersion {
+		return false, err
+	}
+	var removed bool
+	err = st.Tx(ctx, func(ctx context.Context) error {
+		// Read again inside the transaction: another instance sharing the
+		// database may have upgraded it since.
+		m, _, err := readMarker(ctx, st)
+		if err != nil || m.Version >= seedVersion {
+			return err
+		}
+		p, err := st.Permissions().Get(ctx, AnyRemotePermission)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+		case err != nil:
+			return fmt.Errorf("permission %s: %w", AnyRemotePermission, err)
+		case seededV1(p):
+			delete(p.Resources[types.ResourceArtifact].Actions.Users, AnonymousUser)
+			p.Updated = now
+			if err := st.Permissions().Update(ctx, p); err != nil {
+				return fmt.Errorf("permission %s: %w", AnyRemotePermission, err)
+			}
+			removed = true
+		}
+		m.Version = seedVersion
+		if err := st.Settings().Put(ctx, types.SettingSeeded, m); err != nil {
+			return fmt.Errorf("seeded marker: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Errorf("auth: upgrade seed: %w", err)
+	}
+	return removed, nil
+}
+
+// seededV1 reports whether p is Any Remote as seed version 1 wrote it:
+// anonymous holding read and deploy/cache on every path of every remote
+// repository, and nothing else.
+func seededV1(p types.Permission) bool {
+	r, ok := p.Resources[types.ResourceArtifact]
+	if !ok || p.Description != "" || len(p.Resources) != 1 || len(r.Targets) != 1 ||
+		len(r.Actions.Groups) != 0 || len(r.Actions.Users) != 1 ||
+		r.Actions.Users[AnonymousUser] != types.ActionRead|types.ActionWrite {
+		return false
+	}
+	t, ok := r.Targets[types.TargetAnyRemote]
+	return ok && slices.Equal(t.Include, []string{"**"}) && len(t.Exclude) == 0
 }
 
 // Seed creates, in one transaction, the admin user with adminPassword, the
@@ -131,9 +205,10 @@ func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) 
 		{
 			Name: AnyRemotePermission,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
-				Actions: types.Grants{Users: map[string]types.Actions{
-					AnonymousUser: types.ActionRead | types.ActionWrite,
-				}},
+				// No grants, as Artifactory ships it since 7.84.3: anonymous
+				// here would let anyone fetch through every remote, and fill
+				// its cache, once anonymous access is on.
+				Actions: types.Grants{},
 				Targets: map[string]types.Target{
 					types.TargetAnyRemote: {Include: everything, Exclude: []string{}},
 				},
@@ -153,7 +228,7 @@ func seed(ctx context.Context, st store.Store, adminHash []byte, now time.Time) 
 		return fmt.Errorf("repository %s: %w", types.BuildInfoRepository, err)
 	}
 	if err := st.Settings().
-		Put(ctx, types.SettingSeeded, seedMarker{Version: 1, At: now}); err != nil {
+		Put(ctx, types.SettingSeeded, seedMarker{Version: seedVersion, At: now}); err != nil {
 		return fmt.Errorf("seeded marker: %w", err)
 	}
 	return nil

@@ -84,10 +84,9 @@ write such a holder reaches; the v1 and Access writes need an administrator. The
   ([createorreplacepermissiontargetv2](https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2));
   fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
 
-Decision [0005](0005-authentication-and-tokens.md#artifactory-7x-check) records the seeded
-`Any Remote` grant to `anonymous`, and
-[research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check) the `+` that
-stands for a space in permission names.
+[Research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check) records the
+`+` that stands for a space in permission names. The seeded permissions match 7.x, as
+[Seeded permissions](#seeded-permissions-383) records.
 
 ## Constraints
 
@@ -244,6 +243,35 @@ undocumented.
   | Access DELETE | 204 | documented, `deletepermission.json` |
   | Access section DELETE | 204 | documented, `deletepermissionresource.json` |
   | Access list | 400 and 404 as above | documented, `getpermissions.json` |
+
+## Seeded permissions (#383)
+
+- **What the seed grants.** Since 7.84.3 Artifactory ships `Anything` and `Any Remote`
+  without `anonymous` ([permissions](https://docs.jfrog.com/administration/docs/permissions);
+  "Changes to Anonymous Access" in the
+  [7.84.10 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed)).
+  artifactweave seeds `Anything` with read for the `readers` group on `ANY`, and `Any Remote`
+  on `ANY REMOTE` with no grants (`internal/auth/seed.go`). With anonymous access on, a request
+  without credentials reads only what a permission an administrator writes for `anonymous`
+  grants, as JFrog advises.
+  - *Inferred:* the pages name no user or group in place of `anonymous`, so `Any Remote`
+    grants no one.
+- **A store seeded earlier.** Seeding runs once, so a store that an earlier artifactweave
+  seeded still lets `anonymous` read and deploy/cache on every remote repository.
+  artifactweave is not released yet, so rather than leave that grant in place, every start
+  runs `auth.UpgradeSeed`:
+  - It removes `anonymous` from `Any Remote` only while the permission is exactly as the
+    earlier seed wrote it: that one grant, the one `ANY REMOTE` target with `**`, no exclude
+    pattern and no description.
+  - An administrator who edited or deleted `Any Remote` made a choice it keeps.
+  - It leaves `Anything` alone, since no earlier seed put `anonymous` there.
+  - It logs a warning when it removes the grant, because anonymous reads of remote
+    repositories then fail.
+  - The seeded marker's version, now 2, records that it ran, so it runs once.
+  - *Inferred:* whether Artifactory's own upgrade to 7.84.3 removes `anonymous` from an older
+    instance. The pages say "by default" and do not mention upgrades.
+
+Both inferred points are on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
 ## Verification
 

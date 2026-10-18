@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -669,10 +670,30 @@ func TestStoragePermissions(t *testing.T) {
 		!reflect.DeepEqual(p["groups"], map[string]any{"readers": []any{"r"}}) {
 		t.Fatalf("principals %v", p)
 	}
-	rec = w.do(http.MethodGet, "/artifactory/api/storage/up-cache?permissions", "admin", "")
-	wantStatus(t, rec, http.StatusOK)
-	p = decodeObject(t, rec.Body.String())["principals"].(map[string]any)
-	if p["users"].(map[string]any)["anonymous"] == nil {
+	// The seeded Any Remote grants no one (#383), so a remote's cache shows
+	// only Anything's readers.
+	cachePerms := func() map[string]any {
+		t.Helper()
+		rec := w.do(http.MethodGet, "/artifactory/api/storage/up-cache?permissions", "admin", "")
+		wantStatus(t, rec, http.StatusOK)
+		return decodeObject(t, rec.Body.String())["principals"].(map[string]any)
+	}
+	if p := cachePerms(); !reflect.DeepEqual(p["users"], map[string]any{}) ||
+		!reflect.DeepEqual(p["groups"], map[string]any{"readers": []any{"r"}}) {
+		t.Fatalf("seeded principals on a remote %v", p)
+	}
+	// A grant through Any Remote shows on the cache of every remote.
+	anyRemote, err := w.db.Permissions().Get(context.Background(), auth.AnyRemotePermission)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := anyRemote.Resources[types.ResourceArtifact]
+	r.Actions.Users = map[string]types.Actions{"user": types.ActionRead}
+	anyRemote.Resources[types.ResourceArtifact] = r
+	if err := w.db.Permissions().Update(context.Background(), anyRemote); err != nil {
+		t.Fatal(err)
+	}
+	if p := cachePerms(); !reflect.DeepEqual(p["users"], map[string]any{"user": []any{"r"}}) {
 		t.Fatalf("Any Remote does not show on a remote: %v", p)
 	}
 	wantStatus(

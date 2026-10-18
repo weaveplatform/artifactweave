@@ -388,7 +388,8 @@ func repositoryStatusRows() []statusCase {
 		{shared, r + "/remote-shared/configuration", "", "", 401},
 
 		{get, r + "/libs-local", "admin", "", 200},
-		{get, r + "/remote-private", "anonymous", "", 200},
+		// The seeded Any Remote grants anonymous nothing (#383).
+		{get, r + "/remote-private", "anonymous", "", 401},
 		{get, r + "/libs-local", "anonymous", "", 401},
 		{get, r + "/libs-local", "user", "", 403},
 		{get, r + "/missing", "admin", "", 404},

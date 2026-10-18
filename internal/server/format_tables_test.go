@@ -108,18 +108,6 @@ func formatGrants(under string, a types.Actions) []matrixGrant {
 	return out
 }
 
-// formatRemoteGrants is a grant of a on every format repository that is
-// remote, as the seeded Any Remote permission grants anonymous.
-func formatRemoteGrants(a types.Actions) []matrixGrant {
-	var out []matrixGrant
-	for _, c := range formatRepos() {
-		if c.Class == repo.Remote {
-			out = append(out, matrixGrant{c.Key, "", a})
-		}
-	}
-	return out
-}
-
 // formatTargets is a permission target on every format repository, for
 // paths under the prefix.
 func formatTargets(under string) map[string]types.Target {

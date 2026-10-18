@@ -79,11 +79,14 @@ Feature: Permission APIs
     Then the response status is 200
     And the JSON field "repositories" equals "[ANY]"
     And the JSON field "principals.groups.readers" equals "[r]"
+    And the response body does not contain "anonymous"
     When I GET "/artifactory/api/v2/security/permissions/Any%20Remote" as admin
     Then the response status is 200
     And the JSON field "repo.repositories" equals "[ANY REMOTE]"
+    # Since Artifactory 7.84.3 neither seeded permission grants anonymous.
     When I GET "/access/api/v2/permissions/Any%20Remote" as admin
     Then the response status is 200
-    And the JSON field "resources.artifact.actions.users.anonymous" equals "[READ WRITE]"
+    And the JSON field "resources.artifact.targets.ANY REMOTE.include_patterns" equals "[**]"
+    And the response body does not contain "anonymous"
     When I GET "/artifactory/api/security/permissions" as admin
     Then the response body contains "Any Remote"
