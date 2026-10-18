@@ -36,35 +36,34 @@ components:
       - server-generated-checksums
       type: string
     FederatedRepositoryConfiguration:
-      description: 'Configuration of a federated repository: a local repository whose content and metadata are kept
-        in sync with copies on other artifactweave instances (decision 0022). Members are artifactweave peers that
-        trust each other through pairing (decision 0021); JFrog Artifactory instances cannot be members. Deploys,
-        deletes, moves, copies and property changes on any member are sent to the others as ordered events; where
-        two members change the same item, the change with the later event time wins and the originating instance
-        id breaks ties. A full sync repairs members that missed events.'
+      description: 'Configuration of a federated repository: a local repository whose content and metadata are kept in
+        sync with copies on other instances of this server (decision 0022). Members are instances of this server that
+        trust each other through pairing (decision 0021). Deploys, deletes, moves, copies and property changes on any
+        member are sent to the others as ordered events; where two members change the same item, the change with the
+        later event time wins and the originating instance id breaks ties. A full sync repairs members that missed
+        events.'
       properties:
         archiveBrowsingEnabled:
-          description: Optional within this object. When true the contents of zip, tar and similar archives may
-            be browsed and fetched through the archive entry URL. Defaults to false because it serves untrusted
-            content inline.
+          description: Optional within this object. When true the contents of zip, tar and similar archives may be
+            browsed and fetched through the archive entry URL. Defaults to false. Archive entries are served inline.
           type: boolean
         blackedOut:
           description: Optional within this object. When true the repository refuses every download and deploy.
             Defaults to false.
           type: boolean
         blockPushingSchema1:
-          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
-            Defaults to false; artifactweave never accepts schema 1 regardless. Rendered as a JSON boolean on federated
-            repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults
+            to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on
+            federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         calculateYumMetadata:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy.
-            Defaults to false. Not implemented for RPM in v1 but stored.
+            Defaults to false. Stored only; not implemented for RPM.
           type: boolean
         cdnRedirect:
-          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted and
-            stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Rendered as a JSON
-            boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never
+            redirected to a CDN. Defaults to false. Rendered as a JSON boolean on federated repositories; the server
+            also accepts the strings "true" and "false" on input.
           type: boolean
         checksumPolicyType:
           allOf:
@@ -73,7 +72,7 @@ components:
             bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
         debianTrivialLayout:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
-            Stored for compatibility.
+            Stored only.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
@@ -83,8 +82,7 @@ components:
             is configured. Defaults to false.
           type: boolean
         dockerApiVersion:
-          description: Optional within this object. Docker registry API version served. Only V2 exists; V1 was removed
-            by Artifactory.
+          description: Optional within this object. Docker registry API version served. Only V2 is accepted.
           enum:
           - V2
           type: string
@@ -99,18 +97,17 @@ components:
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableFileListsIndexing:
-          description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
-            Rendered as a JSON boolean on federated repositories; the server also accepts the strings "true" and
-            "false" on input.
+          description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a
+            JSON boolean on federated repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         encryptStates:
           description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
-            Defaults to true. The terraformbackend package type is not supported in v1 and the field is stored only.
+            Defaults to true. The terraformbackend package type is not supported and the field is stored only.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
-            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after. An administrator's read lists none as an empty array rather than leaving the field out.
+            Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read
+            lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -120,8 +117,8 @@ components:
             on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored for compatibility;
-            Conan is not served.
+          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan
+            is not served.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. When true a Helm chart file name must match the name and version
@@ -132,12 +129,12 @@ components:
             exist is rejected with 403. Defaults to false.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
-            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
+            anonymous 200. Defaults to false.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. When true anonymous P2 requests receive 401. Stored for compatibility;
-            P2 is not served.
+          description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not
+            served.
           type: boolean
         handleReleases:
           description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to
@@ -153,7 +150,7 @@ components:
           type: string
         key:
           description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
             cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
             created inside a project are prefixed with the project key followed by a hyphen.
           type: string
@@ -167,11 +164,11 @@ components:
             a push exceeds it. 0 (the default) keeps everything.
           type: integer
         members:
-          description: Optional within this object. The federation members, including this instance. Each must be
-            an artifactweave instance paired with this one for the `federated-repo/*` or `federated-repo/r` use
-            case; an unpaired member is rejected with 400. Adding a member starts a full sync to it; removing one
-            stops sync without deleting its copy. Every member must share the repository's package type and, inside
-            a project, its project key.
+          description: Optional within this object. The federation members, including this instance. Each must be an
+            instance of this server paired with this one for the `federated-repo/*` or `federated-repo/r` use case; an
+            unpaired member is rejected with 400. Adding a member starts a full sync to it; removing one stops sync
+            without deleting its copy. Every member must share the repository's package type and, inside a project, its
+            project key.
           items:
             description: One federation member.
             properties:
@@ -193,8 +190,8 @@ components:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files,
-            for example bz2 or lzma. Stored for compatibility.
+          description: Optional within this object. Additional compression formats generated for Debian index files, for
+            example bz2 or lzma. Stored only.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -215,8 +212,8 @@ components:
           type: boolean
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing
-            environments become DEV (decision 0013). The repository key is not checked for the project prefix, which
-            Artifactory's web UI adds. Changing it moves the repository between projects.
+            environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing
+            it moves the repository between projects.
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered
@@ -238,22 +235,21 @@ components:
         repoLayoutRef:
           description: Optional within this object. Name of the repository layout that parses paths into org, module,
             revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
-            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+            when omitted on the API regardless of package type.
           type: string
         secondaryKeyPairRef:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary.
             Must name an existing key pair.
           type: string
         signedUrlTtl:
-          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued
-            for this repository. Returned for compatibility; the configured value cannot be changed through this
-            API.
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for
+            this repository. The configured value cannot be changed through this API.
           readOnly: true
           type: integer
         snapshotVersionBehavior:
-          description: 'Optional within this object. Naming of deployed Maven snapshots: unique (the default since
-            7.41) rewrites the file name with a timestamp and build number, non-unique keeps the literal -SNAPSHOT
-            name and overwrites, deployer keeps whatever the client sent.'
+          description: 'Optional within this object. Naming of deployed Maven snapshots: unique (the default) rewrites
+            the file name with a timestamp and build number, non-unique keeps the literal -SNAPSHOT name and overwrites,
+            deployer keeps whatever the client sent.'
           enum:
           - unique
           - non-unique
@@ -264,17 +260,16 @@ components:
             is accepted instead of rejected. Defaults to false.
           type: boolean
         xrayDataTtl:
-          description: Optional within this object. Read only. Days that Xray retains scan data. Returned for compatibility
-            only.
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has
+            no effect.
           readOnly: true
           type: integer
         xrayIndex:
-          description: Optional within this object. Whether JFrog Xray should index this repository. artifactweave
-            stores and echoes the flag because the Terraform providers set it, but never scans. Defaults to false.
+          description: Optional within this object. Whether Xray should index this repository. The flag is stored and
+            echoed, but no scan runs. Defaults to false.
           type: boolean
         yumRootDepth:
-          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored
-            for compatibility.
+          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored only.
           type: integer
       required:
       - key
@@ -288,27 +283,26 @@ components:
         itself. Fields outside the common set apply to specific package types and are ignored for others.'
       properties:
         archiveBrowsingEnabled:
-          description: Optional within this object. When true the contents of zip, tar and similar archives may
-            be browsed and fetched through the archive entry URL. Defaults to false because it serves untrusted
-            content inline.
+          description: Optional within this object. When true the contents of zip, tar and similar archives may be
+            browsed and fetched through the archive entry URL. Defaults to false. Archive entries are served inline.
           type: boolean
         blackedOut:
           description: Optional within this object. When true the repository refuses every download and deploy.
             Defaults to false.
           type: boolean
         blockPushingSchema1:
-          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
-            Defaults to false; artifactweave never accepts schema 1 regardless. Rendered as a JSON boolean on local
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults
+            to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on local
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         calculateYumMetadata:
           description: Optional within this object. When true RPM metadata is regenerated automatically on deploy.
-            Defaults to false. Not implemented for RPM in v1 but stored.
+            Defaults to false. Stored only; not implemented for RPM.
           type: boolean
         cdnRedirect:
-          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted and
-            stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Rendered as a JSON
-            boolean on local repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never
+            redirected to a CDN. Defaults to false. Rendered as a JSON boolean on local repositories; the server also
+            accepts the strings "true" and "false" on input.
           type: boolean
         checksumPolicyType:
           allOf:
@@ -316,10 +310,10 @@ components:
           description: Optional within this object. How a client-supplied checksum that disagrees with the uploaded
             bytes is handled. client-checksums rejects, server-generated-checksums accepts and records both values.
         contentSynchronisation:
-          description: Optional within this object. Smart remote repository settings used when the upstream is another
-            Artifactory or artifactweave. enabled turns the feature on; statistics.enabled forwards download counts
-            upstream; properties.enabled syncs item properties; source.originAbsenceDetection removes cached items
-            the upstream no longer has.
+          description: Optional within this object. Smart remote repository settings, used when the upstream serves this
+            same API. enabled turns the feature on; statistics.enabled forwards download counts upstream;
+            properties.enabled syncs item properties; source.originAbsenceDetection removes cached items the upstream no
+            longer has.
           properties:
             enabled:
               description: Optional within this object. Turns smart remote behaviour on. Defaults to false.
@@ -351,14 +345,13 @@ components:
           type: object
         debianTrivialLayout:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
-            Stored for compatibility.
+            Stored only.
           type: boolean
         description:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
           type: string
         dockerApiVersion:
-          description: Optional within this object. Docker registry API version served. Only V2 exists; V1 was removed
-            by Artifactory.
+          description: Optional within this object. Docker registry API version served. Only V2 is accepted.
           enum:
           - V2
           type: string
@@ -373,18 +366,17 @@ components:
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         enableFileListsIndexing:
-          description: Optional within this object. Whether Debian file lists are indexed. Stored for compatibility.
-            Rendered as a JSON boolean on local repositories; the server also accepts the strings "true" and "false" on
-            input.
+          description: Optional within this object. Whether Debian file lists are indexed. Stored only. Rendered as a
+            JSON boolean on local repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         encryptStates:
           description: Optional within this object. Whether Terraform backend state files are encrypted at rest.
-            Defaults to true. The terraformbackend package type is not supported in v1 and the field is stored only.
+            Defaults to true. The terraformbackend package type is not supported and the field is stored only.
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
-            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after. An administrator's read lists none as an empty array rather than leaving the field out.
+            Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read
+            lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -394,8 +386,8 @@ components:
             on deploy and hidden on read. Defaults to the empty string, which excludes nothing.
           type: string
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored for compatibility;
-            Conan is not served.
+          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan
+            is not served.
           type: boolean
         forceMetadataNameVersion:
           description: Optional within this object. When true a Helm chart file name must match the name and version
@@ -406,12 +398,12 @@ components:
             exist is rejected with 403. Defaults to false.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
-            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
+            anonymous 200. Defaults to false.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. When true anonymous P2 requests receive 401. Stored for compatibility;
-            P2 is not served.
+          description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not
+            served.
           type: boolean
         handleReleases:
           description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to
@@ -427,7 +419,7 @@ components:
           type: string
         key:
           description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
             cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
             created inside a project are prefixed with the project key followed by a hyphen.
           type: string
@@ -444,8 +436,8 @@ components:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files,
-            for example bz2 or lzma. Stored for compatibility.
+          description: Optional within this object. Additional compression formats generated for Debian index files, for
+            example bz2 or lzma. Stored only.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -453,8 +445,8 @@ components:
         packageType:
           allOf:
           - $ref: '#/components/schemas/PackageTypeLocal'
-          description: Optional within this object. Package types a local repository may serve. The server additionally
-            accepts bazelmodules, which the documentation lists but the crawled schema omits.
+          description: Optional within this object. Package types a local repository may serve. The server also accepts
+            bazelmodules, which the enumeration omits.
         primaryKeyPairRef:
           description: Optional within this object. Name of the key pair used to sign metadata for formats that
             need it (Debian, RPM, Alpine, Terraform providers). Must name an existing key pair.
@@ -466,8 +458,8 @@ components:
           type: boolean
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing
-            environments become DEV (decision 0013). The repository key is not checked for the project prefix, which
-            Artifactory's web UI adds. Changing it moves the repository between projects.
+            environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing
+            it moves the repository between projects.
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered
@@ -485,22 +477,21 @@ components:
         repoLayoutRef:
           description: Optional within this object. Name of the repository layout that parses paths into org, module,
             revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
-            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+            when omitted on the API regardless of package type.
           type: string
         secondaryKeyPairRef:
           description: Optional within this object. Name of a second signing key pair, used while rotating the primary.
             Must name an existing key pair.
           type: string
         signedUrlTtl:
-          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued
-            for this repository. Returned for compatibility; the configured value cannot be changed through this
-            API.
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for
+            this repository. The configured value cannot be changed through this API.
           readOnly: true
           type: integer
         snapshotVersionBehavior:
-          description: 'Optional within this object. Naming of deployed Maven snapshots: unique (the default since
-            7.41) rewrites the file name with a timestamp and build number, non-unique keeps the literal -SNAPSHOT
-            name and overwrites, deployer keeps whatever the client sent.'
+          description: 'Optional within this object. Naming of deployed Maven snapshots: unique (the default) rewrites
+            the file name with a timestamp and build number, non-unique keeps the literal -SNAPSHOT name and overwrites,
+            deployer keeps whatever the client sent.'
           enum:
           - unique
           - non-unique
@@ -513,23 +504,22 @@ components:
         terraformType:
           description: Optional within this object. Whether a Terraform repository serves MODULE or PROVIDER registry
             endpoints. Local repositories only. The server accepts module and provider in any letter case and echoes
-            upper case, because the JFrog Terraform provider sends lower case.
+            upper case.
           enum:
           - MODULE
           - PROVIDER
           type: string
         xrayDataTtl:
-          description: Optional within this object. Read only. Days that Xray retains scan data. Returned for compatibility
-            only.
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has
+            no effect.
           readOnly: true
           type: integer
         xrayIndex:
-          description: Optional within this object. Whether JFrog Xray should index this repository. artifactweave
-            stores and echoes the flag because the Terraform providers set it, but never scans. Defaults to false.
+          description: Optional within this object. Whether Xray should index this repository. The flag is stored and
+            echoed, but no scan runs. Defaults to false.
           type: boolean
         yumRootDepth:
-          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored
-            for compatibility.
+          description: Optional within this object. Folder depth below which RPM metadata is calculated. Stored only.
           type: integer
       required:
       - key
@@ -574,8 +564,8 @@ components:
       - generic
       type: string
     PackageTypeLocal:
-      description: Package types a local repository may serve. The server additionally accepts bazelmodules, which
-        the documentation lists but the crawled schema omits.
+      description: Package types a local repository may serve. The server also accepts bazelmodules, which the
+        enumeration omits.
       enum:
       - alpine
       - cargo
@@ -614,8 +604,8 @@ components:
       - generic
       type: string
     PackageTypeRemote:
-      description: Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs
-        and p2 are accepted for compatibility but not served.
+      description: Package types a remote repository may serve. terraformbackend and vagrant are not allowed; vcs and p2
+        are accepted but not served.
       enum:
       - alpine
       - cargo
@@ -722,22 +712,21 @@ components:
             is rejected. Defaults to true.
           type: boolean
         blockPushingSchema1:
-          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected.
-            Defaults to false; artifactweave never accepts schema 1 regardless. Rendered as a JSON boolean on remote
+          description: Optional within this object. When true pushes of Docker schema 1 manifests are rejected. Defaults
+            to false; schema 1 manifests are rejected regardless of this setting. Rendered as a JSON boolean on remote
             repositories; the server also accepts the strings "true" and "false" on input.
           type: boolean
         bowerRegistryUrl:
-          description: Optional within this object. Upstream Bower registry URL. Stored for compatibility; Bower
-            is not served.
+          description: Optional within this object. Upstream Bower registry URL. Stored only; Bower is not served.
           type: string
         bypassHeadRequests:
           description: Optional within this object. When true the server skips the HEAD probe before fetching and
             issues GET directly. Defaults to false.
           type: boolean
         cdnRedirect:
-          description: Optional within this object. Artifactory Cloud setting for CDN-backed downloads. Accepted
-            and stored for compatibility; artifactweave never redirects to a CDN. Defaults to false. Rendered as
-            a JSON boolean on remote repositories; the server also accepts the strings "true" and "false" on input.
+          description: Optional within this object. Setting for CDN-backed downloads. Stored only; downloads are never
+            redirected to a CDN. Defaults to false. Rendered as a JSON boolean on remote repositories; the server also
+            accepts the strings "true" and "false" on input.
           type: boolean
         chartsBaseUrl:
           description: Optional within this object. Base URL that Helm chart entries in a proxied index.yaml are
@@ -748,14 +737,13 @@ components:
             to the upstream. Empty means none.
           type: string
         composerRegistryUrl:
-          description: Optional within this object. Upstream Composer registry URL. Stored for compatibility; Composer
-            is not served.
+          description: Optional within this object. Upstream Composer registry URL. Stored only; Composer is not served.
           type: string
         contentSynchronisation:
-          description: Optional within this object. Smart remote repository settings used when the upstream is another
-            Artifactory or artifactweave. enabled turns the feature on; statistics.enabled forwards download counts
-            upstream; properties.enabled syncs item properties; source.originAbsenceDetection removes cached items
-            the upstream no longer has.
+          description: Optional within this object. Smart remote repository settings, used when the upstream serves this
+            same API. enabled turns the feature on; statistics.enabled forwards download counts upstream;
+            properties.enabled syncs item properties; source.originAbsenceDetection removes cached items the upstream no
+            longer has.
           properties:
             enabled:
               description: Optional within this object. Turns smart remote behaviour on. Defaults to false.
@@ -818,7 +806,7 @@ components:
           type: boolean
         dockerProjectId:
           description: Optional within this object. Google Artifact Registry project id used when the upstream is
-            Google. Stored for compatibility.
+            Google. Stored only.
           type: string
         downloadContextPath:
           description: Optional within this object. Path of NuGet package downloads below the upstream URL. Defaults
@@ -840,8 +828,8 @@ components:
           type: boolean
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
-            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after. An administrator's read lists none as an empty array rather than leaving the field out.
+            Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read
+            lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -874,19 +862,19 @@ components:
             artifact. Defaults to false.
           type: boolean
         forceConanAuthentication:
-          description: Optional within this object. When true anonymous Conan requests receive 401. Stored for compatibility;
-            Conan is not served.
+          description: Optional within this object. When true anonymous Conan requests receive 401. Stored only; Conan
+            is not served.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
-            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
+            anonymous 200. Defaults to false.
           type: boolean
         forceP2Authentication:
-          description: Optional within this object. When true anonymous P2 requests receive 401. Stored for compatibility;
-            P2 is not served.
+          description: Optional within this object. When true anonymous P2 requests receive 401. Stored only; P2 is not
+            served.
           type: boolean
         gitRegistryUrl:
-          description: Optional within this object. Upstream git registry URL for Bower. Stored for compatibility.
+          description: Optional within this object. Upstream git registry URL for Bower. Stored only.
           type: string
         handleReleases:
           description: Optional within this object. Whether Maven release artifacts may be deployed. Defaults to
@@ -906,7 +894,7 @@ components:
           type: string
         key:
           description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
             cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
             created inside a project are prefixed with the project key followed by a hyphen.
           type: string
@@ -944,8 +932,8 @@ components:
         packageType:
           allOf:
           - $ref: '#/components/schemas/PackageTypeRemote'
-          description: Optional within this object. Package types a remote repository may serve. terraformbackend
-            and vagrant are not allowed; vcs and p2 are accepted for compatibility but not served.
+          description: Optional within this object. Package types a remote repository may serve. terraformbackend and
+            vagrant are not allowed; vcs and p2 are accepted but not served.
         password:
           description: 'Optional within this object. Password or token for upstream authentication. Write only:
             reads return a masked value, and an omitted field on update keeps the stored secret.'
@@ -957,8 +945,8 @@ components:
           type: boolean
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing
-            environments become DEV (decision 0013). The repository key is not checked for the project prefix, which
-            Artifactory's web UI adds. Changing it moves the repository between projects.
+            environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing
+            it moves the repository between projects.
           type: string
         propertySets:
           description: Optional within this object. Names of property sets whose predefined properties are offered
@@ -1005,7 +993,7 @@ components:
         repoLayoutRef:
           description: Optional within this object. Name of the repository layout that parses paths into org, module,
             revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
-            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+            when omitted on the API regardless of package type.
           type: string
         retrievalCachePeriodSecs:
           description: Optional within this object. Seconds a cached non-unique resource such as maven-metadata.xml,
@@ -1017,9 +1005,8 @@ components:
             deprecated shared configuration endpoint. Defaults to false.
           type: boolean
         signedUrlTtl:
-          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued
-            for this repository. Returned for compatibility; the configured value cannot be changed through this
-            API.
+          description: Optional within this object. Read only. Lifetime in minutes of signed download URLs issued for
+            this repository. The configured value cannot be changed through this API.
           readOnly: true
           type: integer
         socketTimeoutMillis:
@@ -1038,8 +1025,8 @@ components:
           description: Optional within this object. URL of the upstream NuGet symbol server, if any.
           type: string
         synchronizeProperties:
-          description: Optional within this object. When true properties set on the upstream Artifactory are copied
-            with the artifact. Defaults to false.
+          description: Optional within this object. When true properties set on the upstream are copied with the
+            artifact. Defaults to false.
           type: boolean
         terraformProvidersUrl:
           description: Optional within this object. URL from which Terraform provider binaries are downloaded, for
@@ -1066,12 +1053,12 @@ components:
           description: Optional within this object. URL of the upstream NuGet v3 service index. Defaults to https://api.nuget.org/v3/index.json.
           type: string
         vcsGitDownloadUrl:
-          description: Optional within this object. Custom download URL template when vcsGitProvider is CUSTOM.
-            Stored for compatibility.
+          description: Optional within this object. Custom download URL template when vcsGitProvider is CUSTOM. Stored
+            only.
           type: string
         vcsGitProvider:
-          description: Optional within this object. Hosting provider used to build download URLs for VCS-backed
-            remotes. Defaults to GITHUB. Stored for compatibility.
+          description: Optional within this object. Hosting provider used to build download URLs for VCS-backed remotes.
+            Defaults to GITHUB. Stored only.
           enum:
           - GITHUB
           - GITHUBENTERPRISE
@@ -1082,19 +1069,19 @@ components:
           - CUSTOM
           type: string
         vcsType:
-          description: Optional within this object. Version control system behind a VCS-backed remote. Only GIT
-            exists. Stored for compatibility; VCS remotes are not served in v1.
+          description: Optional within this object. Version control system behind a VCS-backed remote. Only GIT exists.
+            Stored only; VCS remotes are not served.
           enum:
           - GIT
           type: string
         xrayDataTtl:
-          description: Optional within this object. Read only. Days that Xray retains scan data. Returned for compatibility
-            only.
+          description: Optional within this object. Read only. Days that Xray retains scan data. Returned only; it has
+            no effect.
           readOnly: true
           type: integer
         xrayIndex:
-          description: Optional within this object. Whether JFrog Xray should index this repository. artifactweave
-            stores and echoes the flag because the Terraform providers set it, but never scans. Defaults to false.
+          description: Optional within this object. Whether Xray should index this repository. The flag is stored and
+            echoed, but no scan runs. Defaults to false.
           type: boolean
       required:
       - key
@@ -1230,16 +1217,16 @@ components:
         URL. Uploads go to defaultDeploymentRepo; metadata is merged across members.'
       properties:
         artifactoryRequestsCanRetrieveRemoteArtifacts:
-          description: Optional within this object. When true requests that originate from another Artifactory instance
-            may trigger remote fetches through this virtual repository. Defaults to false.
+          description: Optional within this object. When true requests that originate from a smart remote repository on
+            another server may trigger remote fetches through this virtual repository. Defaults to false.
           type: boolean
         debianDefaultArchitectures:
-          description: Optional within this object. Comma-separated architectures used when generating aggregated
-            Debian metadata. Stored for compatibility.
+          description: Optional within this object. Comma-separated architectures used when generating aggregated Debian
+            metadata. Stored only.
           type: string
         debianTrivialLayout:
           description: Optional within this object. When true the Debian repository uses the trivial (flat) layout.
-            Stored for compatibility.
+            Stored only.
           type: boolean
         defaultDeploymentRepo:
           description: Optional within this object. Key of the member that receives uploads sent to the virtual
@@ -1249,15 +1236,14 @@ components:
           description: Optional within this object. Free text shown in listings. Not interpreted by the server.
           type: string
         dockerApiVersion:
-          description: Optional within this object. Docker registry API version served. Only V2 exists; V1 was removed
-            by Artifactory.
+          description: Optional within this object. Docker registry API version served. Only V2 is accepted.
           enum:
           - V2
           type: string
         environments:
           description: Optional within this object. Environments the repository belongs to, for example DEV or PROD.
-            Mandatory when projectKey is set; one environment per repository before Artifactory 7.107.1 and several
-            after. An administrator's read lists none as an empty array rather than leaving the field out.
+            Mandatory when projectKey is set; a repository may belong to several environments. An administrator's read
+            lists none as an empty array rather than leaving the field out.
           items:
             description: Optional within this object. An environment name.
             type: string
@@ -1282,12 +1268,11 @@ components:
             are fetched.
           type: string
         forceMavenAuthentication:
-          description: Optional within this object. When true anonymous Maven requests receive 401 so the client
-            authenticates. Defaults to false.
+          description: Optional within this object. When true anonymous Maven requests receive 401. Defaults to false.
           type: boolean
         forceNugetAuthentication:
-          description: Optional within this object. When true anonymous NuGet requests receive 401 so the client
-            sends credentials instead of a confusing anonymous 200. Defaults to false.
+          description: Optional within this object. When true anonymous NuGet requests receive 401 instead of an
+            anonymous 200. Defaults to false.
           type: boolean
         hideUnauthorizedResources:
           description: Optional within this object. When true items in members the caller may not read are omitted
@@ -1299,7 +1284,7 @@ components:
           type: string
         key:
           description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache because that suffix names a remote repository's
+            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
             cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
             created inside a project are prefixed with the project key followed by a hyphen.
           type: string
@@ -1311,8 +1296,8 @@ components:
           description: Optional within this object. Free text for operators. Not interpreted by the server.
           type: string
         optionalIndexCompressionFormats:
-          description: Optional within this object. Additional compression formats generated for Debian index files,
-            for example bz2 or lzma. Stored for compatibility.
+          description: Optional within this object. Additional compression formats generated for Debian index files, for
+            example bz2 or lzma. Stored only.
           items:
             description: Optional within this object. A compression format name.
             type: string
@@ -1333,8 +1318,8 @@ components:
           type: string
         projectKey:
           description: Optional within this object. Key of the project that owns the repository. In a project, missing
-            environments become DEV (decision 0013). The repository key is not checked for the project prefix, which
-            Artifactory's web UI adds. Changing it moves the repository between projects.
+            environments become DEV (decision 0013). The repository key is not checked for the project prefix. Changing
+            it moves the repository between projects.
           type: string
         rclass:
           description: Required within this object. The repository class. It selects which of the class-specific
@@ -1345,7 +1330,7 @@ components:
         repoLayoutRef:
           description: Optional within this object. Name of the repository layout that parses paths into org, module,
             revision and classifier tokens, used by version search and snapshot cleanup. Defaults to maven-2-default
-            when omitted on the API regardless of package type; the bundled names are listed in research 03.
+            when omitted on the API regardless of package type.
           type: string
         repositories:
           description: Required within this object. Ordered keys of the member repositories. Resolution tries members
@@ -1388,8 +1373,8 @@ paths:
         response. Remote caches are never listed.
       operationId: getRepositoriesByTypeAndProject
       parameters:
-      - description: Optional query parameter. Repository class to list. distribution is accepted for compatibility
-          and always yields an empty list.
+      - description: Optional query parameter. Repository class to list. distribution is accepted and always yields an
+          empty list.
         in: query
         name: type
         schema:
@@ -1401,8 +1386,8 @@ paths:
           - federated
           - distribution
           type: string
-      - description: Optional query parameter. Package type to list. Any package type the server knows is accepted,
-          not only the enumerated values, because the documented enumeration is stale.
+      - description: Optional query parameter. Package type to list. Any package type the server knows is accepted, not
+          only the enumerated values.
         in: query
         name: packageType
         schema:
@@ -1728,8 +1713,7 @@ paths:
     get:
       deprecated: true
       description: Returns the sanitised configuration of a remote repository that has shareConfiguration enabled.
-        Deprecated by Artifactory in favour of the ordinary read; kept so old clients keep working. Non-admin callers
-        get the sanitised view only.
+        Deprecated in favour of the ordinary read. Non-admin callers get the sanitised view only.
       operationId: getRemoteRepositoryConfiguration
       parameters:
       - description: Required path parameter. Key of the remote repository.
@@ -1908,11 +1892,11 @@ paths:
       - repositories
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md
     post:
-      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep
-        their value, and an explicit null resets a field to its default. rclass, packageType and key are immutable
-        and a different value is rejected with 400. A remote password omitted from the body keeps the stored secret.
-        Changing projectKey moves the repository; in a project, missing environments become DEV (decision 0013).
-        Answers 200 with a plain-text confirmation, which is what the JFrog CLI and Terraform provider expect.'
+      description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their
+        value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a
+        different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing
+        projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with
+        a plain-text confirmation.'
       operationId: updateRepositoryConfiguration
       parameters:
       - $ref: '#/components/parameters/repoKey'
@@ -1979,12 +1963,12 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/updaterepositoryconfiguration.md
     put:
       description: 'Creates a repository with the configuration in the body. The key in the path wins over the body.
-        Missing values take the defaults in research 03 (includesPattern **/*, repoLayoutRef maven-2-default, cache
-        periods by package type, and so on). The body is validated as the class demands: a remote needs url, a virtual
-        needs repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a
-        project (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text confirmation, not
-        201; 400 when the key already exists or the configuration is invalid. Any of the vendor media types is accepted
-        as the request content type.'
+        Missing values take their defaults (includesPattern **/*, repoLayoutRef maven-2-default, cache periods by
+        package type, and so on). The body is validated as the class demands: a remote needs url, a virtual needs
+        repositories and a defaultDeploymentRepo that is one of them, missing environments become DEV in a project
+        (decision 0013), and the string-typed booleans may arrive as booleans or strings. Answers 200 with a plain-text
+        confirmation, not 201; 400 when the key already exists or the configuration is invalid. Any of the vendor media
+        types is accepted as the request content type.'
       operationId: createRepository
       parameters:
       - $ref: '#/components/parameters/repoKey'

@@ -675,12 +675,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/propagatecreationtimemetadataduringfullsync.md
   /api/federation/reconnect:
     post:
-      description: 'Re-establishes the link between the repository service and the federation sync worker. In Artifactory
-        the worker is the separate Artifactory Federation Service (RTFS), reached over gRPC; a health-check job
-        reconnects it automatically (every 80 seconds by default) and this call does it on demand, for example when
-        the service was unavailable at startup. artifactweave runs the sync worker inside the server process, so
-        the call restarts that worker: it re-reads the peer keys, re-opens the outbound queues and returns once
-        the worker is running. Administrators only.'
+      description: 'Re-establishes the link between the repository service and the federation sync worker, which
+        runs inside the server process. The call restarts that worker: it re-reads the peer keys, re-opens the outbound
+        queues and returns once the worker is running. Administrators only.'
       operationId: reconnectToFederationClient
       responses:
         '200':
@@ -707,9 +704,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The sync worker could not be started. In Artifactory this means the Federation Service could
-            not be reached; in artifactweave it means the worker failed to start, for example because the peer keys
-            could not be unsealed. The body names the cause.
+          description: The sync worker could not be started, for example because the peer keys could not be unsealed.
+            The body names the cause.
         '500':
           content:
             application/json:
@@ -722,10 +718,10 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/reconnecttofederationclient.md
   /api/federation/recovery:
     post:
-      description: Clears the error state of outgoing event queues that exhausted their retries (six attempts by
-        default in Artifactory), so delivery to members resumes without waiting for the auto-healing job (every
-        20 seconds by default). Applies to one repository, or to every federated repository when repoKey is omitted.
-        A member whose missing events were already purged stays out of sync and needs a full sync.
+      description: Clears the error state of outgoing event queues that exhausted their retries, so delivery to
+        members resumes without waiting for the auto-healing job (every 20 seconds by default). Applies to one
+        repository, or to every federated repository when repoKey is omitted. A member whose missing events were
+        already purged stays out of sync and needs a full sync.
       operationId: federationRecovery
       parameters:
       - description: Optional query parameter. Key of the federated repository to recover. Omitted means every federated
@@ -736,9 +732,7 @@ paths:
           description: Repository key.
           type: string
       - description: 'Optional query parameter. When true, recovery runs even for queues that are not exhausted:
-          every outgoing queue in scope has its error counters cleared and is retried at once. Artifactory documents
-          only that the flag forces the operation; this behaviour is artifactweave''s reading of it. Defaults to
-          false.'
+          every outgoing queue in scope has its error counters cleared and is retried at once. Defaults to false.'
         in: query
         name: force
         schema:
@@ -905,9 +899,7 @@ paths:
   /api/federation/status/connectionStates/{repoKey}:
     get:
       description: Shows, for each member of one federated repository, whether events are flowing and how far behind
-        delivery is. The cheapest status operation, suited to routine monitoring. Artifactory serves this operation
-        only when its standalone Federation Service (RTFS) is enabled and answers 405 otherwise; artifactweave always
-        serves it.
+        delivery is. The cheapest status operation, suited to routine monitoring.
       operationId: getFederationConnectionDetails
       parameters:
       - description: Required path parameter. Key of the federated repository.
@@ -973,8 +965,8 @@ paths:
                           type: string
                         supported:
                           description: Optional within this object. False when the remote member cannot report federation
-                            status; the connection then shows N/A or UNSUPPORTED. In artifactweave this is false
-                            when the peer speaks a protocol major version this instance does not (decision 0021).
+                            status; the connection then shows N/A or UNSUPPORTED. It is false when the peer speaks
+                            a protocol major version this instance does not (decision 0021).
                           type: boolean
                       type: object
                     type: array
@@ -1003,7 +995,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The operation is not available in this instance's configuration.
+          description: Not returned.
         '500':
           content:
             application/json:
@@ -1090,10 +1082,7 @@ paths:
       deprecated: true
       description: 'Detailed sync status of one federated repository: binary transfer tasks, event delivery per
         member and artifact counts. Expensive on large repositories; use the connection state operation for routine
-        monitoring. Artifactory serves this operation only without its standalone Federation Service (RTFS), answering
-        405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes no sample body: the
-        member fields follow the legacy status window and the naming of the mirror lag operation, and stay marked
-        unverified until captured.'
+        monitoring.'
       operationId: getFederatedRepositoryStatus
       parameters:
       - description: Required path parameter. Key of the federated repository.
@@ -1121,9 +1110,9 @@ paths:
                         type: integer
                     type: object
                   federatedArtifactStatus:
-                    description: 'Optional within this object. Artifact replication counts on this instance, as
-                      the legacy repository status window shows them: artifacts replicated with metadata and binary,
-                      and artifacts whose metadata arrived but whose binary has not.'
+                    description: 'Optional within this object. Artifact replication counts on this instance: artifacts
+                      replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has
+                      not.'
                     properties:
                       fullyReplicatedArtifacts:
                         description: Optional within this object. Artifacts with both metadata and binary present.
@@ -1142,8 +1131,7 @@ paths:
                   mirrorEventsStatusInfo:
                     description: Optional within this object. Event delivery state per target mirror.
                     items:
-                      description: Event delivery state of one target mirror, as the legacy repository status window
-                        shows it.
+                      description: Event delivery state of one target mirror.
                       properties:
                         createEvents:
                           description: Optional within this object. Create events waiting to be sent.
@@ -1185,10 +1173,9 @@ paths:
                           type: string
                         status:
                           description: Optional within this object. Whether the mirror is in sync. Version 1 reports
-                            a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY,
-                            PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
-                            IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED
-                            or OUT_OF_SYNC there.
+                            SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS,
+                            FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
+                            IMPORT_IN_PROGRESS).
                           type: string
                           x-unverified: true
                         updateEvents:
@@ -1223,7 +1210,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The operation is not available in this instance's configuration.
+          description: Not returned.
         '500':
           content:
             application/json:
@@ -1479,11 +1466,8 @@ paths:
   /api/v2/federation/status/repo/{repoKey}:
     get:
       deprecated: true
-      description: 'Version 2 of the repository sync status, which reports a wider set of member states. The fields
-        are those of version 1. Artifactory serves this operation only without its standalone Federation Service
-        (RTFS), answering 405 with a plain-text note otherwise; artifactweave always serves it. JFrog publishes
-        no sample body: the member fields follow the legacy status window and the naming of the mirror lag operation,
-        and stay marked unverified until captured.'
+      description: Version 2 of the repository sync status, which reports a wider set of member states. The fields
+        are those of version 1.
       operationId: getFederatedRepositoryStatusV2
       parameters:
       - description: Required path parameter. Key of the federated repository.
@@ -1511,9 +1495,9 @@ paths:
                         type: integer
                     type: object
                   federatedArtifactStatus:
-                    description: 'Optional within this object. Artifact replication counts on this instance, as
-                      the legacy repository status window shows them: artifacts replicated with metadata and binary,
-                      and artifacts whose metadata arrived but whose binary has not.'
+                    description: 'Optional within this object. Artifact replication counts on this instance: artifacts
+                      replicated with metadata and binary, and artifacts whose metadata arrived but whose binary has
+                      not.'
                     properties:
                       fullyReplicatedArtifacts:
                         description: Optional within this object. Artifacts with both metadata and binary present.
@@ -1532,8 +1516,7 @@ paths:
                   mirrorEventsStatusInfo:
                     description: Optional within this object. Event delivery state per target mirror.
                     items:
-                      description: Event delivery state of one target mirror, as the legacy repository status window
-                        shows it.
+                      description: Event delivery state of one target mirror.
                       properties:
                         createEvents:
                           description: Optional within this object. Create events waiting to be sent.
@@ -1575,10 +1558,9 @@ paths:
                           type: string
                         status:
                           description: Optional within this object. Whether the mirror is in sync. Version 1 reports
-                            a two-state synchronised or out-of-sync value; version 2 reports the member states (HEALTHY,
-                            PENDING_FS, FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
-                            IMPORT_IN_PROGRESS). The version 1 strings are not published; artifactweave emits SYNCED
-                            or OUT_OF_SYNC there.
+                            SYNCED or OUT_OF_SYNC; version 2 reports the member states (HEALTHY, PENDING_FS,
+                            FULL_SYNC_RUNNING, ERROR_GENERIC, ERROR_INACTIVE, ERROR_OUT_OF_SYNC, READ_ONLY,
+                            IMPORT_IN_PROGRESS).
                           type: string
                           x-unverified: true
                         updateEvents:
@@ -1613,7 +1595,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The operation is not available in this instance's configuration.
+          description: Not returned.
         '500':
           content:
             application/json:

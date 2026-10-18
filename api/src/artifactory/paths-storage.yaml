@@ -13,8 +13,8 @@ components:
           type: string
       type: object
     ArtifactoryArtifactsStorageApiBuildArtifactsRequest:
-      description: Selects the artifacts of one build run and the archive format to pack them in. artifactweave
-        serves this once build-info lands (P5); until then it answers 501.
+      description: Selects the artifacts of one build run and the archive format to pack them in. Not implemented;
+        the operation answers 501.
       properties:
         archiveType:
           description: 'Required within this object. Archive container to produce: `zip`, `tar`, `tar.gz` or `tgz`
@@ -67,8 +67,8 @@ components:
             the process.
           type: string
         nodeId:
-          description: Optional within this object. Identifier of the node executing the task. artifactweave runs
-            a single process in v1 and reports its configured node id.
+          description: Optional within this object. Identifier of the node executing the task, which is the configured
+            node id of this instance.
           type: string
         started:
           description: Optional within this object. RFC 3339 time the current execution started. Absent while the
@@ -85,8 +85,7 @@ components:
           - cancelled
           type: string
         type:
-          description: Optional within this object. Fully qualified task type name. artifactweave uses its own task
-            names and clients should treat the value as opaque.
+          description: Optional within this object. Fully qualified task type name. Treat the value as opaque.
           type: string
       type: object
     BackgroundTasks:
@@ -101,8 +100,7 @@ components:
       type: object
     BinariesSummary:
       description: Totals over the content-addressed blob store and the items that reference it. Every value is
-        a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory emits and what the JFrog
-        CLI prints verbatim.
+        a human-formatted string, such as `3.48 GB` or `125,726`.
       properties:
         artifactsCount:
           description: Optional within this object. Number of file items, formatted with thousands separators.
@@ -139,7 +137,7 @@ components:
           type: string
         sha256:
           description: Optional within this object. Lowercase hex SHA-256 digest, 64 characters. This is the blob
-            store key in artifactweave.
+            store key.
           type: string
       type: object
     CopyOrMoveMessage:
@@ -169,8 +167,8 @@ components:
           type: array
       type: object
     CreateSignedUrlRequest:
-      description: Request for a time-limited download URL for one artifact. Not supported by artifactweave v1 (Enterprise
-        feature in Artifactory); declared for parity.
+      description: Request for a time-limited download URL for one artifact. Not implemented; the operation answers
+        501.
       properties:
         expiry:
           description: Optional within this object. Absolute expiry as Unix epoch milliseconds. Mutually exclusive
@@ -190,7 +188,7 @@ components:
       - repo_path
       type: object
     DistributeArtifactRequest:
-      description: Legacy Bintray distribution request. Bintray was retired in 2021; artifactweave answers 501.
+      description: Bintray distribution request. Not implemented; the operation answers 501.
       properties:
         async:
           default: false
@@ -280,7 +278,7 @@ components:
           type: string
         size:
           description: Optional within this object. Content length in bytes rendered as a decimal string, not a
-            number, because clients parse it as a string.
+            number.
           type: string
         uri:
           description: Optional within this object. Absolute URL of this storage API resource, built from the resolved
@@ -356,8 +354,7 @@ components:
           type: string
       type: object
     FileStoreSummary:
-      description: Capacity figures of the blob store. Space values are human-formatted strings with a unit, as
-        Artifactory emits them.
+      description: Capacity figures of the blob store. Space values are human-formatted strings with a unit.
       properties:
         freeSpace:
           description: Optional within this object. Free space on the volume, with the percentage in parentheses.
@@ -576,8 +573,8 @@ components:
           type: string
       type: object
     PudProcessStatus:
-      description: Current state of the prune unreferenced data process. artifactweave runs blob garbage collection
-        as this process, so the figures are the GC run's figures.
+      description: Current state of the prune unreferenced data process. The process runs blob garbage collection,
+        so the figures are the GC run's figures.
       properties:
         dryRun:
           description: Optional within this object. True when the run only reports what it would delete.
@@ -686,8 +683,8 @@ components:
           type: string
       type: object
     RubyGemVersion:
-      description: One version of a RubyGem as the rubygems.org versions API describes it. Gems are outside the
-        artifactweave v1 ecosystem scope (research 10); the operation answers 501.
+      description: One version of a RubyGem as the rubygems.org versions API describes it. Not implemented; the
+        operation answers 501.
       properties:
         authors:
           description: Optional within this object. Comma-separated author names from the gemspec.
@@ -742,9 +739,8 @@ components:
           type: string
       type: object
     Sha256ChecksumRequest:
-      description: Names the item whose `sha256` property should be computed. Kept for compatibility with clients
-        written before SHA-256 was native; artifactweave always records SHA-256, so the call only re-attaches the
-        property.
+      description: Names the item whose `sha256` property should be computed. SHA-256 is recorded on every deploy,
+        so the call only re-attaches the property.
       properties:
         path:
           description: Required within this object. Item path without a leading `/`. A folder path applies the operation
@@ -783,22 +779,19 @@ components:
           type: string
       type: object
     StorageSummaryInfo:
-      description: Snapshot of storage usage. artifactweave computes the figures on every request, so they never lag
-        writes; Artifactory serves the result of its last calculation.
+      description: Snapshot of storage usage. The figures are computed on every request, so they never lag writes.
       properties:
         binariesSummary:
           allOf:
           - $ref: '#/components/schemas/BinariesSummary'
           description: Optional within this object. Totals over the content-addressed blob store and the items that
-            reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory
-            emits and what the JFrog CLI prints verbatim.
+            reference it. Every value is a human-formatted string, such as `3.48 GB` or `125,726`.
         # The server writes blobMirrors from wire.StorageSummaryMirrors, embedded beside the generated type
         # (summaryWithMirrors in internal/server/storageinfo.go). A second field named blobMirrors at the same depth
         # would make encoding/json drop both, so the generated field is json:"-" and typed as the wire type.
         blobMirrors:
-          description: Optional within this object. artifactweave's addition (decision 0028), sent only when a blob
-            tier is a mirror. Artifactory reports nothing per shard, and JFrog clients ignore the field. One entry per
-            mirrored tier.
+          description: Optional within this object. Sent only when a blob tier is a mirror (decision 0028). One entry
+            per mirrored tier.
           items:
             description: One mirrored blob tier.
             properties:
@@ -944,7 +937,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/FileStoreSummary'
           description: Optional within this object. Capacity figures of the blob store. Space values are human-formatted
-            strings with a unit, as Artifactory emits them.
+            strings with a unit.
         repositoriesSummaryList:
           description: Optional within this object. One row per repository plus the `TOTAL` row, sorted by key.
           items:
@@ -952,11 +945,11 @@ components:
           type: array
       type: object
     UploadsConfig:
-      description: Whether the server accepts the JFrog CLI's multipart upload protocol.
+      description: Whether the server accepts multipart uploads.
       properties:
         supported:
           description: Optional within this object. True when the server can stage parts, which it can whenever a
-            blob store is configured; the JFrog CLI then uploads files of 200 MiB or more in parts.
+            blob store is configured.
           type: boolean
       type: object
     MultipartUploadToken:
@@ -1013,8 +1006,7 @@ components:
 paths:
   /api/archive/buildArtifacts:
     post:
-      description: Packs the artifacts of one build run into a single archive. Served once build-info lands in P5;
-        until then artifactweave answers 501 in the Artifactory envelope.
+      description: Not implemented; answers 501. It would pack the artifacts of one build run into a single archive.
       operationId: retrieveBuildArtifactsArchive
       requestBody:
         content:
@@ -1166,8 +1158,7 @@ paths:
   /api/checksum/sha256:
     post:
       description: Recomputes the SHA-256 of an item and stores it as the `sha256` property, recursively for a folder.
-        Admin only. artifactweave records SHA-256 natively, so this only exists for clients written before Artifactory
-        5.5.
+        Admin only.
       operationId: setItemSha256Checksum
       requestBody:
         content:
@@ -1307,8 +1298,7 @@ paths:
   /api/distribute:
     post:
       deprecated: true
-      description: Legacy Bintray distribution. artifactweave does not implement this operation (research 10, tier
-        stub); it is declared for wire parity and answers 501 in the Artifactory error envelope.
+      description: Not implemented; answers 501. It would distribute artifacts to a Bintray repository.
       operationId: distributeArtifact
       requestBody:
         content:
@@ -1344,7 +1334,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The repository or item does not exist, or the caller may not know that it does.
-      summary: Distribute to Bintray (retired)
+      summary: Distribute to Bintray
       tags:
       - storage
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/distributeartifact.md
@@ -1414,7 +1404,7 @@ paths:
               schema:
                 description: An HTML error page.
                 type: string
-          description: The parameters are invalid; the body is an HTML error page as in Artifactory.
+          description: The parameters are invalid; the body is an HTML error page.
         '401':
           content:
             application/json:
@@ -1441,9 +1431,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/artifactsyncdownload.md
   /api/gems/{repoName}/api/v1/versions/{gemName}:
     get:
-      description: Returns the versions of one gem in the rubygems.org versions format. Gems are outside the v1
-        ecosystem scope (research 10). artifactweave does not implement this operation (research 10, tier stub);
-        it is declared for wire parity and answers 501 in the Artifactory error envelope.
+      description: Not implemented; answers 501. It would return the versions of one gem in the rubygems.org versions
+        format.
       operationId: getRubyGemVersionList
       parameters:
       - description: Required path parameter. Key of the gems repository.
@@ -1689,9 +1678,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/moveitem.md
   /api/signed/url:
     post:
-      description: Returns a time-limited URL that downloads one artifact without credentials. Enterprise feature
-        in Artifactory. artifactweave does not implement this operation (research 10, tier stub); it is declared
-        for wire parity and answers 501 in the Artifactory error envelope.
+      description: Not implemented; answers 501. It would return a time-limited URL that downloads one artifact
+        without credentials.
       operationId: createSignedUrl
       requestBody:
         content:
@@ -1732,9 +1720,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/createsignedurl.md
   /api/signed/url/key:
     post:
-      description: Invalidates every signed URL by replacing the signing key. artifactweave does not implement this
-        operation (research 10, tier stub); it is declared for wire parity and answers 501 in the Artifactory error
-        envelope.
+      description: Not implemented; answers 501. It would invalidate every signed URL by replacing the signing key.
       operationId: replaceSignedUrlKey
       responses:
         '201':
@@ -2105,8 +2091,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/setitemproperties.md
   /api/storageinfo:
     get:
-      description: Returns the storage usage snapshot, computed on every request. Artifactory also admits the
-        `system:info/storage:r` token scope; artifactweave answers administrators only until #390.
+      description: Returns the storage usage snapshot, computed on every request. Admin only.
       operationId: getStorageSummaryInfo
       responses:
         '200':
@@ -2162,8 +2147,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/refreshstoragesummaryinfo.md
   /api/system/storage/optimize:
     post:
-      description: Starts a repair pass on every blob mirror (decision 0028), as Artifactory's optimize starts
-        balancing between the redundant storage units of a sharded filestore. Admin only. Returns a plain-text
+      description: Starts a repair pass on every blob mirror (decision 0028). Admin only. Returns a plain-text
         acknowledgement.
       operationId: optimizeSystemStorage
       responses:
@@ -2192,9 +2176,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/optimizesystemstorage.md
   /api/system/storage/prune/start:
     post:
-      description: Starts the prune unreferenced data process, which deletes blobs no item references. artifactweave
-        runs blob garbage collection as this process. Admin only. Returns 202 when started and 412 when a run is
-        already in progress.
+      description: Starts the prune unreferenced data process, which deletes blobs no item references. The process
+        runs blob garbage collection. Admin only. Returns 202 when started and 412 when a run is already in progress.
       operationId: startPudProcess
       requestBody:
         content:
@@ -2330,7 +2313,7 @@ paths:
   /api/v1/metrics:
     get:
       description: Exposes server metrics in the OpenMetrics text format. Needs admin or the `system:metrics:r`
-        token scope. artifactweave serves this regardless of licence tier.
+        token scope.
       operationId: getOpenMetricsForArtifactory
       responses:
         '200':
@@ -2358,8 +2341,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getopenmetricsforartifactory.md
   /api/v1/metrics/application:
     get:
-      description: Artifactory Cloud exposes application-level metrics here. artifactweave serves the same metrics
-        as `/api/v1/metrics` so dashboards written for either path work.
+      description: Exposes the same metrics as `/api/v1/metrics`, in the OpenMetrics text format.
       operationId: getArtifactoryApplicationMetrics
       responses:
         '200':
@@ -2373,16 +2355,14 @@ paths:
           description: No credentials or invalid credentials.
         '403':
           description: The caller lacks the permission the operation needs.
-      summary: Application metrics (cloud)
+      summary: Application metrics
       tags:
       - storage
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getartifactoryapplicationmetrics.md
   /api/v1/uploads/config:
     get:
-      description: Reports whether multipart upload is available. The JFrog CLI asks before uploading a file of 200 MiB
-        or more to Artifactory 7.82.2 or later; with `supported` true it uploads in parts through create, urlPart,
-        complete and status, and with false in one request, while a 404 or 501 fails the upload (research 09). The
-        endpoint is not in JFrog's published reference.
+      description: Reports whether multipart upload is available. With `supported` true a file is uploaded in parts
+        through create, urlPart, complete and status; with false it is deployed in one request.
       operationId: getUploadsConfig
       responses:
         '200':
@@ -2402,7 +2382,7 @@ paths:
       - storage
   /api/v1/uploads/create:
     post:
-      description: Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository, as for a deploy. Once the parts are complete the CLI checksum-deploys the file, which creates the item. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      description: Starts a multipart upload of one file and returns its upload token. The caller needs deploy rights on the repository, as for a deploy. Once the parts are complete, a checksum deploy of the file creates the item.
       operationId: createMultipartUpload
       parameters:
       - description: Required query parameter. Repository to deploy to.
@@ -2470,7 +2450,7 @@ paths:
       x-handwritten: true
   /api/v1/uploads/urlPart:
     post:
-      description: Returns the URL to PUT one part to. Authenticates with the upload token create returned, as a Bearer token. The URL carries a signature for that upload and part, because the CLI sends the part without credentials. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      description: Returns the URL to PUT one part to. Authenticates with the upload token create returned, as a Bearer token. The URL carries a signature for that upload and part, so the part is sent without credentials.
       operationId: getMultipartUploadPartUrl
       parameters:
       - description: Required query parameter. Number of the part, from 1.
@@ -2512,7 +2492,7 @@ paths:
       x-handwritten: true
   /api/v1/uploads/part:
     put:
-      description: Receives one part, in any order. The URL comes from urlPart and authorises the request; no credentials are sent. A part already appended is accepted again and ignored. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      description: Receives one part, in any order. The URL comes from urlPart and authorises the request; no credentials are sent. A part already appended is accepted again and ignored.
       operationId: putMultipartUploadPart
       parameters:
       - description: Required query parameter. Upload the part belongs to.
@@ -2572,7 +2552,7 @@ paths:
       x-handwritten: true
   /api/v1/uploads/complete:
     post:
-      description: Starts assembling the parts, checked against the file's SHA-1, and returns at once; the CLI then polls status. Completing again after a retryable error starts over. Authenticates with the upload token create returned, as a Bearer token. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      description: Starts assembling the parts, checked against the file's SHA-1, and returns at once; the caller then polls status. Completing again after a retryable error starts over. Authenticates with the upload token create returned, as a Bearer token.
       operationId: completeMultipartUpload
       parameters:
       - description: Required query parameter. SHA-1 of the whole file, in hex.
@@ -2610,7 +2590,7 @@ paths:
       x-handwritten: true
   /api/v1/uploads/status:
     post:
-      description: Reports the assembly as `PROCESSING` with a progress percentage, `FINISHED` with a checksum token for the checksum deploy that follows, `RETRYABLE_ERROR` (the CLI completes again), or `NON_RETRYABLE_ERROR`. Authenticates with the upload token create returned, as a Bearer token. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      description: Reports the assembly as `PROCESSING` with a progress percentage, `FINISHED` with a checksum token for the checksum deploy that follows, `RETRYABLE_ERROR` (complete again to retry), or `NON_RETRYABLE_ERROR`. Authenticates with the upload token create returned, as a Bearer token.
       operationId: getMultipartUploadStatus
       responses:
         '200':
@@ -2632,7 +2612,7 @@ paths:
       x-handwritten: true
   /api/v1/uploads/abort:
     post:
-      description: Discards the upload's parts and session. The CLI calls it when any step fails. Authenticates with the upload token create returned, as a Bearer token. The protocol is the one the JFrog CLI drives (jfrog-client-go artifactory/services/utils/multipartupload.go); it is not in JFrog's published reference.
+      description: Discards the upload's parts and session. Authenticates with the upload token create returned, as a Bearer token.
       operationId: abortMultipartUpload
       responses:
         '204':
@@ -3030,13 +3010,13 @@ paths:
           - true
           type: boolean
       - description: 'Optional header parameter. Checksum whose algorithm is inferred from its length: 32 hex characters
-          MD5, 40 SHA-1, 64 SHA-256. The JFrog CLI sends SHA-256 here.'
+          MD5, 40 SHA-1, 64 SHA-256.'
         in: header
         name: X-Checksum
         required: false
         schema:
           description: 'Checksum whose algorithm is inferred from its length: 32 hex characters MD5, 40 SHA-1, 64
-            SHA-256. The JFrog CLI sends SHA-256 here.'
+            SHA-256.'
           type: string
       requestBody:
         content:
@@ -3125,9 +3105,9 @@ paths:
       - https://docs.jfrog.com/artifactory/reference/deployartifactbychecksum.md
   /{repoKey}/{filePath}/checksum:
     put:
-      description: 'Documentation alias of the checksum-deploy variant of deployArtifact. JFrog''s reference lists
-        it under a `/checksum` suffix, but clients send the ordinary deploy URL with `X-Checksum-Deploy: true`;
-        artifactweave serves it there and never routes this path, so a file named `checksum` can still be deployed.'
+      description: 'Documentation alias of the checksum-deploy variant of deployArtifact. Checksum deploys are
+        served at the ordinary deploy URL with `X-Checksum-Deploy: true`, and this path is never routed, so a file
+        named `checksum` can still be deployed.'
       operationId: deployArtifactByChecksum
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
@@ -3177,13 +3157,13 @@ paths:
           description: Lowercase hex SHA-256 of the blob to link.
           type: string
       - description: 'Optional header parameter. Checksum whose algorithm is inferred from its length: 32 hex characters
-          MD5, 40 SHA-1, 64 SHA-256. The JFrog CLI sends SHA-256 here.'
+          MD5, 40 SHA-1, 64 SHA-256.'
         in: header
         name: X-Checksum
         required: false
         schema:
           description: 'Checksum whose algorithm is inferred from its length: 32 hex characters MD5, 40 SHA-1, 64
-            SHA-256. The JFrog CLI sends SHA-256 here.'
+            SHA-256.'
           type: string
       requestBody:
         content:
