@@ -285,7 +285,7 @@ states ([decision 0010](decisions/0010-retention-trash-and-gc.md#artifactory-7x-
 
 artifactweave differs from 7.x in two places:
 
-- 7.x differs: from 7.41.4 a non-admin with deploy or manage on a repository sees that repository's trashed items in the trash can, and only those ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories"). artifactweave lists the `auto-trashcan` storage path to admins only.
+- 7.x differs: from 7.41.4 a non-admin with deploy or manage on a repository sees that repository's trashed items in the trash can, and only those ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories"). artifactweave lists the `auto-trashcan` storage path to admins only; fixed by [#439](https://github.com/weaveplatform/artifactweave/issues/439).
 - 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10: the expected and the observed properties of restored items both include them); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
 
 ## Federated repositories API
