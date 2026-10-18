@@ -22,7 +22,8 @@ scenario's committed `.terraform.lock.hcl`. No run contacts registry.terraform.i
 
 The providers authenticate only with a Bearer access token (`access_token`). The apply run
 starts one `-cover` artifactweave and mints an admin token from its token API with the
-bootstrap admin's password. `TERRAFORM_ACCESS_TOKEN` supplies a token instead. Terraform runs
+bootstrap admin's password, starting the server with `token.allow_basic_auth` on so that the
+Access token API takes it. `TERRAFORM_ACCESS_TOKEN` supplies a token instead. Terraform runs
 on a copy of each scenario in the work directory, so no state file is left in the source
 tree. Each scenario has a case in `run.sh` with its apply steps (the repositories file deploy,
 the identity key pair); a scenario without one fails rather than being skipped. See

@@ -128,6 +128,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	w.registerDocker(sc)
 	w.registerClients(sc)
 	sc.Step(`^the registry is running$`, w.start)
+	sc.Step(`^the registry is running with environment "([^"]*)"$`, w.startWith)
 	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I GET "([^"]*)" as admin$`, w.getAsAdmin)
 	sc.Step(`^I GET "([^"]*)" as "([^"]*)" with password "([^"]*)"$`, w.getAs)
@@ -214,6 +215,11 @@ func (w *world) start() error {
 		// A scenario that collects garbage collects what it has just released,
 		// rather than waiting out the production grace period.
 		"ARTIFACTWEAVE_GC_GRACE_PERIOD=1ms",
+		// Scenarios mint their first token with the admin's password, as an
+		// operator who automates with Basic credentials does once they turn
+		// this on (Artifactory's "Enable Token Generation via API"). The
+		// basic_auth_tokens feature runs with the default instead.
+		"ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true",
 	)
 	w.server.Env = append(w.server.Env, w.env...)
 	if coverDir != "" {
@@ -224,6 +230,14 @@ func (w *world) start() error {
 		return err
 	}
 	return w.waitReady()
+}
+
+// startWith starts the binary with one more NAME=value in its environment.
+// It comes after start's own, and exec keeps the last value of a repeated
+// name, so it can also undo one of start's settings.
+func (w *world) startWith(pair string) error {
+	w.env = append(w.env, pair)
+	return w.start()
 }
 
 func (w *world) waitReady() error {

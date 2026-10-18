@@ -55,6 +55,7 @@ artifactweave has three configuration layers (decision
 | `search.aql.non_admin_scan_factor` | | `ARTIFACTWEAVE_SEARCH_AQL_NON_ADMIN_SCAN_FACTOR` | `1` | For a non-admin query with `.limit(N)`, read N times this many rows before dropping those the caller may not read, so up to N readable rows come back. At least `1`; a `scan-factor` request header above 1 overrides it for that request, as Artifactory's `artifactory.aql.query.non.admin.scan.factor` does |
 | `search.user_query_limit` | | `ARTIFACTWEAVE_SEARCH_USER_QUERY_LIMIT` | `1000` | Most results a GET search (quick, property, checksum, usage, dates, creation and GAVC) returns to an anonymous caller, and to every non-admin when `search.limit_anonymous_users_only` is `false`; extra results are dropped silently. `0` removes the limit. Artifactory's `artifactory.search.userQueryLimit` (decision [0012](../research/decisions/0012-search-and-aql.md)) |
 | `search.limit_anonymous_users_only` | | `ARTIFACTWEAVE_SEARCH_LIMIT_ANONYMOUS_USERS_ONLY` | `true` | Whether `search.user_query_limit` spares signed-in users; administrators are never limited. Artifactory's `artifactory.search.limitAnonymousUsersOnly` |
+| `token.allow_basic_auth` | | `ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH` | `false` | Lets a user name and password sent with Basic create tokens through `POST /access/api/v1/tokens`. Off, the request answers 401 `Unsupported authentication method Basic`, and a token must create the first token: an access or reference token, as Bearer or as the Basic password, always may. The legacy `POST /artifactory/api/security/token`, where `jf c add` with a password swaps it for a token, takes a password either way. Artifactory's `token.allow-basic-auth`, "Enable Token Generation via API" (decision [0005](../research/decisions/0005-authentication-and-tokens.md)) |
 | `build.block_duplicate_entries` | | `ARTIFACTWEAVE_BUILD_BLOCK_DUPLICATE_ENTRIES` | `true` | Refuses, with 400, a build-info publish or append whose module lists one file twice: two artifacts with the same name, path and checksums, or two dependencies with the same id and checksums. `false` accepts them. Artifactory's `artifactory.build.block.duplicate.entries` (decision [0014](../research/decisions/0014-build-info.md)) |
 | `distribution.import_dir` | | `ARTIFACTWEAVE_DISTRIBUTION_IMPORT_DIR` | `<data_dir>/import` | Release bundle import directory: `POST /distribution/api/release/import` and `/artifactory/api/release/import` read archives by file name from here and never outside it (decision 0023) |
 | `distribution.edge_role` | | | `false` | Makes the instance an edge: ordinary deploys are refused and content arrives only through distribution (decision 0023) |
@@ -129,7 +130,9 @@ Changing `bootstrap.admin_password` after the first start has no effect.
 Requests authenticate with HTTP Basic, using a password or an access or reference token as
 the password; with `Authorization: Bearer` and an access or reference token; or with
 `X-JFrog-Art-Api` and a reference token (API keys are retired). Wrong credentials answer
-`401` on every route.
+`401` on every route. A password creates no token through `POST /access/api/v1/tokens`
+until `token.allow_basic_auth` is on; the legacy `POST /artifactory/api/security/token`
+takes one, so the admin's first token can come from there.
 Without credentials, only the probes (`system/ping`, readiness, liveness, router health),
 the Access version and the usage sinks answer, until anonymous access is turned on. The
 Artifactory version (`/artifactory/api/system/version`) is not among them; the JFrog CLI

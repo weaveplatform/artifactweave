@@ -25,7 +25,9 @@ telemetry and, on recent versions, a jfconnect metrics log.
 token as the password; the username must match the token subject), `Bearer` (JWT or
 reference token), `X-JFrog-Art-Api` (reference tokens only), and anonymous when
 `anonAccessEnabled` is on and the anonymous principal has permission. Basic auth can be
-disabled platform-wide through the Access configuration endpoint.
+disabled platform-wide through the Access configuration endpoint. A password does not create
+tokens through the Access token API unless `token.allow_basic_auth` is on (**Token API**
+below).
 
 **Access tokens** are JWTs signed with a per-instance RS256 key. Subject
 `jfac@<service-id>/users/<name>`, the scope string as issued, `token_id` persisted for
@@ -75,6 +77,19 @@ issue tokens from the same service, under these rules:
 - The refresh grant is authenticated by the refresh token itself, so both create routes let a
   request through without other credentials, and the handlers require a user for every other
   grant.
+- *Token creation with a password (#385):* a user name and password sent with Basic create
+  tokens through `POST /access/api/v1/tokens` only while the application setting
+  `token.allow_basic_auth` is on. It is off by default, as 7.x ships `token.allow-basic-auth`
+  ("Enable Token Generation via API";
+  [research 05](../05-platform-identity-and-security-apis.md#authentication-accepted-on-every-endpoint),
+  item 7). It is configuration only, because 7.x has no REST API for it either.
+  - A refused request answers 401 with `Unsupported authentication method Basic`, the code and
+    message Access gives Basic credentials it does not take **[I]**.
+  - An access or reference token, as Bearer or as the Basic password, is not a password and is
+    not refused; nor is a refresh grant, whose credential is its refresh token.
+  - The legacy `POST /api/security/token` takes a password whatever the setting says **[I]**.
+    In 7.x it is Artifactory's own route, where `jf c add` with a password swaps it for a token
+    and `jf rt atc` creates one, so refusing it would break every such configuration.
 - *Refresh statuses (#106):* both create routes answer a refresh grant as follows:
   - **400** for an unknown, expired, revoked or malformed refresh token. This is inferred, as
     the analogue of OAuth's `invalid_grant`; Access documents no status for it.
@@ -414,11 +429,15 @@ reference and the CLI.
   but that resource treats a 404 after create as a warning only
   (`resource_artifactory_scoped_token.go`, lines 512 to 523, terraform-provider-artifactory
   v12.11.14). Kept, as a deviation registered by #378.
-- 7.x differs: a password sent with Basic may create tokens only once an administrator turns on
-  "Enable Token Generation via API" (`token.allow-basic-auth: false` by default;
-  [createtoken](https://docs.jfrog.com/administration/reference/createtoken),
-  [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations));
-  fixed by [#385](https://github.com/weaveplatform/artifactweave/issues/385).
+- A password sent with Basic creates tokens through the Access token API only once an
+  administrator turns on "Enable Token Generation via API" (`token.allow-basic-auth: false` by
+  default; [createtoken](https://docs.jfrog.com/administration/reference/createtoken),
+  [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations),
+  [security configuration](https://docs.jfrog.com/administration/docs/security-configuration)).
+  artifactweave matches it with `token.allow_basic_auth`, off by default (**Token API** above,
+  [#385](https://github.com/weaveplatform/artifactweave/issues/385)). The 401 it answers and
+  the legacy route staying open are inferred, and on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - 7.x differs: a token for a user that does not exist authenticates as a transient user, and a
   groups-scoped one acts with its groups' permissions
   ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Support
@@ -477,6 +496,10 @@ section 3 describes each point, from
 - Token issue, refresh, revoke and reference-token tests through the Access API.
 - A test that every issued JWT payload decodes with `base64.RawStdEncoding`.
 - `jf c add` and `jf rt access-token-create` in the acceptance suite.
+- Token creation with a password: `TestAccessTokenWithPassword`, the status table and the
+  route by principal matrix at the default, and `basic_auth_tokens.feature`, where the Access
+  route refuses the password, the legacy route and `jf c add` with a password still work, and
+  the token from the legacy route creates one through the Access route.
 - `artifactory_scoped_token` and `platform_permission` Terraform acceptance.
 - OIDC: `internal/service/oidc` and `internal/auth/idtoken` tests against a fake issuer
   (`idtokentest`); `oidc.feature`, where the real `jf eot` exchanges a token and

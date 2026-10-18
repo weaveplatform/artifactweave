@@ -226,7 +226,7 @@ Source: https://docs.jfrog.com/administration/docs/access-tokens and the per-end
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| POST | `/access/api/v1/tokens` | **200** | create or refresh; JSON or form-urlencoded; non-admins can only create identity tokens; `artifactory_scoped_token` requires exactly 200 |
+| POST | `/access/api/v1/tokens` | **200** | create or refresh; JSON or form-urlencoded; non-admins can only create identity tokens; `artifactory_scoped_token` requires exactly 200; Basic credentials need "Enable Token Generation via API" (see [Authentication](#authentication-accepted-on-every-endpoint), item 7) |
 | GET | `/access/api/v1/tokens` | 200 | admin sees all, a user sees their own; `{"tokens":[TokenDetails]}`; `last_used` needs `access_token_last_used_enabled` (7.108.3+); a `scope` query parameter filters by scope from 7.133.3 ([7.133.3 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed), SaaS 7.126.0), not yet on the [reference page](https://docs.jfrog.com/administration/reference/gettokens), which says reference tokens are listed from 7.133.8; artifactweave keeps the tokens whose whole scope, or one of its space-separated scopes, is exactly the string, and lists tokens issued with a reference token like any other ([#351](https://github.com/weaveplatform/artifactweave/issues/351)); the matching rule is **[I]**, since JFrog says only "token results for a specific scope, such as group" |
 | GET | `/access/api/v1/tokens/{tokenId}` | 200 / 404 | `me` is the current token; the provider removes the resource from state on 404 |
 | DELETE | `/access/api/v1/tokens/{tokenId}` | 200 | revoke by id; `me` allowed; a token that is not revocable answers 400 **[KB]** ([000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui)) |
@@ -372,6 +372,28 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    `/access/api/v1/config/security/authentication/basic_authentication_enabled`.
 6. The Docker token flow is described in [04-package-protocols.md](04-package-protocols.md);
    `/artifactory/api/docker/<repo>/v1|v2/auth` returns `{"auth":"<base64 user:pass>","email":"..."}`.
+7. Basic credentials create tokens through `POST /access/api/v1/tokens` only once an
+   administrator turns on **Enable Token Generation via API**, the Access setting
+   `token.allow-basic-auth`, which is `false` by default.
+   - [createtoken](https://docs.jfrog.com/administration/reference/createtoken) says "If you use
+     basic credentials, you must enable creation of tokens in the JFrog Platform UI".
+   - [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)
+     lists `allow-basic-auth: false # when enabled, allow basic authentication for create token
+     api`.
+   - [security configuration](https://docs.jfrog.com/administration/docs/security-configuration)
+     (2026-08-20) describes the UI switch: "allow users logged in through basic authentication
+     to generate tokens with the API".
+   - No REST API sets it: **[J]**
+     [RTFACT-29875](https://jfrog.atlassian.net/browse/RTFACT-29875), still open, asks for one.
+     The setting lives in the UI and in `access.config.patch.yml`.
+   - Access answers Basic credentials it does not take on its APIs with
+     `{"errors":[{"code":"UNAUTHORIZED","message":"Unsupported authentication method Basic"}]}`
+     **[KB]** ([what causes "Unsupported authentication method Basic"](https://jfrog.com/help/r/artifactory-what-causes-the-error-message-unsupported-authentication-method-basic-to-appear-when-using-a-rest-api)).
+   - The legacy `POST /artifactory/api/security/token` takes Basic credentials:
+     `jf c add` with a password swaps it for a token there (jfrog-cli-core
+     `utils/config/tokenrefresh.go`, `createTokensForConfig`), and `jf rt atc` with a password
+     works where `jf atc` refuses it (jfrog-cli issue
+     [2547](https://github.com/jfrog/jfrog-cli/issues/2547)).
 
 Built-in principals that Artifactory ships and artifactweave seeds at first start:
 `admin`, `anonymous`, the `readers` group, and the `Anything` and `Any Remote` permission
@@ -462,6 +484,13 @@ permission ones. The others:
 
 **Unconfirmed for 7.x**, for the live check on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+- The status and message of `POST /access/api/v1/tokens` with a password while
+  `token.allow-basic-auth` is off. **[I]** 401 with "Unsupported authentication method Basic",
+  from the KB article on Access's answer to Basic credentials it does not take (item 7 of
+  [Authentication](#authentication-accepted-on-every-endpoint)).
+- Whether `token.allow-basic-auth` also governs the legacy `POST /api/security/token`.
+  **[I]** It does not: the JFrog CLI's password configurations create their tokens there,
+  which would fail on every default instance if it did.
 - The lifetime of a legacy `POST /api/security/token` without `expires_in`. **[J]**
   [RTFACT-29239](https://jfrog.atlassian.net/browse/RTFACT-29239) says it rose from one hour
   to one year in 7.46.x, but the issue is open and the statement is not a JFrog staff comment.

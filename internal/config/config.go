@@ -90,6 +90,17 @@ type Config struct {
 	Work              WorkConfig      `yaml:"work"`
 	Build             BuildConfig     `yaml:"build"`
 	NPM               NPMConfig       `yaml:"npm"`
+	Token             TokenConfig     `yaml:"token"`
+}
+
+// TokenConfig holds the access token settings (decision 0005).
+type TokenConfig struct {
+	// AllowBasicAuth lets a user name and password sent with HTTP Basic
+	// create tokens through POST /access/api/v1/tokens. Off by default, as
+	// Artifactory 7.x ships token.allow-basic-auth ("Enable Token Generation
+	// via API"): a token outlives a change of the password that minted it,
+	// so a leaked password would otherwise leave credentials behind.
+	AllowBasicAuth bool `yaml:"allow_basic_auth"`
 }
 
 // BuildConfig holds the build-info settings (decision 0014).
@@ -322,6 +333,7 @@ var keys = append(append([]string{
 	"work.workers", "work.lease", "work.max_attempts",
 	"build.block_duplicate_entries",
 	"npm.max_publish_size",
+	"token.allow_basic_auth",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -390,6 +402,8 @@ func set(cfg *Config, key, value string) error {
 		return setBool(&cfg.Build.BlockDuplicateEntries, key, value)
 	case "npm.max_publish_size":
 		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
+	case "token.allow_basic_auth":
+		return setBool(&cfg.Token.AllowBasicAuth, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}

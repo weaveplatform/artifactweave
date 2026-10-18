@@ -112,12 +112,19 @@ func tokenStatusRows() []statusCase {
 		revokeAt = "/access/api/v1/tokens/revoke"
 	)
 	return []statusCase{
-		{create, tokens, "admin", `{"username":"svc","scope":"applied-permissions/admin"}`, 200},
-		{create, tokens, "user", `{"refreshable":true}`, 200},
-		{create, tokens, "user", `{"username":"admin"}`, 403},
-		{create, tokens, "user", `{"scope":"applied-permissions/admin"}`, 403},
-		{create, tokens, "user", `{"expires_in":0}`, 400},
-		{create, tokens, "admin", `{"scope":"nonsense"}`, 400},
+		// A password creates no token here while token.allow_basic_auth is
+		// off, its default (#385); a token does.
+		{create, tokens, "admin", `{}`, 401},
+		{create, tokens, "user", `{}`, 401},
+		{
+			create, tokens, "admin-token",
+			`{"username":"svc","scope":"applied-permissions/admin"}`, 200,
+		},
+		{create, tokens, "user-token", `{"refreshable":true}`, 200},
+		{create, tokens, "user-token", `{"username":"admin"}`, 403},
+		{create, tokens, "user-token", `{"scope":"applied-permissions/admin"}`, 403},
+		{create, tokens, "user-token", `{"expires_in":0}`, 400},
+		{create, tokens, "admin-token", `{"scope":"nonsense"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"password"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"refresh_token"}`, 400},
 		{create, tokens, "admin", `{"grant_type":"refresh_token","refresh_token":"unknown"}`, 400},
@@ -217,6 +224,8 @@ func tokenStatusRows() []statusCase {
 		{lList, legacy, "anonymous", "", 401},
 		{lList, legacy, "", "", 401},
 
+		// The legacy route takes a password whatever token.allow_basic_auth
+		// says.
 		{lCreate, legacy, "admin", "form:username=svc&scope=member-of-groups:readers", 200},
 		{lCreate, legacy, "user", "form:username=admin", 403},
 		{lCreate, legacy, "admin", "form:expires_in=soon", 400},

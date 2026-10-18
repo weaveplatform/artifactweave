@@ -149,6 +149,8 @@ build:
   block_duplicate_entries: false
 npm:
   max_publish_size: 256MiB
+token:
+  allow_basic_auth: true
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -202,6 +204,7 @@ npm:
 		Work:  WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
 		Build: BuildConfig{BlockDuplicateEntries: false},
 		NPM:   NPMConfig{MaxPublishSize: 256 << 20},
+		Token: TokenConfig{AllowBasicAuth: true},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -245,7 +248,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.AQL.MaxResults != 3 || cfg.Search.AQL.NonAdminScanFactor != 3 ||
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
-		cfg.NPM.MaxPublishSize != 8<<20 ||
+		cfg.NPM.MaxPublishSize != 8<<20 || !cfg.Token.AllowBasicAuth ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -839,6 +842,35 @@ func TestBuildConfig(t *testing.T) {
 		})
 		if err != nil || got.Build.BlockDuplicateEntries != tc.want {
 			t.Fatalf("flags %v: %+v, %v", tc.flags, got.Build, err)
+		}
+	}
+}
+
+func TestTokenConfig(t *testing.T) {
+	if Default().Token.AllowBasicAuth {
+		t.Fatal("a password may create tokens by default")
+	}
+	cfg := Default()
+	if err := set(&cfg, "token.allow_basic_auth", "yes"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("bad boolean: %v", err)
+	}
+	// The flag beats the environment, which beats the file.
+	off := map[string]string{"ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH": "false"}
+	for _, tc := range []struct {
+		env, flags map[string]string
+		want       bool
+	}{
+		{nil, nil, true},
+		{off, nil, false},
+		{off, map[string]string{"token.allow_basic_auth": "true"}, true},
+	} {
+		got, err := Load(LoadOptions{
+			File:  writeFile(t, "token:\n  allow_basic_auth: true\n"),
+			Env:   envOf(tc.env),
+			Flags: tc.flags,
+		})
+		if err != nil || got.Token.AllowBasicAuth != tc.want {
+			t.Fatalf("env %v, flags %v: %+v, %v", tc.env, tc.flags, got.Token, err)
 		}
 	}
 }

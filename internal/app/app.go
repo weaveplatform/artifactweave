@@ -107,6 +107,7 @@ func serve(
 				LimitInternalUsers: !cfg.Search.LimitAnonymousUsersOnly,
 			},
 			DockerSubdomainMatch:       cfg.Docker.SubdomainMatch,
+			AllowBasicAuthTokens:       cfg.Token.AllowBasicAuth,
 			AllowDuplicateBuildEntries: !cfg.Build.BlockDuplicateEntries,
 			NPMMaxPublishSize:          int64(cfg.NPM.MaxPublishSize),
 			Work:                       rt.work,

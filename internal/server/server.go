@@ -76,6 +76,10 @@ type Config struct {
 	// Tokens issues, refreshes and revokes access tokens for the token API;
 	// nil answers that API 501.
 	Tokens *token.Service
+	// AllowBasicAuthTokens lets a password sent with Basic create tokens
+	// through POST /access/api/v1/tokens (token.allow_basic_auth); the zero
+	// value refuses it, as Artifactory 7.x does by default.
+	AllowBasicAuthTokens bool
 	// PasswordHash is the cost of passwords the security API sets; the zero
 	// value is production's. Only Go code can choose another: tests use a
 	// tiny cost.

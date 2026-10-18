@@ -12,7 +12,8 @@
 # A scenario is a directory relative to the repository root; the default is
 # the repositories reference in deploy/artifactweave/terraform. The providers
 # authenticate only with a Bearer access token, so apply mints one with the
-# bootstrap admin's password; TERRAFORM_ACCESS_TOKEN overrides it.
+# bootstrap admin's password, which the server takes because it starts with
+# token.allow_basic_auth on; TERRAFORM_ACCESS_TOKEN overrides it.
 set -euo pipefail
 
 ARTIFACTORY_VERSION=12.11.14
@@ -114,6 +115,7 @@ mkdir -p "${GOCOVERDIR:-$work/cover}"
 GOCOVERDIR=${GOCOVERDIR:-$work/cover} \
 	ARTIFACTWEAVE_MASTER_KEY=terraform-master-key-0123456789abcdef0123456789abcdef \
 	ARTIFACTWEAVE_BOOTSTRAP_ADMIN_PASSWORD=$password \
+	ARTIFACTWEAVE_TOKEN_ALLOW_BASIC_AUTH=true \
 	"$work/artifactweave" serve --listen "127.0.0.1:$port" --data-dir "$work/data" \
 	--base-url "$url" >"$work/server.log" 2>&1 &
 server=$!

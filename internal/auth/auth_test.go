@@ -201,7 +201,8 @@ func TestBasic(t *testing.T) {
 	a, clk := newAuth(t, db, Options{})
 
 	p, err := a.Basic(ctx, "dev", "pw")
-	if err != nil || p.Name != "dev" || p.Admin || p.Anonymous || len(p.Groups) != 1 {
+	if err != nil || p.Name != "dev" || p.Admin || p.Anonymous || len(p.Groups) != 1 ||
+		!p.Password {
 		t.Fatalf("dev = %+v, %v", p, err)
 	}
 	if p, err := a.Basic(ctx, "boss", "pw"); err != nil || !p.Admin {
