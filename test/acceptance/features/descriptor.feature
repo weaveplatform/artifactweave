@@ -50,3 +50,54 @@ Feature: Configuration descriptor
       """
     Then the response status is 400
     And the JSON field "errors.0.message" exists
+
+  # The bodies are what the artifactory_repository_layout resource (provider
+  # 12.11.14) marshals with yaml.v3 on create and update, and its delete body
+  # verbatim. The resource's read and its delete's lookup go through the XML
+  # descriptor GET, which is not served yet.
+  Scenario: The Terraform repository layout resource creates, updates and deletes a layout
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      repoLayouts:
+          tf-layout:
+              name: tf-layout
+              artifactPathPattern: '[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]'
+              descriptorPathPattern: ""
+              distinctiveDescriptorPathPattern: false
+              fileIntegrationRevisionRegExp: SNAPSHOT|(?:(?:[0-9]{8}.[0-9]{6})-(?:[0-9]+))
+              folderIntegrationRevisionRegExp: SNAPSHOT
+      """
+    Then the response status is 200
+    And the response body contains "Created: repoLayouts.tf-layout"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      repoLayouts:
+          tf-layout:
+              name: tf-layout
+              artifactPathPattern: '[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]'
+              descriptorPathPattern: '[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).pom'
+              distinctiveDescriptorPathPattern: true
+              fileIntegrationRevisionRegExp: Foo|(?:(?:[0-9]{8}.[0-9]{6})-(?:[0-9]+))
+              folderIntegrationRevisionRegExp: Foo
+      """
+    Then the response status is 200
+    And the response body contains "Updated: repoLayouts.tf-layout"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+
+      repoLayouts:
+        tf-layout: ~
+      """
+    Then the response status is 200
+    And the response body contains "Deleted: repoLayouts.tf-layout"
+
+  Scenario: A layout entry naming another layout is refused
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      repoLayouts:
+        tf-layout:
+          name: other-layout
+          artifactPathPattern: "[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"
+      """
+    Then the response status is 400
+    And the response body contains "repoLayouts.tf-layout: name other-layout does not match the entry key"

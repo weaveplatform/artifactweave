@@ -75,6 +75,10 @@ func TestPatchConfigurationErrors(t *testing.T) {
 			as: "admin", body: "localRepositories:\n  artifactory-build-info: null\n",
 			want: 400, message: "cannot be deleted",
 		},
+		"layout names another": {
+			as: "admin", body: "repoLayouts:\n  mine:\n    name: theirs\n    artifactPathPattern: x\n",
+			want: 400, message: "repoLayouts.mine: name theirs does not match the entry key",
+		},
 		"store fails": {
 			as: "admin", body: "localRepositories:\n  x-local: {type: generic}\n",
 			fail: "list", want: 500, message: "internal error",

@@ -68,6 +68,14 @@ var configSections = []struct {
 	}, nil},
 }
 
+// ownNames are the fields in which an entry repeats its own key: the
+// artifactory_repository_layout resource sends name inside
+// repoLayouts.<name> on every create and update. The key already is the
+// name, so the field is checked and dropped rather than stored twice; a
+// stored copy would make the same layout written with and without it
+// compare as changed.
+var ownNames = map[string]string{SectionLayouts: "name"}
+
 // Patch is a parsed descriptor.
 type Patch struct {
 	Repos   []RepoChange
@@ -150,6 +158,9 @@ func Parse(doc []byte, env Lookup) (*Patch, error) {
 			case nil:
 				c.Delete = true
 			case map[string]any:
+				if err := dropOwnName(cs.name, key, v); err != nil {
+					return nil, err
+				}
 				if bad := unknown(v, cs.fields); bad != "" {
 					return nil, fmt.Errorf(
 						"%w: %s.%s: unknown field %s",
@@ -193,6 +204,29 @@ func section(top map[string]any, name string) (map[string]any, error) {
 		)
 	}
 	return m, nil
+}
+
+// dropOwnName removes the field in which an entry names itself. A null
+// passes, as a repository's key: null does. A different name is refused
+// rather than read as a rename: the entry key is what the descriptor
+// identifies the layout by, and nothing documents which of the two wins.
+func dropOwnName(sectionName, key string, entry map[string]any) error {
+	field, ok := ownNames[sectionName]
+	if !ok {
+		return nil
+	}
+	if v := entry[field]; v != nil && v != key {
+		return fmt.Errorf(
+			"%w: %s.%s: %s %v does not match the entry key",
+			ErrInvalid,
+			sectionName,
+			key,
+			field,
+			v,
+		)
+	}
+	delete(entry, field)
+	return nil
 }
 
 func unknown(m map[string]any, allowed []string) string {

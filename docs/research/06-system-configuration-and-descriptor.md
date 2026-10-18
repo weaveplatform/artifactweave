@@ -270,14 +270,24 @@ security:
   `virtualRepositories`, `proxies`, `propertySets` and `repoLayouts`
   (`internal/descriptor/parse.go`). The rest are ignored until their features land,
   `federatedRepositories` among them until P13.
+- A `repoLayouts` entry may repeat its key as `name`, as the `artifactory_repository_layout`
+  resource does in every create and update body ([S] provider 12.11.14, "Section shapes").
+  A `name` equal to the key, or `null`, is accepted and not stored, because the key is the
+  layout's name. A different `name` answers 400 naming the entry. **[I]** What 7.x does with
+  a `name` that differs from the key: no source shows it, and refusing it keeps the key as
+  the one identity of a layout.
 - Where the PATCH differs from 7.x (found by #378; the issue named changes the code):
   - 7.x differs: a successful patch answers `<n> changes to config merged successfully` ([J] RTFACT-31174, RTFACT-17040; "Semantics"); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
   - 7.x differs: repository entries accept the keys in JFrog's YAML samples, among them `downloadRedirect{enabled}`, `cocoaPods`, `yumGroupFileNames`, virtual `p2{urls}`, `type: terraformbe`, `primaryKeyPairDescriptor` and `remoteRepoLayout` ([D] [YAML page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md); [J] RTFACT-29540, RTFACT-29858); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
-  - 7.x differs: a `repoLayouts` entry may carry `name`, as the `artifactory_repository_layout` resource sends it ([S] provider 12.11.14, "Section shapes"); fixed by [#393](https://github.com/weaveplatform/artifactweave/issues/393).
   - 7.x differs: `null` is allowed only on a repository's string fields ([D] [delete an element](https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md)), where artifactweave also takes it on other fields and resets them to their defaults; fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
   - 7.x differs: Artifactory applies every section the YAML pages document ([D] https://docs.jfrog.com/installation/docs/artifactory-yaml-configuration.md); fixed by [#398](https://github.com/weaveplatform/artifactweave/issues/398).
 - `GET` returns an XML descriptor generated from current state, so that the
-  `artifactory_*` configuration resources can read back what they wrote.
+  `artifactory_*` configuration resources can read back what they wrote. It lands in P12
+  and answers 501 until then. The `artifactory_repository_layout` resource finds its layout
+  by the `name` element of `repoLayouts/repoLayout`, both to read it and before deleting it
+  ([S] provider 12.11.14
+  [`resource_artifactory_repository_layout.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/configuration/resource_artifactory_repository_layout.go)),
+  so the XML gives each layout its key as `name`.
 - Secrets inside a descriptor may be given as `${ENV_VAR}` references, resolved at apply
   time and never written back.
 - The security descriptor (`GET/POST /api/system/security`, the security configuration as

@@ -178,7 +178,7 @@ The descriptor is a patch:
 | `localRepositories`, `remoteRepositories`, `virtualRepositories` | Repositories. A virtual repository may list members created by the same patch; deleting a repository removes it from the virtual repositories that list it |
 | `proxies` | Proxy settings; `password` is sealed and never stored in the document |
 | `propertySets` | Property sets |
-| `repoLayouts` | Repository layouts, checked by compiling `artifactPathPattern` and the descriptor pattern |
+| `repoLayouts` | Repository layouts, checked by compiling `artifactPathPattern` and the descriptor pattern. An entry may repeat its key as `name`, as the `artifactory_repository_layout` resource sends it; a different `name` is refused, so delete a layout and create it under the new key to rename it |
 
 Every other section is accepted and named as ignored in the summary, but not stored:
 sections such as `mailServer` and `security` carry passwords that must not reach the
