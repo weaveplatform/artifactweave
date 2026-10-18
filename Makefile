@@ -9,6 +9,7 @@ GOLANGCI_LINT ?= golangci-lint
 MODULE := $(shell GOWORK=off $(GO) list -m)
 COVER_DIR := cover
 BIN_DIR := bin
+GOEXE := $(shell $(GO) env GOEXE)
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo devel)
 COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -49,9 +50,17 @@ vet:
 	$(GO) vet ./...
 
 ## test: unit tests (race, shuffle); coverage to cover/unit
+# Each test binary writes its coverage to a directory of its own under
+# cover/unit/parts (tools/coverexec), merged into cover/unit afterwards: in
+# one shared directory, binaries finishing together rename onto the same
+# covmeta file, which Windows refuses (issue 368). The merge keeps cover/unit
+# the flat directory that make cover and the coverage job read.
 test:
-	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit
-	$(GO) test -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit
+	@rm -rf $(COVER_DIR)/unit && mkdir -p $(COVER_DIR)/unit/parts $(BIN_DIR)
+	$(GO) build -o $(BIN_DIR)/coverexec$(GOEXE) ./tools/coverexec
+	$(GO) test -race -shuffle=on -count=1 -cover -coverpkg=$(MODULE)/... -exec=$(CURDIR)/$(BIN_DIR)/coverexec$(GOEXE) $(UNIT_PKGS) -args -test.gocoverdir=$(CURDIR)/$(COVER_DIR)/unit/parts
+	@parts=($(COVER_DIR)/unit/parts/*/); IFS=,; $(GO) tool covdata merge -i="$${parts[*]}" -o=$(COVER_DIR)/unit
+	@rm -rf $(COVER_DIR)/unit/parts
 
 ## accept: godog acceptance features against the coverage-instrumented binary (Linux; needs Docker for @storage)
 accept:
