@@ -97,23 +97,93 @@ artifactweave targets the latest self-hosted Artifactory 7.x release, as listed 
    ([self-managed](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases),
    [SaaS](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), for every
    behaviour that changed after 6.x.
-3. **The Artifactory OSS 6.20 source** (`knottnhupfer/artifactory-oss` at `b99e5649bcad`),
-   only for what the first two leave out. Artifactory 7.x is closed source, and 6.20 (2020)
+3. **JFrog KB articles**, labelled **[KB]** (`https://jfrog.com/help/r/<slug>`). They are
+   JFrog's own answers to support cases and often state 7.x behaviour that neither the
+   documentation nor the release notes record.
+4. **JFrog's public Jira**, labelled **[J]**. Read each issue's fix versions, affected
+   versions and JFrog staff comments.
+5. **The JFrog clients' sources and issues:** jfrog-cli, jfrog-client-go and the Terraform
+   providers. What a JFrog client sends, or accepts in a response, shows what 7.x answers.
+6. **The Artifactory OSS 6.20 source** (`knottnhupfer/artifactory-oss` at `b99e5649bcad`),
+   only for what the others leave out. Artifactory 7.x is closed source, and 6.20 (2020)
    is the last release whose source was published.
 
+The audit of P1 to P7 ([#378](https://github.com/weaveplatform/artifactweave/issues/378))
+added sources 3 to 5 (maintainer decision, 2026-10-18). Earlier checks read only the
+documentation and the release notes. They missed behaviour that KB articles and Jira record,
+such as npm `latest` being stored as `npm.disttag=latest`.
+
+**Rules for Jira claims.** A [J] claim counts as 7.x behaviour in either of two cases:
+- JFrog fixed the issue in a 7.x release;
+- a JFrog staff comment on the issue states the behaviour.
+
+Any other claim that rests on Jira alone is still listed on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216) for the live check.
+
 **Rules for 6.20 claims.**
-- A claim taken from 6.20 says that the 7.x documentation and release notes were checked
-  for the same behaviour.
+- A claim taken from 6.20 says that the 7.x sources above were checked for the same
+  behaviour.
 - When 7.x documents the behaviour differently, 7.x wins.
 - A 6.20 claim nothing confirms for 7.x stays **[I]** and is listed on
   [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
 **Recording what was checked.** Each research document and decision record states the
 release it was last checked against, as `Checked against: Artifactory 7.161.32`. P19 reads
-the release notes onwards from there.
+the release notes onwards from there. A document's label table adds **[KB]** and **[J]**
+when it cites them.
 
 **P19** brings everything up to the latest 7.x release current when it runs
 ([plan](../implementation/plan.md#p19-live-artifactory-comparison-and-tidy-up)).
+
+### Where to check 7.x
+
+**Reading the documentation:**
+- Append `.md` to any docs.jfrog.com page to get its raw text with an `updatedAt` date.
+  API reference pages embed their OpenAPI 3.1 definition there.
+- Page indexes: <https://docs.jfrog.com/llms.txt>, <https://docs.jfrog.com/artifactory/llms.txt>
+  and <https://docs.jfrog.com/artifactory/reference/llms.txt>.
+- The spec oracle (`make oracle-fetch`) fetches the reference pages through those indexes.
+
+Pages by area, all under `https://docs.jfrog.com/`:
+
+| Area | Pages |
+|---|---|
+| Package types | `artifactory/docs/` pages: `docker-repositories`, `additional-docker-information`, `oci-repositories`, `npm-repositories`, `go-modules`, `maven-repositories`, `gradle-repositories`, `cargo-repositories`, `repository-layouts`, `supported-package-types` |
+| Generic repositories | `artifactory/docs/repository-management-overview#generic-repositories` (`/generic-repositories` is a 404) |
+| Repository configuration | `artifactory/docs/` pages: `local-repositories`, `remote-repositories`, `virtual-repositories`, `federated-repositories`. Also `integrations/docs/configuration-json-files` |
+| System properties | `installation/docs/artifactory-system-properties`, `installation/docs/supported-access-configurations` |
+| Artifacts and storage API | `artifactory/reference/` pages: `deployartifact`, `deployartifactbychecksum`, `retrieveartifact`, `getstorageitem`, `setitemproperties`, `deleteitem`, `copyitem`, `moveitem`, `getstoragesummaryinfo` |
+| Repositories API | `artifactory/reference/` pages: `createrepository`, `getrepositoryconfiguration`, `getrepositoryconfigurationv2`, `getrepositoriesbytypeandproject`, `updaterepositoryconfiguration`, `deleterepository` |
+| AQL and searches | `artifactory/reference/searchaql`. The `artifactory/docs/` pages: `artifactory-query-language`, `aql-entities-fields-reference`, `aql-search-criteria`, `aql-query-output`, `aql-performance` |
+| Build-info | The `integrations/reference/` pages `uploadbuild`, `getbuildinfo`, `promotebuild` and `deletebuilds`. The section is published twice; the second copy's pages end in `-1`, and the two can disagree |
+| Access tokens, users, groups, permissions | `administration/reference/` pages: `createtoken`, `gettokens`, `revoketokenbyid`, `oidctokenexchange`, `createuser`, `creategroup`, `createpermission`, `getpermissions`. Also the `administration/docs/` pages `access-tokens` and `permissions` |
+| Legacy security API | `administration/reference/` pages: `getuserdetails-1`, `getpermissiontargetsv2`, `createorreplacepermissiontargetv2`. Also `integrations/docs/deprecated-jfrog-apis` |
+| System configuration | `administration/reference/patchsystemconfiguration` and `getsystemconfiguration` (self-managed only) |
+| Release information | `releases/docs/` pages: `artifactory-self-managed-releases`, `artifactory-saas-releases`, `artifactory-known-issues`, `artifactory-deprecations`, `artifactory-end-of-life` |
+
+**Release notes.** The self-managed notes start at 7.84.3; the 7.84.10 entry rolls up
+changes since 7.77. JFrog no longer publishes the notes for 7.0 to 7.83. Some changes appear
+only in a KB article and never in the notes. For example, KB 000007043 records the npm
+stable-first `latest` in virtual repositories from 7.120.0.
+
+**Jira.** The browse pages need JavaScript. Read issues through the REST API instead:
+- `https://jfrog.atlassian.net/rest/api/2/issue/<KEY>` for one issue;
+- `https://jfrog.atlassian.net/rest/api/2/search?jql=...` for a search.
+
+**Dead links.**
+- `www.jfrog.com/confluence/...` pages are gone.
+- `jfrog.com/help/r/<book>/<page>` links redirect through docs-redirect.jfrog.com. Some land
+  on the wrong page, and `jfrog-rest-apis/artifactory-rest-apis` ends at a 404. Cite the
+  docs.jfrog.com page instead.
+- When a page has gone, the Internet Archive's copy of the old `jfrog.com/help/r` page is
+  acceptable as **[D]**, citing the archive URL and its date.
+
+**SaaS or self-managed only.**
+- SaaS notes sometimes list a change that the self-managed notes do not, such as the npm
+  strict-layout switch in SaaS 7.170.0. Record such a change as SaaS-only until a
+  self-managed release lists it.
+- Get System Configuration, the support-bundle APIs and the Access service's Swagger UI are
+  self-managed only.
 
 ## Conventions
 
