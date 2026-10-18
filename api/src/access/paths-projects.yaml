@@ -46,8 +46,7 @@ components:
             index_resources:
               description: >-
                 Optional within this object. Project admins may mark the project's resources for
-                indexing. Stored and echoed; artifactweave has no indexing service. Defaults to
-                true.
+                indexing. Stored and echoed; no effect. Defaults to true.
               type: boolean
             manage_members:
               description: >-
@@ -129,8 +128,7 @@ components:
               default: true
               description: >-
                 Optional within this object. Project admins may mark the project's resources for
-                indexing. Stored and echoed; artifactweave has no indexing service. Defaults to
-                true.
+                indexing. Stored and echoed; no effect. Defaults to true.
               type: boolean
             manage_members:
               default: true
@@ -247,17 +245,16 @@ components:
       properties:
         actions:
           description: >-
-            Optional within this object. Actions the role grants. Project roles use the 32 project
-            actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY,
+            Optional within this object. Actions the role grants. Project roles use the 32 project actions:
+            READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY,
             MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE,
             DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD,
             ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE,
             TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE,
             MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY,
             POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY,
-            MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action
-            and is rejected here. Pipeline and security actions are stored and echoed but grant
-            nothing in artifactweave.
+            MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action and is rejected
+            here. Pipeline and security actions are stored and echoed but grant nothing.
           items:
             type: string
           type: array
@@ -290,17 +287,16 @@ components:
       properties:
         actions:
           description: >-
-            Optional within this object. Actions the role grants. Project roles use the 32 project
-            actions: READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY,
+            Optional within this object. Actions the role grants. Project roles use the 32 project actions:
+            READ_REPOSITORY, ANNOTATE_REPOSITORY, DEPLOY_CACHE_REPOSITORY, DELETE_OVERWRITE_REPOSITORY,
             MANAGE_XRAY_MD_REPOSITORY, READ_RELEASE_BUNDLE, ANNOTATE_RELEASE_BUNDLE, CREATE_RELEASE_BUNDLE,
             DISTRIBUTE_RELEASE_BUNDLE, DELETE_RELEASE_BUNDLE, MANAGE_XRAY_MD_RELEASE_BUNDLE, READ_BUILD,
             ANNOTATE_BUILD, DEPLOY_BUILD, DELETE_BUILD, MANAGE_XRAY_MD_BUILD, READ_SOURCES_PIPELINE,
             TRIGGER_PIPELINE, READ_INTEGRATIONS_PIPELINE, READ_POOLS_PIPELINE, MANAGE_INTEGRATIONS_PIPELINE,
             MANAGE_SOURCES_PIPELINE, MANAGE_POOLS_PIPELINE, REPORTS_SECURITY, WATCHES_SECURITY,
             POLICIES_SECURITY, RULES_SECURITY, TRIGGER_SECURITY, ISSUES_SECURITY, LICENCES_SECURITY,
-            MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action
-            and is rejected here. Pipeline and security actions are stored and echoed but grant
-            nothing in artifactweave.
+            MANAGE_MEMBERS and MANAGE_RESOURCES. READ_POLICIES_SECURITY is a global-role action and is rejected
+            here. Pipeline and security actions are stored and echoed but grant nothing.
           items:
             type: string
           type: array
@@ -370,8 +366,7 @@ components:
             index_resources:
               description: >-
                 Optional within this object. Project admins may mark the project's resources for
-                indexing. Stored and echoed; artifactweave has no indexing service. Defaults to
-                true.
+                indexing. Stored and echoed; no effect. Defaults to true.
               type: boolean
             manage_members:
               description: >-
@@ -564,10 +559,9 @@ paths:
   /api/v1/projects/_/attach/repositories/{repoName}/{targetProjectKey}:
     put:
       description: >-
-        Makes targetProjectKey the owner of the repository, moving it from its current project
-        when force is true. The assignment is visible synchronously: when the call returns, the
-        repository's configuration (GET /artifactory/api/repositories/{key}) already carries projectKey,
-        because the jfrog/project Terraform provider polls that field right after this call. The
+        Makes targetProjectKey the owner of the repository, moving it from its current project when
+        force is true. The assignment is visible synchronously: when the call returns, the repository's
+        configuration (GET /artifactory/api/repositories/{key}) already carries projectKey. The
         repository key is not renamed. Requires a platform admin.
       operationId: attachRepositoryToProject
       parameters:
