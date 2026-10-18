@@ -24,9 +24,34 @@ For example, a remote repository's `password` is optional in the schema but requ
 when `username` is set; a virtual repository's `defaultDeploymentRepo` must name one
 of its own `repositories`; a repository created with `projectKey` must also carry
 `environments`. Explain these relationships at the affected fields rather than
-leaving the reader to infer them. Where JFrog's wire format types a boolean as a
-string (see [research 03](../research/03-repository-configuration-model.md)), say so
-at the field and state what the server echoes.
+leaving the reader to infer them. Where a boolean is also accepted as a string (see
+[research 03](../research/03-repository-configuration-model.md)), say so at the field
+and state what the server echoes.
+
+## Describe the contract, not the comparison
+
+A description states what this API accepts and returns, in the present tense. It does not
+name artifactweave, Artifactory or JFrog as the subject of a behaviour, compare the two,
+or carry history, release versions, the reason for a choice or what a client happens to do
+with a field. Those belong in the [research](../research/README.md), the decision records
+and the [deviations register](deviations.md), which cite their evidence.
+
+- Write "Returns one entry for this instance", not "Artifactory lists one per node;
+  artifactweave is a single process and returns one".
+- Where a client's needs shape the contract, state the contract: "One licence key object,
+  or an array of them", not the story of which client sends which.
+- A response code the server never sends keeps its entry, because the parity oracle
+  compares response codes; describe it as "Not returned." or by the condition it would
+  answer.
+- An unimplemented operation says "Not implemented; answers 501."
+- Literal identifiers stay, in code spans: `X-JFrog-Download-Redirect-To`,
+  `/artifactory/api/storage`, `jfrt@`. So do the `x-oracle-source` and `x-unverified`
+  extensions, which are metadata rather than descriptions.
+
+`TestOpenAPIDescriptionsDescribeContract` fails any description, summary or `info` text
+that names artifactweave, or names Artifactory or JFrog outside a code span.
+
+## Response-only fields and defaults
 
 Shared resource schemas can contain response-only fields and application defaults
 that differ from formal schema requirements. Describe those distinctions explicitly;
