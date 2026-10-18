@@ -2,7 +2,7 @@
 
 Research baseline: **2026-10-15**.
 
-Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#6-artifactory-7x-check) records it.
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#6-artifactory-7x-check) records it. Audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 Phase P5 completes Artifactory Query Language, serves the GET search endpoints and adds
 build-info. Decision [0012](decisions/0012-search-and-aql.md) covers search and AQL, and
@@ -16,7 +16,7 @@ Each claim is labelled:
 
 | Label | Means |
 |---|---|
-| **[D]** | documented by JFrog at the cited URL, read on 2026-10-15 |
+| **[D]** | documented by JFrog at the cited URL, read on 2026-10-15, or on 2026-10-18 for what the audit (#378) added |
 | **[S]** | seen in source code at the cited commit |
 | **[I]** | inferred from the documented facts; not stated by any source |
 
@@ -111,12 +111,18 @@ Sources:
 - **[D] `?compact=true`** minifies the JSON. A `stream: true` request header switches the
   server to cursor reads in batches of 50,000 rows; the response shape is unchanged
   (`aql-query-execution`).
-- **[D, S] Builds rows** carry `build.<field>` keys, and promotions rows
-  `build.promotion.<field>`, as the `builds.find` example in `aql-query-output` shows. In the
-  open source edition every build and promotion field is a default result field
-  (`AqlPhysicalFieldEnum`), and result rows serialise their keys alphabetically and leave
-  out nulls (`AqlRestResult.Row`: Jackson `alphabetic = true`, `NON_NULL`). Fields of other
-  domains in an include nest under `modules`, `artifacts`, `items` and so on.
+- **[D] Builds rows** carry `build.<field>` keys, as the `builds.find` example in
+  `aql-query-output` shows.
+- **[S] Promotions rows** carry `build.promotion.<field>` keys in the open source edition
+  6.20 (`AqlRestResult.Row`, `@JsonProperty("build.promotion.created")` and the rest). No
+  7.x page shows a `build.promotions.find` row, so the form is unconfirmed for 7.x.
+- **[S] Row fields.** In the open source edition every build and promotion field is a
+  default result field (`AqlPhysicalFieldEnum`), and result rows serialise their keys
+  alphabetically and leave out nulls (`AqlRestResult.Row`: Jackson `alphabetic = true`,
+  `NON_NULL`).
+- **[D] Fields of other domains** in an include nest under `modules`, `artifacts`, `items`
+  and so on, as the `builds.find` example with `.include("module.artifact.item.name")` in
+  `aql-query-output` shows.
 - **[D] `virtual_repos`** needs `repo`, `path` and `name` in the result set. It must usually
   be requested, and it is added implicitly when the query targets a virtual repository
   (`aql-repository-queries`).
@@ -155,6 +161,11 @@ Sources:
   repositories and remote repository caches included in the specified virtual repository"
   without `.transitive()`. With it, the query also lists items on Smart Remote members
   (`aql-repository-queries`).
+- **[D] Transitive query limitations.** A `.transitive()` query takes no `.sort()` or
+  `.offset()`, its `.include()` may name only item and item property fields, and it must
+  name a single repository with `$eq`. The number of remote members searched is
+  `artifactory.aql.transitive.remote.repos.limit`, five by default
+  (`aql-repository-queries`, "Transitive Query Limitations").
 - **[D] The CLI's own guidance.** For a remote file that is not yet cached, it says to fetch
   it once, then "Run `jf rt dl` again against the same path", with the example
   `jf rt dl "generic-remote/path/file.zip" ./ --fail-no-op`
@@ -186,6 +197,19 @@ Confidence:
 - **Undocumented:** no page gives the response body, the permission each action needs, what
   an action without `.dryRun()` does, the version that introduced them, or a licence tier.
   Section 4 and decision 0012 cover what artifactweave does.
+- **[S] What Artifactory 6.20 does,** unconfirmed for 7.x:
+  - an action without `.dryRun()` is a dry run: `AqlDeleteItemAction` and
+    `AqlUpdateItemPropertyAction` both declare `private boolean dryRun = true;`;
+  - `properties.update` changes only keys the item already has
+    (`PropertiesServiceImpl.editProperty`: "Only update if property actually exists for
+    path.");
+  - an action answers the `find` result stream, and leaves out the rows whose action failed
+    (`AqlJsonStreamer.actOnRow`: "Don't return rows that failed the action.").
+- **[S] Suffixes on actions.** 6.20's grammar accepts `.include()` and `.dryRun()` after
+  `items.delete(...)`, and `.keys()`, `.newValue()`, `.include()` and `.dryRun()` after
+  `properties.update(...)` (`DomainElement.getChainByDomain`). The 7.x pages list only
+  `.limit()`, `.offset()` and `.sort()` as unsupported with `.delete()` (`aql-syntax`,
+  "Limitations").
 
 ## 2. Searches
 
@@ -227,7 +251,10 @@ The cached definitions in `.specoracle/artifactory-searches-api/` match the spec
   - `/api/versions/{repo}/{path}` compares the lowercase `version` property. Its example answers
     `artifacts: []` without `listFiles=1`, and download URLs with it.
 - **[D] Build-info searches.** `dependency` and `buildArtifacts` read build-info. `license`
-  belongs to the licence feature and `archive` is deprecated; neither is in P5.
+  belongs to the licence feature, and JFrog records Archive Search as "completely
+  deprecated in Artifactory 7.90.5"
+  ([deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations.md)).
+  Neither is in P5, and `GET /api/search/archive` answers 501.
   - `buildArtifacts` takes `buildNumber: LATEST`, the latest promotion status as
     `buildStatus`, and `mappings[].input` regular expressions. No page documents a 404.
   - [S] Artifactory 6.20's `BuildArtifactsSearchResource` refuses a blank `buildName`,
@@ -266,9 +293,11 @@ The Builds API pages carry OpenAPI 3.1 blocks. The spec oracle fetches them from
 | Delete (multiple) | `POST /api/build/delete`, `{project, buildName, buildNumbers[], deleteArtifacts, deleteAll}` | 200 `text/plain` | 200 or 204 |
 | Build artifacts | `GET /api/builds/buildArtifacts/{name}/{number}/{build-info repo}` | undocumented | 200 `[{repo, path, name}]`; any error falls back to AQL (`artifactory/services/utils/artifactoryutils.go`) |
 
-- **[D] Upload preconditions.** Every artifact in `modules[].artifacts` must already exist with
-  matching SHA-1 and MD5, and carry `build.name` and `build.number` properties equal to the
-  document's `name` and `number`; otherwise the UI reports "No path found".
+- **[D] Linking artifacts.** For the Builds UI to link an artifact in `modules[].artifacts`,
+  it must already exist with matching checksums, and carry `build.name` and `build.number`
+  properties equal to the document's `name` and `number`; otherwise the UI shows "No path
+  found (externally resolved or deleted/overwritten)" (`uploadbuild`, "Link artifacts to
+  the build"). The page states these as what the UI needs, not as a check on the upload.
 - **[D] Permissions.**
   - Upload needs deploy permission on the build, plus delete to overwrite an existing
     build-info artifact.
@@ -391,17 +420,19 @@ itself is in the closed Pro build add-on.
 
 ## 4. Inferred and undocumented
 
-These points are not stated by any source. Decision 0012 or 0014 records what artifactweave
-does for each.
+These points are not stated by any 7.x source. Decision 0012 or 0014 records what
+artifactweave does for each.
 
 - **[I] Reading a number without `started`.** `GET /api/build/{name}/{number}` without
   `started` answers the most recent run with that number.
 - **[I] What actions return.** A dry run must show which items it would touch, which suggests
   `.delete()` and `.update()` answer in the `find` shape: the affected rows and a `range`.
+  Artifactory 6.20 does, leaving out the rows whose action failed (§1.5).
 - **[I] What actions need.** `.delete()` would follow `DELETE` and need delete permission on
   each item; `.update()` would follow set-properties and need annotate permission.
-- **[I] An action without `.dryRun()`.** Every documented example names it, so no source
-  shows the default. Only a dry run makes leaving it out harmless.
+- **[I] An action without `.dryRun()`.** Every documented example names it, so no 7.x page
+  shows the default. Artifactory 6.20 defaults to a dry run (§1.5), and only a dry run makes
+  leaving it out harmless.
 - **[I] Out of P5.** The `releases` and `release_artifacts` domains depend on release
   bundles v1 (P15). `item.infos` needs a record of property modifications that the item store
   does not keep.
@@ -422,7 +453,7 @@ does for each.
 
 ## 6. Artifactory 7.x check
 
-Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 **Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The pages read again are [artifactory-query-language](https://docs.jfrog.com/artifactory/docs/artifactory-query-language.md),
 [aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md), [aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md), [aql-query-execution](https://docs.jfrog.com/artifactory/docs/aql-query-execution.md),
@@ -440,6 +471,19 @@ Two 7.x changes back the repository-pattern rule:
 - AQL results honour include and exclude patterns for non-admins from [7.146.7](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71467-self-managed), "so AQL
   results align with repository access rules and other search methods";
 - concurrency limits apply globally and per user from the same release.
+
+**[I] Whether 7.x throttles by default** is unconfirmed. The 7.146.7 note says an AQL limit
+"includes concurrency limits at both global and per-user levels", and names no property. The
+only documented switch, `artifactory.aql.queries.limit.enabled`, has defaulted to `false`
+since 7.84.16 ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md),
+"How Do I Configure AQL Rate Limiting?"), so a default instance may answer no 429 at all.
+artifactweave sets no concurrency limit (`internal/server/aql.go`). The default is to verify
+against a live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+
+**Where artifactweave differs.** The audit of 2026-10-18 found code that differs from the
+pages above. The 7.x check sections of [decision 0012](decisions/0012-search-and-aql.md#artifactory-7x-check)
+and [decision 0014](decisions/0014-build-info.md#artifactory-7x-check) list each difference,
+its evidence and the issue that fixes it.
 
 The search APIs' rate limiting ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and the bad checksum search's 10,000 cap
 ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)) are in decision 0012.
@@ -481,7 +525,9 @@ run.
 
 **Unconfirmed for 7.x:** the **[S]** claims from Artifactory 6.20, which stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
 - the domain joins (section 1.1);
+- the promotion row keys (section 1.2);
 - the pre-scope build drop;
+- the actions' default dry run, update rule, row shape and suffixes (section 1.5);
 - the versions, latest version and build artifacts handlers (section 2);
 - promotion and retention (section 3).
 

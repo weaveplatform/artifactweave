@@ -786,7 +786,7 @@ paths:
         - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getallbuilds.md
     put:
-      description: Stores one run's build-info document. Every artifact in modules[].artifacts must already exist with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+      description: Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number, and Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
       operationId: uploadBuild
       parameters:
         - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
@@ -9163,7 +9163,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/searchaql.md
   /api/search/archive:
     get:
-      description: Deprecated search for entries inside archives by member name. Artifactory has scheduled it for removal and recommends AQL. artifactweave serves it for parity but it is a candidate for removal with the next major release; prefer AQL.
+      description: Search for entries inside archives by member name. Artifactory removed Archive Search in 7.90.5. artifactweave keeps the operation for parity with JFrog's definition and always answers 501; use AQL instead.
       operationId: searchArchive
       parameters:
         - description: Optional query parameter. Member name or fragment to look for inside archives; * and ? wildcards are allowed.
@@ -17391,7 +17391,7 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-      description: The request was malformed, for example an unreadable build-info document, a missing required field, or an artifact whose checksums do not match the stored file.
+      description: The request was malformed, for example an unreadable build-info document, a missing required field, or a module that lists one file twice.
     ArtifactoryBuildsApiForbidden:
       content:
         application/json:
@@ -18283,7 +18283,7 @@ components:
       type: object
       x-unverified: true
     ArchiveSearchResult:
-      description: Result of the deprecated archive entry search. Kept for parity; artifactweave answers it only until AQL covers the use case and may remove it when Artifactory does.
+      description: Result of the archive entry search, which Artifactory removed in 7.90.5. Kept for parity with JFrog's definition; artifactweave never returns it, because the search always answers 501.
       properties:
         results:
           description: Optional within this object. One entry per archive member name that matched.
@@ -18328,10 +18328,10 @@ components:
           type: array
       type: object
     Artifact:
-      description: One artifact a module produced. It must already exist in Artifactory before the build is uploaded.
+      description: One artifact a module produced. The upload does not check that the file exists; promotion and the build artifacts search find it later by its checksums and its build.name and build.number properties.
       properties:
         md5:
-          description: Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Upload requires it to match the stored file.
+          description: Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Used to find the stored file; the upload does not check it.
           type: string
         name:
           description: Optional within this object. File name, without the path.
@@ -18343,7 +18343,7 @@ components:
           description: Optional within this object. Repository-relative path of the file, including its name, without the repository key.
           type: string
         sha1:
-          description: Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Upload requires it to match the stored file.
+          description: Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Used to find the stored file; the upload does not check it.
           type: string
         sha256:
           description: Optional within this object. SHA-256 of the file, 64 lowercase hexadecimal characters.

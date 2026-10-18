@@ -9,7 +9,7 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
       description: The request was malformed, for example an unreadable build-info document, a missing required
-        field, or an artifact whose checksums do not match the stored file.
+        field, or a module that lists one file twice.
     ArtifactoryBuildsApiForbidden:
       content:
         application/json:
@@ -71,11 +71,12 @@ components:
           type: string
       type: object
     Artifact:
-      description: One artifact a module produced. It must already exist in Artifactory before the build is uploaded.
+      description: One artifact a module produced. The upload does not check that the file exists; promotion and
+        the build artifacts search find it later by its checksums and its build.name and build.number properties.
       properties:
         md5:
-          description: Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Upload
-            requires it to match the stored file.
+          description: Optional within this object. MD5 of the file, 32 lowercase hexadecimal characters. Used to
+            find the stored file; the upload does not check it.
           type: string
         name:
           description: Optional within this object. File name, without the path.
@@ -88,8 +89,8 @@ components:
             the repository key.
           type: string
         sha1:
-          description: Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Upload
-            requires it to match the stored file.
+          description: Optional within this object. SHA-1 of the file, 40 lowercase hexadecimal characters. Used to
+            find the stored file; the upload does not check it.
           type: string
         sha256:
           description: Optional within this object. SHA-256 of the file, 64 lowercase hexadecimal characters.
@@ -612,9 +613,11 @@ paths:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getallbuilds.md
     put:
-      description: Stores one run's build-info document. Every artifact in modules[].artifacts must already exist
-        with matching SHA-1 and MD5. Uploading a run that already exists overwrites it and needs delete permission
-        as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
+      description: Stores one run's build-info document. The artifacts in modules[].artifacts are not checked
+        against stored files. Promotion and the build artifacts search later find each one as an item holding its
+        checksums and carrying build.name and build.number equal to the document's name and number, and
+        Artifactory's Builds UI needs the same to link it. Uploading a run that already exists overwrites it and
+        needs delete permission as well as deploy. The JFrog CLI sends the vendor media type; application/json is accepted too.
       operationId: uploadBuild
       parameters:
       - description: Optional query parameter. Key of the project that owns the build. Omitted or default means
