@@ -37,7 +37,10 @@ func basic(user, password string) map[string]string {
 
 func TestAuthentication(t *testing.T) {
 	h, db := seededHandler(t)
-	const protected = "/artifactory/api/repositories"
+	const (
+		protected = "/artifactory/api/repositories"
+		version   = "/artifactory/api/system/version"
+	)
 	type want struct {
 		status    int
 		challenge bool
@@ -53,6 +56,13 @@ func TestAuthentication(t *testing.T) {
 			want{http.StatusUnauthorized, true, "Authentication is required"},
 		},
 		"public without credentials": {"GET", "/artifactory/api/system/ping", nil, want{status: http.StatusOK}},
+		// Version is not public: Artifactory requires a valid user for it
+		// (RTFACT-26414).
+		"version without credentials": {
+			"GET", version, nil,
+			want{http.StatusUnauthorized, true, "Authentication is required"},
+		},
+		"version as admin": {"GET", version, basic("admin", "pw"), want{status: http.StatusOK}},
 		"usage sink without credentials": {
 			"POST", "/artifactory/api/system/usage", nil, want{status: http.StatusOK},
 		},
@@ -120,6 +130,9 @@ func TestAuthentication(t *testing.T) {
 	if rec := do(t, h, "GET", protected, nil, ""); rec.Code != http.StatusOK ||
 		rec.Body.String() != "[]\n" {
 		t.Fatalf("anonymous on: %d %s", rec.Code, rec.Body)
+	}
+	if rec := do(t, h, "GET", version, nil, ""); rec.Code != http.StatusOK {
+		t.Fatalf("version, anonymous on: %d %s", rec.Code, rec.Body)
 	}
 }
 

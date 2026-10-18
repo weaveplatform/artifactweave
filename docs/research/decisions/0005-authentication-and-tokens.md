@@ -330,7 +330,10 @@ and the `artifactory-build-info` repository.
 **Compatibility version strings.** `/artifactory/api/system/version` returns a
 configurable Artifactory-compatible `version`, default 7.155.0 or newer, with the real
 artifactweave version in `revision` and `addons`. `/access/api/v1/system/version` returns
-`{"name":"<same>","version":"<same>"}`. `/api/system/license` is honest
+`{"name":"<same>","version":"<same>"}`. The Artifactory version answers any signed-in
+caller, and anonymous only while anonymous access is on, because 7.x refuses it to callers
+without credentials ([research 01](../01-jfrog-api-landscape.md#authentication-schemes));
+the Access version stays open. `/api/system/license` is honest
 (`type: "artifactweave"`); no client gates on it. `POST /api/system/usage` and
 `POST /jfconnect/api/v1/backoffice/metrics/log` answer 2xx and discard the body.
 

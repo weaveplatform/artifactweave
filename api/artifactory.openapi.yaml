@@ -12955,7 +12955,7 @@ paths:
         - system
   /api/system/version:
     get:
-      description: Reports the Artifactory version artifactweave is compatible with. The JFrog Terraform providers parse only the version field and gate features on it; the JFrog CLI reads it before uploads to decide on multipart. The real artifactweave build is in revision.
+      description: Reports the compatibility version in version, the server build in revision, and the installed add-ons. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
       operationId: getSystemVersion
       parameters:
         - description: Optional header parameter. Clients that send the vendor media type application/vnd.org.jfrog.artifactory.system.Version+json receive it back as the response content type; any other value yields application/json.
@@ -12975,7 +12975,7 @@ paths:
                 $ref: '#/components/schemas/SystemVersion'
           description: The compatibility version.
         '401':
-          description: Rejected credentials. artifactweave serves the endpoint without credentials, but a request that carries credentials which fail is refused with 401, as Artifactory documents.
+          description: The request carried no credentials while anonymous access is disabled, or its credentials were rejected.
       summary: Artifactory-compatible version
       tags:
         - system

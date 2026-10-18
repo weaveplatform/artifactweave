@@ -1,7 +1,7 @@
 Feature: Authentication
-  Basic credentials against the seeded admin (decision 0005). Probes and
-  version reads answer without credentials; everything else is challenged
-  until anonymous access is turned on.
+  Basic credentials against the seeded admin (decision 0005). Probes and the
+  Access version answer without credentials; everything else, the Artifactory
+  version included, is challenged until anonymous access is turned on.
 
   Background:
     Given the registry is running
