@@ -256,6 +256,14 @@ func (a access) removes(c repo.Config, path string) bool {
 	return a.file(c, path, types.ActionDelete) || a.file(c, path, types.ActionManage)
 }
 
+// seesTrash reports whether the caller sees what was trashed from path in c:
+// deploy or manage there, not read, as 7.x shows the trash can. Manage is
+// accepted on its own because a permission can grant it without deploy.
+func (a access) seesTrash(c repo.Config, path string, folder bool) bool {
+	return a.item(c, path, folder, types.ActionWrite) ||
+		a.item(c, path, folder, types.ActionManage)
+}
+
 // cutRepoPath splits "key/some/path" into the key and the path, as given.
 func cutRepoPath(rp string) (key, rest string) {
 	key, rest, _ = strings.Cut(strings.Trim(rp, "/"), "/")
@@ -264,21 +272,24 @@ func cutRepoPath(rp string) (key, rest string) {
 
 // listTrash answers the storage API for the auto-trashcan repository: its
 // root lists the repositories with trashed items, a folder its next path
-// segments, and a trashed file its file info. Admin only.
+// segments, and a trashed file its file info. An administrator sees all of
+// it; anyone else what trashSight allows.
 func (s artifactoryService) listTrash(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
-	if err == nil {
-		err = adminOnly(ctx)
-	}
 	if err != nil {
 		writeErr(w, r, err)
 		return
 	}
 	dir := strings.Trim(strings.TrimPrefix(
 		strings.TrimPrefix(r.URL.Path, "/artifactory/api/storage/"+trash.Repository), "/"), "/")
-	svc := s.trashService(st)
 	key, rest := cutRepoPath(dir)
+	p, sees, err := s.trashSight(ctx, st, key, rest)
+	if err != nil {
+		writeErr(w, r, err)
+		return
+	}
+	svc := s.trashService(st)
 	var entry types.TrashEntry
 	found := false
 	if rest != "" {
@@ -293,10 +304,16 @@ func (s artifactoryService) listTrash(w http.ResponseWriter, r *http.Request) {
 	}
 	base := baseurl.From(ctx) + "/artifactory/api/storage/" + trash.Repository
 	if found && !entry.Record.Item.Folder {
+		// The folder check let the path through; a file needs the exact
+		// right, as the storage API asks once it has found the item.
+		if sees != nil && !sees(entry.Record.Item) {
+			writeErr(w, r, denied(p))
+			return
+		}
 		writeJSON(w, http.StatusOK, trashFileInfo(base, dir, entry))
 		return
 	}
-	children, err := svc.Children(ctx, dir)
+	children, err := svc.Children(ctx, dir, sees)
 	if err != nil {
 		writeErr(w, r, s.internalError(ctx, "list trash", err))
 		return
@@ -313,6 +330,65 @@ func (s artifactoryService) listTrash(w http.ResponseWriter, r *http.Request) {
 		"repo": trash.Repository, "path": "/" + dir, "children": list,
 		"uri": strings.TrimSuffix(base+"/"+escapePath(dir), "/"),
 	})
+}
+
+// trashSight decides what a caller sees of the trash can at key/rest, as
+// 7.x filters it from 7.41.4 (decision 0010): what was trashed from the
+// repositories it holds deploy or manage on, judged at each item's original
+// path so exclude patterns hold, and no trash can at all for a caller that
+// holds neither anywhere. A path where it sees nothing is refused before
+// the trash is read, so a refusal never tells it whether anything is
+// trashed there.
+//
+// An administrator gets a nil filter. Only it sees the trash of a deleted
+// repository, which has no configuration left to judge a permission by, as
+// for clean and restore. Anonymous is refused even holding deploy, an
+// inferred choice: the listing names who deleted each item.
+func (s artifactoryService) trashSight(
+	ctx context.Context,
+	st store.Store,
+	key, rest string,
+) (auth.Principal, func(types.Item) bool, error) {
+	p, acc, err := s.itemCaller(ctx, st)
+	if err != nil || p.Admin {
+		return p, nil, err
+	}
+	if p.Anonymous {
+		return p, nil, denied(p)
+	}
+	var origins []repo.Config
+	if key == "" {
+		// The root shows to a holder of deploy or manage anywhere, so every
+		// repository is a candidate.
+		origins, err = st.Repos().List(ctx, store.RepoFilter{})
+		if err != nil {
+			return p, nil, s.internalError(ctx, "list repositories", err)
+		}
+	} else {
+		c, err := st.Repos().Get(ctx, key)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			return p, nil, denied(p)
+		case err != nil:
+			return p, nil, s.internalError(ctx, "get repository", err)
+		}
+		origins = []repo.Config{c}
+	}
+	byKey := make(map[string]repo.Config, len(origins))
+	allowed := false
+	for _, c := range origins {
+		byKey[c.Key] = c
+		// A folder shows when something below it does, so at the root this
+		// asks whether the caller sees anything in the repository at all.
+		allowed = allowed || acc.seesTrash(c, rest, true)
+	}
+	if !allowed {
+		return p, nil, denied(p)
+	}
+	return p, func(it types.Item) bool {
+		c, ok := byKey[it.RepoKey]
+		return ok && acc.seesTrash(c, it.FullPath(), it.Folder)
+	}, nil
 }
 
 // trashFileInfo is a trashed file's storage info, with when and by whom it

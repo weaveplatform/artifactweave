@@ -696,10 +696,42 @@ func storageMatrix() []matrixRow {
 	}
 }
 
+// trashViewer: a signed-in caller holding deploy or manage in some
+// repository, whom 7.x shows the trash can (#439). Grants on
+// artifactory-build-info are the build resource's, which shows nothing.
+func trashViewer(p matrixPrincipal) int {
+	if !p.anonymous && slices.ContainsFunc(p.grants, func(g matrixGrant) bool {
+		return g.repo != types.BuildInfoRepository &&
+			(g.actions.Has(types.ActionWrite) || g.actions.Has(types.ActionManage))
+	}) {
+		return 0
+	}
+	return refuse(p)
+}
+
 // trashMatrix covers the trash can.
 func trashMatrix() []matrixRow {
+	const (
+		list = "GET /artifactory/api/storage/auto-trashcan"
+		tc   = "/artifactory/api/storage/auto-trashcan"
+	)
+	write, manage := types.ActionWrite, types.ActionManage
 	return []matrixRow{
-		at("GET /artifactory/api/storage/auto-trashcan", "", administrators, 200),
+		at(list, "", trashViewer, 200),
+		// What was trashed from A shows to its deploy and manage holders,
+		// and B's to no one but administrators (#439).
+		row(
+			list, tc+"/libs-local/work", "",
+			holdsEither("libs-local", "work/", write, manage), 200,
+		).seeding(trashed("libs-local", "work/listed-{p}.txt")),
+		row(
+			list, tc+"/libs-local/work/listed-file-{p}.txt", "",
+			holdsEither("libs-local", "work/", write, manage), 200,
+		).seeding(trashed("libs-local", "work/listed-file-{p}.txt")),
+		row(
+			list, tc+"/libs-b/work", "",
+			holdsEither("libs-b", "work/", write, manage), 200,
+		).seeding(trashed("libs-b", "work/b-listed-{p}.txt")),
 		row(
 			"DELETE /artifactory/api/trash/clean/{repoPath}",
 			"/artifactory/api/trash/clean/libs-local/work/trash-{p}.txt", "",

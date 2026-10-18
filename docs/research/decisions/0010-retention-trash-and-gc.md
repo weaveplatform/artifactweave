@@ -40,7 +40,8 @@ item or trash entry and refreshes the storage summary.
   - Unset, the trash can is on, with Artifactory's 14-day retention.
   - A trashed file keeps its blob reference, so it stays restorable. Purging an entry, by `clean`, `empty` or expiry, releases that reference.
   - `restore` takes the newest trashed copy of each path. Without a path in `to`, items return to their original paths; with one, the restored path lands there. A file at the destination is replaced, as a deploy replaces one.
-  - The trash can is listed through the storage API under the `auto-trashcan` key.
+  - The trash can is listed through the storage API under the `auto-trashcan` key. An administrator sees all of it. Anyone else sees only what was trashed from repositories it holds deploy or manage on, judged at each item's original path, so exclude patterns hold.
+  - A caller holding deploy or manage on no repository is refused the listing with 403. A path where the caller sees nothing is refused with 403 before the trash is read, and a folder listing leaves out what the caller does not see. Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer exists.
   - `restore` needs Manage on the destination and delete or manage on the repository the items were deleted from, as `clean` does. The origin is checked at the requested path and at every restored item's original path, so an exclude pattern is honoured. One item not covered refuses the whole restore before anything moves.
   - The check at the requested path runs before the trash is read, so a refusal does not reveal whether anything is trashed there. Only an admin restores from a repository that no longer exists.
   - Permission failures on `clean`, `empty` and `restore` answer 400, as Artifactory reports them.
@@ -99,9 +100,23 @@ it, and a permission can grant Manage without delete. Two details are inferred:
 - **[I]** RTFACT-29653 reports that 7.x wants delete on the whole origin repository, so a folder-level grant does not let its holder restore that folder. artifactweave checks the requested path and every restored item's original path, so a folder-level grant is enough and its exclude patterns still hold.
 - **[I]** The general settings page suggests a holder of delete on the origin restores into it without Manage; the reference page names Manage. artifactweave requires Manage on the destination.
 
+Listing the trash can follows the same page. From 7.41.4 a holder of deploy or manage on a
+repository sees what was trashed from it, and only that, and a user holding neither on any
+repository does not see the trash can: "The contents of the Trash Can are filtered based on
+the repositories to which the user has permissions"
+([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring
+Deleted Repositories"). **[J]** [RTFACT-27280](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27280)
+describes the change that
+[RTFACT-13242](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-13242) (Done) made: "users
+with deploy permission of repositories are now able to see the Trash Can items for the
+repositories that they have permission to". artifactweave applies this rule to the
+`auto-trashcan` storage path. Three details are inferred:
+- **[I]** The page and both issues describe the UI's tree. artifactweave refuses a signed-in caller with 403 at a path where it sees nothing, as the storage API refuses an unreadable path, and leaves what it does not see out of folder listings.
+- **[I]** artifactweave judges each trashed item at its original path, so a folder-level grant shows only that folder's items and exclude patterns hold. 7.x may judge the repository as a whole, as RTFACT-29653 reports for restore.
+- **[I]** Anonymous gets 401 even when it holds deploy, and only an admin sees what was trashed from a repository that no longer exists, as only an admin cleans or restores it.
+
 The audit also found these differences
 ([research 02](../02-artifactory-core-api-inventory.md#trash-can-and-garbage-collection)):
-- 7.x differs: from 7.41.4 a non-admin with deploy or manage on a repository sees that repository's trashed items in the trash can, and only those ([general settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted Repositories"). artifactweave lists the `auto-trashcan` storage path to admins only; fixed by [#439](https://github.com/weaveplatform/artifactweave/issues/439).
 - 7.x differs: a restored item also carries the properties `trash.originalRepository` and `trash.restoredTime` (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10); fixed by [#401](https://github.com/weaveplatform/artifactweave/issues/401).
 - 7.x differs: storage summary rows carry `usedSpaceInBytes`, a number, and `projectKey` (**[S]** jfrog-client-go's live `storageInfoTest` at `3b4b900d8174`); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).
 - 7.x differs: a non-admin whose token has the `system:info/storage:r` scope may read the storage summary ([getstoragesummaryinfo](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md); [7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)); fixed by [#390](https://github.com/weaveplatform/artifactweave/issues/390).

@@ -375,7 +375,7 @@ func TestChildrenAndFind(t *testing.T) {
 		"libs/a": {{Name: "b", Folder: true}},
 		"libs/x": {},
 	} {
-		got, err := w.trash.Children(ctx, dir)
+		got, err := w.trash.Children(ctx, dir, nil)
 		if err != nil || len(got) != len(want) {
 			t.Fatalf("%q: %v, %v", dir, got, err)
 		}
@@ -391,6 +391,42 @@ func TestChildrenAndFind(t *testing.T) {
 	}
 	if _, err := w.trash.Find(ctx, "libs", "absent"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("find absent: %v", err)
+	}
+}
+
+// A repository or folder shows only when an entry the filter keeps lies at
+// or below it.
+func TestChildrenFiltered(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "a/b/f.txt", "f", nil)
+	w.deploy(t, w.libs, "a/c/g.txt", "g", nil)
+	w.deploy(t, w.libs, "top.txt", "top", nil)
+	w.deploy(t, w.other, "o.txt", "o", nil)
+	w.remove(t, w.libs, "a")
+	w.remove(t, w.libs, "top.txt")
+	w.remove(t, w.other, "o.txt")
+	// Everything trashed from libs under a/b, and the folders on the way.
+	sees := func(it types.Item) bool {
+		return it.RepoKey == "libs" &&
+			(it.FullPath() == "a" || strings.HasPrefix(it.FullPath(), "a/b"))
+	}
+	for dir, want := range map[string][]trash.Child{
+		"":       {{Name: "libs", Folder: true}},
+		"libs":   {{Name: "a", Folder: true}},
+		"libs/a": {{Name: "b", Folder: true}},
+		"libs/c": {},
+		"other":  {},
+	} {
+		got, err := w.trash.Children(ctx, dir, sees)
+		if err != nil || len(got) != len(want) {
+			t.Fatalf("%q: %v, %v", dir, got, err)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("%q: %v, want %v", dir, got, want)
+			}
+		}
 	}
 }
 
@@ -520,7 +556,7 @@ func TestStoreFailures(t *testing.T) {
 			return err
 		},
 		"children": func() error {
-			_, err := svc(map[string]error{"list": errBoom}).Children(ctx, "libs")
+			_, err := svc(map[string]error{"list": errBoom}).Children(ctx, "libs", nil)
 			return err
 		},
 		"find": func() error {
