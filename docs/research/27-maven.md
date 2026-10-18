@@ -353,9 +353,11 @@ highest in version order, whatever the upload order.
   recorded as client checksums; a mismatch fails the upload only under `client-checksums`
   (`UploadServiceUtils.setFileInfoChecksums`, `LocalRepoChecksumPolicy.verify`).
 - **[S]** 6.20 knows SHA-1, MD5 and SHA-256 only (`ChecksumType`); a `.sha512` upload is an
-  ordinary file there. Research 04 records that Artifactory 7 serves `.sha512`; artifactweave
-  stores SHA-512 for all content and checks `.sha512` uploads like the others (#296, decision
-  0032).
+  ordinary file there. No 7.x page or release note documents SHA-512 for Maven files, and
+  **[J]** [RTFACT-30948](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30948) is an open
+  request to add it for generic files. artifactweave stores SHA-512 for all content and checks
+  `.sha512` uploads like the others (#296, decision 0032), as its own extension (a deviation
+  registered by #378).
 
 ## 5. Release and snapshot policy
 
