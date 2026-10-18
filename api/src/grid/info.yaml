@@ -1,14 +1,13 @@
 openapi: 3.0.3
 info:
-  title: artifactweave topology-compatible REST API
+  title: Topology REST API
   version: 0.1.0
   description: >-
-    The topology and monitoring surface: known peer instances, their topology and health (decision 0025), served under /grid. Paths and shapes mirror JFrog's documented API
-    (docs/research/16). Authored by the artifactweave project; cites JFrog's
-    documentation and copies nothing from it.
+    The topology and monitoring surface: known peer instances, their topology and health, served under
+    /grid.
 servers:
   - url: /grid
-    description: The grid service prefix on the single artifactweave listener.
+    description: The grid service prefix on the single listener.
 tags:
   - name: handwritten
     description: Marker tag. Operations with this tag are implemented by hand and excluded from generation.

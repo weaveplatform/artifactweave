@@ -3,7 +3,7 @@ components:
   schemas:
     ErrorResponse:
       type: object
-      description: The Distribution error envelope. status_code and message repeat the first entry of errors so clients reading either form agree.
+      description: The Distribution error envelope. status_code and message repeat the first entry of errors.
       required: [status_code, message, errors]
       properties:
         status_code:
@@ -18,8 +18,7 @@ components:
         errors:
           type: array
           description: >-
-            Required within this object. One entry per error. jfrog-client-go
-            reports the whole body after the status and reads no field of it.
+            Required within this object. One entry per error.
           items:
             type: object
             required: [status, message]

@@ -1,14 +1,13 @@
 openapi: 3.0.3
 info:
-  title: artifactweave platform-federation-compatible REST API
+  title: Platform federation REST API
   version: 0.1.0
   description: >-
-    The platform federation surface: federations of peer instances and their membership (decision 0025), served under /pfed. Paths and shapes mirror JFrog's documented API
-    (docs/research/16). Authored by the artifactweave project; cites JFrog's
-    documentation and copies nothing from it.
+    The platform federation surface: federations of peer instances and their membership, served under
+    /pfed.
 servers:
   - url: /pfed
-    description: The pfed service prefix on the single artifactweave listener.
+    description: The pfed service prefix on the single listener.
 tags:
   - name: handwritten
     description: Marker tag. Operations with this tag are implemented by hand and excluded from generation.

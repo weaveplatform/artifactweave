@@ -42,11 +42,10 @@ components:
           description: Optional within this object. Free text describing what the federation is for.
           type: string
         entities:
-          description: Required within this object. The entity types to federate. Must list all four documented
-            types, each once. JFrog defines platform federation over a fixed list of Curation entity types. artifactweave
-            does not implement Curation, so it accepts exactly that list for wire compatibility and records the
-            federation and its membership, but those types carry no data to synchronise. Identity replication between
-            peers is configured through /access/api/v1/system/federation instead (decision 0025).
+          description: Required within this object. The entity types to federate. Must list all four types of
+            the EntityConfig type enum, each once. The federation and its membership are recorded, but these types
+            carry no data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation
+            instead.
           items:
             $ref: '#/components/schemas/EntityConfig'
           type: array
@@ -61,7 +60,7 @@ components:
     CreateJpdRequest:
       description: A follower instance to add to this controller. Obtain pairing_token on the follower with POST
         /access/api/v1/service_trust/pairing/platform-federation; the token is used once to establish mutual trust
-        (decision 0021) and is not stored.
+        and is not stored.
       properties:
         id:
           description: Required within this object. Label for the follower, unique on this controller; referenced
@@ -74,7 +73,7 @@ components:
           type: string
           writeOnly: true
         url:
-          description: Required within this object. Base URL of the follower artifactweave instance.
+          description: Required within this object. Base URL of the follower instance.
           type: string
       required:
       - id
@@ -85,11 +84,9 @@ components:
       description: One entity type a federation covers.
       properties:
         type:
-          description: Required within this object. Entity type identifier in <service>.<entityType> form. JFrog
-            defines platform federation over a fixed list of Curation entity types. artifactweave does not implement
-            Curation, so it accepts exactly that list for wire compatibility and records the federation and its
-            membership, but those types carry no data to synchronise. Identity replication between peers is configured
-            through /access/api/v1/system/federation instead (decision 0025).
+          description: Required within this object. Entity type identifier in <service>.<entityType> form. These
+            types are recorded but carry no data to synchronise. Identity replication between peers is configured
+            through /access/api/v1/system/federation instead.
           enum:
           - catalog.customLabels
           - xray.curationCondition
@@ -205,11 +202,9 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/listfederations.md
     post:
       description: Defines a federation on this controller that groups previously added follower instances. Every
-        follower id in the connection group must already exist (POST /pfed/api/v1/jpd). JFrog defines platform federation
-        over a fixed list of Curation entity types. artifactweave does not implement Curation, so it accepts exactly
-        that list for wire compatibility and records the federation and its membership, but those types carry no
-        data to synchronise. Identity replication between peers is configured through /access/api/v1/system/federation
-        instead (decision 0025). Administrators only.
+        follower id in the connection group must already exist (POST /pfed/api/v1/jpd). The federation and its
+        membership are recorded, but its entity types carry no data to synchronise. Identity replication between
+        peers is configured through /access/api/v1/system/federation instead. Administrators only.
       operationId: createFederation
       requestBody:
         content:
@@ -231,7 +226,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: 'Invalid body: a missing field, a connection group key other than source-jpd, an unknown
-            follower id, or an entity list that differs from the documented one.'
+            follower id, or an entity list other than the four required types.'
         '401':
           content:
             application/json:
@@ -340,8 +335,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getfederation.md
   /api/v1/jpd:
     get:
-      description: Returns every follower instance added to this controller. In artifactweave a JPD is always a
-        peer artifactweave instance; JFrog Platform Deployments cannot join (decision 0025). Administrators only.
+      description: Returns every follower instance added to this controller. A follower is always a peer instance
+        paired over the peer protocol. Administrators only.
       operationId: listFollowerJpds
       responses:
         '200':
@@ -377,8 +372,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/listfollowerjpds.md
     post:
       description: Adds a follower and establishes mutual trust with it by redeeming the follower's platform-federation
-        pairing token over the peer protocol (decision 0021). The token is consumed; the resulting per-peer keys
-        are sealed at rest (decision 0017). Administrators only.
+        pairing token over the peer protocol. The token is consumed; the resulting per-peer keys are sealed at
+        rest. Administrators only.
       operationId: addFollowerJpd
       requestBody:
         content:

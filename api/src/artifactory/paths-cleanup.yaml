@@ -12,7 +12,7 @@ components:
       properties:
         cronExp:
           description: 'Optional within this object. Quartz cron expression (six or seven fields with seconds, ?,
-            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone (decision 0010).
+            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone.
             Omitted or empty means the policy only runs when triggered through the run operation.'
           type: string
         deleteArtifacts:
@@ -105,9 +105,8 @@ components:
           minimum: 0
           type: integer
         createdBeforeInMonths:
-          description: Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for
-            configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays
-            is set.
+          description: Optional within this object. Month-based form of createdBeforeInDays; a month counts as 30
+            days. Ignored when createdBeforeInDays is set.
           minimum: 0
           type: integer
         excludeBuildsWithReleaseBundles:
@@ -315,8 +314,7 @@ components:
         status:
           description: Optional within this object. Run status. IN_PROGRESS and IN_PROGRESS_WITH_ERRORS are running;
             COMPLETED, COMPLETED_WITH_ERRORS, STOPPED and FAILED are final; STOPPING is a stop in progress. PENDING_WARM,
-            PARTIAL_WARMED and WARMED describe Artifactory's index warm-up before a run and are never reported by
-            artifactweave, whose package index is always current.
+            PARTIAL_WARMED and WARMED are not returned.
           enum:
           - IN_PROGRESS
           - IN_PROGRESS_WITH_ERRORS
@@ -556,7 +554,7 @@ components:
       properties:
         cronExp:
           description: 'Optional within this object. Quartz cron expression (six or seven fields with seconds, ?,
-            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone (decision 0010).
+            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone.
             Omitted or empty means the policy only runs when triggered through the run operation.'
           type: string
         description:
@@ -639,9 +637,8 @@ components:
           minimum: 0
           type: integer
         createdBeforeInMonths:
-          description: Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for
-            configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays
-            is set.
+          description: Optional within this object. Month-based form of createdBeforeInDays; a month counts as 30
+            days. Ignored when createdBeforeInDays is set.
           minimum: 0
           type: integer
         excludedPackageVersions:
@@ -676,8 +673,7 @@ components:
           type: boolean
         includeAllStages:
           description: Optional within this object. When true the policy covers repositories in every environment
-            and includedStages must be empty. Defaults to true in artifactweave, which has no lifecycle stages beyond
-            environments.
+            and includedStages must be empty. Defaults to true.
           type: boolean
         includedPackageVersions:
           description: Optional within this object. Version strings or wildcard patterns (for example 1.*) to clean
@@ -725,14 +721,14 @@ components:
           minimum: 0
           type: integer
         lastDownloadedBeforeInMonths:
-          description: Optional within this object. Legacy month-based form of lastDownloadedBeforeInDays (30-day
-            months). Ignored when the day form is set.
+          description: Optional within this object. Month-based form of lastDownloadedBeforeInDays (30-day months).
+            Ignored when the day form is set.
           minimum: 0
           type: integer
         packageTypes:
           description: Required within this object. Package types the policy applies to, at least one, using the
             repository packageType names (for example npm, docker, maven). Versions are identified and ordered with
-            each type's own rules through the package index (decision 0018).
+            each type's own rules through the package index.
           items:
             type: string
           type: array
@@ -754,7 +750,7 @@ components:
       properties:
         cronExp:
           description: 'Optional within this object. Quartz cron expression (six or seven fields with seconds, ?,
-            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone (decision 0010).
+            L, W, # and an optional year) for scheduled runs, evaluated in the server''s time zone.
             Omitted or empty means the policy only runs when triggered through the run operation.'
           type: string
         description:
@@ -828,9 +824,8 @@ components:
           minimum: 0
           type: integer
         createdBeforeInMonths:
-          description: Optional within this object. Legacy month-based form of createdBeforeInDays, accepted for
-            configurations written for older Artifactory versions. A month counts as 30 days. Ignored when createdBeforeInDays
-            is set.
+          description: Optional within this object. Month-based form of createdBeforeInDays; a month counts as 30
+            days. Ignored when createdBeforeInDays is set.
           minimum: 0
           type: integer
         excludeAllPromotedEnvironments:
@@ -867,10 +862,7 @@ components:
 paths:
   /api/cleanup/builds/policies:
     get:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Returns every build cleanup policy
-        the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform admin,
-        or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: getAllBuildCleanupPolicies
       parameters:
       - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
@@ -923,11 +915,7 @@ paths:
       x-tier: stub
   /api/cleanup/builds/policies/{policyKey}:
     delete:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule.
-        A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation;
-        the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when
-        the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: deleteBuildCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -979,9 +967,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletebuildcleanuppolicy.md
       x-tier: stub
     get:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Returns one build cleanup policy.
-        Requires a platform admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: getBuildCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1033,12 +1019,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getbuildcleanuppolicy.md
       x-tier: stub
     post:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Stores a new build cleanup policy
-        under policyKey, disabled. The body''s key must match the path, and enabled must be false or omitted: a
-        policy is always created inactive and switched on with the enablement operation, which is the sequence the
-        jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the policy
-        belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: createBuildCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1097,11 +1078,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/createbuildcleanuppolicy.md
       x-tier: stub
     put:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Replaces the policy''s configuration
-        with the body. The key, item type and project cannot change. The enablement state is kept; change it with
-        the enablement operation. A run already in progress continues with the configuration it started with. Requires
-        a platform admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: updateBuildCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1161,10 +1138,7 @@ paths:
       x-tier: stub
   /api/cleanup/builds/policies/{policyKey}/enablement:
     post:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Sets whether the policy''s schedule
-        fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform
-        admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: enableDisableBuildCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1220,12 +1194,7 @@ paths:
       x-tier: stub
   /api/cleanup/builds/policies/{policyKey}/run:
     put:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside
-        its schedule and returns at once with the run''s identifier. The policy must be enabled. Only one run per
-        policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run
-        selects builds and writes its report without deleting anything. Requires a platform admin, or a project
-        admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: runBuildCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1285,10 +1254,7 @@ paths:
       x-tier: stub
   /api/cleanup/bundles/policies:
     get:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Returns every release bundle cleanup
-        policy the caller may manage, global ones for a platform admin or those of projectKey. Requires a platform
-        admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: getAllReleaseBundleCleanupPolicies
       parameters:
       - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
@@ -1337,11 +1303,7 @@ paths:
       x-tier: stub
   /api/cleanup/bundles/policies/{policyKey}:
     delete:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Deletes the policy and its schedule.
-        A run in progress is stopped first. Run history and reports are kept. Answers 200 with a short text confirmation;
-        the Terraform provider accepts no other success code. Requires a platform admin, or a project admin when
-        the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: deleteReleaseBundleCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1393,9 +1355,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletereleasebundlecleanuppolicy.md
       x-tier: stub
     get:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Returns one release bundle cleanup
-        policy. Requires a platform admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: getReleaseBundleCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1447,12 +1407,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getreleasebundlecleanuppolicy.md
       x-tier: stub
     post:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Stores a new release bundle cleanup
-        policy under policyKey, disabled. The body''s key must match the path, and enabled must be false or omitted:
-        a policy is always created inactive and switched on with the enablement operation, which is the sequence
-        the jfrog/artifactory Terraform provider follows. Requires a platform admin, or a project admin when the
-        policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: createReleaseBundleCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1511,11 +1466,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/createreleasebundlecleanuppolicy.md
       x-tier: stub
     put:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Replaces the policy''s configuration
-        with the body. The key, item type and project cannot change. The enablement state is kept; change it with
-        the enablement operation. A run already in progress continues with the configuration it started with. Requires
-        a platform admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: updateReleaseBundleCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1575,10 +1526,7 @@ paths:
       x-tier: stub
   /api/cleanup/bundles/policies/{policyKey}/enablement:
     post:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Sets whether the policy''s schedule
-        fires and whether manual runs are accepted. Disabling does not stop a run in progress. Requires a platform
-        admin, or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: enableDisableReleaseBundleCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1634,12 +1582,7 @@ paths:
       x-tier: stub
   /api/cleanup/bundles/policies/{policyKey}/run:
     put:
-      description: 'Not implemented in v1: artifactweave answers 501 Not Implemented in the Artifactory error envelope.
-        The contract is specified so the shape is fixed when the feature lands. Queues a run of the policy outside
-        its schedule and returns at once with the run''s identifier. The policy must be enabled. Only one run per
-        policy executes at a time; a second request while one is running is rejected with 400. With dryRun the run
-        selects release bundle versions and writes its report without deleting anything. Requires a platform admin,
-        or a project admin when the policy belongs to their project.'
+      description: Not implemented; answers 501.
       operationId: runReleaseBundleCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1701,8 +1644,7 @@ paths:
     get:
       description: Returns every package cleanup policy the caller may manage, global ones for a platform admin
         or those of projectKey. Requires a platform admin, or a project admin when the policy belongs to their project.
-        Package policies are evaluated by artifactweave's in-process scheduler over the package index (decisions
-        0010 and 0018).
+        Package policies are evaluated by the in-process scheduler over the package index.
       operationId: getAllPackageCleanupPolicies
       parameters:
       - description: Optional query parameter. Limits the operation to policies of this project. Omitted means global
@@ -1751,8 +1693,8 @@ paths:
   /api/cleanup/packages/policies/{policyKey}:
     delete:
       description: Deletes the policy and its schedule. A run in progress is stopped first. Run history and reports
-        are kept. Answers 200 with a short text confirmation; the Terraform provider accepts no other success code.
-        Requires a platform admin, or a project admin when the policy belongs to their project.
+        are kept. Answers 200 with a short text confirmation. Requires a platform admin, or a project admin when
+        the policy belongs to their project.
       operationId: deletePackageCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -1814,10 +1756,9 @@ paths:
         schema:
           type: string
       - description: Optional query parameter. When true the server also resolves the repository keys named explicitly
-          in searchCriteria.repos and excludedRepos against the repositories that exist now. JFrog documents only
-          the name and the default, and its response has no field for the result, so artifactweave leaves keys that
-          no longer resolve out of the returned searchCriteria (patterns are returned as stored) and never changes
-          the stored policy. Defaults to false, which returns the policy exactly as stored.
+          in searchCriteria.repos and excludedRepos against the repositories that exist now, and leaves keys that
+          no longer resolve out of the returned searchCriteria (patterns are returned as stored). The stored policy
+          never changes. Defaults to false, which returns the policy exactly as stored.
         in: query
         name: checkRepoAvailability
         required: false
@@ -1869,8 +1810,7 @@ paths:
     post:
       description: 'Stores a new package cleanup policy under policyKey, disabled. The body''s key must match the
         path, and enabled must be false or omitted: a policy is always created inactive and switched on with the
-        enablement operation, which is the sequence the jfrog/artifactory Terraform provider follows. Requires a
-        platform admin, or a project admin when the policy belongs to their project.'
+        enablement operation. Requires a platform admin, or a project admin when the policy belongs to their project.'
       operationId: createPackageCleanupPolicy
       parameters:
       - description: Required path parameter. Key of the cleanup policy.
@@ -2357,8 +2297,8 @@ paths:
           minimum: 1
           type: integer
         x-unverified: true
-      - description: Optional query parameter. Runs per page. JFrog documents no default or maximum; artifactweave
-          defaults to 25, caps the value at 500 and reports the size it applied in pagination.pageSize.
+      - description: Optional query parameter. Runs per page. Defaults to 25 and is capped at 500; pagination.pageSize
+          reports the size applied.
         in: query
         name: pageSize
         schema:
@@ -2366,8 +2306,7 @@ paths:
           type: integer
         x-unverified: true
       - description: Optional query parameter. Run field to order by. Defaults to startTime which, with the default
-          sortOrder desc, puts the newest run first as JFrog's Runs tab does. Any other field name is rejected with
-          400.
+          sortOrder desc, puts the newest run first. Any other field name is rejected with 400.
         in: query
         name: sortBy
         schema:
