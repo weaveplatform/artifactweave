@@ -65,6 +65,7 @@ func checksumDeploy(headers map[string]string, body string) (map[string]string, 
 func statusTable() []statusCase {
 	return slices.Concat(
 		systemStatusRows(),
+		sinkStatusRows(),
 		repositoryStatusRows(),
 		descriptorStatusRows(),
 		itemStatusRows(),
@@ -143,6 +144,27 @@ func systemStatusRows() []statusCase {
 		},
 		{"GET /access/api/v1/system/version", "/access/api/v1/system/version", "", "", 200},
 	}
+}
+
+// sinkStatusRows are the telemetry sinks: public, and limited to
+// sinkBodyLimit bytes of body (#431).
+func sinkStatusRows() []statusCase {
+	const report = `{"productId":"jfrog-cli-go/2.60.0","features":[]}`
+	oversized := strings.Repeat("x", sinkBodyLimit+1)
+	var rows []statusCase
+	for _, route := range []string{
+		"POST /artifactory/api/system/usage",
+		"POST /jfconnect/api/v1/backoffice/metrics/log",
+	} {
+		_, path, _ := strings.Cut(route, " ")
+		rows = append(rows,
+			statusCase{route, path, "", report, 200},
+			statusCase{route, path, "anonymous", report, 200},
+			statusCase{route, path, "admin", report, 200},
+			statusCase{route, path, "", oversized, 413},
+		)
+	}
+	return rows
 }
 
 // statusFixture is a seeded store with the admin (password "pw"), a user

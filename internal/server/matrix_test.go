@@ -558,6 +558,8 @@ func systemMatrix() []matrixRow {
 			"localRepositories:\n  patch-{p}:\n    type: generic\n", administrators, 200,
 		),
 		at("GET /artifactory/api/v1/uploads/config", "", anyone, 200),
+		at("POST /artifactory/api/system/usage", `{"features":[]}`, noCredentials, 200),
+		at("POST /jfconnect/api/v1/backoffice/metrics/log", `{"metrics":[]}`, noCredentials, 200),
 	}
 }
 

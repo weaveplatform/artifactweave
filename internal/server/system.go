@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
 	artgen "github.com/weaveplatform/artifactweave/internal/server/gen/artifactory"
 	distributiongen "github.com/weaveplatform/artifactweave/internal/server/gen/distribution"
@@ -132,11 +134,27 @@ func pingHandler(w http.ResponseWriter, _ *http.Request) {
 	_, _ = io.WriteString(w, "OK")
 }
 
+// sinkBodyLimit bounds the telemetry sinks' bodies. The sinks answer
+// without credentials, so without a bound anyone could hold a connection
+// open for as long as they kept sending (#431). The reports the JFrog CLI
+// and the Terraform providers post are well under a kilobyte; 1 MiB leaves
+// ample room for a larger one without letting the read run on.
+const sinkBodyLimit = 1 << 20
+
 // sinkHandler drains and discards telemetry posted by the JFrog CLI and the
-// Terraform providers (usage reports, jfconnect metrics). Reading the body to
-// EOF lets the connection be reused.
+// Terraform providers (usage reports, jfconnect metrics). It runs behind
+// bodyLimit(sinkBodyLimit). Reading a body within the limit to EOF lets the
+// connection be reused; a body without a declared length that runs past the
+// limit stops the read there and answers 413, as bodyLimit answers a
+// declared one, and the server then closes the connection rather than
+// drain the rest.
 func sinkHandler(w http.ResponseWriter, r *http.Request) {
-	_, _ = io.Copy(io.Discard, r.Body)
+	_, err := io.Copy(io.Discard, r.Body)
+	var tooLarge *http.MaxBytesError
+	if errors.As(err, &tooLarge) {
+		apierror.Write(w, surfaceFor(r.URL.Path), bodyTooLarge(tooLarge.Limit))
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 

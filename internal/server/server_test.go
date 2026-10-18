@@ -3,6 +3,8 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -201,6 +203,99 @@ func TestTelemetrySinks(t *testing.T) {
 		if rec.Code != 200 || rec.Body.Len() != 0 {
 			t.Fatalf("%s: status %d body %q", path, rec.Code, rec.Body.String())
 		}
+	}
+}
+
+// endlessBody is a request body that never ends, as a client that keeps
+// sending would make it. It fails the test once more than budget bytes have
+// been read, which is how a handler that reads a body to the end shows.
+type endlessBody struct {
+	t      *testing.T
+	budget int64
+	read   int64
+}
+
+func (b *endlessBody) Read(p []byte) (int, error) {
+	if b.read >= b.budget {
+		b.t.Errorf("read past the budget of %d bytes", b.budget)
+		return 0, errors.New("read past the budget")
+	}
+	n := int(min(int64(len(p)), b.budget-b.read))
+	for i := range n {
+		p[i] = 'x'
+	}
+	b.read += int64(n)
+	return n, nil
+}
+
+// TestTelemetrySinkBodyLimit holds both sinks to sinkBodyLimit: a body at
+// the limit is drained and answered 200, and a longer one answers 413
+// without being read to the end, whether its length is declared or not.
+func TestTelemetrySinkBodyLimit(t *testing.T) {
+	h := testHandler()
+	tooLarge := `{"errors":[{"status":413,"message":"request body exceeds 1048576 bytes"}]}`
+	post := func(path string, body io.Reader, length int64) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(http.MethodPost, path, body)
+		r.Header.Set("Content-Type", "application/json")
+		r.ContentLength = length
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, r)
+		return rec
+	}
+	for _, path := range []string{
+		"/artifactory/api/system/usage",
+		"/jfconnect/api/v1/backoffice/metrics/log",
+	} {
+		t.Run(path, func(t *testing.T) {
+			// At the limit, declared and undeclared: read to the end.
+			atLimit := strings.Repeat("x", sinkBodyLimit)
+			if rec := post(
+				path,
+				strings.NewReader(atLimit),
+				sinkBodyLimit,
+			); rec.Code != http.StatusOK {
+				t.Errorf("declared, at the limit: status %d: %s", rec.Code, rec.Body)
+			}
+			if rec := post(
+				path,
+				io.MultiReader(strings.NewReader(atLimit)),
+				-1,
+			); rec.Code != http.StatusOK {
+				t.Errorf("undeclared, at the limit: status %d: %s", rec.Code, rec.Body)
+			}
+
+			// A declared length over the limit is refused before any read.
+			declared := &endlessBody{t: t}
+			rec := post(path, declared, sinkBodyLimit+1)
+			assertTooLarge(t, "declared", rec, tooLarge)
+
+			// An undeclared body is read one byte past the limit, which is
+			// how MaxBytesReader detects the overrun, and no further. The
+			// margin only keeps a regression from looping forever.
+			undeclared := &endlessBody{t: t, budget: sinkBodyLimit + 64<<10}
+			rec = post(path, undeclared, -1)
+			assertTooLarge(t, "undeclared", rec, tooLarge)
+			if undeclared.read > sinkBodyLimit+1 {
+				t.Errorf(
+					"undeclared: read %d bytes, want at most %d",
+					undeclared.read,
+					sinkBodyLimit+1,
+				)
+			}
+		})
+	}
+}
+
+func assertTooLarge(t *testing.T, name string, rec *httptest.ResponseRecorder, want string) {
+	t.Helper()
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("%s: status %d, want 413: %s", name, rec.Code, rec.Body)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
+		t.Errorf("%s: content type %q", name, ct)
+	}
+	if diff := cmp.Diff(decode(t, want), decode(t, rec.Body.String())); diff != "" {
+		t.Errorf("%s: body (-want +got):\n%s", name, diff)
 	}
 }
 

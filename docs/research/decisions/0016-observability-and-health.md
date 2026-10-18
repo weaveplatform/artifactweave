@@ -42,6 +42,23 @@ upstream and scheduler metrics. Logs are `slog` JSON with request ids. The telem
 follows hostweave 0015: an OpenTelemetry metric and trace API with no-op defaults and test
 recorders, so exporters can be configured without code changes.
 
+**Telemetry sinks.** `POST /artifactory/api/system/usage` and
+`POST /jfconnect/api/v1/backoffice/metrics/log` receive the usage reports and metrics that
+`jf` and the Terraform providers post ([research 06](../06-system-configuration-and-descriptor.md#system-endpoints)).
+Both answer 200 and discard a body of up to 1 MiB. A longer body answers 413 in the
+Artifactory error envelope: a declared length over the limit is refused before any of the
+body is read, and an undeclared one is read only to the limit
+([#431](https://github.com/weaveplatform/artifactweave/issues/431)). The reports the clients
+send are well under a kilobyte.
+
+Both sinks answer without credentials, and stay that way until the live check on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216) settles what 7.x does.
+Whether 7.x requires authentication on `/api/system/usage` is **[I]**:
+[RTFACT-22629](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22629), an open request for
+an unauthenticated call-home endpoint, lists the current endpoint as "Auth required", but it
+has no fix version and no JFrog staff comment, so it does not settle the question. The
+clients only log a failed post, so either answer leaves them working.
+
 ## Rationale
 
 The endpoints are required for compatibility; Prometheus text is what every operator
@@ -61,6 +78,8 @@ already scrapes. Reusing the hostweave seam keeps the platform consistent.
 - Health endpoint shape tests.
 - Metrics endpoint parse test with the Prometheus text parser.
 - Log field tests for request id propagation.
+- Telemetry sink tests: a body over 1 MiB answers 413 on each sink and is not read to the
+  end; a client's report answers 200.
 
 ## References
 

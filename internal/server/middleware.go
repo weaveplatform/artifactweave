@@ -108,14 +108,7 @@ func bodyLimit(limit int64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.ContentLength > limit {
-				apierror.Write(
-					w,
-					surfaceFor(r.URL.Path),
-					apierror.New(
-						http.StatusRequestEntityTooLarge,
-						"request body exceeds "+strconv.FormatInt(limit, 10)+" bytes",
-					),
-				)
+				apierror.Write(w, surfaceFor(r.URL.Path), bodyTooLarge(limit))
 				return
 			}
 			if r.Body != nil {
@@ -124,6 +117,16 @@ func bodyLimit(limit int64) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// bodyTooLarge is bodyLimit's 413. A handler that meets the MaxBytesReader
+// bodyLimit installs answers with it too, so a body over the limit gets the
+// same answer whether its length was declared or not.
+func bodyTooLarge(limit int64) *apierror.Error {
+	return apierror.New(
+		http.StatusRequestEntityTooLarge,
+		"request body exceeds "+strconv.FormatInt(limit, 10)+" bytes",
+	)
 }
 
 // normalizeContentType maps the vendor media types Artifactory clients send,
