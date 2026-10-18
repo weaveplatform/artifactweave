@@ -4294,7 +4294,7 @@ type ClientInterface interface {
 
 	// CreateTokenWithBody Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4303,7 +4303,7 @@ type ClientInterface interface {
 
 	// CreateToken Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4312,7 +4312,7 @@ type ClientInterface interface {
 
 	// CreateTokenWithFormdataBody Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type.
 	//
@@ -7649,7 +7649,7 @@ func (c *Client) GetTokens(ctx context.Context, params *GetTokensParams, reqEdit
 
 // CreateTokenWithBody Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7668,7 +7668,7 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 
 // CreateToken Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7687,7 +7687,7 @@ func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBod
 
 // CreateTokenWithFormdataBody Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type.
 //
@@ -16459,7 +16459,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithBodyWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16468,7 +16468,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16477,7 +16477,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithFormdataBodyWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -28697,7 +28697,7 @@ func (c *ClientWithResponses) GetTokensWithResponse(ctx context.Context, params 
 
 // CreateTokenWithBodyWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28712,7 +28712,7 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 
 // CreateTokenWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28727,7 +28727,7 @@ func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body 
 
 // CreateTokenWithFormdataBodyWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 //

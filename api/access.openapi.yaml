@@ -4977,7 +4977,7 @@ paths:
       tags:
         - tokens
     post:
-      description: With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. The response status is 200 and the body always carries token_id.
+      description: With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
       operationId: createToken
       requestBody:
         content:
@@ -5007,7 +5007,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: No valid credentials.
+          description: No valid credentials, or a user name and password sent with Basic while token.allow_basic_auth is off, answered with the message `Unsupported authentication method Basic`.
         '403':
           content:
             application/json:
