@@ -85,7 +85,12 @@ func TestOpenAPIDescriptionsDescribeContract(t *testing.T) {
 				for _, p := range op.Parameters {
 					check(where+" param "+p.Value.Name, p.Value.Description)
 					if p.Value.Schema != nil {
-						walkSchemaText(where+" param "+p.Value.Name, p.Value.Schema.Value, seen, check)
+						walkSchemaText(
+							where+" param "+p.Value.Name,
+							p.Value.Schema.Value,
+							seen,
+							check,
+						)
 					}
 				}
 				if rb := op.RequestBody; rb != nil && rb.Value != nil {
