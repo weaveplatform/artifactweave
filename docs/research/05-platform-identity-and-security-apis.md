@@ -14,6 +14,14 @@ Research baseline: **2026-10-12**. Sources are the per-endpoint pages on docs.jf
 [08-terraform-providers.md](08-terraform-providers.md) and `jfrog-client-go` v1.55.0.
 Claims not confirmed against a primary source are marked *(unverified)*.
 
+Where a claim names the kind of source behind it, it uses these labels:
+
+| Label | Means |
+|---|---|
+| **[KB]** | stated in a JFrog KB article at the cited URL |
+| **[J]** | recorded in JFrog's public Jira; it counts as 7.x behaviour only when JFrog fixed the issue in 7.x or a JFrog staff comment states it ([sources](README.md#target-version-and-sources)) |
+| **[I]** | inferred; not stated by any source, and listed on [#216](https://github.com/weaveplatform/artifactweave/issues/216) |
+
 ## Error envelopes
 
 | Service | Envelope |
@@ -66,6 +74,9 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | POST | `/api/security/unlockUsers` | 200 | body `["userA"]`; the CLI uses the deprecated path form `POST /api/security/unlockUsers/{name}` with no body, so both are served |
 | POST | `/api/security/unlockAllUsers` | 200 | |
 | POST | `/api/security/users/authorization/expirePassword` | 200 | body `["davids"]` |
+| POST | `/api/security/users/authorization/expirePassword/{userName}` | not documented | admin; deprecated but still documented ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis), "Expire Password for a Single User"); artifactweave does not serve it yet ([#405](https://github.com/weaveplatform/artifactweave/issues/405)) |
+| POST | `/api/security/users/authorization/changePassword` | not documented | body `{userName,oldPassword,newPassword1,newPassword2}`; an admin for anyone, a user for themselves; deprecated, same page, "Change Password"; not served yet (#405) |
+| POST | `/api/security/users/authorization/expirePasswordForAllUsers` | not documented | admin; deprecated, same page, "Expire Password for All Users"; not served yet (#405) |
 | POST | `/api/security/users/authorization/unexpirePassword/{userName}` | 200 | **[I]** JFrog's [deprecations table](https://docs.jfrog.com/releases/docs/artifactory-deprecations) says this endpoint "has been removed from Artifactory REST APIs and the UI", with no version, while its [reference page](https://docs.jfrog.com/administration/reference/unexpirepasswordforsingleuser) still documents it. artifactweave serves it; unconfirmed for 7.x |
 | GET / PUT | `/api/security/configuration/passwordExpirationPolicy` | 200 | `{"enabled":true,"passwordMaxAge":60,"notifyByEmail":true}`. The docs show quoted strings but `artifactory_password_expiration_policy` decodes `bool` and `int64`, so real JSON types are emitted |
 | POST | `/api/security/token` | 200 | legacy create or refresh, form-encoded: `grant_type` (`client_credentials` default, `refresh_token`), `username`, `scope` (legacy forms `member-of-groups:<g>`, `api:*`, `jfrt@<id>:admin`; `member-of-groups:*` authenticates as a copy of the real user, admin flag included, per OSS 6.20 `AccessTokenAuthenticationProvider.populateGroups`, and is the scope `jf` requests when it swaps a configured user's password for a token, `jfrog-cli-core` `utils/config/tokenrefresh.go`), `expires_in`, `refreshable`, `audience`, `refresh_token`, `access_token`. Not on JFrog's deprecation page; `jf` still implements it |
@@ -183,7 +194,7 @@ there is no other version gate on groups.
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| GET | `/access/api/v2/permissions` | 200 | admin or `system:permissions:r`; query `cursor`, `limit` (1 to 99999), `user` (csv), `group` (csv), `include_inherited_groups` (default true), `expand` (needs `user` or `group`) |
+| GET | `/access/api/v2/permissions` | 200 | admin or `system:permissions:r`; query `cursor`, `limit` (1 to 99999), `user` (csv), `group` (csv), `include_inherited_groups` (default true), `expand` (needs `user` or `group`). The [reference page](https://docs.jfrog.com/administration/reference/getpermissions) gives `user`, `group`, `include_inherited_groups` and `expand` as available only from Artifactory 7.210.0, later than 7.161.32 and SaaS 7.174.0; artifactweave serves them already ([0006](decisions/0006-authorization-native-permission-model.md)) |
 | POST | `/access/api/v2/permissions` | **201** | 409 on conflict |
 | GET | `/access/api/v2/permissions/{name}` | 200 | |
 | DELETE | `/access/api/v2/permissions/{name}` | 204 | |
@@ -218,8 +229,8 @@ Source: https://docs.jfrog.com/administration/docs/access-tokens and the per-end
 | POST | `/access/api/v1/tokens` | **200** | create or refresh; JSON or form-urlencoded; non-admins can only create identity tokens; `artifactory_scoped_token` requires exactly 200 |
 | GET | `/access/api/v1/tokens` | 200 | admin sees all, a user sees their own; `{"tokens":[TokenDetails]}`; `last_used` needs `access_token_last_used_enabled` (7.108.3+); a `scope` query parameter filters by scope from 7.133.3 ([7.133.3 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed), SaaS 7.126.0), not yet on the [reference page](https://docs.jfrog.com/administration/reference/gettokens), which says reference tokens are listed from 7.133.8; artifactweave keeps the tokens whose whole scope, or one of its space-separated scopes, is exactly the string, and lists tokens issued with a reference token like any other ([#351](https://github.com/weaveplatform/artifactweave/issues/351)); the matching rule is **[I]**, since JFrog says only "token results for a specific scope, such as group" |
 | GET | `/access/api/v1/tokens/{tokenId}` | 200 / 404 | `me` is the current token; the provider removes the resource from state on 404 |
-| DELETE | `/access/api/v1/tokens/{tokenId}` | 200 | revoke by id; `me` allowed |
-| DELETE | `/access/api/v1/tokens/revoke` | 200 | admin; body `{"token":"<jwt or reference>"}` returns `{"revoked_token_id":"..."}` |
+| DELETE | `/access/api/v1/tokens/{tokenId}` | 200 | revoke by id; `me` allowed; a token that is not revocable answers 400 **[KB]** ([000005622](https://jfrog.com/help/r/artifactory-how-to-troubleshoot-failed-to-revoke-tokens-when-trying-to-revoke-a-token-through-the-ui)) |
+| DELETE | `/access/api/v1/tokens/revoke` | 200 | admin; body `{"token":"<jwt or reference>"}` returns `{"revoked_token_id":"..."}`; 404 for a token "not found or not revocable" ([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue)) |
 | GET / PUT | `/access/api/v1/config/token/default_expiry` | 200 | `{"default_token_expiration":3600}` |
 | POST | `/access/api/v1/service_trust/pairing/{useCase}` | 200 | `mission-control`, `bridge`, `platform-federation`; out of scope |
 
@@ -240,13 +251,27 @@ The docs omit `token_id` from the response schema but the provider reads it to d
 `GET`/`DELETE /tokens/{id}`, so it is always returned.
 
 `TokenDetails`: `{token_id, subject, expiry, issued_at, issuer, description, refreshable, scope, last_used}`.
-There is no `audience` field. `subject` has the form `jfac@<service-id>/users/<name>`.
+The [reference page](https://docs.jfrog.com/administration/reference/gettokens) has no
+`audience` field, but the
+[deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis) page
+lists `audience`, `description`, `scope`, `project_key` and `last_used` as additional fields of
+the Access response. Which holds for 7.x is on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216). `subject` has the form
+`jfac@<service-id>/users/<name>`.
 
-Defaults and limits: `expires_in` defaults to the value of `default_expiry` (3600 s);
-`0` means never expires and is admin-only; tokens with an expiry below the
-`revocable-expiry-threshold` (default 21600 s) are not revocable unless `force_revocable`;
-refresh grace `token.refresh-expiry` 24 h; `token.max-expiry` 0 means unlimited; `scope`
-at most 500 characters, `username` at most 255, `description` at most 1024.
+Defaults and limits: `expires_in` defaults to the value of `default_expiry`. The Access
+configuration reference gives one year (`token.default-expiry: 31536000`,
+[supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)),
+as does the JFrog CLI, while the
+[access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens) says 3600 s;
+decision 0005's [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check)
+records the maintainer's choice of one year. `0` means never expires and is admin-only;
+tokens with an expiry below the `revocable-expiry-threshold` (default 21600 s) are not
+revocable unless `force_revocable` or, for a JWT, `refreshable`
+([revoketokenbyvalue](https://docs.jfrog.com/administration/reference/revoketokenbyvalue));
+tokens below `persistent-expiry-threshold` (default 10800 s) are not stored at all; refresh
+grace `token.refresh-expiry` 24 h; `token.max-expiry` 0 means unlimited; `scope` at most 500
+characters, `username` at most 255, `description` at most 1024.
 
 ### Scope grammar
 
@@ -281,8 +306,10 @@ across a Circle of Trust.
 Go's `base64.RawStdEncoding` (standard alphabet, no padding), then reading `sub`
 (https://github.com/jfrog/jfrog-client-go/blob/master/auth/authutils.go). The subject must
 contain `/users/<name>` or start with `jfrt@`. A base64url payload containing `-` or `_`
-(or trailing `=`) fails silently and the CLI prompts for a username. artifactweave pads the
-payload JSON with whitespace until its encoding contains none of those characters.
+(or trailing `=`) fails silently and the CLI prompts for a username. artifactweave escapes
+`>`, `?`, `~`, DEL and every non-ASCII rune inside the payload's JSON strings as `\u`
+sequences, which keeps `-` and `_` out of the encoding by construction, and encodes without
+padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented (#74)").
 
 ### Roles, environments, OIDC, SCIM, external auth, config
 
@@ -369,3 +396,85 @@ https://docs.jfrog.com/user-management/docs/api-key,
 https://docs.jfrog.com/user-management/docs/identity-tokens,
 https://github.com/jfrog/terraform-provider-platform/blob/main/docs/resources/permission.md,
 https://github.com/jfrog/jfrog-client-go/blob/master/auth/authutils.go.
+
+## Artifactory 7.x check
+
+Audited on 2026-10-18 against Artifactory 7.161.32 (SaaS 7.174.0) with the KB, Jira and
+client sources the [research README](README.md#target-version-and-sources) lists
+([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
+
+**Sources.** The docs.jfrog.com pages cited in the tables above, read as `.md` on 2026-10-18;
+the [self-managed](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)
+and [SaaS](https://docs.jfrog.com/releases/docs/artifactory-saas-releases) release notes;
+KB 000005622; JFrog's public Jira; jfrog-cli and jfrog-client-go at `master`;
+terraform-provider-artifactory v12.11.14 and terraform-provider-platform v2.2.11.
+
+**Confirmed for 7.x:** the Access token routes, fields and scope grammar; the shapes and
+statuses of the legacy token, user, group, lock-policy and password-expiry APIs; key pair and
+certificate shapes; Access v2 users, groups and permissions; roles and environments; the
+basic authentication switch and the password policy. Every read path and status the two
+Terraform providers check is met.
+
+**Corrected here:**
+- the default token lifetime, and which tokens are revocable or stored (Access tokens v1);
+- the revoke statuses for a token that is not revocable (Access tokens v1);
+- when the Access permission filters became available (Permissions v2);
+- the JWT payload quirk, which described padding the payload rather than escaping it;
+- three deprecated password endpoints missing from the legacy table.
+
+**Where artifactweave differs.** Decision 0005's
+[7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
+account policy, seeding and OIDC differences, and decision 0006's
+[7.x check](decisions/0006-authorization-native-permission-model.md#artifactory-7x-check) the
+permission ones. The others:
+- 7.x differs: `last_used` is recorded and returned only when the
+  `access_token_last_used_enabled` and `access_token_last_used_threshold` (900 s) system
+  properties are set, which they are not by default
+  ([gettokens](https://docs.jfrog.com/administration/reference/gettokens)); artifactweave
+  always records it, at most once a minute per token (`internal/auth/token/token.go`), and
+  returns it. Kept, as a deviation registered by #378.
+- 7.x differs: the three deprecated password endpoints in the legacy table are still served
+  ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis));
+  fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
+- 7.x differs: a `+` in a user, group or permission name in the path stands for a space, as
+  `artifactory.security.api.plus.insteadof.space` is true by default
+  ([deletepermissiontarget](https://docs.jfrog.com/administration/reference/deletepermissiontarget));
+  fixed by [#405](https://github.com/weaveplatform/artifactweave/issues/405).
+- 7.x differs: `GET /api/security/keypair/{name}` needs only an authenticated user, or none
+  when anonymous access is on ([getkeypair](https://docs.jfrog.com/administration/reference/getkeypair));
+  fixed by [#407](https://github.com/weaveplatform/artifactweave/issues/407).
+- 7.x differs: `GET /api/security/keypair/public/repositories/{repo}` needs the same, with no
+  read permission on the repository
+  ([getkeypairpublickeyperrepository](https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository));
+  fixed by [#407](https://github.com/weaveplatform/artifactweave/issues/407).
+- 7.x differs: `POST /api/security/keypair` replaces a pair of the same name, verify answers
+  "Key was verified." and delete answers "OK"
+  ([createkeypair](https://docs.jfrog.com/administration/reference/createkeypair),
+  [verifykeypair](https://docs.jfrog.com/administration/reference/verifykeypair),
+  [deletekeypair](https://docs.jfrog.com/administration/reference/deletekeypair)); fixed by
+  [#407](https://github.com/weaveplatform/artifactweave/issues/407).
+- 7.x differs: at most 10 global environments by default
+  ([createglobalenvironment](https://docs.jfrog.com/administration/reference/createglobalenvironment));
+  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+
+**Unconfirmed for 7.x**, for the live check on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216):
+- The lifetime of a legacy `POST /api/security/token` without `expires_in`. **[J]**
+  [RTFACT-29239](https://jfrog.atlassian.net/browse/RTFACT-29239) says it rose from one hour
+  to one year in 7.46.x, but the issue is open and the statement is not a JFrog staff comment.
+  `jf rt atc` sends 3600 itself.
+- Whether token details carry `audience` and `project_key` (Access tokens v1).
+- Whether `unexpirePassword/{userName}` still exists (the legacy table).
+- Whether the legacy user has `lastLoggedInMillis` and `offlineMode`. The deprecated-APIs
+  page says the Access user drops them, and the
+  [legacy user schema](https://docs.jfrog.com/administration/reference/getuserdetails-1)
+  lists neither.
+- The legacy lock policy on a fresh instance, where Access defaults
+  `user-lock-policy.attempts` to 0.
+- Whether a non-administrator may read their own Access v2 user.
+- The Access permissions cursor, which the page describes both as the first name of the next
+  page and as the last name of this one.
+- The v2 by-user and by-group views, whose example shows each section's `actions` as a flat
+  list.
+- How an exclude pattern meets an include pattern in a permission target.
+- The characters allowed in environment names; only the length and case are documented.
