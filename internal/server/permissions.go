@@ -79,8 +79,9 @@ func (c permCaller) admin() error {
 	return nil
 }
 
-// reader may list and read every permission: an administrator, or a token
-// carrying the system:permissions:r scope.
+// reader may list every permission and read any one whole: an
+// administrator, or a token carrying the system:permissions:r scope. Reading
+// one section is stricter, for administrators alone (GetPermissionResource).
 func (c permCaller) reader() bool { return c.dec.System("permissions", types.ScopeRead) }
 
 // manages reports whether the caller may manage p through the v2 API: an
@@ -857,17 +858,19 @@ func sectionTo(rt types.ResourceType, r types.Resource) (accessgen.PermissionRes
 	return convert[accessgen.PermissionResource](w.Resources[string(rt)])
 }
 
-// GetPermissionResource returns one section.
+// GetPermissionResource returns one section. It is admin only, as
+// getpermissionresource documents: a system:permissions:r token, which reads
+// the whole permission, is refused here (#382).
 func (s accessService) GetPermissionResource(
 	ctx context.Context,
 	req accessgen.GetPermissionResourceRequestObject,
 ) (accessgen.GetPermissionResourceResponseObject, error) {
 	c, err := s.caller(ctx)
+	if err == nil {
+		err = c.admin()
+	}
 	if err != nil {
 		return nil, err
-	}
-	if !c.reader() {
-		return nil, auth.ErrForbidden
 	}
 	rt, err := resourceType(req.PermissionName, string(req.ResourceType))
 	if err != nil {

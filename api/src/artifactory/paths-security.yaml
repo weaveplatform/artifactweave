@@ -1614,8 +1614,7 @@ paths:
   /api/security/token:
     get:
       deprecated: true
-      description: Lists tokens in the legacy shape; admins see every token, other users only their own. The same
-        data is served by GET /access/api/v1/tokens. Not in the oracle; from docs/research/05.
+      description: Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.
       operationId: getLegacyTokens
       responses:
         '200':
@@ -1626,6 +1625,8 @@ paths:
           description: The tokens.
         '401':
           $ref: '#/components/responses/SecurityUnauthorized'
+        '403':
+          $ref: '#/components/responses/SecurityForbidden'
         '500':
           $ref: '#/components/responses/SecurityInternalServerError'
       summary: List access tokens (legacy)
@@ -1702,9 +1703,8 @@ paths:
   /api/security/token/revoke:
     post:
       deprecated: true
-      description: Revokes a token by value or by id. Admins may revoke any token, other users only their own. Answers
-        200 even when the token was already revoked or never existed, as Artifactory does. Hand-written because
-        the body is form-encoded. Not in the oracle; from docs/research/05.
+      description: Revokes any user's token by value or by id. Admin only. Answers 200 when the token was already
+        revoked or does not exist, and 400 when it is not revocable. The body is form-encoded.
       operationId: revokeLegacyToken
       requestBody:
         content:

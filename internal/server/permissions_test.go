@@ -427,8 +427,9 @@ func TestPermissionBodies(t *testing.T) {
 }
 
 // TestPermissionTokenScopes checks that a token's scope, not its user,
-// decides: system:permissions:r reads every permission but writes none, and
-// a group-scoped token loses the MANAGE its user holds directly.
+// decides: system:permissions:r lists and reads every permission whole but
+// writes none, and may not read one section, which is admin only (#382); a
+// group-scoped token loses the MANAGE its user holds directly.
 func TestPermissionTokenScopes(t *testing.T) {
 	h := statusFixture(t, false)
 	token := func(scope string) map[string]string {
@@ -442,7 +443,7 @@ func TestPermissionTokenScopes(t *testing.T) {
 	mustStatus(
 		t,
 		do(t, h, http.MethodGet, permAcc+"/Anything/artifact", reader, ""),
-		200,
+		403,
 		"scoped section",
 	)
 	mustStatus(

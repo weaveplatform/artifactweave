@@ -80,8 +80,8 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | POST | `/api/security/users/authorization/unexpirePassword/{userName}` | 200 | **[I]** JFrog's [deprecations table](https://docs.jfrog.com/releases/docs/artifactory-deprecations) says this endpoint "has been removed from Artifactory REST APIs and the UI", with no version, while its [reference page](https://docs.jfrog.com/administration/reference/unexpirepasswordforsingleuser) still documents it. artifactweave serves it; unconfirmed for 7.x |
 | GET / PUT | `/api/security/configuration/passwordExpirationPolicy` | 200 | `{"enabled":true,"passwordMaxAge":60,"notifyByEmail":true}`. The docs show quoted strings but `artifactory_password_expiration_policy` decodes `bool` and `int64`, so real JSON types are emitted |
 | POST | `/api/security/token` | 200 | legacy create or refresh, form-encoded: `grant_type` (`client_credentials` default, `refresh_token`), `username`, `scope` (legacy forms `member-of-groups:<g>`, `api:*`, `jfrt@<id>:admin`; `member-of-groups:*` authenticates as a copy of the real user, admin flag included, per OSS 6.20 `AccessTokenAuthenticationProvider.populateGroups`, and is the scope `jf` requests when it swaps a configured user's password for a token, `jfrog-cli-core` `utils/config/tokenrefresh.go`), `expires_in`, `refreshable`, `audience`, `refresh_token`, `access_token`. Not on JFrog's deprecation page; `jf` still implements it |
-| GET | `/api/security/token` | 200 | `{"tokens":[{token_id,issuer,subject,expiry,refreshable,issued_at}]}` |
-| POST | `/api/security/token/revoke` | 200 | form `token` or `token_id`; 200 even if already revoked |
+| GET | `/api/security/token` | 200 | admin only, "Requires an admin user" ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis), "Get Tokens"); every user's tokens, `{"tokens":[{token_id,issuer,subject,expiry,refreshable,issued_at}]}` |
+| POST | `/api/security/token/revoke` | 200 | admin only, even for the caller's own token, "Requires an admin user" (same page, "Revoke Token"); form `token` or `token_id`; 200 even if already revoked |
 | GET | `/api/system/security/certificates` | 200 | remote-repository client certificates: `[{certificateAlias,issuedTo,issuedBy,issuedOn,validUntil,fingerPrint}]` |
 | POST | `/api/system/security/certificates/{alias}` | 200 | PEM body, `text/plain`; response `{status,message[]}` |
 | DELETE | `/api/system/security/certificates/{alias}` | 200 | |
@@ -198,7 +198,7 @@ there is no other version gate on groups.
 | POST | `/access/api/v2/permissions` | **201** | 409 on conflict |
 | GET | `/access/api/v2/permissions/{name}` | 200 | |
 | DELETE | `/access/api/v2/permissions/{name}` | 204 | |
-| GET / PUT / PATCH / DELETE | `/access/api/v2/permissions/{name}/{resourceType}` | 200 / 204 | `resourceType` in `artifact`, `build`, `release_bundle` (the provider also uses `destination` and `pipeline_source`) |
+| GET / PUT / PATCH / DELETE | `/access/api/v2/permissions/{name}/{resourceType}` | 200 / 204 | admin only, GET included: "Requires admin privileges" ([getpermissionresource](https://docs.jfrog.com/administration/reference/getpermissionresource)), so a `system:permissions:r` token may not read one section; `resourceType` in `artifact`, `build`, `release_bundle` (the provider also uses `destination` and `pipeline_source`) |
 
 ```json
 {"name":"my-permission","description":"...",

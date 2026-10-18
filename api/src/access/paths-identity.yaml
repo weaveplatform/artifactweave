@@ -2347,7 +2347,7 @@ paths:
       - permissions
     get:
       description: Returns the actions and targets of a single resource type within the permission. A permission
-        that has no section for the type answers 404. Requires a platform admin or the system:permissions:r scope.
+        that has no section for the type answers 404. Requires a platform admin.
       operationId: getPermissionResource
       parameters:
       - $ref: '#/components/parameters/permissionName'
@@ -2376,7 +2376,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller may not read this permission.
+          description: The caller is not a platform admin.
         '404':
           content:
             application/json:

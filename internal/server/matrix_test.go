@@ -789,9 +789,11 @@ func tokenMatrix() []matrixRow {
 		row("DELETE "+tokens+"/{tokenId}", tokens+"/o-{p}", "", administrators, 200),
 		at("GET "+expiry, "", administrators, 200),
 		at("PUT "+expiry, `{"default_token_expiration":7200}`, administrators, 200),
-		at("GET "+legacy, "", signedIn, 200),
+		// The legacy list and revoke are admin only, even for the caller's
+		// own token (#382).
+		at("GET "+legacy, "", administrators, 200),
 		at("POST "+legacy, "form:username={u}", wholeIdentity, 200),
-		at("POST "+legacy+"/revoke", "form:token_id=t-{p}", signedIn, 200),
+		at("POST "+legacy+"/revoke", "form:token_id=t-{p}", administrators, 200),
 		at("POST "+legacy+"/revoke", "form:token_id=o-{p}", administrators, 200),
 		at("GET /artifactory/api/security/encryptedPassword", "", passwordLogin, 200),
 	}

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"slices"
 	"strings"
@@ -112,6 +113,37 @@ func TestTokenListOmitsNonRevocable(t *testing.T) {
 	) { //nolint:forcetypeassert // fixture
 		t.Fatalf("legacy list: %s", legacy.Body)
 	}
+}
+
+// TestLegacyTokenListAndRevokeAdminOnly: the legacy list and revoke are
+// admin only (#382). A user is refused even for their own token, which
+// survives and stays revocable through the Access API; an administrator
+// lists every user's tokens and revokes any of them.
+func TestLegacyTokenListAndRevokeAdminOnly(t *testing.T) {
+	h := statusFixture(t, false)
+	const legacy = "/artifactory/api/security/token"
+	user, admin := basic("user", "pw"), basic("admin", "pw")
+
+	mustStatus(t, do(t, h, http.MethodGet, legacy, user, ""), 403, "user's legacy list")
+	rec := do(t, h, http.MethodGet, legacy, admin, "")
+	mustStatus(t, rec, 200, "admin's legacy list")
+	if body := rec.Body.String(); !strings.Contains(body, `"user-token"`) ||
+		!strings.Contains(body, `"admin-token"`) {
+		t.Fatalf("admin's legacy list lacks a user's token: %s", body)
+	}
+
+	revoke := func(who map[string]string) *httptest.ResponseRecorder {
+		return do(t, h, http.MethodPost, legacy+"/revoke", formAs(who), "token_id=user-token")
+	}
+	mustStatus(t, revoke(user), 403, "user's legacy revoke of their own token")
+	mustStatus(t, do(t, h, http.MethodGet, "/access/api/v1/tokens/user-token", user, ""), 200,
+		"the token after a refused revoke")
+	rec = revoke(admin)
+	if rec.Code != http.StatusOK || rec.Body.String() != "Token revoked" {
+		t.Fatalf("admin's legacy revoke: %d %s", rec.Code, rec.Body)
+	}
+	mustStatus(t, do(t, h, http.MethodGet, "/access/api/v1/tokens/user-token", admin, ""), 404,
+		"the token after the admin's revoke")
 }
 
 // TestTokenRefreshAndRevokeByValue: a refresh grant needs no credentials but

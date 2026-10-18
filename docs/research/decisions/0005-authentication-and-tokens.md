@@ -362,7 +362,13 @@ Audited against 7.161.32 (SaaS 7.174.0) on 2026-10-18 with the KB, Jira and clie
 [research 05](../05-platform-identity-and-security-apis.md#artifactory-7x-check),
 [research 21](../21-oidc-token-exchange.md#6-artifactory-7x-check)). The token routes, fields
 and scope grammar, the legacy token shapes, the Access v2 users and groups, the account policy
-endpoints and the OIDC configuration and exchange shapes match 7.x. These differ.
+endpoints and the OIDC configuration and exchange shapes match 7.x. So does who may use the
+legacy `GET /api/security/token` and `POST /api/security/token/revoke`: an administrator
+alone, "Requires an admin user"
+([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis),
+Get Tokens and Revoke Token). A user is refused even for their own token, which they list and
+revoke through `/access/api/v1/tokens` instead
+([#382](https://github.com/weaveplatform/artifactweave/issues/382)). These differ.
 
 **The default token lifetime.** JFrog's sources disagree:
 - the [access-tokens page](https://docs.jfrog.com/administration/docs/access-tokens)
@@ -416,11 +422,6 @@ reference and the CLI.
   Authentication for Non-existing Users"). Here an administrator may mint such a token, but
   it answers 401 on every use; only OIDC tokens act as transient users (**The token**
   above); fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
-- 7.x differs: the legacy `GET /api/security/token` and `POST /api/security/token/revoke` are
-  admin only
-  ([deprecated JFrog APIs](https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis),
-  Get Tokens and Revoke Token); fixed by
-  [#382](https://github.com/weaveplatform/artifactweave/issues/382).
 
 **Account policies and seeded principals:**
 - 7.x differs: failed Basic logins also suspend the account for a moment, answering 403 for a

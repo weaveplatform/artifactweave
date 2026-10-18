@@ -210,8 +210,11 @@ func tokenStatusRows() []statusCase {
 		{expPut, expiry, "", `{"default_token_expiration":7200}`, 401},
 		{expPut, expiry, "admin", `{"default_token_expiration":7200}`, 200},
 
+		// The legacy list and revoke are admin only, even for the caller's
+		// own tokens (#382).
 		{lList, legacy, "admin", "", 200},
-		{lList, legacy, "user", "", 200},
+		{lList, legacy, "user", "", 403},
+		{lList, legacy, "anonymous", "", 401},
 		{lList, legacy, "", "", 401},
 
 		{lCreate, legacy, "admin", "form:username=svc&scope=member-of-groups:readers", 200},
@@ -236,6 +239,8 @@ func tokenStatusRows() []statusCase {
 		{lRevoke, legacy + "/revoke", "admin", "form:token_id=a&token=b", 400},
 		{lRevoke, legacy + "/revoke", "admin", "form:token_id=short-token", 400},
 		{lRevoke, legacy + "/revoke", "user", "form:token_id=admin-token-2", 403},
+		{lRevoke, legacy + "/revoke", "user", "form:token_id=user-token", 403},
+		{lRevoke, legacy + "/revoke", "user", "form:", 403},
 		{lRevoke, legacy + "/revoke", "", "form:token_id=admin-token-2", 401},
 		{lRevoke, legacy + "/revoke", "admin", "form:token_id=admin-token-2", 200},
 
