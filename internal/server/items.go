@@ -307,7 +307,9 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 			CanOverwrite: acc.file(c, req.path, types.ActionDelete),
 		})
 	case strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true"):
-		it, err = svc.DeployByChecksum(ctx, s.fileDeploy(r, t, req, p, acc))
+		d := s.fileDeploy(r, t, req, p, acc)
+		d.Reusable = s.reusable(st, p, acc, r.Header.Get("X-Checksum-Deploy-Token"))
+		it, err = svc.DeployByChecksum(ctx, d)
 	default:
 		if artifact, alg, ok := item.Sidecar(req.path); ok &&
 			(svc.OwnsSidecars(c) || s.isFile(ctx, st, c, artifact)) {
@@ -365,6 +367,65 @@ func (s artifactoryService) fileDeploy(
 	d := s.deployRequest(r, t, req, p)
 	d.CanOverwritePath = func(full string) bool { return acc.file(t.Repo, full, types.ActionDelete) }
 	return d
+}
+
+// reusable decides whether a checksum deploy may store content the server
+// already holds, as Artifactory does: only when the caller may read a file
+// with that content. Otherwise anyone who learned a checksum could copy a
+// file out of a repository it cannot read into one it can write. The
+// exception is token, the checksum token of the caller's own finished
+// multipart upload of the content, which no item holds until this deploy.
+func (s artifactoryService) reusable(
+	st store.Store,
+	p auth.Principal,
+	acc access,
+	token string,
+) func(context.Context, types.Blob) (bool, error) {
+	return func(ctx context.Context, b types.Blob) (bool, error) {
+		if token != "" && s.cfg.Multipart != nil {
+			ok, err := s.cfg.Multipart.Finished(ctx, token, p.Name, b.Checksums.SHA256)
+			if err != nil || ok {
+				return ok, err //nolint:wrapcheck // DeployByChecksum wraps it
+			}
+		}
+		return readsContent(ctx, st, acc, b.Checksums.SHA256)
+	}
+}
+
+// readsContent reports whether the caller may read a file whose content
+// has SHA-256 sum. Only files in repositories count, so content that only
+// the trash can or a multipart upload holds is reused by no one; the client
+// uploads it again.
+func readsContent(ctx context.Context, st store.Store, acc access, sum string) (bool, error) {
+	// A nil entry is a repository that no longer exists.
+	repos := map[string]*repo.Config{}
+	page := store.Page{Limit: store.MaxLimit}
+	for {
+		files, next, err := st.Items().FindByChecksum(ctx, types.Checksums{SHA256: sum}, page)
+		if err != nil {
+			return false, fmt.Errorf("find files by checksum: %w", err)
+		}
+		for _, f := range files {
+			c, seen := repos[f.RepoKey]
+			if !seen {
+				got, err := st.Repos().Get(ctx, f.RepoKey)
+				switch {
+				case err == nil:
+					c = &got
+				case !errors.Is(err, store.ErrNotFound):
+					return false, fmt.Errorf("get repository %s: %w", f.RepoKey, err)
+				}
+				repos[f.RepoKey] = c
+			}
+			if c != nil && acc.file(*c, f.FullPath(), types.ActionRead) {
+				return true, nil
+			}
+		}
+		if next == "" {
+			return false, nil
+		}
+		page.After = next
+	}
 }
 
 func (artifactoryService) isFile(

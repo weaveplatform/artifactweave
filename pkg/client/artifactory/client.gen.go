@@ -4860,7 +4860,7 @@ type MultipartUploadPartUrl struct {
 
 // MultipartUploadStatus State of a multipart upload's assembly.
 type MultipartUploadStatus struct {
-	// ChecksumToken Optional within this object. Token for the checksum deploy that follows a finished upload.
+	// ChecksumToken Optional within this object. Token for the checksum deploy that follows a finished upload, sent as `X-Checksum-Deploy-Token`. It holds for the caller that made the upload and its content only.
 	ChecksumToken *string `json:"checksumToken,omitempty"`
 
 	// Error Optional within this object. Why the assembly failed.

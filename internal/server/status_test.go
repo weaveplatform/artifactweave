@@ -38,13 +38,29 @@ type statusCase struct {
 	// token of admin's, as a Bearer token) or "forged" (that token with its
 	// signature altered).
 	// A body names the fixture's other token values as {name}
-	// (statusSecrets).
+	// (statusSecrets). A body of checksum:<sha1> is a checksum deploy
+	// (checksumDeploy).
 	as   string
 	body string
 	want int
 }
 
 func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); return m }
+
+// checksumDeploy turns a row body of "checksum:<sha1>" into the request of
+// a checksum deploy of that SHA-1: the headers that ask for one, which a row
+// has no field for, and no body.
+func checksumDeploy(headers map[string]string, body string) (map[string]string, string) {
+	sum, ok := strings.CutPrefix(body, "checksum:")
+	if !ok {
+		return headers, body
+	}
+	if headers == nil {
+		headers = map[string]string{}
+	}
+	headers["X-Checksum-Deploy"], headers["X-Checksum-Sha1"] = "true", sum
+	return headers, ""
+}
 
 func statusTable() []statusCase {
 	return slices.Concat(
@@ -313,6 +329,15 @@ func itemStatusRows() []statusCase {
 		{put, lib + "/new/b.txt", "user", "a", 403},
 		{put, lib + "/new/b.txt", "anonymous", "a", 401},
 		{put, lib + "/new/b.txt", "", "a", 401},
+		// Checksum deploys: fixture/get.txt holds "fixture". A caller that
+		// may read no file with the content gets the 404 of a miss (#379;
+		// the matrix has callers that may deploy but not read).
+		{put, lib + "/new/cs.bin", "admin", "checksum:" + sha1Hex("fixture"), 201},
+		{put, lib + "/new/cs-miss.bin", "admin", "checksum:" + sha1Hex("never stored"), 404},
+		{put, lib + "/new/cs-bad.bin", "admin", "checksum:zz", 400},
+		{put, lib + "/new/cs.bin", "user", "checksum:" + sha1Hex("fixture"), 403},
+		{put, lib + "/new/cs.bin", "anonymous", "checksum:" + sha1Hex("fixture"), 401},
+		{put, lib + "/new/cs.bin", "", "checksum:" + sha1Hex("fixture"), 401},
 
 		{get, lib + "/fixture/get.txt", "admin", "", 200},
 		{get, lib + "/fixture/get.txt.sha256", "admin", "", 200},
@@ -506,7 +531,8 @@ func TestStatusTable(t *testing.T) {
 		case "forged":
 			headers = bearerAuth(secrets["forged-access"])
 		}
-		body := fill.Replace(c.body)
+		var body string
+		headers, body = checksumDeploy(headers, fill.Replace(c.body))
 		if body != "" {
 			if headers == nil {
 				headers = map[string]string{}

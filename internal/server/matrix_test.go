@@ -283,6 +283,21 @@ func trashRule(r rule) rule {
 	}
 }
 
+// reusing: a checksum deploy, which needs deploy, and then reuses the
+// content only for a caller that read allows to read a file holding it;
+// any other caller gets the 404 of content the server lacks (#379).
+func reusing(deploy, read rule) rule {
+	return func(p matrixPrincipal) int {
+		if s := deploy(p); s != 0 {
+			return s
+		}
+		if read(p) != 0 {
+			return http.StatusNotFound
+		}
+		return 0
+	}
+}
+
 // uploadToken: the multipart calls after create carry an upload token or a
 // part signature, which no principal has.
 func uploadToken(matrixPrincipal) int { return http.StatusUnauthorized }
@@ -337,6 +352,12 @@ func deployed(path string) seeder {
 		t.Helper()
 		f.deploy(t, "libs-local", strings.ReplaceAll(path, "{p}", p), []byte(p))
 	}
+}
+
+// onlyInB seeds content no repository but libs-b holds.
+func onlyInB(t *testing.T, f *matrixFixture, _ string) {
+	t.Helper()
+	f.deploy(t, "libs-b", "b/only.txt", []byte("only in b"))
 }
 
 // trashed seeds a file at path in the trash can, deleted from repoKey.
@@ -557,6 +578,16 @@ func contentMatrix() []matrixRow {
 		row(put, lib+"work/new-{p}.txt", "a", holds("libs-local", "work/", write), 201),
 		row(put, lib+"other/new-{p}.txt", "a", holds("libs-local", "other/", write), 201),
 		row(put, "/artifactory/libs-b/new-{p}.txt", "a", holds("libs-b", "", write), 201),
+		// Checksum deploys into libs-local: of content libs-local's
+		// work/get.txt holds, which every caller that may deploy there may
+		// read; and of content only libs-b holds. Each caller gets a fixture
+		// of its own for the second, or one caller's copy in libs-local would
+		// make the content readable to the next.
+		row(put, lib+"work/cs-{p}.bin", "checksum:"+sha1Hex("matrix"),
+			holds("libs-local", "work/", write), 201),
+		row(put, lib+"work/cs-{p}.bin", "checksum:"+sha1Hex("only in b"),
+			reusing(holds("libs-local", "work/", write), holds("libs-b", "b/", read)), 201,
+		).alone().seeding(onlyInB),
 		row(get, lib+"work/get.txt", "", holds("libs-local", "work/", read), 200),
 		row(get, lib+"fixture/get.txt", "", holds("libs-local", "fixture/", read), 200),
 		row(get, "/artifactory/libs-b/b/get.txt", "", holds("libs-b", "b/", read), 200),
@@ -1030,7 +1061,7 @@ func (f *matrixFixture) call(t *testing.T, r matrixRow, p matrixPrincipal) (int,
 	case !p.anonymous:
 		headers = basic(p.user, "pw")
 	}
-	body := fill.Replace(r.body)
+	headers, body := checksumDeploy(headers, fill.Replace(r.body))
 	if body != "" {
 		headers["Content-Type"], body = contentTypeOf(body)
 	}

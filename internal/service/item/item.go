@@ -102,6 +102,13 @@ type Deploy struct {
 	// the path it sent does not cover it; ErrOverwriteDenied when it says
 	// no.
 	CanOverwritePath func(fullPath string) bool
+	// Reusable, when set, decides whether a checksum deploy may store the
+	// content it found; when it says no, the deploy fails with ErrNoBlob as
+	// if the content were not there, so the answer does not reveal that it
+	// is. A caller's checksum deploy sets it (knowing a checksum must not
+	// copy content the caller cannot read); a write that already holds the
+	// content, such as a registry upload's completion, leaves it nil.
+	Reusable func(ctx context.Context, b types.Blob) (bool, error)
 }
 
 // ParseChecksums checks declared checksums: lowercase hex of the length of
@@ -247,7 +254,8 @@ func (s *Service) finishCollection(ctx context.Context, sha string) {
 
 // DeployByChecksum stores the item from content the server already holds,
 // found by the strongest declared checksum. Every other declared checksum
-// must match too; otherwise, and when the content is gone, ErrNoBlob.
+// must match too, and d.Reusable must allow it; otherwise, and when the
+// content is gone, ErrNoBlob.
 func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, error) {
 	declared, err := ParseChecksums(d.Declared)
 	if err != nil {
@@ -270,6 +278,15 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 		{declared.MD5, b.Checksums.MD5},
 	} {
 		if pair[0] != "" && pair[0] != pair[1] {
+			return types.Item{}, ErrNoBlob
+		}
+	}
+	if d.Reusable != nil {
+		ok, err := d.Reusable(ctx, b)
+		if err != nil {
+			return types.Item{}, fmt.Errorf("item: may reuse content: %w", err)
+		}
+		if !ok {
 			return types.Item{}, ErrNoBlob
 		}
 	}
