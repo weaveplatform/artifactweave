@@ -10911,7 +10911,7 @@ type ClientInterface interface {
 
 	// GetLegacyTokens List access tokens (legacy)
 	//
-	// Lists tokens in the legacy shape; admins see every token, other users only their own. The same data is served by GET /access/api/v1/tokens. Not in the oracle; from docs/research/05.
+	// Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.
 	//
 	// Corresponds with GET /api/security/token (the `GetLegacyTokens` operationId).
 	//
@@ -17019,7 +17019,7 @@ func (c *Client) CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifa
 
 // GetLegacyTokens List access tokens (legacy)
 //
-// Lists tokens in the legacy shape; admins see every token, other users only their own. The same data is served by GET /access/api/v1/tokens. Not in the oracle; from docs/research/05.
+// Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.
 //
 // Corresponds with GET /api/security/token (the `GetLegacyTokens` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -37689,7 +37689,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetLegacyTokensWithResponse List access tokens (legacy)
 	//
-	// Lists tokens in the legacy shape; admins see every token, other users only their own. The same data is served by GET /access/api/v1/tokens. Not in the oracle; from docs/research/05.
+	// Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -53617,6 +53617,8 @@ type GetLegacyTokensResponse struct {
 	JSON200 *LegacyTokenList
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *SecurityUnauthorized
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *SecurityForbidden
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *SecurityInternalServerError
 }
@@ -53629,6 +53631,11 @@ func (r GetLegacyTokensResponse) GetJSON200() *LegacyTokenList {
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
 func (r GetLegacyTokensResponse) GetJSON401() *SecurityUnauthorized {
 	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetLegacyTokensResponse) GetJSON403() *SecurityForbidden {
+	return r.JSON403
 }
 
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
@@ -64965,7 +64972,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithApplicationVndO
 
 // GetLegacyTokensWithResponse List access tokens (legacy)
 //
-// Lists tokens in the legacy shape; admins see every token, other users only their own. The same data is served by GET /access/api/v1/tokens. Not in the oracle; from docs/research/05.
+// Lists every user's revocable, unexpired tokens in the legacy shape. Admin only.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -78472,6 +78479,13 @@ func ParseGetLegacyTokensResponse(rsp *http.Response) (*GetLegacyTokensResponse,
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest SecurityForbidden
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest SecurityInternalServerError

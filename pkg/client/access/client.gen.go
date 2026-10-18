@@ -4524,7 +4524,7 @@ type ClientInterface interface {
 
 	// GetPermissionResource Get one resource section of a permission
 	//
-	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or the system:permissions:r scope.
+	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
 	//
 	// Corresponds with GET /api/v2/permissions/{permissionName}/{resourceType} (the `GetPermissionResource` operationId).
 	GetPermissionResource(ctx context.Context, permissionName PermissionName, resourceType GetPermissionResourceParamsResourceType, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -8159,7 +8159,7 @@ func (c *Client) DeletePermissionResource(ctx context.Context, permissionName Pe
 
 // GetPermissionResource Get one resource section of a permission
 //
-// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or the system:permissions:r scope.
+// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
 //
 // Corresponds with GET /api/v2/permissions/{permissionName}/{resourceType} (the `GetPermissionResource` operationId).
 func (c *Client) GetPermissionResource(ctx context.Context, permissionName PermissionName, resourceType GetPermissionResourceParamsResourceType, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16711,7 +16711,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionResourceWithResponse Get one resource section of a permission
 	//
-	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or the system:permissions:r scope.
+	// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -29117,7 +29117,7 @@ func (c *ClientWithResponses) DeletePermissionResourceWithResponse(ctx context.C
 
 // GetPermissionResourceWithResponse Get one resource section of a permission
 //
-// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin or the system:permissions:r scope.
+// Returns the actions and targets of a single resource type within the permission. A permission that has no section for the type answers 404. Requires a platform admin.
 //
 // Returns a wrapper object for the known response body format(s).
 //

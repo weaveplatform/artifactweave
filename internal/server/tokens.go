@@ -541,12 +541,16 @@ func (s artifactoryService) registerTokenRoutes(r chi.Router) {
 	r.With(bodyLimit(managementBodyLimit)).Post(legacyTokenRevokePath, s.revokeLegacyToken)
 }
 
-// GetLegacyTokens lists tokens in the legacy shape, with the same
-// visibility as GET /access/api/v1/tokens.
+// GetLegacyTokens lists every token in the legacy shape. Unlike
+// GET /access/api/v1/tokens, which shows a user their own, it is admin only,
+// as the deprecated legacy API documents (#382).
 func (s artifactoryService) GetLegacyTokens(
 	ctx context.Context,
 	_ artgen.GetLegacyTokensRequestObject,
 ) (artgen.GetLegacyTokensResponseObject, error) {
+	if _, err := auth.RequireAdmin(ctx); err != nil {
+		return nil, fmt.Errorf("tokens: %w", err)
+	}
 	recs, svc, err := tokenAPI{cfg: s.cfg}.visible(ctx)
 	if err != nil {
 		return nil, err
@@ -610,14 +614,15 @@ func (s artifactoryService) createLegacyToken(w http.ResponseWriter, r *http.Req
 
 // revokeLegacyToken is POST /api/security/token/revoke, by value or by id.
 // It answers 200 when the token was already revoked or never existed, as
-// Artifactory does; another user's token is 403 for a non-administrator,
-// and a non-revocable one 400.
+// Artifactory does, and 400 for a non-revocable one. It is admin only, even
+// for the caller's own token (#382): DELETE /access/api/v1/tokens/{id} is
+// where a user revokes their own.
 func (s artifactoryService) revokeLegacyToken(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	t := tokenAPI{cfg: s.cfg}
 	svc, err := t.service()
 	if err == nil {
-		_, err = auth.RequireAuthenticated(ctx)
+		_, err = auth.RequireAdmin(ctx)
 	}
 	if err == nil {
 		err = r.ParseForm()

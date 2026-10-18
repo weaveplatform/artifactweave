@@ -55,8 +55,11 @@ evaluator's basics match 7.x: grants are additive, a virtual repository has no p
 target of its own, and anonymous gets 401 where a user gets 403
 ([permissions](https://docs.jfrog.com/administration/docs/permissions),
 [security configuration](https://docs.jfrog.com/administration/docs/security-configuration)).
-So do the routes, statuses and shapes of the v1, v2 and Access v2 permission APIs. These
-differ:
+So do the routes, statuses and shapes of the v1, v2 and Access v2 permission APIs. Reading
+one Access permission section needs an administrator, as in 7.x: "Requires admin privileges"
+([getpermissionresource](https://docs.jfrog.com/administration/reference/getpermissionresource)).
+A `system:permissions:r` token, which lists permissions and reads one whole, is refused there
+([#382](https://github.com/weaveplatform/artifactweave/issues/382)). These differ:
 - 7.x differs: `applied-permissions/admin` makes the token an admin token, even for a user
   that does not exist
   ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token));
@@ -65,9 +68,6 @@ differ:
   (`exclude-manage`, the Permissions V2 default;
   [permissions](https://docs.jfrog.com/administration/docs/permissions)); fixed by
   [#381](https://github.com/weaveplatform/artifactweave/issues/381).
-- 7.x differs: reading one Access permission section needs an administrator
-  ([getpermissionresource](https://docs.jfrog.com/administration/reference/getpermissionresource));
-  fixed by [#382](https://github.com/weaveplatform/artifactweave/issues/382).
 - 7.x differs: the Access listing's `user` filter matches user names without case
   ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions)); fixed by
   [#408](https://github.com/weaveplatform/artifactweave/issues/408).
@@ -174,8 +174,11 @@ undocumented.
   - An Access PATCH on a section merges users, groups and targets by key; a PUT replaces it.
 - **Who may** (documented, each page's Security note):
   - v1, and every Access write: an administrator.
-  - Access reads and listing: an administrator or a `system:permissions:r` token
-    (`getpermissiondetails.json`, `getpermissions.json`).
+  - Access listing and whole-permission reads: an administrator or a `system:permissions:r`
+    token (`getpermissiondetails.json`, `getpermissions.json`).
+  - Access reads of one section: an administrator
+    ([getpermissionresource](https://docs.jfrog.com/administration/reference/getpermissionresource),
+    "Requires admin privileges"; #382).
   - v2 reads, HEAD, listings and the by-user and by-group views: an administrator, or a
     holder of MANAGE, who sees the permissions it manages.
   - v2 PUT: an administrator, or a MANAGE holder who "can only edit the actions"

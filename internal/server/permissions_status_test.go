@@ -225,6 +225,22 @@ func permissionStatusRows() []statusCase {
 			"",
 			403,
 		},
+		// One section is admin only (#382): MANAGE on the permission does
+		// not open it, and a missing name is 403 too.
+		{
+			"GET " + permAcc + "/{permissionName}/{resourceType}",
+			permAcc + "/st-managed/artifact",
+			"user",
+			"",
+			403,
+		},
+		{
+			"GET " + permAcc + "/{permissionName}/{resourceType}",
+			permAcc + "/missing/artifact",
+			"user",
+			"",
+			403,
+		},
 		{
 			"GET " + permAcc + "/{permissionName}/{resourceType}",
 			permAcc + "/Anything/artifact",
