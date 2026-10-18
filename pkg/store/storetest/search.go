@@ -27,7 +27,7 @@ func testItemSearch(t *testing.T, st store.Store) {
 		it := get[types.Item](t)(s.Put(ctx, seed.Item))
 		key := aqltest.Paths([]aql.Hit{{Item: it}})[0]
 		if seed.Properties != nil {
-			must(t, s.SetProperties(ctx, it.ID, seed.Properties))
+			must(t, s.SetProperties(ctx, it.ID, seed.Properties, base))
 			props[key] = seed.Properties
 		}
 		if seed.Stats != nil {

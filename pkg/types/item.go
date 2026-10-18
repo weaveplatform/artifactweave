@@ -42,6 +42,12 @@ type Checksums struct {
 // holds what the client declared at deploy time, so a mismatch stays
 // visible to the bad-checksum search. The type is persisted as part of the
 // trash record, hence the tags.
+//
+// PropertiesModified is when the item's properties last changed, zero while
+// it has none; the storage API lists it as mdTimestamps.properties. Only
+// the property methods of store.ItemStore set it. Put keeps the stored value
+// whatever the caller passes, so a trash record or a copied item cannot
+// carry another item's time onto the one written.
 type Item struct {
 	ID         int64     `json:"id"`
 	RepoKey    string    `json:"repo_key"`
@@ -60,6 +66,8 @@ type Item struct {
 	ModifiedBy string    `json:"modified_by,omitempty"`
 	Updated    time.Time `json:"updated"`
 	RemoteURL  string    `json:"remote_url,omitempty"`
+
+	PropertiesModified time.Time `json:"properties_modified,omitzero"`
 }
 
 // RootItem is the record of a repository root, which holds the properties
@@ -225,6 +233,11 @@ func (p Properties) Has(key, value string) bool {
 
 // Keys returns the keys in sorted order.
 func (p Properties) Keys() []string { return slices.Sorted(maps.Keys(p)) }
+
+// Equal reports whether p and o hold the same keys with the same values in
+// the same order; nil and empty are equal. Values in the order Set keeps
+// them compare as sets.
+func (p Properties) Equal(o Properties) bool { return maps.EqualFunc(p, o, slices.Equal[[]string]) }
 
 // Clone returns a deep copy.
 func (p Properties) Clone() Properties {

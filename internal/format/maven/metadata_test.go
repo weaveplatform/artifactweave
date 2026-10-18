@@ -609,7 +609,7 @@ func TestPluginMetadataOnEveryWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := w.db.Items().PatchProperties(w.ctx, it.ID,
-		types.Properties{maven.PluginProperty: {"true"}}, nil); err != nil {
+		types.Properties{maven.PluginProperty: {"true"}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if got := w.queued(); got[maven.KindPlugins] != 0 {

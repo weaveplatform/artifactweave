@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -28,18 +29,21 @@ var itemWriteCols = []string{
 	"created_at", "created_by", "modified_at", "modified_by", "updated_at", "remote_url",
 }
 
-var itemCols = "id, " + strings.Join(itemWriteCols, ", ")
+// itemCols are the columns scanItem reads. props_modified_at is not one of
+// itemWriteCols: only the property methods write it, so a Put that
+// replaces an item keeps it (types.Item.PropertiesModified).
+var itemCols = "id, " + strings.Join(itemWriteCols, ", ") + ", props_modified_at"
 
 func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 	var (
-		it                         types.Item
-		typ                        string
-		created, modified, updated sql.NullInt64
+		it                                    types.Item
+		typ                                   string
+		created, modified, updated, propsTime sql.NullInt64
 	)
 	err := row.Scan(&it.ID, &it.RepoKey, &it.Cached, &it.Path, &it.Name, &it.Depth, &typ, &it.Size,
 		&it.Actual.SHA256, &it.Actual.SHA512, &it.Actual.SHA1, &it.Actual.MD5,
 		&it.Original.SHA256, &it.Original.SHA512, &it.Original.SHA1, &it.Original.MD5, &it.MimeType,
-		&created, &it.CreatedBy, &modified, &it.ModifiedBy, &updated, &it.RemoteURL)
+		&created, &it.CreatedBy, &modified, &it.ModifiedBy, &updated, &it.RemoteURL, &propsTime)
 	it.Folder = typ == typeFolder
 	it.Created, it.Modified, it.Updated = fromMicros(
 		created,
@@ -48,6 +52,7 @@ func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 	), fromMicros(
 		updated,
 	)
+	it.PropertiesModified = fromMicros(propsTime)
 	return it, err //nolint:wrapcheck // wrapped by the caller
 }
 
@@ -497,23 +502,66 @@ func (i items) Properties(ctx context.Context, id int64) (types.Properties, erro
 		if err := i.requireItem(ctx, id); err != nil {
 			return err
 		}
-		out = types.Properties{}
-		return i.s.rows(
-			ctx,
-			"item properties",
-			"SELECT key, value FROM item_properties WHERE item_id = ? ORDER BY key, value",
-			[]any{id},
-			func(rs *sql.Rows) error {
-				var k, v string
-				if err := rs.Scan(&k, &v); err != nil {
-					return err //nolint:wrapcheck // wrapped by rows
-				}
-				out[k] = append(out[k], v)
-				return nil
-			},
-		)
+		var err error
+		out, err = i.props(ctx, id)
+		return err
 	})
 	return out, err
+}
+
+// props reads the properties of the item with id, which must exist.
+func (i items) props(ctx context.Context, id int64) (types.Properties, error) {
+	out := types.Properties{}
+	err := i.s.rows(
+		ctx,
+		"item properties",
+		"SELECT key, value FROM item_properties WHERE item_id = ? ORDER BY key, value",
+		[]any{id},
+		func(rs *sql.Rows) error {
+			var k, v string
+			if err := rs.Scan(&k, &v); err != nil {
+				return err //nolint:wrapcheck // wrapped by rows
+			}
+			out[k] = append(out[k], v)
+			return nil
+		},
+	)
+	return out, err
+}
+
+// changeProperties runs write, which changes the properties of the item
+// with id, and stamps the item with at when they changed
+// (store.ItemStore). The properties are read back rather than predicted,
+// so the stamp follows what the columns' collation and the truncation kept.
+func (i items) changeProperties(
+	ctx context.Context,
+	id int64,
+	at time.Time,
+	write func(context.Context) error,
+) error {
+	return i.s.Tx(ctx, func(ctx context.Context) error {
+		if err := i.requireItem(ctx, id); err != nil {
+			return err
+		}
+		before, err := i.props(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := write(ctx); err != nil {
+			return err
+		}
+		after, err := i.props(ctx, id)
+		if err != nil || after.Equal(before) {
+			return err
+		}
+		stamp := micros(at)
+		if len(after) == 0 {
+			stamp = nil
+		}
+		_, err = i.s.exec(ctx, "stamp properties",
+			"UPDATE items SET props_modified_at = ? WHERE id = ?", stamp, id)
+		return err
+	})
 }
 
 // setKeys replaces the values of every key in props, each cut to
@@ -540,14 +588,16 @@ func (i items) setKeys(ctx context.Context, id int64, props types.Properties) er
 	return nil
 }
 
-func (i items) SetProperties(ctx context.Context, id int64, props types.Properties) error {
+func (i items) SetProperties(
+	ctx context.Context,
+	id int64,
+	props types.Properties,
+	at time.Time,
+) error {
 	if err := store.CheckPropertyKeys(props); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
-	return i.s.Tx(ctx, func(ctx context.Context) error {
-		if err := i.requireItem(ctx, id); err != nil {
-			return err
-		}
+	return i.changeProperties(ctx, id, at, func(ctx context.Context) error {
 		if _, err := i.s.exec(ctx, "clear properties",
 			"DELETE FROM item_properties WHERE item_id = ?", id); err != nil {
 			return err
@@ -561,14 +611,12 @@ func (i items) PatchProperties(
 	id int64,
 	set types.Properties,
 	remove []string,
+	at time.Time,
 ) error {
 	if err := store.CheckPropertyKeys(set); err != nil {
 		return fmt.Errorf("properties of item %d: %w", id, err)
 	}
-	return i.s.Tx(ctx, func(ctx context.Context) error {
-		if err := i.requireItem(ctx, id); err != nil {
-			return err
-		}
+	return i.changeProperties(ctx, id, at, func(ctx context.Context) error {
 		for _, k := range remove {
 			if _, err := i.s.exec(ctx, "remove property "+k,
 				"DELETE FROM item_properties WHERE item_id = ? AND key = ?", id, k); err != nil {

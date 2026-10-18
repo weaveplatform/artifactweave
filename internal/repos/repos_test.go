@@ -6,6 +6,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -162,7 +163,7 @@ func TestRemove(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := db.Items().
-		PatchProperties(ctx, root.ID, types.Properties{"k": {"v"}}, nil); err != nil {
+		PatchProperties(ctx, root.ID, types.Properties{"k": {"v"}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	files, found, err := Remove(ctx, db, "libs")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
@@ -121,12 +122,12 @@ func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 
 //nolint:wrapcheck // test double
 func (i faultyItems) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, remove []string,
+	ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
 ) error {
 	if i.f.fail("PatchProperties") {
 		return errFault
 	}
-	return i.ItemStore.PatchProperties(ctx, id, set, remove)
+	return i.ItemStore.PatchProperties(ctx, id, set, remove, at)
 }
 
 //nolint:wrapcheck // test double

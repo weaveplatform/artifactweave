@@ -219,15 +219,17 @@ func (s *Service) Annotate(
 	set types.Properties,
 	remove []string,
 ) error {
+	now := s.now()
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		if err := s.Store.Items().PatchProperties(ctx, it.ID, set, remove); err != nil {
+		if err := s.Store.Items().PatchProperties(ctx, it.ID, set, remove, now); err != nil {
 			return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
 		}
 		h := s.format(c.PackageType)
 		if _, ok := h.(format.Annotator); !ok {
 			return nil
 		}
-		return s.annotated(ctx, h, s.env(), c, it, format.Annotation{Set: set, Removed: remove})
+		return s.annotated(ctx, h, s.env(), c, it,
+			format.Annotation{Set: set, Removed: remove, At: now})
 	})
 	if err != nil {
 		return err //nolint:wrapcheck // the transaction returns ours

@@ -163,6 +163,8 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the JSON field "([^"]*)" is not empty$`, w.jsonFieldNotEmpty)
 	sc.Step(`^the JSON field "([^"]*)" exists$`, w.jsonFieldExists)
 	sc.Step(`^the JSON field "([^"]*)" has (\d+) entries$`, w.jsonFieldLen)
+	sc.Step(`^the JSON field "([^"]*)" is the number (-?\d+)$`, w.jsonFieldNumber)
+	sc.Step(`^the JSON field "([^"]*)" does not exist$`, w.jsonFieldAbsent)
 	sc.Step(`^the JFrog CLI is available$`, w.jfAvailable)
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
 	sc.Step(`^I run jf "([^"]*)" in "([^"]*)"$`, w.runJFIn)
@@ -693,6 +695,33 @@ func (w *world) jsonFieldLen(key string, want int) error {
 	}
 	if len(list) != want {
 		return fmt.Errorf("field %q has %d entries, want %d: %v", key, len(list), want, list)
+	}
+	return nil
+}
+
+// jsonFieldNumber checks that a field is a JSON number with the value want.
+// "equals" cannot tell them apart: it prints a number and a string holding
+// the same digits alike, and a client that decodes into an integer accepts
+// only the number.
+func (w *world) jsonFieldNumber(key string, want int) error {
+	v, err := w.jsonField(key)
+	if err != nil {
+		return err
+	}
+	if n, ok := v.(float64); !ok || n != float64(want) {
+		return fmt.Errorf("field %q is %#v, want the number %d", key, v, want)
+	}
+	return nil
+}
+
+// jsonFieldAbsent checks that a field is not in the response, which must be
+// JSON: any body that is not would otherwise pass.
+func (w *world) jsonFieldAbsent(key string) error {
+	if !json.Valid(w.body) {
+		return fmt.Errorf("body is not JSON: %s", w.body)
+	}
+	if v, err := w.jsonField(key); err == nil {
+		return fmt.Errorf("field %q is %v, want it absent", key, v)
 	}
 	return nil
 }

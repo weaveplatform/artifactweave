@@ -158,8 +158,9 @@ func (v storageView) downloadURI(ctx context.Context, p string) string {
 
 // target finds the item the request names, through a virtual repository's
 // members when it is one. The root is a folder that carries only the ID of
-// its record, when properties have given it one: the other root views
-// describe the repository the same way whether or not it has a record.
+// its record and when its properties last changed, when properties have
+// given it one: the other root views describe the repository the same way
+// whether or not it has a record.
 func (v storageView) target(ctx context.Context) (found, error) {
 	if v.path == "" {
 		root := types.Item{RepoKey: v.repo.Key, Cached: v.cached, Folder: true}
@@ -167,7 +168,7 @@ func (v storageView) target(ctx context.Context) (found, error) {
 			rec, err := v.st.Items().Root(ctx, v.repo.Key, v.cached || v.repo.Class == repo.Remote)
 			switch {
 			case err == nil:
-				root.ID = rec.ID
+				root.ID, root.PropertiesModified = rec.ID, rec.PropertiesModified
 			case !errors.Is(err, store.ErrNotFound):
 				return found{}, fmt.Errorf("repository root: %w", err)
 			}
@@ -434,7 +435,13 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 		return "", nil, err
 	}
 	base := segments(folder)
-	files := make([]map[string]any, 0, len(items))
+	files := make([]map[string]any, 0, len(items)+1)
+	if opts["includeRootPath"] {
+		// The listed folder itself, at "/" relative to itself. The
+		// Terraform provider's TestAccDataSourceFileList_include_root_path
+		// expects this entry first at a repository root, with size -1.
+		files = append(files, listEntry(f.item, "/", opts["mdTimestamps"]))
+	}
 	for _, it := range items {
 		if it.Folder && !opts["listFolders"] {
 			continue
@@ -444,22 +451,8 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 		if depth > 0 && segments(it.FullPath())-base > depth {
 			continue
 		}
-		entry := map[string]any{"folder": it.Folder, "size": "-1"}
-		entry["uri"] = "/" + strings.TrimPrefix(strings.TrimPrefix(it.FullPath(), folder), "/")
-		if opts["includeRootPath"] {
-			entry["uri"] = it.StoragePath()
-		}
-		putTime(entry, "lastModified", it.Modified)
-		if !it.Folder {
-			entry["size"] = strconv.FormatInt(it.Size, 10)
-			entry["sha1"] = it.Actual.SHA1
-		}
-		if opts["mdTimestamps"] {
-			// Metadata write times are not recorded per kind; the map is
-			// present, as clients that ask for it expect, but empty.
-			entry["mdTimestamps"] = map[string]string{}
-		}
-		files = append(files, entry)
+		uri := "/" + strings.TrimPrefix(strings.TrimPrefix(it.FullPath(), folder), "/")
+		files = append(files, listEntry(it, uri, opts["mdTimestamps"]))
 	}
 	slices.SortFunc(files, func(a, b map[string]any) int {
 		return strings.Compare(
@@ -472,6 +465,25 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 		"created": formatTime(time.Now()),
 		"files":   files,
 	}, nil
+}
+
+// listEntry is one entry of a FileList. size is a JSON number, -1 for a
+// folder: the Terraform provider decodes it as an int64 and fails on a
+// string. mdTimestamps, when asked for, is left out for an item without
+// properties, as 6.20's FileListElement creates the map only when it adds a
+// time to it.
+func listEntry(it types.Item, uri string, mdTimestamps bool) map[string]any {
+	entry := map[string]any{"uri": uri, "folder": it.Folder, "size": int64(-1)}
+	putTime(entry, "lastModified", it.Modified)
+	if !it.Folder {
+		entry["size"] = it.Size
+		entry["sha1"] = it.Actual.SHA1
+		entry["sha2"] = it.Actual.SHA256
+	}
+	if mdTimestamps && !it.PropertiesModified.IsZero() {
+		entry["mdTimestamps"] = map[string]string{"properties": formatTime(it.PropertiesModified)}
+	}
+	return entry
 }
 
 func segments(p string) int {

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -136,7 +137,8 @@ func TestStorageList(t *testing.T) {
 		var out []string
 		for _, f := range decodeObject(t, rec.Body.String())["files"].([]any) {
 			e := f.(map[string]any)
-			s := e["uri"].(string) + ":" + e["size"].(string)
+			// size is a JSON number, which decodes as a float64.
+			s := e["uri"].(string) + ":" + strconv.FormatFloat(e["size"].(float64), 'f', -1, 64)
 			if _, ok := e["mdTimestamps"]; ok {
 				s += ":md"
 			}
@@ -145,23 +147,26 @@ func TestStorageList(t *testing.T) {
 		return out
 	}
 	for query, want := range map[string]string{
-		"":                               "/top.txt:1",
-		"&deep=1":                        "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
-		"&deep=1&listFolders=1":          "/dir:-1 /dir/a.txt:3 /dir/sub:-1 /dir/sub/b.txt:4 /top.txt:1",
-		"&deep=1&listFolders=1&depth=1":  "/dir:-1 /top.txt:1",
-		"&deep=1&depth=2":                "/dir/a.txt:3 /top.txt:1",
-		"&deep=1&depth=0":                "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
-		"&mdTimestamps=1":                "/top.txt:1:md",
-		"&deep=1&listFolders=":           "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
-		"&deep=true&includeRootPath=1":   "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
-		"&listFolders=1&includeRootPath": "/dir:-1 /top.txt:1",
+		"":                              "/top.txt:1",
+		"&deep=1":                       "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
+		"&deep=1&listFolders=1":         "/dir:-1 /dir/a.txt:3 /dir/sub:-1 /dir/sub/b.txt:4 /top.txt:1",
+		"&deep=1&listFolders=1&depth=1": "/dir:-1 /top.txt:1",
+		"&deep=1&depth=2":               "/dir/a.txt:3 /top.txt:1",
+		"&deep=1&depth=0":               "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
+		"&mdTimestamps=1":               "/top.txt:1",
+		"&deep=1&listFolders=":          "/dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
+		"&deep=true&includeRootPath=1":  "/:-1 /dir/a.txt:3 /dir/sub/b.txt:4 /top.txt:1",
+		// An empty flag is its default, off.
+		"&listFolders=1&includeRootPath":   "/dir:-1 /top.txt:1",
+		"&listFolders=1&includeRootPath=1": "/:-1 /dir:-1 /top.txt:1",
+		"&includeRootPath=0":               "/top.txt:1",
 	} {
 		if got := strings.Join(files(query), " "); got != want {
 			t.Errorf("list%s = %q, want %q", query, got, want)
 		}
 	}
-	// Below a folder, uris are relative to it unless includeRootPath asks
-	// for the full path.
+	// Below a folder, uris are relative to it, and includeRootPath adds
+	// the folder itself as "/", with its own time.
 	rec := w.do(
 		http.MethodGet,
 		"/artifactory/api/storage/libs-local/dir?list&deep=1&includeRootPath=1",
@@ -169,9 +174,15 @@ func TestStorageList(t *testing.T) {
 		"",
 	)
 	wantStatus(t, rec, http.StatusOK)
-	first := decodeObject(t, rec.Body.String())["files"].([]any)[0].(map[string]any)
-	if first["uri"] != "/dir/a.txt" || first["sha1"] != sha1Hex("aaa") {
+	entries := decodeObject(t, rec.Body.String())["files"].([]any)
+	first, second := entries[0].(map[string]any), entries[1].(map[string]any)
+	if first["uri"] != "/" || first["folder"] != true || first["size"] != float64(-1) ||
+		first["lastModified"] == nil || first["sha1"] != nil || first["sha2"] != nil {
 		t.Fatalf("includeRootPath entry %v", first)
+	}
+	if second["uri"] != "/a.txt" || second["size"] != float64(3) ||
+		second["sha1"] != sha1Hex("aaa") || second["sha2"] != sha256Hex("aaa") {
+		t.Fatalf("file entry %v", second)
 	}
 	rec = w.do(http.MethodGet, "/artifactory/api/storage/libs-local/dir?list", "admin", "")
 	if got := decodeObject(t, rec.Body.String())["files"].([]any)[0].(map[string]any)["uri"]; got != "/a.txt" {

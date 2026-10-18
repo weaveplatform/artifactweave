@@ -4323,7 +4323,7 @@ type FileList struct {
 	// Created Optional within this object. RFC 3339 time the listing was generated, not the folder's creation time.
 	Created *time.Time `json:"created,omitempty"`
 
-	// Files Optional within this object. Entries in depth-first path order. Folders appear only when `listFolders=1`.
+	// Files Optional within this object. Entries in depth-first path order. Folders below the listed folder appear only when `listFolders=1`; `includeRootPath=1` adds the listed folder itself first.
 	Files *[]FileListItem `json:"files,omitempty"`
 
 	// Uri Optional within this object. Absolute storage API URL of the listed folder.
@@ -4338,16 +4338,22 @@ type FileListItem struct {
 	// LastModified Optional within this object. RFC 3339 time the content was last replaced.
 	LastModified *time.Time `json:"lastModified,omitempty"`
 
-	// MdTimestamps Optional within this object. Map from metadata name to the RFC 3339 time that metadata was last written. Present only when `mdTimestamps=1`.
-	MdTimestamps *map[string]time.Time `json:"mdTimestamps,omitempty"`
+	// MdTimestamps Optional within this object. When the entry's metadata was last written. Present only when `mdTimestamps=1` and the entry has properties.
+	MdTimestamps *struct {
+		// Properties Optional within this object. RFC 3339 time the entry's properties last changed. A write that leaves them as they were does not move it.
+		Properties *time.Time `json:"properties,omitempty"`
+	} `json:"mdTimestamps,omitempty"`
 
 	// Sha1 Optional within this object. Lowercase hex SHA-1 of a file; absent for folders.
 	Sha1 *string `json:"sha1,omitempty"`
 
-	// Size Optional within this object. Content length in bytes as a decimal string; folders report `-1`.
-	Size *string `json:"size,omitempty"`
+	// Sha2 Optional within this object. Lowercase hex SHA-256 of a file; absent for folders.
+	Sha2 *string `json:"sha2,omitempty"`
 
-	// Uri Optional within this object. Path relative to the listed folder with a leading `/`, or the item's own path when `includeRootPath=1`.
+	// Size Optional within this object. Content length in bytes; folders report `-1`.
+	Size *int64 `json:"size,omitempty"`
+
+	// Uri Optional within this object. Path relative to the listed folder with a leading `/`. The entry `includeRootPath=1` adds for the listed folder itself is `/`.
 	Uri *string `json:"uri,omitempty"`
 }
 

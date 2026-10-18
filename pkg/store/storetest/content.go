@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -503,6 +504,13 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 	it := get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
 	props := get[types.Properties](t)
 	same(t, "no properties", types.Properties{}, props(s.Properties(ctx, it.ID)))
+	// stamped checks when the properties of the item with id last changed,
+	// zero for never or for none left.
+	stamped := func(what string, id int64, when time.Time) {
+		t.Helper()
+		same(t, what, when, get[types.Item](t)(s.GetByID(ctx, id)).PropertiesModified)
+	}
+	stamped("a new item", it.ID, time.Time{})
 
 	must(
 		t,
@@ -510,6 +518,7 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 			ctx,
 			it.ID,
 			types.Properties{"b": {"2", "1", "1"}, "a": {"x"}, "empty": nil},
+			at(10),
 		),
 	)
 	same(
@@ -518,6 +527,10 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 		types.Properties{"a": {"x"}, "b": {"1", "2"}},
 		props(s.Properties(ctx, it.ID)),
 	)
+	stamped("SetProperties", it.ID, at(10))
+	// The same properties again, spelt differently, change nothing.
+	must(t, s.SetProperties(ctx, it.ID, types.Properties{"b": {"1", "2", "2"}, "a": {"x"}}, at(11)))
+	stamped("SetProperties without a change", it.ID, at(10))
 
 	must(
 		t,
@@ -526,6 +539,7 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 			it.ID,
 			types.Properties{"c": {"3"}, "a": {"z", "y"}},
 			[]string{"b", "absent"},
+			at(12),
 		),
 	)
 	same(
@@ -534,14 +548,18 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 		types.Properties{"a": {"y", "z"}, "c": {"3"}},
 		props(s.Properties(ctx, it.ID)),
 	)
+	stamped("PatchProperties", it.ID, at(12))
+	must(t, s.PatchProperties(ctx, it.ID, types.Properties{"c": {"3"}}, []string{"absent"}, at(13)))
+	stamped("PatchProperties without a change", it.ID, at(12))
 	// A key both removed and set ends with the set values.
-	must(t, s.PatchProperties(ctx, it.ID, types.Properties{"c": {"4"}}, []string{"c"}))
+	must(t, s.PatchProperties(ctx, it.ID, types.Properties{"c": {"4"}}, []string{"c"}, at(14)))
 	same(
 		t,
 		"remove then set",
 		types.Properties{"a": {"y", "z"}, "c": {"4"}},
 		props(s.Properties(ctx, it.ID)),
 	)
+	stamped("remove then set", it.ID, at(14))
 
 	got := props(s.Properties(ctx, it.ID))
 	got["a"][0] = "changed"
@@ -552,28 +570,69 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 		props(s.Properties(ctx, it.ID)),
 	)
 
-	must(t, s.SetProperties(ctx, it.ID, types.Properties{"d": {""}}))
-	same(t, "SetProperties replaces", types.Properties{"d": {""}}, props(s.Properties(ctx, it.ID)))
+	// Only the property methods stamp: Put keeps the stored time over the
+	// one it is given, and a new item starts without one.
+	replace := fileItem("r", "a/b.jar", 3)
+	replace.PropertiesModified = at(90)
+	same(t, "Put over an item", at(14), get[types.Item](t)(s.Put(ctx, replace)).PropertiesModified)
+	fresh := fileItem("r", "a/c.jar", 2)
+	fresh.PropertiesModified = at(91)
+	other := get[types.Item](t)(s.Put(ctx, fresh))
+	stamped("Put of a new item", other.ID, time.Time{})
 
-	other := get[types.Item](t)(s.Put(ctx, fileItem("r", "a/c.jar", 2)))
-	must(t, s.PatchProperties(ctx, other.ID, types.Properties{"k": {"v"}}, []string{"x"}))
+	must(t, s.SetProperties(ctx, it.ID, types.Properties{"d": {""}}, at(15)))
+	same(t, "SetProperties replaces", types.Properties{"d": {""}}, props(s.Properties(ctx, it.ID)))
+	stamped("SetProperties replaces", it.ID, at(15))
+
+	must(t, s.PatchProperties(ctx, other.ID, types.Properties{"k": {"v"}}, []string{"x"}, at(16)))
 	same(
 		t,
 		"PatchProperties on a bare item",
 		types.Properties{"k": {"v"}},
 		props(s.Properties(ctx, other.ID)),
 	)
+	// Every read of an item carries the time.
+	when := func(items []types.Item) []time.Time {
+		out := make([]time.Time, 0, len(items))
+		for _, i := range items {
+			out = append(out, i.PropertiesModified)
+		}
+		return out
+	}
+	same(t, "Children", []time.Time{at(15), at(16)}, when(pages(
+		t,
+		1,
+		func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", false, "a", p) },
+	)))
+	same(t, "Descendants", []time.Time{at(15), at(16)}, when(pages(
+		t,
+		1,
+		func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, "", p) },
+	)))
+	same(t, "Get", at(16), get[types.Item](t)(s.Get(ctx, "r", false, "a/c.jar")).PropertiesModified)
+
+	// Removing the last property clears the time, by either method.
+	must(t, s.SetProperties(ctx, it.ID, nil, at(17)))
+	stamped("SetProperties of nothing", it.ID, time.Time{})
+	must(t, s.PatchProperties(ctx, other.ID, nil, []string{"k"}, at(18)))
+	stamped("PatchProperties removing the last key", other.ID, time.Time{})
 
 	missing := it.ID + 1000
 	_, err := s.Properties(ctx, missing)
 	wantErr(t, err, store.ErrNotFound)
-	wantErr(t, s.SetProperties(ctx, missing, types.Properties{"a": {"1"}}), store.ErrNotFound)
-	wantErr(t, s.PatchProperties(ctx, missing, nil, []string{"a"}), store.ErrNotFound)
+	wantErr(
+		t,
+		s.SetProperties(ctx, missing, types.Properties{"a": {"1"}}, at(19)),
+		store.ErrNotFound,
+	)
+	wantErr(t, s.PatchProperties(ctx, missing, nil, []string{"a"}, at(19)), store.ErrNotFound)
 
-	// Properties go with the item.
+	// Properties, and their time, go with the item.
+	must(t, s.SetProperties(ctx, it.ID, types.Properties{"e": {"1"}}, at(20)))
 	get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a/b.jar"))
 	again := get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
 	same(t, "properties after re-deploy", types.Properties{}, props(s.Properties(ctx, again.ID)))
+	stamped("re-deployed", again.ID, time.Time{})
 }
 
 // testRepositoryRoot covers the record a repository root gets for its own
@@ -619,9 +678,20 @@ func testRepositoryRoot(t *testing.T, s store.ItemStore) {
 	}
 
 	props := get[types.Properties](t)
-	must(t, s.PatchProperties(ctx, root.ID, types.Properties{"k1": {"v2", "v1"}, "k2": {"x"}}, nil))
+	must(
+		t,
+		s.PatchProperties(
+			ctx,
+			root.ID,
+			types.Properties{"k1": {"v2", "v1"}, "k2": {"x"}},
+			nil,
+			at(4),
+		),
+	)
 	same(t, "root properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
 		props(s.Properties(ctx, root.ID)))
+	want.PropertiesModified = at(4)
+	same(t, "Root after its properties changed", want, item(s.Root(ctx, "r", false)))
 
 	list := func(fn func(store.Page) ([]types.Item, string, error)) []string {
 		t.Helper()

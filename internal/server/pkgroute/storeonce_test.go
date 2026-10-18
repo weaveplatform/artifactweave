@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -212,6 +213,8 @@ func (s failingPatch) Items() store.ItemStore { return failingPatchItems{s.Store
 
 type failingPatchItems struct{ store.ItemStore }
 
-func (failingPatchItems) PatchProperties(context.Context, int64, types.Properties, []string) error {
+func (failingPatchItems) PatchProperties(
+	context.Context, int64, types.Properties, []string, time.Time,
+) error {
 	return errors.New("properties down")
 }

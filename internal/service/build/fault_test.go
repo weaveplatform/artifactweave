@@ -172,12 +172,12 @@ func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties
 }
 
 func (f faultyItems) PatchProperties(
-	ctx context.Context, id int64, set types.Properties, remove []string,
+	ctx context.Context, id int64, set types.Properties, remove []string, at time.Time,
 ) error {
 	if f.fail == "patch" {
 		return errBoom
 	}
-	return f.ItemStore.PatchProperties(ctx, id, set, remove)
+	return f.ItemStore.PatchProperties(ctx, id, set, remove, at)
 }
 
 func (f faultyItems) FindByChecksum(
