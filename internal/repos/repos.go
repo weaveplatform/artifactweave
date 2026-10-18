@@ -208,9 +208,10 @@ func IsNull(raw json.RawMessage) bool { return bytes.Equal(bytes.TrimSpace(raw),
 
 // Remove deletes key with its content, in one transaction: the
 // items of the repository and, for a remote, its cache (dropping their blob
-// references for garbage collection to reclaim), its package index, its
-// place in the virtual repositories that list it, and its configuration.
-// found is false when no configuration exists.
+// references for garbage collection to reclaim), the root records that hold
+// their own properties, its package index, its place in the virtual
+// repositories that list it, and its configuration. found is false when no
+// configuration exists.
 //
 // Deleted content does not pass through the trash can yet; that arrives with
 // the trash can itself (#48).
@@ -238,6 +239,12 @@ func Remove(ctx context.Context, st store.Store, key string) (int64, bool, error
 				if _, err := st.Blobs().Unref(ctx, sha, n); err != nil {
 					return fmt.Errorf("release blob %s: %w", sha, err)
 				}
+			}
+			// A content delete keeps the root's record, so it goes here: a
+			// repository created later under the same key must not inherit
+			// the old one's properties.
+			if err := st.Items().DeleteRoot(ctx, key, cached); err != nil {
+				return fmt.Errorf("delete root: %w", err)
 			}
 		}
 		for {

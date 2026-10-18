@@ -39,6 +39,46 @@ Feature: Storage API: item information, listings and properties
     When I GET "/artifactory/api/storage/props-local/dir/a.txt?properties" as admin
     Then the response status is 404
 
+  Scenario: Properties on the repository itself, as the Terraform provider sets them
+    When I GET "/artifactory/api/storage/props-local?properties=" as admin
+    Then the response status is 404
+    When I PUT "/artifactory/api/storage/props-local?properties=key1=value1,value2;key2=value3&recursive=0" as admin
+    Then the response status is 204
+    When I GET "/artifactory/api/storage/props-local?properties=" as admin
+    Then the response status is 200
+    And the JSON field "properties.key1" equals "[value1 value2]"
+    And the JSON field "properties.key2" equals "[value3]"
+    When I GET "/artifactory/api/storage/props-local/dir/a.txt?properties" as admin
+    Then the response status is 404
+    When I PATCH "/artifactory/api/metadata/props-local?recursiveProperties=0" as admin with JSON:
+      """
+      {"props": {"key1": "value1", "key3": "value5", "key2": null}}
+      """
+    Then the response status is 204
+    When I GET "/artifactory/api/storage/props-local?properties=" as admin
+    Then the response status is 200
+    And the JSON field "properties.key1" equals "[value1]"
+    And the JSON field "properties.key3" equals "[value5]"
+    When I DELETE "/artifactory/api/storage/props-local?properties=key1,key3&recursive=0" as admin
+    Then the response status is 204
+    When I GET "/artifactory/api/storage/props-local?properties=" as admin
+    Then the response status is 404
+
+  @jf
+  Scenario: jf rt sp and jf rt delp on the repository itself
+    Given the JFrog CLI is available
+    When I run jf "rt sp props-local/ owner=platform --repo-only --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/artifactory/api/storage/props-local?properties" as admin
+    Then the response status is 200
+    And the JSON field "properties.owner" equals "[platform]"
+    When I GET "/artifactory/api/storage/props-local/dir/a.txt?properties" as admin
+    Then the response status is 404
+    When I run jf "rt delp props-local/ owner --repo-only --url {url} --user admin --password {password}"
+    Then the command succeeds
+    When I GET "/artifactory/api/storage/props-local?properties" as admin
+    Then the response status is 404
+
   @jf
   Scenario: jf rt sp and jf rt delp
     Given the JFrog CLI is available

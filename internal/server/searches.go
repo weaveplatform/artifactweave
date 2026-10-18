@@ -298,10 +298,15 @@ func within(f aql.Field, from, to time.Time) aql.Node {
 	}
 }
 
-// uri is the storage API URL of an item under the key clients see for it.
+// uri is the storage API URL of an item under the key clients see for it;
+// a repository root, which the property search finds by the properties set
+// on it, is the repository's URL with no trailing slash.
 func (r *searchRun) uri(ctx context.Context, it types.Item) string {
-	key := it.ReportedRepoKey()
-	return baseurl.From(ctx) + storagePrefix + key + "/" + escapePath(it.FullPath())
+	u := baseurl.From(ctx) + storagePrefix + it.ReportedRepoKey()
+	if p := it.FullPath(); p != "" {
+		u += "/" + escapePath(p)
+	}
+	return u
 }
 
 // resultDetail is what X-Result-Detail asks for beyond each result's uri.

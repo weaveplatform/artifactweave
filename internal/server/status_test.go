@@ -589,6 +589,9 @@ func storageStatusRows() []statusCase {
 		patch = "PATCH /artifactory/api/metadata/{repoKey}/{itemPath}"
 		file  = "/artifactory/api/storage/libs-local/fixture/get.txt"
 		meta  = "/artifactory/api/metadata/libs-local/fixture/get.txt"
+		root  = "/artifactory/api/storage/libs-local"
+
+		rootMeta = "/artifactory/api/metadata/libs-local"
 	)
 	return []statusCase{
 		{get, file, "admin", "", 200},
@@ -632,6 +635,23 @@ func storageStatusRows() []statusCase {
 		{patch, meta, "user", `{"props":{"k":"v"}}`, 403},
 		{patch, meta, "anonymous", `{"props":{"k":"v"}}`, 401},
 		{patch, meta, "", `{"props":{"k":"v"}}`, 401},
+
+		// The repository root holds properties of its own (#388).
+		{get, root + "?properties", "admin", "", 404},
+		{put, root + "?properties=team=core&recursive=0", "admin", "", 204},
+		{get, root + "?properties", "admin", "", 200},
+		{get, root + "?properties=absent", "admin", "", 404},
+		{put, root + "?properties=k=v&recursive=0", "user", "", 403},
+		{put, root + "?properties=k=v&recursive=0", "", "", 401},
+		{put, "/artifactory/api/storage/virt?properties=k=v", "admin", "", 400},
+		{del, root + "?properties=team&recursive=0", "admin", "", 204},
+		{get, root + "?properties", "admin", "", 404},
+		{del, root + "?properties=team&recursive=0", "admin", "", 204},
+		{del, root + "?properties=k&recursive=0", "user", "", 403},
+		{patch, rootMeta + "?recursiveProperties=0", "admin", `{"props":{"team":"core"}}`, 204},
+		{get, root + "?properties", "admin", "", 200},
+		{patch, rootMeta, "user", `{"props":{"k":"v"}}`, 403},
+		{get, "/artifactory/api/storage/virt?properties", "admin", "", 404},
 	}
 }
 

@@ -603,6 +603,9 @@ func storageMatrix() []matrixRow {
 		get  = "GET /artifactory/api/storage/{repoKey}/{itemPath}"
 		file = "/artifactory/api/storage/libs-local/work/get.txt"
 		meta = "/artifactory/api/metadata/libs-local/work/get.txt"
+		root = "/artifactory/api/storage/libs-local"
+
+		rootMeta = "/artifactory/api/metadata/libs-local"
 	)
 	read, annotate := types.ActionRead, types.ActionAnnotate
 	return []matrixRow{
@@ -620,6 +623,23 @@ func storageMatrix() []matrixRow {
 		row(
 			"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}", meta, `{"props":{"k":"{p}"}}`,
 			holds("libs-local", "work/", annotate), 204,
+		),
+		// The repository root's own properties need annotate on all of it.
+		row(
+			"PUT /artifactory/api/storage/{repoKey}/{itemPath}",
+			root+"?properties=k={p}&recursive=0", "", holds("libs-local", "", annotate), 204,
+		),
+		row(
+			"DELETE /artifactory/api/storage/{repoKey}/{itemPath}",
+			root+"?properties=k&recursive=0",
+			"",
+			holds("libs-local", "", annotate),
+			204,
+		),
+		row(
+			"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}",
+			rootMeta+"?recursiveProperties=0", `{"props":{"k":"{p}"}}`,
+			holds("libs-local", "", annotate), 204,
 		),
 		at("GET /artifactory/api/storageinfo", "", administrators, 200),
 		at("POST /artifactory/api/storageinfo/calculate", "", administrators, 202),

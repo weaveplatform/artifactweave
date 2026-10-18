@@ -62,6 +62,13 @@ func (f faultyItems) Delete(
 	return f.ItemStore.Delete(ctx, repoKey, cached, path) //nolint:wrapcheck // test double
 }
 
+func (f faultyItems) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
+	if f.fail == "root" {
+		return errBoom
+	}
+	return f.ItemStore.DeleteRoot(ctx, repoKey, cached) //nolint:wrapcheck // test double
+}
+
 type faultyBlobs struct {
 	store.BlobIndex
 	fail string
@@ -150,9 +157,21 @@ func world(t *testing.T) *inmem.Store {
 func TestRemove(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
+	root, err := db.Items().EnsureRoot(ctx, types.Item{RepoKey: "libs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Items().
+		PatchProperties(ctx, root.ID, types.Properties{"k": {"v"}}, nil); err != nil {
+		t.Fatal(err)
+	}
 	files, found, err := Remove(ctx, db, "libs")
 	if err != nil || !found || files != 1 {
 		t.Fatalf("Remove = %d, %v, %v", files, found, err)
+	}
+	// A repository created again under the key starts with a bare root.
+	if _, err := db.Items().Root(ctx, "libs", false); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("the root outlived its repository: %v", err)
 	}
 	if v, _ := db.Repos().
 		Get(ctx, "virt"); len(v.Repositories) != 0 ||
@@ -166,7 +185,7 @@ func TestRemove(t *testing.T) {
 
 func TestRemoveFailures(t *testing.T) {
 	for _, fail := range []string{
-		"items", "unref", "list packages", "delete package", "get virtual", "update virtual",
+		"items", "unref", "root", "list packages", "delete package", "get virtual", "update virtual",
 	} {
 		db := world(t)
 		if _, _, err := Remove(

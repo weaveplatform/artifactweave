@@ -1,9 +1,18 @@
 # Repositories on artifactweave with the jfrog/artifactory provider: a local
-# generic repository and properties on one file in it.
+# generic repository, properties on the repository itself and on one file in
+# it.
 
 resource "artifactory_local_generic_repository" "this" {
   key         = var.repository_key
   description = "managed by Terraform"
+}
+
+# Without item_path the provider sets the properties on the repository root,
+# as its TestAccItemProperties_repo_only does. is_recursive stays false, so
+# they stay on the repository and do not reach the files in it.
+resource "artifactory_item_properties" "repository" {
+  repo_key   = artifactory_local_generic_repository.this.key
+  properties = var.repository_properties
 }
 
 # The provider cannot deploy content, so the file the properties go on is

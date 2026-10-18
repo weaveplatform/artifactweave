@@ -135,6 +135,28 @@ func TestPropertyWritesReachTheFormat(t *testing.T) {
 			"",
 			[]string{"d/f.txt m,r"},
 		},
+		// The repository root is annotated like a folder, which full path
+		// "" stands for here.
+		{
+			"PUT", "/artifactory/api/storage/libs-local?properties=s=1", "",
+			[]string{" s", "a s", "a/b s", "a/f.txt s"},
+		},
+		{
+			"POST",
+			aqlURL,
+			`properties.update({"item.repo":"libs-local","item.type":"folder"}).keys("s").newValue("2")` +
+				`.dryRun("false")`,
+			[]string{" s", "a s", "a/b s"},
+		},
+		{
+			"PATCH", "/artifactory/api/metadata/libs-local?recursiveProperties=0",
+			`{"props":{"t":"1","s":null}}`,
+			[]string{" t -s"},
+		},
+		{
+			"DELETE", "/artifactory/api/storage/libs-local?properties=t&recursive=0", "",
+			[]string{"  -t"},
+		},
 	}
 	for _, s := range steps {
 		rec := w.do(s.method, s.path, "admin", s.body, "Content-Type", "application/json")

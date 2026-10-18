@@ -3,12 +3,15 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -275,17 +278,21 @@ func TestStorageProperties(t *testing.T) {
 	if props("libs-local/dir/a.txt")["only"] != nil || props("libs-local/dir")["only"] == nil {
 		t.Fatal("recursive=0 reached below the folder")
 	}
-	// The root holds no properties of its own; recursive reaches every item.
+	// The root holds properties of its own, and recursive reaches every
+	// item below it too.
 	wantStatus(
 		t,
 		w.do(http.MethodPut, api+"libs-local?properties=all=yes", "admin", ""),
 		http.StatusNoContent,
 	)
-	if props("libs-local/top.txt")["all"] == nil {
-		t.Fatal("root set missed top.txt")
+	if props("libs-local/top.txt")["all"] == nil || props("libs-local")["all"] == nil {
+		t.Fatal("root set missed the root or top.txt")
 	}
 	wantStatus(t, w.do(http.MethodPut, api+"libs-local?properties=none=1&recursive=0", "admin", ""),
 		http.StatusNoContent)
+	if props("libs-local/top.txt")["none"] != nil || props("libs-local")["none"] == nil {
+		t.Fatal("recursive=0 on the root reached below it, or missed the root")
+	}
 
 	wantStatus(
 		t,
@@ -336,6 +343,160 @@ func TestStorageProperties(t *testing.T) {
 		http.StatusForbidden)
 	wantStatus(t, w.do(http.MethodPut, api+"libs-local/top.txt?properties=k=v", "", ""),
 		http.StatusUnauthorized)
+}
+
+// TestStorageRootProperties follows the Terraform provider's
+// TestAccItemProperties_repo_only: properties set on a repository itself,
+// with no item path, read back, patched and deleted like an item's.
+func TestStorageRootProperties(t *testing.T) {
+	ctx := context.Background()
+	w := storageWorld(t, false)
+	const (
+		api  = "/artifactory/api/storage/"
+		meta = "/artifactory/api/metadata/"
+	)
+	props := func(path string) map[string]any {
+		t.Helper()
+		rec := w.do(http.MethodGet, api+path+"?properties=", "admin", "")
+		if rec.Code == http.StatusNotFound {
+			return nil
+		}
+		wantStatus(t, rec, http.StatusOK)
+		return decodeObject(t, rec.Body.String())["properties"].(map[string]any)
+	}
+	if props("libs-local") != nil {
+		t.Fatal("a new repository's root has properties")
+	}
+
+	// The provider's create: recursive=1 sets the root and everything below.
+	wantStatus(t, w.do(http.MethodPut,
+		api+"libs-local?properties=key1=value1,value2;key2=value3,value4&recursive=1", "admin", ""),
+		http.StatusNoContent)
+	want := map[string]any{"key1": []any{"value1", "value2"}, "key2": []any{"value3", "value4"}}
+	if got := props("libs-local"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("root properties %v, want %v", got, want)
+	}
+	if !reflect.DeepEqual(props("libs-local/dir/sub/b.txt"), want) {
+		t.Fatal("recursive=1 on the root missed an item below it")
+	}
+	rec := w.do(http.MethodGet, api+"libs-local?properties=key2", "admin", "")
+	wantStatus(t, rec, http.StatusOK)
+	body := decodeObject(t, rec.Body.String())
+	if body["uri"] != "https://reg.example"+api+"libs-local" ||
+		len(body["properties"].(map[string]any)) != 1 {
+		t.Fatalf("named root properties %v", body)
+	}
+	// The other root views describe the repository as before.
+	rec = w.do(http.MethodGet, api+"libs-local", "admin", "")
+	wantStatus(t, rec, http.StatusOK)
+	if info := decodeObject(t, rec.Body.String()); info["path"] != "/" || info["created"] != nil {
+		t.Fatalf("root info %v", info)
+	}
+
+	// The provider's update: a PATCH that replaces, adds and removes keys
+	// on the root alone.
+	wantStatus(t, w.do(http.MethodPatch, meta+"libs-local?recursiveProperties=0", "admin",
+		`{"props":{"key1":"value1","key3":"value5","key2":null}}`), http.StatusNoContent)
+	want = map[string]any{"key1": []any{"value1"}, "key3": []any{"value5"}}
+	if got := props("libs-local"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("patched root properties %v, want %v", got, want)
+	}
+	if props("libs-local/top.txt")["key2"] == nil {
+		t.Fatal("recursiveProperties=0 on the root reached top.txt")
+	}
+
+	// AQL finds the root as Artifactory reports it, and the property search
+	// as the repository's storage URI.
+	rows, _ := aqlRows(t, w, "admin",
+		`items.find({"repo":"libs-local","type":"folder","@key3":"value5"})`)
+	if !slices.Equal(rows, []string{"libs-local/./."}) {
+		t.Fatalf("AQL rows %v", rows)
+	}
+	wantURIs(t, w.do(http.MethodGet, "/artifactory/api/search/prop?key3=value5", "admin", ""),
+		"libs-local")
+	// items.delete passes the root over: it would empty the repository.
+	rows, _ = aqlRows(t, w, "admin",
+		`items.delete({"repo":"libs-local","type":"folder","@key3":"value5"}).dryRun("false")`)
+	if len(rows) != 0 {
+		t.Fatalf("items.delete acted on the root: %v", rows)
+	}
+
+	// Deleting the repository's content keeps the root's properties.
+	wantStatus(t, w.do(http.MethodDelete, "/artifactory/libs-local/", "admin", ""),
+		http.StatusNoContent)
+	if got := props("libs-local"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("root properties after a content delete %v", got)
+	}
+
+	// The provider's delete; the last key gone, the view is a 404 again.
+	wantStatus(t, w.do(http.MethodDelete, api+"libs-local?properties=key1,key3&recursive=0",
+		"admin", ""), http.StatusNoContent)
+	if got := props("libs-local"); got != nil {
+		t.Fatalf("root properties after delete %v", got)
+	}
+	// Removing keys from a root that never had any creates nothing.
+	wantStatus(t, w.do(http.MethodDelete, api+"other-local?properties=k&recursive=0", "admin", ""),
+		http.StatusNoContent)
+	if _, err := w.db.Items().Root(ctx, "other-local", false); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("a delete created a root record: %v", err)
+	}
+
+	// A remote repository's root properties are its cache's, read through
+	// either key; a virtual repository's root holds none.
+	wantStatus(t, w.do(http.MethodPut, api+"up-cache?properties=k=v", "admin", ""),
+		http.StatusNoContent)
+	for _, key := range []string{"up-cache", "up"} {
+		if props(key)["k"] == nil {
+			t.Fatalf("%s: root properties missing", key)
+		}
+	}
+	wantStatus(t, w.do(http.MethodPut, api+"up?properties=k=v", "admin", ""), http.StatusBadRequest)
+	wantStatus(t, w.do(http.MethodPut, api+"virt?properties=k=v", "admin", ""),
+		http.StatusBadRequest)
+	if props("virt") != nil {
+		t.Fatal("a virtual repository's root has properties")
+	}
+
+	// Annotating the root needs the action on the whole repository; reading
+	// or deploying there is not enough.
+	grant(t, w, "read-libs", "user", "libs-local", types.ActionRead)
+	wantStatus(t, w.do(http.MethodPut, api+"libs-local?properties=k=v", "user", ""),
+		http.StatusForbidden)
+	wantStatus(t, w.do(http.MethodPatch, meta+"libs-local", "deployer", `{"props":{"k":"v"}}`),
+		http.StatusForbidden)
+}
+
+// failingRoots fails every read and creation of a repository root's record.
+type failingRoots struct{ store.ItemStore }
+
+func (failingRoots) Root(context.Context, string, bool) (types.Item, error) {
+	return types.Item{}, errBoom
+}
+
+func (failingRoots) EnsureRoot(context.Context, types.Item) (types.Item, error) {
+	return types.Item{}, errBoom
+}
+
+type failingRootStore struct{ store.Store }
+
+func (s failingRootStore) Items() store.ItemStore { return failingRoots{s.Store.Items()} }
+
+// A store that cannot read or create a root's record answers 500.
+func TestStorageRootStoreErrors(t *testing.T) {
+	w := newItemWorld(t, false, func(c *Config) { c.Store = failingRootStore{c.Store} })
+	for _, r := range []struct{ method, path, body string }{
+		{http.MethodGet, "/artifactory/api/storage/libs-local?properties", ""},
+		{http.MethodGet, "/artifactory/api/storage/libs-local", ""},
+		{http.MethodPut, "/artifactory/api/storage/libs-local?properties=k=v", ""},
+		{http.MethodDelete, "/artifactory/api/storage/libs-local?properties=k", ""},
+		{http.MethodPatch, "/artifactory/api/metadata/libs-local", `{"props":{"k":"v"}}`},
+	} {
+		rec := w.do(r.method, r.path, "admin", r.body)
+		if rec.Code != http.StatusInternalServerError ||
+			strings.Contains(rec.Body.String(), "boom") {
+			t.Errorf("%s %s: %d %s", r.method, r.path, rec.Code, rec.Body)
+		}
+	}
 }
 
 func TestStoragePropertiesOnRemoteCache(t *testing.T) {

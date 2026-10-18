@@ -1496,8 +1496,9 @@ paths:
     patch:
       description: 'Applies a partial update to an item''s properties from a JSON body: keys set to a string or
         array are replaced, keys set to `null` are removed, other keys are untouched. Needs annotate permission
-        on the path. Works on local repositories and remote caches. Responds 204 on success and 400 when `props`
-        is missing or empty.'
+        on the path. Works on local repositories and remote caches. An empty item path names the repository
+        itself, which keeps properties of its own. Responds 204 on success and 400 when `props` is missing or
+        empty.'
       operationId: updateItemProperties
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
@@ -1758,8 +1759,9 @@ paths:
   /api/storage/{repoKey}/{itemPath}:
     delete:
       description: Removes the named property keys from an item and, by default, from everything below a folder.
-        Needs annotate permission. Works on local repositories and remote caches. Responds 204; asking to remove
-        a key the item does not have is not an error.
+        Needs annotate permission. Works on local repositories and remote caches. An empty item path names the
+        repository itself, which keeps properties of its own. Responds 204; asking to remove a key the item does
+        not have is not an error.
       operationId: deleteItemProperties
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as
@@ -1864,13 +1866,15 @@ paths:
           minLength: 1
           type: string
       - description: Optional query parameter. Selects the properties view. Empty returns every property; a comma-separated
-          list of keys returns only those. Cannot be combined with another mode.
+          list of keys returns only those. With an empty item path it shows the repository's own properties. Cannot
+          be combined with another mode.
         in: query
         name: properties
         required: false
         schema:
           description: Selects the properties view. Empty returns every property; a comma-separated list of keys
-            returns only those. Cannot be combined with another mode.
+            returns only those. With an empty item path it shows the repository's own properties. Cannot be combined
+            with another mode.
           type: string
       - description: Optional query parameter. Selects the last-modified view, which needs deploy permission on
           the path and for a folder reports the newest descendant. Cannot be combined with another mode.
@@ -2023,7 +2027,8 @@ paths:
     put:
       description: Sets properties on an item and, by default, on everything below a folder, replacing existing
         values of the same keys. Needs annotate permission. Works on local repositories and remote caches only;
-        a virtual or remote repository key is refused with 400. Responds 204.
+        a virtual or remote repository key is refused with 400. An empty item path names the repository itself,
+        which keeps properties of its own and, by default, passes them to everything in it. Responds 204.
       operationId: setItemProperties
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as

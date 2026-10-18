@@ -20,6 +20,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -156,12 +157,22 @@ func (v storageView) downloadURI(ctx context.Context, p string) string {
 }
 
 // target finds the item the request names, through a virtual repository's
-// members when it is one. The root is a folder with no stored item.
+// members when it is one. The root is a folder that carries only the ID of
+// its record, when properties have given it one: the other root views
+// describe the repository the same way whether or not it has a record.
 func (v storageView) target(ctx context.Context) (found, error) {
 	if v.path == "" {
-		return found{repo: v.repo, item: types.Item{
-			RepoKey: v.repo.Key, Cached: v.cached, Folder: true,
-		}}, nil
+		root := types.Item{RepoKey: v.repo.Key, Cached: v.cached, Folder: true}
+		if v.repo.Class != repo.Virtual {
+			rec, err := v.st.Items().Root(ctx, v.repo.Key, v.cached || v.repo.Class == repo.Remote)
+			switch {
+			case err == nil:
+				root.ID = rec.ID
+			case !errors.Is(err, store.ErrNotFound):
+				return found{}, fmt.Errorf("repository root: %w", err)
+			}
+		}
+		return found{repo: v.repo, item: root}, nil
 	}
 	// The storage API describes the item at the path as given; only
 	// downloads resolve it through the format.
@@ -653,7 +664,9 @@ func (s artifactoryService) patchMetadata(w http.ResponseWriter, r *http.Request
 // editProperties applies a property edit to an item and, when recursive (the
 // default) and it is a folder, to everything below it, in one transaction
 // with the format's Annotated hook for each. Only local repositories and
-// remote caches hold editable properties.
+// remote caches hold editable properties. The repository root is edited too:
+// its record is made by the first edit that sets a key, and an edit that only
+// removes keys from a root without one has nothing to remove.
 func (s artifactoryService) editProperties(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -696,19 +709,16 @@ func (s artifactoryService) editProperties(
 		apply := func(it types.Item) error {
 			return items.Annotate(ctx, v.repo, it, edit.set, edit.remove)
 		}
-		var target types.Item
-		folder := true
-		if v.path != "" {
-			it, err := v.st.Items().Get(ctx, v.repo.Key, cached, v.path)
-			if err != nil {
+		target, ok, err := s.editTarget(ctx, v, cached, len(edit.set) > 0, p.Name)
+		if err != nil {
+			return err
+		}
+		if ok {
+			if err := apply(target); err != nil {
 				return err //nolint:wrapcheck // mapped by itemError
 			}
-			if err := apply(it); err != nil {
-				return err //nolint:wrapcheck // as above
-			}
-			target, folder = it, it.Folder
 		}
-		if !recursive || !folder {
+		if !recursive || !target.Folder {
 			return nil
 		}
 		page := store.Page{Limit: store.MaxLimit}
@@ -734,6 +744,31 @@ func (s artifactoryService) editProperties(
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// editTarget is the item a property edit names: the item at v.path, or for
+// the root its record, made first when create is set. ok is false for a root
+// without a record, which the edit passes over; the item returned is then
+// the root, so a recursive edit still reaches everything below it.
+func (s artifactoryService) editTarget(
+	ctx context.Context,
+	v storageView,
+	cached, create bool,
+	by string,
+) (types.Item, bool, error) {
+	if v.path != "" {
+		it, err := v.st.Items().Get(ctx, v.repo.Key, cached, v.path)
+		return it, err == nil, err //nolint:wrapcheck // mapped by itemError
+	}
+	if create {
+		it, err := s.items(v.st).EnsureRoot(ctx, item.Target{Repo: v.repo, Cached: cached}, by)
+		return it, err == nil, err //nolint:wrapcheck // the item service wraps its own
+	}
+	it, err := v.st.Items().Root(ctx, v.repo.Key, cached)
+	if errors.Is(err, store.ErrNotFound) {
+		return types.RootItem(v.repo.Key, cached), false, nil
+	}
+	return it, err == nil, err //nolint:wrapcheck // mapped by itemError
 }
 
 // parseProperties parses the properties API's "k=v1,v2;k2=v3": ";" or "|"

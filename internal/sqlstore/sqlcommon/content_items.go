@@ -293,17 +293,29 @@ func (i items) list(
 func (i items) Children(
 	ctx context.Context, repoKey string, cached bool, folder string, p store.Page,
 ) ([]types.Item, string, error) {
-	return i.list(ctx, "list children of "+folder,
-		"repo_key = ? AND cached = ? AND path = ?", []any{repoKey, cached, folderPath(folder)},
-		p, []string{"name"}, nil, func(it types.Item) []string { return []string{it.Name} })
+	return i.list(
+		ctx,
+		"list children of "+folder,
+		"repo_key = ? AND cached = ? AND path = ? AND "+notRoot,
+		[]any{repoKey, cached, folderPath(folder)},
+		p,
+		[]string{"name"},
+		nil,
+		func(it types.Item) []string { return []string{it.Name} },
+	)
 }
+
+// notRoot leaves out a repository root's record (types.RootItem), which
+// has the root's path but is not inside the root. Depth is enough: every
+// other item is at least one segment deep.
+const notRoot = "depth > 0"
 
 // under returns the condition and arguments selecting every item below
 // folder (not folder itself).
 func under(folder string) (string, []any) {
 	folder = folderPath(folder)
 	if folder == types.RootPath {
-		return "1 = 1", nil
+		return notRoot, nil
 	}
 	prefix := folder + "/"
 	// substr counts characters on both engines; LIKE would need escaping of
@@ -336,7 +348,7 @@ func (i items) Delete(
 ) (store.DeleteResult, error) {
 	res := store.DeleteResult{BlobRefs: map[string]int64{}}
 	err := i.s.Tx(ctx, func(ctx context.Context) error {
-		where := "repo_key = ? AND cached = ?"
+		where := "repo_key = ? AND cached = ? AND " + notRoot
 		args := []any{repoKey, cached}
 		if folderPath(fullPath) != types.RootPath {
 			it, err := i.Get(ctx, repoKey, cached, fullPath)
@@ -389,6 +401,45 @@ func (i items) Delete(
 	return res, nil
 }
 
+func (i items) Root(ctx context.Context, repoKey string, cached bool) (types.Item, error) {
+	it, err := scanItem(i.s.q(ctx).QueryRowContext(ctx, i.s.d.Rebind(
+		"SELECT "+itemCols+" FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
+	),
+		repoKey, cached, types.RootPath, types.RootPath))
+	return it, i.s.wrap("get the root of "+repoKey, err)
+}
+
+func (i items) EnsureRoot(ctx context.Context, r types.Item) (types.Item, error) {
+	if r.RepoKey == "" {
+		return r, fmt.Errorf("repository root: repository key is required: %w", store.ErrInvalid)
+	}
+	root := types.RootItem(r.RepoKey, r.Cached)
+	var out types.Item
+	err := i.s.Tx(ctx, func(ctx context.Context) error {
+		// Ignoring the conflict keeps an existing record as it was, and two
+		// requests creating it at once end with one.
+		if _, err := i.s.exec(ctx, "create the root of "+r.RepoKey,
+			InsertIgnore("items", itemWriteCols, []string{"repo_key", "cached", "path", "name"}),
+			root.RepoKey, root.Cached, root.Path, root.Name, root.Depth, typeFolder, int64(0),
+			"", "", "", "", "", "", "", "", "",
+			micros(r.Created), r.CreatedBy, micros(r.Modified), r.ModifiedBy, micros(r.Updated), "",
+		); err != nil {
+			return err
+		}
+		var err error
+		out, err = i.Root(ctx, r.RepoKey, r.Cached)
+		return err
+	})
+	return out, err
+}
+
+func (i items) DeleteRoot(ctx context.Context, repoKey string, cached bool) error {
+	_, err := i.s.exec(ctx, "delete the root of "+repoKey,
+		"DELETE FROM items WHERE repo_key = ? AND cached = ? AND path = ? AND name = ?",
+		repoKey, cached, types.RootPath, types.RootPath)
+	return err
+}
+
 func (i items) FindByChecksum(
 	ctx context.Context,
 	c types.Checksums,
@@ -418,7 +469,7 @@ func (i items) Usage(ctx context.Context) ([]store.RepoUsage, error) {
 			" CAST(SUM(CASE WHEN type = 'file' THEN 1 ELSE 0 END) AS BIGINT),"+
 			" CAST(SUM(CASE WHEN type = 'folder' THEN 1 ELSE 0 END) AS BIGINT),"+
 			" CAST(SUM(CASE WHEN type = 'file' THEN size ELSE 0 END) AS BIGINT)"+
-			" FROM items GROUP BY repo_key, cached ORDER BY repo_key, cached", nil,
+			" FROM items WHERE "+notRoot+" GROUP BY repo_key, cached ORDER BY repo_key, cached", nil,
 		func(rs *sql.Rows) error {
 			var u store.RepoUsage
 			err := rs.Scan(&u.RepoKey, &u.Cached, &u.Files, &u.Folders, &u.Bytes)

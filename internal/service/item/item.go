@@ -451,8 +451,23 @@ func (s *Service) MakeFolder(
 	return folder, nil
 }
 
+// EnsureRoot returns the record of the root of t's repository, or of its
+// cache when t.Cached, creating it when absent. The record holds the
+// properties set on the repository itself (store.ItemStore).
+func (s *Service) EnsureRoot(ctx context.Context, t Target, by string) (types.Item, error) {
+	now := s.now()
+	it, err := s.Store.Items().EnsureRoot(ctx, types.Item{
+		RepoKey: t.Repo.Key, Cached: t.Cached,
+		Created: now, CreatedBy: by, Modified: now, ModifiedBy: by, Updated: now,
+	})
+	if err != nil {
+		return types.Item{}, fmt.Errorf("item: root of %s: %w", t.Repo.Key, err)
+	}
+	return it, nil
+}
+
 // ensureFolders creates every missing folder from the root down to dir
-// ("." or "" is the root, which is not an item).
+// ("." or "" is the root, which holds no folder of its own).
 func (s *Service) ensureFolders(
 	ctx context.Context,
 	t Target,

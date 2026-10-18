@@ -42,7 +42,7 @@ func (s artifactoryService) aqlAction(
 	}
 	kept := hits[:0]
 	for _, h := range hits {
-		if c, ok := configs[h.Item.RepoKey]; ok && actsOn(c, h.Item) {
+		if c, ok := configs[h.Item.RepoKey]; ok && actsOn(c, h.Item, q.Action) {
 			kept = append(kept, h)
 		}
 	}
@@ -71,11 +71,15 @@ func (s artifactoryService) aqlAction(
 	return kept, nil
 }
 
-// actsOn reports whether an action can change it in c. A virtual repository
+// actsOn reports whether action a can change it in c. A virtual repository
 // holds nothing of its own, and a remote repository's items are changed in
-// its cache, which is where DELETE and set-properties address them.
-func actsOn(c repo.Config, it types.Item) bool {
-	return c.Class != repo.Virtual && (c.Class != repo.Remote || it.Cached)
+// its cache, which is where DELETE and set-properties address them. A
+// repository root's record holds the repository's own properties, which
+// properties.update may change; items.delete passes it over, because
+// deleting the root would empty the whole repository, not remove one row.
+func actsOn(c repo.Config, it types.Item, a aql.Action) bool {
+	return c.Class != repo.Virtual && (c.Class != repo.Remote || it.Cached) &&
+		(a == aql.UpdateProperties || !it.IsRoot())
 }
 
 // updateProperties replaces the values of each of q's keys that a hit has

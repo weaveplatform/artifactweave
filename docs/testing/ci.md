@@ -418,8 +418,8 @@ signature committed in `deploy/ci/testdata/jfrog-providers`.
    (`POST /access/api/v1/tokens`). The providers authenticate only with a Bearer token.
    Set `TERRAFORM_ACCESS_TOKEN` to supply one instead.
 3. Apply each scenario with its own steps:
-   - **repositories:** apply the repository, deploy `fixture.txt`, then apply its
-     properties;
+   - **repositories:** apply the repository with properties on the repository itself,
+     deploy `fixture.txt`, then apply its properties;
    - **identity:** generate an RSA key pair for `artifactory_keypair`, apply, then check
      that the permission written through Access v2 reads back through the legacy v2
      permission target API;

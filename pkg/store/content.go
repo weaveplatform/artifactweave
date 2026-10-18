@@ -77,6 +77,11 @@ type RepoUsage struct {
 // (RepoKey, Cached, Path, Name); its ID is assigned by the store. Paths are
 // repository-relative without a leading slash; "" and "." both name the
 // repository root.
+//
+// A repository root has a record (types.RootItem) once properties are set
+// on it, so they are kept and found by item ID like any item's. Only Root,
+// EnsureRoot, GetByID and Search return it; Get, Children, Descendants,
+// FindByChecksum and Usage leave it out, as does the result of Delete.
 type ItemStore interface {
 	// Put creates the item or replaces the one at the same natural key,
 	// keeping that item's ID, and returns it as stored. The store derives
@@ -98,9 +103,22 @@ type ItemStore interface {
 	) ([]types.Item, string, error)
 	// Delete removes the item at fullPath and, for a folder, everything
 	// below it, with their properties and statistics. A root path removes
-	// all of (repoKey, cached) and returns a zero result for an empty
-	// repository; any other path returns ErrNotFound when nothing is there.
+	// all of (repoKey, cached) but the root's record, which belongs to the
+	// repository rather than its content, and returns a zero result for an
+	// empty repository; any other path returns ErrNotFound when nothing is
+	// there.
 	Delete(ctx context.Context, repoKey string, cached bool, fullPath string) (DeleteResult, error)
+	// Root returns the record of the root of (repoKey, cached), ErrNotFound
+	// while it has none.
+	Root(ctx context.Context, repoKey string, cached bool) (types.Item, error)
+	// EnsureRoot returns the record of the root of (r.RepoKey, r.Cached),
+	// creating it as types.RootItem with r's times and actors when absent;
+	// ErrInvalid without a repository key.
+	EnsureRoot(ctx context.Context, r types.Item) (types.Item, error)
+	// DeleteRoot removes the record of the root of (repoKey, cached) with
+	// its properties, when the repository itself is removed. A root without
+	// a record is not an error.
+	DeleteRoot(ctx context.Context, repoKey string, cached bool) error
 	// FindByChecksum lists files whose actual checksum matches the
 	// strongest digest set in c (sha256, then sha1, then md5), ordered by
 	// ID. SHA512 is not a lookup key: whatever holds one holds the sha256.

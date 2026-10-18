@@ -373,6 +373,30 @@ func TestMakeFolder(t *testing.T) {
 	}
 }
 
+func TestEnsureRoot(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	root, err := w.svc.EnsureRoot(ctx, Target{Repo: w.loc}, "alice")
+	if err != nil || !root.IsRoot() || root.Cached || !root.Created.Equal(at) ||
+		root.CreatedBy != "alice" || root.ModifiedBy != "alice" {
+		t.Fatalf("root %+v %v", root, err)
+	}
+	again, err := w.svc.EnsureRoot(ctx, Target{Repo: w.loc}, "bob")
+	if err != nil || again.ID != root.ID || again.CreatedBy != "alice" {
+		t.Fatalf("existing root %+v %v", again, err)
+	}
+	if _, err := w.svc.EnsureRoot(ctx, Target{}, "alice"); !errors.Is(err, store.ErrInvalid) {
+		t.Fatalf("no repository: %v", err)
+	}
+	// Deleting the repository's content leaves its root alone.
+	if _, err := w.svc.Delete(ctx, Target{Repo: w.loc}, "x"); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := w.db.Items().Root(ctx, "libs", false); err != nil || got.ID != root.ID {
+		t.Fatalf("root after a content delete %+v %v", got, err)
+	}
+}
+
 func TestRecordChecksum(t *testing.T) {
 	w := newWorld(t)
 	ctx := context.Background()

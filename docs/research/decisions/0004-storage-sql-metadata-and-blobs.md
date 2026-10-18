@@ -35,6 +35,19 @@ item table also keeps `sha512` and `original_sha512` (below), which AQL does not
 The storage API layer prefixes `/` on `path` and joins `path` and `name`; AQL reads the
 columns as they are. Properties are an entity-attribute-value table keyed by item.
 
+**Repository root.** Properties can be set on a repository itself, with an empty item path
+([setitemproperties](https://docs.jfrog.com/artifactory/reference/setitemproperties.md):
+"file, folder, repository, or Release Bundle v2"; **[S]** the Terraform provider's
+`TestAccItemProperties_repo_only`, run against live Artifactory). The first write that sets
+one gives the root a row of its own in the items table, keyed by item like any other: a
+folder whose `path` and `name` are both `.` and whose `depth` is 0, which is how AQL reports
+a repository root (jfrog-client-go skips folders named `.` in AQL results). A remote
+repository's cache has its own. AQL and the property search find the row by its properties.
+Listings, usage totals and the result of a delete leave it out. Deleting a repository's
+content keeps it, because the root is the repository itself **[I]**; deleting the
+repository removes it ([#388](https://github.com/weaveplatform/artifactweave/issues/388)).
+A root without the row has no properties, and AQL does not return it.
+
 **Property keys and values.** JFrog's documentation limits property keys to 255 characters
 and values to 2400 ("JFrog Properties"). A value is kept to 2400 UTF-16 code units, and a
 build or module property value to 2048, the limit of Artifactory 6.20's `BuildsDao` and

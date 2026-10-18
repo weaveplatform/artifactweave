@@ -3,11 +3,13 @@ package storetest
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -19,6 +21,7 @@ func runContent(t *testing.T, newStore Factory) {
 	t.Run("Repos", func(t *testing.T) { testRepos(t, newStore(t).Repos()) })
 	t.Run("Items", func(t *testing.T) { testItems(t, newStore(t).Items()) })
 	t.Run("ItemProperties", func(t *testing.T) { testItemProperties(t, newStore(t).Items()) })
+	t.Run("RepositoryRoot", func(t *testing.T) { testRepositoryRoot(t, newStore(t).Items()) })
 	t.Run("ItemStats", func(t *testing.T) { testItemStats(t, newStore(t).Items()) })
 	t.Run("ItemSearch", func(t *testing.T) { testItemSearch(t, newStore(t)) })
 	t.Run("LongPropertyValues", func(t *testing.T) { testLongPropertyValues(t, newStore(t)) })
@@ -509,6 +512,134 @@ func testItemProperties(t *testing.T, s store.ItemStore) {
 	get[store.DeleteResult](t)(s.Delete(ctx, "r", false, "a/b.jar"))
 	again := get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.jar", 1)))
 	same(t, "properties after re-deploy", types.Properties{}, props(s.Properties(ctx, again.ID)))
+}
+
+// testRepositoryRoot covers the record a repository root gets for its own
+// properties: found by Root, ID and AQL, and left out of every listing,
+// usage total and content delete, which describe what is inside the root.
+func testRepositoryRoot(t *testing.T, s store.ItemStore) {
+	ctx := context.Background()
+	for _, cached := range []bool{false, true} {
+		_, err := s.Root(ctx, "r", cached)
+		wantErr(t, err, store.ErrNotFound)
+	}
+	get[types.Item](t)(s.Put(ctx, folderItem("r", "a")))
+	get[types.Item](t)(s.Put(ctx, fileItem("r", "a/b.txt", 1)))
+	get[types.Item](t)(s.Put(ctx, fileItem("r", "z.txt", 2)))
+
+	item := get[types.Item](t)
+	root := item(s.EnsureRoot(ctx, types.Item{
+		RepoKey: "r", Path: "ignored", Name: "ignored", Folder: false, Size: 9,
+		Created: at(1), CreatedBy: "alice", Modified: at(2), ModifiedBy: "bob", Updated: at(3),
+	}))
+	want := types.RootItem("r", false)
+	want.ID = root.ID
+	want.Created, want.CreatedBy = at(1), "alice"
+	want.Modified, want.ModifiedBy, want.Updated = at(2), "bob", at(3)
+	same(t, "EnsureRoot", want, root)
+	if root.FullPath() != "" || root.Depth != 0 {
+		t.Fatalf("root full path %q depth %d", root.FullPath(), root.Depth)
+	}
+	same(t, "EnsureRoot again", want, item(s.EnsureRoot(ctx, types.Item{
+		RepoKey: "r", Created: at(9), CreatedBy: "carol",
+	})))
+	same(t, "Root", want, item(s.Root(ctx, "r", false)))
+	same(t, "GetByID", want, item(s.GetByID(ctx, root.ID)))
+	cachedRoot := item(s.EnsureRoot(ctx, types.Item{RepoKey: "r", Cached: true}))
+	if cachedRoot.ID == root.ID || !cachedRoot.Cached {
+		t.Fatalf("the cache shares the repository's root: %+v", cachedRoot)
+	}
+	_, err := s.EnsureRoot(ctx, types.Item{})
+	wantErr(t, err, store.ErrInvalid)
+	for _, p := range []string{"", ".", "/"} {
+		_, err := s.Get(ctx, "r", false, p)
+		wantErr(t, err, store.ErrNotFound)
+	}
+
+	props := get[types.Properties](t)
+	must(t, s.PatchProperties(ctx, root.ID, types.Properties{"k1": {"v2", "v1"}, "k2": {"x"}}, nil))
+	same(t, "root properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
+		props(s.Properties(ctx, root.ID)))
+
+	list := func(fn func(store.Page) ([]types.Item, string, error)) []string {
+		t.Helper()
+		return itemPaths(pages(t, 1, fn))
+	}
+	same(
+		t,
+		"Children of root",
+		[]string{"a", "z.txt"},
+		list(
+			func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", false, "", p) },
+		),
+	)
+	same(
+		t,
+		"Descendants of root",
+		[]string{"a", "z.txt", "a/b.txt"},
+		list(
+			func(p store.Page) ([]types.Item, string, error) { return s.Descendants(ctx, "r", false, ".", p) },
+		),
+	)
+	same(
+		t,
+		"Children of the empty cache",
+		[]string(nil),
+		list(
+			func(p store.Page) ([]types.Item, string, error) { return s.Children(ctx, "r", true, "", p) },
+		),
+	)
+	same(t, "Usage", []store.RepoUsage{{RepoKey: "r", Files: 2, Folders: 1, Bytes: 300}},
+		get[[]store.RepoUsage](t)(s.Usage(ctx)))
+
+	// AQL reports the root as Artifactory does: a folder whose path and name
+	// are both ".", found by its properties once folders are asked for.
+	find := func(query string) []aql.Hit {
+		t.Helper()
+		q, err := aql.Parse(query)
+		must(t, err)
+		return get[[]aql.Hit](t)(s.Search(ctx, q, aql.Options{}))
+	}
+	hits := find(`items.find({"repo":"r","type":"folder","@k1":"v1"}).include("*","property")`)
+	if len(hits) != 1 {
+		t.Fatalf("root by property: %+v", hits)
+	}
+	same(t, "root hit", want, hits[0].Item)
+	same(t, "root hit properties", types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}},
+		hits[0].Properties)
+	if hits := find(`items.find({"repo":"r","@k1":"v1"})`); len(hits) != 0 {
+		t.Fatalf("a files query found the root: %+v", hits)
+	}
+	var names []string
+	for _, h := range find(`items.find({"repo":"r","path":".","type":"any"})`) {
+		names = append(names, h.Item.Name)
+	}
+	slices.Sort(names)
+	same(t, "items at the root", []string{".", "a", "z.txt"}, names)
+
+	// Deleting the repository's content keeps the root and its properties,
+	// and does not count it.
+	res := get[store.DeleteResult](t)(s.Delete(ctx, "r", false, ""))
+	if res.Files != 2 || res.Folders != 1 {
+		t.Fatalf("Delete root = %+v", res)
+	}
+	same(t, "root after a content delete", want, item(s.Root(ctx, "r", false)))
+	same(t, "root properties after a content delete",
+		types.Properties{"k1": {"v1", "v2"}, "k2": {"x"}}, props(s.Properties(ctx, root.ID)))
+	same(t, "Delete of an empty root", store.DeleteResult{},
+		get[store.DeleteResult](t)(s.Delete(ctx, "r", true, "")))
+
+	must(t, s.DeleteRoot(ctx, "r", false))
+	_, err = s.Root(ctx, "r", false)
+	wantErr(t, err, store.ErrNotFound)
+	_, err = s.Properties(ctx, root.ID)
+	wantErr(t, err, store.ErrNotFound)
+	must(t, s.DeleteRoot(ctx, "r", false))
+	same(t, "the cache's root stays", cachedRoot, item(s.Root(ctx, "r", true)))
+
+	// A new root after removal starts without properties.
+	again := item(s.EnsureRoot(ctx, types.Item{RepoKey: "r"}))
+	same(t, "properties of a new root", types.Properties{}, props(s.Properties(ctx, again.ID)))
 }
 
 func testItemStats(t *testing.T, s store.ItemStore) {

@@ -30,6 +30,15 @@ variable "properties" {
   description = "Properties to set on item_path, each a key with its values."
 }
 
+variable "repository_properties" {
+  type = map(list(string))
+  default = {
+    owner = ["platform"]
+    stage = ["test", "release"]
+  }
+  description = "Properties to set on the generic repository itself, each a key with its values."
+}
+
 variable "with_properties" {
   type        = bool
   default     = true
