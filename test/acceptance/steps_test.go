@@ -158,6 +158,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the JSON field "([^"]*)" has (\d+) entries$`, w.jsonFieldLen)
 	sc.Step(`^the JFrog CLI is available$`, w.jfAvailable)
 	sc.Step(`^I run jf "([^"]*)"$`, w.runJF)
+	sc.Step(`^I run jf "([^"]*)" in "([^"]*)"$`, w.runJFIn)
 	sc.Step(`^the command succeeds$`, w.commandSucceeds)
 	sc.Step(`^the command fails$`, w.commandFails)
 	sc.Step(
@@ -773,7 +774,13 @@ func (w *world) awaitExpiry(name string) error {
 // JFROG_CLI_HOME_DIR isolates the CLI's config from the developer's, and
 // JFROG_CLI_TEMP_DIR its build-info between commands; both last for the
 // scenario.
-func (w *world) runJF(args string) error {
+func (w *world) runJF(args string) error { return w.runJFIn(args, "") }
+
+// runJFIn runs the JFrog CLI in a directory of the scenario's files, for
+// commands that read the project there: jf go-config writes its
+// .jfrog/projects/go.yaml where it runs, and jf go-publish reads that and the
+// go.mod beside it.
+func (w *world) runJFIn(args, sub string) error {
 	if w.jfHome == "" {
 		home, err := os.MkdirTemp("", "jfrog-home-")
 		if err != nil {
@@ -795,6 +802,9 @@ func (w *world) runJF(args string) error {
 	// Relative file specs resolve against the scenario's files, so an
 	// upload of "org/*" keeps the tree's layout under the target.
 	cmd.Dir = w.dir
+	if sub != "" {
+		cmd.Dir = filepath.Join(w.dir, sub)
+	}
 	cmd.Env = append(
 		os.Environ(),
 		"JFROG_CLI_HOME_DIR="+home,
