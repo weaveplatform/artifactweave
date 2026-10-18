@@ -23,10 +23,9 @@ func Compare(a, b string) int {
 }
 
 // digestFolder reports whether folder is the name of a digest folder,
-// where a manifest pushed by digest lives.
+// where a manifest pushed by digest lives. A sha256__<hex> folder is a tag.
 func digestFolder(folder string) bool {
-	hex, ok := strings.CutPrefix(folder, blobPrefix)
-	return ok && hexRE.MatchString(hex)
+	return IsDigestFolder(folder) && hexRE.MatchString(folder[len(DigestFolder("")):])
 }
 
 // manifestFolder reports whether folder, a direct child of an image, is

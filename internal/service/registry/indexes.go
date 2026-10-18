@@ -120,7 +120,7 @@ func (s *Service) unreferenced(
 			for _, d := range other.Children() {
 				kept[d] = true
 			}
-		case !strings.HasPrefix(f, layout.DigestFolder("")):
+		case !layout.IsDigestFolder(f):
 			kept["sha256:"+h.Item.Actual.SHA256] = true
 		}
 	}

@@ -121,7 +121,8 @@ func findReferrers(t *testing.T, db store.Store) {
 		return types.Properties{"oci.subject": {subject}, "oci.artifactType": {artifactType}}
 	}
 	deploy("a_b/sig/manifest.json", "sig", refers(digest("s"), "sig"))
-	deploy("a_b/sha256__"+sum("sbom")+"/manifest.json", "sbom", refers(digest("s"), "sbom"))
+	sbom := "a_b/" + layout.DigestFolder(sum("sbom")) + "/manifest.json"
+	deploy(sbom, "sbom", refers(digest("s"), "sbom"))
 	deploy("a_b/other/manifest.json", "other", refers(digest("o"), "sig"))
 	deploy("a_b/list/list.manifest.json", "list", nil)
 	deploy("a_b/sub/v1/manifest.json", "deep", refers(digest("s"), "sig"))
@@ -135,7 +136,7 @@ func findReferrers(t *testing.T, db store.Store) {
 		return out
 	}
 	hits, err := layout.FindReferrers(ctx, db.Items(), "docker-local", "a_b", digest("s"), "")
-	want := []string{"a_b/sha256__" + sum("sbom") + "/manifest.json", "a_b/sig/manifest.json"}
+	want := []string{sbom, "a_b/sig/manifest.json"}
 	if err != nil || !cmp.Equal(want, names(hits)) {
 		t.Fatalf("%v %v", names(hits), err)
 	}
@@ -151,7 +152,7 @@ func findReferrers(t *testing.T, db store.Store) {
 	hits, err = layout.ImageManifests(ctx, db.Items(), "docker-local", "a_b")
 	all := []string{
 		"a_b/list/list.manifest.json", "a_b/other/manifest.json",
-		"a_b/sha256__" + sum("sbom") + "/manifest.json", "a_b/sig/manifest.json",
+		sbom, "a_b/sig/manifest.json",
 	}
 	if err != nil || !cmp.Equal(all, names(hits)) {
 		t.Fatalf("%v %v", names(hits), err)

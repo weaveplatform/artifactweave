@@ -70,7 +70,8 @@ func listings(t *testing.T, db store.Store) {
 		}
 	}
 	m, other := sum("m"), sum("other")
-	for _, p := range []string{"v1", "Alpha", "alpha", "sha256__" + m} {
+	// sha256__<hex> is an ordinary tag in a local repository, as on 7.x.
+	for _, p := range []string{"v1", "Alpha", "alpha", layout.DigestFolder(m), "sha256__" + m} {
 		deploy("docker-local", "a_b.c/"+p+"/manifest.json", "m")
 	}
 	deploy("docker-local", "a_b.c/list/list.manifest.json", "m")
@@ -81,13 +82,13 @@ func listings(t *testing.T, db store.Store) {
 	deploy("docker-local", "a_b.c/_uploads/manifest.json", "m")
 	deploy("docker-local", "a_b.c/blobs-only/sha256__"+sum("layer"), "layer")
 	deploy("docker-local", "a_b.c/-bad/manifest.json", "m")
-	deploy("docker-local", "a_b.c/sha256__abc/manifest.json", "m")
+	deploy("docker-local", "a_b.c/sha256:abc/manifest.json", "m")
 	// Another image below this one, its look-alike and another repository.
 	deploy("docker-local", "a_b.c/sub/v9/manifest.json", "m")
 	deploy("docker-local", "aXb.c/v8/manifest.json", "m")
 	deploy("other", "a_b.c/v7/manifest.json", "m")
 	// Images only by digest; and folders that are no image.
-	deploy("other", "untagged/sha256__"+other+"/manifest.json", "other")
+	deploy("other", "untagged/"+layout.DigestFolder(other)+"/manifest.json", "other")
 	deploy("other", "plain/manifest.json", "m")
 	deploy("other", "top.json", "m")
 
@@ -95,7 +96,8 @@ func listings(t *testing.T, db store.Store) {
 	if err != nil || !found {
 		t.Fatalf("%v %v", found, err)
 	}
-	if diff := cmp.Diff([]string{"Alpha", "alpha", "list", "v1", "v2"}, tags); diff != "" {
+	want := []string{"Alpha", "alpha", "list", "sha256__" + m, "v1", "v2"}
+	if diff := cmp.Diff(want, tags); diff != "" {
 		t.Error(diff)
 	}
 	tags, found, err = layout.Tags(ctx, db.Items(), "other", "untagged")
@@ -113,7 +115,7 @@ func listings(t *testing.T, db store.Store) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"Alpha", "alpha", "list", "sha256__" + m, "v1"}
+	want = []string{"Alpha", "alpha", "list", layout.DigestFolder(m), "sha256__" + m, "v1"}
 	if diff := cmp.Diff(want, folders); diff != "" {
 		t.Error(diff)
 	}

@@ -206,7 +206,8 @@ func TestIndexUnknownChildren(t *testing.T) {
 		ps := w.platforms()
 		absent, _ := manifestOf(layerB, layerA)
 		// In another image, which does not count.
-		w.deploy(w.docker, "other/sha256__"+sum(absent)+"/manifest.json", absent, start)
+		elsewhere := "other/" + layout.DigestFolder(sum(absent)) + "/manifest.json"
+		w.deploy(w.docker, elsewhere, absent, start)
 		body := `{"schemaVersion":2,"manifests":[` +
 			descriptorOf(layout.MediaTypeOCIManifest, ps[0]) + `,` +
 			descriptorOf(layout.MediaTypeOCIManifest, absent) + `,` +
@@ -275,7 +276,7 @@ func TestReferrers(t *testing.T) {
 		// image's.
 		deep := w.deploy(
 			w.docker,
-			"app/deeper/sha256__"+sum("deep")+"/manifest.json",
+			"app/deeper/"+layout.DigestFolder(sum("deep"))+"/manifest.json",
 			"deep",
 			start,
 		)
@@ -539,7 +540,8 @@ func TestIndexStoreFailures(t *testing.T) {
 			return err
 		},
 		"look at a platform": func(_ *testing.T, f *faulty, ps []string) error {
-			f.st.items.ItemStore = getFailing{f.db.Items(), "app/sha256__" + sum(ps[0])}
+			platform := "app/" + layout.DigestFolder(sum(ps[0]))
+			f.st.items.ItemStore = getFailing{f.db.Items(), platform}
 			_, err := f.svc.UnreferencedPlatforms(ctx, f.owner("app"), "v1")
 			return err
 		},

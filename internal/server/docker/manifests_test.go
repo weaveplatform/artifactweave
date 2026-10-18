@@ -105,13 +105,53 @@ func TestPushByDigestWithTags(t *testing.T) {
 		expect(t, w.do(http.MethodGet, "/v2/docker-local/app/manifests/"+ref, "", nil),
 			http.StatusOK, "")
 	}
-	// The digest folder is not a tag.
-	expect(t, w.do(http.MethodGet, "/v2/docker-local/app/manifests/sha256__"+d[7:], "", nil),
-		http.StatusNotFound, CodeManifestUnknown)
+	// The digest folder keeps the digest's colon, as a 7.x local repository
+	// does, and is not a tag.
 	if _, err := w.db.Items().Get(context.Background(), "docker-local", false,
-		"app/sha256__"+d[7:]+"/manifest.json"); err != nil {
+		"app/"+d+"/manifest.json"); err != nil {
 		t.Fatal(err)
 	}
+	if l := list(t, w.do(http.MethodGet, "/v2/docker-local/app/tags/list", "", nil)); !cmp.Equal(
+		l.Tags, []string{"a", "b"},
+	) {
+		t.Fatalf("tags %v", l.Tags)
+	}
+	expect(t, w.do(http.MethodGet, "/v2/docker-local/app/manifests/sha256__"+d[7:], "", nil),
+		http.StatusNotFound, CodeManifestUnknown)
+}
+
+// sha256__<hex> is an ordinary tag, as in a 7.x local repository: its
+// folder holds the pushed manifest beside the digest folder and the tags
+// list names it.
+func TestSHA256TagIsATag(t *testing.T) {
+	w := newBlobWorld(t)
+	w.uploadBlobs("app", imageConfig, "layer")
+	body := image("layer")
+	d := digestOf(body)
+	tag := "sha256__" + d[7:]
+	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/"+tag, body, ociManifest),
+		http.StatusCreated, "")
+	expect(t, w.do(http.MethodPut, "/v2/docker-local/app/manifests/"+d+"?tag=sha256__x", body,
+		ociManifest), http.StatusCreated, "")
+	for _, ref := range []string{tag, "sha256__x", d} {
+		expect(t, w.do(http.MethodGet, "/v2/docker-local/app/manifests/"+ref, "", nil),
+			http.StatusOK, "")
+	}
+	for _, folder := range []string{tag, "sha256__x", d} {
+		if _, err := w.db.Items().Get(context.Background(), "docker-local", false,
+			"app/"+folder+"/manifest.json"); err != nil {
+			t.Errorf("%s: %v", folder, err)
+		}
+	}
+	if l := list(t, w.do(http.MethodGet, "/v2/docker-local/app/tags/list", "", nil)); !cmp.Equal(
+		l.Tags, []string{tag, "sha256__x"},
+	) {
+		t.Fatalf("tags %v", l.Tags)
+	}
+	expect(t, w.do(http.MethodDelete, "/v2/docker-local/app/manifests/"+tag, "", nil),
+		http.StatusAccepted, "")
+	expect(t, w.do(http.MethodGet, "/v2/docker-local/app/manifests/"+d, "", nil),
+		http.StatusOK, "")
 }
 
 func TestManifestPushErrors(t *testing.T) {
@@ -137,7 +177,6 @@ func TestManifestPushErrors(t *testing.T) {
 		"too large":            {"v1", huge, ociManifest, 413, CodeSizeInvalid},
 		"invalid tag":          {"-v1", body, ociManifest, 400, CodeManifestInvalid},
 		"uploads tag":          {"_uploads", body, ociManifest, 400, CodeTagInvalid},
-		"digest folder tag":    {"sha256__" + d[7:], body, ociManifest, 400, CodeTagInvalid},
 		"invalid digest":       {"sha256:totallywrong", body, ociManifest, 400, CodeManifestInvalid},
 		"other algorithm":      {"sha512:" + strings.Repeat("a", 128), body, ociManifest, 400, CodeDigestInvalid},
 		"digest mismatch":      {digestOf("other"), body, ociManifest, 400, CodeDigestInvalid},
@@ -335,7 +374,7 @@ func TestManifestPermissions(t *testing.T) {
 	}
 	// The refused push by digest stored nothing.
 	if _, err := w.db.Items().Get(ctx, "docker-local", false,
-		"app/sha256__"+digestOf(second)[7:]); !errors.Is(err, store.ErrNotFound) {
+		"app/"+digestOf(second)); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("stored: %v", err)
 	}
 }

@@ -829,6 +829,12 @@ func (s artifactoryService) listFolder(
 			continue
 		}
 		href, text := url.PathEscape(c.Name), c.Name
+		if strings.Contains(href, ":") {
+			// A browser reads "sha256:<hex>/", a Docker digest folder, as a
+			// URL with the scheme sha256 (RFC 3986, 4.2); the dot segment
+			// keeps it relative.
+			href = "./" + href
+		}
 		if c.Folder {
 			href, text = href+"/", text+"/"
 		}

@@ -283,7 +283,7 @@ func TestDeleteManifests(t *testing.T) {
 	for _, ref := range []string{d, "v2"} {
 		expect(t, w.do(http.MethodGet, base+ref, "", nil), http.StatusNotFound, CodeManifestUnknown)
 	}
-	for _, folder := range []string{"app/v2", "app/sha256__" + d[7:]} {
+	for _, folder := range []string{"app/v2", "app/" + d} {
 		if _, err := w.db.Items().Get(context.Background(), "docker-local", false,
 			folder); !errors.Is(err, store.ErrNotFound) {
 			t.Errorf("%s: %v", folder, err)

@@ -302,10 +302,12 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   multi-architecture deletes lists the same local layout,
   `repo/image/sha256:image1/manifest.json` beside `repo/image/sha256:image1/sha256__img1layer1`
   ([RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432), Done). artifactweave
-  writes `<image>/sha256__<hex>/` until [#387](https://github.com/weaveplatform/artifactweave/issues/387)
-  moves these folders.
+  stores them in `<image>/sha256:<hex>/` too (decision 0031,
+  [#387](https://github.com/weaveplatform/artifactweave/issues/387)).
 - **[S]** `jf rt build-docker-create` falls back to `<image>/sha256__<hex>/*` when its tag
-  search finds nothing (`ocicontainer/remoteagent.go`, `searchImage`).
+  search finds nothing (`ocicontainer/remoteagent.go`, `searchImage`). That is the
+  remote-cache form, so in a local repository the fallback finds no image pushed by digest
+  alone, on 7.x as here.
 - **[S]** For a multi-architecture tag jf reads `<image>/<tag>/list.manifest.json`, then
   searches every folder under `<image>/` for a `manifest.json` and keys each by its
   `sha256`, which it matches against the list's entries. The platform manifests therefore
@@ -433,7 +435,7 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   Tags counts tags, so digest folders do not count towards it.
 - **[I]** Where Artifactory puts a version kept by Tag Retention ("renamed by their SHA2
   hash") is not shown by any source. If it follows the digest folders of section 5.1, the
-  folder is `sha256:<hex>`.
+  folder is `sha256:<hex>`, which is where artifactweave keeps it (decision 0031).
 
 ## 9. The conformance suite at v1.1.1
 
@@ -514,6 +516,12 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - Shared layers kept when a promotion overwrites a tag ([7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)).
 - A publisher without Delete may not overwrite layer information (CVE-2026-68754, fixed in
   [7.161.16](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716116-self-managed)): decision 0031 asks Deploy and Delete to replace a tag.
+- Digest folders: a manifest pushed by digest, every platform manifest of a
+  multi-architecture push among them, lives in `<image>/sha256:<hex>/` in a local
+  repository, with its blobs as `sha256__<hex>`, and artifactweave stores it there, so a
+  `sha256__` name is an ordinary tag (section 5.1; jfrog-cli-artifactory
+  `docker_dependencies.go`; [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432);
+  [#387](https://github.com/weaveplatform/artifactweave/issues/387)).
 
 **Changed or added in 7.x:**
 - **`docker.os` and `docker.architecture`.** From [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed) these properties are set on a
@@ -533,11 +541,6 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - **Range uploads.** A fix to the start offset of range uploads ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)).
 
 **Differs in 7.x** (the audit of 2026-10-18, [#378](https://github.com/weaveplatform/artifactweave/issues/378)):
-- **Digest folders.** 7.x differs: a manifest pushed by digest, every platform manifest of a
-  multi-architecture push among them, lives in `<image>/sha256:<hex>/` in a local
-  repository, where artifactweave writes `<image>/sha256__<hex>/` and reserves `sha256__`
-  tags (section 5.1; jfrog-cli-artifactory `docker_dependencies.go`;
-  [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432)); fixed by [#387](https://github.com/weaveplatform/artifactweave/issues/387).
 - **Platform tags.** 7.x differs: from 7.21.2 each platform image of a list push also gets a
   descriptive `<tag>-<os>-<arch>` tag, and an attestation `<tag>-unknown-unknown`, where
   artifactweave tags none ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),

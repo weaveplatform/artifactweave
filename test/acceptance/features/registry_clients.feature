@@ -1,8 +1,9 @@
 @clients
 Feature: Real registry clients round-trip images (the P6 exit checks)
   The P6 exit criteria (docs/implementation/plan.md): docker push and pull
-  through the runner's daemon, crane, oras and cosign round trips, and the
-  JFrog CLI's Docker commands decision 0031 covers. Each client is the
+  through the runner's daemon, a buildx multi-architecture push, crane, oras
+  and cosign round trips, and the JFrog CLI's Docker commands decision 0031
+  covers. Each client is the
   pinned release CI downloads; a scenario skips when its client is absent,
   and the docker ones on any host but Linux, whose daemon cannot reach the
   binary on 127.0.0.1.
@@ -191,3 +192,54 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
     Then the command succeeds
     When I run jf "docker pull {host}/docker-local/team/jfapp:v1 --server-id aw --build-name=jfdock-pull --build-number=1"
     Then the command succeeds
+
+  # A multi-architecture push stores each platform manifest in
+  # <image>/sha256:<hex>/, as a 7.x local repository does (decision 0031).
+  # jf docker build searches exactly those paths: for the base image's
+  # layers, its dependencies, and for the pushed image's, its artifacts.
+  @docker
+  Scenario: jf docker build records the platform layers of a buildx multi-architecture push
+    Given the Docker daemon can reach the registry
+    And the JFrog CLI is available
+    And a file "base/Dockerfile" with content:
+      """
+      FROM scratch
+      COPY base.txt /base.txt
+      """
+    And a file "base/base.txt" with content:
+      """
+      the base layer
+      """
+    And a file "app/Dockerfile" with expanded content:
+      """
+      FROM {host}/docker-local/team/base:v1
+      COPY hello.txt /hello.txt
+      """
+    And a file "app/hello.txt" with content:
+      """
+      hello from jf docker build
+      """
+    When I run docker login as "admin" with password "{password}"
+    Then the command succeeds
+    Given a buildx builder that pushes to the registry
+    When I run docker "buildx build --platform linux/amd64,linux/arm64 --provenance=false --sbom=false -t {host}/docker-local/team/base:v1 --push base"
+    Then the command succeeds
+    When I POST "/artifactory/api/search/aql" as admin with body:
+      """
+      items.find({"repo":"docker-local","path":{"$match":"team/base/sha256:*"},"name":"manifest.json"})
+      """
+    Then the response status is 200
+    And the JSON field "range.total" equals "2"
+    When I run jf "config add aw --url {platform} --artifactory-url {url} --user admin --password {password} --interactive=false"
+    Then the command succeeds
+    Given the JFrog CLI runs with "JFROG_RUN_NATIVE" set to "true"
+    And the JFrog CLI runs with "BUILDX_BUILDER" set to "{builder}"
+    When I run jf "docker build --platform linux/amd64,linux/arm64 --provenance=false --sbom=false -t {host}/docker-local/team/app:v1 -f app/Dockerfile --push --skip-login --server-id aw --build-name=jfbuild --build-number=1 app"
+    Then the command succeeds
+    And the output does not contain "Failed to get"
+    When I run jf "rt bp jfbuild 1 --server-id aw"
+    Then the command succeeds
+    When I GET "/artifactory/api/build/jfbuild/1" as admin
+    Then the response status is 200
+    And the response body contains "team/app/sha256:"
+    And the JSON field "buildInfo.modules.0.dependencies.0.id" exists

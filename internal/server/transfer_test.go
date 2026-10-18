@@ -95,6 +95,73 @@ func TestCopyAndMoveOverHTTP(t *testing.T) {
 	wantStatus(t, w.do("GET", "/artifactory/libs-local/all/m/b.txt", "admin", ""), http.StatusOK)
 }
 
+// A Docker digest folder keeps the digest's colon, sha256:<hex>, as a 7.x
+// local repository does (decision 0031), so a path holding a colon goes
+// through deploys, the storage API, properties, AQL, copy, move and the
+// folder listing like any other: jf docker build searches the exact path
+// and sets its build properties on the folder.
+func TestColonPathsOverHTTP(t *testing.T) {
+	w := newItemWorld(t, false)
+	const dir = "img/sha256:ab12"
+	w.put("/artifactory/libs-local/"+dir+"/manifest.json", "m")
+	w.put("/artifactory/libs-local/"+dir+"/sha256__cd34", "layer")
+
+	folder := w.do("GET", "/artifactory/api/storage/libs-local/"+dir, "admin", "")
+	wantStatus(t, folder, http.StatusOK)
+	for _, want := range []string{`"path":"/` + dir + `"`, `"uri":"/manifest.json"`} {
+		if !strings.Contains(folder.Body.String(), want) {
+			t.Fatalf("folder info lacks %s: %s", want, folder.Body)
+		}
+	}
+	// A client that escapes the colon names the same item.
+	file := w.do("GET", "/artifactory/api/storage/libs-local/img/sha256%3Aab12/manifest.json",
+		"admin", "")
+	wantStatus(t, file, http.StatusOK)
+	if !strings.Contains(file.Body.String(), `"path":"/`+dir+`/manifest.json"`) {
+		t.Fatalf("file info %s", file.Body)
+	}
+	wantStatus(t, w.do("PUT",
+		"/artifactory/api/storage/libs-local/"+dir+"?properties=build.name=app&recursive=1",
+		"admin", ""), http.StatusNoContent)
+	if !w.props("libs-local", dir+"/sha256__cd34").Has("build.name", "app") {
+		t.Fatal("recursive properties missed the digest folder's files")
+	}
+
+	for query, want := range map[string]int{
+		`items.find({"repo":"libs-local","path":{"$eq":"img/sha256:ab12"}})`: 2,
+		`items.find({"repo":"libs-local","path":{"$match":"img/sha256:*"}})`: 2,
+		`items.find({"repo":"libs-local","path":{"$match":"img/sha256_*"}})`: 0,
+	} {
+		rec := w.do("POST", "/artifactory/api/search/aql", "admin", query)
+		wantStatus(t, rec, http.StatusOK)
+		var res struct {
+			Results []map[string]any `json:"results"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &res); err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Results) != want {
+			t.Errorf("%s: %s", query, rec.Body)
+		}
+	}
+
+	wantStatus(t, w.do("POST",
+		"/artifactory/api/copy/libs-local/"+dir+"?to=/other-local/"+dir, "admin", ""),
+		http.StatusOK)
+	wantStatus(t, w.do("POST",
+		"/artifactory/api/move/other-local/"+dir+"?to=/other-local/moved/sha256:ab12", "admin", ""),
+		http.StatusOK)
+	wantStatus(t, w.do("GET", "/artifactory/other-local/moved/sha256:ab12/manifest.json",
+		"admin", ""), http.StatusOK)
+	wantStatus(t, w.do("GET", "/artifactory/other-local/"+dir+"/manifest.json", "admin", ""),
+		http.StatusNotFound)
+
+	list := w.do("GET", "/artifactory/libs-local/img/", "admin", "")
+	if !strings.Contains(list.Body.String(), `<a href="./sha256:ab12/">sha256:ab12/</a>`) {
+		t.Fatalf("listing %s", list.Body)
+	}
+}
+
 // A copied or moved file keeps its creation and last-modified times, as
 // Artifactory 7.x does by default (7.125.4 release notes, #349): the
 // storage API and AQL report the source's, not the operation's.

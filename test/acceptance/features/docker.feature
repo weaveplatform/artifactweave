@@ -241,15 +241,31 @@ Feature: Docker and OCI registry
     Then the response status is 200
     When I GET "/artifactory/api/search/prop?docker.os=linux&docker.architecture=arm64&repos=docker-local" as admin
     Then the response status is 200
-    And the response body contains "/docker-local/team/app/sha256__871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d/manifest.json"
+    And the response body contains "/docker-local/team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d/manifest.json"
     When I POST "/artifactory/api/search/aql" as admin with body:
       """
       items.find({"repo":"docker-local","@docker.architecture":"arm64"}).include("path","name")
       """
     Then the response status is 200
     And the JSON field "range.total" equals "1"
-    And the JSON field "results.0.path" equals "team/app/sha256__871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"
+    And the JSON field "results.0.path" equals "team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"
     And the JSON field "results.0.name" equals "manifest.json"
+    # The platform manifest's folder keeps the digest's colon, as a 7.x local
+    # repository does: jf docker build searches this exact path with $eq.
+    When I POST "/artifactory/api/search/aql" as admin with body:
+      """
+      items.find({"$and":[{"repo":"docker-local"},{"$or":[{"path":{"$eq":"team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"}}]}]}).include("name","repo","path","sha256","actual_sha1","actual_md5")
+      """
+    Then the response status is 200
+    And the JSON field "range.total" equals "3"
+    When I GET "/artifactory/api/storage/docker-local/team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d" as admin
+    Then the response status is 200
+    And the JSON field "path" equals "/team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"
+    And the JSON field "children" has 3 entries
+    When I POST "/artifactory/api/copy/docker-local/team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d?to=/docker-local/copied/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d" as admin
+    Then the response status is 200
+    When I GET "/v2/docker-local/copied/manifests/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d" as admin
+    Then the response status is 200
     When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
     And I PUT "/v2/docker-local/team/app/manifests/sha256:22d26dd7f5f0802e86de103510b816796739580901e8585e66b20c185be0f69b" as admin with body:
       """

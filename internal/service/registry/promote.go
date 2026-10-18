@@ -58,7 +58,7 @@ func (s *Service) PromotedTags(ctx context.Context, o Owner, tag string) ([]stri
 // TagManifest is the manifest file tag holds in o's image; store.ErrNotFound
 // for a reserved name, a digest folder or a folder holding none.
 func (s *Service) TagManifest(ctx context.Context, o Owner, tag string) (types.Item, error) {
-	if layout.ReservedTag(tag) {
+	if layout.ReservedTag(tag) || layout.IsDigestFolder(tag) {
 		return types.Item{}, fmt.Errorf(
 			"registry: tag %s of %s: %w",
 			tag,

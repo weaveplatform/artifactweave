@@ -19,7 +19,8 @@ func TestClassify(t *testing.T) {
 	for p, want := range map[string]format.Class{
 		"app/v1/manifest.json":                format.ClassMetadata,
 		"team/app/v1/list.manifest.json":      format.ClassMetadata,
-		"app/sha256__abc/manifest.json":       format.ClassUnique,
+		"app/sha256:abc/manifest.json":        format.ClassUnique,
+		"app/sha256__abc/manifest.json":       format.ClassMetadata,
 		"app/v1/sha256__abc":                  format.ClassUnique,
 		"manifest.json":                       format.ClassUnique,
 		"app/_uploads/sha256__abc":            format.ClassUnique,
