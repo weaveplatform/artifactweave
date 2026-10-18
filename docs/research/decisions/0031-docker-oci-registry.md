@@ -2,7 +2,7 @@
 
 Status: Proposed
 
-Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -140,7 +140,9 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
     as `sha256__<hex>`.
   - Pushed by digest: `<name>/sha256__<hex>/manifest.json` (or `list.manifest.json`),
     with its blobs linked beside it. Platform manifests of a multi-architecture image live
-    here, which is where `jf` finds them.
+    here. `jf docker push` finds them in any folder of the image by their `sha256`, but a
+    7.x local repository keeps them in `<name>/sha256:<hex>/`, and `jf docker build`
+    searches only that exact path (R23 5.1). [#387](https://github.com/weaveplatform/artifactweave/issues/387) moves these folders.
   - Pushing a different manifest over an existing tag needs Delete, as Artifactory's
     Strict Tag Overwrite does, and replaces the folder's contents in one transaction.
     Pushing the identical manifest again changes nothing and needs only Deploy, so a
@@ -316,6 +318,41 @@ additions:
 The referrers hardening of 7.161.16 (403 without Read on the subject) matches the permission
 table above.
 
+The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where
+7.x differs from this decision. Research 23 sections 7 and 12 give the evidence in full.
+- 7.x differs: a manifest pushed by digest lives in `<name>/sha256:<hex>/` in a local
+  repository, and `jf docker build` searches only there (jfrog-cli-artifactory
+  `docker_dependencies.go`, [RTFACT-30432](https://jfrog.atlassian.net/browse/RTFACT-30432));
+  fixed by [#387](https://github.com/weaveplatform/artifactweave/issues/387).
+- 7.x differs: from 7.21.2 each platform image of a list push also gets a descriptive
+  `<tag>-<os>-<arch>` tag ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+  "Multi-Architecture Tagging"); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
+- 7.x differs: overwriting a list-manifest tag with an image manifest removes the old
+  list's platform manifests ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md),
+  "Overwriting List Manifests with a Manifest and Vice-Versa"); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
+- 7.x differs: the Package Settings option "Complete list manifest image overwrite", off
+  by default, removes the previous platform manifests when a list overwrites a list
+  ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
+- 7.x differs: a promotion with `copy:false` by a caller without Delete on the source
+  copies the image and answers 206
+  ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed),
+  RTDEV-54091). `jf rt docker-promote` fails on 206 and 403 alike, and this decision keeps
+  the 403 (maintainer decision, 2026-10-18), a deviation registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
+- 7.x differs: a stored OCI manifest answers 404 when `Accept` does not name its type, and
+  a stored schema-2 manifest is converted to schema 1 for a client that sends no `Accept`
+  ([RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069),
+  [RTFACT-20795](https://jfrog.atlassian.net/browse/RTFACT-20795)); a deviation registered
+  by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
+- 7.x differs: `_catalog` lists every image of a repository to a user with Read on any path
+  in it ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+  "Repository Metadata and Permissions"); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
+- 7.x differs: `MANIFEST_UNKNOWN` and `MANIFEST_INVALID` carry JFrog's own `message` and a
+  `detail` object ([a KB article on 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl),
+  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
+- 7.x differs: self-managed 7.x still documents Docker V1 repositories, which this
+  decision does not serve ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#use-docker-v1),
+  "Use Docker V1"); recorded as a cut in [research 10](../10-scope-and-tiers.md#product-families).
+
 ## Constraints
 
 - A manifest larger than 4 MiB is refused.
@@ -351,8 +388,11 @@ table above.
 - Acceptance: `docker`, `crane`, `oras` and `cosign` round trips, `jf docker push` and
   `jf docker pull` with `--build-name` and `--build-number` followed by
   `jf rt build-publish`, `jf rt build-docker-create` for an image pushed by `crane`, and
-  `jf rt docker-promote`. `jf docker build` is not covered, as after `docker buildx` it runs
-  the same search as a push, and neither is `jf docker scan`, which calls Xray's stub.
+  `jf rt docker-promote`. `jf docker build` and `jf docker buildx build` are not covered
+  yet: they look for a local repository's platform manifests at the exact path
+  `<name>/sha256:<hex>`, not by the push search (R23 5.1), and [#387](https://github.com/weaveplatform/artifactweave/issues/387) adds them to
+  the acceptance suite with the folders they need. `jf docker scan` is not covered, as it
+  calls Xray's stub.
 
 ## References
 

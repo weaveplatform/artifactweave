@@ -629,8 +629,9 @@ paths:
         still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is
         removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the
         trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under
-        the Docker API path. JFrog documents the operation in its release notes only, so it has no oracle
-        definition.
+        the Docker API path. JFrog documents the operation on its Docker page
+        (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags),
+        not in its API reference, so it has no oracle definition.
       operationId: deleteDockerTag
       parameters:
       - description: Required path parameter. Key of the Docker, OCI or Helm OCI repository, matched without

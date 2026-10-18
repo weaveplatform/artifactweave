@@ -3829,7 +3829,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/findparentmanifestlists.md
   /api/docker/{repo-key}/v2/promote:
     post:
-      description: Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031).
+      description: Promotes a Docker or OCI image from a local or federated repository to another local or federated repository of the same package type, either one tag or every tag of the image, optionally under a new image name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200. Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403 before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial success; rt docker-promote fails on either status, and the 403 is a deviation registered by #378.
       operationId: promoteDockerImage
       parameters:
         - description: Required path parameter. Key of the local or federated Docker, OCI or Helm OCI repository that holds the image.
@@ -3868,7 +3868,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks Read on the source, Deploy on the target, or the Delete that a move or an overwritten target tag needs.
+          description: The caller lacks Read on the source, Deploy on the target, or the Delete that a move or an overwritten target tag needs. Nothing is copied; Artifactory answers 206 to a move without Delete on the source, after copying.
         '404':
           content:
             application/json:
@@ -3940,7 +3940,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/listdockertags.md
   /api/docker/{repoKey}/v2/delete:
     delete:
-      description: Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation in its release notes only, so it has no oracle definition.
+      description: Deletes a tag of a Docker, OCI or Helm OCI image, the multi-architecture delete Artifactory added in 7.91. The tag folder is removed, and when it holds a manifest list or image index, so are the platform manifests no other tag or index of the image references; manifests and layers another tag still uses stay, as from Artifactory 7.118 (decision 0031). A tag holding a single image manifest is removed as the registry's own tag delete removes it. Needs Delete on the image. Removed files go to the trash can when it is on. Errors use the Artifactory envelope, as for every JFrog REST operation under the Docker API path. JFrog documents the operation on its Docker page (https://docs.jfrog.com/artifactory/docs/additional-docker-information#delete-multi-architecture-docker-tags), not in its API reference, so it has no oracle definition.
       operationId: deleteDockerTag
       parameters:
         - description: Required path parameter. Key of the Docker, OCI or Helm OCI repository, matched without regard to case because Docker clients send references in lower case only.
