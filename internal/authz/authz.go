@@ -165,6 +165,24 @@ func (d *Decider) Holds(g types.Grants, want types.Actions) bool {
 	return heldBy(g, d.user, d.groups).Has(want)
 }
 
+// Grantable returns the actions the subject may grant or revoke in a
+// permission section whose grants are g. An administrator may change any.
+// A holder of MANAGE in g may change only the other actions it holds in g:
+// Artifactory 7.x's default exclude-manage rule, without which a holder
+// could hand out rights it lacks, or appoint and remove other managers
+// (decision 0006). Anyone else may change none, so a holder of MANAGE in
+// one section changes nothing in another.
+func (d *Decider) Grantable(g types.Grants) types.Actions {
+	if d.admin {
+		return allActions
+	}
+	held := heldBy(g, d.user, d.groups)
+	if !held.Has(types.ActionManage) {
+		return 0
+	}
+	return held &^ types.ActionManage
+}
+
 // Actions returns every action the subject holds on path in repo's
 // resource. folder is true for a folder, which is also visible when a
 // permitted path lies below it.

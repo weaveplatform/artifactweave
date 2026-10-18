@@ -28,6 +28,9 @@ var (
 	ErrNotFound = errors.New("permission not found")
 	// ErrConflict reports a create of a name already in use.
 	ErrConflict = errors.New("permission already exists")
+	// ErrForbidden reports a change the caller may not make to a permission
+	// it manages; handlers answer it 403 with the message after the sentinel.
+	ErrForbidden = errors.New("permission change not allowed")
 )
 
 const (
@@ -240,6 +243,81 @@ func (s Service) Create(ctx context.Context, p types.Permission) error {
 		p.Created, p.Updated = now, now
 		return s.Store.Permissions().Create(ctx, p)
 	})
+}
+
+// Write applies change to the named permission in one transaction and
+// reports whether it created it. change gets the stored permission, with
+// exists false when there is none, and returns the permission to store or
+// an error that stores nothing. A caller's checks against the stored
+// permission belong in change: run before the transaction, they could pass
+// on a permission a concurrent write has since replaced.
+func (s Service) Write(
+	ctx context.Context,
+	name string,
+	change func(old types.Permission, exists bool) (types.Permission, error),
+) (bool, error) {
+	return s.write(ctx, name, change)
+}
+
+// CheckManagerEdit checks a replace of the sections of old by those of p
+// made by a holder of MANAGE who is not an administrator. Such a holder may
+// change only actions (createorreplacepermissiontargetv2.json): every
+// section and target stays, with the same patterns. In each section it may
+// grant or revoke only what grantable allows, which authz.Decider.Grantable
+// answers from the stored grants; judged on p's grants instead, a holder
+// could first give itself an action and then pass it on.
+func CheckManagerEdit(
+	old, p types.Permission,
+	sections []types.ResourceType,
+	grantable func(types.Grants) types.Actions,
+) error {
+	for _, rt := range sections {
+		was, inOld := old.Resources[rt]
+		now, inNew := p.Resources[rt]
+		if inOld != inNew || !sameTargets(was.Targets, now.Targets) {
+			return fmt.Errorf("%w: A user with Manage permission can only edit the actions",
+				ErrForbidden)
+		}
+		may := grantable(was.Actions)
+		if (changed(was.Actions.Users, now.Actions.Users)|
+			changed(was.Actions.Groups, now.Actions.Groups))&^may != 0 {
+			return fmt.Errorf("%w: A user with Manage permission can grant or revoke only "+
+				"actions it holds, and not Manage", ErrForbidden)
+		}
+	}
+	return nil
+}
+
+// changed is every action granted or revoked between two grant maps, over
+// all principals; a principal added or removed changes all of its actions.
+func changed(was, now map[string]types.Actions) types.Actions {
+	var out types.Actions
+	for name, a := range was {
+		out |= a ^ now[name]
+	}
+	for name, a := range now {
+		if _, ok := was[name]; !ok {
+			out |= a
+		}
+	}
+	return out
+}
+
+// sameTargets reports whether two sections name the same targets with the
+// same patterns.
+func sameTargets(a, b map[string]types.Target) bool {
+	return maps.EqualFunc(a, b, func(x, y types.Target) bool {
+		return slices.Equal(includes(x), includes(y)) && slices.Equal(x.Exclude, y.Exclude)
+	})
+}
+
+// includes are a target's include patterns; none means everything, which
+// the v2 form spells "**", so the two compare equal.
+func includes(t types.Target) []string {
+	if len(t.Include) == 0 {
+		return []string{"**"}
+	}
+	return t.Include
 }
 
 // Put creates p or replaces the stored permission of that name whole, and

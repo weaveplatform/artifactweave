@@ -588,3 +588,41 @@ func TestHolds(t *testing.T) {
 		}
 	}
 }
+
+// TestGrantable checks the exclude-manage rule: a holder of MANAGE grants
+// or revokes only the other actions it holds in the section, an
+// administrator any, and anyone else none.
+func TestGrantable(t *testing.T) {
+	ctx := context.Background()
+	db := world(t)
+	grants := types.Grants{
+		Users:  map[string]types.Actions{"bob": r | w | m, "dave": r | w | d},
+		Groups: map[string]types.Actions{"devs": r | m},
+	}
+	for _, c := range []struct {
+		name string
+		sub  Subject
+		want types.Actions
+	}{
+		{"an administrator", Subject{Name: "root", Admin: true}, allActions},
+		{"an administrator through a group", Subject{Name: "eve", Groups: []string{"admins"}}, allActions},
+		{"a direct holder keeps what it holds but MANAGE", Subject{Name: "bob"}, r | w},
+		{"a holder through a group", Subject{Name: "carol", Groups: []string{"devs"}}, r},
+		{"direct and group grants add up", Subject{Name: "bob", Groups: []string{"devs"}}, r | w},
+		{"actions without MANAGE grant nothing", Subject{Name: "dave"}, 0},
+		{"a groups scope drops the user's own MANAGE", Subject{
+			Name: "bob", Scope: scope(t, "applied-permissions/groups:readers"),
+		}, 0},
+		{"an administrator's token without applied permissions", Subject{
+			Name: "root", Admin: true, Scope: scope(t, "artifact:libs-local:*"),
+		}, 0},
+	} {
+		dec, err := New(ctx, Sources{Permissions: db.Permissions(), Groups: db.Groups()}, c.sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := dec.Grantable(grants); got != c.want {
+			t.Errorf("%s: Grantable = %v, want %v", c.name, got.AccessNames(), c.want.AccessNames())
+		}
+	}
+}

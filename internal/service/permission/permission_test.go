@@ -230,6 +230,153 @@ func TestPutAndPutResource(t *testing.T) {
 	}
 }
 
+// TestWrite checks that change sees the stored permission and that an
+// error from it stores nothing.
+func TestWrite(t *testing.T) {
+	ctx := context.Background()
+	svc := service(seeded(t))
+	first := perm("w", map[types.ResourceType]types.Resource{
+		types.ResourceArtifact: artifact(
+			everywhere("libs-local"),
+			map[string]types.Actions{"bob": r},
+			nil,
+		),
+	})
+	created, err := svc.Write(
+		ctx,
+		"w",
+		func(_ types.Permission, exists bool) (types.Permission, error) {
+			if exists {
+				t.Error("a new name reported as stored")
+			}
+			return first, nil
+		},
+	)
+	if err != nil || !created {
+		t.Fatalf("write creating = %v, %v", created, err)
+	}
+	refused := errors.New("refused")
+	_, err = svc.Write(ctx, "w", func(old types.Permission, exists bool) (types.Permission, error) {
+		if !exists || old.Resources[types.ResourceArtifact].Actions.Users["bob"] != r {
+			t.Errorf("change saw %v, %+v", exists, old)
+		}
+		return perm("w", nil), refused
+	})
+	if !errors.Is(err, refused) {
+		t.Fatalf("a refused write = %v", err)
+	}
+	if got, _ := svc.Get(ctx, "w"); len(got.Resources) != 1 {
+		t.Fatalf("a refused write stored %+v", got.Resources)
+	}
+}
+
+// TestCheckManagerEdit checks what a holder of MANAGE who is not an
+// administrator may change: actions only, and of those only the ones
+// grantable allows in each section, judged on the stored grants.
+func TestCheckManagerEdit(t *testing.T) {
+	const (
+		w = types.ActionWrite
+		d = types.ActionDelete
+	)
+	sections := []types.ResourceType{
+		types.ResourceArtifact, types.ResourceBuild, types.ResourceReleaseBundle,
+	}
+	// bob holds read, write and MANAGE on artifacts, and only read on builds.
+	grantable := func(g types.Grants) types.Actions {
+		held := g.Users["bob"]
+		if !held.Has(m) {
+			return 0
+		}
+		return held &^ m
+	}
+	stored := func() types.Permission {
+		return perm("p", map[types.ResourceType]types.Resource{
+			types.ResourceArtifact: artifact(
+				map[string]types.Target{"libs-local": {}},
+				map[string]types.Actions{"bob": r | w | m, "carol": r},
+				map[string]types.Actions{"ops": r | d},
+			),
+			types.ResourceBuild: artifact(
+				everywhere(types.BuildInfoRepository),
+				map[string]types.Actions{"bob": r},
+				nil,
+			),
+			types.ResourceDestination: artifact(everywhere("edge"), nil, nil),
+		})
+	}
+	const (
+		actionsOnly = "can only edit the actions"
+		heldOnly    = "only actions it holds"
+	)
+	for _, c := range []struct {
+		name string
+		edit func(p *types.Permission)
+		want string
+	}{
+		{"no change", func(*types.Permission) {}, ""},
+		{"grant a held action", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | w
+		}, ""},
+		{"revoke a held action", func(p *types.Permission) {
+			delete(p.Resources[types.ResourceArtifact].Actions.Users, "carol")
+		}, ""},
+		{"add a group with held actions", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Groups["devs"] = r | w
+		}, ""},
+		{"an empty include list is everything", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Targets["libs-local"] = types.Target{
+				Include: []string{"**"},
+			}
+		}, ""},
+		{"a section the form does not carry", func(p *types.Permission) {
+			delete(p.Resources, types.ResourceDestination)
+		}, ""},
+		{"grant an action it lacks", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | d
+		}, heldOnly},
+		{"grant MANAGE", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Users["carol"] = r | m
+		}, heldOnly},
+		{"revoke its own MANAGE", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Users["bob"] = r | w
+		}, heldOnly},
+		{"revoke an action it lacks", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Actions.Groups["ops"] = r
+		}, heldOnly},
+		{"remove a principal holding an action it lacks", func(p *types.Permission) {
+			delete(p.Resources[types.ResourceArtifact].Actions.Groups, "ops")
+		}, heldOnly},
+		{"grant in a section it does not manage", func(p *types.Permission) {
+			p.Resources[types.ResourceBuild].Actions.Users["carol"] = r
+		}, heldOnly},
+		{"change a pattern", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Targets["libs-local"] = types.Target{
+				Exclude: []string{"secret/**"},
+			}
+		}, actionsOnly},
+		{"add a target", func(p *types.Permission) {
+			p.Resources[types.ResourceArtifact].Targets["central"] = types.Target{}
+		}, actionsOnly},
+		{"drop a section", func(p *types.Permission) {
+			delete(p.Resources, types.ResourceBuild)
+		}, actionsOnly},
+		{"add a section", func(p *types.Permission) {
+			p.Resources[types.ResourceReleaseBundle] = artifact(nil, nil, nil)
+		}, actionsOnly},
+	} {
+		p := stored()
+		c.edit(&p)
+		err := permission.CheckManagerEdit(stored(), p, sections, grantable)
+		switch {
+		case c.want == "" && err != nil:
+			t.Errorf("%s: %v", c.name, err)
+		case c.want != "" && (!errors.Is(err, permission.ErrForbidden) ||
+			!strings.Contains(err.Error(), c.want)):
+			t.Errorf("%s: %v, want %q", c.name, err, c.want)
+		}
+	}
+}
+
 func TestMergeAndDeleteResource(t *testing.T) {
 	ctx := context.Background()
 	svc := service(seeded(t))

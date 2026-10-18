@@ -59,15 +59,17 @@ So do the routes, statuses and shapes of the v1, v2 and Access v2 permission API
 one Access permission section needs an administrator, as in 7.x: "Requires admin privileges"
 ([getpermissionresource](https://docs.jfrog.com/administration/reference/getpermissionresource)).
 A `system:permissions:r` token, which lists permissions and reads one whole, is refused there
-([#382](https://github.com/weaveplatform/artifactweave/issues/382)). These differ:
+([#382](https://github.com/weaveplatform/artifactweave/issues/382)). So does what a MANAGE
+holder may grant: one who is not an administrator grants only the actions it holds, and never
+MANAGE. This is `exclude-manage`, the Permissions V2 default, under which "Users with manage
+permissions can grant only permissions that they have, except for manage permissions", and
+"Users with the manage permission cannot grant or revoke the manage action"
+([permissions](https://docs.jfrog.com/administration/docs/permissions)). The v2 PUT is the only
+write such a holder reaches; the v1 and Access writes need an administrator. These differ:
 - 7.x differs: `applied-permissions/admin` makes the token an admin token, even for a user
   that does not exist
   ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token));
   fixed by [#406](https://github.com/weaveplatform/artifactweave/issues/406).
-- 7.x differs: a MANAGE holder may grant only the actions it holds, and never MANAGE
-  (`exclude-manage`, the Permissions V2 default;
-  [permissions](https://docs.jfrog.com/administration/docs/permissions)); fixed by
-  [#381](https://github.com/weaveplatform/artifactweave/issues/381).
 - 7.x differs: the Access listing's `user` filter matches user names without case
   ([getpermissions](https://docs.jfrog.com/administration/reference/getpermissions)); fixed by
   [#408](https://github.com/weaveplatform/artifactweave/issues/408).
@@ -184,6 +186,21 @@ undocumented.
   - v2 PUT: an administrator, or a MANAGE holder who "can only edit the actions"
     (`createorreplacepermissiontargetv2.json`). A replace that changes a section, target
     or pattern answers that holder 403.
+  - What that holder may grant (documented, `exclude-manage`, the Permissions V2 default;
+    [permissions](https://docs.jfrog.com/administration/docs/permissions)):
+    - In each section it may grant only the actions it holds there, and never MANAGE, which
+      it can neither grant nor revoke. `authz.Decider.Grantable` answers which actions it may
+      change, from the stored grants, so a body cannot first give it what it then passes on.
+    - Only the sections where it holds MANAGE: the page gives MANAGE separately for the
+      repository, build and release bundle sections.
+    - **[I]** It may not revoke an action it does not hold either. The page states the rule
+      for grants and for MANAGE only; the narrower reading keeps a holder from taking away
+      what it could not give back.
+    - **[I]** Such a change answers 403, the status `createorreplacepermissiontargetv2.json`
+      gives a caller without the rights the operation needs.
+    - `permission.CheckManagerEdit` runs inside the write's transaction, against the
+      permission it replaces, so a concurrent change cannot slip between the check and the
+      write.
   - v2 POST and DELETE: an administrator (`createpermissiontargetv2.json`,
     `deletepermissiontargetv2.json`).
   - The request's evaluator decides MANAGE (`Decider.Holds`) under the caller's token
