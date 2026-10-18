@@ -34,6 +34,20 @@ and in the `gate` job's `needs`, so the merged coverage includes them and a fail
 `deploy-terraform` is in the `gate` job's `needs` only: it runs no Go code, so it adds no
 coverage.
 
+## Unit coverage
+
+`make test` runs every unit package in one `go test` with `-coverpkg=<module>/...`.
+Through `-exec`, `tools/coverexec` gives each test binary a coverage directory of its own
+under `cover/unit/parts`. When the binaries are done, `go tool covdata merge` combines the
+parts into `cover/unit`, the flat directory that each `Unit tests` job uploads as
+`cover-unit-<os>` and that `make cover` reads.
+
+**Why not one shared directory:** binaries that link the same instrumented packages write
+the same `covmeta.<hash>` file. Each writes a temporary file and renames it onto that name.
+Linux and macOS let two binaries finishing together both rename, but Windows refuses the
+second rename with "Access is denied", and that test binary fails
+([#368](https://github.com/weaveplatform/artifactweave/issues/368)).
+
 ## Why acceptance runs on Linux only
 
 GitHub's macOS runners have no Docker daemon and the Windows runners only run Windows
