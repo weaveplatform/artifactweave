@@ -12003,7 +12003,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithBody Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12012,7 +12012,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2 Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12021,7 +12021,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 	//
@@ -19458,7 +19458,7 @@ func (c *Client) CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySe
 
 // CreateOrReplacePermissionTargetV2WithBody Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19477,7 +19477,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2WithBody(ctx context.Context, 
 
 // CreateOrReplacePermissionTargetV2 Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19496,7 +19496,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2(ctx context.Context, permissi
 
 // CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 //
@@ -38925,7 +38925,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithBodyWithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38934,7 +38934,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -38943,7 +38943,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -67020,7 +67020,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithApplicationVndOrgJfrog
 
 // CreateOrReplacePermissionTargetV2WithBodyWithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67035,7 +67035,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithBodyWithRespo
 
 // CreateOrReplacePermissionTargetV2WithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67050,7 +67050,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithResponse(ctx 
 
 // CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 //

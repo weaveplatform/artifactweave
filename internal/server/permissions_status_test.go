@@ -18,7 +18,7 @@ const (
 
 // seedPermissions adds the permissions the status rows change, one per
 // state-changing row, so the rows run in any order against one store.
-// "user" holds MANAGE on the st-managed* permissions. Every permission the
+// "user" holds READ and MANAGE on the st-managed* permissions. Every permission the
 // rows create or seed targets perm-local, a repository no other row reads:
 // a grant on a shared repository would change other rows' answers.
 func seedPermissions(t *testing.T, db store.Store) {
@@ -41,7 +41,9 @@ func seedPermissions(t *testing.T, db store.Store) {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"st-managed", "st-managed-put", "st-managed-del"} {
+	for _, name := range []string{
+		"st-managed", "st-managed-put", "st-managed-del", "st-managed-grant",
+	} {
 		if err := db.Permissions().Create(ctx, types.Permission{
 			Name: name,
 			Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
@@ -65,6 +67,16 @@ func permissionStatusRows() []statusCase {
 			`"targets":{"perm-local":{"include_patterns":["**"]}}}}}`
 	}
 	section := `{"actions":{"users":{"user":["READ"]}},"targets":{"perm-local":{}}}`
+	// managed is a v2 body for an st-managed* permission that keeps "user"'s
+	// READ and MANAGE and adds grants.
+	managed := func(more string) string {
+		return `{"repo":{"repositories":["perm-local"],"actions":{` +
+			`"users":{"user":["read","manage"]},` + more + `}}}`
+	}
+	// grantManage is an Access section that grants MANAGE on st-managed. The
+	// v1 and Access writes need an administrator, so a Manage holder cannot
+	// grant through them either.
+	grantManage := `{"actions":{"groups":{"readers":["READ","MANAGE"]}},"targets":{"perm-local":{}}}`
 	return []statusCase{
 		// v1
 		{"GET " + permV1, permV1, "admin", "", 200},
@@ -80,6 +92,12 @@ func permissionStatusRows() []statusCase {
 			`{"repositories":["nope"]}`, 400,
 		},
 		{"PUT " + permV1 + "/{permissionTargetName}", permV1 + "/st-v1-x", "user", v1Body, 403},
+		{
+			"PUT " + permV1 + "/{permissionTargetName}", permV1 + "/st-managed", "user",
+			`{"repositories":["perm-local"],` +
+				`"principals":{"users":{"user":["r","m"]},"groups":{"readers":["m"]}}}`,
+			403,
+		},
 		{"PUT " + permV1 + "/{permissionTargetName}", permV1 + "/st-v1-x", "", v1Body, 401},
 		{"DELETE " + permV1 + "/{permissionTargetName}", permV1 + "/st-del-v1", "admin", "", 200},
 		{"DELETE " + permV1 + "/{permissionTargetName}", permV1 + "/missing", "admin", "", 404},
@@ -141,6 +159,24 @@ func permissionStatusRows() []statusCase {
 			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed",
 			"user", `{"repo":{"repositories":["perm-local"],"include-patterns":["a/**"],` +
 				`"actions":{"users":{"user":["read","manage"]}}}}`, 403,
+		},
+		// A Manage holder grants or revokes only actions it holds, and never
+		// Manage (exclude-manage, decision 0006).
+		{
+			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed-grant",
+			"user", managed(`"groups":{"readers":["read"]}`), 200,
+		},
+		{
+			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed",
+			"user", managed(`"groups":{"readers":["read","write"]}`), 403,
+		},
+		{
+			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed",
+			"user", managed(`"groups":{"readers":["read","manage"]}`), 403,
+		},
+		{
+			"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-managed", "user",
+			`{"repo":{"repositories":["perm-local"],"actions":{"users":{"user":["read"]}}}}`, 403,
 		},
 		{"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/st-v2-new", "user", v2Body, 403},
 		{"PUT " + permV2 + "/{permissionTargetName}", permV2 + "/Anything", "", v2Body, 401},
@@ -278,6 +314,13 @@ func permissionStatusRows() []statusCase {
 		},
 		{
 			"PUT " + permAcc + "/{permissionName}/{resourceType}",
+			permAcc + "/st-managed/artifact",
+			"user",
+			grantManage,
+			403,
+		},
+		{
+			"PUT " + permAcc + "/{permissionName}/{resourceType}",
 			permAcc + "/st-res-put/artifact",
 			"",
 			section,
@@ -309,6 +352,13 @@ func permissionStatusRows() []statusCase {
 			permAcc + "/st-res-patch/artifact",
 			"user",
 			section,
+			403,
+		},
+		{
+			"PATCH " + permAcc + "/{permissionName}/{resourceType}",
+			permAcc + "/st-managed/artifact",
+			"user",
+			grantManage,
 			403,
 		},
 		{

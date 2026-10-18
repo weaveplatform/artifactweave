@@ -15356,7 +15356,7 @@ paths:
         - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpermissiontargetv2.md
     put:
-      description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. Validation is the same as for create.'
+      description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself, and any other change answers 403. Validation is the same as for create.'
       operationId: createOrReplacePermissionTargetV2
       parameters:
         - description: Required path parameter. The target name; wins over name in the body.

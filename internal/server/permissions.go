@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -134,6 +133,8 @@ func (s artifactoryService) permissionError(ctx context.Context, op string, err 
 		return apierror.New(http.StatusNotFound, after(err, permission.ErrNotFound))
 	case errors.Is(err, permission.ErrConflict):
 		return apierror.New(http.StatusConflict, after(err, permission.ErrConflict))
+	case errors.Is(err, permission.ErrForbidden):
+		return apierror.New(http.StatusForbidden, after(err, permission.ErrForbidden))
 	default:
 		return s.internalError(ctx, op, err)
 	}
@@ -505,8 +506,9 @@ var v2Sections = []types.ResourceType{
 
 // CreateOrReplacePermissionTargetV2 creates the permission or replaces its
 // v2 sections whole. Administrators may create; holders of MANAGE may
-// replace the actions of one that exists, and nothing else
-// (createorreplacepermissiontargetv2.json).
+// replace the actions of one that exists, granting or revoking only the
+// actions they hold and never MANAGE (createorreplacepermissiontargetv2.json,
+// decision 0006).
 func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 	ctx context.Context,
 	req artgen.CreateOrReplacePermissionTargetV2RequestObject,
@@ -528,55 +530,38 @@ func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 	if err != nil {
 		return nil, err
 	}
-	old, err := c.svc.Get(ctx, p.Name)
-	switch {
-	case errors.Is(err, permission.ErrNotFound):
-		if err := c.admin(); err != nil {
-			return nil, err
-		}
-	case err != nil:
-		return nil, s.permissionError(ctx, "get permission", err)
-	case !c.manages(old):
-		return nil, auth.ErrForbidden
-	case !c.dec.Admin() && !sameTargets(old, p):
-		return nil, apierror.New(http.StatusForbidden,
-			"A user with Manage permission can only edit the actions")
-	default:
-		p.Description = old.Description
-		for rt, r := range old.Resources {
-			if !slices.Contains(v2Sections, rt) {
-				p.Resources[rt] = r
+	_, err = c.svc.Write(
+		ctx,
+		p.Name,
+		func(old types.Permission, exists bool) (types.Permission, error) {
+			switch {
+			case !exists:
+				return p, c.admin()
+			case !c.manages(old):
+				return types.Permission{}, auth.ErrForbidden
+			case !c.dec.Admin():
+				if err := permission.CheckManagerEdit(
+					old,
+					p,
+					v2Sections,
+					c.dec.Grantable,
+				); err != nil {
+					return types.Permission{}, fmt.Errorf("permissions: %w", err)
+				}
 			}
-		}
-	}
-	if _, err := c.svc.Put(ctx, p); err != nil {
+			p.Description = old.Description
+			for rt, r := range old.Resources {
+				if !slices.Contains(v2Sections, rt) {
+					p.Resources[rt] = r
+				}
+			}
+			return p, nil
+		},
+	)
+	if err != nil {
 		return nil, s.permissionError(ctx, "store permission", err)
 	}
 	return artgen.CreateOrReplacePermissionTargetV2200Response{}, nil
-}
-
-// sameTargets reports whether a and b have the same v2 sections over the
-// same targets and patterns, so that a replace changes only actions.
-func sameTargets(a, b types.Permission) bool {
-	for _, rt := range v2Sections {
-		ra, inA := a.Resources[rt]
-		rb, inB := b.Resources[rt]
-		if inA != inB || !maps.EqualFunc(ra.Targets, rb.Targets, func(x, y types.Target) bool {
-			return slices.Equal(includes(x), includes(y)) && slices.Equal(x.Exclude, y.Exclude)
-		}) {
-			return false
-		}
-	}
-	return true
-}
-
-// includes are a target's include patterns; none means everything, which
-// v2 spells "**".
-func includes(t types.Target) []string {
-	if len(t.Include) == 0 {
-		return []string{"**"}
-	}
-	return t.Include
 }
 
 // DeletePermissionTargetV2 removes the permission. Unlike a read or a

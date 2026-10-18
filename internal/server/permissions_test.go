@@ -302,6 +302,69 @@ func TestManageHolderListing(t *testing.T) {
 	}
 }
 
+// TestManageHolderGrants follows a Manage holder's v2 replaces: it grants
+// and revokes only actions it holds in the section, never MANAGE, and an
+// administrator still may (exclude-manage, decision 0006).
+func TestManageHolderGrants(t *testing.T) {
+	h := statusFixture(t, false)
+	rec := do(t, h, http.MethodPost, permAcc, adminJSON(), `{"name":"mixed","resources":{`+
+		`"artifact":{"actions":{"users":{"user":["READ","WRITE","MANAGE"]}},`+
+		`"targets":{"perm-local":{"include_patterns":["**"]}}},`+
+		`"build":{"actions":{"users":{"user":["READ"]}},`+
+		`"targets":{"artifactory-build-info":{"include_patterns":["**"]}}}}}`)
+	mustStatus(t, rec, 201, "create")
+	holder := map[string]string{"Content-Type": "application/json"}
+	for k, v := range basic("user", "pw") {
+		holder[k] = v
+	}
+	body := func(repo, build string) string {
+		return `{"repo":{"repositories":["perm-local"],"actions":{` + repo + `}},` +
+			`"build":{"repositories":["artifactory-build-info"],"actions":{` + build + `}}}`
+	}
+	const (
+		keep  = `"users":{"user":["read","write","manage"]}`
+		build = `"users":{"user":["read"]}`
+	)
+	for _, c := range []struct {
+		name, body string
+		want       int
+	}{
+		{"grant held actions", body(keep+`,"groups":{"readers":["read","write"]}`, build), 200},
+		{"revoke a held action", body(keep+`,"groups":{"readers":["read"]}`, build), 200},
+		{"grant an action it lacks", body(keep+`,"groups":{"readers":["delete"]}`, build), 403},
+		{"grant MANAGE", body(keep+`,"groups":{"readers":["read","manage"]}`, build), 403},
+		{"revoke its own MANAGE", body(`"users":{"user":["read","write"]}`, build), 403},
+		{
+			"grant in a section it does not manage",
+			body(keep, build+`,"groups":{"readers":["read"]}`), 403,
+		},
+	} {
+		rec := do(t, h, http.MethodPut, permV2+"/mixed", holder, c.body)
+		mustStatus(t, rec, c.want, c.name)
+		if c.want == 403 && !strings.Contains(rec.Body.String(), "only actions it holds") {
+			t.Errorf("%s: message %s", c.name, rec.Body)
+		}
+	}
+	var acc struct {
+		Resources map[string]struct {
+			Actions struct{ Users, Groups map[string][]string }
+		}
+	}
+	rec = do(t, h, http.MethodGet, permAcc+"/mixed", basic("admin", "pw"), "")
+	mustStatus(t, rec, 200, "read back")
+	permDecode(t, rec, &acc)
+	art := acc.Resources["artifact"].Actions
+	if !slices.Equal(art.Groups["readers"], []string{"READ"}) ||
+		!slices.Equal(art.Users["user"], []string{"READ", "WRITE", "MANAGE"}) ||
+		len(acc.Resources["build"].Actions.Groups) != 0 {
+		t.Fatalf("after the holder's edits: %+v", acc.Resources)
+	}
+	// An administrator grants MANAGE through the same replace.
+	rec = do(t, h, http.MethodPut, permV2+"/mixed", adminJSON(),
+		body(keep+`,"groups":{"readers":["read","manage"]}`, build))
+	mustStatus(t, rec, 200, "an administrator grants MANAGE")
+}
+
 func TestAccessSections(t *testing.T) {
 	h := statusFixture(t, false)
 	admin := adminJSON()
