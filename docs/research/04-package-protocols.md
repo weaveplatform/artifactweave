@@ -213,8 +213,11 @@ non-preemptive mode is supported.
 
 ### Checksums
 
-The client deploys `.md5` and `.sha1`; the server exposes `.sha256` and `.sha512` as well
-and sets `X-Checksum-*` response headers. `checksumPolicyType` decides whether a
+The client deploys `.md5` and `.sha1`; the server exposes `.sha256` as well and sets
+`X-Checksum-*` response headers. artifactweave also serves `.sha512`, which is its own
+extension, not Artifactory behaviour (a deviation registered by #378; **[J]**
+[RTFACT-30948](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30948) is an open request
+to add SHA-512 for generic files). `checksumPolicyType` decides whether a
 mismatch between the client's sidecar and the computed value is rejected
 (`client-checksums`) or replaced (`server-generated-checksums`). Sidecars are served from
 metadata and are not items.
