@@ -241,7 +241,8 @@ func (g *Registry) putManifest(w http.ResponseWriter, r *http.Request, q Request
 	h.Set(contentDigestHeader, "sha256:"+hexSum)
 	if m.Subject != nil {
 		// Tells the client the registry tracks referrers itself, so it
-		// keeps no referrers tag of its own (end-7, Artifactory 7.90.1).
+		// keeps no referrers tag of its own (end-7; Artifactory 7.90.5,
+		// SaaS 7.90.1).
 		h.Set(subjectHeader, m.Subject.Digest)
 	}
 	for _, t := range tags {

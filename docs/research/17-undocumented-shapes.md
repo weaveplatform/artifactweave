@@ -2,7 +2,7 @@
 
 Research baseline: **2026-10-13**.
 
-Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#artifactory-7x-check) records it.
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#artifactory-7x-check) records it.
 
 JFrog's published definitions leave some request and response shapes untyped, and some
 wire details are only visible on a live instance. This report records what public
@@ -24,14 +24,15 @@ JFrog prose is reproduced.
 
 | Detail | Finding | Confidence |
 |---|---|---|
-| Realm | `<base>/artifactory/api/docker/<repo-key>/v2/token` on the host the client addressed | Confirmed |
+| Realm, repository-path method | `<host>/v2/token`, in a 7.71.5 capture by JFrog support ([RTFACT-30264](https://jfrog.atlassian.net/browse/RTFACT-30264), closed without a fix), as older reverse-proxy setups advertised; JFrog's documented proxy rewrite maps it to `.../api/docker/null/v2/token` | Likely |
+| Realm naming the repository | `<base>/artifactory/api/docker/<repo-key>/v2/token` on the host the client addressed, in captures from 2017 to 2019 (Artifactory 6.0.3 and earlier) that do not name the access method | Likely |
+| Realm, subdomain and ports methods | no 7.x capture; artifactweave names the repository, as the 2017 to 2019 captures do | Guess |
 | Realm with no repository context | a bare `/v2/` on the repository-path method uses the literal key `null`: `.../api/docker/null/v2/token` | Confirmed |
-| Older reverse-proxy setups | advertise `https://<host>/v2/token` | Confirmed |
 | `service` | the hostname the client addressed, including a non-default port (`host%3A443` seen URL-encoded); never the repository key | Confirmed |
-| `scope` | present on repository requests, absent on the bare `/v2/` probe | Confirmed |
+| `scope` | present on repository requests, absent on the bare `/v2/` probe. On the repository-path method 7.71.5 names the image without the repository key: `repository:oras-test:pull` for `/v2/test-docker-local/oras-test/tags/list` (RTFACT-30264) | Confirmed |
 | Token request | `GET` with Basic credentials and `account`, `client_id`, `offline_token`, `service`, `scope`; `POST` answers 405 with credentials and 401 without, and containerd falls back to `GET` | Confirmed |
 | Anonymous | an anonymous `GET` returns a token when anonymous access is enabled | Confirmed |
-| Token body | `{"token":"...","expires_in":3600}`; `access_token` and `issued_at` never seen | Confirmed |
+| Token body | `{"token":"...","expires_in":3600}`; `access_token` and `issued_at` never seen, on 7.12.8 and 7.21.7 too ([RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069), [RTFACT-26227](https://jfrog.atlassian.net/browse/RTFACT-26227)) | Confirmed |
 | Default lifetime | 3600 seconds | Likely |
 
 artifactweave sends `Bearer realm="<base>/artifactory/api/docker/<repo|null>/v2/token",service="<public host[:port]>"`
@@ -39,7 +40,14 @@ plus `scope` on repository requests, taking the host from the base-URL resolver.
 serves the token on `GET` at both the per-repository path (including `null`) and
 `/v2/token`, answers `POST` with 405, ignores `account`, `client_id` and `offline_token`,
 and returns `token`, `expires_in: 3600` and, harmlessly, `access_token` and `issued_at`
-from the Docker token specification.
+from the Docker token specification. Two points differ from what 7.x was seen to send:
+- 7.x differs: the token body has neither `access_token` nor `issued_at` (RTFACT-25069,
+  RTFACT-26227, the docker.art.local walk-through); a deviation registered by
+  [#378](https://github.com/weaveplatform/artifactweave/issues/378).
+- 7.x differs: on the repository-path method 7.71.5 challenges with
+  `realm="<host>/v2/token"` and a scope without the repository key (RTFACT-30264). artifactweave
+  keeps the key in the scope, which spares oras a token per request; a deviation
+  registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
 
 Sources: <https://github.com/moby/moby/issues/38662>,
 <https://bugzilla.redhat.com/show_bug.cgi?id=1413987>,
@@ -47,7 +55,10 @@ Sources: <https://github.com/moby/moby/issues/38662>,
 <https://github.com/jfrog/artifactory-docker-examples/issues/86>,
 <https://github.com/containerd/containerd/issues/2148>,
 <https://jfrog.com/help/r/how-to-troubleshoot-docker-problems/docker-login-docker.art.local>,
-<https://jfrog.atlassian.net/browse/RTFACT-26227> (search snippet).
+<https://jfrog.atlassian.net/browse/RTFACT-26227>,
+<https://jfrog.atlassian.net/browse/RTFACT-25069> and
+<https://jfrog.atlassian.net/browse/RTFACT-30264> (read through Jira's REST API on 2026-10-18),
+<https://docs.jfrog.com/installation/docs/install-jfrog-platform-with-nginx-ingress-controller>.
 
 ### npm web login
 
@@ -178,9 +189,9 @@ Sources: <https://github.com/jfrog/jfrog-client-go/blob/master/artifactory/servi
 
 ### Still needs a live capture
 
-Only the Terraform backend sub-paths (relevant only if `terraformbackend` returns) and,
-optionally, the 600-second Docker token lifetime reported for access-token
-authentication.
+Only the Terraform backend sub-paths (relevant only if `terraformbackend` returns), the
+Docker challenge's realm and scope on each access method, and, optionally, the 600-second
+Docker token lifetime reported for access-token authentication.
 
 ## 2. Access configuration, cleanup policies and webhooks
 
@@ -480,7 +491,7 @@ Captures still worth taking on a live instance, in priority order:
 
 ## Artifactory 7.x check
 
-Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 **Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation.
 

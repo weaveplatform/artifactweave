@@ -1150,7 +1150,9 @@ paths:
         than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci
         repositories are promoted the same way. The JFrog CLI's rt docker-promote calls it and checks only for 200.
         Needs Read on the source, and Delete there too for a move; Deploy on the target, and Delete there too when
-        the target tag already exists (decision 0031).
+        the target tag already exists (decision 0031). A move by a caller without Delete on the source answers 403
+        before anything is copied. Artifactory 7.111.4 and later copies the image instead and answers 206, partial
+        success; rt docker-promote fails on either status, and the 403 is a deviation registered by #378.
       operationId: promoteDockerImage
       parameters:
       - description: Required path parameter. Key of the local or federated Docker, OCI or Helm OCI repository
@@ -1193,7 +1195,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: The caller lacks Read on the source, Deploy on the target, or the Delete that a move or an
-            overwritten target tag needs.
+            overwritten target tag needs. Nothing is copied; Artifactory answers 206 to a move without Delete on the
+            source, after copying.
         '404':
           content:
             application/json:
