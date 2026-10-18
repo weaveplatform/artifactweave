@@ -34,6 +34,8 @@ func trashStatusRows() []statusCase {
 		{restore, rs + del + "?to=libs-local&transaction-size=10", "admin", "", 202},
 		{restore, rs + del + "?to=libs-local", "admin", "", 404},
 		{restore, rs + "libs-local?to=libs-local", "admin", "", 404},
+		// An admin may restore from a repository that is gone (#380).
+		{restore, rs + "gone-repo/x?to=libs-local", "admin", "", 404},
 
 		{remove, "/artifactory/" + del, "admin", "", 204},
 		{clean, cl + del, "user", "", 400},
