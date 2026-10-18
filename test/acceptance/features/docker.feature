@@ -239,6 +239,17 @@ Feature: Docker and OCI registry
     And the JSON field "config.digest" equals "sha256:d6f56bc20064075ce319ac2e6fcef5de9ea21773b0a8a4398c4405222971f9c0"
     When I GET "/artifactory/api/storage/docker-local/team/app/multi/list.manifest.json" as admin
     Then the response status is 200
+    When I GET "/artifactory/api/search/prop?docker.os=linux&docker.architecture=arm64&repos=docker-local" as admin
+    Then the response status is 200
+    And the response body contains "/docker-local/team/app/sha256__871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d/manifest.json"
+    When I POST "/artifactory/api/search/aql" as admin with body:
+      """
+      items.find({"repo":"docker-local","@docker.architecture":"arm64"}).include("path","name")
+      """
+    Then the response status is 200
+    And the JSON field "range.total" equals "1"
+    And the JSON field "results.0.path" equals "team/app/sha256__871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"
+    And the JSON field "results.0.name" equals "manifest.json"
     When the next request has header "Content-Type" "application/vnd.oci.image.manifest.v1+json"
     And I PUT "/v2/docker-local/team/app/manifests/sha256:22d26dd7f5f0802e86de103510b816796739580901e8585e66b20c185be0f69b" as admin with body:
       """

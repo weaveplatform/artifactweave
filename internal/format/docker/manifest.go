@@ -24,8 +24,9 @@ const (
 	MediaTypeDockerList     = "application/vnd.docker.distribution.manifest.list.v2+json"
 )
 
-// The image configurations whose labels become properties. Another config
-// type is an artifact's (a signature, a Helm chart) and carries no labels.
+// The image configurations whose platform and labels become properties.
+// Another config type is an artifact's (a signature, a Helm chart) and
+// carries neither.
 const (
 	mediaTypeOCIConfig    = "application/vnd.oci.image.config.v1+json"
 	mediaTypeDockerConfig = "application/vnd.docker.container.image.v1+json"
@@ -35,8 +36,8 @@ const (
 // registries to take at least 4 MB, and a larger one answers 413.
 const MaxManifestSize = 4 << 20
 
-// maxConfigSize bounds how much of a config blob is read for its labels. A
-// config is a few kilobytes; one larger than a manifest may be is not read.
+// maxConfigSize bounds how much of a config blob is read for its properties.
+// A config is a few kilobytes; one larger than a manifest may be is not read.
 const maxConfigSize = MaxManifestSize
 
 // The stored manifest's file name in its tag or digest folder, which jf
@@ -59,6 +60,10 @@ const (
 	// LabelPropertyPrefix starts the property of each label of an image's
 	// config.
 	LabelPropertyPrefix = "docker.label."
+	// OSProperty and ArchitectureProperty are an image's platform, from its
+	// config, as Artifactory sets them on manifest.json from 7.125.4.
+	OSProperty           = "docker.os"
+	ArchitectureProperty = "docker.architecture"
 )
 
 // ErrManifestInvalid is a manifest the registry refuses to store:
@@ -250,9 +255,10 @@ func (m Manifest) ConfigType() string {
 // Properties are the properties of the manifest stored in folder of the
 // image name: the five jf and Docker clients rely on, oci.subject and
 // oci.artifactType for a manifest with a subject, which the referrers API
-// is answered from (DV-036), and a docker.label.<label> for each of the
-// image's labels. A label whose name no property key may carry is left out.
-func Properties(m Manifest, name, folder string, labels map[string]string) types.Properties {
+// is answered from (DV-036), the image's docker.os and docker.architecture,
+// and a docker.label.<label> for each of its labels. A label whose name no
+// property key may carry is left out.
+func Properties(m Manifest, name, folder string, c Config) types.Properties {
 	p := types.Properties{}
 	p.Set(ManifestProperty, folder)
 	p.Set(ManifestDigestProperty, "sha256:"+m.Digest)
@@ -265,7 +271,15 @@ func Properties(m Manifest, name, folder string, labels map[string]string) types
 			p.Set(ArtifactTypeProperty, t)
 		}
 	}
-	for k, v := range labels {
+	// An empty value would make a search for the platform match an image
+	// that never named one.
+	if c.OS != "" {
+		p.Set(OSProperty, c.OS)
+	}
+	if c.Architecture != "" {
+		p.Set(ArchitectureProperty, c.Architecture)
+	}
+	for k, v := range c.Labels {
 		key := LabelPropertyPrefix + k
 		if types.ValidatePropertyKey(key) == nil {
 			p.Set(key, v)
@@ -274,26 +288,40 @@ func Properties(m Manifest, name, folder string, labels map[string]string) types
 	return p
 }
 
-// Labels reads the labels of an image config of media type configType
-// from r. A config of another type, or one too large or malformed to read,
-// has none: labels are metadata, and a push never fails for them.
-func Labels(configType string, r io.Reader) map[string]string {
+// Config is what an image's config gives its manifest's properties.
+type Config struct {
+	// OS and Architecture are the config's own fields. A platform variant
+	// (arm's v7, arm64's v8) is not part of either: Artifactory documents
+	// no variant property, so docker.architecture holds the config's
+	// architecture exactly as an index's platform names it, recorded as
+	// [I] on #216 (decision 0031).
+	OS           string
+	Architecture string
+	Labels       map[string]string
+}
+
+// ReadConfig reads an image config of media type configType from r. A
+// config of another type, an artifact's, or one too large or malformed to
+// read gives nothing: this is metadata, and a push never fails for it.
+func ReadConfig(configType string, r io.Reader) Config {
 	if configType != mediaTypeOCIConfig && configType != mediaTypeDockerConfig {
-		return nil
+		return Config{}
 	}
 	raw, err := io.ReadAll(io.LimitReader(r, maxConfigSize+1))
 	if err != nil || len(raw) > maxConfigSize {
-		return nil
+		return Config{}
 	}
 	var c struct {
-		Config struct {
+		OS           string `json:"os"`
+		Architecture string `json:"architecture"`
+		Config       struct {
 			Labels map[string]string `json:"Labels"` //nolint:tagliatelle // Docker's config names it so
 		} `json:"config"`
 	}
 	if json.Unmarshal(raw, &c) != nil {
-		return nil
+		return Config{}
 	}
-	return c.Config.Labels
+	return Config{OS: c.OS, Architecture: c.Architecture, Labels: c.Config.Labels}
 }
 
 // digestRE is the specification's digest grammar: an algorithm and its

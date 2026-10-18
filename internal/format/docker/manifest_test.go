@@ -125,10 +125,13 @@ func TestParseManifestRefuses(t *testing.T) {
 
 func TestProperties(t *testing.T) {
 	m := layout.Manifest{MediaType: layout.MediaTypeDockerManifest, Digest: "abc"}
-	got := layout.Properties(m, "team/app", "v1", map[string]string{
-		"org.opencontainers.image.source": "https://example.com/app",
-		"has space":                       "left out",
-		"maintainer":                      "team",
+	got := layout.Properties(m, "team/app", "v1", layout.Config{
+		OS: "linux", Architecture: "arm64",
+		Labels: map[string]string{
+			"org.opencontainers.image.source": "https://example.com/app",
+			"has space":                       "left out",
+			"maintainer":                      "team",
+		},
 	})
 	want := types.Properties{
 		"docker.manifest":        {"v1"},
@@ -136,39 +139,51 @@ func TestProperties(t *testing.T) {
 		"docker.manifest.type":   {layout.MediaTypeDockerManifest},
 		"docker.repoName":        {"team/app"},
 		"sha256":                 {"abc"},
+		"docker.os":              {"linux"},
+		"docker.architecture":    {"arm64"},
 		"docker.label.org.opencontainers.image.source": {"https://example.com/app"},
 		"docker.label.maintainer":                      {"team"},
 	}
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatal(diff)
 	}
+	// A config that names no platform sets neither property, so a search
+	// for an empty value finds nothing.
+	got = layout.Properties(m, "team/app", "v1", layout.Config{})
+	if len(got["docker.os"]) != 0 || len(got["docker.architecture"]) != 0 {
+		t.Fatal(got)
+	}
 }
 
-func TestLabels(t *testing.T) {
-	const config = `{"architecture":"amd64","config":{"Labels":{"a":"1","b":"2"}}}`
-	want := map[string]string{"a": "1", "b": "2"}
+func TestReadConfig(t *testing.T) {
+	const config = `{"architecture":"arm","os":"linux","variant":"v7",` +
+		`"config":{"Labels":{"a":"1","b":"2"}}}`
+	want := layout.Config{
+		OS: "linux", Architecture: "arm",
+		Labels: map[string]string{"a": "1", "b": "2"},
+	}
 	for _, mt := range []string{
 		"application/vnd.oci.image.config.v1+json",
 		"application/vnd.docker.container.image.v1+json",
 	} {
-		if diff := cmp.Diff(want, layout.Labels(mt, strings.NewReader(config))); diff != "" {
+		if diff := cmp.Diff(want, layout.ReadConfig(mt, strings.NewReader(config))); diff != "" {
 			t.Errorf("%s: %s", mt, diff)
 		}
 	}
 	// An artifact's config, a broken one, an unreadable one and one too
-	// large to be a config give none, without failing.
+	// large to be a config give nothing, without failing.
 	huge := `{"config":{"Labels":{"a":"` + strings.Repeat("x", layout.MaxManifestSize) + `"}}}`
-	for name, labels := range map[string]map[string]string{
-		"artifact": layout.Labels(
+	for name, got := range map[string]layout.Config{
+		"artifact": layout.ReadConfig(
 			"application/vnd.cncf.helm.config.v1+json",
 			strings.NewReader(config),
 		),
-		"broken":     layout.Labels("application/vnd.oci.image.config.v1+json", strings.NewReader("{")),
-		"unreadable": layout.Labels("application/vnd.oci.image.config.v1+json", iotest.ErrReader(errors.New("x"))),
-		"too large":  layout.Labels("application/vnd.oci.image.config.v1+json", strings.NewReader(huge)),
+		"broken":     layout.ReadConfig("application/vnd.oci.image.config.v1+json", strings.NewReader("{")),
+		"unreadable": layout.ReadConfig("application/vnd.oci.image.config.v1+json", iotest.ErrReader(errors.New("x"))),
+		"too large":  layout.ReadConfig("application/vnd.oci.image.config.v1+json", strings.NewReader(huge)),
 	} {
-		if labels != nil {
-			t.Errorf("%s: %v", name, labels)
+		if diff := cmp.Diff(layout.Config{}, got); diff != "" {
+			t.Errorf("%s: %s", name, diff)
 		}
 	}
 }

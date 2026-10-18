@@ -125,9 +125,10 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	if err != nil {
 		return err
 	}
-	var labels map[string]string
+	// An index names many platforms and no labels, so it gets neither.
+	var cfg layout.Config
 	if !m.Index() {
-		labels = s.labels(ctx, m)
+		cfg = s.config(ctx, m)
 	}
 	info, err := s.commitBody(ctx, p.Body, m.Digest)
 	if err != nil {
@@ -136,7 +137,7 @@ func (s *Service) PutManifest(ctx context.Context, p Push) error {
 	items := s.items()
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		for _, folder := range p.Folders {
-			if err := s.putFolder(ctx, items, p, folder, labels, found, info); err != nil {
+			if err := s.putFolder(ctx, items, p, folder, cfg, found, info); err != nil {
 				return err
 			}
 		}
@@ -222,17 +223,17 @@ func (s *Service) sized(
 	return found, nil
 }
 
-// labels reads the image's labels from its config blob, which present
-// found in the image. A config that cannot be read gives none: labels
-// never fail a push.
-func (s *Service) labels(ctx context.Context, m layout.Manifest) map[string]string {
+// config reads the image's platform and labels from its config blob, which
+// present found in the image. A config that cannot be read gives nothing:
+// its properties never fail a push.
+func (s *Service) config(ctx context.Context, m layout.Manifest) layout.Config {
 	hex, _ := layout.SHA256Hex(m.Config.Digest)
 	r, _, err := s.Blobs.Open(ctx, hex)
 	if err != nil {
-		return nil
+		return layout.Config{}
 	}
 	defer func() { _ = r.Close() }()
-	return layout.Labels(m.ConfigType(), r)
+	return layout.ReadConfig(m.ConfigType(), r)
 }
 
 // commitBody stores the manifest's bytes in the blob store, verified
@@ -252,7 +253,7 @@ func (s *Service) putFolder(
 	items *item.Service,
 	p Push,
 	folder string,
-	labels map[string]string,
+	cfg layout.Config,
 	blobs []string,
 	info blob.Info,
 ) error {
@@ -272,7 +273,7 @@ func (s *Service) putFolder(
 	_, err = items.DeployCommitted(ctx, item.Deploy{
 		Target:     item.Target{Repo: p.Repo, Path: dir + "/" + m.File()},
 		Declared:   types.Checksums{SHA256: m.Digest},
-		Properties: layout.Properties(m, p.Name, folder, labels),
+		Properties: layout.Properties(m, p.Name, folder, cfg),
 		By:         p.By,
 	}, info)
 	if err != nil {

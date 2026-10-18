@@ -304,6 +304,11 @@ behaviour below is documented or seen in its clients; where neither shows it, th
 - **[D]** Artifactory extracts an image's labels into properties on `manifest.json`
   (`additional-docker-information`). **[I]** The property name is `docker.label.<label>`; no
   source read here shows the prefix.
+- **[D]** From [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed),
+  `docker.os` and `docker.architecture`, the image's operating system and architecture, are
+  set on `manifest.json` "after pushing or caching a new image". **[I]** Whether a platform
+  `variant` is part of `docker.architecture`, and whether `list.manifest.json` gets either
+  property: the release note names only `manifest.json`, and no other source describes them.
 - **[D]** Schema-1 images carried `docker.imageId`, `docker.size`, `docker.tag.name`,
   `docker.tag.content` and `docker.repoName` under a V1 layout (`.images`, `repositories`).
 
@@ -423,6 +428,8 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
     authenticated with a token.
 12. Whether a manifest whose descriptor `size` differs from the stored blob or manifest is
     refused, and with which code (section 1.2).
+13. Whether `docker.architecture` includes a platform `variant`, and whether
+    `list.manifest.json` carries `docker.os` or `docker.architecture` (section 5.2).
 
 ## 11. Versions at the research baseline
 
@@ -455,7 +462,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 
 **Changed or added in 7.x:**
 - **`docker.os` and `docker.architecture`.** From [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed) these properties are set on a
-  pushed or cached `manifest.json`. artifactweave does not set them yet: [#352](https://github.com/weaveplatform/artifactweave/issues/352).
+  pushed or cached `manifest.json`. artifactweave sets them on every pushed image manifest
+  ([#352](https://github.com/weaveplatform/artifactweave/issues/352), decision 0031 "Platform properties").
 - **Referrers need Read.** From [7.161.16](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716116-self-managed) (SaaS 7.164.0) the referrers API answers 403
   to a caller without Read on the subject image. Decision 0031 already requires Read on
   `<name>/` and answers `DENIED` 403.

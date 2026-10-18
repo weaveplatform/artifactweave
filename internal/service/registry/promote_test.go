@@ -126,13 +126,16 @@ func TestPromote(t *testing.T) {
 			t.Fatalf("prod's index: %v", got)
 		}
 
-		// Copy under a new name and tag: the manifest says so.
+		// Copy under a new name and tag: the manifest says so, and keeps
+		// the platform its push set.
 		promote("team/web", true, registry.Rename{From: "v1", To: "release"})
 		props := w.propsIn(prod, "team/web/release/manifest.json")
 		for k, want := range map[string]string{
 			layout.RepoNameProperty:       "team/web",
 			layout.ManifestProperty:       "release",
 			layout.ManifestDigestProperty: "sha256:" + d1,
+			layout.OSProperty:             "linux",
+			layout.ArchitectureProperty:   "amd64",
 		} {
 			if !props.Has(k, want) {
 				t.Errorf("%s = %q, want %q", k, props[k], want)
@@ -155,6 +158,11 @@ func TestPromote(t *testing.T) {
 		if !after.Created.Equal(before.Created) || after.CreatedBy != before.CreatedBy {
 			t.Fatalf("history: %v by %s, was %v by %s",
 				after.Created, after.CreatedBy, before.Created, before.CreatedBy)
+		}
+		moved := w.propsIn(prod, "app/v2/manifest.json")
+		if !moved.Has(layout.OSProperty, "linux") ||
+			!moved.Has(layout.ArchitectureProperty, "amd64") {
+			t.Fatalf("moved manifest's platform: %v", moved)
 		}
 		if w.existsIn(w.docker, "app/v2") {
 			t.Fatal("a move kept the source tag")

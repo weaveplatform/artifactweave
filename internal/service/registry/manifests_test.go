@@ -33,6 +33,12 @@ const (
 // manifestOf is an OCI image manifest of imageConfig and the given layers,
 // with its SHA-256.
 func manifestOf(layers ...string) (string, string) {
+	return manifestWith(imageConfig, layers...)
+}
+
+// manifestWith is an OCI image manifest of config and the given layers,
+// with its SHA-256.
+func manifestWith(config string, layers ...string) (string, string) {
 	var ls []string
 	for _, l := range layers {
 		ls = append(ls, `{"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip",`+
@@ -40,7 +46,7 @@ func manifestOf(layers ...string) (string, string) {
 	}
 	body := `{"schemaVersion":2,"mediaType":"` + layout.MediaTypeOCIManifest + `",` +
 		`"config":{"mediaType":"application/vnd.oci.image.config.v1+json",` +
-		`"digest":"sha256:` + sum(imageConfig) + `","size":` + strconv.Itoa(len(imageConfig)) + `},` +
+		`"digest":"sha256:` + sum(config) + `","size":` + strconv.Itoa(len(config)) + `},` +
 		`"layers":[` + strings.Join(ls, ",") + `]}`
 	h := sha256.Sum256([]byte(body))
 	return body, hex.EncodeToString(h[:])
@@ -121,6 +127,8 @@ func TestPushByTag(t *testing.T) {
 			"docker.manifest.type":          {layout.MediaTypeOCIManifest},
 			"docker.repoName":               {"app"},
 			"sha256":                        {digest},
+			"docker.os":                     {"linux"},
+			"docker.architecture":           {"amd64"},
 			"docker.label.org.example.team": {"platform"},
 			"docker.label.version":          {"1"},
 		}
@@ -307,7 +315,7 @@ func (openFailing) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, 
 	return nil, blob.Info{}, errBoom
 }
 
-func TestUnreadableConfigLosesItsLabels(t *testing.T) {
+func TestUnreadableConfigLosesItsProperties(t *testing.T) {
 	w := newWorld(t, inmem.New())
 	w.upload(imageConfig, layerA)
 	w.svc.Blobs = openFailing{w.blobs}
@@ -316,6 +324,7 @@ func TestUnreadableConfigLosesItsLabels(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p := w.properties("app/v1/manifest.json"); p.Has("docker.label.version", "1") ||
+		len(p["docker.os"]) != 0 || len(p["docker.architecture"]) != 0 ||
 		!p.Has("sha256", digest) {
 		t.Fatal(p)
 	}

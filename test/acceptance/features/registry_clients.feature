@@ -34,12 +34,15 @@ Feature: Real registry clients round-trip images (the P6 exit checks)
       """
     When I run docker login as "admin" with password "{password}"
     Then the command succeeds
-    When I run docker "build -t {host}/docker-local/team/app:v1 image"
+    When I run docker "build --platform linux/amd64 -t {host}/docker-local/team/app:v1 image"
     Then the command succeeds
     When I run docker "push {host}/docker-local/team/app:v1"
     Then the command succeeds
     When I GET "/artifactory/api/storage/docker-local/team/app/v1/manifest.json" as admin
     Then the response status is 200
+    When I GET "/artifactory/api/search/prop?docker.os=linux&docker.architecture=amd64&repos=docker-local" as admin
+    Then the response status is 200
+    And the response body contains "/docker-local/team/app/v1/manifest.json"
     When I run docker "rmi {host}/docker-local/team/app:v1"
     Then the command succeeds
     When I run docker "pull {host}/docker-local/team/app:v1"

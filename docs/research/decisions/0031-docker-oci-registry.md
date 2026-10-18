@@ -156,6 +156,21 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   labels become `docker.label.<label>` properties. A manifest with a `subject` also gets
   `oci.subject` (the subject digest) and `oci.artifactType` (the descriptor's
   `artifactType` as the referrers API reports it).
+- **Platform properties.** An image manifest also gets `docker.os` and `docker.architecture`,
+  the config's `os` and `architecture`, as 7.x sets them on `manifest.json` from 7.125.4:
+  - **Variant.** A platform `variant` (arm's `v7`, arm64's `v8`) goes into neither property:
+    `docker.architecture` is the config's `architecture` exactly, as an index's `platform`
+    names it. **[I]** No source says whether 7.x appends the variant.
+  - **Index.** An image index or manifest list (`list.manifest.json`) names many platforms
+    and gets neither. **[I]** The release note names only `manifest.json`.
+  - **No value.** A config without the field, an artifact's config (a signature, a Helm
+    chart), or a config that cannot be read sets neither, so a search for the platform never
+    matches an image that names none.
+  - **Copies.** A promoted, copied or moved manifest keeps both, as it keeps its other
+    properties.
+  - **Remote caches.** A manifest cached by a remote repository gets the same two properties
+    when remote Docker repositories land (P9), as 7.x sets them "after pushing or caching".
+    Manifests stored before this change are not updated.
 - **Push response.** 201 with `Location` (`.../manifests/<digest>`), `Docker-Content-Digest`,
   and `OCI-Subject` when the manifest has a `subject`.
 - **`end-7b`.** `PUT .../manifests/<digest>?tag=a&tag=b` stores the manifest by digest and
@@ -293,7 +308,8 @@ The decision stands against 7.161.32
 ([research 23 section 12](../23-docker-oci-registry.md#12-artifactory-7x-check)), with two
 additions:
 - **`docker.os` and `docker.architecture`** go on each image manifest, as 7.x sets them from
-  7.125.4 ([#352](https://github.com/weaveplatform/artifactweave/issues/352)).
+  7.125.4 ([#352](https://github.com/weaveplatform/artifactweave/issues/352)); see
+  "Platform properties" above.
 - **A digest mismatch is always refused,** where 7.x accepts it unless an administrator sets
   the flag added in 7.111.4 (DV-061).
 
