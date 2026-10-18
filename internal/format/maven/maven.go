@@ -35,10 +35,10 @@ func Serves(t repo.PackageType) bool {
 	return false
 }
 
-// Handler is the Maven format: its deploy rules (admit.go), its download
-// policy and version tokens (policy.go, resolve.go), the package index, and
-// maven-metadata.xml derived through the work queue (work.go, #279).
-// Snapshot naming comes with #280.
+// Handler is the Maven format: its deploy rules (admit.go) and snapshot
+// naming (snapshot.go), its download policy and version tokens (policy.go,
+// resolve.go), the package index, and maven-metadata.xml derived through
+// the work queue (work.go, #279).
 type Handler struct {
 	// The generic format's hooks, which Admit's own checks replace.
 	generic.Handler

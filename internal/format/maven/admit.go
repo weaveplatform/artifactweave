@@ -37,7 +37,8 @@ func (Handler) Inspect(
 // Admit applies Artifactory's checks in its order (RealRepoBase
 // .assertValidPath, then UploadServiceImpl): a blacked-out repository, the
 // release and snapshot policy, the include and exclude patterns, and then
-// what each kind of write adds.
+// what each kind of write adds, a snapshot file's name under the
+// repository's snapshotVersionBehavior included (snapshot.go).
 func (Handler) Admit(
 	ctx context.Context,
 	env format.Env,
@@ -62,7 +63,10 @@ func (Handler) Admit(
 	}
 	switch w.Op {
 	case format.OpChecksum:
-		return w, admitChecksum(w)
+		if err := admitChecksum(w); err != nil {
+			return w, err
+		}
+		return snapshotWrite(ctx, env, c, r, w)
 	case format.OpDeploy:
 		// Snapshot metadata is computed from the POMs (#279); under the
 		// Maven layout Artifactory reads the client's and drops it with
@@ -70,6 +74,11 @@ func (Handler) Admit(
 		if IsSnapshotMetadata(w.Path) && IsMavenLayout(r.l) &&
 			c.SnapshotVersionBehavior != repo.Deployer {
 			return w, &format.Accepted{Status: http.StatusAccepted}
+		}
+		// The POM is checked at the path it lands at, as Artifactory
+		// renames before it stores.
+		if w, err = snapshotWrite(ctx, env, c, r, w); err != nil {
+			return w, err
 		}
 		return admitPOM(c, r, env.Inspection, w)
 	case format.OpCopy, format.OpMove:

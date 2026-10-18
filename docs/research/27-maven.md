@@ -535,6 +535,11 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
     view of the folder, and the candidate whose path holds the request first (section 8).
 15. What 7.x answers for a path that mixes `[RELEASE]` and `[INTEGRATION]` (section 8).
 16. Whether 7.x orders `maxUniqueSnapshots` builds by deployment date (section 7).
+17. Whether 7.x still numbers `-SNAPSHOT` uploads with 6.20's rules (2.2): from the snapshot
+    folder's metadata, with `build.timestamp`, and with a sidecar mapped to the newest build
+    of its file. The 7.x documentation says only that unique names are "time-based".
+18. Whether 7.x renames the snapshot files of an exploded archive, as artifactweave does
+    for every entry it stores; 6.20's archive deploy was not read.
 
 ## 12. Versions at the research baseline
 
@@ -586,4 +591,4 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - token tie-breaks (section 8);
 - the 6.20 behaviour of `calculateMetadata` (section 9).
 
-They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added.
+They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added, and items 17 and 18 from #280.
