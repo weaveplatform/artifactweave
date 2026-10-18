@@ -18,6 +18,7 @@ import (
 
 	"github.com/oapi-codegen/runtime"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types/wire"
 )
 
 // Defines values for ArchiveCriterionOperator.
@@ -5782,6 +5783,9 @@ type StatusMessage struct {
 type StorageSummaryInfo struct {
 	// BinariesSummary Optional within this object. Totals over the content-addressed blob store and the items that reference it. Every value is a human-formatted string (`3.48 GB`, `125,726`) because that is what Artifactory emits and what the JFrog CLI prints verbatim.
 	BinariesSummary *BinariesSummary `json:"binariesSummary,omitempty"`
+
+	// BlobMirrors Optional within this object. artifactweave's addition (decision 0028), sent only when a blob tier is a mirror. Artifactory reports nothing per shard, and JFrog clients ignore the field. One entry per mirrored tier.
+	BlobMirrors *[]wire.BlobMirror `json:"-"`
 
 	// FileStoreSummary Optional within this object. Capacity figures of the blob store. Space values are human-formatted strings with a unit, as Artifactory emits them.
 	FileStoreSummary *FileStoreSummary `json:"fileStoreSummary,omitempty"`

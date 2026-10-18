@@ -1,6 +1,6 @@
 # 0029: CDN delivery and download redirect
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 (#378)
 
 Status: Proposed
 
@@ -26,6 +26,42 @@ from 7.19.4, and signed URLs from 7.5.0. One change applies to self-hosted S3 on
 JFrog points to the `s3-storage-v3-direct` template. 7.84.10 also fixed redirect URLs that
 had dropped a `+` from the media type (RTDEV-40507), and artifactweave's signed URLs must
 keep it ([release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed)).
+
+Two fixes in the 7.90 line bear on direct download:
+- 7.90.8 fixed S3 redirects that Artifactory served itself instead of the bucket, and
+  CloudFront redirects that failed (RTDEV-46659,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7908-self-managed)).
+- 7.90.9 fixed signed URL redirects with the cluster-sharding provider over a cloud provider:
+  `cluster-s3-storage-v3`, `cluster-google-storage-v2` and `cluster-azure-blob-storage-v2`
+  (RTDEV-46858,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7909-self-managed)).
+  So the 7.84.10 limit no longer holds for those cluster templates. The self-managed notes
+  record no later change for the `eventual` provider.
+
+Where this design differs from 7.x (audit #378):
+- 7.x differs: a file over 50 GB requested from a store with CloudFront downloads, where it
+  got a 400 before 7.104.5 (RTDEV-49674,
+  [release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
+  CloudFront caches GET responses of at most 50 GB (research 19 section 3.1), and
+  artifactweave sends a file of any size to the CDN; fixed by #402.
+- 7.x differs: a Docker manifest at or above the minimum size is redirected like a layer, and
+  with the minimum at 0 MB a local pull gets the manifest by 302
+  ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705), affects 7.59.9, Done),
+  where artifactweave never redirects a manifest; fixed by #402.
+- 7.x differs: the minimum size is a system setting, "Minimum Direct Cloud Storage Download
+  Size" in General settings, stored in the descriptor as
+  `downloadRedirectConfig.fileMinimumSize` in MB
+  ([general settings](https://docs.jfrog.com/administration/docs/general-settings)), where
+  artifactweave reads only `download.redirect.min_size`; fixed by #402.
+- 7.x differs: the YAML descriptor gives local and remote repositories
+  `downloadRedirect: {enabled: <bool>}`, which artifactweave refuses with 400 because it
+  expects a flat boolean
+  ([repositories in YAML](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml));
+  fixed by #398.
+- 7.x differs: `downloadRedirect` on a remote repository with `storeArtifactsLocally=false`
+  "generates an error"
+  ([direct download, step 2](https://docs.jfrog.com/installation/docs/step-2-specify-repositories-for-direct-download)),
+  where artifactweave accepts it; left to P9 (remote repositories), with no issue yet.
 
 artifactweave already redirects `downloadRedirect` GETs to a presigned URL on any store that
 can sign (research 19 section 5). Teams leaving Artifactory run on all three clouds and want
@@ -196,6 +232,20 @@ when the store has one, and SaaS uses `cdnRedirect` for the CDN. Accepting eithe
 the CDN means a repository migrated from either keeps its delivery path, and the header
 keeps its meaning.
 
+**HEAD and conditional requests never leave the registry,** so the CLI's split-download
+probe works on every backend and revalidation never fetches a whole file from storage. This
+matches Artifactory rather than improving on it, because JFrog treats a HEAD answered with a
+redirect signed for GET as a bug:
+- [RTFACT-21799](https://jfrog.atlassian.net/browse/RTFACT-21799) ("Download service returns
+  a 'GET' signedUrl redirect for 'HEAD' request") was fixed in 7.5.0.
+- [RTFACT-31121](https://jfrog.atlassian.net/browse/RTFACT-31121) (SaaS, 2025, Done) records a
+  HEAD that Artifactory redirected to S3 and that failed because "the signature is for GET,
+  not HEAD".
+
+Artifactory 6.20 also answers HEAD and a 304 locally, before any redirect
+(`DownloadServiceImpl.respond`); no 7.x source covers conditional requests. Whether 7.161.32
+still redirects a HEAD is on #216.
+
 **Where it improves on Artifactory** (see the
 [deviations register](../../implementation/deviations.md#delivery)):
 - **CDNs on every cloud and on self-hosted instances,** with no licence tier. Artifactory
@@ -205,8 +255,6 @@ keeps its meaning.
   later range of a split download, after 30 seconds fails without coming back to the
   registry. Five minutes covers those retries. A leaked link still expires quickly, and on
   CloudFront, where every request is checked, it expires exactly.
-- **HEAD and conditional requests never leave the registry,** so the CLI's split-download
-  probe works on every backend and revalidation never fetches a whole file from storage.
 
 **Alternatives considered:**
 - *Only `cdnRedirect` selects the CDN* (separate flags for CDN and storage): clearer per

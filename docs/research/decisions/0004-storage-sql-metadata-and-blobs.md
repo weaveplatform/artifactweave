@@ -40,13 +40,26 @@ and values to 2400 ("JFrog Properties"). A value is kept to 2400 UTF-16 code uni
 build or module property value to 2048, the limit of Artifactory 6.20's `BuildsDao` and
 `BuildModulesDao`, which neither the documentation nor the 7.x release notes cover. As 6.20
 does (`PropertiesDao`), the stores cut a longer value on write rather than refusing it, but
-never inside a surrogate pair; whether 7.x still cuts is unconfirmed (#216). A key longer than 255
-characters is refused with 400 on every route that sets properties, and the stores refuse
-it too ([DV-059](../../implementation/deviations.md#api-behaviour), #340). On PostgreSQL no
+never inside a surrogate pair. 7.x cuts too:
+- [RTFACT-26495](https://jfrog.atlassian.net/browse/RTFACT-26495) (affects 7.27.0, fix
+  version 7.35.1) logs "Trimming property value to 900 characters" on MSSQL. A user on the issue
+  reports the cut at 2400 characters on PostgreSQL, in 7.21.3 and in the cloud version.
+  JFrog's reply states that "Properties defined as an index are trimmed automatically by
+  Artifactory". The 7.35 fix moved Cargo's long metadata out of properties and left the cut
+  in place.
+- The 7.28.9 Cloud notes limit `node_props.prop_value` on MySQL to 2400 bytes, "aligned with
+  an existing limitation in PostgreSQL"
+  ([legacy release notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)).
+
+How 7.x counts the 2400 (characters, UTF-16 code units or bytes) and the 2048 build limit
+stay unconfirmed (#216). A key longer than 255 characters is refused with 400 on every
+route that sets properties, and the stores refuse it too
+([DV-059](../../implementation/deviations.md#api-behaviour), #340). On PostgreSQL no
 index holds a whole value, because a B-tree entry is at most 2704 bytes: the property
 tables are unique on `md5(value)`, and value lookups use an index on the first 255
 characters, which AQL narrows on before it compares whole values (migration 0013, #338).
-The property limits were checked against Artifactory 7.161.32 (2026-10-17).
+The property limits were checked against Artifactory 7.161.32 (2026-10-17), and the cut
+against Jira and the legacy release notes (2026-10-18, #378).
 
 **Blobs.** `pkg/blob` is a content-addressed store keyed by sha256. Every upload computes
 four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three are recorded

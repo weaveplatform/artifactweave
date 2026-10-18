@@ -1,6 +1,6 @@
 # Data model derived from the JFrog API definitions
 
-Checked against: Artifactory 7.161.32
+Checked against: Artifactory 7.161.32; audited against KB, Jira and client sources on 2026-10-18 (#378)
 
 Research baseline: **2026-10-12**. This report derives artifactweave's domain model from
 the 637 OpenAPI blocks cached by the parity oracle (`.specoracle/<family>/<page>.json`,
@@ -56,6 +56,16 @@ JSON documentation page adds read-only `signedUrlTtl` and `xrayDataTtl`, see
 Identity: `key` (also the path parameter; the path wins when both are given). Mutability:
 `key` and `rclass` are create-only; `packageType` is create-only in practice (changing it
 is rejected by Artifactory and must be rejected here); everything else is updatable.
+
+7.x differs: a key is at most 64 characters for local, federated and virtual repositories,
+58 for remote and 63 for Docker, OCI and Helm OCI local and federated ones; it cannot
+contain `/ \ : | ? * " < >`, be one of the reserved names (`.`, `..`, `&`,
+`artifactory-build-info`, `Auto-trashcan`, `release-bundles` and others) or start with
+`Jfrog-system-reserved` or `Jfrog-artifactory-system`; and Docker, OCI and Helm OCI keys
+cannot contain upper case or `_`
+([repository management overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview)).
+artifactweave refuses only an empty key, spaces, `/`, `\` and a `-cache` suffix
+(`pkg/repo/validate.go`); fixed by #395.
 
 Common fields (all classes):
 
@@ -179,6 +189,13 @@ Identity: `(repo, path)`. Mutability: content is replaced by a new deploy (a new
 properties and statistics change independently of content; `created`, `createdBy` and the
 checksums are server-owned.
 
+7.x differs: a copy or move whose source does not exist answers 400 with a
+`CopyOrMoveResult` body ([copy item](https://docs.jfrog.com/artifactory/reference/copyitem),
+[move item](https://docs.jfrog.com/artifactory/reference/moveitem)), where artifactweave
+answers 404 in the error envelope (`internal/service/item/transfer.go`); fixed by #400.
+Whether 7.x sends 400 or 409 is on #216:
+[RTFACT-27134](https://jfrog.atlassian.net/browse/RTFACT-27134) (7.38.8, open) reports a 409.
+
 Supporting records in the same family:
 
 | Record | Operation | Shape |
@@ -189,6 +206,31 @@ Supporting records in the same family:
 | Build artifacts archive request | `POST /api/archive/buildArtifacts` | `{buildName, buildNumber, buildStatus, repos[], archiveType tar\|zip\|tar.gz\|tgz, mappings[{input, output}]}` |
 | Signed URL request | `POST /api/signed/url` | `{repo_path, valid_for_secs, expiry}` (Enterprise, tier stub) |
 | Trash | `/api/trash/*` | no body shapes; `restore` takes `to` and `transaction-size`; `deleteDirectoryTrashProperty/start` takes `{batchSize, pauseBetweenBatchesMs, batchesCount}` |
+
+The storage summary artifactweave serves (`internal/server/storageinfo.go`) differs from 7.x
+in five ways, all fixed by #390:
+- 7.x differs: a token scoped `system:info/storage:r` may read the summary
+  ([get storage summary info](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo)),
+  where artifactweave allows administrators only; fixed by #390.
+- 7.x differs: each repository row also carries `usedSpaceInBytes`, a number, and
+  `projectKey`, `default` outside a project. jfrog-client-go's test asserts both
+  ([`tests/artifactorystorage_test.go`](https://github.com/jfrog/jfrog-client-go/blob/3b4b900d8174/tests/artifactorystorage_test.go)),
+  and jfrog-cli-core reads `usedSpaceInBytes` before it parses `usedSpace`
+  ([`artifactory/utils/storageinfo.go`](https://github.com/jfrog/jfrog-cli-core/blob/master/artifactory/utils/storageinfo.go),
+  `GetUsedSpaceInBytes`). artifactweave sends neither; fixed by #390.
+- 7.x differs: `packageType` is the display name, `Maven` in JFrog's example and `Generic`
+  and `BuildInfo` in a 7.x SaaS capture ([jartifactory](https://github.com/watsonmartin/jartifactory),
+  2022), where artifactweave sends the lower-case API name; fixed by #390.
+- 7.x differs: sizes group thousands, `1,004.64 KB` in jfrog-cli-core's parser test
+  ([`storageinfo_test.go`](https://github.com/jfrog/jfrog-cli-core/blob/master/artifactory/utils/storageinfo_test.go));
+  an empty instance shows `N/A` for `optimization` and each `percentage`; the TOTAL row has
+  no `packageType`, `percentage` or `projectKey`; and an `auto-trashcan` row counts the trash
+  can (the SaaS capture). artifactweave writes `1004.88 KB` and `0%`, gives the TOTAL row
+  `packageType: "NA"` and `percentage: "100%"`, and has no trash row; fixed by #390.
+- 7.x differs: `fileStoreSummary.storageType` names the binary-provider template, such as
+  `s3-storage-v3-direct` on S3 SaaS, and an object store reports no space fields (the SaaS
+  capture), where artifactweave reports `s3`, `google-cloud-storage`, `azure-blob-storage` or
+  `mirror` (`internal/app/gc.go`) with each space value `"unknown"`; fixed by #390.
 
 ### 2.3 Search results (`artifactory-searches-api`)
 
