@@ -218,8 +218,10 @@ func Versions(
 
 // writePackageMetadata rebuilds package name's maven-metadata.xml files in
 // c from the package index: the artifact-level file in the package's
-// folder, each snapshot folder's, and its group's plugin metadata, which
-// Artifactory has recalculated on every deploy and delete since 7.10.1. A
+// folder, each snapshot folder's, and its group's plugin metadata. Since
+// 7.10.1 Artifactory recalculates plugin metadata only for a deployed or
+// deleted plugin file (RTFACT-20623). Rebuilding it on every run stores the
+// same result, because writePluginMetadata writes only a changed file. A
 // file with nothing left to describe is removed (#279), except an
 // artifact-level file a client uploaded.
 func writePackageMetadata(

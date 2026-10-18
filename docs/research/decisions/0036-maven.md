@@ -2,7 +2,7 @@
 
 Status: Accepted
 
-Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 27 section 13](../27-maven.md#13-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against: **Artifactory 7.161.32** on 2026-10-17 ([research 27 section 13](../27-maven.md#13-artifactory-7x-check), [#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 ## Context
 
@@ -82,11 +82,16 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   returns the server's metadata; with no such version the client's file stays.
 - **Deployer** (amended 2026-10-17, #279). A repository whose `snapshotVersionBehavior` is
   `deployer` gets no derived metadata at any level: nothing is queued, written or removed,
-  and every `maven-metadata.xml` in it is the client's. Artifactory 7.x documents the setting
-  so ("Metadata will not be generated when selecting the Deployer option", `local-repositories`),
-  and 7.x fixed a delete of a snapshot emptying a `deployer` repository's metadata
-  (RTFACT-26126). 6.20's source skipped only snapshot files under `deployer`; that difference
-  is on #216.
+  and every `maven-metadata.xml` in it is the client's. Artifactory 7.x documents the deploy
+  side so ("Metadata will not be generated when selecting the Deployer option",
+  `local-repositories`). [RTFACT-26126](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26126)
+  does not support the delete side: its fix (7.27.3) keeps the metadata of a `deployer`
+  repository's other snapshots after a delete, rather than emptying the file, and JFrog staff
+  on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651) say that after
+  other files are deleted "the re-calculation should be done properly on our end". So 7.x
+  recalculates after a delete where this decision does nothing;
+  [#418](https://github.com/weaveplatform/artifactweave/issues/418) aligns it. 6.20's source
+  skipped only snapshot files under `deployer`; that difference is on #216.
 - **Metadata checksums.** A checksum PUT for `maven-metadata.xml` answers 200 and is
   ignored; a metadata file's checksums are always the server's, so the client's later
   `.sha1` never fails under `client-checksums`.
@@ -114,13 +119,16 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   do not re-enter the hooks and the files carry server checksums. They remove through
   `Underive`. A derived file records `_system_` as its creator and modifier, which is how a run
   tells it from a client's artifact-level file (#279).
-- **Plugin metadata** is recalculated on every deploy and delete, as Artifactory has done since
-  7.10.1 ("Improved Maven Plugin Metadata Calculation", [self-managed release
-  notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)): a package's
-  metadata run rebuilds its group's plugin metadata too. A group's own item, keyed by
-  `groupId`, is queued when a POM marked `artifactory.maven.mavenPlugin` is deployed or
-  deleted, or a POM gains or loses the mark, so a read of the group's metadata waits for it
-  (#279).
+- **Plugin metadata** is rebuilt by every package's metadata run, and written only when it
+  changes, so a run for a package with no plugin leaves it as it was. Artifactory has
+  recalculated plugin metadata only when the file deployed or deleted is a Maven plugin since
+  7.10.1 and 6.23.0 ([RTFACT-20623](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20623),
+  research 27 section 3.2), so the stored result is the same. The legacy 7.10.1 note,
+  "calculated for every deploy or delete actions"
+  ([legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)),
+  is the weaker source. A group's own item, keyed by `groupId`, is queued when a POM marked
+  `artifactory.maven.mavenPlugin` is deployed or deleted, or a POM gains or loses the mark, so
+  a read of the group's metadata waits for it (#279).
 - **Reads.** A GET or HEAD of a `maven-metadata.xml`, or of its sidecar, whose package or
   group has pending work calls `EnsureFresh` first, so a client never reads stale metadata.
   A parked item answers 500 in the error envelope.
@@ -242,6 +250,30 @@ The decision stands against 7.161.32. The 7.x documentation and release notes ad
 - **`calculateMetadata`** answers 403 on 7.x to a caller without the permission it needs, so
   DV-052 now differs from 7.x only in which permission that is.
 - **`maxUniqueSnapshots` of 0** turns the cleanup off (SaaS 7.164.0).
+
+The audit against KB, Jira and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) adds the following:
+- **Plugin metadata** is calculated only for plugin files since 7.10.1 ([J] RTFACT-20623);
+  the derived-work rule above stores the same result.
+- 7.x differs: an ISO-8859-1 POM is accepted on upload and on copy ([D] SaaS 7.110.5,
+  RTDEV-56287); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- 7.x differs: version tokens resolve only under a layout that defines both
+  `[folderItegRev]` and `[fileItegRev]` ([D] retrieveartifact); fixed by
+  [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- 7.x differs: under `deployer`, a delete of other files recalculates the metadata ([J]
+  RTFACT-26126, fixed in 7.27.3; JFrog staff on RTFACT-26651); fixed by
+  [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- 7.x differs: under `client-checksums`, a GET of a sidecar the client never sent answers 404
+  ([D] local-repositories); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+- 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
+  sbt-repositories); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
+- `maxUniqueSnapshots`: a KB article gives a floor of 2 unique snapshots and a cleanup every 5
+  minutes ([KB], research 27 section 13), where this decision accepts a limit of 1 and runs
+  the cleanup when the queue reaches it; [#283](https://github.com/weaveplatform/artifactweave/issues/283)
+  settles both.
+- `calculateMetadata`: JFrog's REST reference required Manage, Delete/Overwrite, Deploy/Cache,
+  Annotate and Read from 4.8 ([D], an Internet Archive copy, research 27 section 13), so
+  DV-052's "open to any authenticated user" no longer describes Artifactory;
+  [#282](https://github.com/weaveplatform/artifactweave/issues/282) settles the permission.
 
 ## Constraints
 

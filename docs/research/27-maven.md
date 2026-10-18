@@ -2,7 +2,7 @@
 
 Research baseline: **2026-10-16**.
 
-Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [section 13](#13-artifactory-7x-check) records the check.
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [section 13](#13-artifactory-7x-check) records the check.
 
 Phase P7 serves Maven local repositories, and Gradle, Ivy and SBT repositories through the
 same handler with their own layouts. [Research 03](03-repository-configuration-model.md)
@@ -19,6 +19,8 @@ Each claim is labelled:
 |---|---|
 | **[D]** | documented at the cited place, read on 2026-10-16 |
 | **[S]** | seen in source code at the cited commit |
+| **[KB]** | stated in the cited JFrog KB article, read on 2026-10-18 |
+| **[J]** | recorded in JFrog's public Jira, in the cited issue, read on 2026-10-18 |
 | **[I]** | inferred from the documented facts; not stated by any source |
 
 Sources:
@@ -102,8 +104,14 @@ for 7.x and stays on that list.
   ([research 03](03-repository-configuration-model.md#bundled-definitions)).
 - **[S]** The Terraform provider gives each type a default `repoLayoutRef`: `maven-2-default`
   for Maven and Gradle, `ivy-default` for Ivy and `sbt-default` for SBT
-  (`default_repo_layout_map.go`). Artifactory's REST API defaults every type to
-  `maven-2-default` (research 24, fact 2.13).
+  (`default_repo_layout_map.go`).
+- **[D]** JFrog's Create Repository reference gives `repoLayoutRef` as "Default
+  `maven-2-default` where applicable"
+  ([createrepository](https://docs.jfrog.com/artifactory/reference/createrepository.md)), and
+  its sbt page says `sbt-default` "is automatically applied when creating a repository without
+  specifying a layout" ([sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md),
+  updated 2026-01-05). Research 24's fact 2.13 records artifactweave's own default, which gives
+  every type `maven-2-default`, and is no source for Artifactory's.
 
 ### 1.2 Tokens
 
@@ -242,6 +250,14 @@ Artifactory uses two different tests:
   work queues of 8 and 2 workers (`mvn.metadata.calculation.workers`,
   `mvn.metadata.plugin.calculation.workers`). Every calculation, synchronous or not, then
   queues the plugin metadata of the whole repository (`MavenMetadataServiceImpl`).
+- **[J] 7.x** calculates plugin metadata only when the file deployed or deleted is a Maven
+  plugin, since 7.10.1 and 6.23.0
+  ([RTFACT-20623](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20623): "Today we
+  calculate the plugins metadata on every deploy/delete, we need to do so only if the file
+  deployed/deleted is a maven plugin file"). The legacy 7.10.1 note, "Maven plugin metadata is
+  now calculated for every deploy or delete actions"
+  ([legacy notes](https://releases.jfrog.io/artifactory/legacydocs/Artifactory-Self-Managed-Release-Notes-End-of-Life.pdf)),
+  reads the other way; the Jira issue fixed in that release is the more precise source.
 - **[S] Calculations** are not recursive unless asked; `calculateMetadata` asks by default
   (section 9).
 
@@ -555,14 +571,14 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
 
 ## 13. Artifactory 7.x check
 
-Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 **Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The Maven pages read are [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md), [maven-repositories](https://docs.jfrog.com/artifactory/docs/maven-repositories.md),
 [repository-layouts](https://docs.jfrog.com/artifactory/docs/repository-layouts.md), [retrieveartifact](https://docs.jfrog.com/artifactory/reference/retrieveartifact.md), [calculatemavenmetadata](https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md) and
 [generatemavenpomfile](https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md).
 
 **Confirmed for 7.x:**
-- The three snapshot behaviours, and no metadata under `deployer` (2.1).
+- The three snapshot behaviours, and no metadata generated on a deploy under `deployer` (2.1).
 - The two checksum policies and their 404 and 409 (section 4).
 - `handleReleases`, `handleSnapshots` and the POM consistency refusal (sections 5 and 6), now
   with its status, 409 (7.125.4).
@@ -580,6 +596,53 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   DV-052 amended).
 - A reset of `maxUniqueSnapshots` to 0 turns the cleanup off, and the cleanup is queued
   (section 7).
+- Plugin metadata is calculated only when the file deployed or deleted is a Maven plugin,
+  since 7.10.1 ([J] RTFACT-20623, section 3.2). Decision 0036 now says so.
+
+**7.x differs** from artifactweave on these points, found by the audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
+- 7.x differs: an ISO-8859-1 POM is accepted on upload and on copy, where artifactweave reads
+  every POM as UTF-8 and refuses one with a non-ASCII byte ([D]
+  [SaaS 7.110.5](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71105-saas),
+  RTDEV-56287, section 6); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- 7.x differs: `[RELEASE]` and `[INTEGRATION]` resolve only under a layout that defines both
+  `[folderItegRev]` and `[fileItegRev]`, so under `maven-1-default` or `sbt-default` the path
+  is looked up as it is ([D] [retrieveartifact](https://docs.jfrog.com/artifactory/reference/retrieveartifact.md):
+  "Both [folderItegRev] and [fileItegRev] have to be defined in the repository layout",
+  section 8); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- 7.x differs: under `deployer`, a delete of other files recalculates `maven-metadata.xml`
+  rather than leaving it ([J] [RTFACT-26126](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26126),
+  fixed in 7.27.3, expects "metadata related to other snapshots in that repository" to remain
+  after a delete; JFrog staff on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651):
+  "If the file is not deleted, but only the other files (jars,etc.), the re-calculation should
+  be done properly on our end"); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+- 7.x differs: under `client-checksums`, a GET of a sidecar the client never sent answers 404
+  ([D] [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md):
+  "Artifactory will return a 404 (not found) error to a client trying to access that
+  checksum", section 4); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+- 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
+  [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), section
+  1.1); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
+
+**Evidence for open tickets.** The audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found 7.x evidence for three points that open tickets change:
+- `maxUniqueSnapshots`: "Artifactory requires that you store a minimum of 2 unique
+  snapshots", builds over the limit are marked on deploy, and "every 5 minutes, Artifactory
+  runs a background process" that deletes them ([KB] [how the max unique snapshots parameter
+  works](https://jfrog.com/help/r/artifactory-how-does-the-max-unique-snapshots-parameter-work-in-artifactory/how-does-this-feature-work),
+  modified 2025-05-15). This is the knowledge-base source section 7 could not read; the floor
+  and the timing are [#283](https://github.com/weaveplatform/artifactweave/issues/283)'s.
+- `calculateMetadata` permission: JFrog's REST reference required "Manage, Delete/Overwrite,
+  Deploy/Cache, Annotate, and Read" from 4.8 ([D] the
+  [Internet Archive copy](http://web.archive.org/web/20260216142936/https://jfrog.com/help/r/jfrog-rest-apis/calculate-maven-metadata)
+  of 2026-02-16; the current page names no permission), so DV-052's "open to any
+  authenticated user" no longer describes Artifactory. Section 9 also still quotes
+  artifactweave's specification as "Plain-text acknowledgement naming the folder", where it
+  now says "Empty." (`api/src/artifactory/paths-packagetypes.yaml`). Both are
+  [#282](https://github.com/weaveplatform/artifactweave/issues/282)'s.
+- `sbt-ivy-default`: the two newest exported 7.x descriptors define it as
+  `[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]`
+  ([I], [research 03](03-repository-configuration-model.md#exported-7x-descriptors)), which
+  weakens DV-055's reasoning that no definition is published;
+  [#376](https://github.com/weaveplatform/artifactweave/issues/376) aligns it.
 
 **Unconfirmed for 7.x:** every other **[S]** claim, which the 6.20 source alone supports:
 - the snapshot adapters and build numbering (2.2, 2.3);

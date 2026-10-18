@@ -2,7 +2,7 @@
 
 Research baseline: **2026-10-16**.
 
-Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); [the 7.x check](#8-artifactory-7x-check) records it.
+Checked against: **Artifactory 7.161.32** (self-managed; SaaS 7.174.0) on 2026-10-17, by [#341](https://github.com/weaveplatform/artifactweave/issues/341); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)); [the 7.x check](#8-artifactory-7x-check) records it.
 
 Phase P7 serves Go modules from local `go` repositories. [Research 04](04-package-protocols.md)
 sketched the GOPROXY protocol and said nothing in it was unverified. Planning on 2026-10-16
@@ -18,6 +18,7 @@ Each claim is labelled:
 |---|---|
 | **[D]** | documented at the cited URL, read on 2026-10-16 |
 | **[S]** | seen in source code at the cited commit |
+| **[J]** | recorded in JFrog's public Jira, in the cited issue, read on 2026-10-18 |
 | **[I]** | inferred from the documented facts; not stated by any source |
 
 Sources:
@@ -37,7 +38,7 @@ Sources:
   `4a0f3827cfa0` (`artifactory/commands/golang/`: `gopublish.go`, `publish.go`, `go.go` and
   `archive.go`), jfrog-client-go `0646d7b50f9a` (`artifactory/services/go/`, and
   `AddChecksumHeaders` in `artifactory/services/utils/artifactoryutils.go`), and jfrog-cli
-  `eb1d5eb7ca97` (`docs/buildtools/gopublish/help.go`).
+  `eb1d5eb7ca97` (`GetAIDescription` in `docs/buildtools/gopublish/help.go`).
 - **Artifactory 6.20's open-source edition**, the `knottnhupfer/artifactory-oss` mirror at
   `b99e5649bcad` that research 22 used, under `base/config/src/main/`:
   `java/org/artifactory/version/converter/v213/GoDefaultLayoutConverter.java`,
@@ -187,10 +188,15 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
     `X-Checksum-Md5`, and `X-Checksum` carrying the SHA-256;
   - each upload must answer exactly 201 (`CheckResponseStatusWithBody(..., http.StatusCreated)`);
   - it reads `X-Checksum-Sha256` from the response, and only logs when it is missing.
-- **[S]** jfrog-cli `docs/buildtools/gopublish/help.go`: "The version must follow Go module
-  versioning (vMAJOR.MINOR.PATCH); without 'v' prefix go tooling will reject it" and
-  "Republishing the same version is rejected by Artifactory's Go repository." It gives no
-  status code.
+- **[S]** jfrog-cli `docs/buildtools/gopublish/help.go` holds two texts. `GetDescription`,
+  the help `jf gp` prints, says only "Publish go package and/or its dependencies to
+  Artifactory." `GetAIDescription`, a context string for AI agents that
+  [jfrog-cli #3503](https://github.com/jfrog/jfrog-cli/pull/3503) added on 2026-06-08
+  (`eb1d5eb7ca97`), says "The version must follow Go module versioning
+  (vMAJOR.MINOR.PATCH); without 'v' prefix go tooling will reject it" and "Republishing the
+  same version is rejected by Artifactory's Go repository." It gives no status code.
+- **[I]** That Artifactory refuses a republish rests on that string alone. No JFrog
+  documentation, KB article or Jira issue states it (item 5 of section 6).
 - **[I]** Publishing the same source twice gives the same `.zip` and `.mod`, since the zip
   holds no times, and a different `.info`, since its `Time` is the moment of publishing.
 
@@ -310,7 +316,7 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
 
 ## 8. Artifactory 7.x check
 
-Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)).
+Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/weaveplatform/artifactweave/issues/341)); audited against KB, Jira and client sources on 2026-10-18 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)).
 
 **Sources.** JFrog's current documentation, read on 2026-10-17 (the pages named below), and the Artifactory release notes: self-managed 7.84.3 to 7.161.32 ([self-managed releases](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases)), SaaS 7.80.0 to 7.174.0 ([SaaS releases](https://docs.jfrog.com/releases/docs/artifactory-saas-releases)), the [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues) and the [deprecations](https://docs.jfrog.com/releases/docs/artifactory-deprecations). JFrog no longer publishes the notes for 7.0 to 7.83 (the [end-of-life page](https://docs.jfrog.com/releases/docs/artifactory-end-of-life) keeps only their dates), so a change in that range shows only through the current documentation. The Go pages read are [go-modules](https://docs.jfrog.com/artifactory/docs/go-modules.md) and [jf-go](https://docs.jfrog.com/artifactory/docs/jf-go.md).
 
@@ -333,7 +339,19 @@ their VCS providers (P9). They are:
   ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed));
 - include and exclude patterns honoured for a remote's `.info` files ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
 
-None changes what a local repository stores or answers.
+None changes what a local repository stores or answers. Jira and the exported descriptors
+show two earlier changes that do ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
+- 7.x differs: a local repository's `@v/list` gives each version a second field, its time
+  from the version's `.info`, and lists the pseudo-versions `jf gp` pushed ([J]
+  [RTFACT-21670](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21670), fixed in 7.8.1:
+  Artifactory "is using the last update timestamp for local Go repositories when populating
+  the version list ... we should use that information"); fixed by
+  [#417](https://github.com/weaveplatform/artifactweave/issues/417).
+- `go-default`: three of the four exported 7.x descriptors define it as
+  `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]`, and only the scala one keeps
+  6.20's `v[refs].zip` ([I], [research 03](03-repository-configuration-model.md#exported-7x-descriptors)),
+  so section 4.2's "matches no module file" no longer describes current 7.x;
+  [#376](https://github.com/weaveplatform/artifactweave/issues/376) aligns the layout and DV-040.
 
 **Unconfirmed for 7.x:** Artifactory's Go handler was closed source before 7, so the 6.20 mirror
 holds nothing for this report beyond the shared repository code. Every **[I]** above stays on
