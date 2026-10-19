@@ -917,11 +917,13 @@ paths:
       x-tier: stub
   /api/system/usage:
     post:
-      description: Accepts any usage report body and discards it.
+      description: Accepts a usage report body of up to 1 MiB and discards it.
       operationId: postSystemUsage
       responses:
         '200':
           description: Accepted and discarded.
+        '413':
+          description: The request body is larger than 1 MiB.
       summary: Usage telemetry sink
       tags:
       - system

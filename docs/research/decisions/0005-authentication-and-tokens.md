@@ -380,7 +380,8 @@ caller, and anonymous only while anonymous access is on, because 7.x refuses it 
 without credentials ([research 01](../01-jfrog-api-landscape.md#authentication-schemes));
 the Access version stays open. `/api/system/license` is honest
 (`type: "artifactweave"`); no client gates on it. `POST /api/system/usage` and
-`POST /jfconnect/api/v1/backoffice/metrics/log` answer 2xx and discard the body.
+`POST /jfconnect/api/v1/backoffice/metrics/log` answer 2xx and discard a body of up to
+1 MiB, and 413 to a longer one ([0016](0016-observability-and-health.md#decision)).
 
 ## Rationale
 

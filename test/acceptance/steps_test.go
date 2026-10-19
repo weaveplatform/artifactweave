@@ -137,6 +137,7 @@ func (w *world) register(sc *godog.ScenarioContext) {
 	sc.Step(`^the response header "([^"]*)" contains "([^"]*)"$`, w.headerContains)
 	sc.Step(`^I keep the path of the response header "([^"]*)" as "([^"]*)"$`, w.keepHeaderPath)
 	sc.Step(`^I POST "([^"]*)" with body:$`, w.post)
+	sc.Step(`^I POST "([^"]*)" with a body of (\d+) bytes$`, w.postSized)
 	sc.Step(`^I (PUT|POST|PATCH|DELETE) "([^"]*)" as admin with body:$`, w.sendAsAdmin)
 	sc.Step(`^I DELETE "([^"]*)" as admin$`, w.deleteAsAdmin)
 	sc.Step(`^I create the RSA key pair "([^"]*)" with alias "([^"]*)" as admin$`, w.createKeyPair)
@@ -312,6 +313,12 @@ func (w *world) getWithToken(path, name string) error {
 // argument would need escaping that godog's step regex cannot match.
 func (w *world) post(path string, body *godog.DocString) error {
 	return w.request(http.MethodPost, path, w.expand(body.Content))
+}
+
+// postSized posts a body too long to write out in a feature, for the body
+// limits.
+func (w *world) postSized(path string, size int) error {
+	return w.request(http.MethodPost, path, strings.Repeat("x", size))
 }
 
 func (w *world) sendAsAdmin(method, path string, body *godog.DocString) error {

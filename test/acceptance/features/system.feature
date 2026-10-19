@@ -56,6 +56,20 @@ Feature: System endpoints
       {"productId":"jfrog-cli-go/2.126.0","features":[]}
       """
     Then the response status is 200
+    When I POST "/jfconnect/api/v1/backoffice/metrics/log" with body:
+      """
+      {"metrics":[]}
+      """
+    Then the response status is 200
+
+  # The sinks answer without credentials, so their bodies are capped at
+  # 1 MiB (#431).
+  Scenario: A telemetry body over 1 MiB is refused
+    When I POST "/artifactory/api/system/usage" with a body of 1048577 bytes
+    Then the response status is 413
+    And the JSON field "errors.0.status" equals "413"
+    When I POST "/jfconnect/api/v1/backoffice/metrics/log" with a body of 1048577 bytes
+    Then the response status is 413
 
   Scenario: Xray is stubbed in its own envelope
     When I GET "/xray/api/v1/system/version" as admin
