@@ -19,6 +19,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/formats"
 	"github.com/weaveplatform/artifactweave/internal/server/baseurl"
 	"github.com/weaveplatform/artifactweave/internal/server/docker"
 	accessgen "github.com/weaveplatform/artifactweave/internal/server/gen/access"
@@ -126,9 +127,13 @@ type Config struct {
 	// (decision 0033). Nil writes that work to the store's queue directly,
 	// where the workers find it on their next poll.
 	Work *work.Queue
-	// Formats returns a package type's format; nil means formats.For. Only
-	// tests set it, to substitute formats that record their hooks.
+	// Formats returns a package type's format; nil means
+	// FormatSettings.For. Only tests set it, to substitute formats that
+	// record their hooks.
 	Formats func(repo.PackageType) format.Handler
+	// FormatSettings are the formats' server-wide options, such as
+	// npm.tag_latest_by_publish; the zero value is each format's default.
+	FormatSettings formats.Settings
 	// Protocols are mounted through the router kit after the built-in ones
 	// (protocols). Only tests set it, to mount a test-only protocol.
 	Protocols []pkgroute.Protocol
@@ -143,6 +148,7 @@ var protocols = []func(Config) pkgroute.Protocol{
 		return npm.Protocol(npm.Options{
 			Accounts:       npmAccounts(cfg),
 			MaxPublishSize: cfg.NPMMaxPublishSize,
+			Format:         cfg.FormatSettings.NPM,
 		})
 	},
 }

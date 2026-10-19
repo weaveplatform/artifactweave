@@ -8,7 +8,8 @@ Status: Accepted
 ## Context
 
 Package formats derive data from what is deployed:
-- Maven metadata at the snapshot, artifact and plugin levels, and `maxUniqueSnapshots` (P7);
+- Maven metadata at the snapshot, artifact and plugin levels, and `maxUniqueSnapshots` for
+  Maven and npm (P7);
 - Helm's `index.yaml` and NuGet's registration pages (P8);
 - webhook deliveries, replication and cleanup (P11).
 
@@ -88,9 +89,11 @@ takes them at once.
 
 So clients never read stale derived data, while the write path stays short.
 
-**Periodic kinds** (#283). A kind whose work Artifactory does on a timer, such as Maven's
+**Periodic kinds** (#283). A kind whose work Artifactory does on a timer, such as the
 `maxUniqueSnapshots` cleanup every five minutes, is registered with an interval
-(`HandleEvery`). Its items are enqueued like any other, so a mark survives a restart, but
+(`HandleEvery`). Maven's cleanup and npm's, of pre-releases (decision [0034](0034-npm.md),
+#515), are two kinds on one interval, `maven.snapshot_cleanup_interval`, since 7.x runs one
+cleanup for every package type. Its items are enqueued like any other, so a mark survives a restart, but
 the workers do not take them as they fall due: a timer on each node takes every due item of
 the kind once per interval (`RunDue`), with the usual leases, retries and parking. An item
 asked for again during its run waits for the next tick. `EnsureFresh` still runs one at
@@ -153,4 +156,6 @@ Kinds are code constants, so the labels stay bounded.
   heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics;
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
 - `internal/format/npm/work_test.go` and `internal/server/npm_operations_test.go`: npm's
-  queued reindex and conversion, a conversion that fails and is parked, and its resume.
+  queued reindex and conversion, a conversion that fails and is parked, and its resume;
+  `internal/format/npm/cleanup_test.go`: npm's pre-release cleanup, marked by a deploy and
+  run by `RunDue`.

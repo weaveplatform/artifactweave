@@ -33,6 +33,7 @@ Sources:
   `f9d40441f262`, `build/utils/npm.go`.
 - **Artifactory OSS 6.20** (`knottnhupfer/artifactory-oss` at `b99e5649bcad`):
   `base/config/src/main/resources/META-INF/default/artifactory.config.xml`,
+  `base/config/src/main/java/org/artifactory/common/ConstantValues.java`,
   `backend/core/src/main/java/org/artifactory/repo/interceptor/NpmMetadataInterceptor.java`,
   `backend/core/src/main/java/org/artifactory/metadata/service/provider/NpmMetadataProvider.java`,
   `web/rest-ui/src/main/java/org/artifactory/ui/rest/service/artifacts/search/packagesearch/strategy/AqlUINpmKeywordsSearchStrategy.java`,
@@ -88,7 +89,9 @@ Sources:
 | From 7.31.10 an npm publish follows the repository's checksum policy, with the SHA-1 in the body's `dist` as the client's checksum, so `server-generated-checksums` does not refuse a mismatch. artifactweave records `dist.shasum` and the `dist.integrity` hashes of the algorithms it computes as the tarball's original checksums under either policy, so under `client-checksums` the tarball's `.sha1` file serves `dist.shasum` ([#399](https://github.com/weaveplatform/artifactweave/issues/399)) | [J] RTFACT-14280 (fixed in 7.31.10) |
 | The repository's release and snapshot handling applies to npm local deploys: a `.tgz` the policy forbids answers 409: "409 conflict … rejected the resolution of an artifact 'zhl-npm-local:jenkins/-/jenkins-1.1.0.tgz' due to conflict in the snapshot release handling policy" | [KB] 000006800 |
 | The opening of that message, "The repository '<repo>'", which the KB elides; artifactweave gives 6.20's `SnapshotPolicyException` wording, as for Maven | [I] |
-| How 7.x classes an npm version as a release or a snapshot. artifactweave reads the version from the path and classes a pre-release as a snapshot, as the `npm-default` layout of 7.x's exported descriptors reads anything after the version's first hyphen as an integration revision | [I] |
+| How 7.x classes an npm version as a release or a snapshot. artifactweave reads the version from the path and classes a pre-release as a snapshot. The `npm-default` layout of 7.x's exported descriptors does not settle it: its greedy `[module]` reads `lodash-5.0.0-rc.1.tgz` as module `lodash-5.0.0` and base revision `rc.1`, with no integration revision ([research 03](03-repository-configuration-model.md#bundled-definitions)) | [I] |
+| `maxUniqueSnapshots` can be set on an npm repository, and 7.x's cleanup then deletes artifacts there: "Users can set the `maxUniqueSnapshots` value on npm repos, causing artifacts to be deleted unexpectedly in certain cases" (from 7.35.4, no fix listed) | [D] [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), RTDEV-45622 |
+| Which npm versions that cleanup counts, how it groups them, and what the "certain cases" are. artifactweave counts each pre-release of a base version as one unique build of it and deletes the oldest past the limit, on Maven's timer ([#515](https://github.com/weaveplatform/artifactweave/issues/515)) | [I] |
 | The body of a successful publish, and the status and body of one the checksum policy refuses; KB 000005823's log gives the republish 403 a 144-byte body | [I] |
 
 ### 2.2 Dist-tags, deprecate and unpublish
@@ -200,11 +203,15 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 |---|---|
 | By default `latest` is the version with the highest SemVer | [D] npm-repositories |
 | `artifactory.npm.tag.tagLatestByPublish=true` makes the most recently published version `latest` | [D] npm-repositories |
-| `tagLatestByPublish` is one global system property, off by default. Artifactory ignored it until 6.18.0 and 7.3.0, and a per-repository setting is an open request | [J] RTFACT-20127 (fixed in 6.18.0 and 7.3.0), RTFACT-16406 (open) |
+| `tagLatestByPublish` is one global system property, off by default. Artifactory ignored it until 6.18.0 and 7.3.0, and a per-repository setting is an open request | [J] RTFACT-20127 (fixed in 6.18.0 and 7.3.0), RTFACT-16406 (open); [S] 6.20 `ConstantValues.java:121`, `npmTagLatestByPublish("npm.tag.tagLatestByPublish", FALSE)` |
+| The property came with RTFACT-9754 (5.2.1), "Implicitly tag publish package with 'latest' tag if no tag was specified", so a publish with a tag does not take `latest` | [J] RTFACT-9754 |
+| With the property in effect a pre-release published last becomes `latest`: after 0.1.2, a publish of 0.0.33-SNAPSHOT11 made it `latest` | [J] RTFACT-20127, the reporter's capture of the behaviour the property gives |
+| How the property treats a redeploy of an existing version, a version copied or moved in, a removal of `latest`'s version, and two versions deployed at one moment. artifactweave's `npm.tag_latest_by_publish` ranks versions by when each was last deployed in rules 2 and 4, leaves `latest` on a redeploy, keeps a moved version's deploy time, and breaks a tie by the default order ([#515](https://github.com/weaveplatform/artifactweave/issues/515)) | [I] |
 | Artifactory stores `latest` as it stores any dist-tag, as `npm.disttag=latest` on the latest version's tarball, and indexing rewrites it | [D] [7.84.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78410-self-managed), RTDEV-37593 and RTDEV-40221 ("overwrote the latest dist-tag to the wrong version during package indexing"); [J] RTFACT-31340, RTFACT-21400, RTFACT-30153 (an AQL query on `{"@npm.disttag": "latest"}`). artifactweave stores it the same way ([#289](https://github.com/weaveplatform/artifactweave/issues/289)) |
 | `npm publish --tag <t>` leaves `latest` where it is, unless the package has no version yet | [J] RTFACT-14111, RTFACT-14920, RTFACT-31108; RTFACT-24072, JFrog's reproduction: after `npm publish --tag beta` of 1.0.0-beta.2, `latest` stays 1.0.0-beta.1. artifactweave leaves it too ([#289](https://github.com/weaveplatform/artifactweave/issues/289)) |
 | How long a `latest` set by `npm dist-tag add` lasts across later publishes, reindex, copy, move and delete; which version becomes `latest` when every version left is a pre-release; and what `npm dist-tag rm latest` answers. artifactweave keeps such a `latest` until an untagged version that outranks it arrives or its version goes, then gives it to the highest release, or the highest pre-release when there is none, and answers `dist-tag rm latest` by giving `latest` to that version | [I] |
 | The `latest` a publish body names is ignored, and `npm dist-tag add <version> latest` sets it | [J] RTFACT-8184, RTFACT-26099; RTFACT-16009, RTFACT-7400 |
+| What 7.x does with the dist-tags of a tarball overwritten with another version's content. artifactweave takes the dropped version's `npm.disttag` values off the file unless the write sets its own, so a later conversion hands none of them on ([#515](https://github.com/weaveplatform/artifactweave/issues/515)) | [I] |
 | In a local repository a pre-release does not become `latest` while a stable version exists: with 1.0.0 and 1.0.1-2 published, `latest` is 1.0.0 | [J] RTFACT-30783 (a local repository on 7.94.1), RTFACT-17732 (6.5.1) |
 | Virtual repositories merge `latest` by the same stable-first rule from 7.120.0; the release notes do not list it | [KB] 000007043 (virtual repositories only) |
 | In a virtual repository a custom dist-tag resolves to the first member, in resolution order, that has it; `artifactory.npm.merge.latest.dist.tag.base.strategy.enabled=true` (from 7.75.3) takes the highest SemVer version across members instead, or the newest with `tagLatestByPublish` | [D] npm-repositories, "Configure Distribution Tag Behavior" |
@@ -310,6 +317,16 @@ Each item below is on #216 for the live comparison in P19:
     client's read removes it (section 2.2).
 30. What the strict-layout conversion does with a tarball whose canonical path is taken,
     and how it reports it (section 6).
+31. What 7.x does with the dist-tags of a tarball overwritten with another version's
+    content, and of one off its canonical path; artifactweave takes the dropped version's
+    off the file unless the write sets its own, and leaves a stray tarball's alone
+    (section 7).
+32. How `tagLatestByPublish` treats a redeploy, a version copied or moved in, a removal of
+    `latest`'s version, `npm dist-tag rm latest`, and two versions deployed at one moment
+    (section 7).
+33. Which npm versions 7.x's `maxUniqueSnapshots` cleanup counts, how it groups and dates
+    them, what the known issue's "certain cases" are, and whether a dist-tag keeps a
+    version from it (section 2.1).
 
 ## 11. Artifactory 7.x check
 
@@ -332,6 +349,10 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   to an anonymous request, its 30-day token and the scope given without `@` (section 4);
   `npm.deprecated` and the `npm.keywords` format (section 5); and stable-first `latest` in a
   local repository (section 7).
+- From [#515](https://github.com/weaveplatform/artifactweave/issues/515), checked on
+  2026-10-19 against 7.161.32 and SaaS 7.174.0: `maxUniqueSnapshots` deletes in npm
+  repositories (known issue RTDEV-45622, section 2.1), and `tagLatestByPublish` is off by
+  default and makes the last untagged publish `latest`, a pre-release included (section 7).
 
 **7.x differs from the code on main** where the tables above name an issue; [decision
 0034's 7.x check](decisions/0034-npm.md#artifactory-7x-check) lists each difference with the

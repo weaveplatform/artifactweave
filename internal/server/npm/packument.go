@@ -26,6 +26,8 @@ type pkg struct {
 	repoKey, name string
 	created       time.Time
 	versions      []version
+	// rules are the format's settings, by which a read resolves latest.
+	rules npmfmt.Settings
 }
 
 // version is one indexed version: the index's cleaned version string and
@@ -161,7 +163,7 @@ func (h handler) readable(r *http.Request, name string) (pkg, bool, error) {
 	if err != nil {
 		return pkg{}, false, fmt.Errorf("npm: versions of %s: %w", name, err)
 	}
-	p := pkg{repoKey: key, name: name, created: found.Created}
+	p := pkg{repoKey: key, name: name, created: found.Created, rules: h.format}
 	for _, v := range all {
 		if !h.k.Can(r, npmfmt.CanonicalPath(name, v.Version), types.ActionRead) {
 			continue
@@ -190,11 +192,11 @@ func (p pkg) distTags() map[string]string {
 		}
 	}
 	if _, stored := tags[latestTag]; !stored {
-		numbers := make([]string, 0, len(p.versions))
+		cs := make([]npmfmt.Candidate, 0, len(p.versions))
 		for _, v := range p.versions {
-			numbers = append(numbers, v.number)
+			cs = append(cs, npmfmt.Candidate{Version: v.number, Published: v.meta.Published})
 		}
-		tags[latestTag] = npmfmt.Highest(numbers)
+		tags[latestTag] = p.rules.Latest(cs)
 	}
 	return tags
 }

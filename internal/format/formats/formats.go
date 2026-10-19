@@ -13,25 +13,39 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 )
 
+// Settings are the server-wide options of the formats that take any, from
+// the configuration (decision 0009), each format's in a field of its own.
+// The zero value is every format's default, which is 7.x's. A format's
+// handler carries its settings, so every write that reaches it through an
+// item service built with Settings.For applies them, whichever route the
+// write came by.
+type Settings struct {
+	// NPM is the npm format's (decision 0034).
+	NPM npm.Settings
+}
+
 // handlers are the formats with handlers of their own, each with the test
 // for the package types it serves. A format adds one line here.
 var handlers = []struct {
 	serves  func(repo.PackageType) bool
-	handler format.Handler
+	handler func(Settings) format.Handler
 }{
-	{docker.Serves, docker.Handler{}},
-	{golang.Serves, golang.Handler{}},
-	{maven.Serves, maven.Handler{}},
-	{npm.Serves, npm.Handler{}},
+	{docker.Serves, func(Settings) format.Handler { return docker.Handler{} }},
+	{golang.Serves, func(Settings) format.Handler { return golang.Handler{} }},
+	{maven.Serves, func(Settings) format.Handler { return maven.Handler{} }},
+	{npm.Serves, func(s Settings) format.Handler { return npm.Handler{Settings: s.NPM} }},
 }
 
-// For returns the format of a package type. A type is generic until its
-// format lands: generic keeps no package index.
-func For(t repo.PackageType) format.Handler {
+// For returns the format of a package type with s applied. A type is
+// generic until its format lands: generic keeps no package index.
+func (s Settings) For(t repo.PackageType) format.Handler {
 	for _, h := range handlers {
 		if h.serves(t) {
-			return h.handler
+			return h.handler(s)
 		}
 	}
 	return generic.Handler{}
 }
+
+// For returns the format of a package type with its default settings.
+func For(t repo.PackageType) format.Handler { return Settings{}.For(t) }

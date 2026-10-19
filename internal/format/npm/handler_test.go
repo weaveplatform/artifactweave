@@ -471,28 +471,51 @@ func TestMissingContent(t *testing.T) {
 }
 
 // Inspect reads only what could be a canonical tarball, before the write's
-// transaction.
+// transaction, and notes whether the write sets its own dist-tags, which
+// content that is no tarball needs as much as a tarball.
 func TestInspect(t *testing.T) {
 	w := newWorld(t)
 	h := npm.Handler{}
 	tarball := w.deploy("x/-/x-1.0.0.tgz", pkg("x", "1.0.0", ""), nil)
 	garbage := w.deploy("y/-/y-1.0.0.tgz", []byte("garbage"), nil)
 	env := format.Env{Blobs: w.items.Blobs}
+	tagged := types.Properties{npm.PropDistTag: {"beta"}}
 	for _, c := range []struct {
-		w    format.Write
-		want bool
+		w               format.Write
+		inspected, read bool
+		ownTags         bool
 	}{
-		{format.Write{Op: format.OpDeploy, Path: "x/-/x-1.0.0.tgz", Checksums: tarball.Actual}, true},
-		{format.Write{Op: format.OpCopy, Path: "z/-/z-1.0.0.tgz", Checksums: tarball.Actual}, true},
-		{format.Write{Op: format.OpDeploy, Path: "x/x-1.0.0.tgz", Checksums: tarball.Actual}, false},
-		{format.Write{Op: format.OpChecksum, Path: "x/-/x-1.0.0.tgz"}, false},
-		{format.Write{Op: format.OpDeploy, Path: "y/-/y-1.0.0.tgz", Checksums: garbage.Actual}, false},
+		{
+			format.Write{Op: format.OpDeploy, Path: "x/-/x-1.0.0.tgz", Checksums: tarball.Actual},
+			true, true, false,
+		},
+		{
+			format.Write{
+				Op: format.OpCopy, Path: "z/-/z-1.0.0.tgz", Checksums: tarball.Actual,
+				Properties: tagged,
+			},
+			true, true, true,
+		},
+		{
+			format.Write{Op: format.OpDeploy, Path: "x/x-1.0.0.tgz", Checksums: tarball.Actual},
+			false, false, false,
+		},
+		{format.Write{Op: format.OpChecksum, Path: "x/-/x-1.0.0.tgz"}, false, false, false},
+		{
+			format.Write{
+				Op: format.OpDeploy, Path: "y/-/y-1.0.0.tgz", Checksums: garbage.Actual,
+				Properties: tagged,
+			},
+			true, false, true,
+		},
 	} {
 		got, err := h.Inspect(w.ctx, env, w.c, c.w)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if tb, ok := got.(*npm.Tarball); ok != c.want || ok && tb.SHA256 != tarball.Actual.SHA256 {
+		tb, own, ok := npm.Inspected(got)
+		if ok != c.inspected || (tb != nil) != c.read || own != c.ownTags ||
+			tb != nil && tb.SHA256 != tarball.Actual.SHA256 {
 			t.Errorf("%+v: %#v", c.w, got)
 		}
 	}

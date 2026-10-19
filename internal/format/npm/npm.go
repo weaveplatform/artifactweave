@@ -57,10 +57,30 @@ type Handler struct {
 	// over a tarball is an overwrite, which needs Delete, as for any item
 	// (decision 0034).
 	generic.Handler
+	// Settings are the server's npm options.
+	Settings Settings
+}
+
+// inspection is what Inspect read for a write to a path that could be
+// canonical.
+type inspection struct {
+	// sha256 is the content read, so a hook can tell the inspection of its
+	// own write from one of other content.
+	sha256 string
+	// tarball is the content as a package tarball, nil when the format
+	// cannot index it.
+	tarball *Tarball
+	// ownTags reports a write that sets npm.disttag itself: a deploy's
+	// matrix parameters, or the properties a copy or move carries over.
+	// Its values then replace the file's (store.ItemStore.PatchProperties),
+	// so none of the dist-tags the file has after the write is left from
+	// content it held before.
+	ownTags bool
 }
 
 // Inspect reads a tarball written at a path that could be canonical,
-// before the write's transaction. Other content needs no reading.
+// before the write's transaction, and notes whether the write sets its
+// own dist-tags. Other content needs no reading.
 func (Handler) Inspect(
 	ctx context.Context,
 	env format.Env,
@@ -70,29 +90,33 @@ func (Handler) Inspect(
 	if w.Checksums.SHA256 == "" || !candidate(w.Path) {
 		return nil, nil //nolint:nilnil // nothing to read is no failure
 	}
-	t, ok, err := ReadStored(ctx, env.Blobs, w.Checksums.SHA256)
-	if err != nil || !ok {
+	t, _, err := ReadStored(ctx, env.Blobs, w.Checksums.SHA256)
+	if err != nil {
 		return nil, err
 	}
-	return t, nil
+	_, own := w.Properties[PropDistTag]
+	return &inspection{sha256: w.Checksums.SHA256, tarball: t, ownTags: own}, nil
 }
 
 // Deployed indexes a tarball stored at its canonical path, and drops the
 // version of a file that no longer is one, such as a tarball overwritten
 // with another version's content. A tarball stored anywhere but where the
 // index reads (pkgindex.Stored) is not indexed.
-func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
+func (h Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
-	t, ok, err := tarballOf(ctx, env, it)
+	in, err := inspectionOf(ctx, env, it)
 	if err != nil {
 		return err
 	}
-	if ok && it.FullPath() == CanonicalPath(t.Name, t.Version) {
-		return index(ctx, env.Store, c, it, t)
+	if t := in.tarball; t != nil && it.FullPath() == CanonicalPath(t.Name, t.Version) {
+		if err := h.index(ctx, env.Store, c, it, t); err != nil {
+			return err
+		}
+		return queueCleanup(ctx, env, c, it, t)
 	}
-	return unindex(ctx, env.Store, it.ID, it.Updated)
+	return h.unindex(ctx, env.Store, it, !in.ownTags)
 }
 
 // Deleted settles latest in each package a delete or a move took a
@@ -101,7 +125,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 // removed tarballs' versions are gone by now, so their packages are found
 // by the names their paths give; a package with no version left is gone
 // too, and a stray tarball's package keeps its latest.
-func (Handler) Deleted(
+func (h Handler) Deleted(
 	ctx context.Context,
 	env format.Env,
 	c repo.Config,
@@ -122,23 +146,29 @@ func (Handler) Deleted(
 		case err != nil:
 			return fmt.Errorf("npm: package %s: %w", name, err)
 		}
-		if err := settleLatest(ctx, env.Store, p.ID, env.Now()); err != nil {
+		if err := h.Settings.settleLatest(ctx, env.Store, p.ID, env.Now()); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// tarballOf is what it holds: the inspection of its write when there was
-// one of this content, or a read of the content, as a restore needs.
-func tarballOf(ctx context.Context, env format.Env, it types.Item) (*Tarball, bool, error) {
+// inspectionOf is the inspection of the write that stored it when there
+// was one of this content, or else a read of the content, as a restore
+// needs. A restore sets the item's properties to those it recorded
+// (store.ItemStore.SetProperties), so its dist-tags are its own too.
+func inspectionOf(ctx context.Context, env format.Env, it types.Item) (*inspection, error) {
 	if !candidate(it.FullPath()) {
-		return nil, false, nil
+		return &inspection{ownTags: true}, nil
 	}
-	if t, ok := env.Inspection.(*Tarball); ok && t.SHA256 == it.Actual.SHA256 {
-		return t, true, nil
+	if in, ok := env.Inspection.(*inspection); ok && in.sha256 == it.Actual.SHA256 {
+		return in, nil
 	}
-	return ReadStored(ctx, env.Blobs, it.Actual.SHA256)
+	t, _, err := ReadStored(ctx, env.Blobs, it.Actual.SHA256)
+	if err != nil {
+		return nil, err
+	}
+	return &inspection{sha256: it.Actual.SHA256, tarball: t, ownTags: true}, nil
 }
 
 // Annotated follows a change to an indexed tarball's dist-tags or
@@ -150,7 +180,7 @@ func tarballOf(ctx context.Context, env format.Env, it types.Item) (*Tarball, bo
 // settles it anew (rule 4), so npm dist-tag rm latest hands latest to the
 // version that outranks the others, which may be the one it was taken
 // from.
-func (Handler) Annotated(
+func (h Handler) Annotated(
 	ctx context.Context,
 	env format.Env,
 	_ repo.Config,
@@ -172,7 +202,7 @@ func (Handler) Annotated(
 	if err := refresh(ctx, env.Store, pv, it.ID); err != nil {
 		return err
 	}
-	return settleLatest(ctx, env.Store, pv.PackageID, a.At)
+	return h.Settings.settleLatest(ctx, env.Store, pv.PackageID, a.At)
 }
 
 // followed reports whether a changes a property the index follows.
@@ -194,6 +224,6 @@ func nonEmpty(values []string) []string {
 // properties, a remote repository's from its cache. Which repositories the
 // JFrog reindex operation accepts is the API's rule, not the index's:
 // decision 0034's local-only 400 is answered in internal/server.
-func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
-	return reindex(ctx, env, c)
+func (h Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error {
+	return h.reindex(ctx, env, c)
 }

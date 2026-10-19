@@ -18,6 +18,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/weaveplatform/artifactweave/internal/auth"
+	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -31,6 +32,9 @@ type Options struct {
 	// MaxPublishSize is the largest publish request accepted
 	// (npm.max_publish_size); zero means DefaultMaxPublishSize.
 	MaxPublishSize int64
+	// Format are the npm format's settings, which a read applies when it
+	// resolves latest itself, as the format would settle it.
+	Format npmfmt.Settings
 }
 
 // DefaultMaxPublishSize is decision 0034's default npm.max_publish_size.
@@ -54,7 +58,9 @@ func Protocol(o Options) pkgroute.Protocol {
 		// operation's own POST reaches the generated server ahead of the kit.
 		Reserved: []string{"auth", "{repoKey}/auth/{scope}"},
 		Routes: func(r chi.Router, k *pkgroute.Kit) {
-			routes(r, handler{accounts: o.Accounts, k: k, maxPublish: o.MaxPublishSize})
+			routes(r, handler{
+				accounts: o.Accounts, k: k, maxPublish: o.MaxPublishSize, format: o.Format,
+			})
 		},
 	}
 }
@@ -82,6 +88,7 @@ type handler struct {
 	accounts   Accounts
 	k          *pkgroute.Kit
 	maxPublish int64
+	format     npmfmt.Settings
 }
 
 // ping answers every caller the server lets through: an authenticated

@@ -23,22 +23,6 @@ import (
 // minutes.
 const KindSnapshots = "maven.snapshots"
 
-// MinUniqueSnapshots is the fewest unique builds the cleanup keeps,
-// whatever the limit: "Artifactory requires that you store a minimum of 2
-// unique snapshots" (JFrog KB, "How does the max unique snapshots parameter
-// work", 2025-05-15). So a limit of 1 keeps two; whether 7.x refuses a
-// limit of 1 instead is on #216.
-const MinUniqueSnapshots = 2
-
-// uniqueLimit is the maxUniqueSnapshots c sets, 0 for none, which keeps
-// every build.
-func uniqueLimit(c repo.Config) int {
-	if c.MaxUniqueSnapshots == nil {
-		return 0
-	}
-	return *c.MaxUniqueSnapshots
-}
-
 // cleanupCandidate reports a file the cleanup counts, as 6.20's
 // SnapshotVersionsRetriever filters them: one of an integration version,
 // and, under a layout whose folder and file revisions differ, one whose
@@ -63,7 +47,7 @@ func queueCleanup(
 	co Coordinates,
 	indexed bool,
 ) error {
-	if !indexed || it.Cached || c.Class != repo.Local || uniqueLimit(c) <= 0 ||
+	if !indexed || it.Cached || c.Class != repo.Local || format.UniqueSnapshots(c) == 0 ||
 		!cleanupCandidate(r.l, co.Coordinates) {
 		return nil
 	}
@@ -110,11 +94,10 @@ func older(a, b *uniqueBuild) int {
 // 7): for each base revision, the counted files are grouped into builds by
 // file revision, and for each classifier, while more builds have files of
 // it than the limit allows, the oldest build's files of that classifier
-// are deleted. The limit is read as the run finds it, so one set back to 0
-// since the deploy deletes nothing (RTDEV-93991, SaaS 7.164.0), and it is
-// never below MinUniqueSnapshots. The deletes go through the item service
-// (Env.Remove), so the trash can, the index and the metadata queue see
-// them, and the folders they empty are pruned.
+// are deleted. The limit is format.UniqueSnapshots, read as the run finds
+// it. The deletes go through the item service (Env.Remove), so the trash
+// can, the index and the metadata queue see them, and the folders they
+// empty are pruned.
 func cleanSnapshots(
 	ctx context.Context,
 	env format.Env,
@@ -122,11 +105,10 @@ func cleanSnapshots(
 	r reader,
 	name string,
 ) error {
-	limit := uniqueLimit(c)
-	if limit <= 0 {
+	limit := format.UniqueSnapshots(c)
+	if limit == 0 {
 		return nil
 	}
-	limit = max(limit, MinUniqueSnapshots)
 	vs, byVersion, err := Versions(ctx, env.Store, c, name)
 	if err != nil {
 		return err

@@ -2,10 +2,12 @@ package formats
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/format/docker"
+	"github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -52,6 +54,23 @@ func TestImagesHaveTheirFormat(t *testing.T) {
 			[]types.Item{{Name: "x"}},
 		); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+// Settings reach the format that takes them, and For is the zero
+// Settings: each format with its default, which is 7.x's.
+func TestSettings(t *testing.T) {
+	s := Settings{NPM: npm.Settings{TagLatestByPublish: true}}
+	if h, ok := s.For(repo.NPM).(npm.Handler); !ok || !h.Settings.TagLatestByPublish {
+		t.Fatalf("npm with settings: %#v", s.For(repo.NPM))
+	}
+	if h, ok := For(repo.NPM).(npm.Handler); !ok || h.Settings != (npm.Settings{}) {
+		t.Fatalf("npm by default: %#v", For(repo.NPM))
+	}
+	for _, pt := range []repo.PackageType{repo.Maven, repo.Go, repo.Docker, repo.Generic} {
+		if !reflect.DeepEqual(s.For(pt), For(pt)) {
+			t.Errorf("%s: %#v and %#v", pt, s.For(pt), For(pt))
 		}
 	}
 }

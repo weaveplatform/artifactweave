@@ -22,7 +22,13 @@ import (
 // from its package.json, and gives the version latest when rule 2 or 3
 // says so (claimLatest), by the dist-tags the tarball carries. Those are
 // the write's own, or a copy's or a restore's carried over.
-func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, t *Tarball) error {
+func (h Handler) index(
+	ctx context.Context,
+	st store.Store,
+	c repo.Config,
+	it types.Item,
+	t *Tarball,
+) error {
 	props, err := setProperties(ctx, st, it, t)
 	if err != nil {
 		return err
@@ -47,7 +53,7 @@ func index(ctx context.Context, st store.Store, c repo.Config, it types.Item, t 
 		return err //nolint:wrapcheck // pkgindex wraps its own
 	}
 	// The time setProperties writes at, for the reason it gives.
-	return claimLatest(ctx, st, pv, nonEmpty(props[PropDistTag]), isNew, it.Updated)
+	return h.Settings.claimLatest(ctx, st, pv, nonEmpty(props[PropDistTag]), isNew, it.Updated)
 }
 
 // setProperties sets npm.name, npm.version, npm.description, npm.keywords
@@ -128,15 +134,27 @@ func versionOf(ctx context.Context, st store.Store, id int64) (types.PackageVers
 	return pkgindex.VersionOf(ctx, st, id) //nolint:wrapcheck // pkgindex wraps its own
 }
 
-// unindex drops the version the item with id is the tarball of, if any,
-// and its package when no version is left; a package with versions left
-// that lost latest with it settles it anew, at now. A version has one
-// file, its tarball, so a file that no longer backs it leaves nothing to
-// keep.
-func unindex(ctx context.Context, st store.Store, id int64, now time.Time) error {
-	pv, ok, err := versionOf(ctx, st, id)
+// unindex drops the version it was the tarball of, if any, now that it
+// holds other content, and its package when no version is left; a package
+// with versions left that lost latest with it settles it anew (rule 4), at
+// the write's time. A version has one file, its tarball, so a file that no
+// longer backs it leaves nothing to keep.
+//
+// With staleTags, the write set no dist-tags of its own, so those the file
+// has are the dropped version's, and they go with it. Otherwise a later
+// move of the file to its own canonical path, by a conversion say, would
+// give them to a version that never had them, latest included (rule 1).
+// A file the index does not hold names no version, so it keeps its tags.
+func (h Handler) unindex(ctx context.Context, st store.Store, it types.Item, staleTags bool) error {
+	pv, ok, err := versionOf(ctx, st, it.ID)
 	if err != nil || !ok {
 		return err
+	}
+	if staleTags {
+		if err := st.Items().PatchProperties(ctx, it.ID, nil,
+			[]string{PropDistTag}, it.Updated); err != nil {
+			return fmt.Errorf("npm: dist-tags of %s: %w", it.FullPath(), err)
+		}
 	}
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("npm: drop version %s: %w", pv.Version, err)
@@ -146,7 +164,7 @@ func unindex(ctx context.Context, st store.Store, id int64, now time.Time) error
 		return fmt.Errorf("npm: versions of package %d: %w", pv.PackageID, err)
 	}
 	if len(rest) > 0 {
-		return settleLatest(ctx, st, pv.PackageID, now)
+		return h.Settings.settleLatest(ctx, st, pv.PackageID, it.Updated)
 	}
 	if err := st.Packages().Delete(ctx, pv.PackageID); err != nil {
 		return fmt.Errorf("npm: drop package %d: %w", pv.PackageID, err)
@@ -252,7 +270,7 @@ func tarballQuery(c repo.Config, props bool) *aql.Query {
 // properties. The tarballs are read first, outside any transaction, so no
 // decompression holds the store's write lock; the transaction then reads
 // the tree again and reads only content that changed in between.
-func reindex(ctx context.Context, env format.Env, c repo.Config) error {
+func (h Handler) reindex(ctx context.Context, env format.Env, c repo.Config) error {
 	st := env.Store
 	hits, err := st.Items().Search(ctx, tarballQuery(c, false), aql.Options{})
 	if err != nil {
@@ -305,7 +323,7 @@ func reindex(ctx context.Context, env format.Env, c repo.Config) error {
 			if err != nil {
 				return fmt.Errorf("npm: package %s: %w", name, err)
 			}
-			if err := settleLatest(ctx, st, p.ID, env.Now()); err != nil {
+			if err := h.Settings.settleLatest(ctx, st, p.ID, env.Now()); err != nil {
 				return err
 			}
 		}

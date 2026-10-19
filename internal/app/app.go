@@ -115,6 +115,7 @@ func serve(
 			EnforceIdenticalChecksumDeploy: cfg.Deploy.EnforceIdenticalChecksumDeploy,
 			NPMLoginTokenExpiry:            cfg.NPM.LoginTokenExpiry,
 			NPMMaxPublishSize:              int64(cfg.NPM.MaxPublishSize),
+			FormatSettings:                 formatSettings(cfg),
 			GlobalEnvironmentLimit:         cfg.Environments.GlobalLimit,
 			Work:                           rt.work,
 		}),

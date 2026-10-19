@@ -47,10 +47,11 @@ func (Handler) Admit(
 // deploy is. A path that names no version this way is exempt, as
 // Artifactory exempts a path its layout cannot read.
 //
-// [I] 7.x's rule for which npm versions are snapshots is unknown. The
-// npm-default layout 7.x exports reads anything after the version's first
-// hyphen as an integration revision, which for a SemVer version is its
-// pre-release, so a pre-release is classed as a snapshot (#216).
+// [I] 7.x's rule for which npm versions are snapshots is unknown, and the
+// npm-default layout 7.x exports does not settle it: its greedy [module]
+// reads a pre-release's last hyphen as the one before the base revision,
+// leaving no integration revision. A pre-release is classed as a snapshot,
+// as the pre-release cleanup counts it too (#216).
 func checkPolicy(c repo.Config, p string) error {
 	if handles(c.HandleReleases) && handles(c.HandleSnapshots) {
 		return nil
