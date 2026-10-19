@@ -108,7 +108,7 @@ func (s *Service) Promote(ctx context.Context, p Promotion) error {
 			platforms = append(platforms, children...)
 		}
 		if !p.Copy && len(platforms) > 0 {
-			orphans, err := s.unreferenced(ctx, p.From, "", platforms)
+			orphans, err := s.unreferenced(ctx, p.From, nil, platforms)
 			if err != nil {
 				return err
 			}
@@ -133,7 +133,9 @@ func (s *Service) Promote(ctx context.Context, p Promotion) error {
 
 // promoteTag lands one tag of p's source image in its target folder, and
 // returns the platform digests the tag's manifest list names, for a move to
-// clear up after.
+// clear up after. A move also takes the list's descriptive tags out of the
+// source; they are not written at the target, as 7.111.4 stopped renaming
+// sub-manifest tags on promotion (RTDEV-55450).
 func (s *Service) promoteTag(
 	ctx context.Context,
 	items *item.Service,
@@ -144,11 +146,17 @@ func (s *Service) promoteTag(
 	if err != nil {
 		return nil, err
 	}
-	var children []string
-	if manifest.Name == layout.ListManifestFile {
+	var children, derived []string
+	list := manifest.Name == layout.ListManifestFile
+	if list {
 		// Platforms first, while the list is still where they are read from.
 		if children, err = s.promotePlatforms(ctx, items, p, manifest); err != nil {
 			return nil, err
+		}
+		if !p.Copy {
+			if derived, err = s.sourcePlatformTags(ctx, p.From, r.From); err != nil {
+				return nil, err
+			}
 		}
 	}
 	src, dst := p.From.Name+"/"+r.From, p.To.Name+"/"+r.To
@@ -168,16 +176,27 @@ func (s *Service) promoteTag(
 				return nil, fmt.Errorf("registry: remove %s: %w", src, err)
 			}
 		}
-		return children, nil
-	case exists:
-		if err := s.replace(ctx, items, Push{Owner: p.To}, r.To); err != nil {
+	default:
+		if exists {
+			if err := s.replace(ctx, items, Push{Owner: p.To}, r.To, list); err != nil {
+				return nil, err
+			}
+		}
+		if err := s.landFolder(ctx, items, p.From, p.To, src, dst, r.To, !p.Copy); err != nil {
 			return nil, err
 		}
 	}
-	if err := s.landFolder(ctx, items, p, src, dst, r.To, !p.Copy); err != nil {
+	return children, removeFolders(ctx, items, p.From, derived)
+}
+
+// sourcePlatformTags returns the descriptive tags of the list tag holds in
+// o's image that still hold their platforms.
+func (s *Service) sourcePlatformTags(ctx context.Context, o Owner, tag string) ([]string, error) {
+	m, ok, err := s.folderList(ctx, o, tag)
+	if err != nil || !ok {
 		return nil, err
 	}
-	return children, nil
+	return s.heldPlatformTags(ctx, o, m, tag)
 }
 
 // promotePlatforms copies the digest folders of the platform manifests the
@@ -215,7 +234,7 @@ func (s *Service) promotePlatforms(
 		if found, err := s.isFolder(ctx, p.To, to); err != nil || found {
 			return nil, err
 		}
-		if err := s.landFolder(ctx, items, p, from, to, folder, false); err != nil {
+		if err := s.landFolder(ctx, items, p.From, p.To, from, to, folder, false); err != nil {
 			return nil, err
 		}
 	}
@@ -234,21 +253,23 @@ func (s *Service) isFolder(ctx context.Context, o Owner, dir string) (bool, erro
 	return true, nil
 }
 
-// landFolder copies, or with move moves, the image folder from to the
-// target folder to, then names the target image and tag in the manifest's
-// properties, so jf and the registry read it as their own.
+// landFolder copies, or with move moves, the folder from in src's
+// repository to the folder to in dst's, whose name below dst's image is
+// folder, linking its blobs rather than copying their bytes, then names
+// dst's image and the folder in the manifest's properties, so jf and the
+// registry read it as their own.
 func (s *Service) landFolder(
 	ctx context.Context,
 	items *item.Service,
-	p Promotion,
+	src, dst Owner,
 	from, to, folder string,
 	move bool,
 ) error {
 	res, err := items.Transfer(ctx, item.Transfer{
-		From:     item.Target{Repo: p.From.Repo, Path: from},
-		To:       item.Target{Repo: p.To.Repo, Path: to},
+		From:     item.Target{Repo: src.Repo, Path: from},
+		To:       item.Target{Repo: dst.Repo, Path: to},
 		Move:     move,
-		FailFast: true, CanOverwrite: true, By: p.To.By,
+		FailFast: true, CanOverwrite: true, By: dst.By,
 	})
 	if err == nil && res.Failed > 0 {
 		err = fmt.Errorf("%w: %d items: %v", errNotKept, res.Failed, res.Messages)
@@ -256,7 +277,7 @@ func (s *Service) landFolder(
 	if err != nil {
 		return fmt.Errorf("registry: promote %s: %w", from, err)
 	}
-	landed, ok, err := layout.FolderManifest(ctx, s.Store.Items(), p.To.Repo.Key, false, to)
+	landed, ok, err := layout.FolderManifest(ctx, s.Store.Items(), dst.Repo.Key, false, to)
 	switch {
 	case err != nil:
 		return err //nolint:wrapcheck // the layout names itself
@@ -264,9 +285,9 @@ func (s *Service) landFolder(
 		return nil
 	}
 	set := types.Properties{}
-	set.Set(layout.RepoNameProperty, p.To.Name)
+	set.Set(layout.RepoNameProperty, dst.Name)
 	set.Set(layout.ManifestProperty, folder)
-	if err := items.Annotate(ctx, p.To.Repo, landed, set, nil); err != nil {
+	if err := items.Annotate(ctx, dst.Repo, landed, set, nil); err != nil {
 		return fmt.Errorf("registry: properties of %s: %w", landed.FullPath(), err)
 	}
 	return nil

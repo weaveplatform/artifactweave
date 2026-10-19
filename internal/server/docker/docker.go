@@ -74,6 +74,13 @@ type Options struct {
 	// server's download, which applies the download redirect policy
 	// (decision 0029) and counts the download. Nil streams it from Blobs.
 	ServeBlob func(w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item)
+	// RedirectManifest answers a GET of a manifest's item, whose media type
+	// is mediaType, with the server's download redirect when the policy says
+	// so (decision 0029), and reports whether it wrote a response. Nil
+	// streams every manifest.
+	RedirectManifest func(
+		w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
+	) bool
 	// Now supplies the time to upload sessions; nil means time.Now.
 	Now func() time.Time
 	// Tokens signs registry tokens; nil leaves the token endpoint
@@ -95,9 +102,10 @@ type Registry struct {
 	endpoints map[endpointKey]Endpoint
 	// blobs, uploads and serveBlob serve blobs; uploads is nil without a
 	// blob store.
-	blobs     blob.Store
-	uploads   *registry.Service
-	serveBlob func(http.ResponseWriter, *http.Request, repo.Config, types.Item)
+	blobs            blob.Store
+	uploads          *registry.Service
+	serveBlob        func(http.ResponseWriter, *http.Request, repo.Config, types.Item)
+	redirectManifest func(http.ResponseWriter, *http.Request, repo.Config, types.Item, string) bool
 }
 
 type endpointKey struct {
@@ -120,6 +128,7 @@ func New(o Options) *Registry {
 		if g.serveBlob == nil {
 			g.serveBlob = g.streamBlob
 		}
+		g.redirectManifest = o.RedirectManifest
 	}
 	// Each feature registers its endpoints with one call here.
 	g.registerProbe()

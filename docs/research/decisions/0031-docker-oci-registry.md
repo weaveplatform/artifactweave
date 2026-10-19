@@ -59,7 +59,23 @@ each code with the reference registry's status (R23 1.3):
 Only these fourteen codes are sent, with one exception, `TAG_INVALID` for the reserved
 tag below; the other legacy schema-1 codes and the reference registry's `RANGE_INVALID` are
 not. `message` is a short English sentence, and `detail`, when present,
-names what failed (the digest, the tag, the expected and actual sizes). The JFrog REST
+names what failed (the digest, the tag, the expected and actual sizes). Two codes carry
+7.x's own text:
+- `MANIFEST_UNKNOWN` answers `"message":"The named manifest is not known to the registry."`
+  with `"detail":{"manifest":"<image>"}`, the image as the client named it, without the tag
+  or digest ([a KB article on 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl),
+  [RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069),
+  [RTFACT-30468](https://jfrog.atlassian.net/browse/RTFACT-30468)). A manifest the `Accept`
+  header leaves out answers the same body, as RTFACT-25069 shows. **[I]** On the
+  repository-path method that name begins with the repository key: the KB article's request
+  to `/v2/docker/<image>` names `docker/test`, but does not say which part is the key.
+- `MANIFEST_INVALID` answers `"message":"manifest invalid"` with
+  `"detail":{"description":"<what failed>"}`
+  ([RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656),
+  [RTFACT-22236](https://jfrog.atlassian.net/browse/RTFACT-22236)). 7.x puts its server's
+  exception text there; the description here is a sentence of its own.
+
+The JFrog REST
 operations under `/artifactory/api/docker/<repo>/v2/` that are not registry operations
 (`promote`, `parentManifests`, `delete`) keep the Artifactory envelope.
 
@@ -125,8 +141,8 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   index must be a manifest in the image, or the answer is 400 `MANIFEST_BLOB_UNKNOWN`, one
   error per missing digest. Each of those descriptors' `size` must equal the stored
   content's size, read from the stored item rather than the content, or the answer is 400
-  `MANIFEST_INVALID`, one error per descriptor, with the digest, the declared size and the
-  stored size as detail; missing content is reported first. This is stricter than the
+  `MANIFEST_INVALID`, one error per descriptor, naming the digest, the declared size and the
+  stored size in `detail.description`; missing content is reported first. This is stricter than the
   reference registry, which checks presence only: the image specification says content
   whose length differs from `size` should not be trusted, so the registry refuses to store
   a manifest that would mislead every client reading it (research 23, section 1.2; whether
@@ -152,11 +168,46 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
     Pushing the identical manifest again changes nothing and needs only Deploy, so a
     repeated `docker push` by a deployer succeeds and the build properties `jf` set on
     the layers stay.
+  - A list overwritten by an image manifest takes its descriptive tags (below) and the
+    platform manifests nothing else in the image names along, to the trash can when it is
+    on: "if you decide to overwrite a `list.manifest` with a single manifest, all of the
+    sub-manifests related to the original revision will also be removed"
+    ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md), "Overwriting List
+    Manifests with a Manifest and Vice-Versa";
+    [RTFACT-29681](https://jfrog.atlassian.net/browse/RTFACT-29681)). Under Tag Retention
+    the previous revision is kept whole instead, as the same page says. A list overwritten by
+    a list keeps the previous platform manifests, 7.x's default; the "Complete list manifest
+    image overwrite" setting is not offered (DV-084).
   - One tag is reserved and answers 400 `TAG_INVALID`, though the tag grammar allows it:
     `_uploads`, which would collide with the uploads folder, as on Artifactory. A digest
     folder needs no reservation, since no tag may hold a colon, and a tag starting with
     `sha256__` is an ordinary tag, as the tags list of a 7.x local repository shows it
     (R23 8).
+- **Platform tags.** A list or index pushed to a tag `T` also tags each entry that names a
+  platform `T-<os>-<architecture>`, as 7.x does from 7.21.2
+  ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md), "Multi-Architecture Tagging";
+  [RTFACT-26257](https://jfrog.atlassian.net/browse/RTFACT-26257)):
+  - **The folder.** Each is a tag folder holding the platform manifest and its blobs,
+    linked from a folder that holds them, with the manifest's properties naming the tag, as
+    in [RTFACT-26810](https://jfrog.atlassian.net/browse/RTFACT-26810). It is a tag like any
+    other: the tags list shows it and a pull by it works.
+  - **Attestations.** buildx lists each attestation manifest under `unknown/unknown`, so it
+    gets `T-unknown-unknown`; an empty os or architecture reads `unknown` too. An entry with
+    no platform gets no tag.
+  - **[I] Names given twice.** The variant is not part of the name, since the documentation
+    gives the os and architecture alone, so entries that differ only in variant share one
+    tag. A name given twice, as each platform's attestation gives `T-unknown-unknown`, holds
+    the last entry giving it, as tagging the entries in order would leave it.
+  - **Order.** They are written before the list replaces `T`, so a platform manifest only
+    `T` held lives on in its descriptive tag, where 7.x moved it (RTFACT-26810).
+  - **Scope.** A push by digest with `?tag=` adds them for each tag; a digest folder gets
+    none, and a name outside the tag grammar is skipped. Replacing one that holds another
+    manifest needs Delete, as replacing any tag does (DV-035).
+  - **[J] Later releases.** [RTFACT-27249](https://jfrog.atlassian.net/browse/RTFACT-27249)
+    (affects 7.39.0, deferred) and [RTFACT-26859](https://jfrog.atlassian.net/browse/RTFACT-26859)
+    (affects 7.31.0, open) report 7.x no longer adding them to buildx pushes, while the
+    current documentation still describes them. This decision follows the documentation;
+    the point is on #216.
 - **Properties** set on every stored manifest, in the same transaction:
   `docker.manifest` (the folder's name, the tag or `sha256:<hex>`),
   `docker.manifest.digest` (`sha256:<hex>`), `docker.manifest.type` (the media type),
@@ -192,7 +243,16 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   stored one answers 404 `MANIFEST_UNKNOWN`, and no `Accept` or a wildcard gets the stored
   type. A reference that is neither a valid
   tag nor a valid digest answers 404 `MANIFEST_UNKNOWN` on reads and deletes, and 400
-  `MANIFEST_INVALID` on a push. Manifests never redirect.
+  `MANIFEST_INVALID` on a push.
+- **Redirects.** A manifest `GET` goes through the download redirect policy of decision
+  [0029](0029-cdn-delivery-and-download-redirect.md), as a blob `GET` does, since 7.x
+  redirects a manifest at or above the minimum size: "Pulling from a local works fine" at
+  0 MB ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705)). Manifests are
+  small, so at the 1 MB default they stream. The signed URL answers with the manifest's
+  media type as `Content-Type`, which Docker parses the body by and go-containerregistry
+  compares exactly; every client hashes the body, so none needs `Docker-Content-Digest`
+  from storage. A `HEAD` is always answered here, since containerd and oras resolve a tag
+  with it and a URL signed for `GET` refuses a `HEAD`.
 
 ### Tags, catalogs and referrers
 
@@ -202,8 +262,17 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   (`<...>; rel="next"`) when more follow. An image with no tags but stored manifests
   answers `{"name","tags":[]}`; an unknown image answers 404 `NAME_UNKNOWN`.
 - **Catalogs.** Image names are the folders that hold at least one manifest, sorted the
-  same way and paginated the same way, with the images the caller cannot read left out.
-  The registry-wide catalog prefixes each with its repository key (decision 0003).
+  same way and paginated the same way. A repository lists every image to a caller with Read
+  on any path in it, images outside the caller's paths included: "Any user with read access
+  to a repository can view its metadata, which includes the list of package, image, or
+  artifact names it holds. This includes users whose access is scoped to a specific path"
+  ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md), "Repository Metadata and
+  Permissions"). Pulling an image still needs Read on it. A repository the caller can read
+  nothing in is left out. The registry-wide catalog prefixes each with its repository key
+  (decision 0003). **[I]** 7.x also has a system property,
+  `artifactory.docker.filter.catalog.by.user.permission`
+  ([RTFACT-30175](https://jfrog.atlassian.net/browse/RTFACT-30175)), whose default no source
+  gives.
 - **Referrers.** `GET .../referrers/<digest>` answers 200 with an OCI image index of the
   manifests in `<name>` whose `oci.subject` is the digest, each descriptor carrying
   `mediaType`, `digest`, `size`, `artifactType` and the manifest's annotations. An unknown
@@ -218,8 +287,9 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
   that manifest and answers 202; an index's platform manifests stay, as they are manifests
   of their own.
 - `DELETE /artifactory/api/docker/<repo>/v2/delete` with `{dockerRepository, tag}` removes a
-  multi-architecture tag with the platform manifests no other tag or index in the image
-  references, as Artifactory does from 7.118.0, and answers 200.
+  multi-architecture tag with its descriptive platform tags that still hold their platforms
+  and the platform manifests no other tag or index in the image references, as Artifactory
+  does from 7.118.0, and answers 200.
 - Every delete needs Delete, sends the removed items to the trash can when it is on
   (decision 0010), and updates the package index in the same transaction.
 
@@ -228,7 +298,7 @@ operations under `/artifactory/api/docker/<repo>/v2/` that are not registry oper
 | Operation | Needs |
 |---|---|
 | `HEAD`/`GET` a blob or manifest, tags list, referrers, `parentManifests` | Read on `<name>/` |
-| Catalogs | Read; images the caller cannot read are left out |
+| Catalogs | Read on any path of the repository, which lists all of its images |
 | Upload a blob, push a manifest by digest or to a new tag | Deploy on `<name>/` |
 | Push a different manifest over an existing tag | Deploy and Delete; the identical manifest needs Deploy only |
 | Mount | Read on the source and Deploy on the target |
@@ -255,6 +325,10 @@ the anonymous user.
     Unique Tags then applies.
   - The landed manifest's `docker.repoName` and `docker.manifest` name the target image and
     tag.
+  - No descriptive platform tags are written at the target, as 7.111.4 stopped renaming
+    sub-manifest tags by architecture on promotion (RTDEV-55450,
+    [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)).
+    A move removes the source tag's.
   - `targetTag` without `tag` answers 400: promoting every tag keeps their names. A
     promotion onto itself (same repository, image and tag) answers 400.
 - **Parent manifests** (`POST .../v2/parentManifests`): the indexes in the repository that
@@ -268,12 +342,14 @@ Decision [0018](0018-package-index.md) applies with an image as the package, a t
 version, the tag folder's items as the version's files and the push time as the order. Max
 Unique Tags and Tag Retention follow Artifactory's documented rules (R23 5.3):
 - after each push, the pushed image's oldest tags beyond `maxUniqueTags` are removed,
-  `latest` included, with their retained versions;
+  `latest` included, with their retained versions. **[I]** A list counts as one tag with its
+  descriptive tags, which go with it, so that a list push never removes the list it stored;
 - with `dockerTagRetention` at 2 or more, an overwritten tag's previous manifest stays in
   its digest folder, `<name>/sha256:<hex>/`, and the oldest such versions beyond the
   setting minus one are removed. **[I]** No source shows where 7.x keeps such a version;
   this follows the digest folders above (R23 8);
-- a list manifest is removed with the platform manifests no other tag references.
+- a list manifest is removed with its descriptive tags and the platform manifests no other
+  tag references.
 
 ## Rationale
 
@@ -285,10 +361,12 @@ The layout is the one the JFrog CLI reads: tag folders, `sha256__` files, `sha25
 digest folders for platform images and the five manifest properties. Linking blobs by reference keeps the
 layout without storing a layer once per tag.
 
-Three choices depart from Artifactory and are in the
+Four choices depart from Artifactory and are in the
 [deviations register](../../implementation/deviations.md): schema 1 is refused (DV-034),
-Strict Tag Overwrite has no switch (DV-035), and referrers come from properties rather than
-a `referrers.json` (DV-036).
+Strict Tag Overwrite has no switch (DV-035), referrers come from properties rather than
+a `referrers.json` (DV-036), and the "Complete list manifest image overwrite" setting is not
+offered (DV-084). That setting is global, the descriptor's
+`repositoriesGeneralConfig.docker.completeListManifestOverwrite`, not a repository field.
 
 **Alternatives considered:**
 - *Accepting schema 1, honouring `blockPushingSchema1`*: Docker has removed schema 1 from
@@ -333,15 +411,15 @@ table above.
 
 The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where
 7.x differs from this decision. Research 23 sections 7 and 12 give the evidence in full.
-- 7.x differs: from 7.21.2 each platform image of a list push also gets a descriptive
-  `<tag>-<os>-<arch>` tag ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
-  "Multi-Architecture Tagging"); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
-- 7.x differs: overwriting a list-manifest tag with an image manifest removes the old
-  list's platform manifests ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md),
-  "Overwriting List Manifests with a Manifest and Vice-Versa"); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
-- 7.x differs: the Package Settings option "Complete list manifest image overwrite", off
-  by default, removes the previous platform manifests when a list overwrites a list
-  ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
+- Each platform of a list push gets a descriptive `<tag>-<os>-<arch>` tag, as from 7.21.2
+  ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+  "Multi-Architecture Tagging"); see "Platform tags" above.
+- Overwriting a list-manifest tag with an image manifest removes the old list's platform
+  manifests ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md),
+  "Overwriting List Manifests with a Manifest and Vice-Versa"); see "Where a manifest lives".
+- The Package Settings option "Complete list manifest image overwrite", off by default
+  ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)),
+  is a global setting and is not offered (DV-084).
 - 7.x differs: a promotion with `copy:false` by a caller without Delete on the source
   copies the image and answers 206
   ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed),
@@ -352,12 +430,15 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
   ([RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069),
   [RTFACT-20795](https://jfrog.atlassian.net/browse/RTFACT-20795)); a deviation registered
   by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
-- 7.x differs: `_catalog` lists every image of a repository to a user with Read on any path
-  in it ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
-  "Repository Metadata and Permissions"); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
-- 7.x differs: `MANIFEST_UNKNOWN` and `MANIFEST_INVALID` carry JFrog's own `message` and a
-  `detail` object ([a KB article on 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl),
-  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
+- `_catalog` lists every image of a repository to a user with Read on any path in it
+  ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+  "Repository Metadata and Permissions"); see "Catalogs" above.
+- `MANIFEST_UNKNOWN` and `MANIFEST_INVALID` carry JFrog's own `message` and a `detail`
+  object ([a KB article on 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl),
+  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)); see "Operations and
+  errors" above.
+- A manifest at or above the minimum size redirects like a layer
+  ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705)); see "Reads" above.
 - 7.x differs: self-managed 7.x still documents Docker V1 repositories, which this
   decision does not serve ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#use-docker-v1),
   "Use Docker V1"); recorded as a cut in [research 10](../10-scope-and-tiers.md#product-families).
@@ -400,7 +481,8 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
   `jf rt docker-promote`, and a `docker buildx` multi-architecture push followed by
   `jf docker build` with `JFROG_RUN_NATIVE` set, whose build-info takes the base image's
   layers and the pushed platform layers from the exact paths `<name>/sha256:<hex>`
-  (R23 5.1). `jf docker buildx build` runs the same command. `jf docker scan` is not
+  (R23 5.1). `crane pull` of an image whose manifest and layers redirect to the fake
+  CloudFront edge of decision 0029. `jf docker buildx build` runs the same command. `jf docker scan` is not
   covered, as it calls Xray's stub.
 
 ## References

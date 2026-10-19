@@ -50,6 +50,7 @@ func (w *world) registerCDN(sc *godog.ScenarioContext) {
 	sc.Step(`^the CDN edge served at least (\d+) ranged requests?$`, w.edgeServedRanges)
 	sc.Step(`^the CDN edge served (\d+) requests?$`, w.edgeServed)
 	sc.Step(`^the CDN edge never received an Authorization header$`, w.edgeNoAuthorization)
+	sc.Step(`^the CDN edge served the object "([^"]*)"$`, w.edgeServedObject)
 	sc.Step(`^the CDN edge refuses the last path unsigned$`, w.edgeRefusesUnsigned)
 }
 
@@ -329,6 +330,22 @@ func (w *world) edgeServed(n int) error {
 		return fmt.Errorf("the edge served %d requests, want %d: %+v", len(reqs), n, reqs)
 	}
 	return nil
+}
+
+// edgeServedObject checks that the edge answered a request for the blob
+// whose digest, expanded, is digest: object keys end in its hex.
+func (w *world) edgeServedObject(digest string) error {
+	reqs, err := w.edgeRequests()
+	if err != nil {
+		return err
+	}
+	hex := strings.TrimPrefix(w.expand(digest), "sha256:")
+	for _, r := range reqs {
+		if strings.Contains(r.Path, hex) && r.Status == http.StatusOK {
+			return nil
+		}
+	}
+	return fmt.Errorf("the edge served no %s: %+v", hex, reqs)
 }
 
 func (w *world) edgeNoAuthorization() error {

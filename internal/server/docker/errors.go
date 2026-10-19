@@ -38,6 +38,26 @@ func Errorf(status int, code, format string, args ...any) *apierror.Error {
 	return &apierror.Error{Status: status, Code: code, Message: fmt.Sprintf(format, args...)}
 }
 
+// manifestInvalid is MANIFEST_INVALID as 7.x sends it: the fixed message
+// "manifest invalid" and what failed as detail.description (RTFACT-29656).
+func manifestInvalid(format string, args ...any) *apierror.Error {
+	return &apierror.Error{
+		Status: http.StatusBadRequest, Code: CodeManifestInvalid, Message: "manifest invalid",
+		Detail: map[string]any{"description": fmt.Sprintf(format, args...)},
+	}
+}
+
+// manifestUnknown is MANIFEST_UNKNOWN as 7.x sends it: the fixed message
+// and the image as the client named it as detail.manifest, without the tag
+// or digest (RTFACT-25069, RTFACT-30468, and a KB capture on 7.146.10).
+func manifestUnknown(q Request) *apierror.Error {
+	return &apierror.Error{
+		Status: http.StatusNotFound, Code: CodeManifestUnknown,
+		Message: "The named manifest is not known to the registry.",
+		Detail:  map[string]any{"manifest": q.addressed()},
+	}
+}
+
 // Write renders err in the OCI envelope. An error that is not an
 // *apierror.Error becomes a 500 without its detail, as everywhere else.
 func Write(w http.ResponseWriter, err error) { apierror.Write(w, apierror.OCI, err) }

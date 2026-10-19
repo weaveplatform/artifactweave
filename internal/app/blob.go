@@ -241,6 +241,26 @@ func cloudFront(c config.CloudFrontConfig) (cdn.Signer, error) {
 	return signer, nil
 }
 
+// cdnMaxSize is the largest file the hot tier's CDN is sent: CloudFront's
+// limit when the store, or any member of a mirror, has a distribution, and
+// no limit otherwise. A mirror signs with the first member that holds a
+// blob, which may be the CloudFront one, so one such member limits them all.
+func cdnMaxSize(b config.BlobConfig) int64 {
+	stores := []config.BlobBackendConfig{b.BlobBackendConfig}
+	if b.Backend == "mirror" {
+		stores = make([]config.BlobBackendConfig, 0, len(b.Mirror.Members))
+		for _, name := range b.Mirror.Members {
+			stores = append(stores, b.Stores[name].BlobBackendConfig)
+		}
+	}
+	for _, s := range stores {
+		if s.Backend == "s3" && s.S3.CDN.CloudFront.Enabled() {
+			return cdn.CloudFrontMaxSize
+		}
+	}
+	return 0
+}
+
 // frontDoor builds the Front Door c configures, or none.
 func frontDoor(c config.FrontDoorConfig) (*cdn.FrontDoor, error) {
 	if !c.Enabled() {

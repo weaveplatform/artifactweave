@@ -156,6 +156,13 @@ func newRegistry(cfg Config, artSvc artifactoryService) *docker.Registry {
 			p, _ := auth.FromContext(r.Context())
 			artSvc.serveFile(w, r, cfg.Store, found{repo: c, item: it}, p)
 		},
+		// A manifest at or above the minimum size redirects too, as on 7.x
+		// (RTFACT-29705), carrying its media type to the object store.
+		RedirectManifest: func(
+			w http.ResponseWriter, r *http.Request, c repo.Config, it types.Item, mediaType string,
+		) bool {
+			return artSvc.redirectManifest(w, r, cfg.Store, found{repo: c, item: it}, mediaType)
+		},
 	}
 	if cfg.Tokens != nil {
 		o.Tokens = cfg.Tokens

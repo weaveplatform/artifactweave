@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -39,6 +40,7 @@ func (w *world) registerDocker(sc *godog.ScenarioContext) {
 	sc.Step(`^(crane|oras|cosign) is available$`, w.toolAvailable)
 	sc.Step(`^I run (crane|oras|cosign) "([^"]*)"$`, w.runTool)
 	sc.Step(`^I keep the output as "([^"]*)"$`, w.keepOutput)
+	sc.Step(`^the auth entry is keyed by the registry URL$`, w.authEntryKeyed)
 	sc.Step(`^a layer "([^"]*)" holding "([^"]*)" with content "([^"]*)"$`, w.writeLayer)
 	sc.Step(`^a file "([^"]*)" with expanded content:$`, w.writeExpandedFile)
 }
@@ -137,6 +139,22 @@ func (w *world) runTool(tool, args string) error {
 	cmd.Dir = w.dir
 	cmd.Env = append(os.Environ(), "DOCKER_CONFIG="+dir, "COSIGN_PASSWORD=", "COSIGN_YES=true")
 	return w.runClient(cmd)
+}
+
+// authEntryKeyed checks the body of a Docker auth endpoint: one config.json
+// entry, keyed by the registry's URL, with the auth string set. A JSON
+// field step cannot name the key, whose dots and colon it would split.
+func (w *world) authEntryKeyed() error {
+	var doc map[string]struct {
+		Auth string `json:"auth"`
+	}
+	if err := json.Unmarshal(w.body, &doc); err != nil {
+		return fmt.Errorf("body is not a config.json entry: %w: %s", err, w.body)
+	}
+	if e, ok := doc[w.url]; len(doc) != 1 || !ok || e.Auth == "" {
+		return fmt.Errorf("want one entry keyed %q with auth set, got %s", w.url, w.body)
+	}
+	return nil
 }
 
 // keepOutput keeps the last command's output, trimmed, for {name} in later

@@ -1132,8 +1132,9 @@ paths:
       description: Promotes a Docker or OCI image from a local or federated repository to another local or federated
         repository of the same package type, either one tag or every tag of the image, optionally under a new image
         name or tag. The image is moved unless copy is true. Each tag folder is copied with its blobs linked rather
-        than copied as bytes, and a multi-architecture tag takes its platform manifests with it. Helm charts in helmoci
-        repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there
+        than copied as bytes, and a multi-architecture tag takes its platform manifests with it; no descriptive
+        `<tag>-<os>-<architecture>` tags are written at the target, and a move removes the source tag's. Helm
+        charts in helmoci repositories are promoted the same way. Answers 200 on success. Needs Read on the source, and Delete there
         too for a move; Deploy on the target, and Delete there too when the target tag already exists. A move by a
         caller without Delete on the source answers 403 before anything is copied.
       operationId: promoteDockerImage

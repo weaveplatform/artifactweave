@@ -33,8 +33,7 @@ func (g *Registry) deleteManifest(w http.ResponseWriter, r *http.Request, q Requ
 	}
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		Write(w, Errorf(http.StatusNotFound, CodeManifestUnknown,
-			"manifest unknown to registry: %s", q.Reference))
+		Write(w, manifestUnknown(q))
 	case err != nil:
 		g.writeErr(w, r, err)
 	default:

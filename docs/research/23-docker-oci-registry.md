@@ -190,6 +190,19 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   turns this off is named `...docker.filter.digests.from.tags.list.enabled`, so what it
   drops is digest-named entries. Both lists have been paginated since 5.4.6. The catalog
   needs read permission; JFrog's page for the tags list says it needs "a privileged user".
+- **[D]** The catalog shows a path-scoped reader every image: "Any user with read access to a
+  repository can view its metadata, which includes the list of package, image, or artifact
+  names it holds. This includes users whose access is scoped to a specific path. Access to
+  package content is governed separately by your permission targets"
+  ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md), "Repository Metadata and Permissions", updatedAt
+  2026-09-21). **[J]** [RTFACT-26945](https://jfrog.atlassian.net/browse/RTFACT-26945) (affects 7.33.6, Done) had a path-scoped
+  user refused with 403, and [RTFACT-30175](https://jfrog.atlassian.net/browse/RTFACT-30175) names a system property,
+  `artifactory.docker.filter.catalog.by.user.permission`, whose default no source gives.
+- **[D]** The `auth` endpoints answer the `config.json` entry keyed by the registry's URL,
+  scheme and host only: `{"https://artprod.company.com": {"auth": "<base64>", "email":
+  "admin@email.com"}}` ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md), "Set Your Docker
+  Credentials Manually"). **[I]** No source says which host the key names when the base URL,
+  the request's host and a repository subdomain differ, nor whether a port is kept.
 - **[I]** No source shows Artifactory answering a registry-wide `GET /v2/_catalog` on the
   repository-path method: its catalog belongs to one repository, and a bare `/v2/_catalog`
   names none.
@@ -326,8 +339,30 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   `sha256`. The stored `manifest.json` must therefore be the exact bytes the client pushed.
 - **[D]** From 7.81 the user interface shows the platform manifests nested under the tag
   folder of a list manifest. From 7.90.5 (SaaS 7.90.1) referrers are tracked in a
-  `referrers.json` in the image folder; and from 7.21.2 pushing a platform image also publishes `<tag>-<os>-<arch>`
-  tags (research 04). None of the three is read by jf.
+  `referrers.json` in the image folder. Neither is read by jf.
+- **[D] Descriptive platform tags.** "Starting from Artifactory version 7.21.2, when you push a
+  platform-specific Docker image, the server automatically adds a second descriptive tag
+  that includes the operating system" ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+  "Multi-Architecture Tagging", updatedAt 2026-09-21). jf reads none of them.
+  - **[J]** The tag is the list's tag with the platform's os and architecture: after a list
+    tagged `1.33` and `latest` naming `linux/amd64` and `linux/s390x`, the tags list held
+    `1.33-linux-amd64`, `latest-linux-amd64` and `latest-linux-s390x`
+    ([RTFACT-26257](https://jfrog.atlassian.net/browse/RTFACT-26257)). So it is made when the list is pushed, from the index's
+    platform fields.
+  - **[J]** Each is a tag folder holding the platform's `manifest.json` and its
+    `sha256__<hex>` blobs; a list pushed over a single-platform tag moved that tag's manifest
+    into it ([RTFACT-26810](https://jfrog.atlassian.net/browse/RTFACT-26810)).
+  - **[J]** buildx lists attestation manifests under `unknown/unknown`, and a promotion
+    named one `latest-attest-unknown-unknown` ([RTFACT-29773](https://jfrog.atlassian.net/browse/RTFACT-29773)). 7.111.4 then
+    "Fixed an issue whereby the Promote Docker Image API renamed sub-manifest tags according
+    to their architectures" (RTDEV-55450, [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)),
+    so a promotion writes none.
+  - **[J]** [RTFACT-27249](https://jfrog.atlassian.net/browse/RTFACT-27249) (affects 7.39.0, deferred) and
+    [RTFACT-26859](https://jfrog.atlassian.net/browse/RTFACT-26859) (affects 7.31.0, open) report that 7.x no longer adds them
+    to buildx pushes.
+  - **[I]** No source shows a name for an entry with a variant (`arm/v7`), which entry holds a
+    name two entries give, whether Max Unique Tags counts the tags, or a switch to turn them
+    off. artifactweave adds them as decision 0031 records.
 
 ### 5.2 Properties
 
@@ -372,9 +407,24 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   retained versions. Retention removes a list manifest with its platform manifests as one
   unit, for tags pushed through the current upload service. Removed tags go to the trash
   can when it is on.
-- **[D]** Overwriting a list manifest overwrites only the list unless
-  `artifactory.docker.complete.manifest.override.enabled` is set. From 7.117.1 a promotion
-  that overwrites a tag leaves layers other tags share.
+- **[D]** Overwriting a list manifest with a list overwrites only the list, "(default
+  behavior)", unless `artifactory.docker.complete.manifest.override.enabled` is set
+  ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md), "Tag Retention Logic"). From
+  [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed) (SaaS 7.125.3) the Package Settings
+  option "Complete list manifest image overwrite" does the same. It is global, the
+  descriptor's `<repositoriesGeneralConfig><docker><completeListManifestOverwrite>`, false by
+  default: "Once saved, this setting will apply to all Docker, OCI, and Helm OCI
+  local/federated repositories"
+  ([configuration XSD](https://docs.jfrog.com/installation/docs/artifactory-configuration-xsd.md));
+  a sibling `explicitConfig` lets the system property decide until the option is saved.
+  Neither the Terraform provider nor jfrog-client-go sets it. artifactweave offers neither
+  (DV-084).
+- **[D]** Overwriting a list with a single manifest removes "all of the sub-manifests related
+  to the original revision", and under Tag Retention "the complete structure of the previous
+  revision is saved" ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md), "Overwriting List
+  Manifests with a Manifest and Vice-Versa"; [RTFACT-29681](https://jfrog.atlassian.net/browse/RTFACT-29681)). artifactweave does
+  both (decision 0031).
+- **[D]** From 7.117.1 a promotion that overwrites a tag leaves layers other tags share.
 - **[I]** No source shows what a `DELETE /v2/<name>/blobs/<digest>` or
   `DELETE /v2/<name>/manifests/<reference>` answers on Artifactory.
 
@@ -487,6 +537,14 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
     refused, and with which code (section 1.2).
 13. Whether `docker.architecture` includes a platform `variant`, and whether
     `list.manifest.json` carries `docker.os` or `docker.architecture` (section 5.2).
+14. Whether 7.161.32 still adds descriptive platform tags to a buildx push (RTFACT-27249,
+    RTFACT-26859), how it names an entry with a variant, which entry holds a name two entries
+    give, and whether Max Unique Tags counts the tags (section 5.1).
+15. The default of `artifactory.docker.filter.catalog.by.user.permission` (section 2.1).
+16. Which host the `auth` endpoints key their entry by when the base URL, the request's host
+    and a repository subdomain differ, and whether a port is kept (section 2.1).
+17. On the repository-path method, whether `MANIFEST_UNKNOWN`'s `detail.manifest` begins with
+    the repository key (section 12).
 
 ## 11. Versions at the research baseline
 
@@ -541,29 +599,32 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - **`library/` in tag lists.** Tag lists with or without `library/` for official images
   ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)); that concerns remote caches of Docker Hub (P9).
 - **Range uploads.** A fix to the start offset of range uploads ([7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed)).
+- **Platform tags.** From 7.21.2 each platform of a list push also gets a descriptive
+  `<tag>-<os>-<arch>` tag, and an attestation `<tag>-unknown-unknown`; artifactweave adds
+  them (section 5.1; decision 0031, "Platform tags").
+- **A list overwritten by an image** removes the old list's platform manifests, and under
+  Tag Retention keeps the previous revision whole; artifactweave does the same (section 5.3).
+- **Complete list-manifest overwrite.** The global Package Settings option from 7.125.4, off
+  by default, is not offered (section 5.3, DV-084).
+- **`auth` endpoints** answer the `config.json` entry keyed by the registry URL,
+  `{"https://<host>": {"auth", "email"}}`, as artifactweave does with its base URL's scheme
+  and host (section 2.1).
+- **Catalog visibility.** A user with Read on any path of a repository sees every image name
+  in its `_catalog`, as in artifactweave (section 2.1).
+- **Error texts.** `MANIFEST_UNKNOWN` carries "The named manifest is not known to the
+  registry." with `{"manifest":"<image>"}` as `detail`, the image without the tag or digest,
+  and `MANIFEST_INVALID` carries "manifest invalid" with `{"description":…}`, as in
+  artifactweave ([KB, 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl);
+  [RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069), [RTFACT-30468](https://jfrog.atlassian.net/browse/RTFACT-30468),
+  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)).
+- **Manifest redirects.** A manifest at or above the minimum direct download size redirects
+  like a layer ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705)), as in artifactweave (decision 0031, "Redirects";
+  [research 19](19-cdn-and-download-redirect.md)).
 
 **Differs in 7.x** (the audit of 2026-10-18, [#378](https://github.com/weaveplatform/artifactweave/issues/378)):
-- **Platform tags.** 7.x differs: from 7.21.2 each platform image of a list push also gets a
-  descriptive `<tag>-<os>-<arch>` tag, and an attestation `<tag>-unknown-unknown`, where
-  artifactweave tags none ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
-  "Multi-Architecture Tagging"; [RTFACT-26257](https://jfrog.atlassian.net/browse/RTFACT-26257);
-  [RTFACT-29773](https://jfrog.atlassian.net/browse/RTFACT-29773)); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
-- **A list overwritten by an image.** 7.x differs: overwriting a list-manifest tag with a
-  single image manifest removes the old list's platform manifests, where artifactweave
-  keeps them in their digest folders ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information.md),
-  "Overwriting List Manifests with a Manifest and Vice-Versa";
-  [RTFACT-29681](https://jfrog.atlassian.net/browse/RTFACT-29681), fixed in 7.55.13); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
-- **Complete list-manifest overwrite.** 7.x differs: the Package Settings option
-  "Complete list manifest image overwrite", off by default, makes a list that overwrites a
-  list remove the previous platform manifests, and artifactweave has no such option
-  ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)); fixed by [#413](https://github.com/weaveplatform/artifactweave/issues/413).
 - **A move without Delete.** 7.x differs: a promotion with `copy:false` by a caller without
   Delete on the source copies the image and answers 206, where artifactweave answers 403
   (section 7; [7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed), RTDEV-54091); a deviation registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
-- **`auth` endpoints.** 7.x differs: `.../v2/auth` and `.../v1/auth` answer the
-  `config.json` entry keyed by the registry URL, `{"https://<host>": {"auth", "email"}}`,
-  where artifactweave answers the bare entry ([additional-docker-information](https://docs.jfrog.com/artifactory/docs/additional-docker-information#set-your-docker-credentials-manually),
-  "Set Your Docker Credentials Manually"); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
 - **Token body.** 7.x differs: the token endpoint answers `{"token","expires_in"}`, without
   the `access_token` and `issued_at` artifactweave adds
   ([RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069),
@@ -577,16 +638,6 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   ([RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069), fixed in 7.18.0;
   [RTFACT-20795](https://jfrog.atlassian.net/browse/RTFACT-20795), JFrog comment;
   [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed) RTDEV-63511); a deviation registered by [#378](https://github.com/weaveplatform/artifactweave/issues/378).
-- **Catalog visibility.** 7.x differs: a user with Read on any path of a repository sees
-  every image name in its `_catalog`, where artifactweave leaves out the images the caller
-  cannot read ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
-  "Repository Metadata and Permissions"); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
-- **Error texts.** 7.x differs: `MANIFEST_UNKNOWN` carries "The named manifest is not
-  known to the registry." with `{"manifest":"<image>"}` as `detail`, and `MANIFEST_INVALID`
-  carries "manifest invalid" with `{"description":…}`, where artifactweave sends sentences
-  of its own and no `detail`
-  ([KB, 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl);
-  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)); fixed by [#414](https://github.com/weaveplatform/artifactweave/issues/414).
 - **Docker V1.** 7.x differs: self-managed 7.x still documents Docker V1 repositories ("not
   supported on Cloud instances"), and neither the deprecations nor the end-of-life page
   removes them, where artifactweave serves only `.../v1/auth`

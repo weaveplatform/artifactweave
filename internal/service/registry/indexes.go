@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	layout "github.com/weaveplatform/artifactweave/internal/format/docker"
-	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -64,42 +63,28 @@ func (s *Service) Referrers(
 // other tag folder holds and no other index in the image lists: what
 // deleting the multi-architecture tag also removes, as Artifactory does from
 // 7.118.0 (decision 0031), and what tag retention removes with a list
-// manifest. A folder holding an image manifest, or nothing, has none. The
-// list's own digest folder, when it was pushed by digest too, is another
-// index that lists them, so its platforms stay.
+// manifest. The list's own descriptive tags (PlatformTags) go with it, so
+// they keep nothing. A folder holding an image manifest, or nothing, has
+// none. The list's own digest folder, when it was pushed by digest too, is
+// another index that lists them, so its platforms stay.
 func (s *Service) UnreferencedPlatforms(
 	ctx context.Context,
 	o Owner,
 	folder string,
 ) ([]string, error) {
-	items := s.Store.Items()
-	list, err := items.Get(ctx, o.Repo.Key, false, o.Name+"/"+folder+"/"+layout.ListManifestFile)
-	if errors.Is(err, store.ErrNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("registry: get the list in %s/%s: %w", o.Name, folder, err)
-	}
-	props, err := items.Properties(ctx, list.ID)
-	if err != nil {
-		return nil, fmt.Errorf("registry: properties of the list in %s/%s: %w", o.Name, folder, err)
-	}
-	m, err := s.stored(ctx, aql.Hit{Item: list, Properties: props})
-	if err != nil {
-		return nil, err
-	}
-	return s.unreferenced(ctx, o, folder, m.Children())
+	_, platforms, err := s.listUnit(ctx, o, folder)
+	return platforms, err
 }
 
 // unreferenced returns the digest folders, below o's image, of the manifests
-// among digests that no tag folder other than exclude holds and no index in
-// another folder lists: platform manifests nothing would name once exclude
-// is gone. exclude "" leaves out no folder. A digest whose folder the image
-// does not hold is left out.
+// among digests that no tag folder outside gone holds and no index in a
+// folder outside gone lists: platform manifests nothing would name once the
+// folders in gone are removed. A digest whose folder the image does not
+// hold is left out.
 func (s *Service) unreferenced(
 	ctx context.Context,
 	o Owner,
-	exclude string,
+	gone []string,
 	digests []string,
 ) ([]string, error) {
 	items := s.Store.Items()
@@ -111,7 +96,7 @@ func (s *Service) unreferenced(
 	for _, h := range hits {
 		f := path.Base(h.Item.Path)
 		switch {
-		case exclude != "" && f == exclude:
+		case slices.Contains(gone, f):
 		case h.Item.Name == layout.ListManifestFile:
 			other, err := s.stored(ctx, h)
 			if err != nil {
@@ -142,17 +127,17 @@ func (s *Service) unreferenced(
 	return out, nil
 }
 
-// DeleteMultiArch removes the tag folder of o's image together with the
-// platform manifests UnreferencedPlatforms names, in one transaction, sending
-// them to the trash can when it is on (decision 0010), by o.By. It returns
-// the folders removed, the tag first; store.ErrNotFound when the image has
-// no such tag. The caller has checked Delete on the image, which covers its
-// digest folders. DELETE /artifactory/api/docker/<repo>/v2/delete (#226)
-// calls it.
+// DeleteMultiArch removes the tag folder of o's image together with its
+// descriptive platform tags and the platform manifests UnreferencedPlatforms
+// names, in one transaction, sending them to the trash can when it is on
+// (decision 0010), by o.By: 7.x deletes the tag "with all of their
+// sub-architectures". It returns the folders removed, the tag first;
+// store.ErrNotFound when the image has no such tag. The caller has checked
+// Delete on the image, which covers its digest folders. DELETE
+// /artifactory/api/docker/<repo>/v2/delete (#226) calls it.
 func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]string, error) {
 	var removed []string
 	err := s.Store.Tx(ctx, func(ctx context.Context) error {
-		removed = nil
 		dir := o.Name + "/" + tag
 		f, err := s.Store.Items().Get(ctx, o.Repo.Key, false, dir)
 		if err == nil && !f.Folder {
@@ -161,19 +146,12 @@ func (s *Service) DeleteMultiArch(ctx context.Context, o Owner, tag string) ([]s
 		if err != nil {
 			return fmt.Errorf("registry: tag %s: %w", dir, err)
 		}
-		platforms, err := s.UnreferencedPlatforms(ctx, o, tag)
+		tags, platforms, err := s.listUnit(ctx, o, tag)
 		if err != nil {
 			return err
 		}
-		items := s.items()
-		for _, folder := range append([]string{tag}, platforms...) {
-			t := item.Target{Repo: o.Repo, Path: o.Name + "/" + folder}
-			if _, err := items.Delete(ctx, t, o.By); err != nil {
-				return fmt.Errorf("registry: delete %s: %w", t.Path, err)
-			}
-			removed = append(removed, folder)
-		}
-		return nil
+		removed = slices.Concat([]string{tag}, tags, platforms)
+		return removeFolders(ctx, s.items(), o, removed)
 	})
 	if err != nil {
 		return nil, err //nolint:wrapcheck // the transaction returns ours

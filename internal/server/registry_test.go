@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"regexp"
 	"slices"
 	"strconv"
@@ -584,6 +585,67 @@ func TestRegistryBlobsDownloadAsFiles(t *testing.T) {
 	if rec.Code != http.StatusForbidden ||
 		rec.Header().Get(docker.APIVersionHeader) != "registry/2.0" {
 		t.Fatalf("deployer: %d %v %s", rec.Code, rec.Header(), rec.Body)
+	}
+}
+
+// A manifest GET goes through the download redirect policy as a layer
+// does, as 7.x redirects manifests at or above the minimum size
+// (RTFACT-29705): the signed URL carries the manifest's media type, which
+// the clients parse the body by, a HEAD stays local, and a manifest under
+// the minimum streams. Neither answer counts as a download, as a streamed
+// manifest never has.
+func TestRegistryManifestsRedirect(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	c := repo.Config{
+		Key: "docker-redirect", Class: repo.Local, PackageType: repo.Docker,
+		DownloadRedirect: repo.Flex(true),
+	}
+	if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	for _, blob := range []string{registryConfig, "registry layer"} {
+		rec := w.do(http.MethodPost, "/v2/docker-redirect/app/blobs/uploads/?digest="+
+			sha256Digest(blob), "admin", blob)
+		wantStatus(t, rec, http.StatusCreated)
+	}
+	body := registryManifest("r")
+	rec := w.do(http.MethodPut, "/v2/docker-redirect/app/manifests/v1", "admin", body,
+		"Content-Type", layout.MediaTypeOCIManifest)
+	wantStatus(t, rec, http.StatusCreated)
+	const target = "/v2/docker-redirect/app/manifests/v1"
+	rec = w.do(http.MethodGet, target, "admin", "")
+	loc, err := url.Parse(rec.Header().Get("Location"))
+	if rec.Code != http.StatusFound || err != nil ||
+		!strings.HasPrefix(loc.String(), "https://storage.example/"+sha256Digest(body)[7:]) ||
+		loc.Query().Get("type") != layout.MediaTypeOCIManifest ||
+		rec.Header().Get("Content-Type") != "" ||
+		rec.Header().Get("Docker-Content-Digest") != sha256Digest(body) {
+		t.Fatalf("GET: %d %v", rec.Code, rec.Header())
+	}
+	rec = w.do(http.MethodHead, target, "admin", "")
+	if rec.Code != http.StatusOK ||
+		rec.Header().Get("Content-Type") != layout.MediaTypeOCIManifest ||
+		rec.Header().Get("Docker-Content-Digest") != sha256Digest(body) {
+		t.Fatalf("HEAD: %d %v", rec.Code, rec.Header())
+	}
+	it := w.item("docker-redirect", false, "app/v1/manifest.json")
+	if stats, err := w.db.Items().Stats(ctx, it.ID); err != nil || stats.DownloadCount != 0 {
+		t.Fatalf("stats %+v %v", stats, err)
+	}
+	w2 := newItemWorld(t, false, func(c *Config) { c.Redirect.MinSize = 1 << 20 })
+	if err := w2.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	for _, blob := range []string{registryConfig, "registry layer"} {
+		w2.do(http.MethodPost, "/v2/docker-redirect/app/blobs/uploads/?digest="+
+			sha256Digest(blob), "admin", blob)
+	}
+	wantStatus(t, w2.do(http.MethodPut, target, "admin", body,
+		"Content-Type", layout.MediaTypeOCIManifest), http.StatusCreated)
+	rec = w2.do(http.MethodGet, target, "admin", "")
+	if rec.Code != http.StatusOK || rec.Body.String() != body {
+		t.Fatalf("under the minimum: %d %v", rec.Code, rec.Header())
 	}
 }
 

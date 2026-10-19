@@ -137,15 +137,16 @@ func GrantsCatalog(r *http.Request) bool {
 	})
 }
 
-// readable reports whether the caller may read path in c, for listings
-// that leave out what the caller cannot read rather than refuse; a request
-// without a principal, as Require allows it, reads everything.
-func readable(r *http.Request, c repo.Config, path string) bool {
+// readsAnything reports whether the caller may read some path in c, which
+// lets it list c's images in a catalog; a request without a principal, as
+// Require allows it, reads everything. The repository's root is asked as a
+// folder, which a grant on any path below it makes readable.
+func readsAnything(r *http.Request, c repo.Config) bool {
 	p, ok := auth.FromContext(r.Context())
 	if !ok || p.Access() == nil {
 		return true
 	}
-	return p.Access().Allows(types.ResourceArtifact, authz.Repo{
+	return p.Access().AllowsFolder(types.ResourceArtifact, authz.Repo{
 		Key: c.Key, Class: string(c.Class),
-	}, path, types.ActionRead)
+	}, "", types.ActionRead)
 }

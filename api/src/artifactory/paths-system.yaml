@@ -372,7 +372,10 @@ paths:
     patch:
       description: 'The configuration-as-code entry point (decision 0009). The body is a YAML document in the descriptor
         format with any of the top-level sections `localRepositories`, `remoteRepositories`, `virtualRepositories`,
-        `proxies`, `propertySets` and `repoLayouts`, each a map keyed by entity name. Any other top-level section
+        `proxies`, `propertySets` and `repoLayouts`, each a map keyed by entity name, and `downloadRedirectConfig`,
+        whose one field `fileMinimumSize` is the smallest file, in whole MB, that a repository with
+        `downloadRedirect` or `cdnRedirect` answers with a redirect, a value that may not be null. Any other
+        top-level section
         answers 400 naming it, and nothing is applied. Named entities that do not exist are created, existing ones
         are updated field by field, omitted keys are untouched, and an entity whose value is null is deleted. In a
         repository entry, null clears a string field; null on `type`, on a block or on a field that does not hold

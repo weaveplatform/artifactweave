@@ -178,7 +178,7 @@ Feature: Docker and OCI registry
     Then the response status is 405
     When I GET "/artifactory/api/docker/docker-local/v2/auth" as admin
     Then the response status is 200
-    And the JSON field "auth" is not empty
+    And the auth entry is keyed by the registry URL
 
   @docker
   Scenario: docker login against the binary
@@ -251,9 +251,26 @@ Feature: Docker and OCI registry
     When I GET "/artifactory/api/search/prop?docker.os=linux&docker.architecture=arm64&repos=docker-local" as admin
     Then the response status is 200
     And the response body contains "/docker-local/team/app/sha256:871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d/manifest.json"
+    # The list's push also tagged its platform multi-linux-arm64, as 7.x
+    # does from 7.21.2: a tag folder holding a copy of the platform manifest,
+    # which so carries the same platform properties.
+    When I GET "/v2/docker-local/team/app/tags/list" as admin
+    Then the response status is 200
+    And the JSON field "tags" has 2 entries
+    And the JSON field "tags.0" equals "multi"
+    And the JSON field "tags.1" equals "multi-linux-arm64"
+    When I GET "/artifactory/api/storage/docker-local/team/app/multi-linux-arm64/manifest.json" as admin
+    Then the response status is 200
+    And the JSON field "checksums.sha256" equals "871a7b7e86fbe5b01f905fb4c5f1b6d8a9aaece5265f56e243d3c68c9fd6019d"
     When I POST "/artifactory/api/search/aql" as admin with body:
       """
       items.find({"repo":"docker-local","@docker.architecture":"arm64"}).include("path","name")
+      """
+    Then the response status is 200
+    And the JSON field "range.total" equals "2"
+    When I POST "/artifactory/api/search/aql" as admin with body:
+      """
+      items.find({"repo":"docker-local","path":{"$match":"team/app/sha256:*"},"@docker.architecture":"arm64"}).include("path","name")
       """
     Then the response status is 200
     And the JSON field "range.total" equals "1"
@@ -339,6 +356,8 @@ Feature: Docker and OCI registry
     When I GET "/v2/docker-local/team/app/manifests/v1" as admin
     Then the response status is 404
     And the JSON field "errors.0.code" equals "MANIFEST_UNKNOWN"
+    And the JSON field "errors.0.message" equals "The named manifest is not known to the registry."
+    And the JSON field "errors.0.detail.manifest" equals "docker-local/team/app"
     When I GET "/artifactory/api/docker/docker-local/v2/team/app/tags/list" as admin
     Then the response status is 200
     And the JSON field "tags" has 1 entries

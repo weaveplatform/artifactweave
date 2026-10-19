@@ -47,9 +47,13 @@ func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 
 // catalog serves _catalog: the images of one repository by name, or with
 // no repository those of every repository the registry serves, each as
-// <repo>/<image> (decision 0003). Images the caller cannot read are left
-// out rather than refused, and so are folders whose names no client could
-// pull.
+// <repo>/<image> (decision 0003). A repository the caller can read nothing
+// in is left out rather than refused, and so are folders whose names no
+// client could pull. One the caller can read anything in lists every image,
+// those outside the caller's paths included: 7.x treats the names as the
+// repository's metadata, which "users whose access is scoped to a specific
+// path" may view (docker-repositories, "Repository Metadata and
+// Permissions"). The images themselves still need Read to pull.
 func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 	if !GrantsCatalog(r) {
 		// A registry token lists only with registry:catalog:*, which the
@@ -67,10 +71,10 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 		}
 	}
 	keys := make([]string, 0, len(repos))
-	byKey := make(map[string]repo.Config, len(repos))
 	for _, c := range repos {
-		keys = append(keys, c.Key)
-		byKey[c.Key] = c
+		if readsAnything(r, c) {
+			keys = append(keys, c.Key)
+		}
 	}
 	images, err := layout.Images(r.Context(), g.store.Items(), keys)
 	if err != nil {
@@ -79,7 +83,7 @@ func (g *Registry) catalog(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	names := []string{}
 	for _, im := range images {
-		if !ValidName(im.Name) || !readable(r, byKey[im.Repo], im.Name+"/") {
+		if !ValidName(im.Name) {
 			continue
 		}
 		if q.RepoKey == "" {
