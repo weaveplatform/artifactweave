@@ -35,8 +35,12 @@ Feature: Copy, move and archives
     Then the response status is 404
     When I GET "/artifactory/dst-local/moved/a.txt" as admin
     Then the response body is "alpha"
+    # A missing source is a bad request with a report, as JFrog's copy and
+    # move pages say (#400).
     When I POST "/artifactory/api/copy/src-local/missing?to=/dst-local/x" as admin
-    Then the response status is 404
+    Then the response status is 400
+    And the response header "Content-Type" contains "CopyOrMoveResult"
+    And the response body contains "The source src-local:missing does not exist"
 
   @jf
   Scenario: jf rt cp and jf rt mv, with a dry run

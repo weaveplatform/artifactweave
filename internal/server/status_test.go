@@ -38,7 +38,8 @@ type statusCase struct {
 	// token of admin's, as a Bearer token) or "forged" (that token with its
 	// signature altered).
 	// A body names the fixture's other token values as {name}
-	// (statusSecrets). A body of checksum:<sha1> is a checksum deploy
+	// (statusSecrets). A body of checksum:<sha1> is a checksum deploy, and
+	// one of declared:<content> an upload declaring its SHA-1
 	// (checksumDeploy).
 	as   string
 	body string
@@ -49,14 +50,20 @@ func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); retu
 
 // checksumDeploy turns a row body of "checksum:<sha1>" into the request of
 // a checksum deploy of that SHA-1: the headers that ask for one, which a row
-// has no field for, and no body.
+// has no field for, and no body. A body of "declared:<content>" is an upload
+// of content with its SHA-1 declared, as the JFrog CLI sends one.
 func checksumDeploy(headers map[string]string, body string) (map[string]string, string) {
-	sum, ok := strings.CutPrefix(body, "checksum:")
-	if !ok {
+	sum, byChecksum := strings.CutPrefix(body, "checksum:")
+	content, declared := strings.CutPrefix(body, "declared:")
+	if !byChecksum && !declared {
 		return headers, body
 	}
 	if headers == nil {
 		headers = map[string]string{}
+	}
+	if declared {
+		headers["X-Checksum-Sha1"] = sha1Hex(content)
+		return headers, content
 	}
 	headers["X-Checksum-Deploy"], headers["X-Checksum-Sha1"] = "true", sum
 	return headers, ""
@@ -877,14 +884,17 @@ func transferStatusRows() []statusCase {
 		{cp, c + "get.txt?to=/libs-local/copied/get.txt", "admin", "", 200},
 		{cp, c + "get.txt", "admin", "", 400},
 		{cp, c + "get.txt?to=/virt/x", "admin", "", 400},
-		{cp, c + "absent?to=/libs-local/x", "admin", "", 404},
+		// A missing source is a 400 with a report (#400).
+		{cp, c + "absent?to=/libs-local/x", "admin", "", 400},
+		{cp, "/artifactory/api/copy/missing/x?to=/libs-local/x", "admin", "", 400},
 		{cp, c + "get.txt?to=/libs-local/x", "user", "", 403},
 		{cp, c + "get.txt?to=/libs-local/x", "anonymous", "", 401},
 		{cp, c + "get.txt?to=/libs-local/x", "", "", 401},
 
 		{mv, m + "move.txt?to=/libs-local/moved/move.txt", "admin", "", 200},
 		{mv, m + "get.txt?to=/virt/x", "admin", "", 400},
-		{mv, m + "absent?to=/libs-local/x", "admin", "", 404},
+		{mv, m + "absent?to=/libs-local/x", "admin", "", 400},
+		{mv, "/artifactory/api/move/missing/x?to=/libs-local/x", "admin", "", 400},
 		{mv, m + "get.txt?to=/libs-local/x", "user", "", 403},
 		{mv, m + "get.txt?to=/libs-local/x", "", "", 401},
 

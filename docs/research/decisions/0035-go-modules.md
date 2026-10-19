@@ -153,7 +153,9 @@ Every error under `/artifactory/api/go/` is plain text, `text/plain; charset=utf
 - `@v/list` and `@latest` consider only versions whose `.mod` the caller can read.
 - A PUT on `/api/go/` needs Deploy. Replacing a `.info` needs Delete as well, as an
   overwrite does on the item routes; repeating a `.zip` or `.mod` with the same content
-  needs only Deploy. The item routes keep their own rule: an overwrite needs Delete.
+  needs only Deploy. The item routes keep their own rule: an overwrite needs Delete,
+  unless it declares the stored file's SHA-1 or SHA-256 and carries that content
+  ([#400](https://github.com/weaveplatform/artifactweave/issues/400)).
 
 ### The checksum database
 

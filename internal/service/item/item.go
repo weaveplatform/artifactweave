@@ -102,6 +102,13 @@ type Deploy struct {
 	// the path it sent does not cover it; ErrOverwriteDenied when it says
 	// no.
 	CanOverwritePath func(fullPath string) bool
+	// OverwriteIdentical replaces a file without CanOverwritePath's consent
+	// when the deploy declares the file's content (DeclaresContentOf) and
+	// stores exactly that content, as Artifactory lets a re-deploy of
+	// identical content through without the delete permission. The stored
+	// content is compared too, because a declaration alone is only the
+	// client's claim: under server-generated-checksums nothing checks it.
+	OverwriteIdentical bool
 	// Reusable, when set, decides whether a checksum deploy may store the
 	// content it found; when it says no, the deploy fails with ErrNoBlob as
 	// if the content were not there, so the answer does not reveal that it
@@ -132,6 +139,18 @@ func ParseChecksums(c types.Checksums) (types.Checksums, error) {
 		}
 	}
 	return out, nil
+}
+
+// DeclaresContentOf reports whether parsed declared checksums name f's
+// content: a SHA-1 or SHA-256 that equals f's, and neither that differs.
+// MD5 and SHA-512 do not count, as in Artifactory 6.20's isFileOverwrite,
+// which compares the SHA-1 and SHA-256 alone.
+func DeclaresContentOf(declared types.Checksums, f types.Item) bool {
+	if declared.SHA1 == "" && declared.SHA256 == "" {
+		return false
+	}
+	return (declared.SHA1 == "" || declared.SHA1 == f.Actual.SHA1) &&
+		(declared.SHA256 == "" || declared.SHA256 == f.Actual.SHA256)
 }
 
 // clientPolicy reports whether declared checksums must match: everywhere but
@@ -392,7 +411,7 @@ func (s *Service) writeFile(
 		return types.Item{}, fmt.Errorf("%w: %s", ErrExists, full)
 	case err == nil && old.Folder:
 		return types.Item{}, fmt.Errorf("%w: %s is a folder", ErrConflict, full)
-	case err == nil && d.CanOverwritePath != nil && !d.CanOverwritePath(full):
+	case err == nil && !d.mayReplace(full, old, declared, actual):
 		return types.Item{}, fmt.Errorf("%w: %s", ErrOverwriteDenied, full)
 	case err == nil:
 		it.Created, it.CreatedBy = old.Created, old.CreatedBy
@@ -436,6 +455,18 @@ func (s *Service) writeFile(
 		}
 	}
 	return stored, nil
+}
+
+// mayReplace reports whether d may replace old, the file at full, with
+// content whose digests are actual: CanOverwritePath allows it, or
+// OverwriteIdentical does and the deploy declares and stores old's own
+// content.
+func (d *Deploy) mayReplace(full string, old types.Item, declared, actual types.Checksums) bool {
+	if d.CanOverwritePath == nil || d.CanOverwritePath(full) {
+		return true
+	}
+	return d.OverwriteIdentical && DeclaresContentOf(declared, old) &&
+		actual.SHA256 == old.Actual.SHA256
 }
 
 // MakeFolder creates the folder at t.Path and its parents; an existing

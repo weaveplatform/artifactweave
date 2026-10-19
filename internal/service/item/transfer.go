@@ -29,6 +29,11 @@ const (
 // into its own subtree, or below a file at the target (400).
 var ErrInvalidTransfer = errors.New("item: invalid copy or move")
 
+// ErrNoSource is a copy or move whose source does not exist (400 with a
+// report). It wraps store.ErrNotFound, so a caller that tests for that,
+// such as a promotion whose file went in the meantime, still sees a miss.
+var ErrNoSource = fmt.Errorf("item: no source: %w", store.ErrNotFound)
+
 // Message is one line of a copy or move report.
 type Message struct {
 	Level string
@@ -136,7 +141,11 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 	root := types.Item{RepoKey: t.From.Repo.Key, Cached: t.From.Cached, Folder: true}
 	if srcFull != "" {
 		var err error
-		if root, err = items.Get(ctx, t.From.Repo.Key, t.From.Cached, srcFull); err != nil {
+		root, err = items.Get(ctx, t.From.Repo.Key, t.From.Cached, srcFull)
+		switch {
+		case errors.Is(err, store.ErrNotFound):
+			return nil, fmt.Errorf("%w: %s:%s", ErrNoSource, t.From.Repo.Key, srcFull)
+		case err != nil:
 			return nil, fmt.Errorf("item: source %s: %w", srcFull, err)
 		}
 	}

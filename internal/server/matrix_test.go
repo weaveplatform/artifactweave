@@ -95,6 +95,12 @@ var matrixPrincipals = []matrixPrincipal{
 		{types.BuildInfoRepository, "", types.ActionRead | types.ActionWrite},
 		{dockerA, "work/", rwd},
 	}, formatGrants("work/", rwd))},
+	// deployer reads and deploys under A's work/ but may not delete there:
+	// the CI user whose jf rt u, run again, replaces files with their own
+	// content (#400).
+	{name: "deployer", user: "deployer", grants: []matrixGrant{
+		{"libs-local", "work/", types.ActionRead | types.ActionWrite},
+	}},
 	// member holds A and every build through its group, and reads B through
 	// a direct grant.
 	{name: "member", user: "member", grants: slices.Concat([]matrixGrant{
@@ -415,6 +421,15 @@ func deployed(path string) seeder {
 	}
 }
 
+// holding seeds a file at path in libs-local, {p} the principal's name,
+// that holds content.
+func holding(path, content string) seeder {
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		f.deploy(t, "libs-local", strings.ReplaceAll(path, "{p}", p), []byte(content))
+	}
+}
+
 // onlyInB seeds content no repository but libs-b holds.
 func onlyInB(t *testing.T, f *matrixFixture, _ string) {
 	t.Helper()
@@ -654,6 +669,24 @@ func contentMatrix() []matrixRow {
 		row(put, lib+"work/cs-{p}.bin", "checksum:"+sha1Hex("only in b"),
 			reusing(holds("libs-local", "work/", write), holds("libs-b", "b/", read)), 201,
 		).alone().seeding(onlyInB),
+		// Replacing a file needs delete too, except with the file's own
+		// content (#400). deployed gives a file the content {p}; the checksum
+		// deploys reuse work/get.txt's "matrix", which every caller that may
+		// deploy under work/ may read.
+		row(put, lib+"work/same-{p}.txt", "declared:{p}", holds("libs-local", "work/", write), 201).
+			seeding(deployed("work/same-{p}.txt")),
+		row(
+			put, lib+"work/diff-{p}.txt", "declared:changed",
+			holds("libs-local", "work/", write|del), 201,
+		).seeding(deployed("work/diff-{p}.txt")),
+		row(
+			put, lib+"work/same-cs-{p}.bin", "checksum:"+sha1Hex("matrix"),
+			holds("libs-local", "work/", write), 201,
+		).seeding(holding("work/same-cs-{p}.bin", "matrix")),
+		row(
+			put, lib+"work/diff-cs-{p}.bin", "checksum:"+sha1Hex("matrix"),
+			holds("libs-local", "work/", write|del), 201,
+		).seeding(deployed("work/diff-cs-{p}.bin")),
 		row(get, lib+"work/get.txt", "", holds("libs-local", "work/", read), 200),
 		row(get, lib+"fixture/get.txt", "", holds("libs-local", "fixture/", read), 200),
 		row(get, "/artifactory/libs-b/b/get.txt", "", holds("libs-b", "b/", read), 200),
@@ -674,6 +707,11 @@ func contentMatrix() []matrixRow {
 			"/artifactory/api/move/libs-local/work/move-{p}.txt?to=/libs-local/work/moved-{p}.txt",
 			"", holds("libs-local", "work/", read|del|write), 200,
 		).seeding(deployed("work/move-{p}.txt")),
+		// A missing source is a 400 for a caller with the rights (#400).
+		row(
+			cp, "/artifactory/api/copy/libs-local/work/absent?to=/libs-local/work/copy-{p}.txt",
+			"", holds("libs-local", "work/", read|write), 400,
+		),
 		row(
 			"GET /artifactory/api/archive/download/{repoKey}/{path}",
 			"/artifactory/api/archive/download/libs-local/work?archiveType=zip", "",
@@ -1208,7 +1246,7 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []string{"nobody", "reader", "writer", "member", "gadmin"} {
+	for _, u := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin"} {
 		must(db.Users().Create(ctx, types.User{Name: u, PasswordHash: cheapHash}))
 	}
 	for _, p := range names {
@@ -1256,6 +1294,12 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	// The permissions behind matrixPrincipals' grants.
 	grant("matrix-reader", users("reader", types.ActionRead), "libs-local", "**")
 	grant("matrix-writer", users("writer", rwd), "libs-local", "work/**")
+	grant(
+		"matrix-deployer",
+		users("deployer", types.ActionRead|types.ActionWrite),
+		"libs-local",
+		"work/**",
+	)
 	grant(
 		"matrix-team",
 		types.Grants{Groups: map[string]types.Actions{"team": rawd}},

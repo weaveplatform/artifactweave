@@ -99,6 +99,12 @@ type Config struct {
 	// lists one file twice (build.block_duplicate_entries false); the zero
 	// value refuses it, as Artifactory 7.x does by default.
 	AllowDuplicateBuildEntries bool
+	// EnforceIdenticalChecksumDeploy makes a checksum deploy over a file
+	// with the same content need the delete permission
+	// (deploy.enforce_permission_check_on_identical_checksum_deploy); the
+	// zero value lets it through with deploy alone, as Artifactory 7.x does
+	// by default.
+	EnforceIdenticalChecksumDeploy bool
 	// NPMMaxPublishSize caps an npm publish request (npm.max_publish_size);
 	// zero means decision 0034's default.
 	NPMMaxPublishSize int64

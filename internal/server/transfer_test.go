@@ -282,8 +282,14 @@ func TestCopyAndMoveRefused(t *testing.T) {
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/other-local/x&dry=maybe", "admin", 400},
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/other-local/x&suppressLayouts=x", "admin", 400},
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/other-local/x&failFast=x", "admin", 400},
-		{"/artifactory/api/copy/libs-local/d/missing?to=/other-local/x", "admin", 404},
-		{"/artifactory/api/copy/missing/a?to=/other-local/x", "admin", 404},
+		// A source that does not exist is a bad request with a report, as
+		// JFrog's copy and move pages say (#400).
+		{"/artifactory/api/copy/libs-local/d/missing?to=/other-local/x", "admin", 400},
+		{"/artifactory/api/move/libs-local/d/missing?to=/other-local/x", "admin", 400},
+		{"/artifactory/api/copy/missing/a?to=/other-local/x", "admin", 400},
+		{"/artifactory/api/copy/up-cache/missing.jar?to=/other-local/x", "admin", 400},
+		// A caller that may not read the source learns nothing of it.
+		{"/artifactory/api/copy/libs-local/d/missing?to=/other-local/x", "user", 403},
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/virt/x", "admin", 400},
 		{"/artifactory/api/copy/libs-local/d/a.txt?to=/nowhere/x", "admin", 400},
 		{"/artifactory/api/copy/virt/d/a.txt?to=/other-local/x", "admin", 400},
@@ -303,6 +309,18 @@ func TestCopyAndMoveRefused(t *testing.T) {
 			if m := report(t, rec.Body.Bytes()); m[0]["level"] != "ERROR" {
 				t.Errorf("%s: %v", c.path, m)
 			}
+		}
+	}
+	for path, want := range map[string]string{
+		"/artifactory/api/move/libs-local/d/missing?to=/other-local/x": "The source libs-local:d/missing does not exist",
+		"/artifactory/api/copy/missing/a?to=/other-local/x":            "Repository 'missing' does not exist",
+	} {
+		rec := w.do("POST", path, "admin", "")
+		if ct := rec.Header().Get("Content-Type"); ct != copyOrMoveType {
+			t.Errorf("%s: Content-Type %q", path, ct)
+		}
+		if m := report(t, rec.Body.Bytes()); len(m) != 1 || m[0]["message"] != want {
+			t.Errorf("%s: %v", path, m)
 		}
 	}
 	// A remote repository's cache can be copied from, by either key.
@@ -331,7 +349,7 @@ func TestExplodeOverHTTP(t *testing.T) {
 	rec := w.do("PUT", "/artifactory/libs-local/ex/bundle.zip", "admin", string(body),
 		"X-Explode-Archive", "true")
 	wantStatus(t, rec, http.StatusCreated)
-	if !strings.Contains(rec.Body.String(), `"path":"/ex"`) {
+	if !strings.Contains(rec.Body.String(), `"path":"/ex/"`) {
 		t.Fatalf("body %s", rec.Body)
 	}
 	wantStatus(

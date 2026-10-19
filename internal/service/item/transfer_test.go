@@ -315,7 +315,8 @@ func TestTransferRefused(t *testing.T) {
 	}
 	if _, err := w.svc.Transfer(ctx, Transfer{
 		From: Target{Repo: w.loc, Path: "missing"}, To: Target{Repo: w.loc, Path: "x"},
-	}); !errors.Is(err, ErrNotFound) {
+	}); !errors.Is(err, ErrNoSource) || !errors.Is(err, ErrNotFound) ||
+		!strings.Contains(err.Error(), "libs:missing") {
 		t.Fatalf("missing source: %v", err)
 	}
 }
