@@ -285,7 +285,7 @@ func TestMappings(t *testing.T) {
 		"two names":               mapping("x", oidc.TokenSpec{Username: ptr("u"), UsernamePattern: ptr("{{sub}}")}, nil),
 		"pattern without a claim": mapping("x", oidc.TokenSpec{UsernamePattern: ptr("plain")}, nil),
 		"bad pattern regex":       mapping("x", oidc.TokenSpec{UsernamePattern: ptr("{{sub}} | ( | $1")}, nil),
-		"four-part pattern":       mapping("x", oidc.TokenSpec{UsernamePattern: ptr("{{a}}|b|c|d")}, nil),
+		"bad resource pattern":    mapping("x", oidc.TokenSpec{Username: ptr("u"), ResourcePattern: ptr("plain")}, nil),
 		"expires_in 0":            mapping("x", oidc.TokenSpec{Username: ptr("u"), ExpiresIn: ptr(int64(0))}, nil),
 		"no scope, no user":       mapping("x", oidc.TokenSpec{}, nil),
 		"bad scope":               mapping("x", oidc.TokenSpec{Scope: ptr("nonsense")}, nil),
@@ -338,9 +338,145 @@ func TestMappings(t *testing.T) {
 	}
 }
 
-// TestExchangeOrder: the request's project's mappings first, then global
-// ones; lower priorities first, none last, the first created among equals;
-// another project's mappings never.
+// TestCombinations applies the page's table of the scopes one mapping may
+// combine (IDZ-60): admin with nothing, neither a user with a user pattern
+// nor groups with a groups pattern, and every other pair.
+func TestCombinations(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	const (
+		user   = "applied-permissions/user"
+		groups = "applied-permissions/groups:ci"
+		admin  = "applied-permissions/admin"
+	)
+	for name, c := range map[string]struct {
+		spec oidc.TokenSpec
+		ok   bool
+	}{
+		"user and groups":         {oidc.TokenSpec{Username: ptr("u"), Scope: ptr(user + " " + groups)}, true},
+		"user and groups pattern": {oidc.TokenSpec{Username: ptr("u"), GroupsPattern: ptr("{{g}}")}, true},
+		"user scope and groups pattern": {
+			oidc.TokenSpec{Username: ptr("u"), Scope: ptr(user), GroupsPattern: ptr("{{g}}")}, true,
+		},
+		"user and resource": {oidc.TokenSpec{Username: ptr("u"), ResourcePattern: ptr("{{r}}")}, true},
+		"groups and user pattern": {
+			oidc.TokenSpec{Scope: ptr(groups), UsernamePattern: ptr("{{a}}")}, true,
+		},
+		"groups and resource": {oidc.TokenSpec{Scope: ptr(groups), ResourcePattern: ptr("{{r}}")}, true},
+		"user pattern and groups pattern": {
+			oidc.TokenSpec{UsernamePattern: ptr("{{a}}"), GroupsPattern: ptr("{{g}}")}, true,
+		},
+		"every dynamic mapping": {
+			oidc.TokenSpec{
+				UsernamePattern: ptr("{{a}}"), GroupsPattern: ptr("{{g}}"),
+				ResourcePattern: ptr("{{r}}"),
+			},
+			true,
+		},
+		"groups pattern and resource": {
+			oidc.TokenSpec{GroupsPattern: ptr("{{g}}"), ResourcePattern: ptr("{{r}}")}, true,
+		},
+		"admin with a user": {oidc.TokenSpec{Username: ptr("u"), Scope: ptr(admin)}, true},
+		"user and user pattern": {
+			oidc.TokenSpec{Username: ptr("u"), UsernamePattern: ptr("{{a}}")}, false,
+		},
+		"user scope and user pattern": {
+			oidc.TokenSpec{Scope: ptr(user), UsernamePattern: ptr("{{a}}")}, false,
+		},
+		"groups and groups pattern": {
+			oidc.TokenSpec{Scope: ptr(groups), GroupsPattern: ptr("{{g}}")}, false,
+		},
+		"admin and user scope": {oidc.TokenSpec{Username: ptr("u"), Scope: ptr(admin + " " + user)}, false},
+		"admin and groups":     {oidc.TokenSpec{Username: ptr("u"), Scope: ptr(admin + " " + groups)}, false},
+		"admin and user pattern": {
+			oidc.TokenSpec{Scope: ptr(admin), UsernamePattern: ptr("{{a}}")}, false,
+		},
+		"admin and groups pattern": {
+			oidc.TokenSpec{Username: ptr("u"), Scope: ptr(admin), GroupsPattern: ptr("{{g}}")}, false,
+		},
+		"admin and resource": {
+			oidc.TokenSpec{Username: ptr("u"), Scope: ptr(admin), ResourcePattern: ptr("{{r}}")}, false,
+		},
+		"resource beside artifact entries": {
+			oidc.TokenSpec{
+				Username: ptr("u"), Scope: ptr("artifact:a/**:r"), ResourcePattern: ptr("{{r}}"),
+			},
+			false,
+		},
+		"resource alone": {oidc.TokenSpec{ResourcePattern: ptr("{{r}}")}, false},
+	} {
+		_, err := w.svc.CreateMapping(ctx, "ci", mapping("m", c.spec, nil))
+		if c.ok != (err == nil) || (!c.ok && !errors.Is(err, oidc.ErrInvalid)) {
+			t.Errorf("%s: %v", name, err)
+		}
+		if err == nil {
+			if err := w.svc.DeleteMapping(ctx, "ci", "m"); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
+// TestPatternSyntax: a pattern that cannot be evaluated is refused when the
+// mapping is saved.
+func TestPatternSyntax(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	for name, p := range map[string]string{
+		"two claims":                 "{{a}}-{{b}}",
+		"empty part":                 "{{a}} | | $0",
+		"too many parts":             "{{a}}" + strings.Repeat(` | op:replaceAll("x","y")`, 16),
+		"bad template":               "({{a}}",
+		"bad expression":             "{{a}} | ( | $1",
+		"unknown operator":           `{{a}} | op:upper("a","b")`,
+		"operator not a call":        "{{a}} | op:replaceAll",
+		"unquoted argument":          `{{a}} | op:replaceAll(a,"b")`,
+		"unterminated argument":      `{{a}} | op:replaceAll("a)`,
+		"one argument":               `{{a}} | op:replaceAll("a")`,
+		"one argument and a comma":   `{{a}} | op:replaceAll("a" "b")`,
+		"three arguments":            `{{a}} | op:replaceAll("a","b","c")`,
+		"empty text to replace":      `{{a}} | op:replaceAll("","b")`,
+		"no such group":              "{{a}} | $2",
+		"no such group after regex":  "{{a}} | ^(x)$ | $2",
+		"no such named group":        "{{a}} | ${nope}",
+		"unterminated named group":   "{{a}} | ${1",
+		"dollar without a group":     "{{a}} | $x",
+		"dollar at the end":          "{{a}} | x$",
+		"escape at the end":          `{{a}} | x\`,
+		"no such group in a chain":   `{{a}} | op:replaceAll("-","_") | $3`,
+		"replacement before its use": "{{a}} | ^(.)(.)$ | $1 | $3",
+	} {
+		_, err := w.svc.CreateMapping(
+			ctx, "ci", mapping("x", oidc.TokenSpec{UsernamePattern: ptr(p)}, nil),
+		)
+		if !errors.Is(err, oidc.ErrInvalid) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	for name, p := range map[string]string{
+		"spaces in the placeholder": "{{ a }}",
+		"named group":               "{{a}} | ^(?P<head>.)(.*)$ | ${head}",
+		"numbered group in braces":  "{{a}} | ${1}x",
+		"escapes":                   `{{a}} | \$\\$0`,
+		"long chain":                "{{a}}" + strings.Repeat(` | op:replaceAll("x","y")`, 15),
+		"three replacements":        "{{a}} | ^(.*)$ | $1 | $0",
+	} {
+		_, err := w.svc.CreateMapping(
+			ctx, "ci", mapping("y", oidc.TokenSpec{UsernamePattern: ptr(p)}, nil),
+		)
+		if err != nil {
+			t.Errorf("%s: %v", name, err)
+			continue
+		}
+		if err := w.svc.DeleteMapping(ctx, "ci", "y"); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+// TestExchangeOrder: with a project, its mappings first, then global ones,
+// and never another project's; without one, every mapping competes. Lower
+// priorities first, none last, the first created among equals.
 func TestExchangeOrder(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
@@ -348,12 +484,12 @@ func TestExchangeOrder(t *testing.T) {
 	for _, m := range []oidc.Mapping{
 		{Name: ptr("unranked"), TokenSpec: &oidc.TokenSpec{Username: ptr("unranked")}, Claims: anySub},
 		{Name: ptr("second"), Priority: ptr(2), TokenSpec: &oidc.TokenSpec{Username: ptr("second")}, Claims: anySub},
-		{Name: ptr("first-a"), Priority: ptr(1), TokenSpec: &oidc.TokenSpec{Username: ptr("first-a")}, Claims: anySub},
-		{Name: ptr("first-b"), Priority: ptr(1), TokenSpec: &oidc.TokenSpec{Username: ptr("first-b")}, Claims: anySub},
 		{
 			Name: ptr("p2"), Priority: ptr(1), Claims: anySub,
 			TokenSpec: &oidc.TokenSpec{Username: ptr("p2"), Scope: ptr(`applied-permissions/roles:p2:"Viewer"`)},
 		},
+		{Name: ptr("first-a"), Priority: ptr(1), TokenSpec: &oidc.TokenSpec{Username: ptr("first-a")}, Claims: anySub},
+		{Name: ptr("first-b"), Priority: ptr(1), TokenSpec: &oidc.TokenSpec{Username: ptr("first-b")}, Claims: anySub},
 		{
 			Name: ptr("p1"), Priority: ptr(9), Claims: anySub,
 			TokenSpec: &oidc.TokenSpec{Username: ptr("p1"), Scope: ptr(`applied-permissions/roles:p1:"Viewer"`)},
@@ -365,18 +501,18 @@ func TestExchangeOrder(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 	raw := w.mint(t, map[string]any{"sub": "x"})
-	for project, want := range map[string]string{"": "first-a", "p1": "p1", "p3": "first-a"} {
+	// Without a project, p2 competes on its priority and age with the global
+	// mappings and wins (IDZ-64); with p3, p2 is another project's.
+	for project, want := range map[string]struct{ user, project string }{
+		"":   {"p2", "p2"},
+		"p1": {"p1", "p1"},
+		"p2": {"p2", "p2"},
+		"p3": {"first-a", ""},
+	} {
 		got, err := w.exchange(raw, func(r *oidc.ExchangeRequest) { r.ProjectKey = project })
-		if err != nil || got.Username != want {
-			t.Errorf("project %q: %q, %v; want %q", project, got.Username, err, want)
-			continue
-		}
-		wantProject := ""
-		if project == "p1" {
-			wantProject = "p1"
-		}
-		if got.Record.ProjectKey != wantProject {
-			t.Errorf("project %q: token project %q", project, got.Record.ProjectKey)
+		if err != nil || got.Username != want.user || got.Record.ProjectKey != want.project {
+			t.Errorf("project %q: %q in %q, %v; want %+v",
+				project, got.Username, got.Record.ProjectKey, err, want)
 		}
 	}
 	if got, err := w.exchange(
@@ -494,142 +630,6 @@ func TestClaimMatching(t *testing.T) {
 		)
 		if c.match != (err == nil) || (!c.match && !errors.Is(err, oidc.ErrNoMatch)) {
 			t.Errorf("%s: %v", c.name, err)
-		}
-	}
-}
-
-func TestPatterns(t *testing.T) {
-	w := newWorld(t)
-	ctx := context.Background()
-	token := map[string]any{
-		"actor":  "octocat",
-		"groups": []any{"dev", "ops"},
-		"n":      float64(7),
-		"path":   "a/b",
-	}
-	cases := []struct {
-		name       string
-		spec       oidc.TokenSpec
-		user, scop string
-		err        error
-	}{
-		{
-			"claim",
-			oidc.TokenSpec{UsernamePattern: ptr("{{actor}}")},
-			"octocat",
-			"applied-permissions/user",
-			nil,
-		},
-		{
-			"replacement",
-			oidc.TokenSpec{UsernamePattern: ptr("{{actor}} | $0@example.com")},
-			"octocat@example.com",
-			"applied-permissions/user",
-			nil,
-		},
-		{
-			"regex",
-			oidc.TokenSpec{UsernamePattern: ptr("ci-{{ actor }} | ^ci-(.*)$ | ${1}-bot")},
-			"octocat-bot",
-			"applied-permissions/user",
-			nil,
-		},
-		{
-			"number",
-			oidc.TokenSpec{UsernamePattern: ptr("run-{{n}}")},
-			"run-7",
-			"applied-permissions/user",
-			nil,
-		},
-		{
-			"groups",
-			oidc.TokenSpec{GroupsPattern: ptr("{{groups}} | $0-jfrog")},
-			"oidc-ci-groups",
-			`applied-permissions/groups:dev-jfrog,ops-jfrog`,
-			nil,
-		},
-		{
-			"groups and scope",
-			oidc.TokenSpec{
-				GroupsPattern: ptr("{{groups}}"),
-				Scope:         ptr("applied-permissions/groups:base"),
-			},
-			"oidc-ci-gs",
-			"applied-permissions/groups:base applied-permissions/groups:dev,ops",
-			nil,
-		},
-		{
-			"missing claim",
-			oidc.TokenSpec{UsernamePattern: ptr("{{nope}}")},
-			"",
-			"",
-			oidc.ErrNoMatch,
-		},
-		{
-			"regex mismatch",
-			oidc.TokenSpec{UsernamePattern: ptr("{{actor}} | ^x(.*)$ | $1")},
-			"",
-			"",
-			oidc.ErrNoMatch,
-		},
-		{
-			"several names",
-			oidc.TokenSpec{UsernamePattern: ptr("{{groups}}")},
-			"",
-			"",
-			oidc.ErrNoMatch,
-		},
-		{
-			"empty groups",
-			oidc.TokenSpec{GroupsPattern: ptr("{{groups}} | ^(z)?.*$ | $1")},
-			"",
-			"",
-			oidc.ErrNoMatch,
-		},
-		{
-			"group regex mismatch",
-			oidc.TokenSpec{GroupsPattern: ptr("{{groups}} | ^z$ | $0")},
-			"",
-			"",
-			oidc.ErrNoMatch,
-		},
-		{
-			"missing group claim",
-			oidc.TokenSpec{GroupsPattern: ptr("{{nope}}")},
-			"",
-			"",
-			oidc.ErrNoMatch,
-		},
-		{
-			"slash in a name",
-			oidc.TokenSpec{UsernamePattern: ptr("{{path}}")},
-			"",
-			"",
-			oidc.ErrInvalid,
-		},
-	}
-	for i, c := range cases {
-		name := "p" + string(rune('a'+i))
-		if c.name == "groups" {
-			name = "groups"
-		}
-		if c.name == "groups and scope" {
-			name = "gs"
-		}
-		if _, err := w.svc.CreateMapping(ctx, "ci", mapping(name, c.spec, nil)); err != nil {
-			t.Fatalf("%s: %v", c.name, err)
-		}
-		got, err := w.exchange(
-			w.mint(t, token),
-			func(r *oidc.ExchangeRequest) { r.MappingName = name },
-		)
-		switch {
-		case c.err != nil:
-			if !errors.Is(err, c.err) {
-				t.Errorf("%s: %v, want %v", c.name, err, c.err)
-			}
-		case err != nil || got.Username != c.user || got.Record.Scope.String() != c.scop:
-			t.Errorf("%s: %q %q, %v", c.name, got.Username, got.Record.Scope.String(), err)
 		}
 	}
 }

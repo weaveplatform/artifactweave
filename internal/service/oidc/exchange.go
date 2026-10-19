@@ -5,9 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/weaveplatform/artifactweave/internal/auth/idtoken"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
@@ -107,10 +110,11 @@ func (s Service) verify(ctx context.Context, p Provider, raw string) (map[string
 }
 
 // candidates are the mappings to try, in order. A named mapping is the only
-// candidate. Otherwise the project's mappings come first when the request
-// names a project, then the global ones; within each, lower priorities
-// first, a mapping without one last, and the first created among equals.
-// Another project's mappings never apply.
+// candidate. When the request names a project, that project's mappings come
+// first, then the global ones, and another project's are not tried; without
+// a project every mapping competes equally (research 21). Within each tier,
+// lower priorities first, a mapping without one last, and the first created
+// among equals.
 func (s Service) candidates(ctx context.Context, p Provider, r ExchangeRequest) ([]Mapping, error) {
 	all, err := s.stored(ctx, str(p.Name))
 	if err != nil {
@@ -130,11 +134,14 @@ func (s Service) candidates(ctx context.Context, p Provider, r ExchangeRequest) 
 	}
 	rank := func(m stored) int {
 		switch str(m.Mapping.ProjectKey) {
-		case "":
-			return 1
 		case r.ProjectKey:
 			return 0
+		case "":
+			return 1
 		default:
+			if r.ProjectKey == "" {
+				return 0
+			}
 			return 2
 		}
 	}
@@ -173,7 +180,7 @@ func (s Service) issue(
 	if err != nil {
 		return Exchanged{}, err
 	}
-	sc, err := mappedScope(ts, claims)
+	sc, err := mappedScope(ts, claims, identity != types.IdentitySynthetic)
 	if err != nil {
 		return Exchanged{}, err
 	}
@@ -182,13 +189,12 @@ func (s Service) issue(
 		expires = time.Duration(*ts.ExpiresIn) * time.Second
 	}
 	expires = min(expires, MaxExpiry)
-	project := ""
-	if str(m.ProjectKey) != "" {
-		project = r.ProjectKey
-	}
+	// The mapping's own project: candidates never picks another project's
+	// mapping when the request names one, and without one the token belongs
+	// to the project whose roles its scope names.
 	issued, err := s.Tokens.Issue(ctx, token.Request{
 		Username: username, Scope: sc, ExpiresIn: &expires, Audience: str(ts.Audience),
-		Description: description(p, m, r), ProjectKey: project,
+		Description: description(p, m, r), ProjectKey: str(m.ProjectKey),
 		IncludeReference: r.IncludeReference, Identity: identity,
 	})
 	if errors.Is(err, token.ErrInvalidRequest) {
@@ -210,11 +216,7 @@ func mappedUser(p Provider, m Mapping, claims map[string]any) (string, types.Tok
 	case str(ts.Username) != "":
 		return *ts.Username, types.IdentityTransient, nil
 	case str(ts.UsernamePattern) != "":
-		pat, err := parsePattern(*ts.UsernamePattern)
-		if err != nil {
-			return "", "", err
-		}
-		names, err := pat.apply(claims)
+		names, err := applyPattern(*ts.UsernamePattern, claims)
 		if err != nil {
 			return "", "", err
 		}
@@ -225,15 +227,36 @@ func mappedUser(p Provider, m Mapping, claims map[string]any) (string, types.Tok
 				len(names),
 			)
 		}
+		if !printable(names[0]) {
+			return "", "", invalid("username_pattern yields the user name %q", names[0])
+		}
 		return names[0], types.IdentityTransient, nil
 	default:
 		return "oidc-" + str(p.Name) + "-" + str(m.Name), types.IdentitySynthetic, nil
 	}
 }
 
+func applyPattern(src string, claims map[string]any) ([]string, error) {
+	pat, err := parsePattern(src)
+	if err != nil {
+		return nil, err
+	}
+	return pat.apply(claims)
+}
+
+// printable reports whether a name a claim produced is valid UTF-8 without
+// control characters, which no user or group name legitimately holds.
+func printable(s string) bool {
+	return utf8.ValidString(s) && !strings.ContainsFunc(s, unicode.IsControl)
+}
+
 // mappedScope is the scope of a mapping's token: its token_spec.scope, the
-// groups its groups_pattern yields, or the user's own permissions.
-func mappedScope(ts *TokenSpec, claims map[string]any) (types.Scope, error) {
+// groups its groups_pattern yields, the repositories its resource_pattern
+// yields and, when the mapping names a user, applied-permissions/user, so
+// the token also acts through the auto-join groups ("Transient Users in OIDC
+// Token Exchange"). A project roles scope takes no user scope (JA-19609),
+// and an admin scope needs none.
+func mappedScope(ts *TokenSpec, claims map[string]any, named bool) (types.Scope, error) {
 	var sc types.Scope
 	if str(ts.Scope) != "" {
 		parsed, err := types.ParseScope(*ts.Scope)
@@ -243,11 +266,7 @@ func mappedScope(ts *TokenSpec, claims map[string]any) (types.Scope, error) {
 		sc = parsed
 	}
 	if str(ts.GroupsPattern) != "" {
-		pat, err := parsePattern(*ts.GroupsPattern)
-		if err != nil {
-			return types.Scope{}, err
-		}
-		groups, err := pat.apply(claims)
+		groups, err := applyPattern(*ts.GroupsPattern, claims)
 		if err != nil {
 			return types.Scope{}, err
 		}
@@ -255,12 +274,75 @@ func mappedScope(ts *TokenSpec, claims map[string]any) (types.Scope, error) {
 		if len(groups) == 0 {
 			return types.Scope{}, fmt.Errorf("%w: groups_pattern yields no group", ErrNoMatch)
 		}
+		for _, g := range groups {
+			// The scope grammar has no escape for a quote in a group name.
+			if !printable(g) || strings.Contains(g, `"`) {
+				return types.Scope{}, invalid("groups_pattern yields the group name %q", g)
+			}
+		}
 		sc.Entries = append(sc.Entries, types.ScopeEntry{Kind: types.ScopeGroups, Names: groups})
 	}
-	if len(sc.Entries) == 0 {
-		sc = types.UserScope()
+	if str(ts.ResourcePattern) != "" {
+		values, err := applyPattern(*ts.ResourcePattern, claims)
+		if err != nil {
+			return types.Scope{}, err
+		}
+		for _, v := range values {
+			e, err := resourceEntry(v)
+			if err != nil {
+				return types.Scope{}, err
+			}
+			sc.Entries = append(sc.Entries, e)
+		}
 	}
-	return sc, nil
+	if named && !hasKind(sc, types.ScopeUser) && !hasKind(sc, types.ScopeAdmin) &&
+		!hasKind(sc, types.ScopeRoles) {
+		sc.Entries = append(sc.Entries, types.ScopeEntry{Kind: types.ScopeUser})
+	}
+	return sc, issuable(sc)
+}
+
+// resourceEntry is the artifact scope entry one value of a resource_pattern
+// names (research 21, "Add a Resource Scope to an Identity Mapping"): a bare
+// repository key is normalised to artifact:<repo>/**:r, and anything else
+// must itself be a single artifact entry. The repository must be named
+// exactly, never by a wildcard. Such an entry only narrows: artifact entries
+// intersect the subject's permissions (decision 0006), so the token never
+// reaches a repository its user or groups could not.
+func resourceEntry(v string) (types.ScopeEntry, error) {
+	e := types.ScopeEntry{
+		Kind:    types.ScopeArtifact,
+		Target:  v,
+		Path:    "**",
+		Actions: types.ScopeRead,
+	}
+	if strings.Contains(v, ":") {
+		sc, err := types.ParseScope(v)
+		if err != nil || len(sc.Entries) != 1 || sc.Entries[0].Kind != types.ScopeArtifact {
+			return types.ScopeEntry{}, invalid(
+				"resource_pattern yields %q, which is not one artifact scope", v,
+			)
+		}
+		e = sc.Entries[0]
+	}
+	if e.Target == "" || !printable(e.Target) ||
+		strings.ContainsFunc(e.Target, unicode.IsSpace) || strings.ContainsAny(e.Target, `*?/\:"`) {
+		return types.ScopeEntry{}, invalid(
+			"resource_pattern yields %q, which does not name one repository", v,
+		)
+	}
+	return e, nil
+}
+
+// issuable checks that sc reads back as itself. A token's scope is signed
+// and stored as text, so a value a claim supplied must not change how that
+// text parses, and the text must stay within the scope length limit.
+func issuable(sc types.Scope) error {
+	back, err := types.ParseScope(sc.String())
+	if err != nil || !reflect.DeepEqual(back, sc) {
+		return invalid("the claims give a scope that cannot be issued: %q", sc.String())
+	}
+	return nil
 }
 
 // description records where the token came from, for the token list.

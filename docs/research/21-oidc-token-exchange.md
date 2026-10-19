@@ -80,22 +80,37 @@ From <https://docs.jfrog.com/administration/docs/openid-connect-integration>:
   global identity mappings ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). SaaS 7.172.1 ([release notes](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)) adds a Resource Scope
   dynamic mapping; it is not yet in self-managed 7.161.32. The integration page dates it from
   7.161.5: a claim such as `jfrog_scope` becomes the token's resource scope, and a bare
-  repository name is normalised to `artifact:<repo>/**:r`.
+  repository name is normalised to `artifact:<repo>/**:r`. Its patterns take the same
+  syntax as the user and group patterns ("Add a Resource Scope to an Identity Mapping").
+  Neither the API reference (`createoidcidentitymapping`, read 2026-10-19) nor the
+  jfrog/platform provider names the `token_spec` field that carries the pattern.
 - **[D]** Dynamic mapping (7.95+), "Dynamic Mapping": a pattern names its claim as
   `{{claim}}`, and "If the claim is not found, the token request fails."
   - `{{claim}}` alone takes the claim's value as it is.
   - `template | replacement` matches the template against the claim. `{{claim}}` stands for a
-    capture group, and the text around it must match literally. The replacement builds the
+    capture group, and the text around it must match. The replacement builds the
     result from `$0`, the whole match, and `$1`, the group: `jf{{actor}}jf|$1` turns
     `jfuser-f12jf` into `user-f12`, and `{{actor}} | hub$0jfrog` turns `user` into
     `hubuserjfrog`. A claim that does not match fails the request:
     `jf{{mail}}jfrog.com|$0` fails for a mail that does not start with `jf`.
+  - `({{actor}}) @jfrog.com|$1` turns `username@jfrog.com` into `username`. That works only
+    if the template's text is a regular expression, its parentheses a group, and its
+    whitespace is ignored (section 4).
   - `{{claim}} | regex | replacement` matches the claim against a regular expression.
   - A groups pattern "is applied to all groups and adds the pattern to the group scope".
 - **[D]** Advanced dynamic mappings (7.130.0+, "Advanced Dynamic Mappings"): a pattern may
   chain more than three parts, and a part may be `op:replaceAll("a","b")`,
   `op:replaceFirst(…)` or `op:replaceLast(…)`. For example
-  `{{actor}} | op:replaceAll("-","_") | ^([^_]+)_([^_]+)_([^_]+)_mac$ | $1_$2_$3_artifactory_cicd`.
+  `{{actor}} | op:replaceAll("-","_") | ^([^_]+)_([^_]+)_([^_]+)_mac$ | $1_$2_$3_artifactory_cicd`
+  turns `Si-for-abced_mac` into `Si_for_abced_artifactory_cicd`. The page's other examples:
+  - `{{email}} | ^([^@]+)@jfrog\.com$ | $1_com | op:replaceAll(".","-")` turns
+    `nick.v.goose@jfrog.com` into `nick-v-goose_com`;
+  - `{{data}} | ^([^-]+)-([^-]+)$ | op:replaceFirst("a","A") | op:replaceLast("t","T") | $1_$2`
+    turns `team-project` into `teAm_projecT`;
+  - for a resource scope, `{{repo}} | op:replaceAll(".","-") | $1` turns `my.docker.repo`
+    into `my-docker-repo`, and
+    `{{email_path}} | op:replaceAll(".","-") | ^([^@]+)@.*$ | $1` turns
+    `team.a@company.com/docker-prod` into `team-a`.
 - **[D]** A mapping that resolves a username issues "a token with the
   `applied-permissions/user` scope", which is added to any groups scope ("Transient Users in
   OIDC Token Exchange"). User only acts through the auto-join groups, groups only through the
@@ -169,6 +184,25 @@ Artifactory's Docker registry, and as whom.
 - **[I]** `*` stops at `/` and `**` does not, by analogy with the two examples above and
   with Artifactory's Ant-style repository patterns.
 
+Dynamic mappings, from the examples of section 3 (implemented for
+[#409](https://github.com/weaveplatform/artifactweave/issues/409)):
+- **[I]** The template is a regular expression with its whitespace dropped, which
+  `({{actor}}) @jfrog.com|$1` needs. A template names one claim, and a template alone
+  verifies the claim and yields it unchanged.
+- **[I]** The operators replace literal text, since `op:replaceAll(".","-")` replaces only
+  periods. They apply to the whole value, and a replacement takes its groups from matching
+  the latest expression again afterwards: that is how `team-project` becomes `teAm_projecT`.
+- **[I]** `$1_$2` reads group numbers as Java does (group 1, `_`, group 2). Read as Go reads
+  it, `$1_` would name a group called `1_`.
+- **[I]** Of the parts that are not operators, one is an expression when another follows it
+  and the one before it is not an expression; the others are replacements. That reading fits
+  every example on the page.
+- **[I]** The table's "User" is the `username` field or an `applied-permissions/user` scope.
+- **[I]** The Resource Scope pattern is `token_spec.resource_pattern`, after
+  `username_pattern` and `groups_pattern`.
+- **[I]** With a `project_key`, another project's mappings are not tried; the page says only
+  that the project's own come first.
+
 ## 5. Versions at the research baseline
 
 | Component | Version |
@@ -195,13 +229,19 @@ the order of mappings with a `project_key`.
 operators, the user scope that a resolved username adds, which scopes one mapping may
 combine, and how mappings compete without a `project_key`.
 
-**Where artifactweave differs:** on those five points and the Resource Scope mapping.
-Decision 0005's [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check)
-lists them; [#409](https://github.com/weaveplatform/artifactweave/issues/409) fixes them.
+**Where artifactweave differs:** since
+[#409](https://github.com/weaveplatform/artifactweave/issues/409), artifactweave follows
+section 3 on those five points and the Resource Scope mapping. One choice goes further: a
+resource scope from a claim narrows the permissions of the token's user and groups and never
+grants on its own. Decision 0005's
+[7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) records it.
 
 **Unconfirmed for 7.x**, for the live check on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216):
 - `*` and `**` in claims (section 4);
+- the dynamic mapping details of section 4: the template as a regular expression, the
+  operators, `$1_$2`, which parts are expressions, the table's "User", the
+  `resource_pattern` field and another project's mappings;
 - whether a `token_spec.expires_in` over 24 hours is refused or capped;
 - what `self_revocable` changes;
 - whether an exchanged token shorter than six hours can be revoked. 7.133.3 fixed revoking one
