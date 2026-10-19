@@ -190,15 +190,64 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   `repository_owner` to equal its organisation. Azure's `azure_app_id` asks the JWKS
   for the application's keys. Keys are fetched directly, or through the environment's
   proxy when `use_default_proxy` is set.
-- **Mapping.** A named `identity_mapping_name` is the only candidate. Otherwise the
-  request's project's mappings come first, then global ones, then lower priorities, a
-  mapping without one last, then creation order; another project's mappings never
-  apply. A claim matches with `*` (not across `/`) and `**` wildcards, a list matches
-  when any element does, an object matches its nested claims, and a dotted name reaches
-  into nested objects. `username_pattern` and `groups_pattern` take `{{claim}}`,
-  optionally followed by `| replacement` or `| regex | replacement`.
+- **Mapping.** A named `identity_mapping_name` is the only candidate. With a
+  `project_key`, that project's mappings come first, then global ones, and another
+  project's mappings are not tried. Without one, every mapping competes: "When no
+  `project_key` is supplied, all identity mappings compete equally based on priority and
+  creation time" ("Identity Mappings"). Within each tier lower priorities come first, a
+  mapping without one last, then creation order. The token belongs to the project of
+  the mapping that matched, if it has one. A claim matches with `*` (not across `/`) and
+  `**` wildcards, a list matches when any element does, an object matches its nested
+  claims, and a dotted name reaches into nested objects.
+- **Combinations** (the page's table under "Identity Mappings"). An admin scope combines
+  with nothing. `username_pattern` combines with neither `username` nor an
+  `applied-permissions/user` scope, and `groups_pattern` does not combine with a groups
+  scope. Every other pair is accepted, so a user or a user pattern may come with a groups
+  pattern. `resource_pattern` also refuses artifact entries in the mapping's own scope,
+  because a token's artifact entries allow their union and a claim's entry would widen
+  them. A mapping without `username` or `username_pattern` needs a groups scope or
+  `groups_pattern`.
+- **Patterns** ("Dynamic Mapping" and "Advanced Dynamic Mappings"). `username_pattern`,
+  `groups_pattern` and `resource_pattern` name one claim as `{{claim}}`, followed by at
+  most 15 more parts separated by `|`.
+  - The first part is a regular expression, its whitespace dropped, in which `{{claim}}`
+    is a capture group, and the claim must match it whole. So `jf{{actor}}jf|$1` turns
+    `jfuser-f12jf` into `user-f12`, and a claim that does not match fails the request
+    with 400.
+  - A later part is an operator, `op:replaceAll("a","b")`, `op:replaceFirst` or
+    `op:replaceLast`, which replace literal text; a regular expression the value must
+    match; or a replacement. A replacement rebuilds the value from the groups of the
+    latest expression, matched again against the current value. It reads `$1_$2` as
+    Java does: group 1, `_`, group 2.
+  - Of the parts that are not operators, one is an expression when another follows it
+    and the one before it is not an expression; the others are replacements.
+  - A username pattern must yield one name. A groups or resource pattern applies to
+    every element of a list claim.
+- **Pattern safety.** Patterns come from administrators, but claims come from external
+  tokens.
+  - A claim is only ever input. It is never compiled or expanded, so a `$` in it stays
+    text.
+  - A claim value, and every value a step produces, is at most 1024 bytes. A list claim
+    has at most 100 elements and a pattern at most 16 parts. Go's regular expressions
+    run in linear time, so these bound the work of one exchange.
+  - A user or group name with a control character, or a group name with a quote, fails
+    the request. The finished scope must read back as itself, within the 500-character
+    scope limit, so no claim can add a scope entry.
+- **Resource scope** ("Add a Resource Scope to an Identity Mapping"). Each value of
+  `resource_pattern` becomes one artifact entry. A bare repository key is normalised to
+  `artifact:<repo>/**:r`, and any other value must be one `artifact:` entry. Its
+  repository must be named exactly, without `*` or `?`. A wildcard repository, a second
+  entry or another resource type fails the request with 400. The entries only narrow:
+  like every artifact entry they intersect the permissions of the token's user and
+  groups ([0006](0006-authorization-native-permission-model.md)), so a claim never
+  reaches a repository the mapping's user or groups cannot. That is why a mapping with
+  `resource_pattern` needs a user or groups as well.
 - **The token.** Its lifetime is `token_spec.expires_in`, one hour when unset, at most
-  24 hours. A named or patterned user may not exist: the token is marked
+  24 hours. Its scope is the mapping's `scope`, then the groups and artifact entries its
+  patterns yield, then `applied-permissions/user` whenever the mapping names a user. So a
+  token with groups and a user also acts through the auto-join groups ("Transient Users
+  in OIDC Token Exchange"). A project roles scope takes no user scope (JA-19609), and an
+  admin scope needs none. A named or patterned user may not exist: the token is marked
   `transient`, and authenticates as the stored user of that name when there is one,
   otherwise as a transient user in the auto-join groups. A mapping without a user
   issues for the synthetic subject `oidc-<provider>-<mapping>`, marked `synthetic`,
@@ -209,10 +258,12 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   and the request's
   CI fields; `audience`, `application_key` and the `gh_*` fields are accepted and
   ignored.
-- **Statuses.** 400 for a malformed request, an unknown provider or mapping, or no
-  matching mapping; 401 for a token that does not verify, including when the
-  provider's keys cannot be fetched, which is logged at WARN. Management answers 404
-  for an unknown provider or mapping, 400 for an invalid body or a name in use.
+- **Statuses.** 400 for a malformed request, an unknown provider or mapping, no
+  matching mapping, or a matching mapping whose patterns refuse the claims; 401 for a
+  token that does not verify, including when the provider's keys cannot be fetched,
+  which is logged at WARN. Management answers 404 for an unknown provider or mapping,
+  400 for an invalid body, a combination the table refuses, a pattern that cannot be
+  read, or a name in use.
 
 **Docker token endpoint** (values from [research 17](../17-undocumented-shapes.md),
 behaviour from [research 23](../23-docker-oci-registry.md) section 3; routes in
@@ -504,31 +555,45 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
 
 **OIDC token exchange** ([research 21](../21-oidc-token-exchange.md#3-matching-and-the-token-issued)
 section 3 describes each point, from
-[OpenID Connect integration](https://docs.jfrog.com/administration/docs/openid-connect-integration)):
-- 7.x differs: a mapping that resolves a username adds `applied-permissions/user`, so the
-  token acts through its named groups and the auto-join groups; from 7.133.10 not with a
-  project roles scope (JA-18771 in
+[OpenID Connect integration](https://docs.jfrog.com/administration/docs/openid-connect-integration)).
+These match 7.x since [#409](https://github.com/weaveplatform/artifactweave/issues/409), as
+**OIDC token exchange** above describes:
+- A mapping that resolves a username adds `applied-permissions/user`, so the token acts
+  through its named groups and the auto-join groups; from 7.133.10 not with a project roles
+  scope (JA-18771 in
   [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed),
   JA-19609 in
-  [7.133.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-713310-self-managed));
-  fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
-- 7.x differs: one mapping may combine a user with a groups pattern, and a user pattern with a
-  groups pattern; it may not combine groups with a groups pattern, a user with a user pattern,
-  or admin with anything (the page's combination table); fixed by
-  [#409](https://github.com/weaveplatform/artifactweave/issues/409).
-- 7.x differs: a two-part pattern matches its template against the claim, the claim's place
-  being a capture group, and a claim that does not match fails the request ("Dynamic
-  Mapping"); fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
-- 7.x differs: from 7.130.0 a pattern may chain more than three parts and use
-  `op:replaceAll`, `op:replaceFirst` and `op:replaceLast` ("Advanced Dynamic Mappings");
-  fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
-- 7.x differs: a Resource Scope mapping turns a claim such as `jfrog_scope` into an
-  `artifact:` scope (SaaS
-  [7.172.1](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas));
-  fixed by [#409](https://github.com/weaveplatform/artifactweave/issues/409).
-- 7.x differs: with no `project_key`, "all identity mappings compete equally based on priority
-  and creation time", a project's mappings included ("Identity Mappings"); fixed by
-  [#409](https://github.com/weaveplatform/artifactweave/issues/409).
+  [7.133.10](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-713310-self-managed)).
+- One mapping may combine a user with a groups pattern, and a user pattern with a groups
+  pattern. It may not combine groups with a groups pattern, a user with a user pattern, or
+  admin with anything (the page's combination table).
+- A two-part pattern matches its template against the claim, the claim's place being a
+  capture group, and a claim that does not match fails the request ("Dynamic Mapping").
+- From 7.130.0 a pattern may chain more than three parts and use `op:replaceAll`,
+  `op:replaceFirst` and `op:replaceLast` ("Advanced Dynamic Mappings").
+- A Resource Scope mapping turns a claim such as `jfrog_scope` into an `artifact:` scope,
+  and a bare repository name becomes `artifact:<repo>/**:r` (SaaS
+  [7.172.1](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71721-saas)).
+- With no `project_key`, "all identity mappings compete equally based on priority and
+  creation time", a project's mappings included ("Identity Mappings").
+
+Two choices go further than the page. First, the resource scope's entries narrow the user's
+and groups' permissions, as every artifact entry does here
+([0006](0006-authorization-native-permission-model.md)). The
+[create-scoped-token](https://docs.jfrog.com/administration/reference/create-scoped-token)
+page says a resource scope needs no permissions defined beforehand, but a claim from an
+external token never grants anything on its own here. Second, a claim naming a wildcard
+repository, another resource type or several entries fails the request. The details no
+source states are inferred and listed on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216):
+- the field that carries the pattern, `token_spec.resource_pattern`;
+- the template read as a regular expression with its whitespace dropped, which the page's
+  `({{actor}}) @jfrog.com|$1` example needs, and limited to one claim;
+- which parts of a long chain are expressions and which replacements, operators replacing
+  literal text, and `$1_$2` read as Java reads it;
+- the table's "User" being the `username` field or an `applied-permissions/user` scope;
+- another project's mappings not being tried when the request names a project;
+- the bounds on claims and patterns, and the refusal of over-broad resource claims.
 
 ## Constraints
 
@@ -551,8 +616,11 @@ section 3 describes each point, from
   the token from the legacy route creates one through the Access route.
 - `artifactory_scoped_token` and `platform_permission` Terraform acceptance.
 - OIDC: `internal/service/oidc` and `internal/auth/idtoken` tests against a fake issuer
-  (`idtokentest`); `oidc.feature`, where the real `jf eot` exchanges a token and
-  downloads with it; `deploy/artifactweave/terraform/oidc` in the `terraform` job.
+  (`idtokentest`), including every dynamic mapping example on the integration page;
+  `TestOIDCDynamicMappings`, which follows a narrowed token to what it may read;
+  `oidc.feature`, where the real `jf eot` exchanges a token and downloads with it, also
+  through a dynamic mapping narrowed to one repository;
+  `deploy/artifactweave/terraform/oidc` in the `terraform` job.
 - Docker token flow in the OCI conformance job, and `docker login` and `crane auth login`
   against the binary; tests for scope intersection, refusal across images and routes, and
   expiry capped by the credentials.

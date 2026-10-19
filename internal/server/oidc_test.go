@@ -233,6 +233,65 @@ func TestOIDCExchange(t *testing.T) {
 
 func basicToken(user, tok string) map[string]string { return basic(user, tok) }
 
+// TestOIDCDynamicMappings follows exchanged tokens to what they may read: a
+// resolved user adds the auto-join groups to a groups scope (IDZ-59), and a
+// resource pattern narrows what the user and groups may read but never
+// reaches beyond it (IDZ-63).
+func TestOIDCDynamicMappings(t *testing.T) {
+	w := newOIDCWorld(t)
+	admin := jsonAs(basic("admin", "pw"))
+	for _, m := range []string{
+		`{"name":"named","claims":{"sub":"*"},"token_spec":{"username_pattern":"jf{{actor}}jf|$1",` +
+			`"scope":"applied-permissions/groups:ci-team"}}`,
+		`{"name":"narrowed","claims":{"sub":"*"},"token_spec":{"username_pattern":"{{actor}}",` +
+			`"scope":"applied-permissions/groups:ci-team","resource_pattern":"{{jfrog_scope}}"}}`,
+		`{"name":"groups-narrowed","claims":{"sub":"*"},"token_spec":` +
+			`{"scope":"applied-permissions/groups:ci-team","resource_pattern":"{{jfrog_scope}}"}}`,
+	} {
+		w.call(t, http.MethodPost, "/access/api/v1/oidc/ci/identity_mappings", admin, m,
+			http.StatusOK)
+	}
+	exchange := func(mapping string, claims map[string]any, want int) exchangeResult {
+		t.Helper()
+		claims["sub"] = "x"
+		return w.exchange(t, exchangeBody(w.mint(t, "jfrog", time.Hour, claims),
+			`,"identity_mapping_name":"`+mapping+`"`), want)
+	}
+	reads := func(got exchangeResult, team, open int) {
+		t.Helper()
+		bearer := bearerAuth(got.AccessToken)
+		w.call(t, http.MethodGet, "/artifactory/team-local/f.txt", bearer, "", team)
+		w.call(t, http.MethodGet, "/artifactory/open-local/f.txt", bearer, "", open)
+	}
+
+	got := exchange("named", map[string]any{"actor": "jfoctocatjf"}, http.StatusOK)
+	if got.Username != "octocat" ||
+		got.Scope != "applied-permissions/groups:ci-team applied-permissions/user" {
+		t.Fatalf("named = %+v", got)
+	}
+	reads(got, http.StatusOK, http.StatusOK)
+	// The claim must match the template.
+	exchange("named", map[string]any{"actor": "octocat"}, http.StatusBadRequest)
+
+	got = exchange("narrowed", map[string]any{"actor": "octocat", "jfrog_scope": "team-local"},
+		http.StatusOK)
+	if got.Scope != "applied-permissions/groups:ci-team artifact:team-local/**:r applied-permissions/user" {
+		t.Fatalf("narrowed = %+v", got)
+	}
+	reads(got, http.StatusOK, http.StatusForbidden)
+	got = exchange("narrowed", map[string]any{"actor": "octocat", "jfrog_scope": "open-local"},
+		http.StatusOK)
+	reads(got, http.StatusForbidden, http.StatusOK)
+	// The synthetic subject's ci-team group cannot read open-local, and
+	// naming it in the claim does not change that.
+	got = exchange("groups-narrowed", map[string]any{"jfrog_scope": "open-local"}, http.StatusOK)
+	reads(got, http.StatusForbidden, http.StatusForbidden)
+	for _, scope := range []string{"artifact:*:r", "system:metrics:r", "team-local open-local"} {
+		exchange("narrowed", map[string]any{"actor": "octocat", "jfrog_scope": scope},
+			http.StatusBadRequest)
+	}
+}
+
 // TestOIDCReadBack: providers and mappings read back exactly as the
 // jfrog/platform Terraform provider wrote them, so a plan stays empty.
 func TestOIDCReadBack(t *testing.T) {
@@ -260,6 +319,16 @@ func TestOIDCReadBack(t *testing.T) {
 		mapping,
 		http.StatusOK,
 	)
+	dynamic := `{"name":"dynamic","token_spec":{"username":"dev","groups_pattern":"{{groups}} | $0-ci",` +
+		`"resource_pattern":"{{jfrog_scope}}"}}`
+	w.call(t, http.MethodPost, "/access/api/v1/oidc/ci/identity_mappings", jsonAs(admin), dynamic,
+		http.StatusOK)
+	back := w.call(t, http.MethodGet, "/access/api/v1/oidc/ci/identity_mappings/dynamic", admin, "",
+		http.StatusOK)
+	if !strings.Contains(back, `"resource_pattern":"{{jfrog_scope}}"`) ||
+		!strings.Contains(back, `"groups_pattern":"{{groups}} | $0-ci"`) {
+		t.Fatalf("dynamic mapping = %s", back)
+	}
 	one := w.call(
 		t,
 		http.MethodGet,
