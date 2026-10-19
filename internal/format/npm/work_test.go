@@ -50,7 +50,7 @@ func TestWorkReindex(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err := w.run(npm.KindReindex, ""); err != nil {
+	if err := w.run(format.KindReindex, ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := w.index(); len(got["left-pad"]) != len(want["left-pad"]) {

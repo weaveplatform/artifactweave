@@ -263,7 +263,7 @@ func TestLicenses(t *testing.T) {
 	}
 	w.annotate(p, types.Properties{npm.PropLicenses: {"ISC"}})
 	w.deploy(p, bare, nil)
-	if err := w.run(npm.KindReindex, ""); err != nil {
+	if err := w.run(format.KindReindex, ""); err != nil {
 		t.Fatal(err)
 	}
 	if got := w.props(p)[npm.PropLicenses]; !slices.Equal(got, []string{"ISC"}) {

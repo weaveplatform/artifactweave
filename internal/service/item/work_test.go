@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -273,5 +274,115 @@ func TestUnderive(t *testing.T) {
 	}
 	if err := env.Underive(ctx, w.loc, true, "x"); err != nil {
 		t.Errorf("an empty cache: %v", err)
+	}
+}
+
+// reindexer is a format whose index a reindex rebuilds, recording each
+// rebuild.
+type reindexer struct {
+	bare
+	ran  *[]string
+	fail error
+}
+
+func (f reindexer) Reindex(_ context.Context, env format.Env, c repo.Config) error {
+	if env.Store == nil {
+		return errors.New("reindex ran without its environment")
+	}
+	*f.ran = append(*f.ran, "all "+c.Key)
+	return f.fail
+}
+
+// partial is a reindexer that also rebuilds the index of a path alone.
+type partial struct{ reindexer }
+
+func (f partial) ReindexPath(_ context.Context, _ format.Env, c repo.Config, p string) error {
+	*f.ran = append(*f.ran, "path "+c.Key+"/"+p)
+	return f.fail
+}
+
+// reposDown fails every repository lookup.
+type reposDown struct{ store.RepoStore }
+
+func (reposDown) Get(context.Context, string) (repo.Config, error) { return repo.Config{}, errBoom }
+
+type lookupFails struct{ *inmem.Store }
+
+func (lookupFails) Repos() store.RepoStore { return reposDown{} }
+
+// The reindex kinds run through the format of the repository's package
+// type, whichever format it is: a whole repository, or a path through a
+// format that rebuilds one, and the whole repository through any other.
+// A repository that is gone, or whose format keeps no index, owes nothing,
+// and a failure fails the run.
+func TestReindexWork(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	var ran []string
+	formats := map[repo.PackageType]format.Handler{
+		repo.Generic: partial{reindexer{ran: &ran}},
+		repo.PyPI:    reindexer{ran: &ran},
+	}
+	w.svc.Formats = func(t repo.PackageType) format.Handler {
+		if h, ok := formats[t]; ok {
+			return h
+		}
+		return bare{}
+	}
+	for _, c := range []repo.Config{
+		{Key: "py", Class: repo.Local, PackageType: repo.PyPI},
+		{Key: "plain", Class: repo.Local, PackageType: repo.Debian},
+	} {
+		if err := w.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	q := newQueue(t, w.db, work.Options{})
+	if err := w.svc.RegisterWork(q); err != nil {
+		t.Fatal(err)
+	}
+	run := func(kind, key string) error {
+		t.Helper()
+		if err := w.db.WorkQueue().Enqueue(ctx, kind, key, nil, at); err != nil {
+			t.Fatal(err)
+		}
+		return q.EnsureFresh(ctx, kind, key)
+	}
+	for _, c := range []struct{ kind, key string }{
+		{format.KindReindex, "libs"},
+		{format.KindReindexPath, "libs/a/b"},
+		{format.KindReindexPath, "py/a"},
+		{format.KindReindex, "plain"},
+		{format.KindReindexPath, "plain/a"},
+		{format.KindReindex, "gone"},
+		{format.KindReindexPath, "gone/a"},
+	} {
+		if err := run(c.kind, c.key); err != nil {
+			t.Errorf("%s %s: %v", c.kind, c.key, err)
+		}
+	}
+	if want := []string{"all libs", "path libs/a/b", "all py"}; !slices.Equal(ran, want) {
+		t.Fatalf("ran %v, want %v", ran, want)
+	}
+
+	formats[repo.PyPI] = reindexer{ran: &ran, fail: errBoom}
+	if err := run(format.KindReindex, "py"); !errors.Is(err, errBoom) {
+		t.Errorf("a failing rebuild: %v", err)
+	}
+	w.svc.Store = lookupFails{w.db}
+	if err := run(format.KindReindexPath, "libs/a"); !errors.Is(err, errBoom) {
+		t.Errorf("a failing lookup: %v", err)
+	}
+
+	// The service owns the reindex kinds: a format may not claim one.
+	w.svc.Store = w.db
+	w.svc.Formats = func(repo.PackageType) format.Handler {
+		return worker{kinds: []string{format.KindReindex}, ran: &ran}
+	}
+	if err := w.svc.RegisterWork(newQueue(t, w.db, work.Options{})); !errors.Is(
+		err,
+		ErrDuplicateKind,
+	) {
+		t.Errorf("a format claiming a reindex kind: %v", err)
 	}
 }

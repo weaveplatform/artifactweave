@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/format"
 	npmfmt "github.com/weaveplatform/artifactweave/internal/format/npm"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
@@ -92,7 +93,7 @@ func TestNpmReindexIsQueued(t *testing.T) {
 	if got := w.npmPackages(); len(got) != 0 {
 		t.Fatalf("reindexed before the queue ran: %v", got)
 	}
-	if err := q.EnsureFresh(ctx, npmfmt.KindReindex, "npm-local"); err != nil {
+	if err := q.EnsureFresh(ctx, format.KindReindex, "npm-local"); err != nil {
 		t.Fatal(err)
 	}
 	if got := w.npmPackages(); len(got) != 1 {

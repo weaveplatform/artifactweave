@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
@@ -21,12 +23,20 @@ type Freshener interface {
 // ErrDuplicateKind reports two formats that claim one kind of work.
 var ErrDuplicateKind = errors.New("item: two formats claim one kind of work")
 
-// RegisterWork registers with q a handler for every kind of derived work a
-// format runs, each run through s, on a timer for the kinds s.Periodic
-// names. Call it before q.Run, which leases only the kinds registered when
-// it starts.
+// RegisterWork registers with q a handler for the reindex kinds every
+// format shares and for every kind of derived work a format runs, each run
+// through s, on a timer for the kinds s.Periodic names. Call it before
+// q.Run, which leases only the kinds registered when it starts.
 func (s *Service) RegisterWork(q *work.Queue) error {
 	owners := map[string]reflect.Type{}
+	for _, kind := range []string{format.KindReindex, format.KindReindexPath} {
+		// The service owns them, so a format that claims one is refused
+		// as a second owner.
+		owners[kind] = reflect.TypeOf(s)
+		if err := q.Handle(kind, s.reindexWork); err != nil {
+			return fmt.Errorf("item: register %s: %w", kind, err)
+		}
+	}
 	for _, t := range repo.AllowedPackageTypes(repo.Local) {
 		h := s.format(t)
 		w, ok := h.(format.Worker)
@@ -58,6 +68,32 @@ func (s *Service) RegisterWork(q *work.Queue) error {
 		}
 	}
 	return nil
+}
+
+// reindexWork runs a queued reindex, of a whole repository or of a path in
+// one, through the format of the repository's package type. A repository
+// that is gone, or whose format keeps no index, owes nothing: no run could
+// do the work, so failing would only retry it until the queue parked it.
+func (s *Service) reindexWork(ctx context.Context, it types.WorkItem) error {
+	key, path := it.Key, ""
+	if it.Kind == format.KindReindexPath {
+		key, path, _ = strings.Cut(it.Key, "/")
+	}
+	c, err := s.Store.Repos().Get(ctx, key)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil
+	case err != nil:
+		return fmt.Errorf("item: reindex %s: %w", key, err)
+	case it.Kind == format.KindReindexPath:
+		err = s.ReindexPath(ctx, c, path)
+	default:
+		err = s.Reindex(ctx, c)
+	}
+	if errors.Is(err, ErrNoReindex) {
+		return nil
+	}
+	return err
 }
 
 // fresh does the derived work h owes a download of p from c before it is

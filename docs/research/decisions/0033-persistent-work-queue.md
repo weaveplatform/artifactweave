@@ -98,13 +98,49 @@ asked for again during its run waits for the next tick. `EnsureFresh` still runs
 once, and `WaitIdle` does not wait for a pending one.
 
 **Maintenance operations too.** A JFrog operation that 7.x schedules rather than runs
-before it answers is queued the same way, keyed by its repository: npm's reindex and
-strict-layout conversion (decision [0034](0034-npm.md)), which 7.x answers at once (KB
-000005641).
-- No reader waits for such an item, so a format names none of them in `Owed`.
+before it answers is queued the same way, keyed by its repository: the reindex operations
+and npm's strict-layout conversion (decision [0034](0034-npm.md)). The KB describes the
+reindex as "an asynchronous reindexing of a local repository" (KB 000005641).
+- **One reindex kind for every format** (#516). The item service runs `reindex`, keyed by
+  the repository, through the format of the repository's package type, so a format that
+  rebuilds an index (`format.Reindexer`) needs no kind of its own.
+- **Helm's partial reindex** is `reindex.path`, keyed by `<repository>/<path>`, so one
+  path's request never takes another's place, as the payload of a coalesced request would.
+  A format that rebuilds one path (`format.PathReindexer`) does so; any other rebuilds the
+  whole repository.
+- A repository that is gone, or whose format keeps no index, owes nothing.
+- No reader waits for such an item, so a format names none of them in `Owed`. A
+  synchronous operation, PyPI's reindex without `async=true`, waits for its own item as a
+  reader does (`EnsureFresh`), and answers once the run is done or as it failed.
 - A conversion that leaves tarballs it cannot move fails, naming them, so the queue's
   log, retries and parked state carry its report.
 - The operation's resume enqueues the parked item again, which resets its attempts.
+
+Each reindex operation answers 501 until the format of its package type rebuilds an index,
+and then as 7.x does (checked against 7.161.32 and SaaS 7.174.0 on 2026-10-19):
+
+| Operation | Caller needs | Repositories | Runs | Answer | Basis |
+|---|---|---|---|---|---|
+| `POST /api/npm/<repo>/reindex` | Manage | local | queued | `Recalculating index for npm repository <repo> scheduled to run` | [D] archived [*Calculate npm repository metadata*](https://web.archive.org/web/20260210113712/https://jfrog.com/help/r/jfrog-rest-apis/calculate-npm-repository-metadata); decision 0034 |
+| `POST /api/pypi/<repo>/reindex` | Manage | local; federated [I] | before the answer, unless `async` is `true` or `1` | `Recalculating index for pypi repository <repo> scheduled to run`, after a synchronous run too [I] | [D] [calculatepypirepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatepypirepositorymetadata.md); archived [*Calculate PyPI repository metadata*](http://web.archive.org/web/20251009074336/https://jfrog.com/help/r/jfrog-rest-apis/calculate-pypi-repository-metadata) |
+| `POST /api/nuget/<repo>/reindex` | Manage | local; federated [I]. Remote, a remote's cache and virtual: 501 until P9 and P10 | queued | `NuGet reindex calculation for repository '<repo>' accepted.` | [D] [calculatenugetrepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md); archived [*Calculate NuGet repository metadata*](http://web.archive.org/web/20260308210640/https://jfrog.com/help/r/jfrog-rest-apis/calculate-nuget-repository-metadata) |
+| `POST /api/helm/<repo>/reindex` | Manage | local, federated | queued | `Reindex of helm repo <repo> was scheduled to run.` | [D] [calculatehelmchartindex](https://docs.jfrog.com/artifactory/reference/calculatehelmchartindex.md); archived [*Calculate Helm chart index*](http://web.archive.org/web/20260207042251/https://jfrog.com/help/r/jfrog-rest-apis/calculate-helm-chart-index), whose sample shows only `OK`; [S] the answer as the [helm-push-artifactory plugin](https://github.com/belitre/helm-push-artifactory-plugin) prints it (2018) [I] |
+| `POST /api/helm/<repo>/<path>/reindex` | as Helm's [I] | as Helm's [I] | queued, for the path [I] | as Helm's [I] | [D] [helmchartspartialreindexing](https://docs.jfrog.com/artifactory/reference/helmchartspartialreindexing.md); [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md) (from 7.105.2) |
+| `POST /api/terraform/<repo>/reindex` | an administrator | local; federated [I] | queued | `Reindexing of Terraform repository <repo> was scheduled to run.` | [D] [calculateterraformindex](https://docs.jfrog.com/artifactory/reference/calculateterraformindex.md); archived [*Calculate Terraform index*](http://web.archive.org/web/20251118200048/https://jfrog.com/help/r/jfrog-rest-apis/calculate-terraform-index); [terraform-opentofu-and-terraform-backend-repositories](https://docs.jfrog.com/artifactory/docs/terraform-opentofu-and-terraform-backend-repositories.md) |
+
+- Only Helm's page names federated repositories. A federated repository is a local one that
+  federates, and [RTFACT-27144](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27144)
+  says the REST reindex reaches one, so PyPI, NuGet and Terraform reindex them too [I]. npm's
+  answers 400 for one, as [#293](https://github.com/weaveplatform/artifactweave/issues/293)
+  left it.
+- A missing repository answers 404, a caller without the right 401 or 403, and a
+  repository of another package type or class 400. The order of these checks and the text
+  of each refusal are inferred [I].
+- The partial reindex's path may span several segments, which no chi pattern can match
+  before a literal, so the server matches it ahead of routing. A path that cleans to the
+  repository's root reindexes the whole repository [I].
+- The reindex operations of the other package types answer 501, as no format here serves
+  them.
 
 **Not the queue's job.** Work the change itself depends on stays in the change. For
 example, a unique snapshot's build number is assigned at upload from the package index,
@@ -155,3 +191,7 @@ Kinds are code constants, so the labels stay bounded.
   `periodic_test.go`: periodic kinds, their timer and `RunDue`.
 - `internal/format/npm/work_test.go` and `internal/server/npm_operations_test.go`: npm's
   queued reindex and conversion, a conversion that fails and is parked, and its resume.
+- `internal/service/item/work_test.go`: the reindex kinds, through any format, of a whole
+  repository and of a path. `internal/server/reindex_test.go`: each P8 reindex operation's
+  permission, classes, timing and answer through a test-only format, and its 501 without
+  one; `status_reindex_test.go` and `matrix_reindex_test.go`: their rows.
