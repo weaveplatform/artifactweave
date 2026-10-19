@@ -2,6 +2,7 @@ package server
 
 import (
 	"strings"
+	"testing"
 
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -30,6 +31,25 @@ var mavenMatrixPart = matrixPart{
 				holds("maven-releases", "work/", write), 409),
 			row(mavenGet, releases+"app/1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar", "",
 				holds("maven-releases", "work/", read), 409),
+			// calculateMetadata needs every action Manage brings on the
+			// folder; generatePom reads the jar and deploys its POM (#282).
+			row(mavenCalculate, "/artifactory/api/maven/calculateMetadata/maven-local/work/app",
+				"", holds("maven-local", "work/app", calculateMetadataActions), 200),
+			row(
+				mavenGenerate,
+				"/artifactory/api/maven/generatePom/maven-local/work/gen-{p}/1.0/gen-{p}-1.0.jar",
+				"",
+				holds("maven-local", "work/", read|write),
+				200,
+			).seeding(
+				func(t *testing.T, f *matrixFixture, p string) {
+					t.Helper()
+					f.deploy(t, "maven-local", "work/gen-"+p+"/1.0/gen-"+p+"-1.0.jar", []byte(p))
+				}),
 		}
+	},
+	seed: func(t *testing.T, f *matrixFixture) {
+		t.Helper()
+		f.deploy(t, "maven-local", "work/app/1.0/app-1.0.jar", []byte("jar"))
 	},
 }

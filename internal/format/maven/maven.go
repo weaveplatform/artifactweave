@@ -48,7 +48,8 @@ type Handler struct {
 // the tree, so its date and files are what a reindex would read. It queues
 // the package's metadata, whose run rebuilds the group's plugin metadata
 // too, and a plugin POM queues its group's plugin metadata of its own, which
-// a read of that file waits for.
+// a read of that file waits for. A snapshot build in a repository with
+// maxUniqueSnapshots marks the package for its cleanup.
 func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it types.Item) error {
 	if it.Folder {
 		return nil
@@ -64,6 +65,9 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 		}
 	}
 	if err := queueWrite(ctx, env, c, it.Cached, it.FullPath(), co, ok); err != nil {
+		return err
+	}
+	if err := queueCleanup(ctx, env, c, r, it, co, ok); err != nil {
 		return err
 	}
 	return queueMarked(ctx, env, c, it, queued(c, it.Cached))

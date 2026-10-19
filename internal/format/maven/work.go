@@ -27,12 +27,13 @@ const (
 )
 
 // WorkKinds are the kinds the Maven format queues.
-func (Handler) WorkKinds() []string { return []string{KindMetadata, KindPlugins} }
+func (Handler) WorkKinds() []string { return []string{KindMetadata, KindPlugins, KindSnapshots} }
 
 // Work rebuilds the metadata one item names from the package index as it
 // stands now, under deployer as under the other behaviours, since only a
-// delete asks for it there. A repository that is gone, or no longer a local
-// repository of the Maven group, owes nothing.
+// delete asks for it there, or applies the package's maxUniqueSnapshots. A
+// repository that is gone, or no longer a local repository of the Maven
+// group, owes nothing.
 func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) error {
 	key, name, ok := strings.Cut(it.Key, "/")
 	if !ok {
@@ -57,6 +58,8 @@ func (Handler) Work(ctx context.Context, env format.Env, it types.WorkItem) erro
 		return writePackageMetadata(ctx, env, c, r, name)
 	case KindPlugins:
 		return writePluginMetadata(ctx, env, c, r, name)
+	case KindSnapshots:
+		return cleanSnapshots(ctx, env, c, r, name)
 	}
 	return nil
 }

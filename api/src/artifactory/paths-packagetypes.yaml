@@ -886,10 +886,12 @@ paths:
     post:
       description: 'Regenerates maven-metadata.xml for a folder of a local Maven, Gradle, Ivy or SBT
         repository: artifact-level metadata (versions, latest, release), snapshot-level metadata (timestamped
-        builds) and plugin-level metadata. Recurses into subfolders unless noneRecursive is true. The
-        calculation is queued and the call answers once it is; a later read of the metadata waits for it.
-        Needs Deploy on the folder. A missing path or a repository that is not local answers 404. Metadata is
-        rewritten automatically on deploy and delete, so this is a repair operation.'
+        builds) and plugin-level metadata. The package index of the files under the folder is rebuilt from
+        the stored files first. Recurses into subfolders unless noneRecursive is true. The calculation is
+        queued and the call answers once it is; a later read of the metadata waits for it. Needs Manage,
+        Delete, Deploy, Annotate and Read on the folder. A missing path or a repository that is not local
+        answers 404, and a repository of another package type 400. Metadata is rewritten automatically on
+        deploy and delete, so this is a repair operation.'
       operationId: calculateMavenMetadata
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package
@@ -953,10 +955,14 @@ paths:
   /api/maven/generatePom/{repoKey}/{jarFilePath}:
     post:
       description: Writes a POM at the descriptor path of a JAR that was deployed without one, so Maven
-        clients can resolve the artifact. The content is the JAR's own embedded POM for its coordinates
-        (META-INF/maven/<groupId>/<artifactId>/pom.xml) when it has one, otherwise a default POM with the
-        coordinates from the repository layout. Local Maven, Gradle, Ivy and SBT repositories only; an
-        existing POM is left untouched; needs Deploy on the POM path. A missing JAR answers 404.
+        clients can resolve the artifact; the POM of a classifier JAR is its main artifact's. The content
+        is the JAR's own embedded POM for its coordinates (META-INF/maven/<groupId>/<artifactId>/pom.xml)
+        when it has one, otherwise a default POM with the coordinates from the repository layout and the
+        packaging the JAR's extension names. The POM is checked and indexed as a deployed POM is, so one
+        whose coordinates differ from its path answers 409 unless the repository suppresses the check.
+        Local Maven, Gradle, Ivy and SBT repositories only; an existing POM is left untouched. Needs Read
+        on the JAR and Deploy on the POM path. A missing JAR answers 404, and a folder or a file the
+        repository layout reads no coordinates from 400.
       operationId: generateMavenPomFile
       parameters:
       - description: Required path parameter. Key of the repository to act on. The repository's package

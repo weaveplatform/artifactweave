@@ -454,9 +454,21 @@ highest in version order, whatever the upload order.
   (`conditionalCleanup`, `performCleanup`, `SnapshotVersionsRetriever`). Non-unique
   `-SNAPSHOT` files are not candidates under the Maven layout, whose folder and file
   revision expressions differ.
-- **[S]** The cleanup applies to any layout, not only Maven's, and nothing in it sets a
-  floor: a limit of 1 keeps one build. Research 04 reports "the effective minimum is 2"
-  from JFrog's knowledge base, which a plain fetch cannot read; that is on #216.
+- **[S]** The cleanup applies to any layout, not only Maven's, and nothing in 6.20's code
+  sets a floor: a limit of 1 keeps one build there.
+- **[KB] 7.x floor and schedule.** "Artifactory requires that you store a minimum of 2 unique
+  snapshots". Each deploy of a snapshot checks the limit and marks the builds over it for
+  deletion, and "every 5 minutes, Artifactory runs a background process" that deletes them,
+  oldest first ([KB] [how the max unique snapshots parameter works](https://jfrog.com/help/r/artifactory-how-does-the-max-unique-snapshots-parameter-work-in-artifactory/how-does-this-feature-work),
+  modified 2025-05-15). The article does not say what a limit of 1 does, or whether 6.20's
+  60 s quiet period remains **[I]**. It names Maven, NuGet, Gradle, Ivy, SBT and Docker (as
+  "Max Unique Tags").
+- **artifactweave** (decision 0036, [#283](https://github.com/weaveplatform/artifactweave/issues/283)):
+  in a Maven, Gradle, Ivy or SBT repository, a deploy marks the package in the persistent work
+  queue, in the deploy's transaction, and a job every `maven.snapshot_cleanup_interval` (five
+  minutes by default) on each node runs the marked packages with 6.20's rule above. It reads
+  the limit when it runs, keeps at least two builds, and keeps no quiet period. Whether a limit of 1 answers 400 on 7.x, rather than
+  keeping two, is on #216.
 - **[D] 7.x.** A blank limit keeps every build ([local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md)). Setting it back to
   0 turns the cleanup off: [SaaS 7.164.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71640-saas) (RTDEV-93991) fixed a reset to 0 that deleted
   "queued snapshots" instead, which also shows that 7.x queues the cleanup.
@@ -529,13 +541,18 @@ highest in version order, whatever the upload order.
   `META-INF/maven/**/pom.xml` entry of a jar (`MavenModelUtils.getPomFileAsStringFromJar`)
   and a default POM with `modelVersion` 4.0.0, the coordinates, the packaging and the
   description "Artifactory auto generated POM" (`MavenPomBuilder`).
-- **[S] artifactweave's specification** describes `calculateMavenMetadata`'s 200 as "Plain-text
-  acknowledgement naming the folder", and `generateMavenPomFile` as writing a POM "deriving
-  the coordinates from the repository layout" without the jar's own POM
-  (`api/src/artifactory/paths-packagetypes.yaml`); both operations answer 501 today.
 - **[D] 7.x** documents 401, 403 "Permission Denied" and 500 for both operations
-  ([calculatemavenmetadata](https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md), [generatemavenpomfile](https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md)), so 7.x checks a permission
-  it does not name, where 6.20 checked none (DV-052).
+  ([calculatemavenmetadata](https://docs.jfrog.com/artifactory/reference/calculatemavenmetadata.md), [generatemavenpomfile](https://docs.jfrog.com/artifactory/reference/generatemavenpomfile.md)), so 7.x checks a permission,
+  where 6.20 checked none. The current pages name none. JFrog's REST reference named
+  calculateMetadata's from 4.8: it "requires the following permissions: Manage,
+  Delete/Overwrite, Deploy/Cache, Annotate, and Read", and before 4.8 an administrator ([D] the
+  [Internet Archive copy](http://web.archive.org/web/20260216142936/https://jfrog.com/help/r/jfrog-rest-apis/calculate-maven-metadata)
+  of 2026-02-16). No source names generatePom's **[I]**.
+- **artifactweave** serves both ([#282](https://github.com/weaveplatform/artifactweave/issues/282),
+  decision 0036). `calculateMetadata` needs those five actions on the folder and answers 200
+  with an empty body, "Empty." in its specification (`api/src/artifactory/paths-packagetypes.yaml`).
+  `generatePom` needs Read on the jar and Deploy where the POM goes, and takes the embedded POM
+  for the jar's own coordinates, where 6.20's helper takes the first it meets.
 
 ## 10. Corrections to research 03 and 04
 
@@ -562,15 +579,20 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
    checksum PUT (200 in 6.20) on 7.x (3.7).
 4. Whether 7.x checks `.sha512` and `.sha256` uploads under `client-checksums`, and with which
    statuses (section 4).
-5. The `maxUniqueSnapshots` floor: whether a limit of 1 keeps one build or two, and whether
-   the 300 s interval and 60 s quiet period still apply (section 7).
+5. `maxUniqueSnapshots`: whether 7.x answers 400 to a limit of 1, or keeps two builds as
+   artifactweave does, and whether 6.20's 60 s quiet period still applies. The floor of two
+   and the five-minute job are 7.x's ([KB], section 7).
 6. The default `suppressPomConsistencyChecks` of a Gradle, Ivy or SBT repository created over
    REST without the field (section 6).
 7. Settled by the 7.x check: a POM check failure answers 409 (section 6).
-8. Which permission `calculateMetadata` needs on 7.x; 7.x documents a 403, so not every
-   authenticated user may call it (section 9).
-9. `generatePom` on 7.x: the permission it needs, its answer when the POM exists, when the jar
-   is missing or has no embedded POM, and for a repository that is not Maven (section 9).
+8. Settled by the audit: `calculateMetadata` needs Manage, Delete/Overwrite, Deploy/Cache,
+   Annotate and Read, as JFrog's REST reference said from 4.8 (section 9). The current page
+   names no permission, so a live 7.x should confirm it.
+9. `generatePom` on 7.x: the permission it needs (artifactweave: Read on the jar and Deploy on
+   the POM's path), its answer when the POM exists (200 here), when the jar is missing (404),
+   is a folder or has no coordinates in the layout (400), or has no embedded POM (a default
+   POM here), whether it takes a shaded jar's own POM, where a classifier jar's POM goes, and
+   its answer for a repository that is not Maven (400) (section 9).
 10. Whether 7.x writes plugin-level metadata with the 6.20 rules, and whether a calculation of
     a group folder still removes it (3.5, 3.6).
 11. The status `calculateMetadata` answers for a remote or virtual repository on 7.x (404 in
@@ -634,8 +656,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - `handleReleases`, `handleSnapshots` and the POM consistency refusal (sections 5 and 6), now
   with its status, 409 (7.125.4).
 - `<latest>` rewritten on each deployment (3.4, 7.125.4).
-- `maxUniqueSnapshots`: blank or 0 keeps every build, and the cleanup also runs outside the
-  Maven group (section 7).
+- `maxUniqueSnapshots`: blank or 0 keeps every build, the cleanup also runs outside the
+  Maven group, and it runs every five minutes with a floor of two builds (section 7).
 - The version tokens and `searchLatestReleaseByDateCreated` (section 8).
 
 **Changed or added in 7.x:**
@@ -643,8 +665,7 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   posted on [#278](https://github.com/weaveplatform/artifactweave/issues/278)).
 - Tokens resolve in remote caches and virtual repositories too, cannot be mixed, and need
   both integration revisions in the layout (section 8; posted on [#281](https://github.com/weaveplatform/artifactweave/issues/281)).
-- `calculateMetadata` and `generatePom` answer 403 without the right permission (section 9;
-  DV-052 amended).
+- `calculateMetadata` and `generatePom` answer 403 without the right permission (section 9).
 - A reset of `maxUniqueSnapshots` to 0 turns the cleanup off, and the cleanup is queued
   (section 7).
 - Plugin metadata is calculated only when the file deployed or deleted is a Maven plugin,
@@ -669,21 +690,17 @@ sbt ([D] [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-reposito
 Gradle ([D] [gradle-repositories](https://docs.jfrog.com/artifactory/docs/gradle-repositories.md))
 and every other type ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
 
-**Evidence for open tickets.** The audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found 7.x evidence for two points that open tickets change:
-- `maxUniqueSnapshots`: "Artifactory requires that you store a minimum of 2 unique
-  snapshots", builds over the limit are marked on deploy, and "every 5 minutes, Artifactory
-  runs a background process" that deletes them ([KB] [how the max unique snapshots parameter
-  works](https://jfrog.com/help/r/artifactory-how-does-the-max-unique-snapshots-parameter-work-in-artifactory/how-does-this-feature-work),
-  modified 2025-05-15). This is the knowledge-base source section 7 could not read; the floor
-  and the timing are [#283](https://github.com/weaveplatform/artifactweave/issues/283)'s.
-- `calculateMetadata` permission: JFrog's REST reference required "Manage, Delete/Overwrite,
-  Deploy/Cache, Annotate, and Read" from 4.8 ([D] the
+**Settled by [#282](https://github.com/weaveplatform/artifactweave/issues/282) and [#283](https://github.com/weaveplatform/artifactweave/issues/283)**, from evidence the audit found:
+- `maxUniqueSnapshots` keeps at least two unique builds, a deploy marks the builds over the
+  limit, and a background process deletes them every five minutes ([KB] [how the max unique
+  snapshots parameter works](https://jfrog.com/help/r/artifactory-how-does-the-max-unique-snapshots-parameter-work-in-artifactory/how-does-this-feature-work),
+  modified 2025-05-15). artifactweave keeps the marks in the persistent work queue and runs
+  them every `maven.snapshot_cleanup_interval`, five minutes by default (section 7).
+- `calculateMetadata` needs Manage, Delete/Overwrite, Deploy/Cache, Annotate and Read, as
+  JFrog's REST reference required from 4.8 ([D] the
   [Internet Archive copy](http://web.archive.org/web/20260216142936/https://jfrog.com/help/r/jfrog-rest-apis/calculate-maven-metadata)
-  of 2026-02-16; the current page names no permission), so DV-052's "open to any
-  authenticated user" no longer describes Artifactory. Section 9 also still quotes
-  artifactweave's specification as "Plain-text acknowledgement naming the folder", where it
-  now says "Empty." (`api/src/artifactory/paths-packagetypes.yaml`). Both are
-  [#282](https://github.com/weaveplatform/artifactweave/issues/282)'s.
+  of 2026-02-16; the current page names no permission), and artifactweave asks for the same
+  on the folder (section 9).
 
 **Unconfirmed for 7.x:** every other **[S]** claim, which the 6.20 source alone supports:
 - the snapshot adapters and build numbering (2.2, 2.3);
@@ -692,7 +709,7 @@ and every other type ([#396](https://github.com/weaveplatform/artifactweave/issu
 - the computed checksum served for `maven-metadata.xml` under `client-checksums` (section 4);
 - the snapshot policy message (section 5);
 - the POM check's rules and the defaults table (section 6);
-- the cleanup schedule (section 7);
+- which builds the cleanup counts and how it groups them (section 7);
 - token tie-breaks (section 8);
 - the 6.20 behaviour of `calculateMetadata` (section 9).
 

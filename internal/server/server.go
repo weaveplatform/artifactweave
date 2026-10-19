@@ -260,6 +260,7 @@ func New(cfg Config) http.Handler {
 	artSvc.registerMultipartRoutes(r)
 	artSvc.registerTokenRoutes(r)
 	artSvc.registerSearchRoutes(r)
+	artSvc.registerMavenRoutes(r)
 	registry.Register(r)
 	for _, p := range mounted {
 		pkgroute.Mount(r, artSvc.protocolOptions(), p)

@@ -66,6 +66,14 @@ type Env struct {
 	// path is no error. A restore would bring back data the format
 	// recomputes anyway.
 	Underive func(ctx context.Context, c repo.Config, cached bool, path string) error
+	// Remove deletes the files at paths, of c's own content, as a client's
+	// delete does: through every hook, the format's own included, and into
+	// the trash can when it is on, recorded as deleted by by. It then
+	// prunes the folders those deletes left empty, up to the repository
+	// root. A path with nothing at it is skipped. It is one transaction, so
+	// a failure removes none. Derived work removes deployed files with it,
+	// such as Maven's maxUniqueSnapshots cleanup.
+	Remove func(ctx context.Context, c repo.Config, paths []string, by string) error
 	// Enqueue asks the persistent work queue for kind's work on key
 	// (decision 0033). Called with a hook's ctx, the work is asked for
 	// exactly when the write commits, and not at all after a rollback.

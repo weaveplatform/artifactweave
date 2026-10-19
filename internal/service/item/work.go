@@ -22,8 +22,9 @@ type Freshener interface {
 var ErrDuplicateKind = errors.New("item: two formats claim one kind of work")
 
 // RegisterWork registers with q a handler for every kind of derived work a
-// format runs, each run through s. Call it before q.Run, which leases only
-// the kinds registered when it starts.
+// format runs, each run through s, on a timer for the kinds s.Periodic
+// names. Call it before q.Run, which leases only the kinds registered when
+// it starts.
 func (s *Service) RegisterWork(q *work.Queue) error {
 	owners := map[string]reflect.Type{}
 	for _, t := range repo.AllowedPackageTypes(repo.Local) {
@@ -42,9 +43,15 @@ func (s *Service) RegisterWork(q *work.Queue) error {
 				continue
 			}
 			owners[kind] = reflect.TypeOf(h)
-			err := q.Handle(kind, func(ctx context.Context, it types.WorkItem) error {
+			run := func(ctx context.Context, it types.WorkItem) error {
 				return w.Work(ctx, s.env(), it) //nolint:wrapcheck // the format's own error
-			})
+			}
+			var err error
+			if every, ok := s.Periodic[kind]; ok {
+				err = q.HandleEvery(kind, every, run)
+			} else {
+				err = q.Handle(kind, run)
+			}
 			if err != nil {
 				return fmt.Errorf("item: register %s: %w", kind, err)
 			}

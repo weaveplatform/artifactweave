@@ -114,12 +114,14 @@ does without `p2` (research 27 section 1.3). Snapshot renaming, sidecar mapping 
   - a package's metadata, keyed by `groupId:artifactId`: its artifact-level file, the file
     of each snapshot folder, and its group's plugin metadata;
   - a group's plugin metadata, keyed by `groupId`;
-  - a package's `maxUniqueSnapshots` cleanup, keyed by `groupId:artifactId`.
+  - a package's `maxUniqueSnapshots` cleanup, keyed by `groupId:artifactId`, which runs on a
+    timer rather than as soon as it is due (below).
 - **Enqueueing.** The format's hooks call `Env.Enqueue` inside the write's or delete's own
   transaction, so no work is lost and none is queued for a rolled-back write. A deploy,
   delete, copy, move or restore in a package queues its metadata; a POM with
-  `maven-plugin` packaging also queues its group's plugin metadata; a unique build in a
-  repository with `maxUniqueSnapshots` above 0 queues the cleanup.
+  `maven-plugin` packaging also queues its group's plugin metadata; a build the cleanup
+  counts, in a local repository with `maxUniqueSnapshots` above 0, marks the package for its
+  cleanup, under every snapshot behaviour.
 - **Runs** read the package index, not the folder tree, and write through `Derive`, so they
   do not re-enter the hooks and the files carry server checksums. They remove through
   `Underive`. A derived file records `_system_` as its creator and modifier, which is how a run
@@ -153,11 +155,24 @@ departures:
   has no plugin left; Artifactory also removes it whenever that folder is recalculated, until
   its queued plugin calculation writes it back.
 
-**`maxUniqueSnapshots`.** A run applies Artifactory's rule (research 27 section 7) to the
-queued package: per classifier, while there are more unique builds than the limit, the
-oldest build's files are deleted through the item service and empty folders pruned, which
-queues the package's metadata again. The cleanup state lives in the queue, so it survives a
-restart, and it runs when the queue reaches it rather than on a five-minute timer.
+**`maxUniqueSnapshots`** (amended 2026-10-19, #283). As in 7.x, a deploy marks the package
+and a periodic job deletes the builds over the limit ([KB], research 27 section 7):
+- **The mark** is the package's item in the persistent work queue, written in the deploy's
+  transaction, so it survives a restart. Further deploys coalesce into it.
+- **The job** runs on each node every `maven.snapshot_cleanup_interval`, five minutes by
+  default as in 7.x, and takes every marked package then due (`work.Queue.HandleEvery`);
+  the queue's leases keep two nodes from running one package at once. A package marked
+  again while its cleanup runs waits for the next tick.
+- **The rule** is Artifactory's: the files the cleanup counts are grouped by base revision
+  and file revision into builds, each dated by its earliest file; per classifier, while more
+  builds hold a file of it than the limit, the oldest build's files of that classifier are
+  deleted. Builds of one moment go in build-number order.
+- **The limit** is read when the job runs, so a limit set back to 0 since the deploy deletes
+  nothing (RTDEV-93991). It is never below two: "Artifactory requires that you store a
+  minimum of 2 unique snapshots" ([KB]), so a limit of 1 keeps two builds.
+- **The deletes** go through the item service in one transaction, into the trash can when it
+  is on, recorded as `_system_`'s, so the index and the metadata queue see them. The folders
+  they empty are pruned.
 
 **Version tokens** (`Resolve`, GET and HEAD, #281; checked against Artifactory 7.161.32):
 `[RELEASE]`, `[INTEGRATION]` and `-SNAPSHOT` resolve in local repositories and remote
@@ -177,26 +192,36 @@ never `maven-metadata.xml`.
   as it is: "Both [folderItegRev] and [fileItegRev] have to be defined in the repository
   layout" (Retrieve Artifact, research 27 section 8).
 
-**`calculateMetadata`** (`POST /api/maven/calculateMetadata/{repoKey}/{folderPath}`):
-- 404 "Could not find path '...'" for a missing path; 404 "Unable to find local repository
-  '...'." for a repository that is not local; 400 "Repository '...' is not a maven
-  repository." for a type outside the four.
-- **Permission:** Deploy on the folder.
-- **Behaviour:** rebuilds the package index under the folder from the item tree
-  (`Reindexer`), then queues the metadata of every package and group under it, or of the
-  folder alone with `noneRecursive=true`. It answers 200 with an empty body once the work is
-  queued, as Artifactory does.
+**`calculateMetadata`** (`POST /api/maven/calculateMetadata/{repoKey}/{folderPath}`, amended
+2026-10-19, #282):
+- 404 "Could not find path '...'" for a missing path or repository; 404 "Unable to find local
+  repository '...'." for a repository that is not local; 400 "Repository '...' is not a
+  maven repository." for a type outside the four.
+- **Permission:** Manage, Delete, Deploy, Annotate and Read on the folder, as JFrog's REST
+  reference listed them from 4.8 (research 27 section 9). Manage alone is not enough, since
+  a grant may hold it without the others.
+- **Behaviour:** in one transaction, brings the package index of the files under the folder
+  back in line with the item tree, as a reindex would, then queues the metadata of every
+  package with files there and of the package and group each `maven-metadata.xml` there
+  describes, or of the folder's own files and metadata alone with `noneRecursive=true`. It
+  answers 200 with an empty body once the work is queued, as Artifactory does.
 
-**`generatePom`** (`POST /api/maven/generatePom/{repoKey}/{jarFilePath}`):
-- The same 404 and 400 answers; 404 "Could not find path '...'" when the jar is missing.
-- **Permission:** Deploy on the POM's path.
-- **Behaviour:** the POM goes at the jar's descriptor path in the repository's layout. An
-  existing POM is left as it is, with 200. Otherwise the content is the jar's
-  `META-INF/maven/<groupId>/<artifactId>/pom.xml` for the jar's own coordinates, or, without
-  one, a default POM: `modelVersion` 4.0.0, the coordinates from the path, `packaging` from
-  the jar's extension, and the description "Artifactory auto generated POM". It is written
-  through the item service, so the POM checks, the index and the metadata queue apply. 200
-  with an empty body.
+**`generatePom`** (`POST /api/maven/generatePom/{repoKey}/{jarFilePath}`, amended
+2026-10-19, #282):
+- The same 404 and 400 answers; 404 "Could not find path '...'" when the jar is missing, and
+  400 for a folder or a file the layout reads no coordinates from, or a POM **[I]**.
+- **Permission:** Read on the jar, whose content the POM may come from, and Deploy on the
+  POM's path, which is what writing the POM by hand would take **[I]**.
+- **Behaviour:** the POM goes at the descriptor path of the jar's main artifact in the
+  repository's layout: its classifier is dropped, and a unique build keeps its build. Under a
+  layout whose descriptor is no POM, such as `gradle-default`'s Ivy file, it goes at the
+  jar's own path with the extension `pom`. An existing POM is left as it is, with 200.
+  Otherwise the content is the jar's `META-INF/maven/<groupId>/<artifactId>/pom.xml` for the
+  jar's own coordinates, or, without one, a default POM: `modelVersion` 4.0.0, the
+  coordinates from the path, `packaging` from the jar's extension, and the description
+  "Artifactory auto generated POM". It is written through the item service, so the POM
+  checks (409 for a mismatch), the index and the metadata queue apply. 200 with an empty
+  body.
 
 **Gradle, Ivy and SBT for M2.** They are covered by layout tests (#277): coordinates, the
 index, the policy checks and metadata through their layouts. No Ivy or SBT client runs in
@@ -232,14 +257,19 @@ acceptance, and Gradle's run does not gate M2 (decision
   tools that read `<version>` (DV-050).
 - **Plugin metadata** is not wiped, even briefly, by recalculating its group folder;
   Artifactory's own source questions that removal (DV-051).
-- **`calculateMetadata` needs Deploy.** It rewrites files every Maven client trusts. In 6.20
-  any authenticated user can recalculate any folder; Deploy is what writing those files would
-  take anyway (DV-052).
+- **`calculateMetadata` needs what Artifactory's reference names.** It rewrites files every
+  Maven client trusts, and 7.x refuses it with 403 to a caller without the permission. In 6.20
+  any authenticated user could recalculate any folder; JFrog's REST reference has named
+  Manage, Delete/Overwrite, Deploy/Cache, Annotate and Read since 4.8, so a caller allowed
+  there is allowed here.
 - **`generatePom`** picks the embedded POM for the jar's own coordinates, where 6.20's helper
   takes the first `pom.xml` it meets: a shaded jar carries its dependencies' POMs too.
-- **`maxUniqueSnapshots`** keeps its pending folders in memory in Artifactory, so a restart
-  forgets them until the next deploy to that folder. The queue persists them, and its
-  coalescing replaces the 60-second quiet period (DV-053).
+- **`maxUniqueSnapshots`** kept its pending folders in memory in Artifactory 6.20, so a
+  restart forgot them until the next deploy to that folder. The queue persists the marks, and
+  its coalescing replaces the 60-second quiet period (DV-053). The timer is 7.x's, so a
+  client sees builds go when it would on Artifactory. A limit of 1 keeps two builds rather
+  than being refused, since no source says 7.x refuses it, and refusing would fail a
+  configuration that 7.x may accept.
 - **POM reading.** The check reads only the coordinates it compares, where Artifactory's
   strict Maven reader also refuses elements outside the POM model; a POM a newer model or a
   tool extends is still a POM to every client (DV-060).
@@ -256,8 +286,8 @@ The decision stands against 7.161.32. The 7.x documentation and release notes ad
 - **Version tokens** resolve on 7.x in remote caches and virtual repositories as well as local
   ones, and a path cannot mix `[RELEASE]` with `[INTEGRATION]`. P7 resolves in local
   repositories ([#281](https://github.com/weaveplatform/artifactweave/issues/281)); P9 and P10 extend it.
-- **`calculateMetadata`** answers 403 on 7.x to a caller without the permission it needs, so
-  DV-052 now differs from 7.x only in which permission that is.
+- **`calculateMetadata`** answers 403 on 7.x to a caller without the permission it needs, as
+  it does here.
 - **`maxUniqueSnapshots` of 0** turns the cleanup off (SaaS 7.164.0).
 
 The audit against KB, Jira and client sources ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) adds the following:
@@ -277,28 +307,27 @@ The audit against KB, Jira and client sources ([#378](https://github.com/weavepl
 - **Layout of a new repository.** A create without `repoLayoutRef` gets `sbt-default` for sbt
   ([D] sbt-repositories), `ivy-default` for Ivy **[I]** and `maven-2-default` for Maven, Gradle
   and every other type ([#396](https://github.com/weaveplatform/artifactweave/issues/396)).
-- `maxUniqueSnapshots`: a KB article gives a floor of 2 unique snapshots and a cleanup every 5
-  minutes ([KB], research 27 section 13), where this decision accepts a limit of 1 and runs
-  the cleanup when the queue reaches it; [#283](https://github.com/weaveplatform/artifactweave/issues/283)
-  settles both.
-- `calculateMetadata`: JFrog's REST reference required Manage, Delete/Overwrite, Deploy/Cache,
-  Annotate and Read from 4.8 ([D], an Internet Archive copy, research 27 section 13), so
-  DV-052's "open to any authenticated user" no longer describes Artifactory;
-  [#282](https://github.com/weaveplatform/artifactweave/issues/282) settles the permission.
+- `maxUniqueSnapshots` keeps at least two builds and is applied every five minutes ([KB],
+  research 27 section 7), as the rule above does
+  ([#283](https://github.com/weaveplatform/artifactweave/issues/283)).
+- `calculateMetadata` needs Manage, Delete/Overwrite, Deploy/Cache, Annotate and Read, as
+  JFrog's REST reference required from 4.8 ([D], an Internet Archive copy, research 27
+  section 9), and the permission above asks for the same
+  ([#282](https://github.com/weaveplatform/artifactweave/issues/282)).
 
 ## Constraints
 
 - The points in research 27 section 11 are unconfirmed until the live comparison (P19,
   #216). The snapshot `<version>`, the client's artifact-level PUT, the metadata upload
-  statuses, the `maxUniqueSnapshots` floor, `generatePom` and the `calculateMetadata`
+  statuses, a `maxUniqueSnapshots` limit of 1, `generatePom` and the `calculateMetadata`
   permission are the ones that would change this decision.
 - The deploy rules (#278) were checked against Artifactory 7.161.32: the current local
   repository docs and the 7.x release notes confirm the policy on deploys, the POM check's
   409 and the checksum policy's 409, and change none of them. The download side of the
   policy, the messages, the metadata and checksum upload answers and the strict POM reader
   come from 6.20 only and are on #216.
-- Without the 60-second quiet period, a limit of 1 removes the previous build as soon as the
-  first file of the next one is stored.
+- Without the 60-second quiet period, a job that falls while a build is being deployed counts
+  the files of it already stored; the floor of two keeps the build before it.
 - Remote and virtual Maven repositories, including metadata merging, are P9 and P10
   (decisions [0007](0007-remote-repositories.md) and [0008](0008-virtual-repositories.md)).
 
@@ -323,4 +352,5 @@ The audit against KB, Jira and client sources ([#378](https://github.com/weavepl
 - Artifactory OSS 6.20, `knottnhupfer/artifactory-oss` at `b99e5649bcad`
 - Maven repository metadata model,
   <https://maven.apache.org/ref/3-LATEST/maven-repository-metadata/repository-metadata.html>
-- [Deviations register](../../implementation/deviations.md): DV-050 to DV-054, DV-060, DV-063, DV-064
+- [Deviations register](../../implementation/deviations.md): DV-050, DV-051, DV-053, DV-054,
+  DV-060, DV-063, DV-064

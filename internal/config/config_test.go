@@ -160,6 +160,8 @@ environments:
 aql_timeout:
   query: 10m
   streamed: 1h
+maven:
+  snapshot_cleanup_interval: 2m
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -218,6 +220,7 @@ aql_timeout:
 		Deploy:       DeployConfig{EnforceIdenticalChecksumDeploy: true},
 		Environments: EnvironmentsConfig{GlobalLimit: 30},
 		AQLTimeout:   AQLTimeoutConfig{Query: 10 * time.Minute, Streamed: time.Hour},
+		Maven:        MavenConfig{SnapshotCleanupInterval: 2 * time.Minute},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -241,7 +244,8 @@ func TestEnvCoversEveryKey(t *testing.T) {
 			k == "download.folder.max_concurrent_requests", k == "environments.global_limit":
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
-			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."):
+			strings.HasSuffix(k, ".ttl"), k == "work.lease", strings.HasPrefix(k, "aql_timeout."),
+			strings.HasPrefix(k, "maven."):
 			env[envName(k)] = "45s"
 		default:
 			// String keys accept "true" as a plain string; the booleans parse it.
