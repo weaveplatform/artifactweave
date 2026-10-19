@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -50,6 +51,13 @@ var ErrNoMatch = errors.New("path does not match layout")
 
 // ErrMissingValue reports a Build call without a mandatory token value.
 var ErrMissingValue = errors.New("missing value for layout token")
+
+// ErrUnbuildable reports a Build of a pattern with a token outside the
+// documented set, which a bundled layout drops (Lookup). Such a pattern has
+// no place for that token's value, so every path it built would be the same
+// literal text whatever the values, such as ansible-default's
+// collections////--.tar.gz.
+var ErrUnbuildable = errors.New("layout cannot build a path")
 
 // Layout is a compiled Definition.
 type Layout struct {
@@ -145,18 +153,27 @@ func (l *Layout) IsDescriptor(path string) bool {
 
 // Build renders an artifact path from token values. Optional groups are
 // emitted only when every token inside them has a value; mandatory tokens
-// without a value are an error.
+// without a value are an error, and so is a pattern with a token it drops
+// (ErrUnbuildable).
 func (l *Layout) Build(v Values) (string, error) {
-	return l.artifact.build(v)
+	out, err := l.artifact.build(v)
+	if err != nil {
+		return "", fmt.Errorf("layout %q: %w", l.def.Name, err)
+	}
+	return out, nil
 }
 
 // BuildDescriptor renders a descriptor path, or an error when the layout has
-// no descriptor pattern.
+// no descriptor pattern or Build would refuse its pattern.
 func (l *Layout) BuildDescriptor(v Values) (string, error) {
 	if l.descriptor == nil {
 		return "", fmt.Errorf("%w: layout %q has no descriptor pattern", ErrPattern, l.def.Name)
 	}
-	return l.descriptor.build(v)
+	out, err := l.descriptor.build(v)
+	if err != nil {
+		return "", fmt.Errorf("layout %q descriptor: %w", l.def.Name, err)
+	}
+	return out, nil
 }
 
 // Has reports whether the artifact pattern uses token; org and orgPath
@@ -222,19 +239,24 @@ func Org(orgPath string) string {
 	return strings.ReplaceAll(orgPath, "/", ".")
 }
 
-// node is one element of a parsed pattern: a literal, a token or an optional
-// group of nodes.
+// node is one element of a parsed pattern: a literal, a token, an optional
+// group of nodes, or a token the pattern drops, which matches nothing and
+// keeps its name only so that a build can refuse it.
 type node struct {
 	literal string
 	token   string
 	regex   string
 	group   []node
+	dropped string
 }
 
 type pattern struct {
 	nodes []node
 	re    *regexp.Regexp
 	names []string
+	// dropped names the tokens outside the documented set that a bundled
+	// layout's pattern drops, in the pattern's order.
+	dropped []string
 	// repeated is set when a token appears more than once. RE2 has no
 	// back-references, so such patterns are matched in two passes: the first
 	// captures the first occurrence of each token, the second pins the later
@@ -268,7 +290,7 @@ func compilePattern(src string, def Definition, dropUnknown bool) (*pattern, err
 	if rest != "" {
 		return nil, fmt.Errorf("%w: unexpected %q", ErrPattern, rest)
 	}
-	p := &pattern{nodes: nodes}
+	p := &pattern{nodes: nodes, dropped: droppedTokens(nodes, nil)}
 	p.re, p.repeated, err = compileRegexp(nodes, nil, &p.names)
 	if err != nil {
 		return nil, err
@@ -379,10 +401,11 @@ func parseToken(body string, def Definition, dropUnknown bool) (node, error) {
 	case ok:
 		return node{token: body, regex: re}, nil
 	case dropUnknown:
-		// An empty literal: [version] in 7.x's swift-default is no part of
-		// the expression, so the layout matches what remains, as in
-		// Artifactory, and a built path leaves it out.
-		return node{}, nil
+		// No part of the expression: [version] in 7.x's swift-default adds
+		// nothing, so the layout matches what remains, as in Artifactory. A
+		// build refuses the pattern rather than leave the token's place
+		// empty.
+		return node{dropped: body}, nil
 	}
 	return node{}, fmt.Errorf("%w: unknown token %q", ErrPattern, body)
 }
@@ -482,7 +505,29 @@ func capture(re *regexp.Regexp, path string) (Values, bool) {
 	return v, true
 }
 
+// droppedTokens appends the names of the dropped tokens in nodes, those in
+// optional groups included, to out, each once.
+func droppedTokens(nodes []node, out []string) []string {
+	for _, n := range nodes {
+		switch {
+		case n.dropped != "" && !slices.Contains(out, n.dropped):
+			out = append(out, n.dropped)
+		case n.group != nil:
+			out = droppedTokens(n.group, out)
+		}
+	}
+	return out
+}
+
+// build refuses a pattern with a dropped token before it looks at v: the
+// value for that token's place could never reach the path, so the path
+// would ignore it, and a caller that stores files there would land every
+// file on one name.
 func (p *pattern) build(v Values) (string, error) {
+	if len(p.dropped) > 0 {
+		return "", fmt.Errorf("%w: it has no place for [%s]",
+			ErrUnbuildable, strings.Join(p.dropped, "], ["))
+	}
 	var sb strings.Builder
 	if err := buildNodes(&sb, p.nodes, v); err != nil {
 		return "", err

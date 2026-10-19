@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
 	"github.com/weaveplatform/artifactweave/internal/service/work"
@@ -105,6 +106,66 @@ func TestRegisterWork(t *testing.T) {
 	}
 	if err := w.svc.RegisterWork(q); !errors.Is(err, work.ErrDuplicateHandler) {
 		t.Errorf("registered twice: %v", err)
+	}
+}
+
+// A kind the service names as periodic is registered on a timer: its item
+// waits for RunDue, which runs it through the service's environment, and
+// WaitIdle does not wait for it.
+func TestRegisterWorkPeriodic(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	var ran []string
+	f := worker{kinds: []string{"test.a", "test.timed"}, ran: &ran}
+	w.svc.Formats = func(repo.PackageType) format.Handler { return f }
+	w.svc.Periodic = map[string]time.Duration{"test.timed": time.Hour}
+	q := newQueue(t, w.db, work.Options{})
+	if err := w.svc.RegisterWork(q); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.db.WorkQueue().Enqueue(ctx, "test.timed", "k", nil, at); err != nil {
+		t.Fatal(err)
+	}
+	if err := q.WaitIdle(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := q.RunDue(ctx, "test.timed"); err != nil || n != 1 ||
+		!slices.Equal(ran, []string{"test.timed/k"}) {
+		t.Fatalf("RunDue: %d %v, ran %v", n, err, ran)
+	}
+	if _, err := q.RunDue(ctx, "test.a"); err != nil {
+		t.Fatalf("an ordinary kind has a handler too: %v", err)
+	}
+}
+
+// Remove deletes files as a client does, into the trash can, and prunes
+// the folders they leave empty, up to the root; a folder that keeps a file
+// stays, and a path with nothing at it is skipped.
+func TestRemove(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	for _, p := range []string{"g/a/1/x.jar", "g/a/1/y.jar", "g/b/1/z.jar", "g/keep.txt"} {
+		w.must(p, p)
+	}
+	env := w.svc.env()
+	if err := env.Remove(
+		ctx, w.loc, []string{"g/a/1/x.jar", "/g/a/1/y.jar", "g/b/1/z.jar", "g/none.jar"}, "sweeper",
+	); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{"g/a/1/x.jar", "g/a/1", "g/a", "g/b/1", "g/b"} {
+		if _, ok := w.get(w.loc, p); ok {
+			t.Errorf("%s stayed", p)
+		}
+	}
+	for _, p := range []string{"g/keep.txt", "g"} {
+		if _, ok := w.get(w.loc, p); !ok {
+			t.Errorf("%s was removed", p)
+		}
+	}
+	trashed, err := w.db.Trash().Find(ctx, w.loc.Key, "g/a/1/x.jar")
+	if err != nil || len(trashed) != 1 || trashed[0].DeletedBy != "sweeper" {
+		t.Fatalf("trash %+v: %v", trashed, err)
 	}
 }
 

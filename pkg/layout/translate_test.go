@@ -102,12 +102,6 @@ func TestTranslate(t *testing.T) {
 			path: "jfrog/jfrog-cli/tags/v2.50.0/jfrog-cli-v2.50.0.tar.gz",
 			lost: []string{"[refs] tags"},
 		},
-		// A layout whose tokens are all dropped builds the same path for
-		// every file.
-		{
-			from: "simple-default", to: "swift-default", path: "acme/tool/tool-1.0.zip",
-			lost: []string{"[orgPath] acme", "[module] tool", "[baseRev] 1.0", "[ext] zip"},
-		},
 		// Descriptors go through the descriptor patterns, both ways.
 		{
 			from: "maven-2-default", to: "gradle-default",
@@ -175,6 +169,13 @@ func TestTranslateKeeps(t *testing.T) {
 		{
 			"maven-2-default", "simple-default", "com/example/my-library/1.0/my-library-1.0.pom",
 			layout.ErrPattern,
+		},
+		// swift-default drops every token, so it would build one path for
+		// every file (#505).
+		{"simple-default", "swift-default", "acme/tool/tool-1.0.zip", layout.ErrUnbuildable},
+		{
+			"maven-2-default", "ansible-default", "com/example/my-library/1.0/my-library-1.0.jar",
+			layout.ErrUnbuildable,
 		},
 	} {
 		if _, err := layout.Translate(

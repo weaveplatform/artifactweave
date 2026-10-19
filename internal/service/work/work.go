@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"runtime/debug"
 	"slices"
@@ -91,9 +92,11 @@ type Queue struct {
 	o        Options
 	mu       sync.Mutex
 	handlers map[string]Handler
-	wake     chan struct{}
-	running  atomic.Int64
-	runs     metric.Int64Counter
+	// every is the interval of each periodic kind (HandleEvery).
+	every   map[string]time.Duration
+	wake    chan struct{}
+	running atomic.Int64
+	runs    metric.Int64Counter
 }
 
 // New returns a queue over st; register handlers with Handle before Run.
@@ -133,7 +136,8 @@ func New(st store.Store, o Options) (*Queue, error) {
 	}
 	q := &Queue{
 		st: st, q: st.WorkQueue(), o: o,
-		handlers: map[string]Handler{}, wake: make(chan struct{}, 1),
+		handlers: map[string]Handler{}, every: map[string]time.Duration{},
+		wake: make(chan struct{}, 1),
 	}
 	if err := q.instrument(); err != nil {
 		return nil, err
@@ -162,12 +166,33 @@ func holderName() string {
 // leases only the kinds registered when it starts. A second handler for one
 // kind is an error.
 func (q *Queue) Handle(kind string, h Handler) error {
+	return q.handle(kind, 0, h)
+}
+
+// HandleEvery registers h for kind as periodic work, for work that
+// Artifactory does on a timer rather than as it is asked for, such as its
+// snapshot cleanup every five minutes. An item of kind is not run as soon
+// as it is due: it waits in the queue, so a restart keeps it, for the next
+// tick of a timer every interval on each node, which runs every item of
+// kind then due (RunDue). EnsureFresh still runs one at once. Register it
+// before Run, as Handle.
+func (q *Queue) HandleEvery(kind string, every time.Duration, h Handler) error {
+	if every <= 0 {
+		return fmt.Errorf("%w: periodic kind %q needs an interval above zero", ErrOptions, kind)
+	}
+	return q.handle(kind, every, h)
+}
+
+func (q *Queue) handle(kind string, every time.Duration, h Handler) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if _, dup := q.handlers[kind]; dup {
 		return fmt.Errorf("%w: %q", ErrDuplicateHandler, kind)
 	}
 	q.handlers[kind] = h
+	if every > 0 {
+		q.every[kind] = every
+	}
 	return nil
 }
 
@@ -178,15 +203,19 @@ func (q *Queue) handler(kind string) (Handler, bool) {
 	return h, ok
 }
 
-func (q *Queue) kinds() []string {
+// schedule splits the registered kinds into those the workers lease as
+// they fall due and the periodic ones, with their intervals.
+func (q *Queue) schedule() (polled []string, periodic map[string]time.Duration) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	out := make([]string, 0, len(q.handlers))
+	periodic = maps.Clone(q.every)
 	for k := range q.handlers {
-		out = append(out, k)
+		if _, ok := periodic[k]; !ok {
+			polled = append(polled, k)
+		}
 	}
-	slices.Sort(out)
-	return out
+	slices.Sort(polled)
+	return polled, periodic
 }
 
 // Enqueue asks for kind's work on key. Call it with the context of the
@@ -210,19 +239,79 @@ func (q *Queue) signal() {
 }
 
 // Run leases and runs items until ctx ends, then hands back the leases of
-// runs it cuts short and returns once every run has settled.
+// runs it cuts short and returns once every run has settled. Periodic
+// kinds run on their own timers, outside the workers.
 func (q *Queue) Run(ctx context.Context) error {
-	kinds := q.kinds()
-	if len(kinds) == 0 {
+	polled, periodic := q.schedule()
+	if len(polled) == 0 && len(periodic) == 0 {
 		<-ctx.Done()
 		return nil
 	}
 	var wg sync.WaitGroup
-	for range q.o.Workers {
-		wg.Go(func() { q.worker(ctx, kinds) })
+	if len(polled) > 0 {
+		for range q.o.Workers {
+			wg.Go(func() { q.worker(ctx, polled) })
+		}
+	}
+	for kind, every := range periodic {
+		wg.Go(func() { q.tick(ctx, kind, every) })
 	}
 	wg.Wait()
 	return nil
+}
+
+// tick runs kind's due items every interval until ctx ends.
+func (q *Queue) tick(ctx context.Context, kind string, every time.Duration) {
+	t := time.NewTicker(every)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if _, err := q.RunDue(ctx, kind); err != nil && ctx.Err() == nil {
+				q.o.Log.Warn("work queue periodic run failed", "kind", kind, "error", err)
+			}
+		}
+	}
+}
+
+// RunDue runs every item of kind that is due now, one after another, and
+// returns how many runs it made. A periodic kind's timer calls it; so may a
+// caller that need not wait for the timer, such as a test. A run that fails
+// is retried after its backoff, never in the same pass, and an item asked
+// for again during its run waits for the next pass: it is due again from
+// the end of its run, after every item that was due before it, so meeting
+// it again means the pass has taken everything else.
+func (q *Queue) RunDue(ctx context.Context, kind string) (int, error) {
+	if _, ok := q.handler(kind); !ok {
+		return 0, fmt.Errorf("%w for %q", ErrNoHandler, kind)
+	}
+	ran := map[string]bool{}
+	kinds := []string{kind}
+	for ctx.Err() == nil {
+		now := q.o.Now()
+		items, err := q.q.Lease(ctx, store.WorkLease{
+			Kinds: kinds, Holder: q.o.Holder, Limit: 1, Until: now.Add(q.o.Lease), Now: now,
+		})
+		switch {
+		case err != nil:
+			return len(ran), fmt.Errorf("work: lease %s: %w", kind, err)
+		case len(items) == 0:
+			return len(ran), nil
+		}
+		it := items[0]
+		if ran[it.Key] {
+			// Handed back unrun, so the attempt is not counted.
+			if err := q.q.Release(ctx, it.Kind, it.Key, it.Generation, q.o.Now()); err != nil {
+				return len(ran), fmt.Errorf("work: release %s/%s: %w", kind, it.Key, err)
+			}
+			return len(ran), nil
+		}
+		ran[it.Key] = true
+		_ = q.run(ctx, it)
+	}
+	return len(ran), nil
 }
 
 func (q *Queue) worker(ctx context.Context, kinds []string) {
@@ -410,9 +499,11 @@ func (q *Queue) EnsureFresh(ctx context.Context, kind, key string) error {
 
 // WaitIdle returns once no item of a registered kind is pending or leased
 // and no run is in progress on this node, for tests. Parked items do not
-// count; an item that keeps failing keeps it waiting until ctx ends.
+// count; an item that keeps failing keeps it waiting until ctx ends. A
+// pending item of a periodic kind does not count either, since it waits
+// for its timer by design; RunDue runs it.
 func (q *Queue) WaitIdle(ctx context.Context) error {
-	kinds := q.kinds()
+	polled, periodic := q.schedule()
 	for {
 		busy := q.running.Load() > 0
 		if !busy {
@@ -421,7 +512,10 @@ func (q *Queue) WaitIdle(ctx context.Context) error {
 				return fmt.Errorf("work: wait idle: %w", err)
 			}
 			for _, st := range stats {
-				if slices.Contains(kinds, st.Kind) && st.Pending+st.Leased > 0 {
+				_, timed := periodic[st.Kind]
+				switch {
+				case slices.Contains(polled, st.Kind) && st.Pending+st.Leased > 0,
+					timed && st.Leased > 0:
 					busy = true
 				}
 			}

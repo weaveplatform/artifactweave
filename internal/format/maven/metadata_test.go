@@ -557,7 +557,9 @@ func TestOwed(t *testing.T) {
 			t.Errorf("%s: %v; want %v", tc.path, got, tc.want)
 		}
 	}
-	if !slices.Equal(h.WorkKinds(), []string{maven.KindMetadata, maven.KindPlugins}) {
+	if !slices.Equal(h.WorkKinds(), []string{
+		maven.KindMetadata, maven.KindPlugins, maven.KindSnapshots,
+	}) {
 		t.Errorf("kinds %v", h.WorkKinds())
 	}
 }

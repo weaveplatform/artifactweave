@@ -212,12 +212,12 @@ func (s *Service) planItems(
 			continue
 		}
 		dst := join(dstRoot, strings.TrimPrefix(strings.TrimPrefix(full, srcFull), "/"))
-		var problem string
+		var problem, warning string
 		if tr != nil {
 			if src.Folder {
 				continue
 			}
-			dst, problem = tr.path(full)
+			dst, problem, warning = tr.path(full)
 		}
 		var st step
 		if problem == "" {
@@ -239,6 +239,11 @@ func (s *Service) planItems(
 				break
 			}
 			continue
+		}
+		// Only a file that lands is reported as kept: one refused for
+		// another reason has its error instead.
+		if warning != "" {
+			res.Messages = append(res.Messages, Message{LevelWarning, warning})
 		}
 		steps = append(steps, st)
 	}
@@ -385,20 +390,43 @@ type translation struct {
 	landed map[string]string
 }
 
-// path is where the file at p lands, or why it may not: a path the target
-// layout would give another source path too (layout.Translate). A path the
-// source layout does not read, or the target cannot build, is kept.
-func (tr *translation) path(p string) (string, string) {
+// path is where the file at p lands, or the problem why it may not: a path
+// the target layout would give another source path too
+// (layout.Translate). A path the source layout does not read, or the
+// target cannot build, is kept, with a warning that says so (#505), as
+// Artifactory notes conversion failures among a copy's warnings
+// (RTFACT-3944); without one a client could not tell a kept path from a
+// translated one.
+func (tr *translation) path(p string) (dst, problem, warning string) {
 	out, err := layout.Translate(tr.from, tr.to, p)
 	var lossy *layout.LossError
 	switch {
 	case errors.As(err, &lossy):
 		return p, fmt.Sprintf("Cannot transfer %s:%s to %s:%s: %v",
-			tr.t.From.Repo.Key, p, tr.t.To.Repo.Key, lossy.Target, lossy)
+			tr.t.From.Repo.Key, p, tr.t.To.Repo.Key, lossy.Target, lossy), ""
 	case err != nil:
-		return p, ""
+		return p, "", tr.untranslated(p, err)
 	}
-	return out, ""
+	return out, "", ""
+}
+
+// untranslated is the warning for the file at p, which the translation
+// keeps at its own path because of err.
+func (tr *translation) untranslated(p string, err error) string {
+	from, to := tr.from.Definition().Name, tr.to.Definition().Name
+	why := fmt.Sprintf("layout %s cannot build a path from what layout %s reads in it", to, from)
+	switch {
+	case errors.Is(err, layout.ErrNoMatch):
+		why = fmt.Sprintf("layout %s does not read it", from)
+	case errors.Is(err, layout.ErrUnbuildable):
+		why = fmt.Sprintf("layout %s cannot build a path", to)
+	}
+	done := "copied"
+	if tr.t.Move {
+		done = "moved"
+	}
+	return fmt.Sprintf("Cannot translate %s:%s from layout %s to layout %s: %s; it is %s to %s:%s",
+		tr.t.From.Repo.Key, p, from, to, why, done, tr.t.To.Repo.Key, p)
 }
 
 // claim plans the file at src to land at dst, or says why it may not. A

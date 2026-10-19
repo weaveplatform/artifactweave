@@ -179,9 +179,9 @@ components:
             followed by a hyphen.'
           type: string
         maxUniqueSnapshots:
-          description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
-            ones are deleted five minutes after a deploy. 0 (the default) keeps everything and the effective minimum
-            is 2.
+          description: Optional within this object. Maximum unique snapshot builds kept per Maven artifact and
+            classifier. A deploy marks the artifact, and a cleanup that runs every five minutes by default deletes
+            its oldest builds over the limit. 0 (the default) keeps everything; a limit of 1 keeps 2.
           type: integer
         maxUniqueTags:
           description: Optional within this object. Maximum tags kept per Docker image; older tags are deleted when
@@ -488,9 +488,9 @@ components:
             followed by a hyphen.'
           type: string
         maxUniqueSnapshots:
-          description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
-            ones are deleted five minutes after a deploy. 0 (the default) keeps everything and the effective minimum
-            is 2.
+          description: Optional within this object. Maximum unique snapshot builds kept per Maven artifact and
+            classifier. A deploy marks the artifact, and a cleanup that runs every five minutes by default deletes
+            its oldest builds over the limit. 0 (the default) keeps everything; a limit of 1 keeps 2.
           type: integer
         maxUniqueTags:
           description: Optional within this object. Maximum tags kept per Docker image; older tags are deleted when
@@ -1033,9 +1033,9 @@ components:
             to. Empty means any.
           type: string
         maxUniqueSnapshots:
-          description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
-            ones are deleted five minutes after a deploy. 0 (the default) keeps everything and the effective minimum
-            is 2.
+          description: Optional within this object. Maximum unique snapshot builds kept per Maven artifact and
+            classifier. A deploy marks the artifact, and a cleanup that runs every five minutes by default deletes
+            its oldest builds over the limit. 0 (the default) keeps everything; a limit of 1 keeps 2.
           type: integer
         metadataRetrievalTimeoutSecs:
           description: Optional within this object. Seconds to wait for metadata from the upstream before giving

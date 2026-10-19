@@ -32,6 +32,10 @@ func (s *Service) format(t repo.PackageType) format.Handler {
 	return formats.For(t)
 }
 
+// Env is the environment of one operation a format offers beside its hooks,
+// such as Maven's calculateMetadata, which reads and queues as a hook does.
+func (s *Service) Env() format.Env { return s.env() }
+
 // env is the environment of one operation's hooks.
 func (s *Service) env() format.Env {
 	env := format.Env{
@@ -40,6 +44,7 @@ func (s *Service) env() format.Env {
 		Layouts:  &layouts{s: s, seen: map[string]*layout.Layout{}},
 		Derive:   s.derive,
 		Underive: s.underive,
+		Remove:   s.removeFiles,
 		Enqueue:  s.enqueue,
 	}
 	// A nil blob.Store must not become a non-nil format.Blobs.

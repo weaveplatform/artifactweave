@@ -23,6 +23,9 @@ var mavenRepos = append(fixtureRepos("maven", repo.Maven), repo.Config{
 const (
 	mavenPut = "PUT /artifactory/{repoKey}/{filePath}"
 	mavenGet = "GET /artifactory/{repoKey}/{filePath}"
+	// The Maven REST operations (#282).
+	mavenCalculate = "POST /artifactory/api/maven/calculateMetadata/{repoKey}/{folderPath}"
+	mavenGenerate  = "POST /artifactory/api/maven/generatePom/{repoKey}/{jarFilePath}"
 )
 
 // mavenPOM is a POM of g:a:v.
@@ -35,10 +38,13 @@ func mavenPOM(g, a, v string) string {
 // mavenStatusPart is Maven's share of the status table, which its pull
 // requests (#276–#284) fill in.
 var mavenStatusPart = statusPart{
+	handwritten: map[string]bool{mavenCalculate: true, mavenGenerate: true},
 	rows: func() []statusCase {
 		const (
 			local    = "/artifactory/maven-local/com/acme/app/"
 			releases = "/artifactory/maven-releases/com/acme/app/"
+			calc     = "/artifactory/api/maven/calculateMetadata/"
+			gen      = "/artifactory/api/maven/generatePom/"
 		)
 		sha1 := strings.Repeat("0", 40)
 		return []statusCase{
@@ -69,6 +75,27 @@ var mavenStatusPart = statusPart{
 			{mavenPut, releases + "1.0/app-1.0.jar", "admin", "x", 201},
 			{mavenGet, releases + "1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar", "admin", "", 409},
 			{mavenGet, releases + "1.0/app-1.0.jar", "admin", "", 200},
+			// calculateMetadata (#282): a missing path or repository and one
+			// that is not local answer 404, another type 400.
+			{mavenCalculate, calc + "maven-local/com/acme", "admin", "", 200},
+			{mavenCalculate, calc + "maven-local/com/acme?noneRecursive=true", "admin", "", 200},
+			{mavenCalculate, calc + "maven-local/", "admin", "", 200},
+			{mavenCalculate, calc + "maven-local/com/acme?noneRecursive=maybe", "admin", "", 400},
+			{mavenCalculate, calc + "maven-local/com/none", "admin", "", 404},
+			{mavenCalculate, calc + "no-such/com", "admin", "", 404},
+			{mavenCalculate, calc + "maven-remote/com", "admin", "", 404},
+			{mavenCalculate, calc + "libs-local/fixture", "admin", "", 400},
+			{mavenCalculate, calc + "maven-local/com/acme", "user", "", 403},
+			{mavenCalculate, calc + "maven-local/com/acme", "", "", 401},
+			// generatePom (#282): once written, or already there, 200.
+			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-1.0.jar", "admin", "", 200},
+			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-1.0.jar", "admin", "", 200},
+			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-2.0.jar", "admin", "", 404},
+			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0", "admin", "", 400},
+			{mavenGenerate, gen + "maven-local/com/acme/readme.txt", "admin", "", 400},
+			{mavenGenerate, gen + "libs-local/fixture/get.txt", "admin", "", 400},
+			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-1.0.jar", "user", "", 403},
+			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-1.0.jar", "", "", 401},
 		}
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
@@ -78,11 +105,15 @@ var mavenStatusPart = statusPart{
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
-			Target: item.Target{Repo: c, Path: "com/acme/app/1.0/app-1.0.jar"},
-			Body:   strings.NewReader("jar"),
-		}); err != nil {
-			t.Fatal(err)
+		for _, p := range []string{
+			"com/acme/app/1.0/app-1.0.jar", "com/acme/lib/1.0/lib-1.0.jar", "com/acme/readme.txt",
+		} {
+			if _, err := (&item.Service{Store: db, Blobs: blobs}).Deploy(ctx, item.Deploy{
+				Target: item.Target{Repo: c, Path: p},
+				Body:   strings.NewReader("jar"),
+			}); err != nil {
+				t.Fatal(err)
+			}
 		}
 	},
 }

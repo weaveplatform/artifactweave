@@ -105,6 +105,7 @@ type Config struct {
 	Deploy            DeployConfig       `yaml:"deploy"`
 	Environments      EnvironmentsConfig `yaml:"environments"`
 	AQLTimeout        AQLTimeoutConfig   `yaml:"aql_timeout"`
+	Maven             MavenConfig        `yaml:"maven"`
 }
 
 // AQLTimeoutConfig bounds how long POST /api/search/aql reads the
@@ -320,6 +321,7 @@ func Default() Config {
 		AQLTimeout: AQLTimeoutConfig{
 			Query: DefaultAQLQueryTimeout, Streamed: DefaultAQLStreamedTimeout,
 		},
+		Maven: MavenConfig{SnapshotCleanupInterval: DefaultMavenSnapshotCleanupInterval},
 	}
 }
 
@@ -395,6 +397,7 @@ var keys = append(append([]string{
 	"deploy.enforce_permission_check_on_identical_checksum_deploy",
 	"environments.global_limit",
 	"aql_timeout.query", "aql_timeout.streamed",
+	"maven.snapshot_cleanup_interval",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -418,6 +421,9 @@ func set(cfg *Config, key, value string) error {
 	}
 	if sub, ok := strings.CutPrefix(key, "aql_timeout."); ok {
 		return setAQLTimeout(&cfg.AQLTimeout, sub, key, value)
+	}
+	if sub, ok := strings.CutPrefix(key, "maven."); ok {
+		return setMaven(&cfg.Maven, sub, key, value)
 	}
 	switch key {
 	case "listen":
@@ -577,6 +583,7 @@ func (c Config) Validate() error {
 	errs = append(errs, c.Blob.validate("blob", true)...)
 	errs = append(errs, c.ColdBlob.validate("cold_blob", false)...)
 	errs = append(errs, c.validateCDN()...)
+	errs = append(errs, c.Maven.validate()...)
 	switch c.Log.Level {
 	case "debug", "info", "warn", "error":
 	default:

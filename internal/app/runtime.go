@@ -12,6 +12,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/auth/token"
 	"github.com/weaveplatform/artifactweave/internal/config"
+	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/internal/service/multipart"
@@ -122,7 +123,13 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	// The formats' derived work runs through the same item service the
 	// server writes with, and its kinds must be known before Run leases.
-	derived := &item.Service{Store: st, Blobs: hot.store, Work: queue}
+	// Maven's snapshot cleanup waits for its timer, as 7.x's does.
+	derived := &item.Service{
+		Store: st, Blobs: hot.store, Work: queue,
+		Periodic: map[string]time.Duration{
+			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
+		},
+	}
 	if err := derived.RegisterWork(queue); err != nil {
 		return nil, errors.Join(err, st.Close())
 	}

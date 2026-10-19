@@ -88,6 +88,14 @@ takes them at once.
 
 So clients never read stale derived data, while the write path stays short.
 
+**Periodic kinds** (#283). A kind whose work Artifactory does on a timer, such as Maven's
+`maxUniqueSnapshots` cleanup every five minutes, is registered with an interval
+(`HandleEvery`). Its items are enqueued like any other, so a mark survives a restart, but
+the workers do not take them as they fall due: a timer on each node takes every due item of
+the kind once per interval (`RunDue`), with the usual leases, retries and parking. An item
+asked for again during its run waits for the next tick. `EnsureFresh` still runs one at
+once, and `WaitIdle` does not wait for a pending one.
+
 **Not the queue's job.** Work the change itself depends on stays in the change. For
 example, a unique snapshot's build number is assigned at upload from the package index,
 because the upload's name depends on it.
@@ -133,4 +141,5 @@ Kinds are code constants, so the labels stay bounded.
   including concurrent leasing, coalescing, fencing, crash recovery and transactions.
 - `internal/sqlstore/sqlcommon/work_test.go`: driver-failure paths.
 - `internal/service/work/work_test.go`: the worker pool, retries, parking, panics,
-  heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics.
+  heartbeats, lost leases, shutdown, `EnsureFresh`, `WaitIdle` and the metrics;
+  `periodic_test.go`: periodic kinds, their timer and `RunDue`.

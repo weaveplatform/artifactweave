@@ -297,7 +297,16 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
   Artifactory's parser does when it matches a path (`RepoLayoutUtils.generateRegExpFromPattern`
   in 6.20 [S]), so these four match no path, and layout-based searches and layout
   translation find nothing in their repositories [I]. `ansible-default` comes from the 3.4.x
-  exports only; JFrog's 7.38.8 export predates it.
+  exports only; JFrog's 7.38.8 export predates it. What the four can and cannot do here
+  ([#505](https://github.com/weaveplatform/artifactweave/issues/505)):
+  - they are bundled, so a repository may name them and `GET /api/system/configuration` (P12)
+    lists them;
+  - they read no real path, so a layout-based search, a version token or a cleanup finds no
+    module in their repositories;
+  - they build no path: `pkg/layout`'s `Build` and `BuildDescriptor` refuse a pattern with a
+    dropped token (`ErrUnbuildable`) rather than return the same literal path, such as
+    `collections////--.tar.gz`, for any values. A layout-translating copy or move into such a
+    repository keeps each file's path and reports it with a `WARNING` ("Layout translation").
 - **`sbt-ivy-default`** is the Maven pattern with the Ivy descriptor
   `ivy-[baseRev](-[fileItegRev])(-[classifier]).xml` in the revision folder and `\d{14}`
   integration revisions, from the 3.4.5 and 3.4.8 exports only [I].
@@ -423,7 +432,11 @@ value the target layout has no place for is not documented:
 So a translation here never lands two source paths on one target path, which would write
 one version over another; whether 7.x drops the value instead is [I] (#216):
 - A path the source layout does not read, or the target cannot build (a Maven path into
-  `ivy-default`, which needs a `[type]`), keeps its own path.
+  `ivy-default`, which needs a `[type]`, or any path into the four layouts whose tokens are
+  dropped), keeps its own path. The report has a `WARNING` for each such file that is copied
+  or moved, naming it, the two layouts and why, as RTFACT-3944 asked for; its wording, and
+  whether 7.x warns for each file, are [I] (#216)
+  ([#505](https://github.com/weaveplatform/artifactweave/issues/505)).
 - Any other file must lead back to itself alone. The paths that lead back are those the
   source layout builds from what the target layout reads in the translated path. The source
   path must be one of them, and none of the others may translate to the same path. Two
@@ -448,7 +461,7 @@ Every ordered pair of bundled layouts was checked over the real paths in
 | The extension | every layout with `[ext]` | `npm-default`, `nuget-default` and `puppet-default`, which fix it |
 | The base revision | every layout | `build-default`, which has none |
 | A custom token | `vcs-default`'s `[refs]`; `conan-default`'s channel, package and remainder; `npm-default`'s `[scope]` (DV-100); `sbt-default`'s Scala and sbt versions | every layout without it |
-| Every value | every layout | `terraform-module-default`, `terraform-provider-default`, `swift-default` and `ansible-default`, whose tokens are dropped, so every file would build one path, such as `collections////--.tar.gz` |
+| Every value | every layout | none: `terraform-module-default`, `terraform-provider-default`, `swift-default` and `ansible-default` drop their tokens, so they would build one path, such as `collections////--.tar.gz`, for every file; they build none, and each file keeps its own path with a warning |
 
 A different reading loses a value too: `simple-default`'s base revision stops at the first
 dot it can, so it reads Maven's `jetty-ajp-7.0.2.v20100331.jar` as `7.0.2` with the

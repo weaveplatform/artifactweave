@@ -2,6 +2,9 @@ package layout_test
 
 import (
 	"errors"
+	"maps"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -473,5 +476,76 @@ func TestTranslateWithSimpleDefault(t *testing.T) {
 		if got := translate(tt.from, tt.to, tt.path); got != tt.want {
 			t.Errorf("%s to %s, %s: %s; want %s", tt.from, tt.to, tt.path, got, tt.want)
 		}
+	}
+}
+
+// Build never returns a path that ignores its values (#505). Every bundled
+// layout whose patterns hold only tokens it knows builds a path that
+// changes with each token they name; the Terraform, Swift and Ansible
+// layouts, whose tokens are dropped, refuse to build at all, through either
+// pattern.
+func TestBuildCarriesItsValues(t *testing.T) {
+	unbuildable := []string{
+		"terraform-module-default", "terraform-provider-default", "swift-default",
+		"ansible-default",
+	}
+	base := layout.Values{
+		"org": "org.acme", "module": "app", "baseRev": "1.0", "folderItegRev": "SNAPSHOT",
+		"fileItegRev": "SNAPSHOT", "classifier": "sources", "ext": "jar", "type": "jar",
+		"refs": "tags", "channel": "stable", "package_id": "abc", "remainder": "conanfile.py",
+		"scalaVersion": "2.13", "sbtVersion": "1.0", "scope": "@acme",
+	}
+	other := map[string]string{
+		"org": "com.other", "module": "lib", "baseRev": "2.0", "folderItegRev": "20261017090000",
+		"fileItegRev": "20261017090000", "classifier": "javadoc", "ext": "zip", "type": "bundle",
+		"refs": "branches", "channel": "testing", "package_id": "def", "remainder": "conaninfo.txt",
+		"scalaVersion": "3.3", "sbtVersion": "2.0", "scope": "@other",
+	}
+	for _, d := range layout.Bundled() {
+		l := mustLookup(t, d.Name)
+		for _, p := range []struct {
+			pattern string
+			build   func(layout.Values) (string, error)
+		}{
+			{d.ArtifactPathPattern, l.Build},
+			{d.DescriptorPathPattern, l.BuildDescriptor},
+		} {
+			if p.pattern == "" {
+				continue
+			}
+			got, err := p.build(base)
+			if slices.Contains(unbuildable, d.Name) {
+				if !errors.Is(err, layout.ErrUnbuildable) {
+					t.Errorf("%s %s: %q, %v; want ErrUnbuildable", d.Name, p.pattern, got, err)
+				}
+				continue
+			}
+			if err != nil {
+				t.Errorf("%s %s: %v", d.Name, p.pattern, err)
+				continue
+			}
+			for token, val := range other {
+				if !strings.Contains(p.pattern, "["+token) {
+					continue
+				}
+				v := maps.Clone(base)
+				v[token] = val
+				if changed, err := p.build(v); err != nil || changed == got {
+					t.Errorf("%s %s: [%s] %s gives %q, %v, as [%s] %s does",
+						d.Name, p.pattern, token, val, changed, err, token, base[token])
+				}
+			}
+		}
+	}
+}
+
+// The refusal names the tokens the pattern drops, each once, and the
+// layout that refused.
+func TestBuildRefusalText(t *testing.T) {
+	_, err := mustLookup(t, "swift-default").Build(layout.Values{"module": "app"})
+	want := `layout "swift-default": layout cannot build a path: ` +
+		`it has no place for [scope], [name], [version]`
+	if err == nil || err.Error() != want {
+		t.Fatalf("%v, want %s", err, want)
 	}
 }

@@ -64,6 +64,10 @@ type Service struct {
 	// store's queue directly, where every node's workers find it on their
 	// next poll; a queue also wakes its own idle workers on commit.
 	Work Enqueuer
+	// Periodic names the kinds of derived work RegisterWork runs on a timer
+	// rather than as soon as they are due, each with its interval
+	// (work.Queue.HandleEvery).
+	Periodic map[string]time.Duration
 }
 
 func (s *Service) now() time.Time {
