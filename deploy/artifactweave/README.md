@@ -11,7 +11,7 @@ empty plan and destroys it, so a reference that stops working fails the build (s
 
 | Scenario | What it configures | Inputs without a default |
 |---|---|---|
-| [repositories](terraform/repositories/README.md) | A local generic repository (`artifactory_local_generic_repository`) and properties on the repository itself and on a file deployed into it (`artifactory_item_properties`) | `url`, `access_token` |
+| [repositories](terraform/repositories/README.md) | A local generic repository (`artifactory_local_generic_repository`) and properties on the repository itself and on a file deployed into it (`artifactory_item_properties`), local npm, Go, Maven, Gradle, PyPI, NuGet, Helm, Helm OCI and Terraform module, provider and backend repositories (`artifactory_local_<format>_repository`), a GPG key pair for the Terraform provider repository (`artifactory_keypair`), and virtual npm and Maven repositories | `url`, `access_token`, `gpg_private_key`, `gpg_public_key` |
 | [identity](terraform/identity/README.md) | Users (`artifactory_user`, `artifactory_managed_user`), groups (`platform_group`, `artifactory_group`), a permission over one repository (`platform_permission`, read back with the `artifactory_permission_target` data source), a repository-scoped token (`artifactory_scoped_token`) and a signing key pair (`artifactory_keypair`) | `url`, `access_token`, `user_password`, `keypair_private_key`, `keypair_public_key` |
 | [cdn-repositories](terraform/cdn-repositories/README.md) | Repositories whose downloads redirect: one with `cdnRedirect` and one with `downloadRedirect` (`artifactory_local_generic_repository`), for a store with a CDN such as the `cdn` reference deployments render | `url`, `access_token` |
 | [oidc](terraform/oidc/README.md) | OIDC token exchange for CI: a GitHub Actions provider and a generic one (`platform_oidc_configuration`), each with an identity mapping (`platform_oidc_identity_mapping`), one for a named user and one for a group through a synthetic subject | `url`, `access_token`, `github_organization`, `ci_project_path` |
@@ -91,5 +91,6 @@ terraform plan
 ```
 
 Each scenario's README lists its inputs. The repositories reference needs two applies,
-because the provider cannot deploy a file (see its [README](terraform/repositories/README.md)),
-and the identity reference takes a user password and a PKCS#1 key pair as inputs.
+because the provider cannot deploy a file or associate a key pair with a Terraform provider
+repository (see its [README](terraform/repositories/README.md)), and takes a GPG key pair as
+inputs. The identity reference takes a user password and a PKCS#1 key pair as inputs.

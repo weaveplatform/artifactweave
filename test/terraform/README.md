@@ -25,7 +25,9 @@ starts one `-cover` artifactweave and mints an admin token from its token API wi
 bootstrap admin's password, starting the server with `token.allow_basic_auth` on so that the
 Access token API takes it. `TERRAFORM_ACCESS_TOKEN` supplies a token instead. Terraform runs
 on a copy of each scenario in the work directory, so no state file is left in the source
-tree. Each scenario has a case in `run.sh` with its apply steps (the repositories file deploy,
-the identity key pair); a scenario without one fails rather than being skipped. See
+tree. Each scenario has a case in `run.sh` with its apply steps (the repositories file deploy
+and key pair association, the identity key pair); a scenario without one fails rather than
+being skipped. The repositories scenario's GPG key pair is made afresh on each run by
+`tools/gpgkey`, with Go's OpenPGP library, so no host needs `gpg`. See
 [docs/testing/ci.md](../../docs/testing/ci.md#terraform-scenarios) for the steps and for
 moving to a new provider version.

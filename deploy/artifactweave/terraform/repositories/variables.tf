@@ -69,6 +69,65 @@ variable "gradle_repository_key" {
   description = "Key of the local Gradle snapshot repository."
 }
 
+variable "pypi_repository_key" {
+  type        = string
+  default     = "pypi-local"
+  description = "Key of the local PyPI repository."
+}
+
+variable "nuget_repository_key" {
+  type        = string
+  default     = "nuget-local"
+  description = "Key of the local NuGet repository."
+}
+
+variable "helm_repository_key" {
+  type        = string
+  default     = "helm-local"
+  description = "Key of the local Helm repository."
+}
+
+variable "helmoci_repository_key" {
+  type        = string
+  default     = "helmoci-local"
+  description = "Key of the local Helm OCI repository."
+}
+
+variable "terraform_module_repository_key" {
+  type        = string
+  default     = "terraform-modules-local"
+  description = "Key of the local Terraform module registry repository."
+}
+
+variable "terraform_provider_repository_key" {
+  type        = string
+  default     = "terraform-providers-local"
+  description = "Key of the local Terraform provider registry repository."
+}
+
+variable "terraform_backend_repository_key" {
+  type        = string
+  default     = "terraform-backend-local"
+  description = "Key of the local Terraform backend repository."
+}
+
+variable "gpg_keypair_name" {
+  type        = string
+  default     = "terraform-providers-gpg"
+  description = "Name and alias of the GPG key pair the Terraform provider repository signs with."
+}
+
+variable "gpg_private_key" {
+  type        = string
+  description = "ASCII-armored GPG private key of that key pair, without a passphrase."
+  sensitive   = true
+}
+
+variable "gpg_public_key" {
+  type        = string
+  description = "ASCII-armored GPG public key matching gpg_private_key."
+}
+
 variable "npm_virtual_repository_key" {
   type        = string
   default     = "npm"

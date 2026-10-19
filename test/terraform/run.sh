@@ -138,13 +138,35 @@ export TF_VAR_url=$url TF_VAR_access_token=$token
 
 # The repositories scenario: the provider cannot deploy content, so the file
 # its properties go on is deployed between a first apply without them and
-# the full one.
+# the full one. A fresh GPG key pair per run comes from tools/gpgkey rather
+# than gpg, which is not on every host, and is passed through the
+# environment, as the identity scenario's RSA pair is.
 apply_repositories() {
-	export TF_VAR_repository_key=tf-generic-local TF_VAR_item_path=fixture.txt
+	export TF_VAR_repository_key=tf-generic-local TF_VAR_item_path=fixture.txt \
+		TF_VAR_gpg_keypair_name=tf-terraform-providers-gpg
+	(cd "$root" && GOWORK=off go run ./tools/gpgkey "$work/gpg")
+	TF_VAR_gpg_private_key=$(cat "$work/gpg/private.asc")
+	TF_VAR_gpg_public_key=$(cat "$work/gpg/public.asc")
+	export TF_VAR_gpg_private_key TF_VAR_gpg_public_key
 	tf apply -auto-approve -var with_properties=false
 	curl -fsS -u "admin:$password" -X PUT --data-binary 'fixture' \
 		"$url/artifactory/$TF_VAR_repository_key/$TF_VAR_item_path" >/dev/null
+	# Provider 12.11.14 cannot set primary_keypair_ref on a Terraform provider
+	# repository, so the pair is associated through the repositories API, as
+	# the reference's README says. The apply and the empty plan that follow
+	# show the provider leaves the association alone.
+	local providers
+	providers=$(tf output -json package_repository_keys |
+		python3 -I -c 'import json, sys; print(json.load(sys.stdin)["terraform_provider"])')
+	curl -fsS -u "admin:$password" -X POST -H 'Content-Type: application/json' \
+		-d "{\"primaryKeyPairRef\":\"$TF_VAR_gpg_keypair_name\"}" \
+		"$url/artifactory/api/repositories/$providers" >/dev/null
 	tf apply -auto-approve
+	curl -fsS -u "admin:$password" "$url/artifactory/api/repositories/$providers" | python3 -I -c '
+import json, sys
+ref = json.load(sys.stdin).get("primaryKeyPairRef")
+sys.exit(None if ref == sys.argv[1] else f"primaryKeyPairRef is {ref!r}, want {sys.argv[1]!r}")
+' "$TF_VAR_gpg_keypair_name"
 	# The repositories data source must list the generic repository with
 	# the package type spelled as Artifactory lists it, as the provider's own
 	# acceptance test expects "Alpine" for alpine.
