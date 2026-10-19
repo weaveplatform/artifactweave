@@ -15,6 +15,8 @@
     "GET /api/jmis/v1/servers",
     "GET /api/jmis/v1/ssl",
     "GET /api/usage/v1/export/{}",
+    "GET /artifactory/api/admin/projects/{}/connectableRepos",
+    "GET /artifactory/api/admin/repositories/{}/projectScopedConsumers",
     "GET /bridge-client/api/v1/bridges/debug",
     "GET /bridge-client/api/v1/bridges/{}/config",
     "GET /bridge-client/api/v1/metrics",
@@ -62,5 +64,44 @@
     "PUT /mc/api/v1/system/backup/export",
     "PUT /mc/api/v1/system/backup/import"
   ],
-  "divergent": {}
+  "divergent": {
+    "GET /artifactory/api/repositories": [
+      "missing response 200 property [].upstreamRepoKey"
+    ],
+    "GET /artifactory/api/repositories/{}": [
+      "missing response 200 property projectScopedReadUpstream",
+      "missing response 200 property upstreamProjectKey",
+      "missing response 200 property upstreamRepoKey"
+    ],
+    "GET /artifactory/api/v2/repositories/batch": [
+      "missing response 200 property *.projectScopedReadUpstream",
+      "missing response 200 property *.upstreamProjectKey",
+      "missing response 200 property *.upstreamRepoKey"
+    ],
+    "GET /artifactory/api/v2/repositories/{}": [
+      "missing response 200 property projectScopedReadUpstream",
+      "missing response 200 property upstreamProjectKey",
+      "missing response 200 property upstreamRepoKey"
+    ],
+    "POST /artifactory/api/repositories/{}": [
+      "missing request property projectScopedReadUpstream",
+      "missing request property upstreamProjectKey",
+      "missing request property upstreamRepoKey"
+    ],
+    "POST /artifactory/api/v2/repositories/batch": [
+      "missing request property [].projectScopedReadUpstream",
+      "missing request property [].upstreamProjectKey",
+      "missing request property [].upstreamRepoKey"
+    ],
+    "PUT /artifactory/api/repositories/{}": [
+      "missing request property projectScopedReadUpstream",
+      "missing request property upstreamProjectKey",
+      "missing request property upstreamRepoKey"
+    ],
+    "PUT /artifactory/api/v2/repositories/batch": [
+      "missing request property [].projectScopedReadUpstream",
+      "missing request property [].upstreamProjectKey",
+      "missing request property [].upstreamRepoKey"
+    ]
+  }
 }
