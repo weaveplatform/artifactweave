@@ -879,12 +879,16 @@ func keypairMatrix() []matrixRow {
 		at("POST "+kp, keypairBody("kp-new-{p}", "new-{p}", k.public), administrators, 201),
 		at("PUT "+kp, keypairBody("kp-{p}", "renamed-{p}", k.public), administrators, 200),
 		at("POST "+kp+"/verify", keypairBody("kp-{p}", "a-{p}", k.public), administrators, 200),
-		row("GET "+kp+"/{keyPairName}", kp+"/kp-used", "", administrators, 200),
+		// Creating over a name in use replaces the pair (createkeypair).
+		at("POST "+kp, keypairBody("kp-{p}", "again-{p}", k.public), administrators, 201),
+		// One pair's public projection, and the public key of a repository
+		// whether or not the caller reads it, answer any caller (getkeypair,
+		// getkeypairpublickeyperrepository).
+		row("GET "+kp+"/{keyPairName}", kp+"/kp-used", "", anyone, 200),
 		row("DELETE "+kp+"/{keyPairName}", kp+"/kp-{p}", "", administrators, 200),
-		// Package clients fetch the key that signs a repository they read.
 		row(
 			"GET "+kp+"/public/repositories/{repoKey}", kp+"/public/repositories/libs-local", "",
-			sees("libs-local"), 200,
+			anyone, 200,
 		),
 		at("GET "+cert, "", administrators, 200),
 		row(

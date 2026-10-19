@@ -26,6 +26,25 @@ Feature: Key pairs and client certificates
     When I DELETE "/artifactory/api/repositories/debian-signed" as admin
     And I DELETE "/artifactory/api/security/keypair/signing" as admin
     Then the response status is 200
+    And the response body is "OK"
+
+  Scenario: A create replaces a pair of the same name, and any user reads its public half
+    When I create the RSA key pair "rotating" with alias "first" as admin
+    Then the response status is 201
+    When I create the RSA key pair "rotating" with alias "second" as admin
+    Then the response status is 201
+    When I PUT "/artifactory/api/security/users/viewer" as admin with body:
+      """
+      {"name": "viewer", "email": "viewer@example.com", "password": "Viewer-pass1"}
+      """
+    Then the response status is 201
+    When I GET "/artifactory/api/security/keypair/rotating" as "viewer" with password "Viewer-pass1"
+    Then the response status is 200
+    And the JSON field "alias" equals "second"
+    And the JSON field "publicKey" is not empty
+    And the response body does not contain "PRIVATE KEY"
+    When I GET "/artifactory/api/security/keypair" as "viewer" with password "Viewer-pass1"
+    Then the response status is 403
 
   Scenario: A repository cannot reference a missing key pair
     When I PUT "/artifactory/api/repositories/debian-unsigned" as admin with body:

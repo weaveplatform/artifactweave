@@ -10749,7 +10749,7 @@ type ClientInterface interface {
 
 	// CreateKeyPairWithBody Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+	// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10758,7 +10758,7 @@ type ClientInterface interface {
 
 	// CreateKeyPair Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+	// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10785,7 +10785,7 @@ type ClientInterface interface {
 
 	// GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Needs read permission on the repository; anonymous when the repository is anonymously readable. 404 when no pair is assigned.
+	// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 	//
 	// Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 	GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -10817,7 +10817,7 @@ type ClientInterface interface {
 
 	// GetKeyPair Get a key pair
 	//
-	// Returns the readable projection of one pair. Admin only.
+	// Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 	//
 	// Corresponds with GET /api/security/keypair/{keyPairName} (the `GetKeyPair` operationId).
 	GetKeyPair(ctx context.Context, keyPairName string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -16663,7 +16663,7 @@ func (c *Client) GetAllKeyPairs(ctx context.Context, reqEditors ...RequestEditor
 
 // CreateKeyPairWithBody Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 //
 // Takes any type of body and a specified content type.
 //
@@ -16682,7 +16682,7 @@ func (c *Client) CreateKeyPairWithBody(ctx context.Context, contentType string, 
 
 // CreateKeyPair Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -16739,7 +16739,7 @@ func (c *Client) UpdateKeyPair(ctx context.Context, body UpdateKeyPairJSONReques
 
 // GetKeyPairPublicKeyPerRepository Get the public key assigned to a repository
 //
-// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Needs read permission on the repository; anonymous when the repository is anonymously readable. 404 when no pair is assigned.
+// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 //
 // Corresponds with GET /api/security/keypair/public/repositories/{repoKey} (the `GetKeyPairPublicKeyPerRepository` operationId).
 func (c *Client) GetKeyPairPublicKeyPerRepository(ctx context.Context, repoKey string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -16811,7 +16811,7 @@ func (c *Client) DeleteKeyPair(ctx context.Context, keyPairName string, reqEdito
 
 // GetKeyPair Get a key pair
 //
-// Returns the readable projection of one pair. Admin only.
+// Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 //
 // Corresponds with GET /api/security/keypair/{keyPairName} (the `GetKeyPair` operationId).
 func (c *Client) GetKeyPair(ctx context.Context, keyPairName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37509,7 +37509,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateKeyPairWithBodyWithResponse Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+	// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37518,7 +37518,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateKeyPairWithResponse Create a key pair
 	//
-	// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+	// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37545,7 +37545,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 	//
-	// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Needs read permission on the repository; anonymous when the repository is anonymously readable. 404 when no pair is assigned.
+	// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37581,7 +37581,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetKeyPairWithResponse Get a key pair
 	//
-	// Returns the readable projection of one pair. Admin only.
+	// Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -52835,7 +52835,7 @@ type GetKeyPairPublicKeyPerRepositoryResponse struct {
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *SecurityUnauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *SecurityForbidden
+	JSON403 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *SecurityNotFound
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -52848,7 +52848,7 @@ func (r GetKeyPairPublicKeyPerRepositoryResponse) GetJSON401() *SecurityUnauthor
 }
 
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
-func (r GetKeyPairPublicKeyPerRepositoryResponse) GetJSON403() *SecurityForbidden {
+func (r GetKeyPairPublicKeyPerRepositoryResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
 }
 
@@ -53023,7 +53023,7 @@ type GetKeyPairResponse struct {
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *SecurityUnauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
-	JSON403 *SecurityForbidden
+	JSON403 *ErrorResponse
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *SecurityNotFound
 	// JSON500 the response for an HTTP 500 `application/json` response
@@ -53041,7 +53041,7 @@ func (r GetKeyPairResponse) GetJSON401() *SecurityUnauthorized {
 }
 
 // GetJSON403 returns the response for an HTTP 403 `application/json` response
-func (r GetKeyPairResponse) GetJSON403() *SecurityForbidden {
+func (r GetKeyPairResponse) GetJSON403() *ErrorResponse {
 	return r.JSON403
 }
 
@@ -64674,7 +64674,7 @@ func (c *ClientWithResponses) GetAllKeyPairsWithResponse(ctx context.Context, re
 
 // CreateKeyPairWithBodyWithResponse Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64689,7 +64689,7 @@ func (c *ClientWithResponses) CreateKeyPairWithBodyWithResponse(ctx context.Cont
 
 // CreateKeyPairWithResponse Create a key pair
 //
-// Stores a new key pair. Admin only. The pair name must be unused (400 otherwise) and the private and public keys must match (400). Answers 201 with an empty object.
+// Stores a key pair, replacing any pair of the same name. Admin only. The private and public keys must match (400). Repositories that reference a replaced pair by name use its new material from the next request. Answers 201 with an empty object.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -64734,7 +64734,7 @@ func (c *ClientWithResponses) UpdateKeyPairWithResponse(ctx context.Context, bod
 
 // GetKeyPairPublicKeyPerRepositoryWithResponse Get the public key assigned to a repository
 //
-// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Needs read permission on the repository; anonymous when the repository is anonymously readable. 404 when no pair is assigned.
+// Returns the public half of the repository's primary key pair, which package clients fetch to verify signed metadata. Any authenticated caller may read it, with no permission on the repository. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled. 404 when the repository does not exist or has no pair assigned.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -64794,7 +64794,7 @@ func (c *ClientWithResponses) DeleteKeyPairWithResponse(ctx context.Context, key
 
 // GetKeyPairWithResponse Get a key pair
 //
-// Returns the readable projection of one pair. Admin only.
+// Returns the readable projection of one pair, which never includes the private key or the passphrase. Any authenticated caller may read it. A request without credentials reads it as the anonymous user while anonymous access is enabled, and is refused with 401 while it is disabled.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -77870,7 +77870,7 @@ func ParseGetKeyPairPublicKeyPerRepositoryResponse(rsp *http.Response) (*GetKeyP
 		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest SecurityForbidden
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -78018,7 +78018,7 @@ func ParseGetKeyPairResponse(rsp *http.Response) (*GetKeyPairResponse, error) {
 		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest SecurityForbidden
+		var dest ErrorResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

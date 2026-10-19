@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"math/big"
 	"net/http"
 	"strings"
@@ -22,12 +23,13 @@ import (
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
 
-// keyMaterial is generated once per test binary: an RSA pair, the public
-// half of another key, and a self-signed client certificate bundle. Keys
-// are never committed, which would also trip secret scanning.
+// keyMaterial is generated once per test binary: an RSA pair, another RSA
+// pair, and a self-signed client certificate bundle. Keys are never
+// committed, which would also trip secret scanning.
 type keyMaterial struct {
-	private, public, otherPublic string
-	bundle                       string
+	private, public           string
+	otherPrivate, otherPublic string
+	bundle                    string
 }
 
 var testKeys = sync.OnceValue(func() keyMaterial {
@@ -62,12 +64,16 @@ var testKeys = sync.OnceValue(func() keyMaterial {
 	if err != nil {
 		panic(err)
 	}
-	return keyMaterial{
-		private: string(pem.EncodeToMemory(&pem.Block{
+	priv := func(k *rsa.PrivateKey) string {
+		return string(pem.EncodeToMemory(&pem.Block{
 			Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(k),
-		})),
-		public:      pub(k),
-		otherPublic: pub(other),
+		}))
+	}
+	return keyMaterial{
+		private:      priv(k),
+		public:       pub(k),
+		otherPrivate: priv(other),
+		otherPublic:  pub(other),
 		bundle: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: cert})) +
 			string(pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: ecDER})),
 	}
@@ -151,7 +157,8 @@ func keypairStatusRows() []statusCase {
 		{create, kp, "admin", good, 201},
 		// The Terraform provider posts to the collection with a trailing slash.
 		{create, kp + "/", "admin", keypairBody("kp-slash", "slash", k.public), 201},
-		{create, kp, "admin", keypairBody("kp-used", "x", k.public), 400},
+		// A name in use is replaced, not refused (createkeypair).
+		{create, kp, "admin", keypairBody("kp-slash", "again", k.public), 201},
 		{create, kp, "admin", keypairBody("kp-bad", "x", k.otherPublic), 400},
 		{create, kp, "admin", `{"pairName":"kp-empty"}`, 400},
 		{create, kp, "user", good, 403},
@@ -166,16 +173,24 @@ func keypairStatusRows() []statusCase {
 		{verify, kp + "/verify", "admin", other, 400},
 		{verify, kp + "/verify", "user", good, 403},
 
+		// Any authenticated caller reads one pair, and anonymous while
+		// anonymous access is on (getkeypair).
 		{get, kp + "/kp-new", "admin", "", 200},
 		{get, kp + "/kp-absent", "admin", "", 404},
-		{get, kp + "/kp-new", "user", "", 403},
+		{get, kp + "/kp-new", "user", "", 200},
+		{get, kp + "/kp-absent", "user", "", 404},
+		{get, kp + "/kp-used", "anonymous", "", 200},
+		{get, kp + "/kp-used", "", "", 401},
 
+		// No read permission on the repository is needed
+		// (getkeypairpublickeyperrepository).
 		{public, pk + "signed-local", "admin", "", 200},
 		{public, pk + "libs-local", "admin", "", 404},
 		{public, pk + "missing", "admin", "", 404},
-		{public, pk + "signed-local", "user", "", 403},
+		{public, pk + "signed-local", "user", "", 200},
+		{public, pk + "missing", "user", "", 404},
 		{public, pk + "signed-local", "", "", 401},
-		{public, pk + "signed-local", "anonymous", "", 401},
+		{public, pk + "signed-local", "anonymous", "", 200},
 
 		{del, kp + "/kp-used", "admin", "", 400},
 		{del, kp + "/kp-new", "user", "", 403},
@@ -230,8 +245,8 @@ func TestKeypairTerraformFlow(t *testing.T) {
 		t.Fatalf("list: %s", rec.Body)
 	}
 	rec = do(t, h, http.MethodDelete, "/artifactory/api/security/keypair/tf-pair", admin, "")
-	if rec.Code != http.StatusOK {
-		t.Fatalf("delete: %d %s", rec.Code, rec.Body)
+	if rec.Code != http.StatusOK || rec.Body.String() != "OK" {
+		t.Fatalf("delete: %d %q", rec.Code, rec.Body)
 	}
 	if rec := do(
 		t,
@@ -379,5 +394,132 @@ func TestKeypairVaultKeyRefused(t *testing.T) {
 		`{"pairName":"v","pairType":"RSA","alias":"v","publicKey":"x","vaultKey":"vault/key"}`)
 	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "Vault keys") {
 		t.Fatalf("vault key: %d %s", rec.Code, rec.Body)
+	}
+}
+
+// TestKeypairCreateReplaces: creating a pair under a name in use replaces
+// it, as 7.x does (createkeypair), and the repository that refers to the
+// pair by name signs with the new material.
+func TestKeypairCreateReplaces(t *testing.T) {
+	var db store.Store
+	h := statusFixture(t, false, func(c *Config) { db = c.Store })
+	admin := basic("admin", "pw")
+	k := testKeys()
+	body, err := json.Marshal(map[string]string{
+		"pairName": "kp-used", "pairType": "RSA", "alias": "rotated",
+		"privateKey": k.otherPrivate, "publicKey": k.otherPublic,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	const kp = "/artifactory/api/security/keypair"
+	rec := do(t, h, http.MethodPost, kp, admin, string(body))
+	if rec.Code != http.StatusCreated || strings.TrimSpace(rec.Body.String()) != "{}" {
+		t.Fatalf("create over kp-used: %d %s", rec.Code, rec.Body)
+	}
+	got := decodeJSON[map[string]any](
+		t, do(t, h, http.MethodGet, kp+"/kp-used", admin, "").Body.String(),
+	)
+	if got["alias"] != "rotated" || got["publicKey"] != k.otherPublic {
+		t.Fatalf("read after replace: %v", got)
+	}
+	stored, err := db.Keys().Keypair(context.Background(), "kp-used")
+	if err != nil || stored.PrivateKey != k.otherPrivate {
+		t.Fatalf("the stored private key is not the new one: %v", err)
+	}
+	list := decodeJSON[[]map[string]any](t, do(t, h, http.MethodGet, kp, admin, "").Body.String())
+	n := 0
+	for _, p := range list {
+		if p["pairName"] == "kp-used" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Fatalf("kp-used is listed %d times: %v", n, list)
+	}
+	rec = do(t, h, http.MethodGet, kp+"/public/repositories/signed-local", admin, "")
+	if rec.Code != http.StatusOK || rec.Body.String() != k.otherPublic {
+		t.Fatalf("signed-local's public key after replace: %d %s", rec.Code, rec.Body)
+	}
+	// The replaced pair is still in use, so it still cannot be deleted.
+	rec = do(t, h, http.MethodDelete, kp+"/kp-used", admin, "")
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("delete the replaced pair: %d %s", rec.Code, rec.Body)
+	}
+}
+
+func TestKeypairVerifyText(t *testing.T) {
+	h := statusFixture(t, false)
+	rec := do(t, h, http.MethodPost, "/artifactory/api/security/keypair/verify",
+		basic("admin", "pw"), keypairBody("check", "check", testKeys().public))
+	if rec.Code != http.StatusOK || rec.Body.String() != "Key was verified." {
+		t.Fatalf("verify: %d %q", rec.Code, rec.Body)
+	}
+}
+
+// TestKeypairReadByNonAdmin: a user and anonymous read one pair and a
+// repository's public key, and never the private key or the passphrase.
+func TestKeypairReadByNonAdmin(t *testing.T) {
+	var db store.Store
+	h := statusFixture(t, true, func(c *Config) { db = c.Store })
+	k := testKeys()
+	const passphrase = "passphrase-never-read"
+	if err := db.Keys().CreateKeypair(context.Background(), types.Keypair{
+		Name: "kp-secret", Type: types.KeypairRSA, Alias: "secret",
+		PrivateKey: k.private, PublicKey: k.public, Passphrase: passphrase,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for name, headers := range map[string]map[string]string{
+		"user": basic("user", "pw"), "anonymous": nil,
+	} {
+		rec := do(t, h, http.MethodGet, "/artifactory/api/security/keypair/kp-secret", headers, "")
+		got := decodeJSON[map[string]any](t, rec.Body.String())
+		if rec.Code != http.StatusOK || len(got) != 4 || got["pairName"] != "kp-secret" ||
+			got["pairType"] != "RSA" || got["alias"] != "secret" || got["publicKey"] != k.public {
+			t.Errorf("%s reads the pair: %d %v", name, rec.Code, got)
+		}
+		if body := rec.Body.String(); strings.Contains(body, "PRIVATE KEY") ||
+			strings.Contains(body, passphrase) {
+			t.Errorf("%s reads private material: %s", name, body)
+		}
+		rec = do(t, h, http.MethodGet,
+			"/artifactory/api/security/keypair/public/repositories/signed-local", headers, "")
+		if rec.Code != http.StatusOK || rec.Body.String() != k.public {
+			t.Errorf("%s reads signed-local's public key: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+}
+
+// vanishingKeys is a key store whose pair someone else deletes between the
+// create that finds it and the update that would replace it.
+type vanishingKeys struct {
+	store.KeyStore
+	creates   int
+	updateErr error
+}
+
+func (v *vanishingKeys) CreateKeypair(context.Context, types.Keypair) error {
+	v.creates++
+	if v.creates == 1 {
+		return store.ErrConflict
+	}
+	return nil
+}
+
+func (v *vanishingKeys) UpdateKeypair(context.Context, types.Keypair) error {
+	return v.updateErr
+}
+
+func TestPutKeypairRaces(t *testing.T) {
+	ctx := context.Background()
+	gone := &vanishingKeys{updateErr: store.ErrNotFound}
+	if err := putKeypair(ctx, gone, types.Keypair{Name: "kp"}); err != nil || gone.creates != 2 {
+		t.Fatalf("a pair deleted before its update: %v after %d creates", err, gone.creates)
+	}
+	errDown := errors.New("store down")
+	broken := &vanishingKeys{updateErr: errDown}
+	if err := putKeypair(ctx, broken, types.Keypair{Name: "kp"}); !errors.Is(err, errDown) {
+		t.Fatalf("a failed update: %v", err)
 	}
 }

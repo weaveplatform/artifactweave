@@ -97,8 +97,10 @@ func (s artifactoryService) GetAllKeyPairs(
 	return out, nil
 }
 
-// CreateKeyPair stores a new pair. The Terraform provider requires 201
-// with an empty object.
+// CreateKeyPair stores a pair, replacing one of the same name as 7.x does
+// (createkeypair). Repositories refer to a pair by name, so those using a
+// replaced pair sign with the new material from the next request. The
+// Terraform provider requires 201 with an empty object either way.
 func (s artifactoryService) CreateKeyPair(
 	ctx context.Context,
 	req artgen.CreateKeyPairRequestObject,
@@ -111,13 +113,27 @@ func (s artifactoryService) CreateKeyPair(
 	if err != nil {
 		return nil, err
 	}
-	switch err := st.Keys().CreateKeypair(ctx, k); {
-	case errors.Is(err, store.ErrConflict):
-		return nil, badRequest("Key pair '%s' already exists", k.Name)
-	case err != nil:
+	if err := putKeypair(ctx, st.Keys(), k); err != nil {
 		return nil, s.internalError(ctx, "create key pair", err)
 	}
 	return artgen.CreateKeyPair201JSONResponse{}, nil
+}
+
+// putKeypair creates k or replaces the pair of its name. A pair deleted
+// between the refused create and the update is created after all, so a
+// concurrent delete cannot fail the request with a 500.
+func putKeypair(ctx context.Context, keys store.KeyStore, k types.Keypair) error {
+	err := keys.CreateKeypair(ctx, k)
+	if errors.Is(err, store.ErrConflict) {
+		err = keys.UpdateKeypair(ctx, k)
+		if errors.Is(err, store.ErrNotFound) {
+			err = keys.CreateKeypair(ctx, k)
+		}
+	}
+	if err != nil {
+		return fmt.Errorf("put key pair %q: %w", k.Name, err)
+	}
+	return nil
 }
 
 // UpdateKeyPair replaces the pair named in the body; repositories that
@@ -154,16 +170,20 @@ func (s artifactoryService) VerifyKeyPair(
 	if _, err := keypairFrom(req.Body); err != nil {
 		return nil, err
 	}
-	return artgen.VerifyKeyPair200TextResponse("Key pair is valid"), nil
+	return artgen.VerifyKeyPair200TextResponse("Key was verified."), nil
 }
 
 // GetKeyPair returns one pair's readable projection, which the Terraform
-// provider reads after every create.
+// provider reads after every create. Any caller the middleware lets through
+// may read it, as 7.x lets any authenticated user, and anonymous while
+// anonymous access is on (getkeypair). That is safe only because the
+// projection carries the public half alone: keypairSummary must never gain
+// the private key or the passphrase.
 func (s artifactoryService) GetKeyPair(
 	ctx context.Context,
 	req artgen.GetKeyPairRequestObject,
 ) (artgen.GetKeyPairResponseObject, error) {
-	st, err := s.adminStore(ctx)
+	st, err := s.content()
 	if err != nil {
 		return nil, err
 	}
@@ -205,21 +225,20 @@ func (s artifactoryService) DeleteKeyPair(
 	case err != nil:
 		return nil, s.internalError(ctx, "delete key pair", err)
 	}
-	return artgen.DeleteKeyPair200TextResponse(fmt.Sprintf("Key pair '%s' was deleted", name)), nil
+	return artgen.DeleteKeyPair200TextResponse("OK"), nil
 }
 
 // GetKeyPairPublicKeyPerRepository returns the public half of a
 // repository's primary pair, which package clients fetch to verify signed
-// metadata; it needs read access to the repository.
+// metadata. 7.x asks only for an authenticated user, or anonymous while
+// anonymous access is on (getkeypairpublickeyperrepository), and no read
+// permission on the repository, so a caller that may not read a repository
+// still learns whether it exists and which key signs it.
 func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 	ctx context.Context,
 	req artgen.GetKeyPairPublicKeyPerRepositoryRequestObject,
 ) (artgen.GetKeyPairPublicKeyPerRepositoryResponseObject, error) {
 	st, err := s.content()
-	if err != nil {
-		return nil, err
-	}
-	p, can, err := s.readerFor(ctx, st)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +248,6 @@ func (s artifactoryService) GetKeyPairPublicKeyPerRepository(
 		return nil, notFoundRepo(req.RepoKey)
 	case err != nil:
 		return nil, s.internalError(ctx, "get repository", err)
-	case !can(cfg):
-		return nil, denied(p)
 	case cfg.PrimaryKeyPairRef == "":
 		return nil, apierror.New(http.StatusNotFound,
 			fmt.Sprintf("Repository '%s' has no key pair assigned", req.RepoKey))
