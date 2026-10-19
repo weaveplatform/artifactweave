@@ -212,7 +212,8 @@ func TestArtifactMetadata(t *testing.T) {
 		t.Fatal("no artifact-level metadata")
 	}
 	golden(t, "artifact.xml", body)
-	if it.ModifiedBy != maven.Deriver || it.Original != (types.Checksums{}) {
+	// The server wrote it, so its computed checksums are the client's.
+	if it.ModifiedBy != maven.Deriver || it.Original != it.Actual {
 		t.Errorf("written by %q with client checksums %+v", it.ModifiedBy, it.Original)
 	}
 	if got := w.queued(); len(got) != 0 {

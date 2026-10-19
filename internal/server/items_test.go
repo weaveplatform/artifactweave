@@ -334,31 +334,41 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 	)
 	wantStatus(t, w.do("PUT", "/artifactory/libs-local/x.bin", "admin", "x"), http.StatusCreated)
 
-	// Sidecars are served from metadata and never stored.
-	for ext, want := range map[string]string{
-		".sha1": sha1Hex("x"), ".sha256": sha256Hex("x"), ".sha512": sha512Hex("x"),
-	} {
-		rec := w.do("GET", "/artifactory/libs-local/x.bin"+ext, "admin", "")
-		if rec.Code != 200 || rec.Body.String() != want {
-			t.Fatalf("%s: %d %q", ext, rec.Code, rec.Body)
+	// Sidecars are served from metadata and never stored. Under
+	// client-checksums each serves the client's checksum, and the client
+	// sent none but the SHA-256, which every deploy records as its own.
+	sidecars := func(repoKey string, want map[string]string) {
+		t.Helper()
+		for ext, value := range want {
+			rec := w.do("GET", "/artifactory/"+repoKey+"/x.bin"+ext, "admin", "")
+			switch {
+			case value == "" && (rec.Code != http.StatusNotFound ||
+				!strings.Contains(rec.Body.String(), "Checksum not found for x.bin")):
+				t.Errorf("%s %s: %d %q, want 404", repoKey, ext, rec.Code, rec.Body)
+			case value != "" && (rec.Code != http.StatusOK || rec.Body.String() != value):
+				t.Errorf("%s %s: %d %q, want %q", repoKey, ext, rec.Code, rec.Body, value)
+			}
 		}
 	}
-	if rec := w.do(
-		"HEAD",
-		"/artifactory/libs-local/x.bin.md5",
-		"admin",
-		"",
-	); rec.Code != 200 ||
-		rec.Body.Len() != 0 {
-		t.Fatalf("HEAD sidecar %d %q", rec.Code, rec.Body)
-	}
+	sidecars("libs-local", map[string]string{
+		".sha1": "", ".md5": "", ".sha512": "", ".sha256": sha256Hex("x"),
+	})
+	wantStatus(t, w.do("HEAD", "/artifactory/libs-local/x.bin.md5", "admin", ""),
+		http.StatusNotFound)
+	// Under server-generated-checksums the computed checksum is served, not
+	// the declared one.
+	sidecars("server-local", map[string]string{
+		".sha1": sha1Hex("x"), ".md5": md5Hex("x"), ".sha256": sha256Hex("x"),
+		".sha512": sha512Hex("x"),
+	})
 	wantStatus(
 		t,
 		w.do("GET", "/artifactory/libs-local/none.sha1", "admin", ""),
 		http.StatusNotFound,
 	)
 
-	// A sidecar upload records the client's checksum, checked by policy.
+	// A sidecar upload records the client's checksum, checked by policy,
+	// and fixes the missing checksum: the sidecar is served from then on.
 	wantStatus(
 		t,
 		w.do("PUT", "/artifactory/libs-local/x.bin.sha1", "admin", sha1Hex("x")+"  x.bin\n"),
@@ -366,6 +376,16 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 	)
 	if it := w.item("libs-local", false, "x.bin"); it.Original.SHA1 != sha1Hex("x") {
 		t.Fatalf("sidecar not recorded: %+v", it)
+	}
+	sidecars("libs-local", map[string]string{".sha1": sha1Hex("x"), ".md5": ""})
+	if rec := w.do(
+		"HEAD",
+		"/artifactory/libs-local/x.bin.sha1",
+		"admin",
+		"",
+	); rec.Code != 200 ||
+		rec.Body.Len() != 0 {
+		t.Fatalf("HEAD sidecar %d %q", rec.Code, rec.Body)
 	}
 	if _, err := w.db.Items().
 		Get(context.Background(), "libs-local", false, "x.bin.sha1"); err == nil {
@@ -385,6 +405,7 @@ func TestChecksumPolicyAndSidecars(t *testing.T) {
 	if it := w.item("libs-local", false, "x.bin"); it.Original.SHA512 != sha512Hex("x") {
 		t.Fatalf("sha512 sidecar not recorded: %+v", it)
 	}
+	sidecars("libs-local", map[string]string{".sha512": sha512Hex("x")})
 	wantStatus(
 		t,
 		w.do("PUT", "/artifactory/libs-local/x.bin.sha512", "admin", strings.Repeat("3", 128)),
@@ -415,6 +436,26 @@ func TestChecksumDeploy(t *testing.T) {
 		"",
 	); got.Body.String() != "shared" {
 		t.Fatalf("checksum-deployed content %q", got.Body)
+	}
+	// The found content's checksums become the client's, so every sidecar
+	// is served under client-checksums, though the deploy sent only a SHA-1
+	// and the first deploy sent none.
+	for ext, want := range map[string]string{
+		".sha1": sha1Hex("shared"), ".md5": md5Hex("shared"), ".sha256": sha256Hex("shared"),
+		".sha512": sha512Hex("shared"),
+	} {
+		got := w.do("GET", "/artifactory/other-local/copy.bin"+ext, "admin", "")
+		if got.Code != http.StatusOK || got.Body.String() != want {
+			t.Errorf("%s: %d %q", ext, got.Code, got.Body)
+		}
+	}
+	rec = w.do("GET", "/artifactory/api/storage/other-local/copy.bin", "admin", "")
+	var info struct {
+		Original map[string]string `json:"originalChecksums"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &info); err != nil ||
+		info.Original["md5"] != md5Hex("shared") || info.Original["sha256"] != sha256Hex("shared") {
+		t.Errorf("storage info %s %v", rec.Body, err)
 	}
 	wantStatus(t, w.do(
 		"PUT",

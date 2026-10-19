@@ -101,7 +101,7 @@ func (s *Service) derive(ctx context.Context, d format.Derived) (types.Item, err
 	}
 	dep := Deploy{
 		Target:     Target{Repo: d.Repo, Cached: d.Cached, Path: d.Path},
-		Properties: d.Properties, By: d.By,
+		Properties: d.Properties, By: d.By, Trusted: true,
 	}
 	var out types.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {

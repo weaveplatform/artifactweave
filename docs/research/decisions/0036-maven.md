@@ -262,8 +262,11 @@ The audit against KB, Jira and client sources ([#378](https://github.com/weavepl
 - 7.x differs: under `deployer`, a delete of other files recalculates the metadata ([J]
   RTFACT-26126, fixed in 7.27.3; JFrog staff on RTFACT-26651); fixed by
   [#418](https://github.com/weaveplatform/artifactweave/issues/418).
-- 7.x differs: under `client-checksums`, a GET of a sidecar the client never sent answers 404
-  ([D] local-repositories); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+- **Checksum files** follow the policy: under `client-checksums` a GET of a sidecar the
+  client never sent answers 404 ([D] local-repositories), and `mvn deploy` sends a `.sha1`
+  and a `.md5` after each file. `maven-metadata.xml`'s sidecars serve the computed checksums
+  under either policy, as 6.20's `LocalRepoChecksumPolicy` does ([S]; research 27 section 4,
+  [#399](https://github.com/weaveplatform/artifactweave/issues/399)).
 - 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
   sbt-repositories); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
 - `maxUniqueSnapshots`: a KB article gives a floor of 2 unique snapshots and a cleanup every 5

@@ -16998,7 +16998,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitem.md
     get:
-      description: 'Streams the content of a file. Resolution follows the repository class: local serves stored content, remote serves the cache or fetches from upstream, virtual walks its members in order. Matrix parameters `;key=value` on the path restrict resolution to items carrying those properties. The version tokens `[RELEASE]`, `[INTEGRATION]` and `SNAPSHOT` in layout-aware repositories resolve to the latest matching version. Supports `Range` requests with 206 and exposes `X-Checksum-Md5`, `X-Checksum-Sha1` and `X-Checksum-Sha256` headers. Each completed download updates the statistics unless `skipUpdateStats=true`. In a repository with `downloadRedirect` or `cdnRedirect`, a GET of a file at least `download.redirect.min_size` long answers 302 to a signed URL on the CDN in front of the blob store, if it has one, or on the object store itself (`downloadRedirect` only), carrying the file name and media type as response overrides. HEAD and conditional requests are always answered here.'
+      description: 'Streams the content of a file. Resolution follows the repository class: local serves stored content, remote serves the cache or fetches from upstream, virtual walks its members in order. Matrix parameters `;key=value` on the path restrict resolution to items carrying those properties. The version tokens `[RELEASE]`, `[INTEGRATION]` and `SNAPSHOT` in layout-aware repositories resolve to the latest matching version. Supports `Range` requests with 206 and exposes `X-Checksum-Md5`, `X-Checksum-Sha1` and `X-Checksum-Sha256` headers. Each completed download updates the statistics unless `skipUpdateStats=true`. In a repository with `downloadRedirect` or `cdnRedirect`, a GET of a file at least `download.redirect.min_size` long answers 302 to a signed URL on the CDN in front of the blob store, if it has one, or on the object store itself (`downloadRedirect` only), carrying the file name and media type as response overrides. HEAD and conditional requests are always answered here. A path ending in `.md5`, `.sha1`, `.sha256` or `.sha512` beside a file answers that checksum of the file as plain text: under `client-checksums` the one the client sent, and 404 while it has sent none (every deploy records the SHA-256); under `server-generated-checksums`, for `maven-metadata.xml` and in a remote cache, the computed one.'
       operationId: retrieveArtifact
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -19094,7 +19094,7 @@ components:
           type: string
       type: object
     Checksums:
-      description: Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+      description: Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
       properties:
         md5:
           description: Optional within this object. Lowercase hex MD5 digest, 32 characters.
@@ -20108,7 +20108,7 @@ components:
         checksums:
           allOf:
             - $ref: '#/components/schemas/Checksums'
-          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
         created:
           description: Optional within this object. RFC 3339 time the item was first stored. For large uploads this can be later than `lastModified`.
           format: date-time
@@ -20136,7 +20136,7 @@ components:
         originalChecksums:
           allOf:
             - $ref: '#/components/schemas/Checksums'
-          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
         path:
           description: Optional within this object. Item path relative to the repository root, always with a leading `/`. AQL reports the same item without the slash and with `.` for the root.
           type: string
@@ -20415,7 +20415,7 @@ components:
         checksums:
           allOf:
             - $ref: '#/components/schemas/Checksums'
-          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
         created:
           description: Optional within this object. RFC 3339 creation time.
           format: date-time
@@ -20432,7 +20432,7 @@ components:
         originalChecksums:
           allOf:
             - $ref: '#/components/schemas/Checksums'
-          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+          description: Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
         path:
           description: Optional within this object. Item path relative to the repository root with a leading `/`. A folder's ends in `/`.
           type: string

@@ -414,6 +414,15 @@ func itemStatusRows() []statusCase {
 
 		{get, lib + "/fixture/get.txt", "admin", "", 200},
 		{get, lib + "/fixture/get.txt.sha256", "admin", "", 200},
+		// Under client-checksums a sidecar serves the client's checksum:
+		// get.txt was deployed with none, so 404 until the client sends one
+		// (#399). The checksum deploy above recorded all of cs.bin's.
+		{get, lib + "/fixture/get.txt.sha1", "admin", "", 404},
+		{head, lib + "/fixture/get.txt.md5", "admin", "", 404},
+		{get, lib + "/fixture/get.txt.sha1", "user", "", 403},
+		{put, lib + "/fixture/get.txt.sha1", "admin", sha1Hex("fixture"), 201},
+		{get, lib + "/fixture/get.txt.sha1", "admin", "", 200},
+		{get, lib + "/new/cs.bin.md5", "admin", "", 200},
 		{get, lib + "/fixture/", "admin", "", 200},
 		{get, lib + "/fixture/absent", "admin", "", 404},
 		{get, "/artifactory/missing/a.txt", "admin", "", 404},

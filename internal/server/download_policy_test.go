@@ -100,7 +100,8 @@ func TestDownloadOfExcludedPaths(t *testing.T) {
 			"The repository 'libs-local' rejected the artifact '"+c.artifact+"' "+msg)
 	}
 	wantStatus(t, w.do("GET", "/artifactory/libs-local/a/x.jar", "deployer", ""), http.StatusOK)
-	wantStatus(t, w.do("GET", "/artifactory/libs-local/a/x.jar.sha1", "deployer", ""),
+	// The SHA-256 file, which every deploy has: the client sent no SHA-1.
+	wantStatus(t, w.do("GET", "/artifactory/libs-local/a/x.jar.sha256", "deployer", ""),
 		http.StatusOK)
 
 	for _, c := range []struct{ path, shown, left string }{

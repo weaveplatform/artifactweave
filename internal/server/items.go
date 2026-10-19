@@ -786,9 +786,10 @@ func matchesMatrix(
 }
 
 // getSidecar serves "<file>.sha256", ".sha512", ".sha1" and ".md5" from the file's
-// recorded checksums (decision 0004); they are never stored as items. The
-// computed digest is served: under client-checksums the declared one must
-// equal it, and under server-generated-checksums it is the one that counts.
+// recorded checksums (decision 0004); they are never stored as items. Which
+// checksum is served is item.ServedChecksum's: under client-checksums the
+// client's, so a file deployed without one has no SHA-1 file until the
+// client sends one.
 func (s artifactoryService) getSidecar(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -806,16 +807,23 @@ func (s artifactoryService) getSidecar(
 	}
 	f, err := lookup(r.Context(), st, c, cached, artifact, acc, dl, map[string]bool{})
 	// A file the caller may not read has no visible checksum either.
-	if err != nil || f.item.Folder || alg.Of(f.item.Actual) == "" ||
+	if err != nil || f.item.Folder ||
 		!acc.file(f.repo, f.item.FullPath(), types.ActionRead) {
 		writeErr(w, r, itemNotFound())
+		return
+	}
+	value := item.ServedChecksum(f.repo, f.item, alg)
+	if value == "" {
+		// Artifactory 6.20's message (DownloadServiceImpl.respondForChecksumRequest).
+		writeErr(w, r, apierror.New(http.StatusNotFound,
+			"Checksum not found for "+f.item.FullPath()))
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
 	w.Header().Set("Last-Modified", f.item.Modified.UTC().Format(http.TimeFormat))
 	w.WriteHeader(http.StatusOK)
 	if r.Method != http.MethodHead {
-		_, _ = io.WriteString(w, alg.Of(f.item.Actual))
+		_, _ = io.WriteString(w, value)
 	}
 }
 

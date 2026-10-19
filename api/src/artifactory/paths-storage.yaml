@@ -127,8 +127,10 @@ components:
       type: object
     Checksums:
       description: Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums`
-        holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum
-        search.
+        holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is
+        visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared
+        none. A checksum deploy records every checksum of the content it reuses. A file the server writes
+        itself, such as a build-info document or an image manifest, records all of its computed checksums.
       properties:
         md5:
           description: Optional within this object. Lowercase hex MD5 digest, 32 characters.
@@ -232,8 +234,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/Checksums'
           description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
-            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
-            the two is visible to the bad-checksum search.
+            server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum
+            files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always
+            recorded, as the computed one when the client declared none. A checksum deploy records every checksum of
+            the content it reuses. A file the server writes itself, such as a build-info document or an image
+            manifest, records all of its computed checksums.
         created:
           description: Optional within this object. RFC 3339 time the item was first stored. For large uploads this
             can be later than `lastModified`.
@@ -263,8 +268,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/Checksums'
           description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
-            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
-            the two is visible to the bad-checksum search.
+            server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum
+            files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always
+            recorded, as the computed one when the client declared none. A checksum deploy records every checksum of
+            the content it reuses. A file the server writes itself, such as a build-info document or an image
+            manifest, records all of its computed checksums.
         path:
           description: Optional within this object. Item path relative to the repository root, always with a leading
             `/`. AQL reports the same item without the slash and with `.` for the root.
@@ -439,8 +447,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/Checksums'
           description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
-            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
-            the two is visible to the bad-checksum search.
+            server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum
+            files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always
+            recorded, as the computed one when the client declared none. A checksum deploy records every checksum of
+            the content it reuses. A file the server writes itself, such as a build-info document or an image
+            manifest, records all of its computed checksums.
         created:
           description: Optional within this object. RFC 3339 creation time.
           format: date-time
@@ -458,8 +469,11 @@ components:
           allOf:
           - $ref: '#/components/schemas/Checksums'
           description: Optional within this object. Hex digests of a file's content. `checksums` holds what the
-            server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between
-            the two is visible to the bad-checksum search.
+            server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum
+            files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always
+            recorded, as the computed one when the client declared none. A checksum deploy records every checksum of
+            the content it reuses. A file the server writes itself, such as a build-info document or an image
+            manifest, records all of its computed checksums.
         path:
           description: Optional within this object. Item path relative to the repository root with a leading `/`.
             A folder's ends in `/`.
@@ -2900,7 +2914,10 @@ paths:
         `downloadRedirect` or `cdnRedirect`, a GET of a file at least `download.redirect.min_size` long answers 302
         to a signed URL on the CDN in front of the blob store, if it has one, or on the object store itself
         (`downloadRedirect` only), carrying the file name and media type as response overrides. HEAD and conditional
-        requests are always answered here.'
+        requests are always answered here. A path ending in `.md5`, `.sha1`, `.sha256` or `.sha512` beside a file
+        answers that checksum of the file as plain text: under `client-checksums` the one the client sent, and 404
+        while it has sent none (every deploy records the SHA-256); under `server-generated-checksums`, for
+        `maven-metadata.xml` and in a remote cache, the computed one.'
       operationId: retrieveArtifact
       parameters:
       - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as

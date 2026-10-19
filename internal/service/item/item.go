@@ -109,6 +109,14 @@ type Deploy struct {
 	// content is compared too, because a declaration alone is only the
 	// client's claim: under server-generated-checksums nothing checks it.
 	OverwriteIdentical bool
+
+	// Trusted records the computed checksums as the client's, as
+	// Artifactory does for the files it writes itself (6.20
+	// InternalArtifactoryRequest.isTrustServerChecksums) and for a checksum
+	// deploy. A file the server writes, such as a build-info document or a
+	// registry's manifest, has no client to send its checksums, and under
+	// client-checksums its checksum files would otherwise answer 404.
+	Trusted bool
 	// Reusable, when set, decides whether a checksum deploy may store the
 	// content it found; when it says no, the deploy fails with ErrNoBlob as
 	// if the content were not there, so the answer does not reveal that it
@@ -315,6 +323,10 @@ func (s *Service) DeployByChecksum(ctx context.Context, d Deploy) (types.Item, e
 	} else if !ok {
 		return types.Item{}, ErrNoBlob
 	}
+	// Artifactory trusts the found content's checksums (6.20
+	// UploadServiceUtils.setFileInfoChecksums); since 7.161.15 (RTDEV-80481)
+	// a deploy that sent only a SHA-256 no longer lacks a client SHA-1.
+	d.Trusted = true
 	stored, err := s.storeFile(ctx, d, b.Checksums, b.Size, declared)
 	if errors.Is(err, ErrCollected) {
 		// Collected since it was found: a miss, so the client uploads it.
@@ -400,9 +412,23 @@ func (s *Service) writeFile(
 		return types.Item{}, err
 	}
 	items := s.Store.Items()
+	// Otherwise Artifactory records the SHA-256 it computes as the client's
+	// when the client sent none ("Identical"), so a .sha256 file is served
+	// under client-checksums for every deploy (ServedChecksum).
+	// The overwrite check below reads declared, what the client sent: the
+	// SHA-256 filled in here is the server's own, and counting it as a
+	// declaration would let any re-upload of the same bytes replace a file
+	// without the delete permission.
+	original := declared
+	switch {
+	case d.Trusted:
+		original = actual
+	case original.SHA256 == "":
+		original.SHA256 = actual.SHA256
+	}
 	it := types.Item{
 		RepoKey: d.Repo.Key, Cached: d.Cached, Name: full,
-		Size: size, Actual: actual, Original: declared, MimeType: MimeType(full),
+		Size: size, Actual: actual, Original: original, MimeType: MimeType(full),
 		Created: now, CreatedBy: d.By, Modified: now, ModifiedBy: d.By, Updated: now,
 	}
 	old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
@@ -569,6 +595,26 @@ func Sidecar(p string) (artifact string, a Algorithm, ok bool) {
 		}
 	}
 	return "", "", false
+}
+
+// mavenMetadata is the name of Maven's metadata files. internal/format/maven
+// names them too, but its tests import this package.
+const mavenMetadata = "maven-metadata.xml"
+
+// ServedChecksum is the value of the file it that its sidecar for algorithm
+// a answers a GET with, where c is the repository that holds the file, as
+// Artifactory's LocalRepoChecksumPolicy.getChecksum (6.20) chooses it.
+// Under client-checksums it is the client's checksum, and empty while the
+// client has sent none, so the sidecar answers 404 until one is deployed, as
+// local-repositories documents for 7.x. Under server-generated-checksums,
+// for a file named maven-metadata.xml in any repository (the server
+// computes those checksums, and drops a client's), and in a remote cache,
+// which that policy does not govern, it is the computed checksum.
+func ServedChecksum(c repo.Config, it types.Item, a Algorithm) string {
+	if it.Cached || !clientPolicy(c) || path.Base(it.Name) == mavenMetadata {
+		return a.Of(it.Actual)
+	}
+	return a.Of(it.Original)
 }
 
 // Of returns the digest a of c.

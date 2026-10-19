@@ -90,7 +90,9 @@ func TestDeploy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if it.Size != 5 || it.Actual != c || it.Original != (types.Checksums{SHA1: c.SHA1}) ||
+	// The SHA-256 the client did not declare is recorded as its own.
+	if it.Size != 5 || it.Actual != c ||
+		it.Original != (types.Checksums{SHA1: c.SHA1, SHA256: c.SHA256}) ||
 		it.MimeType != "text/plain" || it.CreatedBy != "alice" || !it.Created.Equal(at) {
 		t.Fatalf("item %+v", it)
 	}
@@ -371,8 +373,11 @@ func TestDeployByChecksum(t *testing.T) {
 	for name, d := range map[string]types.Checksums{
 		"sha1": {SHA1: c.SHA1}, "sha256": {SHA256: c.SHA256}, "md5": {MD5: c.MD5}, "all": c,
 	} {
+		// Every checksum of the content is recorded as the client's, however
+		// few the deploy named.
 		it, err := byChecksum("copies/"+name, d)
-		if err != nil || it.Actual != c || it.Size != int64(len("shared content")) {
+		if err != nil || it.Actual != c || it.Original != c ||
+			it.Size != int64(len("shared content")) {
 			t.Fatalf("%s: %+v %v", name, it, err)
 		}
 	}
@@ -735,6 +740,90 @@ func TestSidecarAndMimeType(t *testing.T) {
 	if MimeType("A.JAR") != "application/java-archive" ||
 		MimeType("x.unknown") != "application/octet-stream" {
 		t.Fatal("MimeType")
+	}
+}
+
+// TestServedChecksum: under client-checksums a sidecar serves the client's
+// checksum, or nothing; the computed one under server-generated-checksums,
+// for Maven metadata and in a remote cache.
+func TestServedChecksum(t *testing.T) {
+	c := sums("x")
+	client := *repo.Defaults(&repo.Config{Key: "libs", Class: repo.Local})
+	server := client
+	server.ChecksumPolicyType = repo.ServerGeneratedChecksums
+	remote := *repo.Defaults(&repo.Config{Key: "up", Class: repo.Remote})
+	wrong := strings.Repeat("0", 40)
+	file := types.Item{Name: "app.jar", Actual: c, Original: types.Checksums{SHA1: wrong}}
+	for name, tc := range map[string]struct {
+		c    repo.Config
+		it   types.Item
+		a    Algorithm
+		want string
+	}{
+		"client's":               {client, file, SHA1, wrong},
+		"none sent":              {client, file, MD5, ""},
+		"server-generated":       {server, file, SHA1, c.SHA1},
+		"metadata":               {client, types.Item{Name: "maven-metadata.xml", Actual: c}, SHA1, c.SHA1},
+		"metadata before stored": {client, types.Item{Name: "g/a/maven-metadata.xml", Actual: c}, MD5, c.MD5},
+		"remote cache":           {remote, types.Item{Name: "app.jar", Cached: true, Actual: c}, SHA1, c.SHA1},
+	} {
+		if got := ServedChecksum(tc.c, tc.it, tc.a); got != tc.want {
+			t.Errorf("%s: %q, want %q", name, got, tc.want)
+		}
+	}
+}
+
+// TestDeployOriginals: what each write records as the client's checksums,
+// which a sidecar serves under client-checksums.
+func TestDeployOriginals(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	c := sums("payload")
+	// A deploy that declares nothing still has its SHA-256 as the client's.
+	it, err := w.deploy("plain.bin", "payload", types.Checksums{})
+	if err != nil || it.Original != (types.Checksums{SHA256: c.SHA256}) {
+		t.Fatalf("plain: %+v %v", it, err)
+	}
+	if ServedChecksum(w.loc, it, SHA1) != "" || ServedChecksum(w.loc, it, SHA256) != c.SHA256 {
+		t.Fatalf("plain sidecars: %+v", it.Original)
+	}
+	// A declared SHA-256 is kept as sent, even one the server-generated
+	// policy lets differ.
+	w.loc.ChecksumPolicyType = repo.ServerGeneratedChecksums
+	wrong := strings.Repeat("e", 64)
+	it, err = w.deploy("declared.bin", "payload", types.Checksums{SHA256: wrong, MD5: c.MD5})
+	if err != nil || it.Original != (types.Checksums{SHA256: wrong, MD5: c.MD5}) {
+		t.Fatalf("declared: %+v %v", it, err)
+	}
+	// A checksum deploy that names only the SHA-256 records them all.
+	w.loc.ChecksumPolicyType = repo.ClientChecksums
+	it, err = w.svc.DeployByChecksum(ctx, Deploy{
+		Target: Target{Repo: w.loc, Path: "copy.bin"}, Declared: types.Checksums{SHA256: c.SHA256},
+	})
+	if err != nil || it.Original != c {
+		t.Fatalf("checksum deploy: %+v %v", it, err)
+	}
+	stored, err := w.db.Items().Get(ctx, "libs", false, "copy.bin")
+	if err != nil || stored.Original != c || ServedChecksum(w.loc, stored, MD5) != c.MD5 {
+		t.Fatalf("stored: %+v %v", stored, err)
+	}
+	// A file the server writes itself has its computed checksums as the
+	// client's, whatever was declared.
+	it, err = w.svc.Deploy(ctx, Deploy{
+		Target: Target{Repo: w.loc, Path: "written.bin"}, Body: strings.NewReader("payload"),
+		Declared: types.Checksums{SHA256: c.SHA256}, Trusted: true,
+	})
+	if err != nil || it.Original != c || ServedChecksum(w.loc, it, SHA1) != c.SHA1 {
+		t.Fatalf("server written: %+v %v", it, err)
+	}
+	// Fixing a missing checksum by sending it makes the sidecar serve it.
+	plain := Target{Repo: w.loc, Path: "plain.bin"}
+	if _, err := w.svc.RecordChecksum(ctx, plain, SHA1, c.SHA1); err != nil {
+		t.Fatal(err)
+	}
+	fixed, err := w.db.Items().Get(ctx, "libs", false, "plain.bin")
+	if err != nil || ServedChecksum(w.loc, fixed, SHA1) != c.SHA1 {
+		t.Fatalf("fixed: %+v %v", fixed, err)
 	}
 }
 

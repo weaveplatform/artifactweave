@@ -33,6 +33,10 @@ func TestMavenDownloadsResolveVersions(t *testing.T) {
 	} {
 		wantStatus(t, w.do("PUT", dir+path, "admin", body), http.StatusCreated)
 	}
+	// Maven sends the SHA-1 after the file; under client-checksums the
+	// sidecar serves it, and nothing until it is sent.
+	wantStatus(t, w.do("PUT", dir+"1.0-SNAPSHOT/app-1.0-20261017.100000-2.jar.sha1", "admin",
+		sha1Hex("build 2")), http.StatusCreated)
 	for _, tc := range []struct {
 		method, path, want string
 	}{

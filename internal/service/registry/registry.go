@@ -331,10 +331,12 @@ func (s *Service) store(
 	return it, nil
 }
 
+// uploadDeploy is the write of a finished upload. The registry writes the
+// item, not the client, so its computed checksums are the originals.
 func uploadDeploy(o Owner, hex string) item.Deploy {
 	return item.Deploy{
 		Target:   item.Target{Repo: o.Repo, Path: layout.UploadPath(o.Name, hex)},
-		Declared: types.Checksums{SHA256: hex}, By: o.By,
+		Declared: types.Checksums{SHA256: hex}, By: o.By, Trusted: true,
 	}
 }
 
