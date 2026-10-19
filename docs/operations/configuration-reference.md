@@ -175,7 +175,7 @@ The descriptor is a patch:
 
 | Section | Applied as |
 |---|---|
-| `localRepositories`, `remoteRepositories`, `virtualRepositories` | Repositories. A virtual repository may list members created by the same patch; deleting a repository removes it from the virtual repositories that list it |
+| `localRepositories`, `remoteRepositories`, `virtualRepositories` | Repositories. A virtual repository may list no members, or members created by the same patch; each must have the virtual repository's package type unless it is `generic`, with `maven`, `gradle`, `ivy`, `sbt` and `p2` counted as one. Deleting a repository removes it from the virtual repositories that list it |
 | `proxies` | Proxy settings; `password` is sealed and never stored in the document |
 | `propertySets` | Property sets |
 | `repoLayouts` | Repository layouts, checked by compiling `artifactPathPattern` and the descriptor pattern. An entry may repeat its key as `name`, as the `artifactory_repository_layout` resource sends it; a different `name` is refused, so delete a layout and create it under the new key to rename it |

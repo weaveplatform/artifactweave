@@ -62,8 +62,11 @@ The decision stands against 7.161.32 as a plan for P10. The 7.x notes add inputs
 
 ## Constraints
 
-- A virtual's members must share a package type family; the validator enforces the same
-  rules as Artifactory.
+- A virtual repository may have no members. Each member must have the virtual repository's
+  package type unless the virtual repository is generic; Maven, Gradle, Ivy, SBT and P2
+  count as one type **[I]**. Every write path refuses a mismatch; Artifactory's create API
+  does from 7.133.3 (RTDEV-62756; [research 03](../03-repository-configuration-model.md),
+  [#394](https://github.com/weaveplatform/artifactweave/issues/394)).
 - Merging is bounded by the metadata cache; a write to a member is visible through the
   virtual after invalidation, not instantly for in-flight merges.
 

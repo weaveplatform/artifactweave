@@ -67,3 +67,20 @@ resource "artifactory_local_gradle_repository" "this" {
   checksum_policy_type            = "client-checksums"
   suppress_pom_consistency_checks = true
 }
+
+# Virtual repositories: an npm one over the local npm repository, deploying
+# to it, and a Maven one with no members yet. The provider leaves an empty
+# repositories list out of the request and reads it back as an empty list,
+# so the empty plan after apply proves both.
+resource "artifactory_virtual_npm_repository" "this" {
+  key                     = var.npm_virtual_repository_key
+  description             = "managed by Terraform"
+  repositories            = [artifactory_local_npm_repository.this.key]
+  default_deployment_repo = artifactory_local_npm_repository.this.key
+}
+
+resource "artifactory_virtual_maven_repository" "empty" {
+  key          = var.maven_virtual_repository_key
+  description  = "managed by Terraform"
+  repositories = []
+}

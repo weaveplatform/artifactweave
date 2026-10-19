@@ -1333,9 +1333,10 @@ components:
             when omitted on the API regardless of package type.
           type: string
         repositories:
-          description: Required within this object. Ordered keys of the member repositories. Resolution tries members
-            in this order; local, remote and other virtual repositories may be mixed, and every key must exist and
-            serve the same package type family.
+          description: Optional within this object. Ordered keys of the member repositories; absent or empty means
+            none, and a read lists none as an empty array. Resolution tries members in this order; local, remote and
+            other virtual repositories may be mixed. Every key must exist and, unless this repository is generic, have
+            its package type, where maven, gradle, ivy, sbt and p2 count as one.
           items:
             description: Optional within this object. A member repository key.
             type: string
@@ -1359,7 +1360,6 @@ components:
       required:
       - key
       - rclass
-      - repositories
       type: object
       x-go-type: repo.Config
       x-go-type-import:

@@ -470,11 +470,17 @@ func TestValidate(t *testing.T) {
 			"",
 		},
 		{"remote without url", func(c *repo.Config) { c.Class = repo.Remote }, "url"},
-		{
-			"virtual without members",
-			func(c *repo.Config) { c.Class = repo.Virtual },
-			"repositories",
-		},
+		// repositories is optional in 7.x, absent or empty.
+		{"virtual without members", func(c *repo.Config) { c.Class = repo.Virtual }, ""},
+		{"virtual with an empty member list", func(c *repo.Config) {
+			c.Class = repo.Virtual
+			c.Repositories = []string{}
+		}, ""},
+		// With no members there is nothing a deployment repository can name.
+		{"deployment repo without members", func(c *repo.Config) {
+			c.Class = repo.Virtual
+			c.DefaultDeploymentRepo = "a"
+		}, "defaultDeploymentRepo"},
 		{"deployment repo not a member", func(c *repo.Config) {
 			c.Class = repo.Virtual
 			c.Repositories = []string{"a"}
@@ -528,10 +534,11 @@ func TestValidate(t *testing.T) {
 
 func TestValidateCollectsEveryError(t *testing.T) {
 	c := repo.Config{
-		Key:           "",
-		Class:         repo.Virtual,
-		PackageType:   repo.Cargo,
-		MaxUniqueTags: ptr(-1),
+		Key:                   "",
+		Class:                 repo.Virtual,
+		PackageType:           repo.Cargo,
+		DefaultDeploymentRepo: "absent",
+		MaxUniqueTags:         ptr(-1),
 	}
 	err := repo.Validate(&c)
 	var errs repo.Errors

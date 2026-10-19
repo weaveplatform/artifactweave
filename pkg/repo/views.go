@@ -26,6 +26,12 @@ func Masked(c Config) Config {
 	if c.Environments == nil {
 		c.Environments = []string{}
 	}
+	// The provider's repositories has the same empty default and the same
+	// null reading of an absent key, so a virtual repository without
+	// members lists none as [].
+	if c.Class == Virtual && c.Repositories == nil {
+		c.Repositories = []string{}
+	}
 	if len(c.CustomHTTPHeaders) > 0 {
 		hs := slices.Clone(c.CustomHTTPHeaders)
 		for i := range hs {

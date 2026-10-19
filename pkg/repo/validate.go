@@ -88,9 +88,10 @@ func Validate(c *Config) error {
 			add("url", "is required for a remote repository")
 		}
 	case Virtual:
-		if len(c.Repositories) == 0 {
-			add("repositories", "must list at least one member")
-		}
+		// No members is valid: repositories is optional in 7.x, and deleting
+		// the last member leaves a virtual repository that must still accept
+		// updates. A deployment repository then has nothing to name, so the
+		// check below refuses any.
 		if c.DefaultDeploymentRepo != "" &&
 			!slices.Contains(c.Repositories, c.DefaultDeploymentRepo) {
 			add(
@@ -104,6 +105,26 @@ func Validate(c *Config) error {
 		return nil
 	}
 	return errs
+}
+
+// mavenGroup is the package types Artifactory treats as one family when it
+// offers members for a virtual repository: 6.20's RepoType.isMavenGroup,
+// which its virtual repository editor filters by (GetAvailableRepositories).
+// 7.x documents only "the same package type", so the family is [I].
+var mavenGroup = []PackageType{Maven, Gradle, Ivy, SBT, P2}
+
+// AcceptsMember reports whether a virtual repository of package type
+// virtual may list a member of package type member. A generic virtual
+// repository aggregates any type; the Maven family shares one metadata
+// format, so its types mix; every other type takes only its own.
+func AcceptsMember(virtual, member PackageType) bool {
+	switch {
+	case virtual == Generic, virtual == member:
+		return true
+	case slices.Contains(mavenGroup, virtual):
+		return slices.Contains(mavenGroup, member)
+	}
+	return false
 }
 
 func validateKey(key string, add func(field, msg string)) {

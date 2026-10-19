@@ -49,3 +49,46 @@ Feature: Repositories API
     Then the JSON field "description" equals "updated by jf"
     When I run jf "rt repo-delete jf-generic --quiet --url {url} --user admin --password {password}"
     Then the command succeeds
+
+  Scenario: A virtual repository may have no members, and each member has its package type
+    When I PUT "/artifactory/api/repositories/npm-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "npm"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/maven-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "maven"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/repositories/npm-virtual" as admin with body:
+      """
+      {"rclass": "virtual", "packageType": "npm"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/npm-virtual" as admin
+    Then the response status is 200
+    And the JSON field "repositories" has 0 entries
+    When I POST "/artifactory/api/repositories/npm-virtual" as admin with body:
+      """
+      {"repositories": ["maven-local"]}
+      """
+    Then the response status is 400
+    And the response body contains "does not match the virtual repository's package type 'npm'"
+    When I POST "/artifactory/api/repositories/npm-virtual" as admin with body:
+      """
+      {"repositories": ["npm-local"], "defaultDeploymentRepo": "npm-local"}
+      """
+    Then the response status is 200
+    When I DELETE "/artifactory/api/repositories/npm-local" as admin
+    Then the response status is 200
+    When I POST "/artifactory/api/repositories/npm-virtual" as admin with body:
+      """
+      {"description": "its last member is gone"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/npm-virtual" as admin
+    Then the JSON field "repositories" has 0 entries
+    And the JSON field "description" equals "its last member is gone"
+    When I GET "/artifactory/npm-virtual/any/file.txt" as admin
+    Then the response status is 404
