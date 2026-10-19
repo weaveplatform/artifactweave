@@ -161,6 +161,21 @@ The decision stands against 7.161.32
 - **`includesPattern`** defaults to everything when a create request omits it (7.117.5), as
   here.
 
+The delete answers match 7.x ([#397](https://github.com/weaveplatform/artifactweave/issues/397)).
+Deleting `artifactory-build-info` answers 403 with "Deletion of Build Info repository
+artifactory-build-info is not allowed." A batch that names it is refused before any delete,
+with that `statusMessage` and no `reports` ([D]
+[deleterepositories](https://docs.jfrog.com/artifactory/reference/deleterepositories.md),
+example `buildInfoBlocked`). A blank key, `auto-trashcan` and `jfrog-support-bundles`
+answer 400 ([D] [deleterepository](https://docs.jfrog.com/artifactory/reference/deleterepository.md),
+status list). A batch of `[]` answers 400 with the `statusMessage` "No repository keys were
+provided for deletion" (example `emptyRepoKeyList`), and a batch in which every repository
+failed has the `statusMessage` "Repositories batch removal failed" (the 403, 409, 424 and 500
+examples). Three points are inferred [I]: the single delete's 403 carries the batch's message
+in a failure report, because its page lists 403 for a validation failure but shows no example;
+a batch stops at its first refused key, so that key sets the status when it names both kinds;
+and a key that differs from `artifactory-build-info` only in case is refused the same way.
+
 The audit in [#378](https://github.com/weaveplatform/artifactweave/issues/378) found where
 the Repositories API differs from 7.x. The issue named changes the code, and
 [research 03](../03-repository-configuration-model.md#artifactory-7x-check) lists the
@@ -168,9 +183,6 @@ differences in the configuration model:
 - `GET /api/repositories` gives `packageType` as the type's `RepoType` name, such as `"Generic"`, `"Maven"`, `"Npm"` and `"YUM"` for rpm, and its `packageType` filter matches either spelling without regard to case ([D] [getrepositoriesbytypeandproject](https://docs.jfrog.com/artifactory/reference/getrepositoriesbytypeandproject.md); [S] provider 12.11.14 [`datasource_artifactory_repositories_test.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/datasource/repository/datasource_artifactory_repositories_test.go) expects `"Alpine"`). `pkg/repo.PackageTypeName` holds the names, and [research 03](../03-repository-configuration-model.md#package-type-names-in-listings) gives the source of each.
 - Every read sends an empty `description` and `notes` as `""`, and an administrator's read of a local, remote or federated repository sends empty `propertySets` as `[]` ([D] [getrepositoryconfiguration](https://docs.jfrog.com/artifactory/reference/getrepositoryconfiguration.md), [getbatchofrepositoriesbyname](https://docs.jfrog.com/artifactory/reference/getbatchofrepositoriesbyname.md) and the v2 samples). A read by anyone but an administrator shows `notes` as `""`.
 - The v2 read keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm only, so a generic local repository has neither ([D] [getrepositoryconfigurationv2](https://docs.jfrog.com/artifactory/reference/getrepositoryconfigurationv2.md), sample `genericLocalV2`). That sample also lacks `priorityResolution` and `environments`, which the v2 read still sends for every type: the sample may predate both, and the configurations sample of a generic local repository sends them [I], on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
-- 7.x differs: deleting `artifactory-build-info` answers 403 "Deletion of Build Info repository artifactory-build-info is not allowed." ([D] [deleterepositories](https://docs.jfrog.com/artifactory/reference/deleterepositories.md), example `buildInfoBlocked`); fixed by [#397](https://github.com/weaveplatform/artifactweave/issues/397).
-- 7.x differs: a batch delete of `[]` answers 400 with the `statusMessage` "No repository keys were provided for deletion" ([D] deleterepositories, example `emptyRepoKeyList`); fixed by [#397](https://github.com/weaveplatform/artifactweave/issues/397).
-- 7.x differs: a batch delete in which every repository failed has the `statusMessage` "Repositories batch removal failed" ([D] deleterepositories, the 403, 409, 424 and 500 examples); fixed by [#397](https://github.com/weaveplatform/artifactweave/issues/397).
 - 7.x differs: a YAML PATCH can change a repository's package type ([D] [patchsystemconfiguration](https://docs.jfrog.com/administration/reference/patchsystemconfiguration.md): "it is easy to overwrite configurations, such as a repository's package type"). artifactweave refuses the change on every write path, a deviation registered by #378.
 
 ## Constraints

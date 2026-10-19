@@ -553,6 +553,7 @@ func repositoryStatusRows() []statusCase {
 		{remove, r + "/del-one", "admin", "", 200},
 		{remove, r + "/missing", "admin", "", 404},
 		{remove, r + "/auto-trashcan", "admin", "", 400},
+		{remove, r + "/artifactory-build-info", "admin", "", 403},
 		{remove, r + "/libs-local", "user", "", 403},
 		{remove, r + "/libs-local", "", "", 401},
 
@@ -610,6 +611,7 @@ func repositoryStatusRows() []statusCase {
 		{bDelete, v2 + "/batch", "admin", `["del-batch","missing"]`, 200},
 		{bDelete, v2 + "/batch", "admin", `[]`, 400},
 		{bDelete, v2 + "/batch", "admin", `["libs-local","auto-trashcan"]`, 400},
+		{bDelete, v2 + "/batch", "admin", `["libs-local","artifactory-build-info"]`, 403},
 		{bDelete, v2 + "/batch", "user", `["libs-local"]`, 403},
 		{bDelete, v2 + "/batch", "", `["libs-local"]`, 401},
 	}
