@@ -3,6 +3,7 @@ package aql
 import (
 	"encoding/json"
 	"errors"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -123,8 +124,6 @@ func TestParseErrors(t *testing.T) {
 		deeper:                                            ErrSyntax,
 		`items.find().include(1)`:                         ErrSyntax,
 		`items.find().include("stat.nosuch")`:             ErrUnsupported,
-		`items.find().include("@")`:                       ErrUnsupported,
-		`items.find().include("@*")`:                      ErrUnsupported,
 		`items.find().sort("name")`:                       ErrSyntax,
 		`items.find().sort({"$up":["name"]})`:             ErrSyntax,
 		`items.find().sort({"$asc":[]})`:                  ErrSyntax,
@@ -589,6 +588,14 @@ func TestResponseSecondaryDomains(t *testing.T) {
 			`{"key":"c","value":"y"}],"stats":[{"downloaded":"2026-01-02T03:04:05.678Z","downloads":2,` +
 			`"remote_downloads":0,"remote_origin":"o"}]}`,
 		`items.find().include("name","stat.downloads","@z")`: `{"name":"f","stats":[{"downloads":2}]}`,
+		// "@" and "@*" render every property, as "property.*" does (#506).
+		`items.find().include("name","@")`: `{"name":"f","properties":[{"key":"a","value":"x"},` +
+			`{"key":"b","value":"1"},{"key":"c","value":"y"}]}`,
+		`items.find().include("name","@*","@c")`: `{"name":"f","properties":[{"key":"a","value":"x"},` +
+			`{"key":"b","value":"1"},{"key":"c","value":"y"}]}`,
+		// A record with none of the included values renders no stats row,
+		// rather than an empty one (#506).
+		`items.find().include("name","stat.remote_downloaded_by")`: `{"name":"f"}`,
 	} {
 		b, _ := json.Marshal(mustParse(t, query).Response([]Hit{hit}).Rows[0])
 		if string(b) != want {
@@ -602,6 +609,38 @@ func TestResponseSecondaryDomains(t *testing.T) {
 	b, _ := json.Marshal(q.Response([]Hit{bare}).Rows[0])
 	if string(b) != `{"repo":"r","path":"a","name":"f","virtual_repos":[]}` {
 		t.Fatalf("bare row %s", b)
+	}
+}
+
+// "@" and "@*" include every property and filter nothing, so the criteria
+// are a property.* include's; beside an "@<key>" include the key still
+// filters, and every key still renders (#506). "@" is how JFrog's "Sorting
+// in AQL" example asks for an item's properties.
+func TestEveryKeyIncludes(t *testing.T) {
+	plain := mustParse(t, `items.find({"repo":"r"}).include("name","property.*")`)
+	for _, inc := range []string{"@", "@*"} {
+		q := mustParse(t, `items.find({"repo":"r"}).include("name","`+inc+`")`)
+		if !q.Properties() || q.PropertyKeys() != nil ||
+			!reflect.DeepEqual(q.Criteria, plain.Criteria) {
+			t.Errorf(
+				"%s: properties %v, keys %v, criteria %v",
+				inc,
+				q.Properties(),
+				q.PropertyKeys(),
+				q.Criteria,
+			)
+		}
+		mustParse(t, `items.find({"name":{"$match":"*.jar"}}).include("`+inc+`")`+
+			`.sort({"$asc":["repo","name"]})`)
+		q = mustParse(t, `items.find().include("`+inc+`","@release")`)
+		if q.PropertyKeys() != nil || !slices.Equal(q.keyIncludes(), []string{"release"}) {
+			t.Errorf(
+				"%s beside @release: keys %v, filters %v",
+				inc,
+				q.PropertyKeys(),
+				q.keyIncludes(),
+			)
+		}
 	}
 }
 

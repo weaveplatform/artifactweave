@@ -34,7 +34,7 @@ Source: <https://docs.jfrog.com/artifactory/reference/repositories-api/llms.txt>
 | GET | `/api/repositories/configurations?packageType=&repoType=` | Get all configurations | 200 | Admin. `{"LOCAL":[],"REMOTE":[],"VIRTUAL":[],"FEDERATED":[],"RELEASE_BUNDLE":[]}`; media type `...repositories.RepositoryConfigurationsList+json`. 7.61.3+. |
 | GET | `/api/repositories?type=&packageType=&project=` | List repositories | 200 | Admin or scopes `artifact:*:r` / `system:info:r`. `type` is `local`, `remote`, `virtual`, `federated` or `distribution`; `packageType` accepts any value (the documented enum is stale) and matches the configured type or the listed name. Body `[{key,type,description,url,packageType}]`, where `packageType` is the `RepoType` name, such as `Generic`, `Npm` or `YUM` for rpm ([research 03](03-repository-configuration-model.md#package-type-names-in-listings)); media type `...RepositoryDetailsList+json`. |
 | GET | `/api/repositories/{remoteRepoName}/configuration` | Shared remote configuration | 200 | Deprecated; use get configuration. |
-| DELETE | `/api/repositories/{repoKey}` | Delete repository | 200; 202 deletion already running; 207 partial, configuration kept; 400 blank, trash or support-bundle key; 403 not an admin, a validation failure such as the build-info repository, or every item failed; 404; 409 import in progress or worker veto; 424 federation member removal failed | Admin. Removes configuration and content. The Terraform provider requires exactly 200. The success body is JSON from 7.161.15, plain text before ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)); artifactweave answers JSON. |
+| DELETE | `/api/repositories/{repoKey}` | Delete repository | 200; 202 deletion already running; 207 partial, configuration kept; 400 blank, trash or support-bundle key; 403 not an admin, a validation failure such as the build-info repository, or every item failed; 404; 409 import in progress or worker veto; 424 federation member removal failed | Admin. Removes configuration and content; while the trash can is on, the content moves to it under the repository key, as for a delete of the repository's root ([#504](https://github.com/weaveplatform/artifactweave/issues/504)). The Terraform provider requires exactly 200. The success body is JSON from 7.161.15, plain text before ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)); artifactweave answers JSON. |
 | DELETE | `/api/v2/repositories/batch` | Delete several repositories | 200 all deleted; 207 mixed; 400 fail-fast; 403 fail-fast or all failed; 409, 424, 500 all failed | Body `["a","b"]`. Response `RepoBulkRemovalReport{reports[],statusMessage}`; when every repository failed, `statusMessage` is "Repositories batch removal failed". The fail-fast answers delete nothing and carry only `statusMessage`: 400 "No repository keys were provided for deletion" for `[]`, 400 for a blank, trash or support-bundle key, and 403 "Deletion of Build Info repository artifactory-build-info is not allowed." ([deleterepositories](https://docs.jfrog.com/artifactory/reference/deleterepositories.md), examples `emptyRepoKeyList`, `invalidSystemRepo` and `buildInfoBlocked`). New in 7.161.15 ([7.161.15 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)). |
 
 ## Artifacts and storage API
@@ -323,6 +323,18 @@ nothing at a path is refused with 403 before the trash is read, and folder listi
 what it does not see, as for an unreadable path elsewhere in the storage API **[I]**.
 Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer
 exists **[I]**.
+
+Deleting a repository moves its content to the trash can under the repository's key, as
+deleting its root does, and only an administrator sees, cleans or restores it there
+([#504](https://github.com/weaveplatform/artifactweave/issues/504)). A remote's cache is
+released, as the trash can holds what was deleted from local repositories. 7.x restores "a
+deleted repository root from the Trash Can" without copying the root's properties onto what
+it brings back (RTDEV-84660, [7.146.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714615-self-managed) and [SaaS 7.155.3](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71553-saas)), into a repository that exists: the
+API requires `to`, and **[KB]** [How to Restore a Deleted
+Repository](https://jfrog.com/help/r/how-to-restore-a-deleted-repository/how-to-restore-a-deleted-repository)
+creates "a new repository of the same type" before restoring into it. artifactweave drops
+the root's properties with the repository, and accepts a destination of another package
+type **[I]** ([decision 0010](decisions/0010-retention-trash-and-gc.md#artifactory-7x-check)).
 
 The trash can serves the storage API's views as any repository does
 ([#455](https://github.com/weaveplatform/artifactweave/issues/455)). Its root holds a folder

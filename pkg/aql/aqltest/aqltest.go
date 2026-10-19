@@ -368,6 +368,19 @@ func Cases() []Case {
 		`items.find({"repo":"libs-local"}).include("property")`, jar, pom, util, readme)
 	q("key include filters items", `items.find().include("repo","path","name","@release")`,
 		jar, util)
+	// "@" and "@*" include every property, as "property.*" does, and filter
+	// nothing (#506). "@" beside a sort is aql-query-output's "Sorting in
+	// AQL" example.
+	q("every-key include", `items.find({"repo":"libs-local"}).include("@")`,
+		jar, pom, util, readme)
+	q("every-key include with a star",
+		`items.find({"repo":"libs-local"}).include("repo","path","name","@*")`,
+		jar, pom, util, readme)
+	q("every-key include beside a sort",
+		`items.find({"repo":"libs-local","name":{"$match":"*.jar"}}).include("@")`+
+			`.sort({"$desc":["name"]})`,
+		util, jar)
+	q("every-key include beside a key include", `items.find().include("@*","@owner")`, util)
 	// Sort, offset and limit beside a property or statistic include apply to
 	// the items (decision 0012). The two jars have two properties each, held
 	// inside one row each, so they neither shift the offset nor use up the

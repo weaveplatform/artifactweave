@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -317,6 +318,66 @@ func TestRestoreIntoExistingFolder(t *testing.T) {
 	}
 }
 
+// Keep records a repository's whole content as trashed, folders included,
+// each item with its own properties and the repository's package type, and
+// counts the references the file entries hold. It deletes nothing: the
+// repository delete that calls it does, in the same transaction (#504).
+func TestKeep(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	one := w.deploy(t, w.other, "a/one.txt", "same", types.Properties{"k": {"v"}}).Actual.SHA256
+	w.deploy(t, w.other, "a/b/two.txt", "same", nil)
+	three := w.deploy(t, w.other, "three.txt", "three", nil).Actual.SHA256
+	held, err := w.trash.Keep(ctx, w.other, "carol")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(held) != 2 || held[one] != 2 || held[three] != 1 {
+		t.Fatalf("held %v", held)
+	}
+	entries, err := w.trash.Entries(ctx, "other", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, e := range entries {
+		paths = append(paths, e.Record.Item.FullPath())
+		if e.DeletedBy != "carol" || !e.DeletedAt.Equal(w.clock) ||
+			e.Record.PackageType != string(w.other.PackageType) {
+			t.Errorf("entry %+v", e)
+		}
+		if e.Record.Item.Name == "one.txt" && strings.Join(e.Record.Properties["k"], ",") != "v" {
+			t.Errorf("one.txt's properties %v", e.Record.Properties)
+		}
+	}
+	slices.Sort(paths)
+	if strings.Join(paths, " ") != "a a/b a/b/two.txt a/one.txt three.txt" {
+		t.Fatalf("kept %v", paths)
+	}
+	if !w.exists(w.other, "a/one.txt") || w.refs(t, one) != 2 {
+		t.Fatal("Keep deleted or released something")
+	}
+}
+
+// Keep reads a repository a page at a time, and keeps every page.
+func TestKeepPages(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	const n = store.MaxLimit + 1
+	for i := range n {
+		if _, err := w.db.Items().
+			Put(ctx, types.Item{RepoKey: "other", Name: "f" + strconv.Itoa(i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if held, err := w.trash.Keep(ctx, w.other, "carol"); err != nil || len(held) != 0 {
+		t.Fatalf("Keep = %v, %v", held, err)
+	}
+	if entries, err := w.trash.Entries(ctx, "other", ""); err != nil || len(entries) != n {
+		t.Fatalf("%d entries, %v", len(entries), err)
+	}
+}
+
 func TestCleanEmptyPurge(t *testing.T) {
 	ctx := context.Background()
 	w := newWorld(t)
@@ -536,6 +597,32 @@ type failing struct {
 func (f failing) Trash() store.TrashStore       { return failTrash{f.Store.Trash(), f.fail} }
 func (f failing) Blobs() store.BlobIndex        { return failBlobs{f.Store.Blobs(), f.fail} }
 func (f failing) Settings() store.SettingsStore { return failSettings{f.Store.Settings(), f.fail} }
+func (f failing) Items() store.ItemStore        { return failItems{f.Store.Items(), f.fail} }
+
+type failItems struct {
+	store.ItemStore
+	fail map[string]error
+}
+
+func (f failItems) Descendants(
+	ctx context.Context,
+	r string,
+	c bool,
+	p string,
+	pg store.Page,
+) ([]types.Item, string, error) {
+	if err := f.fail["descendants"]; err != nil {
+		return nil, "", err
+	}
+	return f.ItemStore.Descendants(ctx, r, c, p, pg) //nolint:wrapcheck // test double
+}
+
+func (f failItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
+	if err := f.fail["properties"]; err != nil {
+		return nil, err
+	}
+	return f.ItemStore.Properties(ctx, id) //nolint:wrapcheck // test double
+}
 
 func (f failing) Tx(ctx context.Context, fn func(context.Context) error) error {
 	return f.Store.Tx(ctx, fn) //nolint:wrapcheck // test double
@@ -575,6 +662,13 @@ func (f failTrash) Expired(
 	return f.TrashStore.Expired(ctx, before, n) //nolint:wrapcheck // test double
 }
 
+func (f failTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+	if err := f.fail["add"]; err != nil {
+		return e, err
+	}
+	return f.TrashStore.Add(ctx, e) //nolint:wrapcheck // test double
+}
+
 func (f failTrash) Delete(ctx context.Context, id int64) error {
 	if err := f.fail["delete"]; err != nil {
 		return err
@@ -611,6 +705,7 @@ func TestStoreFailures(t *testing.T) {
 	w := newWorld(t)
 	w.deploy(t, w.libs, "a/f.txt", "content", nil)
 	w.remove(t, w.libs, "a")
+	w.deploy(t, w.other, "o.txt", "other", nil)
 	svc := func(fail map[string]error) *trash.Service {
 		st := failing{w.db, fail}
 		return &trash.Service{Store: st, Items: &item.Service{Store: st, Blobs: w.items.Blobs}}
@@ -655,6 +750,18 @@ func TestStoreFailures(t *testing.T) {
 		},
 		"find": func() error {
 			_, err := svc(map[string]error{"find": errBoom}).Find(ctx, "libs", "a")
+			return err
+		},
+		"keep list": func() error {
+			_, err := svc(map[string]error{"descendants": errBoom}).Keep(ctx, w.other, "bob")
+			return err
+		},
+		"keep properties": func() error {
+			_, err := svc(map[string]error{"properties": errBoom}).Keep(ctx, w.other, "bob")
+			return err
+		},
+		"keep add": func() error {
+			_, err := svc(map[string]error{"add": errBoom}).Keep(ctx, w.other, "bob")
 			return err
 		},
 	} {

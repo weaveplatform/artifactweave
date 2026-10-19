@@ -173,7 +173,12 @@ func (r Row) write(b *bytes.Buffer) {
 	if st := r.hit.Stats; len(r.stats) > 0 && st != nil {
 		var sb bytes.Buffer
 		writeStats(&sb, st, r.stats)
-		put("stats", []json.RawMessage{sb.Bytes()})
+		// A record with none of the included values is no row: 6.20 drops a
+		// row without data (InflatableRow.clean), as Nest does for an item
+		// nested below another row.
+		if sb.Len() > 2 {
+			put("stats", []json.RawMessage{sb.Bytes()})
+		}
 	}
 	b.WriteByte('}')
 }

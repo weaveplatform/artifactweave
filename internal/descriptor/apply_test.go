@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
@@ -239,6 +240,33 @@ repoLayouts:
 	res = mustApply(t, db, "remoteRepositories:\n  maven-central: null\n")
 	if len(res.Deleted) != 0 || len(res.Unchanged) != 1 {
 		t.Fatalf("repeat delete %+v", res)
+	}
+}
+
+// A repository the patch deletes goes to the trash can as deleted by the
+// caller of PATCH /api/system/configuration, or by no one for config apply,
+// which runs outside a request (#504).
+func TestApplyTrashesDeletedRepositoriesAsTheCaller(t *testing.T) {
+	for by, ctx := range map[string]context.Context{
+		"admin": auth.WithPrincipal(context.Background(), auth.Principal{Name: "admin", Admin: true}),
+		"":      context.Background(),
+	} {
+		db := inmem.New()
+		seedRepo(t, db, repo.Config{Key: "gone", Class: repo.Local})
+		if _, err := db.Items().Put(ctx, types.Item{RepoKey: "gone", Name: "f.txt"}); err != nil {
+			t.Fatal(err)
+		}
+		p, err := Parse([]byte("localRepositories:\n  gone: null\n"), env(nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Apply(ctx, db, p, now, false); err != nil {
+			t.Fatal(err)
+		}
+		trashed, _, err := db.Trash().List(ctx, "gone", "", store.Page{})
+		if err != nil || len(trashed) != 1 || trashed[0].DeletedBy != by {
+			t.Fatalf("by %q: %+v, %v", by, trashed, err)
+		}
 	}
 }
 

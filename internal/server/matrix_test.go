@@ -998,6 +998,20 @@ func trashMatrix() []matrixRow {
 				holdsEither("libs-b", "work/", types.ActionDelete, types.ActionManage),
 			)), 202,
 		).seeding(trashed("libs-b", "work/b-trash-{p}.txt")),
+		// A deleted repository's content stays in the trash can under its
+		// key, where only administrators see, clean or restore it, into a
+		// repository that exists (#504).
+		row(list, tc+"/gone-{p}", "", administrators, 200).
+			seeding(repositoryTrashed("gone-{p}")),
+		row(
+			"POST /artifactory/api/trash/restore/{fromPath}",
+			"/artifactory/api/trash/restore/gone-{p}?to=libs-local/from-gone-{p}", "",
+			trashRule(administrators), 202,
+		).seeding(repositoryTrashed("gone-{p}")),
+		row(
+			"DELETE /artifactory/api/trash/clean/{repoPath}",
+			"/artifactory/api/trash/clean/gone-{p}", "", trashRule(administrators), 204,
+		).seeding(repositoryTrashed("gone-{p}")),
 		at("POST /artifactory/api/trash/empty", "", trashRule(administrators), 202),
 	}
 }

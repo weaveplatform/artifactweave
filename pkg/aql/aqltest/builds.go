@@ -293,6 +293,15 @@ func RelatedCases() []Case {
 	)
 	q("properties of a promotion's run",
 		`build.promotions.find().include("status","build.property.*","build.module.property.*")`)
+	// #506: "@" and "@*" name every key, and an item's own statistic that
+	// its record lacks renders no stats row: the pom's record is empty and
+	// readme.md's has no downloaded_by.
+	q(
+		"every key of related rows",
+		`items.find({"repo":"libs-local"}).include("name","stat.downloaded_by","artifact.module.@*")`,
+	)
+	q("every key of a run and its rows",
+		`builds.find().include("number","@*","module.@","module.artifact.item.@")`)
 	return out
 }
 

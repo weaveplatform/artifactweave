@@ -1935,11 +1935,13 @@ paths:
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/getremoterepositoryconfiguration.md
   /api/repositories/{repoKey}:
     delete:
-      description: 'Removes the configuration and every item in the repository, moving items through the trash can
-        when it is enabled. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already
-        running for this key (retry later), 207 some items could not be removed and the configuration was kept,
-        404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository
-        also removes its cache; deleting a virtual repository removes only the aggregation.'
+      description: 'Removes the configuration and every item in the repository. While the trash can is enabled
+        the items move to it under the repository key, where an administrator can restore them into an existing
+        local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200
+        removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed
+        and the configuration was kept, 404 no such repository (success report shape with the message in
+        statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash
+        can; deleting a virtual repository removes only the aggregation.'
       operationId: deleteRepository
       parameters:
       - $ref: '#/components/parameters/repoKey'

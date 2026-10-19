@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/service/trash"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 	"github.com/weaveplatform/artifactweave/pkg/types"
@@ -237,22 +238,41 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 
 func IsNull(raw json.RawMessage) bool { return bytes.Equal(bytes.TrimSpace(raw), []byte("null")) }
 
-// Remove deletes key with its content, in one transaction: the
-// items of the repository and, for a remote, its cache (dropping their blob
-// references for garbage collection to reclaim), the root records that hold
-// their own properties, its package index, its place in the virtual
-// repositories that list it, and its configuration. found is false when no
-// configuration exists.
+// ErrChanged is a repository delete that found the repository's content
+// changing under it: an item it moved to the trash can was gone by the time
+// it deleted the content. Nothing is deleted, and a retry sees the content
+// as it now is.
+var ErrChanged = errors.New("repos: the repository's content changed during the delete")
+
+// Remove deletes key with its content, in one transaction: the items of the
+// repository and, for a remote, its cache, the root records that hold their
+// own properties, its package index, its place in the virtual repositories
+// that list it, and its configuration. by is who deletes it. found is false
+// when no configuration exists.
 //
-// Deleted content does not pass through the trash can yet; that arrives with
-// the trash can itself (#48).
-func Remove(ctx context.Context, st store.Store, key string) (int64, bool, error) {
+// While the trash can is on, the repository's own content moves to it under
+// key, as a delete of its root does, and each file's entry keeps its blob
+// reference until a restore takes it over or a purge releases it. A
+// remote's cache is released for garbage collection, as the trash can holds
+// only what was deleted from local repositories; so is everything while the
+// trash can is off. The root's own properties go with the repository: 7.x
+// fixed a restore of a deleted repository's root copying them onto what it
+// restored (RTDEV-84660).
+//
+// The whole delete is one transaction, however large the repository, so a
+// failure part of the way leaves it whole, its content where it was and the
+// trash can as it was.
+func Remove(ctx context.Context, st store.Store, key, by string) (int64, bool, error) {
 	c, err := st.Repos().Get(ctx, key)
 	if errors.Is(err, store.ErrNotFound) {
 		return 0, false, nil
 	}
 	if err != nil {
 		return 0, true, fmt.Errorf("get repository: %w", err)
+	}
+	bin, err := trash.Settings(ctx, st)
+	if err != nil {
+		return 0, true, fmt.Errorf("delete repository %s: %w", key, err)
 	}
 	var files int64
 	err = st.Tx(ctx, func(ctx context.Context) error {
@@ -261,15 +281,21 @@ func Remove(ctx context.Context, st store.Store, key string) (int64, bool, error
 			caches = append(caches, true)
 		}
 		for _, cached := range caches {
+			var held map[string]int64
+			if bin.Enabled && !cached {
+				kept, err := (&trash.Service{Store: st}).Keep(ctx, c, by)
+				if err != nil {
+					return fmt.Errorf("move content to the trash can: %w", err)
+				}
+				held = kept
+			}
 			res, err := st.Items().Delete(ctx, key, cached, "")
 			if err != nil {
 				return fmt.Errorf("delete content: %w", err)
 			}
 			files += res.Files
-			for sha, n := range res.BlobRefs {
-				if _, err := st.Blobs().Unref(ctx, sha, n); err != nil {
-					return fmt.Errorf("release blob %s: %w", sha, err)
-				}
+			if err := release(ctx, st, res.BlobRefs, held); err != nil {
+				return err
 			}
 			// A content delete keeps the root's record, so it goes here: a
 			// repository created later under the same key must not inherit
@@ -321,4 +347,30 @@ func Remove(ctx context.Context, st store.Store, key string) (int64, bool, error
 		return files, true, fmt.Errorf("delete repository %s: %w", key, err)
 	}
 	return files, true, nil
+}
+
+// release drops the blob references a content delete removed that no trash
+// entry took over (held, from trash.Keep), so each reference is either
+// released here or held by exactly one entry. The listing Keep reads and
+// the delete are separate statements, which a concurrent writer can come
+// between on PostgreSQL's read committed. A file it added is deleted
+// without an entry, and its reference is released here. A file it removed
+// would leave an entry holding a reference the delete never removed, which
+// purging the entry would release a second time, so that refuses the whole
+// delete as ErrChanged instead.
+func release(ctx context.Context, st store.Store, removed, held map[string]int64) error {
+	for sha, n := range held {
+		if removed[sha] < n {
+			return fmt.Errorf("%w: blob %s", ErrChanged, sha)
+		}
+	}
+	for sha, n := range removed {
+		if n -= held[sha]; n == 0 {
+			continue
+		}
+		if _, err := st.Blobs().Unref(ctx, sha, n); err != nil {
+			return fmt.Errorf("release blob %s: %w", sha, err)
+		}
+	}
+	return nil
 }

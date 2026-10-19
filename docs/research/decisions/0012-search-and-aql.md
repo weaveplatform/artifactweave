@@ -104,6 +104,10 @@ what Artifactory 6.20's `AqlRelativeDateComparatorEnum` also parses).
 
 **Output.** The include, sort, offset and limit rules follow research 22 §1.2:
 - naming an item field replaces the defaults, and property or statistic fields add to them;
+- `property`, `property.*`, `@` and `@*` include every property of an item, and `@<key>`
+  one key, which also leaves out the items without it; `@` and `@*` leave out nothing;
+- a statistics include adds `stats` only when the item's record holds one of the included
+  values, as 6.20 drops a row without data (`InflatableRow.clean`);
 - naming fields of a related domain, or the properties or statistics of its rows, adds them
   too, nested, as **Related includes** below sets out;
 - `sort`, `offset` and `limit` are accepted whatever the include, and apply to the items, as
@@ -140,10 +144,11 @@ for every field of that domain, such as `artifact.module.build.name`,
   the row's id (6.20's `InflatableRow`).
 - **Properties and statistics.** An include may name the properties of the items, modules
   and runs a path reaches, and the statistics of the items, as an items query names its own:
-  `<path>.property`, `<path>.property.*`, `<path>.property.key`, `<path>.property.value` or
-  `<path>.@<key>`, and `<path>.stat`, `<path>.stat.*` or `<path>.stat.<field>`. For example
-  `artifact.module.build.@os`, `artifact.module.property.*` and `artifact.item.stat`. A
-  builds query names its runs' own properties the same way, `@os` or `property.*`.
+  `<path>.property`, `<path>.property.*`, `<path>.property.key`, `<path>.property.value`,
+  `<path>.@`, `<path>.@*` or `<path>.@<key>`, and `<path>.stat`, `<path>.stat.*` or
+  `<path>.stat.<field>`. For example `artifact.module.build.@os`,
+  `artifact.module.property.*` and `artifact.item.stat`. A builds query names its runs' own
+  properties the same way, `@os`, `@*` or `property.*`.
   - **Nesting.** Each nested row carries its properties as an array under `properties` for
     an item, `module.properties` for a module and `build.properties` for a run, with the
     names Artifactory's rows use: `{"key","value"}`, `{"module.property.key",
@@ -159,8 +164,10 @@ for every field of that domain, such as `artifact.module.build.name`,
   - **Folded rows.** Rows folded into one nested row list each property, and each statistics
     record, once by its values. An include of the whole property or statistic domain
     (`property`, `property.*`, `stat`, `stat.*`) keeps each row's apart, as Artifactory's
-    then selects each property's and record's id. A statistics record with none of the
-    included values is left out, as Artifactory drops related rows without data.
+    then selects each property's and record's id. `@` and `@*`, like `@<key>`, select no
+    property id in 6.20 (`ParserToAqlAdapter.addIncludePropertyKeyFilter`), so the rows
+    they nest fold by value. A statistics record with none of the included values is left
+    out, as Artifactory drops related rows without data.
 - **Permissions.** A caller who is not an administrator sees only the related runs, with
   their modules, files and promotions, that the build permission lets them read, and the
   related items they may read that their repository's patterns accept, as for the found
@@ -508,8 +515,9 @@ The audit against KB, Jira and client sources on 2026-10-18
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where the code
 differed; [#410](https://github.com/weaveplatform/artifactweave/issues/410),
 [#411](https://github.com/weaveplatform/artifactweave/issues/411),
-[#445](https://github.com/weaveplatform/artifactweave/issues/445) and
-[#494](https://github.com/weaveplatform/artifactweave/issues/494) brought it in line, and
+[#445](https://github.com/weaveplatform/artifactweave/issues/445),
+[#494](https://github.com/weaveplatform/artifactweave/issues/494) and
+[#506](https://github.com/weaveplatform/artifactweave/issues/506) brought it in line, and
 this record states each rule:
 - the size limit's message names the limit (**Errors**,
   [aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md));
@@ -523,6 +531,13 @@ this record states each rule:
   `build.properties` and `module.properties` domains
   [aql-syntax](https://docs.jfrog.com/artifactory/docs/aql-syntax.md) lists ("Update Action"),
   and their keys are Artifactory 6.20's (`AqlRestResult.Row`);
+- `@` and `@*` including every property, of an item and of a related row (**Output**,
+  **Related includes**): `@` is the form the "Sorting in AQL" example of
+  [aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md) uses for an
+  item's properties, and 6.20 reads `@*` as `property.*`
+  (`AqlIncludeServiceTest.includePropertiesWithAtAndAsterisk`);
+- no `stats` row for an item whose record holds none of the included values (**Output**),
+  as 6.20's `InflatableRow.clean` drops a row without data;
 - `item.infos` answering the unsupported-domain 400 (**Domains**,
   [aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md));
 - every repository's root as an item row (**Domains**). No 7.x page shows a root row; the
@@ -554,7 +569,12 @@ Inferred, to verify against a live Artifactory
   a whole-domain include, read from 6.20's `InflatableRow` and the ids its
   `AqlPhysicalFieldEnum` selects;
 - that `<path>.property.key` and `<path>.property.value` list keys and values, as an items
-  query's own `property.key` does here, where 6.20 selects only the part named.
+  query's own `property.key` does here, where 6.20 selects only the part named;
+- that 7.x reads `@` as every key, which only the "Sorting in AQL" example shows, and `@*`
+  as 6.20 does, and folds the related rows they nest by value, as 6.20 selects no property
+  id for them;
+- that 7.x leaves out an item's `stats` row when its record holds none of the included
+  values, as 6.20's `InflatableRow.clean` does.
 
 Two differences are kept on purpose, because **Build searches** follows Artifactory 6.20's
 `BuildArtifactsSearchResource`. Each is a deviation registered by #378, to verify against a
@@ -598,6 +618,10 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   reference evaluator and every store, and an acceptance scenario (`aql_roots.feature`) in
   which `jf rt s` finds the files, `jf rt s --include-dirs` lists the root, and `jf rt dl`
   and `jf rt del` pass it over.
+- Shared cases for `@` and `@*`, of an item (`aqltest.Cases`) and of related rows and runs
+  (`aqltest.RelatedCases`), on the reference evaluator and every store, beside a sort and
+  beside an `@<key>` include, and `pkg/aql` and server tests that an item's statistics
+  record without the included values renders no `stats` ([#506](https://github.com/weaveplatform/artifactweave/issues/506)).
 - Shared related-include cases (`aqltest.RelatedCases`) whose nested rows, loaded from each
   store through `store.AQLSource`, render as the reference corpus's, the properties and
   statistics of related rows and a run's own properties included; `pkg/aql` tests pin the

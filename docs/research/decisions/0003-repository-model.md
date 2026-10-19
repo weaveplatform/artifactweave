@@ -158,8 +158,11 @@ handler serves them.
   ([research 03](../03-repository-configuration-model.md#field-sets-of-the-reads)).
 - **Deletes:** a delete removes the configuration, the content (for a remote, its cache
   too), the package index and the repository's place in virtual repositories, in one
-  transaction. Blob references are released for garbage collection. Until the trash can
-  lands (#48) the content does not pass through it.
+  transaction however large the repository. While the trash can is on, the repository's own
+  content moves to it under the repository's key, as a delete of its root does, so an
+  administrator can restore it until the retention period ends. A remote's cache, and
+  everything while the trash can is off, is released for garbage collection
+  ([decision 0010](0010-retention-trash-and-gc.md), [#504](https://github.com/weaveplatform/artifactweave/issues/504)).
 - **Protected keys:** the trash can (`auto-trashcan`), support bundle
   (`jfrog-support-bundle`) and `artifactory-build-info` repositories cannot be deleted, in
   any letter case.

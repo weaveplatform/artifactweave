@@ -31,6 +31,37 @@ Feature: Trash can and garbage collection
     Then the response status is 200
     And the response body is "restore me"
 
+  # #504: the deleted repository's content waits in the trash can under its
+  # key, and a restore brings it back into a repository that exists.
+  Scenario: A deleted repository's content is restored from the trash can
+    When I PUT "/artifactory/trash-local/docs/a.txt" as admin with body:
+      """
+      keep me
+      """
+    And I DELETE "/artifactory/api/repositories/trash-local" as admin
+    Then the response status is 200
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local/docs/a.txt" as admin
+    Then the response status is 200
+    And the JSON field "size" equals "7"
+    When I POST "/artifactory/api/trash/restore/trash-local?to=trash-local" as admin with body:
+      """
+      {}
+      """
+    Then the response status is 400
+    When I PUT "/artifactory/api/repositories/trash-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/trash/restore/trash-local?to=trash-local" as admin with body:
+      """
+      {}
+      """
+    Then the response status is 202
+    When I GET "/artifactory/trash-local/docs/a.txt" as admin
+    Then the response status is 200
+    And the response body is "keep me"
+
   Scenario: The trash can answers the storage API's views
     When I PUT "/artifactory/trash-local/docs/a.txt" as admin with body:
       """

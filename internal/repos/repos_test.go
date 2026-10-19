@@ -155,6 +155,36 @@ func (f faulty) Items() store.ItemStore       { return faultyItems{f.Store.Items
 func (f faulty) Blobs() store.BlobIndex       { return faultyBlobs{f.Store.Blobs(), f.fail} }
 func (f faulty) Packages() store.PackageStore { return faultyPackages{f.Store.Packages(), f.fail} }
 func (f faulty) Repos() store.RepoStore       { return faultyRepos{f.Store.Repos(), f.fail} }
+func (f faulty) Trash() store.TrashStore      { return faultyTrash{f.Store.Trash(), f.fail} }
+func (f faulty) Settings() store.SettingsStore {
+	return faultySettings{f.Store.Settings(), f.fail}
+}
+
+type faultyTrash struct {
+	store.TrashStore
+	fail string
+}
+
+// Add fails on the second entry, so the first is in the trash can when
+// the delete rolls back.
+func (f faultyTrash) Add(ctx context.Context, e types.TrashEntry) (types.TrashEntry, error) {
+	if f.fail == "trash" && e.Record.Item.Name == "g.txt" {
+		return e, errBoom
+	}
+	return f.TrashStore.Add(ctx, e) //nolint:wrapcheck // test double
+}
+
+type faultySettings struct {
+	store.SettingsStore
+	fail string
+}
+
+func (f faultySettings) Get(ctx context.Context, key string, into any) error {
+	if f.fail == "settings" {
+		return errBoom
+	}
+	return f.SettingsStore.Get(ctx, key, into) //nolint:wrapcheck // test double
+}
 
 type faultyItems struct {
 	store.ItemStore
@@ -276,7 +306,7 @@ func TestRemove(t *testing.T) {
 		PatchProperties(ctx, root.ID, types.Properties{"k": {"v"}}, nil, time.Now()); err != nil {
 		t.Fatal(err)
 	}
-	files, found, err := Remove(ctx, db, "libs")
+	files, found, err := Remove(ctx, db, "libs", "admin")
 	if err != nil || !found || files != 1 {
 		t.Fatalf("Remove = %d, %v, %v", files, found, err)
 	}
@@ -289,7 +319,7 @@ func TestRemove(t *testing.T) {
 		v.DefaultDeploymentRepo != "" {
 		t.Fatalf("virtual still lists the deleted repository: %+v", v)
 	}
-	if _, found, err := Remove(ctx, db, "libs"); found || err != nil {
+	if _, found, err := Remove(ctx, db, "libs", "admin"); found || err != nil {
 		t.Fatalf("second Remove = %v, %v", found, err)
 	}
 }
@@ -346,7 +376,7 @@ func TestCheckMembers(t *testing.T) {
 func TestVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
 	ctx := context.Background()
 	db := world(t)
-	if _, _, err := Remove(ctx, db, "libs"); err != nil {
+	if _, _, err := Remove(ctx, db, "libs", "admin"); err != nil {
 		t.Fatal(err)
 	}
 	v, err := db.Repos().Get(ctx, "virt")
@@ -370,24 +400,46 @@ func TestVirtualEmptiedByRemoveStillUpdates(t *testing.T) {
 	}
 }
 
+// A failure anywhere in a delete leaves the repository whole: its
+// configuration, its content and its blob references, and the trash can
+// as it was.
 func TestRemoveFailures(t *testing.T) {
+	ctx := context.Background()
 	for _, fail := range []string{
-		"items", "unref", "root", "list packages", "delete package", "get virtual", "update virtual",
+		"settings", "trash", "items", "unref", "root", "list packages", "delete package",
+		"get virtual", "update virtual",
 	} {
 		db := world(t)
-		if _, _, err := Remove(
-			context.Background(),
-			faulty{db, fail},
-			"libs",
-		); !errors.Is(
-			err,
-			errBoom,
-		) {
+		sha := strings.Repeat("ab", 32)
+		// A second file with the same content, which "trash" fails on.
+		if _, err := db.Blobs().
+			Ref(ctx, types.Blob{Checksums: types.Checksums{SHA256: sha}, Size: 3}, 1); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.Items().Put(ctx, types.Item{
+			RepoKey: "libs", Name: "g.txt", Size: 3, Actual: types.Checksums{SHA256: sha},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if fail == "unref" {
+			// While the trash can is on it takes the references over, and
+			// nothing is released.
+			trashcan(t, db, false)
+		}
+		if _, _, err := Remove(ctx, faulty{db, fail}, "libs", "admin"); !errors.Is(err, errBoom) {
 			t.Errorf("%s: %v", fail, err)
 		}
-		// The transaction rolled back: the repository is still there.
-		if _, err := db.Repos().Get(context.Background(), "libs"); err != nil {
+		if _, err := db.Repos().Get(ctx, "libs"); err != nil {
 			t.Errorf("%s: the failed delete was not rolled back: %v", fail, err)
+		}
+		if _, err := db.Items().Get(ctx, "libs", false, "g.txt"); err != nil {
+			t.Errorf("%s: the content went: %v", fail, err)
+		}
+		if n := entries(t, db, "libs"); n != 0 {
+			t.Errorf("%s: %d entries in the trash can", fail, n)
+		}
+		if n := refs(t, db, sha); n != 2 {
+			t.Errorf("%s: %d references, want 2", fail, n)
 		}
 	}
 }

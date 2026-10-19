@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/auth"
 	"github.com/weaveplatform/artifactweave/internal/repos"
 	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/layout"
@@ -93,9 +94,16 @@ func Apply(
 	if dryRun {
 		return res, nil
 	}
+	// A repository the patch deletes is trashed as deleted by the caller of
+	// PATCH /api/system/configuration; config apply and the bootstrap
+	// descriptor run outside a request and name no one.
+	by := ""
+	if p, ok := auth.FromContext(ctx); ok {
+		by = p.Name
+	}
 	err = st.Tx(ctx, func(ctx context.Context) error {
 		for _, key := range deletes {
-			if _, _, err := repos.Remove(ctx, st, key); err != nil {
+			if _, _, err := repos.Remove(ctx, st, key, by); err != nil {
 				return err //nolint:wrapcheck // names the repository
 			}
 		}

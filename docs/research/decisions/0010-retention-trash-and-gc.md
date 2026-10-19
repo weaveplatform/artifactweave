@@ -28,9 +28,9 @@ GC in process. Cron expressions are parsed by a Quartz-syntax parser; the candid
 test over every cron string in JFrog's documentation. Runs are recorded with a trigger id
 so `/runs/view`, `/runs/{policyKey}/{triggerId}` and the CSV report work.
 
-**Trash can.** Deleting an item moves it to the trash with the original repository and
-path; `trashcanConfig.retentionPeriodDays` governs purge; `empty`, `clean` and `restore`
-follow the documented endpoints and permissions.
+**Trash can.** Deleting an item, or a repository with its content, moves the items to the
+trash with the original repository and path; `trashcanConfig.retentionPeriodDays` governs
+purge; `empty`, `clean` and `restore` follow the documented endpoints and permissions.
 
 **Garbage collection.** `POST /api/system/storage/gc` removes blobs with no referencing
 item or trash entry and refreshes the storage summary.
@@ -39,6 +39,13 @@ item or trash entry and refreshes the storage summary.
 - **Trash can.**
   - Unset, the trash can is on, with Artifactory's 14-day retention.
   - A trashed file keeps its blob reference, so it stays restorable. Purging an entry, by `clean`, `empty` or expiry, releases that reference.
+  - Deleting a repository moves its content to the trash can under the repository's key, as deleting its root does: every item at its original path, with its own properties, as deleted by the administrator ([#504](https://github.com/weaveplatform/artifactweave/issues/504)).
+    - It happens in the transaction that removes the repository, however large, so a failure leaves the repository, its content and the trash can as they were. The items are read a page at a time.
+    - Each file's entry takes over the file's blob reference, so nothing is released while it is in the trash can and nothing is released twice once it leaves.
+    - Another writer can come between reading the content and deleting it on PostgreSQL's read committed. A file it added meanwhile is deleted without an entry and its reference released. A file it removed meanwhile would leave an entry holding a reference no one removed, so the delete fails with nothing changed and a retry sees the content as it now is.
+    - A remote's cache is released, as the trash can holds what was deleted from local repositories, and so is everything while the trash can is off.
+    - The root's own properties go with the repository and are not restored.
+  - Restoring the deleted repository's root, or a path below it, brings the items back into a local or federated repository that exists, at their original paths or below the path `to` names. A restore does not create the repository again.
   - `restore` takes the newest trashed copy of each path. Without a path in `to`, items return to their original paths; with one, the restored path lands there. A file at the destination is replaced, as a deploy replaces one. Every restored item carries `trash.originalRepository` and `trash.restoredTime` beside its own properties ([Artifactory 7.x check](#artifactory-7x-check)).
   - The trash can answers the storage API under the `auto-trashcan` key with the views any repository serves: the item info, `?list` with all its parameters, `?properties`, `?stats` and `?lastModified`. `?permissions` answers 400 to an administrator. An administrator sees all of it. Anyone else sees only what was trashed from repositories it holds deploy or manage on, judged at each item's original path, so exclude patterns hold, in every view.
   - A caller holding deploy or manage on no repository is refused with 403. A path where the caller sees nothing is refused with 403 before the trash is read, and a listing leaves out what the caller does not see. Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer exists.
@@ -160,6 +167,27 @@ first `file-system` or `cache-fs` provider of a chain and measures that director
 (`BinaryServiceImpl.getBinariesDir`, `FileStoreStorageSummary`), and no 7.x capture shows
 a chain of several providers **[I]**
 ([#490](https://github.com/weaveplatform/artifactweave/issues/490)).
+
+A repository delete keeps the repository's content in the trash can
+([#504](https://github.com/weaveplatform/artifactweave/issues/504)). JFrog's general settings page refers to restoring deleted
+repositories from the trash can ([general
+settings](https://docs.jfrog.com/installation/docs/general-settings), "Restoring Deleted
+Repositories"), and 7.x fixed "restoring a deleted repository root from the Trash Can"
+copying the root's properties onto the restored root folder and everything below it
+(RTDEV-84660, [7.146.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714615-self-managed) and [SaaS 7.155.3](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71553-saas)). A restore needs a destination
+that exists: the trash can's restore window names a "Target Repository"
+([trash can](https://docs.jfrog.com/artifactory/docs/trash-can)), the API requires `to`
+and its example restores `npm-local` into `npm-local2`
+([restoreitemfromtrashcan](https://docs.jfrog.com/artifactory/reference/restoreitemfromtrashcan.md)),
+and **[KB]** [How to Restore a Deleted
+Repository](https://jfrog.com/help/r/how-to-restore-a-deleted-repository/how-to-restore-a-deleted-repository)
+creates "a new repository of the same type" first and restores into it. A restore into a
+repository that does not exist answers 400 "Destination repository '<key>' does not exist".
+Four details are inferred:
+- **[I]** The root's own properties are not kept anywhere. RTDEV-84660 says only that a restore must not copy them onto what it brings back, and no source shows them on the deleted repository's folder in the trash can.
+- **[I]** A restore into a local repository of another package type is accepted. The KB creates one of the same type, and no source says another type is refused.
+- **[I]** A federated repository's content is trashed as a local repository's is, as a single delete from it is.
+- **[I]** A repository deleted by `config apply` or the bootstrap descriptor, which run outside a request, is trashed with no `trash.deletedBy` value.
 
 The trash can's storage views answer 404 while the trash can is off
 ([#490](https://github.com/weaveplatform/artifactweave/issues/490)). 7.x fixed "an issue

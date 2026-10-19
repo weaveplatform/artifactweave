@@ -977,7 +977,8 @@ func (s artifactoryService) DeleteRepository(
 	req artgen.DeleteRepositoryRequestObject,
 ) (artgen.DeleteRepositoryResponseObject, error) {
 	key := string(req.RepoKey)
-	if _, err := auth.RequireAdmin(ctx); err != nil {
+	admin, err := auth.RequireAdmin(ctx)
+	if err != nil {
 		// A user without the right gets the documented failure report;
 		// without credentials the ordinary 401.
 		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
@@ -997,7 +998,7 @@ func (s artifactoryService) DeleteRepository(
 		}
 		return artgen.DeleteRepository400JSONResponse(failed(key, msg)), nil
 	}
-	files, found, err := repos.Remove(ctx, st, key)
+	files, found, err := repos.Remove(ctx, st, key, admin.Name)
 	switch {
 	case err != nil:
 		_ = s.internalError(ctx, "delete repository", err)
@@ -1014,7 +1015,8 @@ func (s artifactoryService) DeleteRepositories(
 	ctx context.Context,
 	req artgen.DeleteRepositoriesRequestObject,
 ) (artgen.DeleteRepositoriesResponseObject, error) {
-	if _, err := auth.RequireAdmin(ctx); err != nil {
+	admin, err := auth.RequireAdmin(ctx)
+	if err != nil {
 		if p, ok := auth.FromContext(ctx); ok && !p.Anonymous {
 			return failFast403(fmt.Sprintf(
 				"User: ('%s') has insufficient permission to delete repositories", p.Name)), nil
@@ -1047,7 +1049,7 @@ func (s artifactoryService) DeleteRepositories(
 	failures := 0
 	for _, key := range keys {
 		var item artgen.RepoBulkRemovalReport_Reports_Item
-		files, found, err := repos.Remove(ctx, st, key)
+		files, found, err := repos.Remove(ctx, st, key, admin.Name)
 		switch {
 		case err != nil:
 			_ = s.internalError(ctx, "delete repository", err)
