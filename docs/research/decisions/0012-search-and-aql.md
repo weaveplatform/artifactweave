@@ -104,8 +104,8 @@ what Artifactory 6.20's `AqlRelativeDateComparatorEnum` also parses).
 
 **Output.** The include, sort, offset and limit rules follow research 22 §1.2:
 - naming an item field replaces the defaults, and property or statistic fields add to them;
-- naming fields of a related domain adds them too, nested, as **Related includes** below
-  sets out;
+- naming fields of a related domain, or the properties or statistics of its rows, adds them
+  too, nested, as **Related includes** below sets out;
 - `sort`, `offset` and `limit` are accepted whatever the include, and apply to the items, as
   **Exploding includes** below sets out; a sort names only fields in the output;
 - `distinct` defaults to true, and `.distinct(false)` turns it off;
@@ -138,13 +138,35 @@ for every field of that domain, such as `artifact.module.build.name`,
   a step whose fields are not included folds into one row that only carries the next. A
   whole-domain include tells rows apart by identity too, as Artifactory's then includes
   the row's id (6.20's `InflatableRow`).
+- **Properties and statistics.** An include may name the properties of the items, modules
+  and runs a path reaches, and the statistics of the items, as an items query names its own:
+  `<path>.property`, `<path>.property.*`, `<path>.property.key`, `<path>.property.value` or
+  `<path>.@<key>`, and `<path>.stat`, `<path>.stat.*` or `<path>.stat.<field>`. For example
+  `artifact.module.build.@os`, `artifact.module.property.*` and `artifact.item.stat`. A
+  builds query names its runs' own properties the same way, `@os` or `property.*`.
+  - **Nesting.** Each nested row carries its properties as an array under `properties` for
+    an item, `module.properties` for a module and `build.properties` for a run, with the
+    names Artifactory's rows use: `{"key","value"}`, `{"module.property.key",
+    "module.property.value"}` and `{"build.property.key","build.property.value"}`. An item's
+    statistics are an array under `stats`, with the fields an items query's own carry. A run
+    a builds query found carries `build.properties` in its own row. Key includes list those
+    keys' properties only; any other form lists them all. The arrays nested in a row render
+    after its fields, in the order of their keys.
+  - **Filtering.** `<path>.@<key>`, and a builds query's `@<key>`, also requires the row the
+    path reaches to have that key, as an items query's own `@<key>` filters the items. The
+    filter shares the path's row with the include and the criteria, so a found row without
+    such a related row is left out, and only related rows with the key nest.
+  - **Folded rows.** Rows folded into one nested row list each property, and each statistics
+    record, once by its values. An include of the whole property or statistic domain
+    (`property`, `property.*`, `stat`, `stat.*`) keeps each row's apart, as Artifactory's
+    then selects each property's and record's id. A statistics record with none of the
+    included values is left out, as Artifactory drops related rows without data.
 - **Permissions.** A caller who is not an administrator sees only the related runs, with
   their modules, files and promotions, that the build permission lets them read, and the
   related items they may read that their repository's patterns accept, as for the found
-  rows.
-- **Limits.** An include whose combinations of related rows pass 1,000,000 answers 400. The
-  properties and statistics of related rows (`artifact.module.build.@os`,
-  `artifact.item.stat.downloads`) answer 400 as unsupported (**Constraints**).
+  rows. The properties and statistics of a row the caller does not see are not nested
+  either.
+- **Limits.** An include whose combinations of related rows pass 1,000,000 answers 400.
 
 **Limits and permission filtering.**
 - **Limit before filtering.** `.limit(N)` reads N rows before permission filtering, as
@@ -227,8 +249,8 @@ for every field of that domain, such as `artifact.module.build.name`,
   - **`.sort()`** orders the items by the item fields it names.
   - **`.offset(N)`** skips the first N items in that order, and `range.start_pos` is N.
   - **`.limit(N)`** returns at most N items, each with all of its properties.
-  - **Related rows** render inside their found row the same way, so a related include
-    never changes which items the window holds.
+  - **Related rows** render inside their found row the same way, with their properties and
+    statistics, so they never add rows for the window to count.
   - **Not Artifactory's rows.** Beside a property, statistic or related-domain include,
     Artifactory ignores the sort and counts its joined rows, so its limit can return fewer
     items than N ([DV-074](../../implementation/deviations.md#api-behaviour)).
@@ -380,7 +402,11 @@ roots in Artifactory; the GET searches keep finding files.
 **Related includes nested from the rows the query found**, loaded through the store's own
 lookups, keep the SQL each store compiles unchanged and give every store the same rows.
 Filtering the nested runs and items by the caller's permissions keeps an include from
-showing what the found rows' filter would hide.
+showing what the found rows' filter would hide; their properties and statistics belong to
+them, so they are hidden with them. Related items are read through the store's own AQL
+search, which loads their properties and statistics as it does for the found rows, so a
+nested item and the same item found render alike: one without a statistics record has no
+`stats`, and one with an empty record has zeros.
 
 **Remote keys matching their caches** is what makes `jf rt dl <remote>/<path>` work once a
 file is cached, which JFrog documents as the way to download from a remote (#68).
@@ -481,8 +507,9 @@ offset there is inferred ([research 22 §1.2](../22-aql-searches-build-info.md#1
 The audit against KB, Jira and client sources on 2026-10-18
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where the code
 differed; [#410](https://github.com/weaveplatform/artifactweave/issues/410),
-[#411](https://github.com/weaveplatform/artifactweave/issues/411) and
-[#445](https://github.com/weaveplatform/artifactweave/issues/445) brought it in line, and
+[#411](https://github.com/weaveplatform/artifactweave/issues/411),
+[#445](https://github.com/weaveplatform/artifactweave/issues/445) and
+[#494](https://github.com/weaveplatform/artifactweave/issues/494) brought it in line, and
 this record states each rule:
 - the size limit's message names the limit (**Errors**,
   [aql-performance](https://docs.jfrog.com/artifactory/docs/aql-performance.md));
@@ -491,7 +518,11 @@ this record states each rule:
 - the long relative-time units and several criteria objects (**Criteria**,
   [aql-search-criteria](https://docs.jfrog.com/artifactory/docs/aql-search-criteria.md));
 - includes of related domains, nested (**Related includes**,
-  [aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md));
+  [aql-query-output](https://docs.jfrog.com/artifactory/docs/aql-query-output.md)), and of
+  their rows' properties and statistics: the property arrays are named for the
+  `build.properties` and `module.properties` domains
+  [aql-syntax](https://docs.jfrog.com/artifactory/docs/aql-syntax.md) lists ("Update Action"),
+  and their keys are Artifactory 6.20's (`AqlRestResult.Row`);
 - `item.infos` answering the unsupported-domain 400 (**Domains**,
   [aql-entities-fields-reference](https://docs.jfrog.com/artifactory/docs/aql-entities-fields-reference.md));
 - every repository's root as an item row (**Domains**). No 7.x page shows a root row; the
@@ -511,8 +542,19 @@ Inferred, to verify against a live Artifactory
 - how 7.x tells nested rows of one domain apart and orders them, read from 6.20's
   `InflatableRow` and `AqlJsonStreamer`, which fold rows by the values of the included
   fields and order them as the database returns them;
-- whether 7.x nests related runs and items a non-admin may not read;
-- what 7.x answers for an include of a related row's properties or statistics.
+- whether 7.x nests related runs and items a non-admin may not read, and their properties
+  and statistics;
+- that 7.x nests a related row's properties and statistics, and a builds row's own
+  properties, under the keys and with the field names of 6.20's `AqlRestResult.Row`;
+- that a related row's `@<key>` include filters the found rows, as 6.20's
+  `ParserToAqlAdapter` filters them, and that several `@<key>` includes must all hold, as an
+  items query's own do here, where 6.20 keeps a row that meets any of them (its
+  `AqlIncludeServiceTest.multipleResultFilter`);
+- how folded rows list their properties and statistics: once by value, or once per row for
+  a whole-domain include, read from 6.20's `InflatableRow` and the ids its
+  `AqlPhysicalFieldEnum` selects;
+- that `<path>.property.key` and `<path>.property.value` list keys and values, as an items
+  query's own `property.key` does here, where 6.20 selects only the part named.
 
 Two differences are kept on purpose, because **Build searches** follows Artifactory 6.20's
 `BuildArtifactsSearchResource`. Each is a deviation registered by #378, to verify against a
@@ -529,11 +571,6 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
 
 - The `builds` domain depends on build-info ([0014](0014-build-info.md)).
 - Sorting on secondary-domain fields is not supported, as in Artifactory.
-- Including the properties or statistics of a related row (`artifact.module.build.@os`,
-  `artifact.module.property.*`, `artifact.item.stat.*`), which Artifactory nests under
-  `build.properties`, `module.properties`, `properties` or `stats`, is not served: such an
-  include answers 400 as unsupported. Criteria on them are served, and the fields of every
-  related domain can be included (**Related includes**).
 - `item.infos`, `releases` and `release_artifacts` are not served (**Domains**).
 - No JFrog page shows how `$ne`, `$match` and `$nmatch` treat a remote or virtual key.
   They are defined above as the complements of `$eq` and `$match` over the expanded
@@ -562,8 +599,10 @@ live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/2
   which `jf rt s` finds the files, `jf rt s --include-dirs` lists the root, and `jf rt dl`
   and `jf rt del` pass it over.
 - Shared related-include cases (`aqltest.RelatedCases`) whose nested rows, loaded from each
-  store through `store.AQLSource`, render as the reference corpus's; `pkg/aql` tests pin
-  the nesting, the criteria it shares, the folding, visibility and the budget.
+  store through `store.AQLSource`, render as the reference corpus's, the properties and
+  statistics of related rows and a run's own properties included; `pkg/aql` tests pin the
+  nesting, the criteria it shares, the folding, the key filter, visibility and the budget,
+  and server tests the properties and statistics a non-admin and a build-scoped token see.
 - Parser tests for the criteria list, the relative-time units and `item.infos`; server
   tests for the 408 on either timeout, the length message and the nested rows a
   non-admin sees.

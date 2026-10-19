@@ -482,7 +482,7 @@ Decisions: [0012](../research/decisions/0012-search-and-aql.md),
 [22](../research/22-aql-searches-build-info.md).
 
 **Tasks**
-1. Full AQL grammar for `items`, `properties`, `builds` and the secondary domains, `.delete()`, `properties.update()`, dialect-specific compilation with the traps named in 0012. The `item.infos`, `releases` and `release_artifacts` domains, and includes of a related row's properties or statistics, answer 400 as unsupported (#410).
+1. Full AQL grammar for `items`, `properties`, `builds` and the secondary domains, `.delete()`, `properties.update()`, dialect-specific compilation with the traps named in 0012. The `item.infos`, `releases` and `release_artifacts` domains answer 400 as unsupported (#410); includes of a related row's properties and statistics nest them (#494).
 2. GET searches: quick, GAVC, property, checksum, bad checksum, usage, dates, creation, pattern, versions, latest version (text), latest by properties.
 3. Build-info: the `builds`, `build_artifacts`, `build_dependencies` and `build_promotions` tables (a new migration and a `BuildStore` contract, deferred from P2), `PUT/GET /api/build`, build runs, build artifacts, delete, retention (204), rename, promotion with the vendor content type, `build.name`/`build.number` properties on upload.
 

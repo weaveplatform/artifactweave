@@ -177,9 +177,10 @@ func buildStatusRows() []statusCase {
 	return append(rows, aqlStatusRows()...)
 }
 
-// aqlStatusRows covers what #410 and #445 added to POST /api/search/aql:
-// several criteria objects, the long relative-time units, includes of
-// related domains, repository roots, item.infos and the length limit.
+// aqlStatusRows covers what #410, #445 and #494 added to POST
+// /api/search/aql: several criteria objects, the long relative-time units,
+// includes of related domains and of their properties and statistics,
+// repository roots, item.infos and the length limit.
 // buildStatusRows lists them beside the Builds API's.
 func aqlStatusRows() []statusCase {
 	const (
@@ -203,7 +204,16 @@ func aqlStatusRows() []statusCase {
 		},
 		{aqlOp, path, "admin", `items.find().include("name","artifact.module.build.*")`, 200},
 		{aqlOp, path, "admin", `builds.find().include("name","module.artifact.item.name")`, 200},
-		{aqlOp, path, "admin", `items.find().include("artifact.module.build.@os")`, 400},
+		{aqlOp, path, "admin", `items.find().include("artifact.module.build.@os")`, 200},
+		{
+			aqlOp,
+			path,
+			"admin",
+			`items.find().include("artifact.item.stat","artifact.module.property.*")`,
+			200,
+		},
+		{aqlOp, path, "admin", `builds.find().include("@os","module.artifact.item.@team")`, 200},
+		{aqlOp, path, "admin", `items.find().include("artifact.module.build.stat")`, 400},
 		{aqlOp, path, "admin", `item.infos.find()`, 400},
 		{aqlOp, path, "admin", `items.find({"name":"` + strings.Repeat("a", 6000) + `"})`, 400},
 		{aqlOp, path, "anonymous", `items.find({},{})`, 403},

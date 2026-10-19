@@ -48,29 +48,23 @@ func (a aqlSource) RunsWithFile(
 	return out, nil
 }
 
+// ItemsWithSHA1 reads the files through the store's AQL search, which
+// loads their properties and statistics as it does for a query's own rows:
+// Items().Stats answers zero for an item without a record, which a nested
+// item would then render as a record of zeros where its own row renders
+// none.
 func (a aqlSource) ItemsWithSHA1(ctx context.Context, sha1 string) ([]aql.Hit, error) {
-	var out []aql.Hit
-	page := Page{Limit: MaxLimit}
-	for {
-		items, next, err := a.s.Items().FindByChecksum(ctx, types.Checksums{SHA1: sha1}, page)
-		if err != nil {
-			return nil, fmt.Errorf("find files by checksum: %w", err)
-		}
-		for _, it := range items {
-			props, err := a.s.Items().Properties(ctx, it.ID)
-			if err != nil {
-				return nil, fmt.Errorf("properties of %s/%s: %w", it.RepoKey, it.FullPath(), err)
-			}
-			if len(props) == 0 {
-				props = nil
-			}
-			out = append(out, aql.Hit{Item: it, Properties: props})
-		}
-		if next == "" {
-			return out, nil
-		}
-		page.After = next
+	hits, err := a.s.Items().Search(ctx, &aql.Query{
+		Criteria: aql.And{
+			&aql.FieldCriterion{Field: aql.FieldType, Op: aql.OpEq, Text: "file"},
+			&aql.FieldCriterion{Field: aql.FieldActualSHA1, Op: aql.OpEq, Text: sha1},
+		},
+		Include: []string{"property", "stat"},
+	}, aql.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("find files by checksum: %w", err)
 	}
+	return hits, nil
 }
 
 func (a aqlSource) Run(ctx context.Context, id int64) (types.Build, error) {

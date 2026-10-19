@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"slices"
+	"strings"
 
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -37,7 +38,7 @@ type Row struct {
 	props   bool
 	keys    []string
 	stats   []StatField
-	related []relGroup
+	related *relRow
 }
 
 // Response builds the body for hits, which Select or a store returned for
@@ -141,10 +142,8 @@ func (r Row) write(b *bytes.Buffer) {
 			}
 		}
 	}
-	for _, g := range r.related {
-		if arr, ok := g.render(); ok {
-			put(g.key, json.RawMessage(arr))
-		}
+	for _, p := range r.related.parts() {
+		put(p.key, p.arr)
 	}
 	if r.virtual {
 		put(FieldVirtualRepos, append([]string{}, r.hit.VirtualRepos...))
@@ -173,7 +172,7 @@ func (r Row) write(b *bytes.Buffer) {
 	}
 	if st := r.hit.Stats; len(r.stats) > 0 && st != nil {
 		var sb bytes.Buffer
-		r.writeStats(&sb, st)
+		writeStats(&sb, st, r.stats)
 		put("stats", []json.RawMessage{sb.Bytes()})
 	}
 	b.WriteByte('}')
@@ -203,10 +202,8 @@ func (r Row) writeBuild(b *bytes.Buffer) {
 			put(prefix+string(f), v)
 		}
 	}
-	for _, g := range r.related {
-		if arr, ok := g.render(); ok {
-			put(g.key, json.RawMessage(arr))
-		}
+	for _, p := range r.related.parts() {
+		put(p.key, p.arr)
 	}
 	b.WriteByte('}')
 }
@@ -251,18 +248,67 @@ func (rr *relRow) render() (obj []byte, data bool) {
 			put(relFieldPrefixes[rr.node.rel]+f, v)
 		}
 	}
-	for _, g := range rr.groups {
-		if arr, ok := g.render(); ok {
-			put(g.key, json.RawMessage(arr))
-		}
+	for _, p := range rr.parts() {
+		put(p.key, p.arr)
 	}
 	b.WriteByte('}')
 	return b.Bytes(), data
 }
 
-// writeStats renders the included statistics as one object, the shape
+// relArray is one array a row renders after its fields: a group of related
+// rows, or the properties or statistics of a nested row or a run.
+type relArray struct {
+	key string
+	arr json.RawMessage
+}
+
+// parts are the arrays rr renders after its fields, ordered by key, as
+// Artifactory's rows serialise their keys alphabetically
+// (AqlRestResult.Row): the groups with rows to show, its properties as
+// {"<prefix>key":k,"<prefix>value":v} rows, and its statistics. A nil rr,
+// the holder of a found row nothing nests in, has none.
+func (rr *relRow) parts() []relArray {
+	if rr == nil {
+		return nil
+	}
+	var out []relArray
+	for _, g := range rr.groups {
+		if arr, ok := g.render(); ok {
+			out = append(out, relArray{g.key, arr})
+		}
+	}
+	if len(rr.props) > 0 {
+		prefix := propFieldPrefixes[rr.node.rel]
+		var b bytes.Buffer
+		b.WriteByte('[')
+		for i, kv := range rr.props {
+			if i > 0 {
+				b.WriteByte(',')
+			}
+			b.WriteByte('{')
+			writeJSON(&b, prefix+"key")
+			b.WriteByte(':')
+			writeJSON(&b, kv[0])
+			b.WriteByte(',')
+			writeJSON(&b, prefix+"value")
+			b.WriteByte(':')
+			writeJSON(&b, kv[1])
+			b.WriteByte('}')
+		}
+		b.WriteByte(']')
+		out = append(out, relArray{propGroupKeys[rr.node.rel], b.Bytes()})
+	}
+	if len(rr.stats) > 0 {
+		arr := append([]byte{'['}, bytes.Join(rr.stats, []byte{','})...)
+		out = append(out, relArray{"stats", append(arr, ']')})
+	}
+	slices.SortStableFunc(out, func(a, b relArray) int { return strings.Compare(a.key, b.key) })
+	return out
+}
+
+// writeStats renders the statistic fields of st as one object, the shape
 // jfrog-client-go reads ("stats":[{...}]).
-func (r Row) writeStats(b *bytes.Buffer, st *types.ItemStats) {
+func writeStats(b *bytes.Buffer, st *types.ItemStats, fields []StatField) {
 	b.WriteByte('{')
 	first := true
 	put := func(key StatField, v any) {
@@ -274,7 +320,7 @@ func (r Row) writeStats(b *bytes.Buffer, st *types.ItemStats) {
 		b.WriteByte(':')
 		writeJSON(b, v)
 	}
-	for _, f := range r.stats {
+	for _, f := range fields {
 		switch statKinds[f] {
 		case kindNumber:
 			put(f, statNumber(st, f))

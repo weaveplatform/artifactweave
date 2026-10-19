@@ -137,9 +137,13 @@ func TestRelatedIncludes(t *testing.T) {
 		t.Fatalf("tree %+v", tree.children)
 	}
 	for src, want := range map[string]error{
-		`items.find().include("artifact.module.build.@os")`:                      ErrUnsupported,
-		`items.find().include("artifact.module.property.*")`:                     ErrUnsupported,
-		`items.find().include("artifact.item.stat.downloads")`:                   ErrUnsupported,
+		`items.find().include("artifact.module.build.stat.downloads")`:           ErrUnsupported,
+		`items.find().include("artifact.property.*")`:                            ErrUnsupported,
+		`items.find().include("artifact.@k")`:                                    ErrUnsupported,
+		`items.find().include("artifact.module.@*")`:                             ErrUnsupported,
+		`items.find().include("artifact.module.build.@")`:                        ErrUnsupported,
+		`items.find().include("artifact.item.stat.nosuch")`:                      ErrUnsupported,
+		`items.find().include("artifact.item.property.nosuch")`:                  ErrUnsupported,
 		`items.find().include("artifact.item.virtual_repos")`:                    ErrUnsupported,
 		`items.find().include("artifact.nosuch")`:                                ErrUnsupported,
 		`items.find().include("module.name")`:                                    ErrUnsupported,
@@ -154,6 +158,85 @@ func TestRelatedIncludes(t *testing.T) {
 		`items.find().include("name","artifact.name").sort({"$asc":["name"]}).limit(1)`)
 	if q.Sort == nil || !q.HasLimit {
 		t.Fatalf("modifiers %+v", q)
+	}
+}
+
+// TestRelatedPropertyIncludes covers what an include of a related row's
+// properties or statistics reads (#494), and the filter an "@<key>"
+// include adds on the row its path reaches.
+func TestRelatedPropertyIncludes(t *testing.T) {
+	q := mustParse(t, `items.find().include("name","artifact.module.build.@os",`+
+		`"artifact.module.property.key","artifact.module.property","artifact.item.stat.downloads",`+
+		`"artifact.item.stat","dependency.item.@build.name","dependency.item.property.value")`)
+	want := []relInclude{
+		{path: "artifact.module.build", rel: relBuild, part: partProperties, key: "os"},
+		{path: "artifact.module", rel: relModule, part: partProperties},
+		{path: "artifact.module", rel: relModule, part: partProperties, whole: true},
+		{path: "artifact.item", rel: relItem, part: partStats, field: "downloads"},
+		{path: "artifact.item", rel: relItem, part: partStats, whole: true},
+		{path: "dependency.item", rel: relItem, part: partProperties, key: "build.name"},
+		{path: "dependency.item", rel: relItem, part: partProperties},
+	}
+	if !slices.Equal(q.related, want) || !slices.Equal(q.Fields(), []Field{FieldName}) ||
+		q.Properties() || len(q.Stats()) > 0 {
+		t.Fatalf("related %+v fields %v", q.related, q.Fields())
+	}
+	// Each "@<key>" include filters on its path, inside the Joined that the
+	// include shares the path's rows with.
+	root := q.Criteria.(And)
+	joined, ok := root[len(root)-1].(*Joined)
+	if !ok || len(joined.Criteria) != 2 {
+		t.Fatalf("criteria %#v", q.Criteria)
+	}
+	for i, path := range []string{"artifact.module.build", "dependency.item"} {
+		p, ok := joined.Criteria[i].(*PathProperty)
+		if !ok || p.Path != path || p.Criterion.Key == "" || p.Criterion.Value != "*" {
+			t.Fatalf("filter %d %#v", i, joined.Criteria[i])
+		}
+	}
+	tree := includeTree(relItem, q.related)
+	byPath := map[string]*nestNode{}
+	var walk func(n *nestNode)
+	walk = func(n *nestNode) {
+		byPath[n.path] = n
+		for _, c := range n.children {
+			walk(c)
+		}
+	}
+	walk(tree)
+	build, module := byPath["artifact.module.build"], byPath["artifact.module"]
+	item, dep := byPath["artifact.item"], byPath["dependency.item"]
+	switch {
+	case !build.props || !slices.Equal(build.keys, []string{"os"}) || build.propsWhole:
+		t.Fatalf("build node %+v", build)
+	case !module.props || module.keys != nil || !module.propsWhole:
+		t.Fatalf("module node %+v", module)
+	case item.props || !slices.Equal(item.stats, statOrder) || !item.statsWhole:
+		t.Fatalf("item node %+v", item)
+	case !dep.props || dep.keys != nil || dep.propsWhole || len(dep.stats) != 0:
+		t.Fatalf("dependency item node %+v", dep)
+	}
+	if n := includeTree(relItem, mustParse(t,
+		`items.find().include("artifact.item.stat.remote_path","artifact.item.stat.downloads")`,
+	).related).children[0].children[0]; !slices.Equal(n.stats,
+		[]StatField{StatDownloads, StatRemotePath}) || n.statsWhole {
+		t.Fatalf("named statistics %+v", n)
+	}
+	// A run's own properties nest as a related run's do, and its "@<key>"
+	// filters the runs themselves.
+	q = mustParse(t, `builds.find().include("name","@os","property.*")`)
+	if !slices.Equal(q.related, []relInclude{
+		{rel: relBuild, part: partProperties, key: "os"},
+		{rel: relBuild, part: partProperties, whole: true},
+	}) || !slices.Equal(q.Fields(), []Field{"name"}) {
+		t.Fatalf("builds related %+v fields %v", q.related, q.Fields())
+	}
+	if p, ok := q.Criteria.(And)[0].(*PathProperty); !ok || p.Path != "" ||
+		p.Criterion.Key != "os" {
+		t.Fatalf("builds criteria %#v", q.Criteria)
+	}
+	if mustParse(t, `builds.find().include("*")`).Relates() {
+		t.Fatal(`builds include("*") relates`)
 	}
 }
 
