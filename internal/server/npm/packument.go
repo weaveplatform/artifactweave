@@ -242,15 +242,18 @@ func (p pkg) modified() time.Time {
 
 // fullPackument is the full packument (decision 0034), with the fields of
 // 7.x's (RTFACT-30472) in its order. Each version is its manifest as
-// document builds it; author and license are the latest version's, as
-// its package.json has them.
+// document builds it; description, author and license are the latest
+// version's, as its package.json has them. omitempty leaves out only a
+// field package.json lacks: an empty description is a pointer to "", which
+// 7.x sends as "description" : "" (RTFACT-30472's second packument), and
+// an empty author or license is the raw "" itself.
 //
 //nolint:tagliatelle // npm's registry names
 type fullPackument struct {
 	ID          string                     `json:"_id"`
 	Rev         string                     `json:"_rev"`
 	Name        string                     `json:"name"`
-	Description string                     `json:"description,omitempty"`
+	Description *string                    `json:"description,omitempty"`
 	DistTags    map[string]string          `json:"dist-tags"`
 	Versions    map[string]json.RawMessage `json:"versions"`
 	Author      json.RawMessage            `json:"author,omitempty"`
@@ -376,11 +379,14 @@ func manifestFields(v version) (map[string]json.RawMessage, error) {
 	return fields, nil
 }
 
-// description is a manifest's description field, when it is a string.
-func description(raw json.RawMessage) string {
+// description is a manifest's description field, nil when it has none or
+// one that is not a string.
+func description(raw json.RawMessage) *string {
 	var s string
-	_ = json.Unmarshal(raw, &s)
-	return s
+	if raw == nil || json.Unmarshal(raw, &s) != nil {
+		return nil
+	}
+	return &s
 }
 
 // tarballBase is the URL a version's dist.tarball starts with: the
