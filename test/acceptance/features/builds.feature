@@ -242,7 +242,7 @@ Feature: Build-info
       {"name": "ret-app", "number": "1", "started": "2026-10-15T09:30:00.000+0000",
        "modules": [{"id": "m", "artifacts": [{"name": "gone.bin", "sha1": "0123456789abcdef0123456789abcdef01234567"}]}]}
       """
-    Then the response status is 200
+    Then the response status is 204
     When I POST "/artifactory/api/build/promote/ret-app/1" as admin with body:
       """
       {"status": "released", "targetRepo": "generic-local", "failFast": true}
@@ -255,7 +255,7 @@ Feature: Build-info
       {"name": "ret-app", "number": "2", "started": "2026-10-16T09:30:00.000+0000",
        "buildRetention": {"count": 1}}
       """
-    Then the response status is 200
+    Then the response status is 204
     When I GET "/artifactory/api/build/ret-app" as admin
     Then the JSON field "buildsNumbers" has 1 entries
     When I POST "/artifactory/api/build/retention/ret-app?async=false" as admin with body:

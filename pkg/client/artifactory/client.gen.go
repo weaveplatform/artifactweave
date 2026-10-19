@@ -68967,6 +68967,9 @@ func ParseUploadBuildResponse(rsp *http.Response) (*UploadBuildResponse, error) 
 	}
 
 	switch {
+	case rsp.StatusCode == 200:
+		break // No content-type
+
 	case rsp.StatusCode == 204:
 		break // No content-type
 

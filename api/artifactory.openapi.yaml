@@ -812,6 +812,8 @@ paths:
         description: The build-info document.
         required: true
       responses:
+        '200':
+          description: Not returned.
         '204':
           description: Stored. The response has no body.
           headers:
