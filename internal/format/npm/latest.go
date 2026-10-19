@@ -37,6 +37,11 @@ type Settings struct {
 	// than the highest. 7.x has it off by default (6.20's ConstantValues;
 	// RTFACT-9754, RTFACT-20127).
 	TagLatestByPublish bool
+	// EnforcePath is npm.enforce_path, 7.x's artifactory.npm.enforce.path:
+	// a package tarball deployed to a local repository under a file name
+	// other than the one its package.json gives is refused (Admit). 7.x
+	// has it off by default (npm-repositories).
+	EnforcePath bool
 }
 
 // Candidate is a version as the latest rules weigh it.
@@ -125,8 +130,9 @@ func (s Settings) holderOf(
 // from a tarball carrying the dist-tags tags. A tarball that carries latest
 // itself is rule 1's, which Annotated applies once the write's properties
 // are set. A version that was indexed before the write, a redeploy, keeps
-// latest where it is, so a redeploy undoes no npm dist-tag add; only a
-// package left without latest gives it out again.
+// latest where it is, so a redeploy of the same content undoes no npm
+// dist-tag add; only a package left without latest gives it out again, as
+// one does when a redeploy of other content took the tags off its file.
 func (s Settings) claimLatest(
 	ctx context.Context,
 	st store.Store,

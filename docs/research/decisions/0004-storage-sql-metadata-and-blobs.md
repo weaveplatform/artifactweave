@@ -74,6 +74,25 @@ characters, which AQL narrows on before it compares whole values (migration 0013
 The property limits were checked against Artifactory 7.161.32 (2026-10-17), and the cut
 against Jira and the legacy release notes (2026-10-18, #378).
 
+**Overwrites.** A file overwritten with other content is a new file at the old path
+([#518](https://github.com/weaveplatform/artifactweave/issues/518)):
+- Its properties and download statistics go, unless the path is a Maven non-unique
+  snapshot, which every build overwrites. This is Artifactory 6.20's
+  `DbStoringRepoMixin.clearOldFileData`, which on a SHA-1 change will "remove all the
+  existing metadata"; [RTFACT-16387](https://jfrog.atlassian.net/browse/RTFACT-16387)
+  shows the properties "completely gone" from a user's side. Otherwise a build's, a
+  package's or a user's properties would go on describing content they were never set on.
+- A deploy's matrix parameters then replace the file's properties, over the same content
+  too, as 6.20's `saveProperties` sets them with `setProperties`, which clears first.
+  Properties a format adds to a deploy, such as Maven's plugin mark, join the file's.
+- A copy or move onto a file replaces it whole: the target has the source's properties and
+  none of its own, and the download statistics of neither a copy's target nor the file it
+  replaced; a move brings the source's. 6.20's mover deletes the target before it writes
+  the source (`BaseRepoPathMover.overrideTargetFileIfExist`).
+
+No 7.x source covers any of this, so all of it is inferred **[I]** and on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216).
+
 **Blobs.** `pkg/blob` is a content-addressed store keyed by sha256. Every upload computes
 four checksums in one pass: SHA-256, SHA-512, SHA-1 and MD5. The other three are recorded
 in the blob and item index, so checksum deploy, checksum search and checksum files work

@@ -125,14 +125,12 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 	}
 	// The formats' derived work runs through the same item service, and
 	// format settings, the server writes with, and its kinds must be known
-	// before Run leases. The maxUniqueSnapshots cleanups wait for their
-	// timer, as 7.x's does; 7.x runs one for every package type, so npm's
-	// shares Maven's interval.
+	// before Run leases. Maven's snapshot cleanup waits for its timer, as
+	// 7.x's does.
 	derived := &item.Service{
 		Store: st, Blobs: hot.store, Work: queue, Formats: formatSettings(cfg).For,
 		Periodic: map[string]time.Duration{
 			maven.KindSnapshots: cfg.Maven.SnapshotCleanupInterval,
-			npm.KindSnapshots:   cfg.Maven.SnapshotCleanupInterval,
 		},
 	}
 	if err := derived.RegisterWork(queue); err != nil {
@@ -182,7 +180,10 @@ func openRuntime(ctx context.Context, cfg config.Config, log *slog.Logger) (*run
 // whether a client or derived work makes it.
 func formatSettings(cfg config.Config) formats.Settings {
 	return formats.Settings{
-		NPM: npm.Settings{TagLatestByPublish: cfg.NPM.TagLatestByPublish},
+		NPM: npm.Settings{
+			TagLatestByPublish: cfg.NPM.TagLatestByPublish,
+			EnforcePath:        cfg.NPM.EnforcePath,
+		},
 	}
 }
 

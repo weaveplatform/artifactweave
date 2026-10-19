@@ -11,10 +11,10 @@ const MinUniqueSnapshots = 2
 
 // UniqueSnapshots is how many unique builds of a snapshot c's cleanup
 // keeps: 0 when c sets no maxUniqueSnapshots, which keeps every build, and
-// otherwise never fewer than MinUniqueSnapshots. Maven's and npm's
-// cleanups read it when they run, so a limit set back to 0 since the
-// deploy that marked a package deletes nothing (RTDEV-93991, SaaS
-// 7.164.0).
+// otherwise never fewer than MinUniqueSnapshots. Maven's cleanup reads it
+// when it runs, so a limit set back to 0 since the deploy that marked a
+// package deletes nothing (RTDEV-93991, SaaS 7.164.0). npm ignores the
+// limit, as JFrog intends (RTFACT-27078, decision 0034).
 func UniqueSnapshots(c repo.Config) int {
 	if c.MaxUniqueSnapshots == nil || *c.MaxUniqueSnapshots <= 0 {
 		return 0

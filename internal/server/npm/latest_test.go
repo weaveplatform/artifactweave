@@ -25,6 +25,19 @@ func (f *fixture) byPublish(t *testing.T) {
 	f.remount(t, npm.Options{Format: s})
 }
 
+// npm publish stores its tarball at the canonical path its own
+// package.json gives, so npm.enforce_path never refuses one, scoped or
+// not.
+func TestPublishUnderEnforcePath(t *testing.T) {
+	f := newFixture(t)
+	s := npmfmt.Settings{EnforcePath: true}
+	f.items.Formats = formats.Settings{NPM: s}.For
+	f.remount(t, npm.Options{Format: s})
+	for _, name := range []string{"plain", "@acme/scoped"} {
+		wantStatus(t, f.publish(t, name, "1.0.0", "writer", nil), http.StatusCreated)
+	}
+}
+
 // With npm.tag_latest_by_publish, npm publish gives latest to the version
 // published last, pre-releases included, but not to one published with
 // --tag; and a read that cannot see latest's version resolves it among the

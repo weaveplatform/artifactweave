@@ -162,6 +162,7 @@ type BuildConfig struct {
 type NPMConfig struct {
 	NPMLoginConfig `yaml:",inline"`
 	NPMTagConfig   `yaml:",inline"`
+	NPMPathConfig  `yaml:",inline"`
 	// MaxPublishSize is the largest npm publish request accepted; a larger
 	// one answers 413.
 	MaxPublishSize ByteSize `yaml:"max_publish_size"`
@@ -415,6 +416,7 @@ var keys = append(append([]string{
 	"maven.snapshot_cleanup_interval",
 	"npm.login_token_expiry",
 	"npm.tag_latest_by_publish",
+	"npm.enforce_path",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -505,6 +507,7 @@ func boolKeys(cfg *Config) map[string]*bool {
 		"token.allow_basic_auth":                                       &cfg.Token.AllowBasicAuth,
 		"deploy.enforce_permission_check_on_identical_checksum_deploy": &cfg.Deploy.EnforceIdenticalChecksumDeploy,
 		"npm.tag_latest_by_publish":                                    &cfg.NPM.TagLatestByPublish,
+		"npm.enforce_path":                                             &cfg.NPM.EnforcePath,
 	}
 }
 

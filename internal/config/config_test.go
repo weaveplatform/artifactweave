@@ -1104,6 +1104,46 @@ func TestNPMTagLatestByPublish(t *testing.T) {
 	}
 }
 
+// npm.enforce_path is off by default, as 7.x's
+// artifactory.npm.enforce.path is, and takes flag over environment over
+// file, strictly parsed.
+func TestNPMEnforcePath(t *testing.T) {
+	if Default().NPM.EnforcePath {
+		t.Fatal("on by default")
+	}
+	if _, err := Load(LoadOptions{
+		Flags: map[string]string{"npm.enforce_path": "yes"},
+	}); !errors.Is(err, ErrInvalidValue) {
+		t.Errorf("yes: %v", err)
+	}
+	if _, err := Load(LoadOptions{
+		File: writeFile(t, "npm:\n  enforce_paths: true\n"),
+	}); !errors.Is(err, ErrUnknownKey) {
+		t.Errorf("a misspelt key: %v", err)
+	}
+	for _, tc := range []struct {
+		env, flags map[string]string
+		want       bool
+	}{
+		{nil, nil, true},
+		{map[string]string{"ARTIFACTWEAVE_NPM_ENFORCE_PATH": "false"}, nil, false},
+		{
+			map[string]string{"ARTIFACTWEAVE_NPM_ENFORCE_PATH": "false"},
+			map[string]string{"npm.enforce_path": "true"},
+			true,
+		},
+	} {
+		got, err := Load(LoadOptions{
+			File:  writeFile(t, "npm:\n  enforce_path: true\n"),
+			Env:   envOf(tc.env),
+			Flags: tc.flags,
+		})
+		if err != nil || got.NPM.EnforcePath != tc.want {
+			t.Errorf("%v %v: %+v, %v", tc.env, tc.flags, got.NPM, err)
+		}
+	}
+}
+
 func TestCloudFrontValidation(t *testing.T) {
 	s3 := func(extra map[string]string) map[string]string {
 		flags := map[string]string{

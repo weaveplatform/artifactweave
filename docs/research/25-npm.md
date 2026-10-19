@@ -62,6 +62,8 @@ Sources:
   (`latest` in virtual repositories).
 - **JFrog's public Jira**, read through `https://jfrog.atlassian.net/rest/api/2/issue/<KEY>`:
   the RTFACT keys cited below.
+- **JFrog's blog** [Addressing the npm Manifest Confusion Vulnerability](https://jfrog.com/blog/addressing-the-npm-manifest-confusion-vulnerability/)
+  (2023-07-20, read on 2026-10-19), on `artifactory.npm.enforce.path`.
 - **terraform-provider-artifactory** v12.11.14, `docs/resources/local.md`.
 
 ## 1. URLs
@@ -90,8 +92,9 @@ Sources:
 | The repository's release and snapshot handling applies to npm local deploys: a `.tgz` the policy forbids answers 409: "409 conflict … rejected the resolution of an artifact 'zhl-npm-local:jenkins/-/jenkins-1.1.0.tgz' due to conflict in the snapshot release handling policy" | [KB] 000006800 |
 | The opening of that message, "The repository '<repo>'", which the KB elides; artifactweave gives 6.20's `SnapshotPolicyException` wording, as for Maven | [I] |
 | How 7.x classes an npm version as a release or a snapshot. artifactweave reads the version from the path and classes a pre-release as a snapshot. The `npm-default` layout of 7.x's exported descriptors does not settle it: its greedy `[module]` reads `lodash-5.0.0-rc.1.tgz` as module `lodash-5.0.0` and base revision `rc.1`, with no integration revision ([research 03](03-repository-configuration-model.md#bundled-definitions)) | [I] |
-| `maxUniqueSnapshots` can be set on an npm repository, and 7.x's cleanup then deletes artifacts there: "Users can set the `maxUniqueSnapshots` value on npm repos, causing artifacts to be deleted unexpectedly in certain cases" (from 7.35.4, no fix listed) | [D] [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), RTDEV-45622 |
-| Which npm versions that cleanup counts, how it groups them, and what the "certain cases" are. artifactweave counts each pre-release of a base version as one unique build of it and deletes the oldest past the limit, on Maven's timer ([#515](https://github.com/weaveplatform/artifactweave/issues/515)) | [I] |
+| `maxUniqueSnapshots` can be set on an npm repository, and 7.x's cleanup then deletes artifacts there: "Users can set the `maxUniqueSnapshots` value on npm repos, causing artifacts to be deleted unexpectedly in certain cases" (from 7.35.4, no fix listed). This is an open known bug | [D] [known issues](https://docs.jfrog.com/releases/docs/artifactory-known-issues), RTDEV-45622 |
+| JFrog's intended behaviour is that npm repositories ignore `maxUniqueSnapshots`: RTFACT-27078, the known issue's ticket (open, affects 7.35.4), says the UI offers no snapshot policy for npm and "We need Artifactory to ignore this completely in cases where snapshot policing does not apply"; RTFACT-30672 expects that the "maxUniqueSnapshots parameter should not be considered for NPM repository". The bug's reported effect removed a release, `@my-scope-one/npm-test-1.0.2.tgz`, as an "old unique snapshot". artifactweave ignores the setting on npm, stores it, and echoes it in the v1 read, but does not reproduce the known issue ([#518](https://github.com/weaveplatform/artifactweave/issues/518)) | [J] RTFACT-27078, RTFACT-30672 |
+| That the v2 read (`GET /api/v2/repositories/{key}`), which returns "only those fields that are relevant to the package type", leaves `maxUniqueSnapshots` out for npm, as artifactweave's does | [I] |
 | The body of a successful publish, and the status and body of one the checksum policy refuses; KB 000005823's log gives the republish 403 a 144-byte body | [I] |
 
 ### 2.2 Dist-tags, deprecate and unpublish
@@ -196,6 +199,10 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 | What the conversion does with a tarball whose canonical path is already taken, and how it reports one it skipped. artifactweave leaves it where it is and fails the conversion naming it, so the work queue retries and then parks it for resume | [I] |
 | The switch was first listed in [SaaS 7.170.0](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71700-saas), which turned it on for new local repositories; the self-managed notes up to 7.161.32 do not list it, so whether 7.161.32 has it is open | [D] SaaS notes; self-managed [I] |
 | An upload that breaks `artifactory.npm.enforce.path` is refused; letting it through was a bug | [D] [7.146.22](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-714622-self-managed) (RTDEV-86877) |
+| `artifactory.npm.enforce.path` prevents "uploading packages with file names that do not match the internal metadata of the package"; it is a global system property, applies "only to npm packages that are uploaded after the system property was activated", and files stored before stay | [D] npm-repositories, "Use npm Enforce Path Layout" (updated 2026-09-17) |
+| JFrog added it against "path confusion", where a publish's manifest names another package than the tarball's `package.json`, from 7.63.5 and 7.64.4: it "will prevent users from uploading packages to a path that does not match your package name" | [D] JFrog's blog on npm manifest confusion (2023-07-20) |
+| The status and message of a refused upload; whether 7.x compares only the file name or the folders too, and a scoped package's scope; how it treats a `.tgz` without a readable `package.json`; and whether it checks copies, moves and federated repositories. No Jira issue or KB article names the property. artifactweave's `npm.enforce_path` answers 400, compares the file name with `<name>-<version>.tgz`, scope included, stores content without a readable `package.json`, and checks uploads (REST deploy, checksum deploy, archive entries, npm publish) to local and federated repositories, not copies or moves ([#518](https://github.com/weaveplatform/artifactweave/issues/518)) | [I] |
+| `npm publish` cannot land a tarball off its canonical path in artifactweave: the path is built from the tarball's own `package.json`, and a body naming another package or version answers 400 (section 2.1), so `npm.enforce_path` never refuses a publish | [S] `internal/server/npm/publish.go` |
 
 ## 7. `latest`
 
@@ -211,7 +218,7 @@ stale, so 7.x cannot refuse one either ([J] RTFACT-30472, RTFACT-29708).
 | `npm publish --tag <t>` leaves `latest` where it is, unless the package has no version yet | [J] RTFACT-14111, RTFACT-14920, RTFACT-31108; RTFACT-24072, JFrog's reproduction: after `npm publish --tag beta` of 1.0.0-beta.2, `latest` stays 1.0.0-beta.1. artifactweave leaves it too ([#289](https://github.com/weaveplatform/artifactweave/issues/289)) |
 | How long a `latest` set by `npm dist-tag add` lasts across later publishes, reindex, copy, move and delete; which version becomes `latest` when every version left is a pre-release; and what `npm dist-tag rm latest` answers. artifactweave keeps such a `latest` until an untagged version that outranks it arrives or its version goes, then gives it to the highest release, or the highest pre-release when there is none, and answers `dist-tag rm latest` by giving `latest` to that version | [I] |
 | The `latest` a publish body names is ignored, and `npm dist-tag add <version> latest` sets it | [J] RTFACT-8184, RTFACT-26099; RTFACT-16009, RTFACT-7400 |
-| What 7.x does with the dist-tags of a tarball overwritten with another version's content. artifactweave takes the dropped version's `npm.disttag` values off the file unless the write sets its own, so a later conversion hands none of them on ([#515](https://github.com/weaveplatform/artifactweave/issues/515)) | [I] |
+| What 7.x does with the dist-tags and deprecation of a tarball overwritten with other content. artifactweave clears every property of a file overwritten with other content, for every package type, as 6.20's `DbStoringRepoMixin.clearOldFileData` does (decision [0004](decisions/0004-storage-sql-metadata-and-blobs.md)), so the dropped version's `npm.disttag` and `npm.deprecated` go unless the write brings its own, and a later conversion hands none of them on ([#515](https://github.com/weaveplatform/artifactweave/issues/515), [#518](https://github.com/weaveplatform/artifactweave/issues/518)) | [I] |
 | In a local repository a pre-release does not become `latest` while a stable version exists: with 1.0.0 and 1.0.1-2 published, `latest` is 1.0.0 | [J] RTFACT-30783 (a local repository on 7.94.1), RTFACT-17732 (6.5.1) |
 | Virtual repositories merge `latest` by the same stable-first rule from 7.120.0; the release notes do not list it | [KB] 000007043 (virtual repositories only) |
 | In a virtual repository a custom dist-tag resolves to the first member, in resolution order, that has it; `artifactory.npm.merge.latest.dist.tag.base.strategy.enabled=true` (from 7.75.3) takes the highest SemVer version across members instead, or the newest with `tagLatestByPublish` | [D] npm-repositories, "Configure Distribution Tag Behavior" |
@@ -317,16 +324,19 @@ Each item below is on #216 for the live comparison in P19:
     client's read removes it (section 2.2).
 30. What the strict-layout conversion does with a tarball whose canonical path is taken,
     and how it reports it (section 6).
-31. What 7.x does with the dist-tags of a tarball overwritten with another version's
-    content, and of one off its canonical path; artifactweave takes the dropped version's
-    off the file unless the write sets its own, and leaves a stray tarball's alone
-    (section 7).
+31. What 7.x does with the dist-tags and deprecation of a tarball overwritten with other
+    content, whether a version or not; artifactweave clears every property of the file, as
+    6.20 does, unless the write brings its own (section 7, decision 0004).
 32. How `tagLatestByPublish` treats a redeploy, a version copied or moved in, a removal of
     `latest`'s version, `npm dist-tag rm latest`, and two versions deployed at one moment
     (section 7).
-33. Which npm versions 7.x's `maxUniqueSnapshots` cleanup counts, how it groups and dates
-    them, what the known issue's "certain cases" are, and whether a dist-tag keeps a
-    version from it (section 2.1).
+33. Whether the v2 read leaves `maxUniqueSnapshots` out for npm, as artifactweave's does;
+    JFrog's stated intent is that npm ignores the field (RTFACT-27078, RTFACT-30672,
+    section 2.1).
+34. The status and message of an upload `artifactory.npm.enforce.path` refuses; whether it
+    compares the folders before the file name, and a scoped name's scope; how it treats a
+    `.tgz` without a readable `package.json`; and whether it checks copies, moves and
+    federated repositories (section 6).
 
 ## 11. Artifactory 7.x check
 
@@ -350,9 +360,14 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   `npm.deprecated` and the `npm.keywords` format (section 5); and stable-first `latest` in a
   local repository (section 7).
 - From [#515](https://github.com/weaveplatform/artifactweave/issues/515), checked on
-  2026-10-19 against 7.161.32 and SaaS 7.174.0: `maxUniqueSnapshots` deletes in npm
-  repositories (known issue RTDEV-45622, section 2.1), and `tagLatestByPublish` is off by
-  default and makes the last untagged publish `latest`, a pre-release included (section 7).
+  2026-10-19 against 7.161.32 and SaaS 7.174.0: `tagLatestByPublish` is off by default and
+  makes the last untagged publish `latest`, a pre-release included (section 7).
+- From [#518](https://github.com/weaveplatform/artifactweave/issues/518), checked on
+  2026-10-19 against the same releases, which no later one changes: `artifactory.npm.enforce.path`
+  compares an upload's file name with the package's metadata and applies to uploads made
+  while it is on (section 6); and JFrog intends npm repositories to ignore
+  `maxUniqueSnapshots` (RTFACT-27078, RTFACT-30672), which its open known issue
+  RTDEV-45622 breaks and artifactweave does not reproduce (section 2.1).
 
 **7.x differs from the code on main** where the tables above name an issue; [decision
 0034's 7.x check](decisions/0034-npm.md#artifactory-7x-check) lists each difference with the

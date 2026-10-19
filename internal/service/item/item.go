@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/weaveplatform/artifactweave/internal/format"
+	"github.com/weaveplatform/artifactweave/internal/format/maven"
 	"github.com/weaveplatform/artifactweave/internal/service/pkgindex"
 	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
@@ -377,6 +378,10 @@ func (s *Service) putFile(
 	now time.Time,
 ) (types.Item, error) {
 	h := s.format(d.Repo.PackageType)
+	// Only properties the client sent replace the file's: those a format
+	// adds in Admit, such as Maven's plugin mark, join the file's, as
+	// 6.20's interceptors add theirs after saveProperties.
+	replace := len(d.Properties) > 0
 	w, err := admit(ctx, h, env, d.Repo, format.Write{
 		Op: format.OpDeploy, Path: strings.Trim(d.Path, "/"), Cached: d.Cached,
 		Properties: d.Properties, Size: size, Checksums: actual,
@@ -385,7 +390,9 @@ func (s *Service) putFile(
 		return types.Item{}, err
 	}
 	d.Path, d.Properties = w.Path, w.Properties
-	stored, err := s.writeFile(ctx, d, actual, size, declared, now)
+	stored, err := s.writeFile(ctx, d, fileWrite{
+		actual: actual, size: size, declared: declared, replace: replace,
+	}, now)
 	if err != nil {
 		return types.Item{}, err
 	}
@@ -399,6 +406,18 @@ func (s *Service) putFile(
 	return stored, nil
 }
 
+// fileWrite is the content writeFile stores, and how its properties land.
+type fileWrite struct {
+	actual types.Checksums
+	size   int64
+	// declared are the checksums the client sent.
+	declared types.Checksums
+	// replace makes the deploy's properties replace the file's rather than
+	// join them: a client's matrix parameters, or a format's own set for an
+	// item it derives.
+	replace bool
+}
+
 // writeFile writes, inside the caller's transaction, the item for stored
 // content without any hook: parent folders, the item (replacing a file at
 // the path), the blob reference (and the release of an overwritten file's)
@@ -406,11 +425,10 @@ func (s *Service) putFile(
 func (s *Service) writeFile(
 	ctx context.Context,
 	d Deploy,
-	actual types.Checksums,
-	size int64,
-	declared types.Checksums,
+	fw fileWrite,
 	now time.Time,
 ) (types.Item, error) {
+	actual, size, declared := fw.actual, fw.size, fw.declared
 	full := strings.Trim(d.Path, "/")
 	if err := s.ensureFolders(ctx, d.Target, path.Dir(full), d.By, now); err != nil {
 		return types.Item{}, err
@@ -479,12 +497,56 @@ func (s *Service) writeFile(
 			return types.Item{}, fmt.Errorf("item: release overwritten blob: %w", err)
 		}
 	}
-	if len(d.Properties) > 0 {
-		if err := items.PatchProperties(ctx, stored.ID, d.Properties, nil, now); err != nil {
-			return types.Item{}, fmt.Errorf("item: properties of %s: %w", full, err)
-		}
+	fresh := old.ID != 0 && old.Actual.SHA256 != actual.SHA256 && !maven.IsNonUniqueSnapshot(full)
+	if err := s.settle(ctx, stored, d.Properties, fresh, fw.replace, now); err != nil {
+		return types.Item{}, err
 	}
 	return stored, nil
+}
+
+// settle gives a file just written its properties and statistics. With
+// fresh, it overwrote a file of other content, which Artifactory treats as
+// a new file at the old path: 6.20's DbStoringRepoMixin.clearOldFileData
+// drops "all the existing metadata", every property and the download
+// statistics, unless the path is a Maven non-unique snapshot, which every
+// build overwrites (RTFACT-16387 shows the properties "completely gone"
+// from a user's side). Otherwise a deploy's dist-tags, deprecation or
+// build properties would go on describing content they were never set on.
+// With replace, props then replace the file's properties, even over the
+// same content, as 6.20's saveProperties sets them with setProperties,
+// which clears first. [I] 7.x documents neither (#216).
+func (s *Service) settle(
+	ctx context.Context,
+	it types.Item,
+	props types.Properties,
+	fresh, replace bool,
+	now time.Time,
+) error {
+	items := s.Store.Items()
+	switch {
+	case fresh || replace:
+		if err := items.SetProperties(ctx, it.ID, props, now); err != nil {
+			return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
+		}
+	case len(props) > 0:
+		if err := items.PatchProperties(ctx, it.ID, props, nil, now); err != nil {
+			return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
+		}
+	}
+	if !fresh {
+		return nil
+	}
+	stats, err := items.Stats(ctx, it.ID)
+	if err != nil {
+		return fmt.Errorf("item: statistics of %s: %w", it.FullPath(), err)
+	}
+	if stats == (types.ItemStats{}) {
+		return nil
+	}
+	if err := items.PutStats(ctx, it.ID, types.ItemStats{}); err != nil {
+		return fmt.Errorf("item: statistics of %s: %w", it.FullPath(), err)
+	}
+	return nil
 }
 
 // mayReplace reports whether d may replace old, the file at full, with

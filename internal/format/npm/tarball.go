@@ -55,7 +55,13 @@ type Tarball struct {
 // in its publish body and the JFrog CLI deploys to, so a scoped package's
 // file name keeps its scope (@scope/name/-/@scope/name-1.0.0.tgz).
 func CanonicalPath(name, version string) string {
-	return name + "/-/" + name + "-" + version + ".tgz"
+	return name + "/-/" + fileName(name, version)
+}
+
+// fileName is a version's tarball file name, the part of its canonical
+// path after /-/, which npm also gives the publish body's attachment.
+func fileName(name, version string) string {
+	return name + "-" + version + ".tgz"
 }
 
 // candidate reports whether p could be a canonical path, which is cheaper
