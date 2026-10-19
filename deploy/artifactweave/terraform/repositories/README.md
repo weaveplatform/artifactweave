@@ -139,9 +139,9 @@ No modules.
 | [artifactory_local_gradle_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_gradle_repository) | resource |
 | [artifactory_local_maven_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_maven_repository) | resource |
 | [artifactory_local_npm_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/local_npm_repository) | resource |
-| [artifactory_repositories.generic](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/data-sources/repositories) | data source |
 | [artifactory_virtual_maven_repository.empty](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/virtual_maven_repository) | resource |
 | [artifactory_virtual_npm_repository.this](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/resources/virtual_npm_repository) | resource |
+| [artifactory_repositories.generic](https://registry.terraform.io/providers/jfrog/artifactory/12.11.14/docs/data-sources/repositories) | data source |
 
 ### Inputs
 
