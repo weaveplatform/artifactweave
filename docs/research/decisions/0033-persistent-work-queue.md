@@ -9,7 +9,9 @@ Status: Accepted
 
 Package formats derive data from what is deployed:
 - Maven metadata at the snapshot, artifact and plugin levels, and `maxUniqueSnapshots` (P7);
-- Helm's `index.yaml` and NuGet's registration pages (P8);
+- Helm's `index.yaml`, one per repository (P8, decision [0039](0039-helm.md)). NuGet's
+  registration pages, first expected here too, are computed on read from the package index
+  instead (decision [0038](0038-nuget.md));
 - webhook deliveries, replication and cleanup (P11).
 
 Doing that work inside the deploy's write transaction does not scale:

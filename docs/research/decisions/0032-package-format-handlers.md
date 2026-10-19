@@ -48,7 +48,7 @@ the protocol that changed it.
 
 **Optional interfaces.** A format implements only what it needs. Each is named here by
 its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotator`,
-`Reindexer` and `Classifier` (#267), and `Worker` (#279).
+`Reindexer` and `Classifier` (#267), `Worker` (#279) and `SidecarKeeper` (#533).
 
 | Interface | Runs | Does | First used by |
 |---|---|---|---|
@@ -59,6 +59,7 @@ its method; the Go interfaces are `Inspector`, `Admitter`, `Resolver`, `Annotato
 | `Reindexer` | On a JFrog reindex operation, and for maintenance | Rebuilds the format's index for a repository from the item tree | Docker (adopting `docker.Reindex`), npm, Maven, P8 |
 | `Classifier` | When asked | Says whether a path is a unique binary, metadata, or a derived item | P9 cache expiry, P11 replication, P13 federation |
 | `Work` | From the work queue, and before a download that `Owed` says waits for it | Runs the derived work the format queued, outside any transaction | Maven (#279) |
+| `Sidecars` | On a delete, copy, move or trash restore of a file | Names the sidecars that go with the file, which the item service then carries | Helm's `.prov` (#533) |
 
 `Annotated` was added after the research: Artifactory's npm metadata follows property
 changes (`NpmMetadataInterceptor`, research 24 fact 1.2), and P7's npm dist-tags are
@@ -78,6 +79,24 @@ as a checksum of its file, so `Admit` sees an `OpChecksum` (with the sidecar's d
 length in `Write.Size`) even when the file is missing, and a missing file answers 404 "Target
 file to set checksum on doesn't exist", as in Artifactory. Elsewhere a sidecar name without
 its file is still stored as a file of its own.
+
+**Sidecars a format keeps** (amended 2026-10-20, #533). Some files are of use only beside
+another, such as a Helm chart's provenance file, which `helm` fetches at the chart's URL plus
+`.prov` (decision [0039](0039-helm.md)). A format that implements `format.SidecarKeeper` names
+the sidecars of a file, and the item service keeps them with it, whichever API carried the
+write:
+- a delete of the file deletes its sidecars in the same operation, into the trash can at the
+  same moment and by the same caller;
+- a copy or move of the file takes each sidecar to its sidecar path beside the file's target,
+  admitted and checked as the file is. When a sidecar cannot land, the file does not go either,
+  and both are reported. A sidecar the operation names itself, as a folder's copy does, is
+  carried once;
+- a trash restore of the file restores the sidecars the same delete removed, beside the
+  file's destination, and asks the restore's permit about them too.
+
+On its own a sidecar is an ordinary file: deleting, copying or moving it touches nothing else,
+and a deploy over its owner leaves it. It is never a version file. This is not
+`SidecarOwner`, which is about checksum uploads.
 
 **Generic deploy policy.** `includesPattern`, `excludesPattern` and `blackedOut` are checked
 for every package type through `Admit`, on the generic handler that every format embeds.
@@ -133,17 +152,21 @@ reach the same result. State a protocol request carries, such as a dist-tag in a
 body, is stored as a property, not kept aside. A derived item is classified as derived, so
 replication and federation skip it and recompute it.
 
-**Which derived work goes through the work queue** (decision 0033):
-- **Through the queue, one kind per format and kind of work, keyed by package:**
-  - Maven metadata at the artifact and plugin levels, and at the snapshot level;
-  - `maxUniqueSnapshots`;
-  - later, Helm's `index.yaml` and NuGet's registration pages (P8).
+**Which derived work goes through the work queue** (decision 0033; amended 2026-10-20, #533):
+- **Through the queue, one kind per format and kind of work:**
+  - keyed by package: Maven metadata at the artifact and plugin levels, and at the snapshot
+    level, and `maxUniqueSnapshots`;
+  - keyed by repository: Helm's `index.yaml` (P8), since one file lists every chart in the
+    repository, so every write to it coalesces into one item whatever package it touched
+    (decision [0039](0039-helm.md)).
 
-  A read of derived data whose package is still queued calls `EnsureFresh` first, so a client
-  never reads stale metadata.
+  A read of derived data whose package or repository is still queued calls `EnsureFresh`
+  first, so a client never reads stale metadata.
 - **Not queued, because the deploy keeps them current or they are computed on read:**
   - npm packuments and search, which read the package index and the per-version metadata
     cache;
+  - NuGet's registration pages (P8), which read the package index and the per-version
+    documents (decision [0038](0038-nuget.md));
   - Go's version list and `@latest`;
   - the assignment of a unique snapshot's build number, which `Admit` reads from the package
     index during the upload;
@@ -231,10 +254,30 @@ The decision stands against 7.161.32
 
 - `internal/format/formattest` runs every format against the same contract on the in-memory,
   SQLite and PostgreSQL stores: the index is right after deploy, overwrite, delete, copy,
-  move and restore, and a reindex reproduces it (#268).
+  move and restore, and a reindex reproduces it (#268). Two options of the fixture cover P8
+  (#533):
+  - `Format.RepoWork` lists the kinds a format keys by repository. Every write that changes a
+    repository's versions (a deploy, an overwrite, a copy's target, a move's two repositories,
+    a delete and a restore) must leave exactly one item of each, keyed by the repository's
+    key, and none for a repository it left alone. `Format.Work` keeps the kinds keyed by
+    package, one item per package after a deploy, as for npm, Go and Maven.
+  - `File.SidecarOf` marks a file as a sidecar its format keeps. It must never be linked to
+    a version, and must follow its owner through a delete, a copy, a move, a trash restore
+    and a remote's cache. On its own it may arrive before its owner, and deleting, copying
+    or moving it alone touches nothing else. A format that notes its sidecars in a version's
+    metadata has that rebuilt by a reindex from empty, as all metadata is.
+
+  The suite's own tests run a test format with each option and with both, and show that it
+  catches a format that keys per-repository work by package, forgets it on a move, leaves a
+  sidecar behind, or links one.
+- `internal/service/item` and `internal/service/trash` test `SidecarKeeper` through each
+  write, with store faults, and a sidecar that cannot land holding its owner back (#533).
 - Unit and fault tests for each optional interface, `Derive` and the `Rejection` mapping
   (#267).
 - A test-only format exercises every part of the router kit (#269).
+- `internal/server`'s `TestP8ProtocolPaths` holds a path of each P8 protocol to the
+  catch-all's 404 until the format mounts the protocol, and then to the kit's 404 in the
+  protocol's own envelope, so no format's pull request edits it (#533).
 - Every read path refuses a blacked-out repository and an excluded path, in unit tests and
   in `download_policy.feature` with `jf rt dl` (#328).
 

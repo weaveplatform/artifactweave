@@ -813,9 +813,11 @@ func TrashEnabled(ctx context.Context, st store.Store) (bool, error) {
 }
 
 // Delete removes the item at t.Path and everything below it ("" is the
-// repository root). Files of local repositories go to the trash can when it
-// is on, keeping their blob references for a restore; otherwise, and for
-// remote caches, the references are released for garbage collection.
+// repository root), with the sidecars its format keeps with each file
+// (format.SidecarKeeper). Files of local repositories go to the trash can
+// when it is on, keeping their blob references for a restore; otherwise,
+// and for remote caches, the references are released for garbage
+// collection.
 func (s *Service) Delete(ctx context.Context, t Target, by string) (store.DeleteResult, error) {
 	trash := !t.Cached
 	if trash {
@@ -851,6 +853,14 @@ func (s *Service) remove(
 		if err != nil {
 			return err
 		}
+		// A file's sidecars go with it (format.SidecarKeeper), through the
+		// same hooks and into the trash can at the same moment, which is
+		// how a restore of the file finds them again.
+		sidecars, err := s.sidecarsOf(ctx, t.Repo, t.Cached, removed)
+		if err != nil {
+			return err
+		}
+		removed = append(removed, sidecars...)
 		hooks, env := s.format(t.Repo.PackageType), s.env()
 		var versions []types.PackageVersion
 		for _, it := range removed {
@@ -884,6 +894,9 @@ func (s *Service) remove(
 		}
 		if res, err = s.Store.Items().Delete(ctx, t.Repo.Key, t.Cached, full); err != nil {
 			return fmt.Errorf("item: delete %s: %w", full, err)
+		}
+		if res, err = s.deleteSidecars(ctx, t, sidecars, res); err != nil {
+			return err
 		}
 		// Deleting an item drops its version links; versions left empty go.
 		if err := pkgindex.Prune(ctx, s.Store, versions); err != nil {

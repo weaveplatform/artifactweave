@@ -174,9 +174,10 @@ type Destination struct {
 }
 
 // Restore moves the newest trashed copy of everything at or below
-// repoKey/from back into dst and returns how many items it restored. Each
-// batch is one transaction that recreates the items and drops their entries;
-// a conflict stops the restore with the earlier batches kept.
+// repoKey/from back into dst, each file with the sidecars its delete
+// removed (format.SidecarKeeper), and returns how many items it restored.
+// Each batch is one transaction that recreates the items and drops their
+// entries; a conflict stops the restore with the earlier batches kept.
 //
 // permit is asked about every selected item, at its original path, before
 // any batch moves, so one refusal restores nothing and answers
@@ -195,31 +196,32 @@ func (s *Service) Restore(
 	if err != nil {
 		return 0, err
 	}
-	selected := Newest(entries)
-	if len(selected) == 0 {
+	newest := Newest(entries)
+	if len(newest) == 0 {
 		return 0, ErrNothingTrashed
 	}
+	selected, err := s.withSidecars(ctx, from, dst, newest)
+	if err != nil {
+		return 0, err
+	}
 	if permit != nil {
-		for _, e := range selected {
-			if !permit(e.Record.Item) {
-				return 0, fmt.Errorf("%w: %s/%s",
-					ErrNotPermitted, e.Record.Item.RepoKey, e.Record.Item.FullPath())
+		for _, r := range selected {
+			if !permit(r.entry.Record.Item) {
+				return 0, fmt.Errorf("%w: %s/%s", ErrNotPermitted,
+					r.entry.Record.Item.RepoKey, r.entry.Record.Item.FullPath())
 			}
 		}
 	}
 	restored := 0
 	for chunk := range slices.Chunk(selected, s.batch()) {
 		err := s.Store.Tx(ctx, func(ctx context.Context) error {
-			for _, e := range chunk {
-				t := item.Target{
-					Repo: dst.Repo,
-					Path: destination(e.Record.Item.FullPath(), from, dst.Path),
-				}
-				if _, err := s.Items.Restore(ctx, t, e.Record, by); err != nil {
+			for _, r := range chunk {
+				t := item.Target{Repo: dst.Repo, Path: r.path}
+				if _, err := s.Items.Restore(ctx, t, r.entry.Record, by); err != nil {
 					return err //nolint:wrapcheck // the item service's typed errors
 				}
-				if err := s.Store.Trash().Delete(ctx, e.ID); err != nil {
-					return fmt.Errorf("trash: drop restored entry %d: %w", e.ID, err)
+				if err := s.Store.Trash().Delete(ctx, r.entry.ID); err != nil {
+					return fmt.Errorf("trash: drop restored entry %d: %w", r.entry.ID, err)
 				}
 			}
 			return nil
@@ -230,6 +232,61 @@ func (s *Service) Restore(
 		restored += len(chunk)
 	}
 	return restored, nil
+}
+
+// restoration is a trash entry a restore brings back, and where to.
+type restoration struct {
+	entry types.TrashEntry
+	path  string
+}
+
+// withSidecars places each of selected at its destination and adds, after
+// each file, the trashed sidecars that the destination's format keeps with
+// it (format.SidecarKeeper) and that the same delete removed: the one by
+// the same caller at the same moment, which is how the item service trashes
+// a file's sidecars with it. Each lands beside the file's destination. A
+// sidecar selected in its own right, as a folder's restore selects it,
+// keeps its own place, and one a later delete removed stays in the trash
+// can.
+func (s *Service) withSidecars(
+	ctx context.Context,
+	from string,
+	dst Destination,
+	selected []types.TrashEntry,
+) ([]restoration, error) {
+	have := make(map[string]bool, len(selected))
+	for _, e := range selected {
+		have[e.Record.Item.RepoKey+"/"+e.Record.Item.FullPath()] = true
+	}
+	out := make([]restoration, 0, len(selected))
+	for _, e := range selected {
+		it := e.Record.Item
+		to := destination(it.FullPath(), from, dst.Path)
+		out = append(out, restoration{e, to})
+		if it.Folder {
+			continue
+		}
+		beside := s.Items.Sidecars(dst.Repo, to)
+		for i, p := range s.Items.Sidecars(dst.Repo, it.FullPath()) {
+			if have[it.RepoKey+"/"+p] || i >= len(beside) {
+				continue
+			}
+			found, err := s.Store.Trash().Find(ctx, it.RepoKey, p)
+			if err != nil {
+				return nil, fmt.Errorf("trash: find %s/%s: %w", it.RepoKey, p, err)
+			}
+			// Find lists the newest first.
+			for _, sc := range found {
+				if !sc.Record.Item.Folder && sc.DeletedAt.Equal(e.DeletedAt) &&
+					sc.DeletedBy == e.DeletedBy {
+					have[it.RepoKey+"/"+p] = true
+					out = append(out, restoration{sc, beside[i]})
+					break
+				}
+			}
+		}
+	}
+	return out, nil
 }
 
 // destination maps an original path below from onto the destination path.

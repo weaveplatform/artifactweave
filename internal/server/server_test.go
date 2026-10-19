@@ -12,6 +12,10 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
+	"github.com/weaveplatform/artifactweave/internal/server/pkgroute"
+	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
 func testHandler() http.Handler {
@@ -485,13 +489,7 @@ func TestStubsAndEnvelopes(t *testing.T) {
 			404,
 			`{"error":"not found: GET /artifactory/api/npm/"}`,
 		},
-		{
-			"terraform 404",
-			"GET",
-			"/artifactory/api/terraform/v1/providers/x/y/versions",
-			404,
-			`{"errors":["not found: GET /artifactory/api/terraform/v1/providers/x/y/versions"]}`,
-		},
+		// Terraform's 404 is p8Paths'.
 		{
 			"root 404",
 			"GET",
@@ -523,12 +521,97 @@ func TestStubsAndEnvelopes(t *testing.T) {
 func TestTextSurfaces404(t *testing.T) {
 	h := testHandler()
 	// Go's paths are the router kit's, which answers 501 without a store;
-	// its checksum database is 404 before any lookup.
-	for _, path := range []string{"/artifactory/api/go/nope/sumdb/sum.golang.org/supported", "/artifactory/api/pypi/nope/simple/x/"} {
-		rec := do(t, h, "GET", path, nil, "")
-		if rec.Code != 404 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {
-			t.Fatalf("%s: %d %q", path, rec.Code, rec.Header().Get("Content-Type"))
+	// its checksum database is 404 before any lookup. PyPI's text 404 is
+	// p8Paths'.
+	path := "/artifactory/api/go/nope/sumdb/sum.golang.org/supported"
+	rec := do(t, h, "GET", path, nil, "")
+	if rec.Code != 404 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "text/plain") {
+		t.Fatalf("%s: %d %q", path, rec.Code, rec.Header().Get("Content-Type"))
+	}
+}
+
+// p8Paths are a path of each P8 protocol, under a repository that does not
+// exist, and the catch-all's answer to it while the protocol is not
+// mounted: a 404 in the envelope surfaceFor gives the protocol's clients.
+// Once the format's pull request adds the protocol to protocols, its router
+// kit answers instead, with a 404 in the protocol's own envelope, and the
+// row checks that. So no format's pull request has to change a row here.
+var p8Paths = []struct {
+	protocol, path string
+	// contentType and body are the catch-all's.
+	contentType, body string
+}{
+	{
+		"pypi", "/artifactory/api/pypi/nope/simple/x/",
+		"text/plain; charset=utf-8", "not found: GET /artifactory/api/pypi/nope/simple/x/\n",
+	},
+	{
+		"nuget",
+		"/artifactory/api/nuget/v3/nope/index.json",
+		"application/json",
+		`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/nuget/v3/nope/index.json"}]}`,
+	},
+	{
+		"helm",
+		"/artifactory/api/helm/nope/index.yaml",
+		"application/json",
+		`{"errors":[{"status":404,"message":"not found: GET /artifactory/api/helm/nope/index.yaml"}]}`,
+	},
+	{
+		"terraform", "/artifactory/api/terraform/v1/providers/x/y/versions", "application/json",
+		`{"errors":["not found: GET /artifactory/api/terraform/v1/providers/x/y/versions"]}`,
+	},
+	// Go's protocol is mounted, so its row is what each row above becomes.
+	{
+		"go",
+		"/artifactory/api/go/nope/example.com/m/@v/list",
+		"text/plain; charset=utf-8",
+		"not found: GET /artifactory/api/go/nope/example.com/m/@v/list\n",
+	},
+}
+
+// mounted returns the built-in protocol named name, if it is mounted.
+func mounted(name string) (pkgroute.Protocol, bool) {
+	for _, p := range protocols {
+		if proto := p(Config{}); proto.Name == name {
+			return proto, true
 		}
+	}
+	return pkgroute.Protocol{}, false
+}
+
+// surfaceType is the Content-Type an error in surface s is written with.
+func surfaceType(s apierror.Surface) string {
+	rec := httptest.NewRecorder()
+	apierror.Write(rec, s, apierror.New(http.StatusNotFound, "probe"))
+	return rec.Header().Get("Content-Type")
+}
+
+func TestP8ProtocolPaths(t *testing.T) {
+	// A store with no repositories, so a mounted protocol finds none.
+	h := New(Config{CompatVersion: "7.155.0", Store: inmem.New()})
+	for _, c := range p8Paths {
+		t.Run(c.protocol, func(t *testing.T) {
+			rec := do(t, h, http.MethodGet, c.path, nil, "")
+			p, ok := mounted(c.protocol)
+			want := c.contentType
+			if ok {
+				want = surfaceType(p.Surface)
+			}
+			if rec.Code != http.StatusNotFound || rec.Header().Get("Content-Type") != want {
+				t.Fatalf("mounted %v: %d %q, want 404 %q: %s",
+					ok, rec.Code, rec.Header().Get("Content-Type"), want, rec.Body)
+			}
+			switch {
+			case ok:
+			case c.contentType == "application/json":
+				if diff := cmp.Diff(decode(t, c.body), decode(t, rec.Body.String())); diff != "" {
+					t.Fatalf("body (-want +got):\n%s", diff)
+				}
+			case rec.Body.String() != c.body:
+				t.Fatalf("body %q, want %q", rec.Body, c.body)
+			}
+		})
 	}
 }
 

@@ -33,6 +33,7 @@ var scenarios = []scenario{
 	{"work", workScenario},
 	{"patterns", patternsScenario},
 	{"cache", cacheScenario},
+	{"sidecars", sidecarScenario},
 }
 
 // three deploys alpha 1.0, alpha 2.0 and beta 1.0 to c and returns them.
@@ -70,38 +71,37 @@ func overwriteScenario(w *world) error {
 	return errors.Join(w.expect(w.a, again), w.verify(w.a))
 }
 
-// Deleting a version's files one by one leaves the index right after each,
-// and the version gone after the last; deleting the repository's content
-// leaves no index.
+// Deleting a version's files one by one, each with its sidecars, leaves the
+// index right after each, and the version gone after the last; deleting the
+// repository's content leaves no index.
 func deleteScenario(w *world) error {
 	vs, err := w.three(w.a)
 	if err != nil {
 		return err
 	}
-	for _, f := range vs[1].Files {
-		w.tick()
-		if _, err := w.items.Delete(
-			w.ctx,
-			item.Target{Repo: w.a, Path: f.Path},
-			"formattest",
-		); err != nil {
-			return fmt.Errorf("delete %s: %w", f.Path, err)
+	for _, f := range principal(vs[1]) {
+		if err := w.remove(w.a, f.Path); err != nil {
+			return err
 		}
-		if err := w.verify(w.a); err != nil {
+		if err := errors.Join(
+			w.holds(w.a, false, with(vs[1], f.Path)...),
+			w.verify(w.a),
+		); err != nil {
 			return fmt.Errorf("after deleting %s: %w", f.Path, err)
 		}
 	}
 	if err := w.expect(w.a, vs[0], vs[2]); err != nil {
 		return err
 	}
-	if _, err := w.items.Delete(w.ctx, item.Target{Repo: w.a}, "formattest"); err != nil {
-		return fmt.Errorf("delete the repository's content: %w", err)
+	if err := w.remove(w.a, ""); err != nil {
+		return err
 	}
 	return errors.Join(w.expect(w.a), w.verify(w.a))
 }
 
 // A copy indexes its target as the source is indexed, a whole repository
-// at once or one file at a time, and leaves the source as it was.
+// at once or one file at a time, each file with its sidecars, and leaves
+// the source as it was.
 func copyScenario(w *world) error {
 	vs, err := w.three(w.a)
 	if err != nil {
@@ -113,32 +113,42 @@ func copyScenario(w *world) error {
 	if err := errors.Join(
 		w.expect(w.a, vs...),
 		w.expect(w.b, vs...),
+		w.holds(w.b, true, everything(vs...)...),
 		w.verify(w.a, w.b),
 	); err != nil {
 		return err
 	}
-	for _, f := range vs[0].Files {
+	for _, f := range principal(vs[0]) {
 		if err := w.transfer(w.a, f.Path, w.c, f.Path, false); err != nil {
 			return err
 		}
-		if err := w.verify(w.c); err != nil {
+		if err := errors.Join(
+			w.holds(w.c, true, with(vs[0], f.Path)...),
+			w.verify(w.c),
+		); err != nil {
 			return fmt.Errorf("after copying %s: %w", f.Path, err)
 		}
 	}
-	return w.expect(w.c, vs[0])
+	return errors.Join(w.expect(w.c, vs[0]), w.holds(w.a, true, everything(vs...)...))
 }
 
-// A move indexes its target and unindexes its source.
+// A move indexes its target and unindexes its source, each file taking its
+// sidecars along.
 func moveScenario(w *world) error {
 	vs, err := w.three(w.a)
 	if err != nil {
 		return err
 	}
-	for _, f := range vs[0].Files {
+	for _, f := range principal(vs[0]) {
 		if err := w.transfer(w.a, f.Path, w.c, f.Path, true); err != nil {
 			return err
 		}
-		if err := w.verify(w.a, w.c); err != nil {
+		moved := with(vs[0], f.Path)
+		if err := errors.Join(
+			w.holds(w.a, false, moved...),
+			w.holds(w.c, true, moved...),
+			w.verify(w.a, w.c),
+		); err != nil {
 			return fmt.Errorf("after moving %s: %w", f.Path, err)
 		}
 	}
@@ -146,7 +156,8 @@ func moveScenario(w *world) error {
 		return err
 	}
 	return errors.Join(
-		w.expect(w.a), w.expect(w.b, vs[1:]...), w.expect(w.c, vs[0]), w.verify(w.a, w.b, w.c),
+		w.expect(w.a), w.expect(w.b, vs[1:]...), w.expect(w.c, vs[0]),
+		w.holds(w.b, true, everything(vs[1:]...)...), w.verify(w.a, w.b, w.c),
 	)
 }
 
@@ -180,31 +191,39 @@ func (w *world) transfer(
 	return nil
 }
 
-// Restoring from the trash can indexes a version again, file by file or a
-// whole repository's content at once.
+// Restoring from the trash can indexes a version again, file by file, each
+// with the sidecars its delete removed, or a whole repository's content at
+// once.
 func restoreScenario(w *world) error {
 	vs, err := w.three(w.a)
 	if err != nil {
 		return err
 	}
-	if _, err := w.items.Delete(w.ctx, item.Target{Repo: w.a}, "formattest"); err != nil {
-		return fmt.Errorf("delete the repository's content: %w", err)
+	if err := w.remove(w.a, ""); err != nil {
+		return err
 	}
 	if err := w.expect(w.a); err != nil {
 		return err
 	}
-	for _, f := range vs[0].Files {
+	for _, f := range principal(vs[0]) {
 		if err := w.restore(f.Path); err != nil {
 			return err
 		}
-		if err := w.verify(w.a); err != nil {
+		if err := errors.Join(
+			w.holds(w.a, true, with(vs[0], f.Path)...),
+			w.verify(w.a),
+		); err != nil {
 			return fmt.Errorf("after restoring %s: %w", f.Path, err)
 		}
 	}
 	if err := w.restore(""); err != nil {
 		return err
 	}
-	return errors.Join(w.expect(w.a, vs...), w.verify(w.a))
+	return errors.Join(
+		w.expect(w.a, vs...),
+		w.holds(w.a, true, everything(vs...)...),
+		w.verify(w.a),
+	)
 }
 
 // restore restores what was trashed from repository a at p.
@@ -325,8 +344,11 @@ func rollbackScenario(w *world) error {
 }
 
 // Committed deploys leave exactly one queued item of each kind the format
-// declares per package, however many versions they wrote, and none of any
-// other kind.
+// keys by package for each package, however many versions they wrote, one
+// of each kind it keys by repository for the repository, however many
+// packages they wrote, and none of any other kind. Each later write leaves
+// one item of each kind keyed by repository for every repository whose
+// versions it changed, and none for another.
 func workScenario(w *world) error {
 	vs, err := w.three(w.a)
 	if err != nil {
@@ -340,12 +362,66 @@ func workScenario(w *world) error {
 	for _, k := range w.f.Work {
 		want[k] = int64(len(pkgs))
 	}
+	for _, k := range w.f.RepoWork {
+		want[k] = 1
+	}
 	got, err := w.work()
 	if err != nil {
 		return err
 	}
 	if !maps.Equal(got, want) {
 		return fmt.Errorf("%w: queued work %v; want %v", errBroken, got, want)
+	}
+	if len(w.f.RepoWork) == 0 {
+		return nil
+	}
+	if err := w.repoWork("deploying", w.a); err != nil {
+		return err
+	}
+	return w.repoWorkAfterWrites(vs)
+}
+
+// repoWorkAfterWrites checks the work keyed by repository that each kind of
+// write leaves, from an empty queue: vs are deployed to repository a.
+func (w *world) repoWorkAfterWrites(vs []Version) error {
+	for _, step := range []struct {
+		what  string
+		write func() error
+		repos []repo.Config
+	}{
+		{"overwriting", func() error {
+			return w.deploy(w.a, w.version("alpha", "1.0", 1), nil)
+		}, []repo.Config{w.a}},
+		{"copying", func() error {
+			return w.transfer(w.a, "", w.b, "", false)
+		}, []repo.Config{w.b}},
+		{"moving", func() error {
+			for _, f := range principal(vs[0]) {
+				if err := w.transfer(w.b, f.Path, w.c, f.Path, true); err != nil {
+					return err
+				}
+			}
+			return nil
+		}, []repo.Config{w.b, w.c}},
+		{"deleting", func() error {
+			for _, f := range principal(vs[1]) {
+				if err := w.remove(w.a, f.Path); err != nil {
+					return err
+				}
+			}
+			return nil
+		}, []repo.Config{w.a}},
+		{"restoring", func() error { return w.restore("") }, []repo.Config{w.a}},
+	} {
+		if err := w.drain(); err != nil {
+			return err
+		}
+		if err := step.write(); err != nil {
+			return err
+		}
+		if err := w.repoWork(step.what, step.repos...); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -425,18 +501,108 @@ func cacheScenario(w *world) error {
 	if err := errors.Join(w.expect(r, vs...), w.verify(r)); err != nil {
 		return err
 	}
-	for _, f := range vs[1].Files {
-		w.tick()
-		if _, err := w.items.Delete(
-			w.ctx,
-			item.Target{Repo: r, Cached: true, Path: f.Path},
-			"formattest",
-		); err != nil {
-			return fmt.Errorf("delete %s from the cache: %w", f.Path, err)
+	for _, f := range principal(vs[1]) {
+		if err := w.remove(r, f.Path); err != nil {
+			return err
 		}
-		if err := w.verify(r); err != nil {
+		if err := errors.Join(
+			w.holds(r, false, with(vs[1], f.Path)...),
+			w.verify(r),
+		); err != nil {
 			return fmt.Errorf("after deleting %s from the cache: %w", f.Path, err)
 		}
 	}
 	return errors.Join(w.expect(r, vs[0], vs[2]), w.verify(r))
+}
+
+// A sidecar on its own is an ordinary file that is never a version file. It
+// may arrive before its owner, and is then kept with it through a delete and
+// a restore; deleting, copying or moving it alone touches nothing else; and
+// a restore of its owner leaves it in the trash can when another delete
+// removed it.
+func sidecarScenario(w *world) error {
+	v := w.version("alpha", "1.0", 0)
+	sidecars := sidecarFiles(v)
+	if len(sidecars) == 0 {
+		return nil
+	}
+	alone, rest := pathsOf(sidecars), pathsOf(principal(v))
+	early := v
+	early.Files = append(slices.Clone(sidecars), principal(v)...)
+	if err := w.deploy(w.a, early, nil); err != nil {
+		return err
+	}
+	if err := errors.Join(w.expect(w.a, v), w.verify(w.a)); err != nil {
+		return fmt.Errorf("with the sidecars deployed first: %w", err)
+	}
+	owners := map[string]bool{}
+	for _, f := range sidecars {
+		owners[f.SidecarOf] = true
+	}
+	for owner := range owners {
+		if err := w.remove(w.a, owner); err != nil {
+			return err
+		}
+		if err := w.holds(w.a, false, with(v, owner)...); err != nil {
+			return fmt.Errorf("after deleting %s, deployed after its sidecars: %w", owner, err)
+		}
+		if err := w.restore(owner); err != nil {
+			return err
+		}
+	}
+	if err := errors.Join(
+		w.holds(w.a, true, everything(v)...),
+		w.expect(w.a, v),
+		w.verify(w.a),
+	); err != nil {
+		return fmt.Errorf("after restoring the owners with their sidecars: %w", err)
+	}
+	for _, p := range alone {
+		if err := w.transfer(w.a, p, w.b, p, false); err != nil {
+			return err
+		}
+	}
+	if err := errors.Join(
+		w.holds(w.b, true, alone...), w.holds(w.b, false, rest...),
+		w.expect(w.a, v), w.expect(w.b), w.verify(w.a, w.b),
+	); err != nil {
+		return fmt.Errorf("after copying the sidecars alone: %w", err)
+	}
+	for _, p := range alone {
+		if err := w.transfer(w.b, p, w.c, p, true); err != nil {
+			return err
+		}
+	}
+	if err := errors.Join(
+		w.holds(w.b, false, alone...), w.holds(w.c, true, alone...),
+		w.expect(w.b), w.expect(w.c), w.verify(w.b, w.c),
+	); err != nil {
+		return fmt.Errorf("after moving the sidecars alone: %w", err)
+	}
+	for _, p := range alone {
+		if err := w.remove(w.a, p); err != nil {
+			return err
+		}
+	}
+	if err := errors.Join(
+		w.holds(w.a, false, alone...), w.holds(w.a, true, rest...),
+		w.expect(w.a, v), w.verify(w.a),
+	); err != nil {
+		return fmt.Errorf("after deleting the sidecars alone: %w", err)
+	}
+	for owner := range owners {
+		if err := w.remove(w.a, owner); err != nil {
+			return err
+		}
+		if err := w.restore(owner); err != nil {
+			return err
+		}
+	}
+	if err := errors.Join(
+		w.holds(w.a, false, alone...), w.holds(w.a, true, rest...),
+		w.expect(w.a, v), w.verify(w.a),
+	); err != nil {
+		return fmt.Errorf("after restoring the owners, deleted after their sidecars: %w", err)
+	}
+	return nil
 }

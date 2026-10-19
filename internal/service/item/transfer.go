@@ -84,8 +84,9 @@ type step struct {
 // an item that cannot land (a file where a folder must go, or the reverse,
 // an overwrite the caller may not make, or a file the target's format
 // refuses) is reported and skipped with its subtree, or ends the plan when
-// t.FailFast. The planned items are then written in one transaction; a dry
-// run stops after the plan.
+// t.FailFast. A file's sidecars that its format keeps with it go with it
+// (format.SidecarKeeper). The planned items are then written in one
+// transaction; a dry run stops after the plan.
 func (s *Service) Transfer(ctx context.Context, t Transfer) (TransferResult, error) {
 	var res TransferResult
 	steps, err := s.plan(ctx, t, &res)
@@ -187,7 +188,11 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 	if err != nil {
 		return nil, err
 	}
-	return s.planItems(ctx, t, res, sources, srcFull, dstRoot, tr)
+	steps, err := s.planItems(ctx, t, res, sources, srcFull, dstRoot, tr)
+	if err != nil {
+		return nil, err
+	}
+	return s.planSidecars(ctx, t, res, sources, steps)
 }
 
 // planItems plans each of sources, the source at srcFull and everything
