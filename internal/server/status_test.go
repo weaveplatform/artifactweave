@@ -626,6 +626,21 @@ func descriptorStatusRows() []statusCase {
 			"localRepositories:\n  patch-env:\n    type: generic\n    projectKey: proj\n    environments: [nope]\n",
 			400,
 		},
+		// The artifactory_repository_layout resource repeats the key as name.
+		{
+			patch,
+			path,
+			"admin",
+			"repoLayouts:\n  patch-layout:\n    name: patch-layout\n    artifactPathPattern: \"[module]/[baseRev]\"\n",
+			200,
+		},
+		{
+			patch,
+			path,
+			"admin",
+			"repoLayouts:\n  patch-layout:\n    name: other\n    artifactPathPattern: \"[module]/[baseRev]\"\n",
+			400,
+		},
 		{patch, path, "", "localRepositories: {}", 401},
 		{patch, path, "anonymous", "localRepositories: {}", 401},
 		{patch, path, "user", "localRepositories: {}", 403},
