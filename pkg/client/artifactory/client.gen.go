@@ -4554,7 +4554,7 @@ type ItemCreated struct {
 	// OriginalChecksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
 	OriginalChecksums *Checksums `json:"originalChecksums,omitempty"`
 
-	// Path Optional within this object. Item path relative to the repository root with a leading `/`.
+	// Path Optional within this object. Item path relative to the repository root with a leading `/`. A folder's ends in `/`.
 	Path *string `json:"path,omitempty"`
 
 	// Repo Optional within this object. Repository key the item was stored in. A deploy to a virtual repository reports its default deployment repository.
@@ -4563,7 +4563,7 @@ type ItemCreated struct {
 	// Size Optional within this object. Content length in bytes as a decimal string.
 	Size *string `json:"size,omitempty"`
 
-	// Uri Optional within this object. Absolute storage API URL of the new item.
+	// Uri Optional within this object. Absolute download URL of the new item, the same as `downloadUri` for a file. A folder's ends in `/`.
 	Uri *string `json:"uri,omitempty"`
 }
 

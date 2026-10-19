@@ -189,11 +189,10 @@ Identity: `(repo, path)`. Mutability: content is replaced by a new deploy (a new
 properties and statistics change independently of content; `created`, `createdBy` and the
 checksums are server-owned.
 
-7.x differs: a copy or move whose source does not exist answers 400 with a
-`CopyOrMoveResult` body ([copy item](https://docs.jfrog.com/artifactory/reference/copyitem),
-[move item](https://docs.jfrog.com/artifactory/reference/moveitem)), where artifactweave
-answers 404 in the error envelope (`internal/service/item/transfer.go`); fixed by #400.
-Whether 7.x sends 400 or 409 is on #216:
+A copy or move whose source does not exist answers 400 with a `CopyOrMoveResult` body, as
+JFrog's pages state ([copy item](https://docs.jfrog.com/artifactory/reference/copyitem),
+[move item](https://docs.jfrog.com/artifactory/reference/moveitem); `item.ErrNoSource` in
+`internal/service/item/transfer.go`, #400). Whether 7.x sends 400 or 409 is on #216:
 [RTFACT-27134](https://jfrog.atlassian.net/browse/RTFACT-27134) (7.38.8, open) reports a 409.
 
 Supporting records in the same family:

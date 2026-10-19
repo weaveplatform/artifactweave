@@ -151,6 +151,8 @@ npm:
   max_publish_size: 256MiB
 token:
   allow_basic_auth: true
+deploy:
+  enforce_permission_check_on_identical_checksum_deploy: true
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -201,10 +203,11 @@ token:
 			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
 			UserQueryLimit: 50,
 		},
-		Work:  WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
-		Build: BuildConfig{BlockDuplicateEntries: false},
-		NPM:   NPMConfig{MaxPublishSize: 256 << 20},
-		Token: TokenConfig{AllowBasicAuth: true},
+		Work:   WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
+		Build:  BuildConfig{BlockDuplicateEntries: false},
+		NPM:    NPMConfig{MaxPublishSize: 256 << 20},
+		Token:  TokenConfig{AllowBasicAuth: true},
+		Deploy: DeployConfig{EnforceIdenticalChecksumDeploy: true},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -249,6 +252,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Search.UserQueryLimit != 3 || !cfg.Search.LimitAnonymousUsersOnly ||
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
 		cfg.NPM.MaxPublishSize != 8<<20 || !cfg.Token.AllowBasicAuth ||
+		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -871,6 +875,41 @@ func TestTokenConfig(t *testing.T) {
 		})
 		if err != nil || got.Token.AllowBasicAuth != tc.want {
 			t.Fatalf("env %v, flags %v: %+v, %v", tc.env, tc.flags, got.Token, err)
+		}
+	}
+}
+
+func TestDeployConfig(t *testing.T) {
+	const key = "deploy.enforce_permission_check_on_identical_checksum_deploy"
+	if Default().Deploy.EnforceIdenticalChecksumDeploy {
+		t.Fatal("an identical checksum deploy needs delete by default")
+	}
+	cfg := Default()
+	if err := set(&cfg, key, "yes"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("bad boolean: %v", err)
+	}
+	// The flag beats the environment, which beats the file.
+	off := map[string]string{
+		"ARTIFACTWEAVE_DEPLOY_ENFORCE_PERMISSION_CHECK_ON_IDENTICAL_CHECKSUM_DEPLOY": "false",
+	}
+	for _, tc := range []struct {
+		env, flags map[string]string
+		want       bool
+	}{
+		{nil, nil, true},
+		{off, nil, false},
+		{off, map[string]string{key: "true"}, true},
+	} {
+		got, err := Load(LoadOptions{
+			File: writeFile(
+				t,
+				"deploy:\n  enforce_permission_check_on_identical_checksum_deploy: true\n",
+			),
+			Env:   envOf(tc.env),
+			Flags: tc.flags,
+		})
+		if err != nil || got.Deploy.EnforceIdenticalChecksumDeploy != tc.want {
+			t.Fatalf("env %v, flags %v: %+v, %v", tc.env, tc.flags, got.Deploy, err)
 		}
 	}
 }

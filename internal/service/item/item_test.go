@@ -262,6 +262,89 @@ func TestDeployIfAbsent(t *testing.T) {
 	}
 }
 
+func TestDeclaresContentOf(t *testing.T) {
+	f := types.Item{Actual: sums("content")}
+	c, o := sums("content"), sums("other")
+	for _, tc := range []struct {
+		declared types.Checksums
+		want     bool
+	}{
+		{types.Checksums{SHA1: c.SHA1}, true},
+		{types.Checksums{SHA256: c.SHA256}, true},
+		{types.Checksums{SHA1: c.SHA1, SHA256: c.SHA256, MD5: o.MD5}, true},
+		{types.Checksums{}, false},
+		{types.Checksums{MD5: c.MD5, SHA512: c.SHA512}, false},
+		{types.Checksums{SHA1: c.SHA1, SHA256: o.SHA256}, false},
+		{types.Checksums{SHA1: o.SHA1, SHA256: c.SHA256}, false},
+	} {
+		if got := DeclaresContentOf(tc.declared, f); got != tc.want {
+			t.Errorf("%+v: %v, want %v", tc.declared, got, tc.want)
+		}
+	}
+}
+
+// TestDeployOverwriteIdentical: without the right to overwrite, a deploy
+// replaces a file only when it declares the file's content and stores
+// exactly it; the stored bytes decide, not the declaration.
+func TestDeployOverwriteIdentical(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	c := sums("content")
+	// Declarations are only recorded here, so a false one gets as far as
+	// the overwrite check.
+	w.loc.ChecksumPolicyType = repo.ServerGeneratedChecksums
+	if _, err := w.deploy("f", "content", types.Checksums{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.deploy("other", "other", types.Checksums{}); err != nil {
+		t.Fatal(err)
+	}
+	deploy := func(body string, declared types.Checksums, identical bool) error {
+		_, err := w.svc.Deploy(ctx, Deploy{
+			Target: Target{Repo: w.loc, Path: "f"}, Body: strings.NewReader(body),
+			Declared: declared, By: "bob", OverwriteIdentical: identical,
+			CanOverwritePath: func(string) bool { return false },
+		})
+		return err
+	}
+	for name, tc := range map[string]struct {
+		body      string
+		declared  types.Checksums
+		identical bool
+		ok        bool
+	}{
+		"same content":            {"content", types.Checksums{SHA1: c.SHA1}, true, true},
+		"not allowed":             {"content", types.Checksums{SHA1: c.SHA1}, false, false},
+		"nothing declared":        {"content", types.Checksums{}, true, false},
+		"other bytes":             {"other", types.Checksums{SHA1: c.SHA1}, true, false},
+		"one declaration differs": {"content", types.Checksums{SHA1: c.SHA1, SHA256: sums("x").SHA256}, true, false},
+	} {
+		err := deploy(tc.body, tc.declared, tc.identical)
+		if tc.ok != (err == nil) || !tc.ok && !errors.Is(err, ErrOverwriteDenied) {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	got, err := w.db.Items().Get(ctx, w.loc.Key, false, "f")
+	if err != nil || got.Actual != c || got.ModifiedBy != "bob" {
+		t.Fatalf("file %+v %v", got, err)
+	}
+	// A checksum deploy is held to the same rule, with the content it found.
+	byChecksum := func(declared types.Checksums) error {
+		_, err := w.svc.DeployByChecksum(ctx, Deploy{
+			Target: Target{Repo: w.loc, Path: "f"}, Declared: declared, OverwriteIdentical: true,
+			CanOverwritePath: func(string) bool { return false },
+		})
+		return err
+	}
+	if err := byChecksum(types.Checksums{SHA256: c.SHA256}); err != nil {
+		t.Fatalf("same content by checksum: %v", err)
+	}
+	err = byChecksum(types.Checksums{SHA1: sums("other").SHA1})
+	if !errors.Is(err, ErrOverwriteDenied) {
+		t.Fatalf("other content by checksum: %v", err)
+	}
+}
+
 func TestDeployUploadFails(t *testing.T) {
 	w := newWorld(t)
 	_, err := w.svc.Deploy(context.Background(), Deploy{

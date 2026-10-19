@@ -214,7 +214,7 @@ func TestDeployAndDownload(t *testing.T) {
 	if created["repo"] != "libs-local" || created["path"] != "/org/app/app-1.0.jar" ||
 		created["size"] != "9" || created["mimeType"] != "application/java-archive" ||
 		created["downloadUri"] != "https://reg.example/artifactory/libs-local/org/app/app-1.0.jar" ||
-		created["uri"] != "https://reg.example/artifactory/api/storage/libs-local/org/app/app-1.0.jar" ||
+		created["uri"] != created["downloadUri"] ||
 		created["createdBy"] != "admin" {
 		t.Fatalf("body %v", created)
 	}
@@ -532,7 +532,13 @@ func TestFoldersAndListing(t *testing.T) {
 	w := newItemWorld(t, false)
 	rec := w.do("PUT", "/artifactory/libs-local/a/b/;owner=me", "admin", "")
 	wantStatus(t, rec, http.StatusCreated)
-	if strings.Contains(rec.Body.String(), "downloadUri") ||
+	// A folder's path and uri end in a slash (#400).
+	var created map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := created["downloadUri"]; ok || created["path"] != "/a/b/" ||
+		created["uri"] != "https://reg.example/artifactory/libs-local/a/b/" ||
 		!w.item("libs-local", false, "a/b").Folder {
 		t.Fatalf("folder create %s", rec.Body)
 	}
@@ -717,6 +723,195 @@ func TestItemPermissions(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantStatus(t, anon.do("GET", "/artifactory/up/absent", "", ""), http.StatusUnauthorized)
+}
+
+// TestDeployIdenticalContent (#400): replacing a file with its own content
+// needs deploy alone, as on Artifactory 7.x, so a CI job re-running jf rt u
+// with a user that may not delete succeeds. The request must declare the
+// file's SHA-1 or SHA-256, and the bytes stored must be the file's: the
+// declaration is the client's word, which nothing checks under
+// server-generated-checksums. Anything else still needs delete.
+func TestDeployIdenticalContent(t *testing.T) {
+	ctx := context.Background()
+	w := newItemWorld(t, false)
+	const file = "/artifactory/libs-local/same.txt"
+	wantStatus(t, w.do("PUT", file, "admin", "content"), http.StatusCreated)
+	before := w.item("libs-local", false, "same.txt")
+	for name, headers := range map[string][]string{
+		"sha1":       {"X-Checksum-Sha1", sha1Hex("content")},
+		"sha256":     {"X-Checksum-Sha256", sha256Hex("content")},
+		"x-checksum": {"X-Checksum", sha256Hex("content")},
+		"all":        {"X-Checksum-Sha1", sha1Hex("content"), "X-Checksum", sha256Hex("content")},
+	} {
+		rec := w.do("PUT", file, "deployer", "content", headers...)
+		if rec.Code != http.StatusCreated {
+			t.Fatalf("%s: %d %s", name, rec.Code, rec.Body)
+		}
+	}
+	after := w.item("libs-local", false, "same.txt")
+	if after.ID != before.ID || after.CreatedBy != "admin" || after.ModifiedBy != "deployer" ||
+		after.Actual != before.Actual {
+		t.Fatalf("re-deployed item %+v, was %+v", after, before)
+	}
+	if b, err := w.db.Blobs().Get(ctx, before.Actual.SHA256); err != nil || b.Refs != 1 {
+		t.Fatalf("content references %+v %v", b, err)
+	}
+	for name, tc := range map[string]struct {
+		body    string
+		headers []string
+		want    int
+	}{
+		// Artifactory protects a file from a request that declares nothing.
+		"nothing declared": {"content", nil, http.StatusForbidden},
+		// MD5 does not count, as in Artifactory 6.20's isFileOverwrite.
+		"md5 only":      {"content", []string{"X-Checksum-Md5", md5Hex("content")}, http.StatusForbidden},
+		"other content": {"other", []string{"X-Checksum-Sha1", sha1Hex("other")}, http.StatusForbidden},
+		// Bytes that are not what the request declares fail the checksum
+		// policy, whatever the file holds.
+		"bytes differ from the declaration": {
+			"other", []string{"X-Checksum-Sha1", sha1Hex("content")}, http.StatusConflict,
+		},
+	} {
+		if rec := w.do("PUT", file, "deployer", tc.body, tc.headers...); rec.Code != tc.want {
+			t.Errorf("%s: %d, want %d: %s", name, rec.Code, tc.want, rec.Body)
+		}
+	}
+	if got := w.do("GET", file, "admin", ""); got.Body.String() != "content" {
+		t.Fatalf("a refused deploy replaced the file: %q", got.Body)
+	}
+	// The right to delete still replaces it with anything.
+	wantStatus(t, w.do("PUT", file, "admin", "replaced"), http.StatusCreated)
+
+	// Under server-generated-checksums the declaration is not checked, so
+	// only the stored bytes can show the content is the file's.
+	if err := w.db.Permissions().Create(ctx, types.Permission{
+		Name: "deploy-server",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{
+				"deployer": types.ActionRead | types.ActionWrite,
+			}},
+			Targets: map[string]types.Target{"server-local": {Include: []string{"**"}}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	const server = "/artifactory/server-local/same.txt"
+	wantStatus(t, w.do("PUT", server, "admin", "content"), http.StatusCreated)
+	wantStatus(t, w.do("PUT", server, "deployer", "other", "X-Checksum-Sha1", sha1Hex("content")),
+		http.StatusForbidden)
+	wantStatus(t, w.do("PUT", server, "deployer", "content", "X-Checksum-Sha1", sha1Hex("content")),
+		http.StatusCreated)
+	if got := w.do("GET", server, "admin", ""); got.Body.String() != "content" {
+		t.Fatalf("a false declaration replaced the file: %q", got.Body)
+	}
+}
+
+// TestChecksumDeployIdenticalContent (#400): a checksum deploy of a file's
+// own content over it needs deploy alone, unless
+// deploy.enforce_permission_check_on_identical_checksum_deploy is on. It
+// still needs to read the content (#379), and the checksum is compared only
+// after that, so a caller that may not read what it would replace learns
+// nothing from a guess: the answer is the 404 of a miss whether or not the
+// guess is the file's checksum.
+func TestChecksumDeployIdenticalContent(t *testing.T) {
+	byChecksum := func(w *itemWorld, p, as, content string) *httptest.ResponseRecorder {
+		return w.do("PUT", "/artifactory/"+p, as, "",
+			"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex(content))
+	}
+	w := newItemWorld(t, false)
+	for p, body := range map[string]string{
+		"libs-local/same.bin":  "content",
+		"libs-local/other.bin": "other",
+		"other-local/hidden":   "hidden",
+	} {
+		wantStatus(t, w.do("PUT", "/artifactory/"+p, "admin", body), http.StatusCreated)
+	}
+	rec := byChecksum(w, "libs-local/same.bin", "deployer", "content")
+	wantStatus(t, rec, http.StatusCreated)
+	const uri = `"uri":"https://reg.example/artifactory/libs-local/same.bin"`
+	if !strings.Contains(rec.Body.String(), uri) {
+		t.Fatalf("checksum deploy answered %s", rec.Body)
+	}
+	if it := w.item("libs-local", false, "same.bin"); it.ModifiedBy != "deployer" {
+		t.Fatalf("re-deployed item %+v", it)
+	}
+	// Content it may read but that is not the file's needs delete.
+	wantStatus(t, byChecksum(w, "libs-local/same.bin", "deployer", "other"), http.StatusForbidden)
+	// Content it may not read is a miss, as at a new path.
+	hidden := byChecksum(w, "libs-local/same.bin", "deployer", "hidden")
+	miss := byChecksum(w, "libs-local/same.bin", "deployer", "never stored")
+	wantStatus(t, hidden, http.StatusNotFound)
+	if hidden.Body.String() != miss.Body.String() {
+		t.Fatalf("an unreadable hit %q differs from a miss %q", hidden.Body, miss.Body)
+	}
+
+	// The setting turns the check back on for checksum deploys alone; the
+	// jf rt u that follows a refused checksum deploy uploads, and passes.
+	strict := newItemWorld(t, false, func(c *Config) { c.EnforceIdenticalChecksumDeploy = true })
+	wantStatus(t, strict.do("PUT", "/artifactory/libs-local/same.bin", "admin", "content"),
+		http.StatusCreated)
+	wantStatus(t, byChecksum(strict, "libs-local/same.bin", "deployer", "content"),
+		http.StatusForbidden)
+	wantStatus(t, byChecksum(strict, "libs-local/same.bin", "admin", "content"), http.StatusCreated)
+	wantStatus(t, strict.do("PUT", "/artifactory/libs-local/same.bin", "deployer", "content",
+		"X-Checksum-Sha1", sha1Hex("content")), http.StatusCreated)
+}
+
+// TestItemCreated (#400): every deploy answers uri with the download URL,
+// as downloadUri, and a folder's path and uri end in a slash.
+func TestItemCreated(t *testing.T) {
+	w := newItemWorld(t, false)
+	const base = "https://reg.example/artifactory/"
+	body := func(rec *httptest.ResponseRecorder) map[string]any {
+		t.Helper()
+		wantStatus(t, rec, http.StatusCreated)
+		var out map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out
+	}
+	zip := string(zipBytes(t, map[string]string{"inner.txt": "inner"}))
+	for name, tc := range map[string]struct {
+		rec       *httptest.ResponseRecorder
+		path, uri string
+		file      bool
+	}{
+		"file": {
+			w.do("PUT", "/artifactory/libs-local/d/a%20b.txt;k=v", "admin", "ab"),
+			"/d/a b.txt", base + "libs-local/d/a%20b.txt", true,
+		},
+		"checksum deploy": {
+			w.do("PUT", "/artifactory/other-local/copy.txt", "admin", "",
+				"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex("ab")),
+			"/copy.txt", base + "other-local/copy.txt", true,
+		},
+		"through a virtual repository": {
+			w.do("PUT", "/artifactory/virt/v.txt", "admin", "v"),
+			"/v.txt", base + "libs-local/v.txt", true,
+		},
+		"folder": {
+			w.do("PUT", "/artifactory/libs-local/f/g/", "admin", ""),
+			"/f/g/", base + "libs-local/f/g/", false,
+		},
+		"explode": {
+			w.do("PUT", "/artifactory/libs-local/ex/bundle.zip", "admin", zip,
+				"X-Explode-Archive", "true"),
+			"/ex/", base + "libs-local/ex/", false,
+		},
+		"explode at the root": {
+			w.do("PUT", "/artifactory/other-local/bundle.zip", "admin", zip,
+				"X-Explode-Archive", "true"),
+			"/", base + "other-local/", false,
+		},
+	} {
+		got := body(tc.rec)
+		_, download := got["downloadUri"]
+		if got["path"] != tc.path || got["uri"] != tc.uri || download != tc.file ||
+			(tc.file && got["downloadUri"] != tc.uri) {
+			t.Errorf("%s: %v", name, got)
+		}
+	}
 }
 
 func TestSearchAQL(t *testing.T) {

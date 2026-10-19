@@ -462,6 +462,7 @@ components:
             the two is visible to the bad-checksum search.
         path:
           description: Optional within this object. Item path relative to the repository root with a leading `/`.
+            A folder's ends in `/`.
           type: string
         repo:
           description: Optional within this object. Repository key the item was stored in. A deploy to a virtual
@@ -471,7 +472,8 @@ components:
           description: Optional within this object. Content length in bytes as a decimal string.
           type: string
         uri:
-          description: Optional within this object. Absolute storage API URL of the new item.
+          description: Optional within this object. Absolute download URL of the new item, the same as `downloadUri`
+            for a file. A folder's ends in `/`.
           type: string
       type: object
     ItemLastModified:
@@ -1298,7 +1300,8 @@ paths:
             application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json:
               schema:
                 $ref: '#/components/schemas/CopyOrMoveResult'
-          description: The source or target path is invalid; the messages explain which.
+          description: The source or target path is invalid, or the source does not exist; the messages explain
+            which.
         '401':
           content:
             application/json:
@@ -1679,8 +1682,8 @@ paths:
             application/vnd.org.jfrog.artifactory.storage.CopyOrMoveResult+json:
               schema:
                 $ref: '#/components/schemas/CopyOrMoveResult'
-          description: The source or target path is invalid, or the source is not a local repository; the messages
-            explain which.
+          description: The source or target path is invalid, the source does not exist, or the source is not a local
+            repository; the messages explain which.
         '401':
           content:
             application/json:
@@ -2960,7 +2963,10 @@ paths:
         at: in a local Maven, Gradle, Ivy or SBT repository with the `maven-2-default` layout, a snapshot file is
         renamed as the repository''s `snapshotVersionBehavior` says, so `unique` stores `app-1.0-SNAPSHOT.jar` as
         `app-1.0-<yyyyMMdd.HHmmss>-<buildNumber>.jar`. Deploying over an existing path replaces the content unless
-        the repository forbids overwrites; replacing needs delete permission at the stored path. A `.md5`, `.sha1`,
+        the repository forbids overwrites; replacing needs delete permission at the stored path, except with the
+        file''s own content: a deploy that declares the stored file''s SHA-1 or SHA-256 and stores those same bytes
+        needs deploy permission only, and so does such a checksum deploy unless the server is set to require delete
+        permission for it. A `.md5`, `.sha1`,
         `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that
         checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries
         two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose

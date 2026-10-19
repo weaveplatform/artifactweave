@@ -91,6 +91,17 @@ type Config struct {
 	Build             BuildConfig     `yaml:"build"`
 	NPM               NPMConfig       `yaml:"npm"`
 	Token             TokenConfig     `yaml:"token"`
+	Deploy            DeployConfig    `yaml:"deploy"`
+}
+
+// DeployConfig holds the deploy settings.
+type DeployConfig struct {
+	// EnforceIdenticalChecksumDeploy makes a checksum deploy over a file
+	// with the same content need the delete permission, as Artifactory
+	// 7.x's enforce.permission.check.on.identical.checksum.deploy does. Off
+	// by default, as there, so that a CI re-run of jf rt u by a user who may
+	// deploy but not delete succeeds.
+	EnforceIdenticalChecksumDeploy bool `yaml:"enforce_permission_check_on_identical_checksum_deploy"`
 }
 
 // TokenConfig holds the access token settings (decision 0005).
@@ -334,6 +345,7 @@ var keys = append(append([]string{
 	"build.block_duplicate_entries",
 	"npm.max_publish_size",
 	"token.allow_basic_auth",
+	"deploy.enforce_permission_check_on_identical_checksum_deploy",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -348,6 +360,9 @@ func set(cfg *Config, key, value string) error {
 	}
 	if sub, ok := strings.CutPrefix(key, "cold_blob."); ok {
 		return setBlob(&cfg.ColdBlob, sub, key, value)
+	}
+	if dst, ok := boolKeys(cfg)[key]; ok {
+		return setBool(dst, key, value)
 	}
 	switch key {
 	case "listen":
@@ -370,8 +385,6 @@ func set(cfg *Config, key, value string) error {
 		cfg.Bootstrap.AdminPassword = value
 	case "bootstrap.descriptor":
 		cfg.Bootstrap.Descriptor = value
-	case "docker.subdomain_match":
-		return setBool(&cfg.Docker.SubdomainMatch, key, value)
 	case "log.level":
 		cfg.Log.Level = value
 	case "log.format":
@@ -390,24 +403,30 @@ func set(cfg *Config, key, value string) error {
 		return setInt(&cfg.Search.AQL.NonAdminScanFactor, key, value)
 	case "search.user_query_limit":
 		return setInt(&cfg.Search.UserQueryLimit, key, value)
-	case "search.limit_anonymous_users_only":
-		return setBool(&cfg.Search.LimitAnonymousUsersOnly, key, value)
 	case "work.workers":
 		return setInt(&cfg.Work.Workers, key, value)
 	case "work.lease":
 		return setDuration(&cfg.Work.Lease, key, value)
 	case "work.max_attempts":
 		return setInt(&cfg.Work.MaxAttempts, key, value)
-	case "build.block_duplicate_entries":
-		return setBool(&cfg.Build.BlockDuplicateEntries, key, value)
 	case "npm.max_publish_size":
 		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
-	case "token.allow_basic_auth":
-		return setBool(&cfg.Token.AllowBasicAuth, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
 	return nil
+}
+
+// boolKeys are the boolean keys and the fields they set. They are kept out
+// of set's switch, where every case adds to a complexity gocyclo caps.
+func boolKeys(cfg *Config) map[string]*bool {
+	return map[string]*bool{
+		"docker.subdomain_match":                                       &cfg.Docker.SubdomainMatch,
+		"search.limit_anonymous_users_only":                            &cfg.Search.LimitAnonymousUsersOnly,
+		"build.block_duplicate_entries":                                &cfg.Build.BlockDuplicateEntries,
+		"token.allow_basic_auth":                                       &cfg.Token.AllowBasicAuth,
+		"deploy.enforce_permission_check_on_identical_checksum_deploy": &cfg.Deploy.EnforceIdenticalChecksumDeploy,
+	}
 }
 
 func setDuration(dst *time.Duration, key, value string) error {

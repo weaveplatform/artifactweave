@@ -87,11 +87,11 @@ func (s artifactoryService) moveItem(w http.ResponseWriter, r *http.Request) {
 	s.transfer(w, r, true)
 }
 
-// transfer answers POST /api/copy and /api/move. Malformed requests and
-// sources or targets that cannot take part answer 400 with a report, as the
-// spec shapes it; a missing source is 404; a caller without the rights gets
-// 401 or 403. Otherwise the answer is 200 with per-item messages, even when
-// items failed.
+// transfer answers POST /api/copy and /api/move. Malformed requests, and
+// sources or targets that are missing or cannot take part, answer 400 with
+// a report, as JFrog's copy and move pages list no 404; a caller without
+// the rights gets 401 or 403. Otherwise the answer is 200 with per-item
+// messages, even when items failed.
 func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, move bool) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -136,7 +136,12 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 		return
 	}
 	from, cached, err := resolveRepo(ctx, st, srcKey)
-	if err != nil {
+	var missing *apierror.Error
+	switch {
+	case errors.As(err, &missing) && missing.Status == http.StatusNotFound:
+		refuseTransfer(w, missing.Message)
+		return
+	case err != nil:
 		writeErr(w, r, s.itemError(ctx, "resolve source repository", err))
 		return
 	}
@@ -190,6 +195,9 @@ func (s artifactoryService) transfer(w http.ResponseWriter, r *http.Request, mov
 	switch {
 	case errors.Is(err, item.ErrInvalidTransfer):
 		refuseTransfer(w, strings.TrimPrefix(err.Error(), item.ErrInvalidTransfer.Error()+": "))
+		return
+	case errors.Is(err, item.ErrNoSource):
+		refuseTransfer(w, fmt.Sprintf("The source %s:%s does not exist", srcKey, srcPath))
 		return
 	case err != nil:
 		writeErr(w, r, s.itemError(ctx, verb, err))

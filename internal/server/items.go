@@ -283,11 +283,15 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 	t := item.Target{Repo: c, Path: req.path}
 	explode := strings.EqualFold(r.Header.Get("X-Explode-Archive"), "true") ||
 		strings.EqualFold(r.Header.Get("X-Explode-Archive-Atomic"), "true")
+	byChecksum := strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true")
+	// Overwriting replaces content, which needs the right to delete it,
+	// except with the same content (item.Deploy.OverwriteIdentical). Only
+	// the item service can tell that, once it holds the content, so only a
+	// deploy that may not replace a file in any case is refused here.
 	existing, err := st.Items().Get(ctx, c.Key, false, req.path)
 	switch {
 	case err == nil && !existing.Folder && !req.folder && !explode &&
-		!acc.file(c, req.path, types.ActionDelete):
-		// Overwriting replaces content, which needs the right to delete it.
+		!s.mayBeIdentical(byChecksum) && !acc.file(c, req.path, types.ActionDelete):
 		writeErr(w, r, denied(p))
 		return
 	case err != nil && !errors.Is(err, store.ErrNotFound):
@@ -306,9 +310,10 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 			// it is checked at the archive's path, not per entry.
 			CanOverwrite: acc.file(c, req.path, types.ActionDelete),
 		})
-	case strings.EqualFold(r.Header.Get("X-Checksum-Deploy"), "true"):
+	case byChecksum:
 		d := s.fileDeploy(r, t, req, p, acc)
 		d.Reusable = s.reusable(st, p, acc, r.Header.Get("X-Checksum-Deploy-Token"))
+		d.OverwriteIdentical = s.mayBeIdentical(true)
 		it, err = svc.DeployByChecksum(ctx, d)
 	default:
 		if artifact, alg, ok := item.Sidecar(req.path); ok &&
@@ -316,7 +321,9 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 			s.recordChecksum(w, r, svc, item.Target{Repo: c, Path: artifact}, alg)
 			return
 		}
-		it, err = svc.Deploy(ctx, s.fileDeploy(r, t, req, p, acc))
+		d := s.fileDeploy(r, t, req, p, acc)
+		d.OverwriteIdentical = s.mayBeIdentical(false)
+		it, err = svc.Deploy(ctx, d)
 	}
 	if answered(w, err) {
 		return
@@ -367,6 +374,20 @@ func (s artifactoryService) fileDeploy(
 	d := s.deployRequest(r, t, req, p)
 	d.CanOverwritePath = func(full string) bool { return acc.file(t.Repo, full, types.ActionDelete) }
 	return d
+}
+
+// mayBeIdentical reports whether a deploy over a file the caller may not
+// delete goes on to the item service, which stores it only with the file's
+// own content: an upload always does, and a checksum deploy unless
+// deploy.enforce_permission_check_on_identical_checksum_deploy is on. The
+// declared checksums are not compared here, as 6.20's isFileOverwrite
+// compares them before it reads the body: a 403 for a wrong checksum and
+// none for the right one would tell a caller that may deploy but not read
+// what the file holds. Compared with the content, after the checksum
+// policy and, for a checksum deploy, the read check (#379), the answer
+// tells only a caller that already holds the content.
+func (s artifactoryService) mayBeIdentical(byChecksum bool) bool {
+	return !byChecksum || !s.cfg.EnforceIdenticalChecksumDeploy
 }
 
 // reusable decides whether a checksum deploy may store content the server
@@ -470,26 +491,38 @@ func (s artifactoryService) recordChecksum(
 	w.WriteHeader(http.StatusCreated)
 }
 
-// itemCreated is the ItemCreated body of a deploy.
+// itemCreated is the ItemCreated body of a deploy. Unlike the storage API's
+// item info, its uri is the item's download URL, the same as downloadUri
+// (the deployartifact page's example), and a folder's path and uri end in
+// "/" (6.20's SuccessfulDeploymentResponseHelper).
 func itemCreated(ctx context.Context, it types.Item) map[string]any {
-	base := baseurl.From(ctx)
-	rel := it.ReportedRepoKey() + "/" + escapePath(it.FullPath())
+	uri := baseurl.From(ctx) + "/artifactory/" + it.ReportedRepoKey() + "/" +
+		escapePath(it.FullPath())
 	body := map[string]any{
 		"repo":      it.ReportedRepoKey(),
 		"path":      it.StoragePath(),
 		"created":   formatTime(it.Created),
 		"createdBy": it.CreatedBy,
-		"uri":       base + "/artifactory/api/storage/" + rel,
+		"uri":       uri,
 	}
 	if it.Folder {
+		body["path"], body["uri"] = withSlash(it.StoragePath()), withSlash(uri)
 		return body
 	}
-	body["downloadUri"] = base + "/artifactory/" + rel
+	body["downloadUri"] = uri
 	body["mimeType"] = it.MimeType
 	body["size"] = fmt.Sprint(it.Size)
 	body["checksums"] = checksumsJSON(it.Actual)
 	body["originalChecksums"] = checksumsJSON(it.Original)
 	return body
+}
+
+// withSlash ends p in one "/"; the repository root's already does.
+func withSlash(p string) string {
+	if strings.HasSuffix(p, "/") {
+		return p
+	}
+	return p + "/"
 }
 
 // checksumsJSON is the file info's checksum object, which in Artifactory names
