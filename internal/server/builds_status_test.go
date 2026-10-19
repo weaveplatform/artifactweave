@@ -85,15 +85,16 @@ func buildStatusRows() []statusCase {
 		arts      = "/artifactory/api/builds/buildArtifacts"
 	)
 	doc := buildDoc("st-new", "1", testStarted)
-	return []statusCase{
+	rows := []statusCase{
 		{all, b, "admin", "", 200},
 		{all, b, "user", "", 200},
 		{all, b + "?project=default", "anonymous", "", 200},
 		{all, b, "", "", 401},
 
-		{publish, b, "admin", doc, 200},
+		{publish, b, "admin", doc, 204},
 		// The same identity again replaces the run.
-		{publish, b, "admin", doc, 200},
+		{publish, b + "?buildRepo=artifactory-build-info", "admin", doc, 204},
+		{publish, b + "?buildRepo=libs-local", "admin", doc, 400},
 		{publish, b, "admin", `{"number":"1","started":"` + testStarted + `"}`, 400},
 		{publish, b, "admin", buildDoc("st-new", "1", "yesterday"), 400},
 		{publish, b, "admin", `[]`, 400},
@@ -109,7 +110,11 @@ func buildStatusRows() []statusCase {
 		{runs, b + "/st-app", "", "", 401},
 
 		{info, b + "/st-app/1", "admin", "", 200},
-		{info, b + "/st-app/1?started=2026-10-15T09:30:00.000%2B0000&diff=0", "admin", "", 200},
+		{info, b + "/st-app/1?started=2026-10-15T09:30:00.000%2B0000", "admin", "", 200},
+		// Comparing runs (diff) is not served (DV-088).
+		{info, b + "/st-app/1?diff=1", "admin", "", 501},
+		{info, b + "/st-app/1?diff=null", "admin", "", 400},
+		{info, b + "/st-app/1?diff=0", "admin", "", 404},
 		{info, b + "/st-app/1?started=soon", "admin", "", 400},
 		{info, b + "/st-app/2", "admin", "", 404},
 		{info, b + "/st-app/1", "user", "", 403},
@@ -168,6 +173,40 @@ func buildStatusRows() []statusCase {
 		{retention, b + "/retention/st-ret", "user", `{"count":1}`, 403},
 		{retention, b + "/retention/st-ret", "anonymous", `{"count":1}`, 401},
 		{retention, b + "/retention/st-ret", "", `{"count":1}`, 401},
+	}
+	return append(rows, aqlStatusRows()...)
+}
+
+// aqlStatusRows covers what #410 and #445 added to POST /api/search/aql:
+// several criteria objects, the long relative-time units, includes of
+// related domains, repository roots, item.infos and the length limit.
+// buildStatusRows lists them beside the Builds API's.
+func aqlStatusRows() []statusCase {
+	const (
+		aqlOp = "POST /artifactory/api/search/aql"
+		path  = "/artifactory/api/search/aql"
+	)
+	return []statusCase{
+		{
+			aqlOp,
+			path,
+			"admin",
+			`items.find({"repo":"libs-local"},{"created":{"$last":"3days"}})`,
+			200,
+		},
+		{
+			aqlOp,
+			path,
+			"user",
+			`items.find({"type":"folder","name":"."}).include("repo","path","name")`,
+			200,
+		},
+		{aqlOp, path, "admin", `items.find().include("name","artifact.module.build.*")`, 200},
+		{aqlOp, path, "admin", `builds.find().include("name","module.artifact.item.name")`, 200},
+		{aqlOp, path, "admin", `items.find().include("artifact.module.build.@os")`, 400},
+		{aqlOp, path, "admin", `item.infos.find()`, 400},
+		{aqlOp, path, "admin", `items.find({"name":"` + strings.Repeat("a", 6000) + `"})`, 400},
+		{aqlOp, path, "anonymous", `items.find({},{})`, 403},
 	}
 }
 

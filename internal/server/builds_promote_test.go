@@ -211,7 +211,7 @@ func TestBuildPublishRetention(t *testing.T) {
 			`","buildRetention":{"count":1}}`
 	}
 	wantStatus(t, w.do(http.MethodPut, buildsPath, "deployer", retained("2", 1),
-		"Content-Type", vendorJSON), 200)
+		"Content-Type", vendorJSON), 204)
 	if runs := w.runsOf("app"); len(runs) != 2 {
 		t.Errorf("runs %v after a publisher without delete", runs)
 	}

@@ -1201,14 +1201,20 @@ func TestSearchAQLRepositoryPatterns(t *testing.T) {
 	}
 	const query = `items.find({"repo":"libs-local","type":"any"}).include("repo","path","name")`
 	rows, _ := aqlRows(t, w, "deployer", query)
+	// The repository's root is a row too (#445), which the patterns accept as
+	// the folder every accepted path lies below.
 	want := []string{
-		"libs-local/./a", "libs-local/a/x.jar", "libs-local/./b", "libs-local/b/y.jar",
+		"libs-local/./.",
+		"libs-local/./a",
+		"libs-local/a/x.jar",
+		"libs-local/./b",
+		"libs-local/b/y.jar",
 	}
 	if !slices.Equal(rows, want) {
 		t.Fatalf("deployer %v", rows)
 	}
 	// Administrators are not filtered.
-	if rows, _ := aqlRows(t, w, "admin", query); len(rows) != 8 {
+	if rows, _ := aqlRows(t, w, "admin", query); len(rows) != 9 {
 		t.Fatalf("admin %v", rows)
 	}
 }

@@ -609,6 +609,13 @@ paths:
         vendor media type or application/json.
       operationId: uploadBuild
       parameters:
+      - description: Optional query parameter. Key of the build-info repository that stores the run. It must be
+          the repository project selects; another key answers 400. Omitted derives it from project.
+        in: query
+        name: buildRepo
+        schema:
+          description: Repository key.
+          type: string
       - description: Optional query parameter. Key of the project that owns the build. Omitted or default means
           builds outside any project, stored in the artifactory-build-info repository; a project key selects that
           project's <project>-build-info repository.
@@ -628,8 +635,8 @@ paths:
         description: The build-info document.
         required: true
       responses:
-        '200':
-          description: Stored.
+        '204':
+          description: Stored. The response has no body.
           headers:
             X-Checksum-Sha256:
               description: SHA-256 of the stored build-info document.
@@ -733,7 +740,8 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text confirmation.
+                description: 'Plain-text confirmation listing each deleted run: `The following builds has been deleted
+                  successfully: ''<name>#<number>'', ''<name>#<number>''.`'
                 type: string
           description: Deleted.
         '400':
@@ -847,7 +855,8 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text confirmation.
+                description: 'Plain-text confirmation: `Build renaming of ''<from>'' to ''<to>'' was successfully
+                  started.`'
                 type: string
           description: Renamed.
         '400':
@@ -963,7 +972,8 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text confirmation.
+                description: 'Plain-text confirmation listing each deleted run: `The following builds has been deleted
+                  successfully: ''<name>#<number>'', ''<name>#<number>''.`'
                 type: string
           description: Deleted.
         '400':
@@ -1045,8 +1055,10 @@ paths:
         schema:
           description: Started timestamp of the run.
           type: string
-      - description: Optional query parameter. Another build number of the same build to compare with. It is accepted
-          and ignored; the run is returned without a comparison.
+      - description: 'Optional query parameter. Number of an older run of the same build to compare with. Comparing
+          runs is not supported: the value null answers 400 `Parameter ''diff'' must contain a value, if specified.`,
+          a number with no run answers 404, a run started after this one answers 400 `Build number should be
+          greater than the build number to compare against.`, and any other value answers 501.'
         in: query
         name: diff
         schema:
@@ -1067,12 +1079,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/BuildInfoResponse'
           description: The run.
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
         '401':
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A comparison with the older run named by diff was asked for; comparing runs is not supported.
       tags:
       - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildinfo.md

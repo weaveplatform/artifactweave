@@ -87,6 +87,19 @@ Sources:
   - **A dependency's name is its id.** `BuildStoreServiceImpl` stores
     `dependency.getId()` as the dependency name and its scope set joined with `,` as the
     scope; build-info dependencies carry an id, not a name.
+- **[S] Repository roots are items.** Artifactory keeps a node for each repository's root,
+  with path and name `.`, so `items.find` returns it where the criteria match a folder at
+  the root. jfrog-client-go skips a result named `.` when it reduces folders for a
+  download, copy or move (`artifactory/services/utils/searchutil.go`) and when it deletes
+  (`deleteutils.go`); its delete query also sends `"path":{"$ne":"."}` with `"type":"any"`.
+  `jf rt s <repo>/ --include-dirs` applies no reduction, so it lists the root as `<repo>/`.
+  No 7.x page shows a root row, so its times and fields are [I].
+- **[D] Criteria lists and relative times.** `find(...)` takes several criteria objects
+  separated by commas, an implicit `$and` ("Compounding Criteria"), and `$before` and
+  `$last` take the units `mills` or `ms`, `seconds` or `s`, `minutes`, `days` or `d`,
+  `weeks` or `w`, `months` or `mo`, and `years` or `y` ("Relative Time Operators")
+  (`aql-search-criteria`). [S] Artifactory 6.20's `AqlRelativeDateComparatorEnum` also
+  parses `millis` and `mi`.
 
 ### 1.2 Output, sorting and limits
 
@@ -143,7 +156,16 @@ Sources:
   `NON_NULL`).
 - **[D] Fields of other domains** in an include nest under `modules`, `artifacts`, `items`
   and so on, as the `builds.find` example with `.include("module.artifact.item.name")` in
-  `aql-query-output` shows.
+  `aql-query-output` shows; the build's default fields stay beside them. For items, "you
+  may include any other accessible field from any domain" (`aql-query-execution`), and
+  `aql-performance` includes `"artifact.module.build.*"`.
+  - **[S] How 6.20 builds the nesting.** The include's fields are selected through the same
+    joins as the criteria, one table per domain (`BasicSqlGenerator.tables`), so a nested
+    row is one the criteria allow. `InflatableRow` folds the joined rows into each found
+    row, telling rows of one domain apart by the values of their selected fields, and
+    `AqlRestResult.Row` names the groups `items`, `artifacts`, `dependencies`, `modules`,
+    `builds` and `build.promotions`. An include of a whole domain (`artifact`,
+    `artifact.module.build.*`) selects its id too, which keeps its rows apart.
 - **[D] `virtual_repos`** needs `repo`, `path` and `name` in the result set. It must usually
   be requested, and it is added implicitly when the query targets a virtual repository
   (`aql-repository-queries`).
@@ -154,9 +176,9 @@ Sources:
 
   | Status | When |
   |---|---|
-  | 400 | the query is empty, over the size limit (`AQL query is too long`), or fails syntax or validation |
+  | 400 | the query is empty, over the size limit (`AQL query is too long; please reduce the query length to less than 6000 chars`, the number being the configured limit, `aql-performance`), or fails syntax or validation |
   | 403 | an anonymous user runs a query |
-  | 408 | the database timeout cancels the query |
+  | 408 | the database cancels the query after `artifactory.aql.query.timeout.seconds`, 900 by default, or `artifactory.aql.streamed.query.timeout`, 7,200, with a `stream: true` header (`aql-performance`, "What Are the Query Timeout Defaults?") |
   | 429 | the concurrent-query limit is reached |
 - **[D] Non-admins.** Without a scoped token, a non-admin may query only the `items` domain,
   and must include `repo`, `path` and `name`. A scoped token with `build:<pattern>:r` may run
@@ -302,18 +324,29 @@ The Builds API pages carry OpenAPI 3.1 blocks. The spec oracle fetches them from
 
 | Operation | Request | Documented response | What the CLI checks [S] |
 |---|---|---|---|
-| Build upload | `PUT /api/build[?project=]`, JSON body | 200 | 200, 201 or 204, and reads `X-Checksum-Sha256` from the response for `--detailed-summary` (`artifactory/services/buildinfo.go`, `PublishBuildInfo`) |
+| Build upload | `PUT /api/build[?buildRepo=&project=]`, JSON body | 204 with `X-Checksum-Sha256` in `uploadbuild-1`, 200 in its twin `uploadbuild`; [S] 6.20's `BuildResource.addBuild` answers 204 | 200, 201 or 204, and reads `X-Checksum-Sha256` from the response for `--detailed-summary` (`artifactory/services/buildinfo.go`, `PublishBuildInfo`) |
 | All builds | `GET /api/build[?project=]` | 200 `{uri, builds[{uri:"/<name>", lastStarted}]}`; no 404 listed | not called |
 | Build runs | `GET /api/build/{name}[?project=]` | 200 `{uri, buildsNumbers[{uri:"/<number>", started}]}`; 404 | 200; 404 means not found |
-| Build info | `GET /api/build/{name}/{number}[?started=&diff=&project=]` | 200 `{uri, buildInfo}`; 404 | 200; 404 means not found |
+| Build info | `GET /api/build/{name}/{number}[?started=&diff=&project=]` | 200 `{uri, buildInfo}`; 404. `diff` names "an older build to which you want to compare contents", for the Builds Diff | 200; 404 means not found; never sends `diff` |
 | Build append | `POST /api/build/append/{name}/{number}[?started=&buildRepo=&project=]` | 204 | not called: `jf rt build-append` appends locally |
 | Promotion | `POST /api/build/promote/{name}/{number}[?project=]`, `application/vnd.org.jfrog.artifactory.build.PromotionRequest+json` | 200 `{messages[]}` | 200 (`artifactory/services/promote.go`) |
-| Rename | `POST /api/build/rename/{name}?to=` | 200 `text/plain` | not called |
+| Rename | `POST /api/build/rename/{name}?to=` | 200 `text/plain`, `Build renaming of '<from>' to '<to>' was successfully started.` | not called |
 | Retention | `POST /api/build/retention/{name}[?async=]`, `count` typed `integer` | 200 | **204** (`artifactory/services/discardBuilds.go`); `count` is sent as a **string** (`MaxBuilds string json:"count,omitempty"`) |
-| Delete | `DELETE /api/build/{name}?buildNumbers=&artifacts=0\|1&deleteAll=0\|1` | 200 `text/plain` | not called |
-| Delete (multiple) | `POST /api/build/delete`, `{project, buildName, buildNumbers[], deleteArtifacts, deleteAll}` | 200 `text/plain` | 200 or 204 |
+| Delete | `DELETE /api/build/{name}?buildNumbers=&artifacts=0\|1&deleteAll=0\|1` | 200 `text/plain`, `The following builds has been deleted successfully: 'my-build#51', 'my-build#52', 'my-build#55'.` (`deletebuilds`) | not called |
+| Delete (multiple) | `POST /api/build/delete`, `{project, buildName, buildNumbers[], deleteArtifacts, deleteAll}` | 200 `text/plain`, the same text as delete | 200 or 204 |
 | Build artifacts | `GET /api/builds/buildArtifacts/{name}/{number}/{build-info repo}` | undocumented | 200 `[{repo, path, name}]`; any error falls back to AQL (`artifactory/services/utils/artifactoryutils.go`) |
 
+- **The Builds Diff.** `getbuildinfo` links `diff` to a "Builds Diff" page that now redirects
+  back to `getbuildinfo`, so no 7.x page gives its response.
+  - **[S] What 6.20 checks** (`BuildResource.getBuildInfo`): `diff=null` is a 400
+    `Parameter 'diff' must contain a value, if specified.`; a number with no run is a 404
+    `No build was found for build name: <name> , build number: <diff> `; a run that started
+    before the one to compare with is a 400 `Build number should be greater than the build
+    number to compare against.`
+  - **[S] The response model** is `BuildsDiff`: `artifacts`, `dependencies` and
+    `properties`, each with `new`, `updated`, `unchanged` and `removed` lists of entries
+    with `name`, `diffName`, `module`, `type`, `sha1`, `md5` and `uri`. The closed
+    `RestAddon.getBuildsDiff` fills it, so how entries are matched is not known.
 - **[D] Linking artifacts.** For the Builds UI to link an artifact in `modules[].artifacts`,
   it must already exist with matching checksums, and carry `build.name` and `build.number`
   properties equal to the document's `name` and `number`; otherwise the UI shows "No path
@@ -458,8 +491,15 @@ artifactweave does for each.
   item-property rows, as `.limit(N)` does, and whether an item the window cuts keeps all its
   properties since 7.104.5 (§1.2).
 - **[I] Out of P5.** The `releases` and `release_artifacts` domains depend on release
-  bundles v1 (P15). `item.infos` needs a record of property modifications that the item store
-  does not keep.
+  bundles v1 (P15). `item.infos` needs who modified an item's properties and their checksum,
+  which the item store does not keep; it answers 400 as unsupported
+  ([research 10](10-scope-and-tiers.md#product-families)).
+- **[I] Nested rows in 7.x.** How 7.x tells nested rows of one domain apart and orders
+  them, whether it nests runs and items a non-admin may not read, and what it answers for
+  an include of a related row's properties or statistics (§1.2).
+- **[I] Root rows.** A root row's times, and whether a non-admin's root row follows the
+  repository's include and exclude patterns (§1.1).
+- **[I] The 408's message**, which no page gives (§1.3).
 
 ## 5. Versions at the research baseline
 
@@ -504,10 +544,18 @@ since 7.84.16 ([aql-performance](https://docs.jfrog.com/artifactory/docs/aql-per
 artifactweave sets no concurrency limit (`internal/server/aql.go`). The default is to verify
 against a live Artifactory ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 
-**Where artifactweave differs.** The audit of 2026-10-18 found code that differs from the
-pages above. The 7.x check sections of [decision 0012](decisions/0012-search-and-aql.md#artifactory-7x-check)
-and [decision 0014](decisions/0014-build-info.md#artifactory-7x-check) list each difference,
-its evidence and the issue that fixes it.
+**Where artifactweave differed.** The audit of 2026-10-18 found code that differed from the
+pages above: the size limit's message, the query timeout, the long relative-time units,
+criteria lists, related-domain includes, `item.infos`, repository roots, and the Builds
+API's publish status, `buildRepo`, `diff` and rename and delete texts.
+[#410](https://github.com/weaveplatform/artifactweave/issues/410),
+[#411](https://github.com/weaveplatform/artifactweave/issues/411),
+[#412](https://github.com/weaveplatform/artifactweave/issues/412) and
+[#445](https://github.com/weaveplatform/artifactweave/issues/445) brought the code in line,
+and the 7.x check sections of [decision 0012](decisions/0012-search-and-aql.md#artifactory-7x-check)
+and [decision 0014](decisions/0014-build-info.md#artifactory-7x-check) state each rule. The
+Builds Diff stays out ([DV-088](../implementation/deviations.md#api-behaviour)). No release
+after 7.161.32 self-managed or 7.174.0 SaaS, checked on 2026-10-19, changes them.
 
 The search APIs' rate limiting ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and the bad checksum search's 10,000 cap
 ([7.111.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71114-self-managed)) are in decision 0012.

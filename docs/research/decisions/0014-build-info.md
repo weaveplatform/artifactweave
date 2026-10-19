@@ -19,20 +19,39 @@ client checks this record relies on.
 **Endpoints.** `internal/service/build` implements the Builds API in research 22 §3.1, with
 the status codes and headers the CLI checks:
 - **`PUT /api/build`** accepts the `application/vnd.org.jfrog.artifactory+json` content type,
-  answers 200, and sets `X-Checksum-Sha256` to the stored document's SHA-256.
+  answers 204 with no body, and sets `X-Checksum-Sha256` to the stored document's SHA-256,
+  as [uploadbuild-1](https://docs.jfrog.com/integrations/reference/uploadbuild-1.md)
+  documents and Artifactory 6.20's `BuildResource.addBuild` answers (its twin page
+  [uploadbuild](https://docs.jfrog.com/integrations/reference/uploadbuild.md) still says
+  200). The JFrog CLI accepts 200, 201 and 204 (jfrog-client-go `PublishBuildInfo`).
+  `buildRepo`, "the build-info repository key that stores the build", is checked as append
+  checks it: it must name the project's build-info repository, and another key answers 400.
 - **Reads:**
   - `GET /api/build` always answers 200, with an empty list when there are no builds;
   - `GET /api/build/{name}` answers 404 for an unknown name;
-  - `GET /api/build/{name}/{number}` takes `started`, `project` and `diff`. Without
-    `started` it answers the latest run with that number.
+  - `GET /api/build/{name}/{number}` takes `started` and `project`. Without `started` it
+    answers the latest run with that number.
+  - **`diff`** asks for the Builds Diff of the run against an older one, which is not
+    served ([DV-088](../../implementation/deviations.md#api-behaviour)). The request is
+    checked as Artifactory 6.20's `BuildResource.getBuildInfo` checks it: `diff=null` is a
+    400 `Parameter 'diff' must contain a value, if specified.`, a number with no run is a
+    404 `No build was found for build name: <name> , build number: <diff>`, and a run that
+    started before the one to compare with is a 400 `Build number should be greater than
+    the build number to compare against.` A request that passes answers 501, not the run,
+    which a client would take for the comparison.
 - **Changes:**
   - append answers 204;
-  - rename answers 200 `text/plain`;
+  - rename answers 200 `text/plain` `Build renaming of '<from>' to '<to>' was successfully
+    started.` ([renamebuild](https://docs.jfrog.com/integrations/reference/renamebuild.md)),
+    although the rename is done when it answers;
   - promotion takes the `PromotionRequest` content type and answers 200 with `{messages[]}`,
     or 400 with them when a fail-fast promotion met an error or a warning;
   - retention answers **204**, accepts `count` as a string or a number, and takes `project`
     and `async`;
-  - both delete forms remove one run per listed occurrence of a number.
+  - both delete forms remove one run per listed occurrence of a number, and answer 200
+    `text/plain` `The following builds has been deleted successfully: '<name>#<number>',
+    '<name>#<number>'.`, one entry per deleted run in deletion order
+    ([deletebuilds](https://docs.jfrog.com/integrations/reference/deletebuilds.md)).
 - **`GET /api/builds/buildArtifacts/{name}/{number}/{repo}`** answers `[{repo, path, name}]`,
   so the CLI skips its AQL fallback.
 
@@ -164,6 +183,11 @@ unchanged.
 **Identifying a run by `started`** follows what the CLI does: a build number is not unique,
 and treating it as unique would break `jf rt bp --overwrite`.
 
+**A `diff` answering 501** rather than the run: neither JFrog's pages nor Artifactory's open
+source say how the Builds Diff matches files or fills its entries, and answering the run
+without a comparison, as artifactweave first did, lets a client take the run for the diff
+([DV-088](../../implementation/deviations.md#api-behaviour)).
+
 **Retention answering 204** follows the CLI, which rejects any other status. JFrog documents
 200 ([DV-031](../../implementation/deviations.md#documentation-versus-behaviour)).
 
@@ -214,29 +238,20 @@ as are the claim rule for files sharing a checksum and the check on append
 
 The audit against KB, Jira and client sources on 2026-10-18
 ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found where the Builds
-API differs from 7.x. [#412](https://github.com/weaveplatform/artifactweave/issues/412)
-fixes each, and corrects this record's text when it lands:
-- 7.x differs: `PUT /api/build` answers 204 with `X-Checksum-Sha256`
-  ([uploadbuild-1](https://docs.jfrog.com/integrations/reference/uploadbuild-1.md); its twin
-  [uploadbuild](https://docs.jfrog.com/integrations/reference/uploadbuild.md) still says
-  200), as Artifactory 6.20's `BuildResource.addBuild` does, where artifactweave answers
-  200; the JFrog CLI accepts 200, 201 or 204; fixed by #412.
-- 7.x differs: `PUT /api/build` takes an optional `buildRepo` query parameter, "the
-  build-info repository key that stores the build", where artifactweave ignores it and
-  stores the run in the project's build-info repository
-  ([uploadbuild-1](https://docs.jfrog.com/integrations/reference/uploadbuild-1.md)); fixed
-  by #412.
-- 7.x differs: `GET /api/build/{name}/{number}?diff=<older number>` answers the Builds Diff
-  of the two runs, where artifactweave ignores `diff` and answers the run
-  ([getbuildinfo](https://docs.jfrog.com/integrations/reference/getbuildinfo.md)); fixed by
-  #412.
-- 7.x differs: rename answers `Build renaming of '<from>' to '<to>' was successfully
-  started.` ([renamebuild](https://docs.jfrog.com/integrations/reference/renamebuild.md));
-  fixed by #412.
-- 7.x differs: both delete forms answer `The following builds has been deleted
-  successfully: '<name>#<number>', ...`
-  ([deletebuilds](https://docs.jfrog.com/integrations/reference/deletebuilds.md)); fixed by
-  #412.
+API differed from 7.x, and [#412](https://github.com/weaveplatform/artifactweave/issues/412)
+brought it in line: **Endpoints** states the 204 on publish, `buildRepo`, `diff`, and the
+rename and delete texts. No release after 7.161.32 self-managed or 7.174.0 SaaS, checked on
+2026-10-19, changes them.
+- **The Builds Diff stays out.** [getbuildinfo](https://docs.jfrog.com/integrations/reference/getbuildinfo.md)
+  points `diff` at "Builds Diff", and that page now redirects to getbuildinfo itself.
+  Artifactory 6.20 carries the response model (`BuildsDiff`: `artifacts`, `dependencies` and
+  `properties`, each `new`, `updated`, `unchanged` and `removed`) but computes it in the
+  closed `RestAddon`, so neither source says how files are matched or what each entry
+  holds. [DV-088](../../implementation/deviations.md#api-behaviour) records the 501.
+- **Inferred** ([#216](https://github.com/weaveplatform/artifactweave/issues/216)): that 7.x
+  still makes the 6.20 checks on `diff` with the same messages; that rename's text has no
+  trailing newline, which 6.20 adds and JFrog's example leaves out; and the delete text's
+  order and its form for `deleteAll`, which JFrog's example does not show.
 
 ## Constraints
 
@@ -262,6 +277,9 @@ fixes each, and corrects this record's text when it lands:
   operation intact.
 - `builds` domain AQL fixtures.
 - Build webhook events observed by the test receiver.
+- `TestBuildPublishBuildRepo` for the 204 and `buildRepo`, `TestBuildDiff` for each `diff`
+  answer, the rename and delete texts in `TestBuildRename` and `TestBuildOverwrite`, and
+  `jf rt bp --detailed-summary` reading the checksum from the 204 in `builds.feature`.
 
 ## References
 

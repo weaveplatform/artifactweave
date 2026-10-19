@@ -56,7 +56,7 @@ func documentPath(name, number, started string) string {
 
 func (w *itemWorld) publish(doc string) {
 	w.t.Helper()
-	wantStatus(w.t, w.do(http.MethodPut, buildsPath, "admin", doc, "Content-Type", vendorJSON), 200)
+	wantStatus(w.t, w.do(http.MethodPut, buildsPath, "admin", doc, "Content-Type", vendorJSON), 204)
 }
 
 func (w *itemWorld) hasItem(key, p string) bool {
@@ -106,7 +106,7 @@ func TestBuildPublishAndRead(t *testing.T) {
 	first := artifactDoc("team/app", "1", testStarted, "artifact")
 	second := artifactDoc("team/app", "1", startedAt(60), "artifact")
 	rec := w.do(http.MethodPut, buildsPath, "admin", first, "Content-Type", vendorJSON)
-	wantStatus(t, rec, 200)
+	wantStatus(t, rec, 204)
 	if got := rec.Header().Get("X-Checksum-Sha256"); got != sha256Hex(first) {
 		t.Errorf("X-Checksum-Sha256 %q, want the document's %q", got, sha256Hex(first))
 	}
@@ -144,7 +144,7 @@ func TestBuildPublishAndRead(t *testing.T) {
 	}
 
 	uri := `{"uri":"https://reg.example/artifactory/api/build/team%2Fapp/1","buildInfo":`
-	rec = w.do(http.MethodGet, buildsPath+"/team%2Fapp/1?diff=2", "admin", "")
+	rec = w.do(http.MethodGet, buildsPath+"/team%2Fapp/1", "admin", "")
 	wantStatus(t, rec, 200)
 	if got := rec.Body.String(); got != uri+second+"}" {
 		t.Errorf("latest run %s, want the second document as published", got)
@@ -206,12 +206,22 @@ func TestBuildOverwrite(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); ct != "text/plain" {
 		t.Errorf("Content-Type %q", ct)
 	}
+	// Artifactory's text (deletebuilds), one entry per deleted run.
+	if got := rec.Body.String(); got !=
+		"The following builds has been deleted successfully: 'app#1', 'app#1'." {
+		t.Errorf("message %q", got)
+	}
 	if runs := w.runsOf("app"); fmt.Sprint(runs) != fmt.Sprint([]string{"/2@" + startedAt(2)}) {
 		t.Errorf("runs %v, want run 2 only", runs)
 	}
 	w.publish(buildDoc("app", "1", startedAt(9)))
 
-	wantStatus(t, w.do(http.MethodDelete, buildsPath+"/app?deleteAll=1", "admin", ""), 200)
+	rec = w.do(http.MethodDelete, buildsPath+"/app?deleteAll=1", "admin", "")
+	wantStatus(t, rec, 200)
+	if got := rec.Body.String(); got !=
+		"The following builds has been deleted successfully: 'app#2', 'app#1'." {
+		t.Errorf("message %q", got)
+	}
 	wantStatus(t, w.do(http.MethodGet, buildsPath+"/app", "admin", ""), 404)
 	if w.hasItem(types.BuildInfoRepository, "app") {
 		t.Error("the build's folder outlived its last document")
@@ -288,7 +298,7 @@ func TestBuildRename(t *testing.T) {
 
 	rec := w.do(http.MethodPost, buildsPath+"/rename/old?to=team%2Fnew", "admin", "")
 	wantStatus(t, rec, 200)
-	if got := rec.Body.String(); got != "Build 'old' was renamed to 'team/new'." {
+	if got := rec.Body.String(); got != "Build renaming of 'old' to 'team/new' was successfully started." {
 		t.Errorf("message %q", got)
 	}
 	wantStatus(t, w.do(http.MethodGet, buildsPath+"/old", "admin", ""), 404)
@@ -374,7 +384,7 @@ func TestBuildPermissions(t *testing.T) {
 		return w.do(http.MethodPut, buildsPath, as, doc, "Content-Type", "application/json").Code
 	}
 
-	if got := put("deployer", buildDoc("app", "1", testStarted)); got != 200 {
+	if got := put("deployer", buildDoc("app", "1", testStarted)); got != 204 {
 		t.Errorf("deploy: %d", got)
 	}
 	// Replacing a run deletes its document: deploy alone is not enough.

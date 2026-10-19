@@ -7,10 +7,11 @@
 // Artifactory's output rules (research 22 §1). The builds and
 // build.promotions domains are served too, and every domain reaches the
 // others through relation paths such as artifact.module.build.name (see
-// Joined), which is how the JFrog CLI finds a build's files. It also
-// parses the two actions, items.delete and properties.update (research 22
-// §1.5), whose criteria select items the same way; the server carries
-// them out.
+// Joined), which is how the JFrog CLI finds a build's files; an include
+// may name those domains' fields too, which Nest fills in (nest.go). It
+// also parses the two actions, items.delete and properties.update
+// (research 22 §1.5), whose criteria select items the same way; the server
+// carries them out. Every repository's root is an items row (Roots).
 //
 // A parsed Query is run two ways that must agree row for row: Match and
 // Compare are the reference semantics (the in-memory store uses them), and
@@ -25,12 +26,14 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
 
 // MaxLength is the longest query accepted, in characters: Artifactory's
-// artifactory.aql.search.query.size.limit default.
+// artifactory.aql.search.query.size.limit default. ErrTooLong's text names
+// it, as Artifactory's message names the configured limit.
 const MaxLength = 6000
 
 // maxDepth bounds $and/$or nesting, so a hostile query cannot exhaust the
@@ -45,8 +48,9 @@ var (
 	// supported set.
 	ErrUnsupported = errors.New("aql: unsupported")
 	// ErrTooLong reports a query above MaxLength characters. Its text is
-	// Artifactory's message.
-	ErrTooLong = errors.New("AQL query is too long")
+	// Artifactory's message (aql-performance).
+	ErrTooLong = errors.New("AQL query is too long; please reduce the query length to less than " +
+		strconv.Itoa(MaxLength) + " chars")
 	// ErrRestricted reports a query a non-admin caller may not run.
 	ErrRestricted = errors.New("aql: restricted")
 	// ErrEmpty reports a request with no query at all.
@@ -270,6 +274,20 @@ var spanUnits = map[string]time.Duration{
 	"d": 24 * time.Hour, "w": 7 * 24 * time.Hour,
 }
 
+// spanAliases maps every unit $before and $last accept to the one Span
+// keeps. The long forms are those aql-search-criteria documents (mills,
+// seconds, days, weeks, months, years); millis and mi are what Artifactory
+// 6.20's AqlRelativeDateComparatorEnum also parses.
+var spanAliases = map[string]string{
+	"ms": "ms", "mills": "ms", "millis": "ms",
+	"s": "s", "seconds": "s",
+	"minutes": "minutes", "mi": "minutes",
+	"d": "d", "days": "d",
+	"w": "w", "weeks": "w",
+	"mo": "mo", "months": "mo",
+	"y": "y", "years": "y",
+}
+
 // Sort orders results by Fields, all ascending or all descending.
 type Sort struct {
 	Desc   bool
@@ -326,6 +344,15 @@ type Query struct {
 	// impliedVirtualRepos is set by Resolve when an $eq names a virtual
 	// repository: the rows then carry virtual_repos without the include.
 	impliedVirtualRepos bool
+	// related are the includes that name fields of other domains, in
+	// include order (relatedInclude).
+	related []relInclude
+	// rooted marks an items query parsed from AQL text, whose rows include
+	// every repository's root as Artifactory's do; Resolve then lists the
+	// roots in roots. The GET searches build their queries in code and
+	// leave it unset, so they never meet a root without a record.
+	rooted bool
+	roots  []RepoRef
 }
 
 // Options are the caller's settings for running a query.

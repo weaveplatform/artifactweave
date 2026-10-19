@@ -6461,6 +6461,9 @@ type GetAllBuildsParams struct {
 
 // UploadBuildParams defines parameters for UploadBuild.
 type UploadBuildParams struct {
+	// BuildRepo Optional query parameter. Key of the build-info repository that stores the run. It must be the repository project selects; another key answers 400. Omitted derives it from project.
+	BuildRepo *string `form:"buildRepo,omitempty" json:"buildRepo,omitempty"`
+
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
 	Project *string `form:"project,omitempty" json:"project,omitempty"`
 }
@@ -6533,7 +6536,7 @@ type GetBuildInfoParams struct {
 	// Started Optional query parameter. Selects one run of the build number by its started timestamp, in the layout yyyy-MM-dd'T'HH:mm:ss.SSSZ, for example 2026-10-15T09:30:00.000+0000 (Go layout 2006-01-02T15:04:05.000-0700). Omitted selects the most recent run with that number.
 	Started *string `form:"started,omitempty" json:"started,omitempty"`
 
-	// Diff Optional query parameter. Another build number of the same build to compare with. It is accepted and ignored; the run is returned without a comparison.
+	// Diff Optional query parameter. Number of an older run of the same build to compare with. Comparing runs is not supported: the value null answers 400 `Parameter 'diff' must contain a value, if specified.`, a number with no run answers 404, a run started after this one answers 400 `Build number should be greater than the build number to compare against.`, and any other value answers 501.
 	Diff *string `form:"diff,omitempty" json:"diff,omitempty"`
 
 	// Project Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
@@ -20955,6 +20958,18 @@ func NewUploadBuildRequestWithBody(server string, params *UploadBuildParams, con
 		// styled parameters, preserving literal commas as delimiters
 		// per the OpenAPI spec (e.g. "color=blue,black,brown").
 		var rawQueryFragments []string
+
+		if params.BuildRepo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "buildRepo", *params.BuildRepo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
 
 		if params.Project != nil {
 
@@ -40707,8 +40722,8 @@ func (r GetAllBuildsResponse) ContentType() string {
 	return ""
 }
 
-// UploadBuildResponse200Headers the declared response headers of an HTTP 200 response for UploadBuild
-type UploadBuildResponse200Headers struct {
+// UploadBuildResponse204Headers the declared response headers of an HTTP 204 response for UploadBuild
+type UploadBuildResponse204Headers struct {
 	XChecksumSha256 *string
 }
 
@@ -40721,8 +40736,8 @@ type UploadBuildResponse struct {
 	JSON401 *ArtifactoryBuildsApiUnauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ArtifactoryBuildsApiForbidden
-	// Headers200 the parsed response headers for an HTTP 200 response
-	Headers200 *UploadBuildResponse200Headers
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *UploadBuildResponse204Headers
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -41208,17 +41223,26 @@ type GetBuildInfoResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *BuildInfoResponse
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *ArtifactoryBuildsApiBadRequest
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *ArtifactoryBuildsApiUnauthorized
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *ArtifactoryBuildsApiForbidden
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *ArtifactoryBuildsApiNotFound
+	// JSON501 the response for an HTTP 501 `application/json` response
+	JSON501 *ErrorResponse
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r GetBuildInfoResponse) GetJSON200() *BuildInfoResponse {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetBuildInfoResponse) GetJSON400() *ArtifactoryBuildsApiBadRequest {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -41234,6 +41258,11 @@ func (r GetBuildInfoResponse) GetJSON403() *ArtifactoryBuildsApiForbidden {
 // GetJSON404 returns the response for an HTTP 404 `application/json` response
 func (r GetBuildInfoResponse) GetJSON404() *ArtifactoryBuildsApiNotFound {
 	return r.JSON404
+}
+
+// GetJSON501 returns the response for an HTTP 501 `application/json` response
+func (r GetBuildInfoResponse) GetJSON501() *ErrorResponse {
+	return r.JSON501
 }
 
 // GetBody returns the raw response body bytes
@@ -68938,7 +68967,7 @@ func ParseUploadBuildResponse(rsp *http.Response) (*UploadBuildResponse, error) 
 	}
 
 	switch {
-	case rsp.StatusCode == 200:
+	case rsp.StatusCode == 204:
 		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
@@ -68965,8 +68994,8 @@ func ParseUploadBuildResponse(rsp *http.Response) (*UploadBuildResponse, error) 
 	}
 
 	switch {
-	case rsp.StatusCode == 200:
-		var headers UploadBuildResponse200Headers
+	case rsp.StatusCode == 204:
+		var headers UploadBuildResponse204Headers
 		if values := rsp.Header.Values("X-Checksum-Sha256"); len(values) > 0 {
 			var value string
 			if err := runtime.BindStyledParameterWithOptions("simple", "X-Checksum-Sha256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
@@ -68974,7 +69003,7 @@ func ParseUploadBuildResponse(rsp *http.Response) (*UploadBuildResponse, error) 
 			}
 			headers.XChecksumSha256 = &value
 		}
-		response.Headers200 = &headers
+		response.Headers204 = &headers
 	}
 
 	return response, nil
@@ -69339,6 +69368,13 @@ func ParseGetBuildInfoResponse(rsp *http.Response) (*GetBuildInfoResponse, error
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest ArtifactoryBuildsApiBadRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest ArtifactoryBuildsApiUnauthorized
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -69359,6 +69395,13 @@ func ParseGetBuildInfoResponse(rsp *http.Response) (*GetBuildInfoResponse, error
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
+		var dest ErrorResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON501 = &dest
 
 	}
 

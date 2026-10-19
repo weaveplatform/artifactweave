@@ -278,6 +278,7 @@ func compareOp(op Op, c int) bool {
 
 // Compare orders two items by the query's sort, then by ID, as the SQL
 // ORDER BY does. A missing time sorts first ascending and last descending.
+// IDs tie only between roots without a record.
 func (q *Query) Compare(a, b types.Item) int {
 	if q.Sort != nil {
 		for _, f := range q.Sort.Fields {
@@ -300,7 +301,22 @@ func (q *Query) Compare(a, b types.Item) int {
 			}
 		}
 	}
-	return cmp.Compare(a.ID, b.ID)
+	// Roots without a record (RootHit) all have ID 0, before every stored
+	// item; their keys order them among themselves.
+	return cmp.Or(
+		cmp.Compare(a.ID, b.ID), cmp.Compare(a.RepoKey, b.RepoKey), compareBool(a.Cached, b.Cached),
+	)
+}
+
+// compareBool orders false before true.
+func compareBool(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	}
+	return -1
 }
 
 func itemType(it types.Item) string {

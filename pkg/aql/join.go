@@ -261,7 +261,7 @@ func (c *PathCriterion) match(r *row, now time.Time) bool {
 
 // plan lists the paths a Joined reaches, and the paths leading to them,
 // parents first; at indexes it by path. The SQL compiler joins the same
-// tables in the same order.
+// tables in the same order. Nest adds the paths a query's include names.
 type plan struct {
 	nodes []planNode
 	at    map[string]int
@@ -273,7 +273,7 @@ type planNode struct {
 	parent int // index into nodes, or -1 for the found row
 }
 
-func newPlan(primary rel, n Node) plan {
+func newPlan(primary rel, n Node, extra ...string) plan {
 	seen := map[string]bool{}
 	var paths []string
 	var walk func(Node)
@@ -282,6 +282,9 @@ func newPlan(primary rel, n Node) plan {
 			seen[path] = true
 			paths = append(paths, path)
 		}
+	}
+	for _, path := range extra {
+		add(path)
 	}
 	walk = func(n Node) {
 		switch n := n.(type) {
@@ -429,11 +432,18 @@ func (e *env) combine(i int, crit Node) bool {
 	return false
 }
 
-// SelectItems is Select over a corpus: the candidates are c.Items, and the
-// relation paths in q's criteria join them to c's builds and promotions.
+// SelectItems is Select over a corpus: the candidates are c.Items and the
+// roots of q that no item of c records, and the relation paths in q's
+// criteria join them to c's builds and promotions.
 func SelectItems(q *Query, o Options, c *Corpus) []Hit {
+	recorded := map[RepoRef]bool{}
+	for _, h := range c.Items {
+		if h.Item.IsRoot() {
+			recorded[RepoRef{Key: h.Item.RepoKey, Cached: h.Item.Cached}] = true
+		}
+	}
+	out := q.MissingRoots(o, func(r RepoRef) bool { return recorded[r] })
 	e := env{c: c, now: o.now()}
-	var out []Hit
 	for i := range c.Items {
 		e.self = &row{rel: relItem, hit: &c.Items[i]}
 		if q.Criteria != nil && !e.eval(q.Criteria) {

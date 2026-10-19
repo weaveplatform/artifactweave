@@ -55,6 +55,11 @@ const (
 	// DefaultAQLScanFactor reads no extra rows for non-admin filtering, the
 	// default of artifactory.aql.query.non.admin.scan.factor.
 	DefaultAQLScanFactor = 1
+	// DefaultAQLQueryTimeout and DefaultAQLStreamedTimeout are the defaults
+	// of artifactory.aql.query.timeout.seconds (900) and
+	// artifactory.aql.streamed.query.timeout (7200).
+	DefaultAQLQueryTimeout    = 15 * time.Minute
+	DefaultAQLStreamedTimeout = 2 * time.Hour
 	// DefaultUserQueryLimit is artifactory.search.userQueryLimit's default.
 	DefaultUserQueryLimit = 1000
 	// The persistent work queue's defaults (decision 0033).
@@ -99,6 +104,18 @@ type Config struct {
 	Token             TokenConfig        `yaml:"token"`
 	Deploy            DeployConfig       `yaml:"deploy"`
 	Environments      EnvironmentsConfig `yaml:"environments"`
+	AQLTimeout        AQLTimeoutConfig   `yaml:"aql_timeout"`
+}
+
+// AQLTimeoutConfig bounds how long POST /api/search/aql reads the
+// database (decision 0012). A query that runs longer is cancelled in the
+// database and answers 408. Zero means no timeout.
+type AQLTimeoutConfig struct {
+	// Query is Artifactory's artifactory.aql.query.timeout.seconds.
+	Query time.Duration `yaml:"query"`
+	// Streamed applies to a request with a stream: true header, as
+	// Artifactory's artifactory.aql.streamed.query.timeout does.
+	Streamed time.Duration `yaml:"streamed"`
 }
 
 // DeployConfig holds the deploy settings.
@@ -300,6 +317,9 @@ func Default() Config {
 		Build:        BuildConfig{BlockDuplicateEntries: true},
 		NPM:          NPMConfig{MaxPublishSize: DefaultNPMMaxPublishSize},
 		Environments: EnvironmentsConfig{GlobalLimit: DefaultGlobalEnvironmentLimit},
+		AQLTimeout: AQLTimeoutConfig{
+			Query: DefaultAQLQueryTimeout, Streamed: DefaultAQLStreamedTimeout,
+		},
 	}
 }
 
@@ -374,6 +394,7 @@ var keys = append(append([]string{
 	"token.allow_basic_auth",
 	"deploy.enforce_permission_check_on_identical_checksum_deploy",
 	"environments.global_limit",
+	"aql_timeout.query", "aql_timeout.streamed",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -394,6 +415,9 @@ func set(cfg *Config, key, value string) error {
 	}
 	if sub, ok := strings.CutPrefix(key, "download."); ok {
 		return setDownload(&cfg.Download, sub, key, value)
+	}
+	if sub, ok := strings.CutPrefix(key, "aql_timeout."); ok {
+		return setAQLTimeout(&cfg.AQLTimeout, sub, key, value)
 	}
 	switch key {
 	case "listen":
@@ -468,6 +492,19 @@ func setDownload(d *DownloadConfig, sub, key, value string) error {
 		return setDuration(&d.Redirect.TTL, key, value)
 	case "folder.max_concurrent_requests":
 		return setInt(&d.Folder.MaxConcurrentRequests, key, value)
+	default:
+		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
+	}
+}
+
+// setAQLTimeout assigns one key under aql_timeout; sub is the key without
+// that prefix.
+func setAQLTimeout(t *AQLTimeoutConfig, sub, key, value string) error {
+	switch sub {
+	case "query":
+		return setDuration(&t.Query, key, value)
+	case "streamed":
+		return setDuration(&t.Streamed, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -571,6 +608,10 @@ func (c Config) Validate() error {
 	if c.Search.AQL.NonAdminScanFactor < 1 {
 		errs = append(errs, fmt.Errorf("%w: search.aql.non_admin_scan_factor %d must be at least 1",
 			ErrInvalidValue, c.Search.AQL.NonAdminScanFactor))
+	}
+	if c.AQLTimeout.Query < 0 || c.AQLTimeout.Streamed < 0 {
+		errs = append(errs, fmt.Errorf(
+			"%w: aql_timeout.query and aql_timeout.streamed must not be negative", ErrInvalidValue))
 	}
 	if c.Environments.GlobalLimit < 1 {
 		errs = append(errs, fmt.Errorf("%w: environments.global_limit %d must be at least 1",

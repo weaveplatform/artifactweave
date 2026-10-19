@@ -789,6 +789,12 @@ paths:
       description: Stores one run's build-info document. The artifacts in modules[].artifacts are not checked against stored files. Promotion and the build artifacts search later find each one as an item holding its checksums and carrying build.name and build.number equal to the document's name and number. Uploading a run that already exists overwrites it and needs delete permission as well as deploy. The body may use the vendor media type or application/json.
       operationId: uploadBuild
       parameters:
+        - description: Optional query parameter. Key of the build-info repository that stores the run. It must be the repository project selects; another key answers 400. Omitted derives it from project.
+          in: query
+          name: buildRepo
+          schema:
+            description: Repository key.
+            type: string
         - description: Optional query parameter. Key of the project that owns the build. Omitted or default means builds outside any project, stored in the artifactory-build-info repository; a project key selects that project's <project>-build-info repository.
           in: query
           name: project
@@ -806,8 +812,8 @@ paths:
         description: The build-info document.
         required: true
       responses:
-        '200':
-          description: Stored.
+        '204':
+          description: Stored. The response has no body.
           headers:
             X-Checksum-Sha256:
               description: SHA-256 of the stored build-info document.
@@ -902,7 +908,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text confirmation.
+                description: 'Plain-text confirmation listing each deleted run: `The following builds has been deleted successfully: ''<name>#<number>'', ''<name>#<number>''.`'
                 type: string
           description: Deleted.
         '400':
@@ -1005,7 +1011,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text confirmation.
+                description: 'Plain-text confirmation: `Build renaming of ''<from>'' to ''<to>'' was successfully started.`'
                 type: string
           description: Renamed.
         '400':
@@ -1112,7 +1118,7 @@ paths:
           content:
             text/plain:
               schema:
-                description: Plain-text confirmation.
+                description: 'Plain-text confirmation listing each deleted run: `The following builds has been deleted successfully: ''<name>#<number>'', ''<name>#<number>''.`'
                 type: string
           description: Deleted.
         '400':
@@ -1187,7 +1193,7 @@ paths:
           schema:
             description: Started timestamp of the run.
             type: string
-        - description: Optional query parameter. Another build number of the same build to compare with. It is accepted and ignored; the run is returned without a comparison.
+        - description: 'Optional query parameter. Number of an older run of the same build to compare with. Comparing runs is not supported: the value null answers 400 `Parameter ''diff'' must contain a value, if specified.`, a number with no run answers 404, a run started after this one answers 400 `Build number should be greater than the build number to compare against.`, and any other value answers 501.'
           in: query
           name: diff
           schema:
@@ -1206,12 +1212,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/BuildInfoResponse'
           description: The run.
+        '400':
+          $ref: '#/components/responses/ArtifactoryBuildsApiBadRequest'
         '401':
           $ref: '#/components/responses/ArtifactoryBuildsApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactoryBuildsApiForbidden'
         '404':
           $ref: '#/components/responses/ArtifactoryBuildsApiNotFound'
+        '501':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: A comparison with the older run named by diff was asked for; comparing runs is not supported.
       tags:
         - builds
       x-oracle-source: https://docs.jfrog.com/integrations/reference/getbuildinfo.md
@@ -9119,7 +9133,7 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/searchpackagearchives.md
   /api/search/aql:
     post:
-      description: 'Runs an AQL query. The body is the query text, not JSON, and is limited to 6,000 characters; longer bodies are rejected with 400. A query has the form domain.find(criteria).include(fields).sort({"$asc"|"$desc":[fields]}).offset(n).limit(n), and may add .transitive() (accepted and ignored) and .distinct(bool) (default true). The suffixes may appear in any order, each at most once. Domains are items, properties, builds, build.promotions and the dotted secondary domains reachable from them; the archive.entries domain is not supported. Criteria are JSON objects: {"field":value} means $eq; {"field":{"$op":value}} with $eq, $ne, $gt, $gte, $lt, $lte, $match, $nmatch, $before and $last; $and and $or combine them and siblings are an implicit $and; {"@key":value} and {"@*":value} address properties; {"$msp":[...]} matches on a single property. Wildcards * and ? apply only with $match and $nmatch and are matched case-sensitively. sort names only fields in the output. sort, offset and limit apply to the result rows, one per found record whatever the include: the properties and statistics of an item are listed inside its row, so offset(n) skips n items and limit(n) returns at most n items, each with all of its properties. An empty query is rejected with 400. An authenticated user is required, and anonymous callers are refused with 403; a user without admin rights may query the items domain, must include repo, path and name, and receives only rows they may read that the include and exclude patterns of the repository accept. With a token scoped build:<repository>/<path>:r such a user may also query builds and build.promotions; a builds query must include name, number and repo, and returns only the runs they may read. For such a user, a scan-factor header above 1 (by default the configured non-admin scan factor) multiplies the rows a limited query reads before that filtering, so the limit can still be met. Every query returns at most the configured result cap (500,000 by default), its own limit included, and a trimmed result says so in range.notification. The response is indented unless compact=true is in the query string; a stream header is accepted and changes nothing. The actions items.delete(criteria).dryRun("true"|"false") and properties.update(criteria).keys(key,...).newValue(value).dryRun(...) change what their criteria select and answer in the same shape, listing the rows they change, or would change on a dry run. An action without dryRun is a dry run, and takes no include, sort, offset or limit. properties.update names item fields as item.<field> and replaces the values of the keys an item already has. A user without admin rights changes only rows they may read and also delete, or annotate; other rows are left out.'
+      description: 'Runs an AQL query. The body is the query text, not JSON, and is limited to 6,000 characters; longer bodies are rejected with 400 `AQL query is too long; please reduce the query length to less than 6000 chars`. A query has the form domain.find(criteria).include(fields).sort({"$asc"|"$desc":[fields]}).offset(n).limit(n), and may add .transitive() (accepted and ignored) and .distinct(bool) (default true). The suffixes may appear in any order, each at most once. Domains are items, properties, builds, build.promotions and the dotted secondary domains reachable from them; the archive.entries, item.infos, releases and release_artifacts domains are rejected with 400. Criteria are JSON objects, and several objects separated by commas are an implicit $and: {"field":value} means $eq; {"field":{"$op":value}} with $eq, $ne, $gt, $gte, $lt, $lte, $match, $nmatch, $before and $last; $and and $or combine them and siblings are an implicit $and; {"@key":value} and {"@*":value} address properties; {"$msp":[...]} matches on a single property. $before and $last take a number and a unit: ms, mills or millis; s or seconds; minutes or mi; d or days; w or weeks; mo or months; y or years. Wildcards * and ? apply only with $match and $nmatch and are matched case-sensitively. Every repository that stores items has a root, a folder whose path and name are ".", which an items query returns when its criteria match it. An include may name fields of the domains a relation path reaches, such as artifact.module.build.name, artifact.module.build.* or artifact: each found record then nests the related rows that meet the criteria under artifacts, dependencies, modules, builds, build.promotions or items, rows of one domain told apart by the fields included; the properties and statistics of related rows cannot be included. sort names only fields in the output. sort, offset and limit apply to the result rows, one per found record whatever the include: the properties, statistics and related rows of an item are listed inside its row, so offset(n) skips n items and limit(n) returns at most n items, each with all of its properties. An empty query is rejected with 400. An authenticated user is required, and anonymous callers are refused with 403; a user without admin rights may query the items domain, must include repo, path and name, and receives only rows they may read that the include and exclude patterns of the repository accept. With a token scoped build:<repository>/<path>:r such a user may also query builds and build.promotions; a builds query must include name, number and repo, and returns only the runs they may read. For such a user, a scan-factor header above 1 (by default the configured non-admin scan factor) multiplies the rows a limited query reads before that filtering, so the limit can still be met. Every query returns at most the configured result cap (500,000 by default), its own limit included, and a trimmed result says so in range.notification. A query whose reads outlast the configured timeout (900 seconds by default, or 7,200 seconds with a stream: true header) is cancelled and answered with 408. The response is indented unless compact=true is in the query string. The actions items.delete(criteria).dryRun("true"|"false") and properties.update(criteria).keys(key,...).newValue(value).dryRun(...) change what their criteria select and answer in the same shape, listing the rows they change, or would change on a dry run. An action without dryRun is a dry run, and takes no include, sort, offset or limit. properties.update names item fields as item.<field> and replaces the values of the keys an item already has. A user without admin rights changes only rows they may read and also delete, or annotate; other rows are left out.'
       operationId: searchAql
       requestBody:
         content:
@@ -9141,7 +9155,7 @@ paths:
                       - $ref: '#/components/schemas/AqlRange'
                     description: Optional within this object. Describes which slice of the full result set the results array holds. Positions are zero-based and end_pos is exclusive.
                   results:
-                    description: Optional within this object. One object per matching record. Items carry repo, path (. for the root, no leading slash), name, type, size, created, created_by, modified, modified_by and updated by default; include widens or narrows the fields and may add a properties array or a stats object. Builds carry build.<field> and promotions build.promotion.<field>, every field by default.
+                    description: Optional within this object. One object per matching record. Items carry repo, path (. for the root, no leading slash), name, type, size, created, created_by, modified, modified_by and updated by default; include widens or narrows the fields and may add a properties array, a stats object or arrays of related rows. Builds carry build.<field> and promotions build.promotion.<field>, every field by default.
                     items:
                       description: One record of the queried domain with the included fields.
                       type: object
@@ -9154,6 +9168,12 @@ paths:
           $ref: '#/components/responses/ArtifactorySearchesApiUnauthorized'
         '403':
           $ref: '#/components/responses/ArtifactorySearchesApiForbidden'
+        '408':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: The query outlasted the configured timeout and was cancelled.
         '500':
           $ref: '#/components/responses/ArtifactorySearchesApiInternalServerError'
       tags:

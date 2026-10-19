@@ -216,7 +216,7 @@ func testLongPropertyKeys(t *testing.T, db store.Store) {
 	if _, err := db.Builds().Latest(ctx, "", "app"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("a refused build-info document was stored: %v", err)
 	}
-	call(http.MethodPut, buildsPath, doc("1", key, key), http.StatusOK)
+	call(http.MethodPut, buildsPath, doc("1", key, key), http.StatusNoContent)
 	run, err := db.Builds().Latest(ctx, "", "app")
 	if err != nil {
 		t.Fatal(err)

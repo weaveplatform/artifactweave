@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"net/http"
 	"slices"
@@ -60,9 +62,17 @@ func (s artifactoryService) searchBuildsAQL(
 	if limit > 0 {
 		o.Max = limit + 1
 	}
-	hits, err := st.Builds().Search(ctx, run, o)
+	timeout := s.aqlTimeout(r)
+	dbctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	if timeout > 0 {
+		var stop context.CancelFunc
+		dbctx, stop = context.WithTimeout(dbctx, timeout)
+		defer stop()
+	}
+	hits, err := st.Builds().Search(dbctx, run, o)
 	if err != nil {
-		writeErr(w, r, s.internalError(ctx, "aql build search", err))
+		writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql build search", err))
 		return
 	}
 	trimmed := limit > 0 && len(hits) > limit
@@ -80,11 +90,45 @@ func (s artifactoryService) searchBuildsAQL(
 			hits = hits[:q.Limit]
 		}
 	}
-	res := q.BuildResponse(hits)
+	var related aql.Related
+	if q.Relates() {
+		related, err = s.nestBuilds(dbctx, st, p, q, o.Now, hits)
+		if err != nil {
+			writeErr(w, r, s.aqlFailure(ctx, dbctx.Err(), timeout, "aql related rows", err))
+			return
+		}
+	}
+	res := q.BuildResponse(hits).WithRelated(related)
 	if trimmed {
 		res.Notification = aqlTrimmed
 	}
 	writeAQL(w, r, res)
+}
+
+// nestBuilds finds the rows of the related domains q's include names, as
+// p may see them (nesting). The configured repositories are read only
+// then, for the items such an include reaches.
+func (s artifactoryService) nestBuilds(
+	ctx context.Context,
+	st store.Store,
+	p auth.Principal,
+	q *aql.Query,
+	now time.Time,
+	hits []aql.BuildHit,
+) (aql.Related, error) {
+	configs, err := repoConfigs(ctx, st)
+	if err != nil {
+		return aql.Related{}, err
+	}
+	n, err := nesting(ctx, st, p, configs, now)
+	if err != nil {
+		return aql.Related{}, err
+	}
+	related, err := q.NestBuilds(ctx, store.AQLSource(st), n, hits)
+	if err != nil {
+		return related, fmt.Errorf("nest related rows: %w", err)
+	}
+	return related, nil
 }
 
 // buildScoped reports whether the token's scope grants reading builds.

@@ -58,26 +58,24 @@ func scanItem(row interface{ Scan(...any) error }) (types.Item, error) {
 
 // Search compiles q for the dialect and loads the properties of the hits
 // in a second query, after offset and limit, as decision 0012 requires.
+// The roots of q without a record are rows no table holds; q.WithRoots
+// merges in those that match.
 func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
 	d := aql.SQLite
 	if i.s.d.Name == "postgres" {
 		d = aql.PostgreSQL
 	}
-	c, err := q.Compile(d, o)
-	if err != nil {
-		return nil, fmt.Errorf("search items: %w", err)
-	}
 	var hits []aql.Hit
-	err = i.s.Tx(ctx, func(ctx context.Context) error {
-		hits = nil
-		if err := i.s.rows(ctx, "search items",
-			"SELECT "+itemCols+" FROM items WHERE "+c.Where+c.Tail, c.Args,
-			func(rs *sql.Rows) error {
-				it, err := scanItem(rs)
-				hits = append(hits, aql.Hit{Item: it})
-				return err
-			}); err != nil {
+	err := i.s.Tx(ctx, func(ctx context.Context) error {
+		roots, err := i.missingRoots(ctx, q, o)
+		if err != nil {
 			return err
+		}
+		hits, err = q.WithRoots(o, roots, func(q *aql.Query, o aql.Options) ([]aql.Hit, error) {
+			return i.search(ctx, d, q, o)
+		})
+		if err != nil {
+			return fmt.Errorf("search items with roots: %w", err)
 		}
 		if q.Properties() {
 			if err := i.hitProperties(ctx, hits); err != nil {
@@ -90,6 +88,56 @@ func (i items) Search(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.H
 		return i.hitStats(ctx, hits)
 	})
 	return hits, err
+}
+
+// search runs q's compiled SQL over the items table.
+func (i items) search(
+	ctx context.Context,
+	d aql.Dialect,
+	q *aql.Query,
+	o aql.Options,
+) ([]aql.Hit, error) {
+	c, err := q.Compile(d, o)
+	if err != nil {
+		return nil, fmt.Errorf("search items: %w", err)
+	}
+	var hits []aql.Hit
+	err = i.s.rows(ctx, "search items",
+		"SELECT "+itemCols+" FROM items WHERE "+c.Where+c.Tail, c.Args,
+		func(rs *sql.Rows) error {
+			it, err := scanItem(rs)
+			hits = append(hits, aql.Hit{Item: it})
+			return err
+		})
+	return hits, err
+}
+
+// missingRoots returns the roots of q that have no record and that q's
+// criteria match, as aql.RootHit makes them. A record is looked up by the
+// natural key, searchBatch repositories at a time.
+func (i items) missingRoots(ctx context.Context, q *aql.Query, o aql.Options) ([]aql.Hit, error) {
+	refs := q.Roots()
+	recorded := map[aql.RepoRef]bool{}
+	for start := 0; start < len(refs); start += searchBatch {
+		batch := refs[start:min(start+searchBatch, len(refs))]
+		args := []any{types.RootPath, types.RootPath}
+		for _, r := range batch {
+			args = append(args, r.Key)
+		}
+		in := "IN (" + strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",") + ")"
+		if err := i.s.rows(ctx, "search item roots",
+			"SELECT repo_key, cached FROM items WHERE path = ? AND name = ? AND repo_key "+in,
+			args,
+			func(rs *sql.Rows) error {
+				var r aql.RepoRef
+				err := rs.Scan(&r.Key, &r.Cached)
+				recorded[r] = true
+				return err //nolint:wrapcheck // wrapped by rows
+			}); err != nil {
+			return nil, err
+		}
+	}
+	return q.MissingRoots(o, func(r aql.RepoRef) bool { return recorded[r] }), nil
 }
 
 // searchBatch bounds the IN list of one property or statistics query, well
