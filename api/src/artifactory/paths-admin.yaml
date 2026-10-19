@@ -45,6 +45,13 @@ components:
             $ref: '#/components/schemas/AdminLegacyErrorResponse'
       description: The caller is not an administrator; the body carries the error envelope with the
         single-message error field.
+    AdminLegacyNotImplemented:
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminLegacyErrorResponse'
+      description: The operation is not implemented; the body carries the error envelope with status 501 and the
+        single-message error field.
     AdminLegacyInternalServerError:
       content:
         application/json:
@@ -81,25 +88,31 @@ components:
   schemas:
     AdminLegacyErrorResponse:
       description: 'The error body of the import and export operations: the error envelope plus a single-message
-        error field. Not returned; every import and export call answers 501 in the standard envelope.'
+        error field.'
       properties:
         error:
-          description: Optional within this object. Single-string form of the error message, sent alongside or instead
-            of errors.
+          description: Required within this object. The error message, the same text as the message of the single
+            entry in errors.
           type: string
         errors:
-          description: Optional within this object. One entry per error.
+          description: Required within this object. One entry per error; always one.
           items:
             description: One error.
             properties:
               message:
-                description: Optional within this object. Human-readable explanation.
+                description: Required within this object. Human-readable explanation.
                 type: string
               status:
-                description: Optional within this object. The HTTP status code repeated in the body.
+                description: Required within this object. The HTTP status code repeated in the body.
                 type: integer
+            required:
+            - status
+            - message
             type: object
           type: array
+      required:
+      - errors
+      - error
       type: object
     ClusterLocksResponse:
       description: A snapshot of the leases the server currently holds in its database lease table, grouped by
@@ -421,7 +434,7 @@ paths:
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
-          $ref: '#/components/responses/AdminNotImplemented'
+          $ref: '#/components/responses/AdminLegacyNotImplemented'
       summary: Export a repository (not supported)
       tags:
       - system
@@ -498,7 +511,7 @@ paths:
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
-          $ref: '#/components/responses/AdminNotImplemented'
+          $ref: '#/components/responses/AdminLegacyNotImplemented'
       summary: Export settings example (not supported)
       tags:
       - system
@@ -534,7 +547,7 @@ paths:
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
-          $ref: '#/components/responses/AdminNotImplemented'
+          $ref: '#/components/responses/AdminLegacyNotImplemented'
       summary: Export the system (not supported)
       tags:
       - system
@@ -597,7 +610,7 @@ paths:
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
-          $ref: '#/components/responses/AdminNotImplemented'
+          $ref: '#/components/responses/AdminLegacyNotImplemented'
       summary: Import repository content (not supported)
       tags:
       - system
@@ -630,7 +643,7 @@ paths:
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
-          $ref: '#/components/responses/AdminNotImplemented'
+          $ref: '#/components/responses/AdminLegacyNotImplemented'
       summary: Import settings example (not supported)
       tags:
       - system
@@ -672,7 +685,7 @@ paths:
         '500':
           $ref: '#/components/responses/AdminLegacyInternalServerError'
         '501':
-          $ref: '#/components/responses/AdminNotImplemented'
+          $ref: '#/components/responses/AdminLegacyNotImplemented'
       summary: Import the system (not supported)
       tags:
       - system

@@ -56,8 +56,10 @@ take their codes from that table, not from convention.
 | Access, Projects | `{"errors":[{"code":"<string>","message":"<string>"}]}` |
 | Event (`/event/`), Workers (`/worker/`) | as Access; JFrog documents no Workers error body |
 | Distribution (`/distribution/`) | `{"status_code":<int>,"message":"<string>","errors":[{"status":<int>,"message":"<string>"}]}`, with `detail` when set |
-| Cold-storage retention, import and export (`/api/retention/`, `/api/import/`, `/api/export/`, `/api/artifactexport/`) | the Artifactory envelope plus top-level `error` and `message` |
-| Platform federation and Grid (`/pfed/`, `/grid/`) | `{"code":"<CODE>","message":"<string>"}`; Grid adds `details` |
+| Cold-storage retention (`/api/retention/`) | the Artifactory envelope plus top-level `error` (the status text) and `message` |
+| Import and export (`/api/import/`, `/api/export/`, `/api/artifactexport/`) | the Artifactory envelope plus top-level `error`, which carries the message |
+| Platform federation (`/pfed/`) | `{"code":<int>,"message":"<string>"}`; `code` is the HTTP status |
+| Grid (`/grid/`) | `{"code":"<CODE>","message":"<string>"}`; `details` when set |
 | OCI `/v2/` | `{"errors":[{"code","message","detail"}]}` with the OCI spec codes |
 | Xray (stub) | `{"error":"<string>"}` |
 | npm | `{"error":"<string>"}` |
@@ -65,15 +67,11 @@ take their codes from that table, not from convention.
 | Go proxy, PyPI | plain text |
 | NuGet | text or XML as the NuGet client expects |
 
-Two rows differ from 7.x:
-- 7.x differs: the `/pfed` envelope carries `code` as the integer HTTP status; only `/grid`
-  uses a string `code`
-  ([Add Follower JPD](https://docs.jfrog.com/administration/reference/addfollowerjpd.md),
-  `ErrorResponse`); fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
-- 7.x differs: on import and export, `error` is the "simple error message (legacy format)"
-  beside `errors[]`, with no top-level `message`
-  ([Export Repository with Metadata](https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md));
-  fixed by [#404](https://github.com/weaveplatform/artifactweave/issues/404).
+The `/pfed` row follows the `ErrorResponse` every `/pfed` page documents, an integer `code`
+([Add Follower JPD](https://docs.jfrog.com/administration/reference/addfollowerjpd.md)), and
+the import and export row the one their pages document, `errors[]` beside `error`, the
+"simple error message (legacy format)", with no top-level `message`
+([Export Repository with Metadata](https://docs.jfrog.com/administration/reference/exportrepositorywithmetadata.md)).
 
 **Base URL resolver.** Embedded absolute URLs (npm `dist.tarball`, Helm `urls`, NuGet
 `@id`, Terraform `download_url`, Docker `Location` and `WWW-Authenticate` realm,

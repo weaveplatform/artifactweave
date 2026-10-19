@@ -84,8 +84,8 @@ type EntityConfigType string
 
 // ErrorResponse The flat error envelope used by /pfed.
 type ErrorResponse struct {
-	// Code Required within this object. A symbolic code such as NOT_FOUND.
-	Code string `json:"code"`
+	// Code Required within this object. The HTTP status code of the response, for example 404.
+	Code int `json:"code"`
 
 	// Message Required within this object. Human readable explanation.
 	Message string `json:"message"`

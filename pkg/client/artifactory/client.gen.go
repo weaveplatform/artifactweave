@@ -2505,19 +2505,19 @@ func (e DownloadVcsTagAlternativeParamsExt) Valid() bool {
 	}
 }
 
-// AdminLegacyErrorResponse The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyErrorResponse The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyErrorResponse struct {
-	// Error Optional within this object. Single-string form of the error message, sent alongside or instead of errors.
-	Error *string `json:"error,omitempty"`
+	// Error Required within this object. The error message, the same text as the message of the single entry in errors.
+	Error string `json:"error"`
 
-	// Errors Optional within this object. One entry per error.
-	Errors *[]struct {
-		// Message Optional within this object. Human-readable explanation.
-		Message *string `json:"message,omitempty"`
+	// Errors Required within this object. One entry per error; always one.
+	Errors []struct {
+		// Message Required within this object. Human-readable explanation.
+		Message string `json:"message"`
 
-		// Status Optional within this object. The HTTP status code repeated in the body.
-		Status *int `json:"status,omitempty"`
-	} `json:"errors,omitempty"`
+		// Status Required within this object. The HTTP status code repeated in the body.
+		Status int `json:"status"`
+	} `json:"errors"`
 }
 
 // AffectedIssue An issue in the tracker that the build relates to.
@@ -6210,16 +6210,19 @@ type AdminForbidden = ErrorResponse
 // AdminInternalServerError The error envelope used by every /artifactory response.
 type AdminInternalServerError = ErrorResponse
 
-// AdminLegacyBadRequest The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyBadRequest The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyBadRequest = AdminLegacyErrorResponse
 
-// AdminLegacyForbidden The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyForbidden The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyForbidden = AdminLegacyErrorResponse
 
-// AdminLegacyInternalServerError The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyInternalServerError The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyInternalServerError = AdminLegacyErrorResponse
 
-// AdminLegacyUnauthorized The error body of the import and export operations: the error envelope plus a single-message error field. Not returned; every import and export call answers 501 in the standard envelope.
+// AdminLegacyNotImplemented The error body of the import and export operations: the error envelope plus a single-message error field.
+type AdminLegacyNotImplemented = AdminLegacyErrorResponse
+
+// AdminLegacyUnauthorized The error body of the import and export operations: the error envelope plus a single-message error field.
 type AdminLegacyUnauthorized = AdminLegacyErrorResponse
 
 // AdminNotFound The error envelope used by every /artifactory response.
@@ -40468,7 +40471,7 @@ type ExportRepositoryWithMetadataResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -40492,7 +40495,7 @@ func (r ExportRepositoryWithMetadataResponse) GetJSON500() *AdminLegacyInternalS
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r ExportRepositoryWithMetadataResponse) GetJSON501() *AdminNotImplemented {
+func (r ExportRepositoryWithMetadataResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -44550,7 +44553,7 @@ type GetExportSystemSettingsExampleResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -44584,7 +44587,7 @@ func (r GetExportSystemSettingsExampleResponse) GetJSON500() *AdminLegacyInterna
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r GetExportSystemSettingsExampleResponse) GetJSON501() *AdminNotImplemented {
+func (r GetExportSystemSettingsExampleResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -44629,7 +44632,7 @@ type ExportSystemResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -44653,7 +44656,7 @@ func (r ExportSystemResponse) GetJSON500() *AdminLegacyInternalServerError {
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r ExportSystemResponse) GetJSON501() *AdminNotImplemented {
+func (r ExportSystemResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -47007,7 +47010,7 @@ type ImportRepositoryContentResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -47031,7 +47034,7 @@ func (r ImportRepositoryContentResponse) GetJSON500() *AdminLegacyInternalServer
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r ImportRepositoryContentResponse) GetJSON501() *AdminNotImplemented {
+func (r ImportRepositoryContentResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -47080,7 +47083,7 @@ type GetImportSystemSettingsExampleResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -47114,7 +47117,7 @@ func (r GetImportSystemSettingsExampleResponse) GetJSON500() *AdminLegacyInterna
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r GetImportSystemSettingsExampleResponse) GetJSON501() *AdminNotImplemented {
+func (r GetImportSystemSettingsExampleResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -47161,7 +47164,7 @@ type FullSystemImportResponse struct {
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *AdminLegacyInternalServerError
 	// JSON501 the response for an HTTP 501 `application/json` response
-	JSON501 *AdminNotImplemented
+	JSON501 *AdminLegacyNotImplemented
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -47190,7 +47193,7 @@ func (r FullSystemImportResponse) GetJSON500() *AdminLegacyInternalServerError {
 }
 
 // GetJSON501 returns the response for an HTTP 501 `application/json` response
-func (r FullSystemImportResponse) GetJSON501() *AdminNotImplemented {
+func (r FullSystemImportResponse) GetJSON501() *AdminLegacyNotImplemented {
 	return r.JSON501
 }
 
@@ -68747,7 +68750,7 @@ func ParseExportRepositoryWithMetadataResponse(rsp *http.Response) (*ExportRepos
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -71954,7 +71957,7 @@ func ParseGetExportSystemSettingsExampleResponse(rsp *http.Response) (*GetExport
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -72008,7 +72011,7 @@ func ParseExportSystemResponse(rsp *http.Response) (*ExportSystemResponse, error
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -73738,7 +73741,7 @@ func ParseImportRepositoryContentResponse(rsp *http.Response) (*ImportRepository
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -73806,7 +73809,7 @@ func ParseGetImportSystemSettingsExampleResponse(rsp *http.Response) (*GetImport
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -73867,7 +73870,7 @@ func ParseFullSystemImportResponse(rsp *http.Response) (*FullSystemImportRespons
 		response.JSON500 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 501:
-		var dest AdminNotImplemented
+		var dest AdminLegacyNotImplemented
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
