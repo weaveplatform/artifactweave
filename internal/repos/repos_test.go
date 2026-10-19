@@ -33,6 +33,36 @@ func TestMergeRefusesMalformedUpdates(t *testing.T) {
 	}
 }
 
+// An update keeps a key the server created under a reserved name, and checks
+// a key it spells in another case as a create would.
+func TestMergeAppliesTheKeyRulesToARespelledKey(t *testing.T) {
+	update := func(stored repo.Config, patch string) error {
+		t.Helper()
+		var p map[string]json.RawMessage
+		if err := json.Unmarshal([]byte(patch), &p); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Merge(*repo.Defaults(&stored), p)
+		return err
+	}
+	reserved := repo.Config{Key: "release-bundles", Class: repo.Local}
+	if err := update(reserved, `{"description": "x"}`); err != nil {
+		t.Errorf("stored reserved key: %v", err)
+	}
+	if err := update(reserved, `{"key": "release-bundles", "description": "x"}`); err != nil {
+		t.Errorf("stored reserved key in the body: %v", err)
+	}
+	if err := update(reserved, `{"key": "Release-Bundles"}`); err == nil ||
+		!strings.Contains(err.Error(), "reserved repository key") {
+		t.Errorf("respelled reserved key: %v", err)
+	}
+	docker := repo.Config{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker}
+	if err := update(docker, `{"key": "Docker-Local"}`); err == nil ||
+		!strings.Contains(err.Error(), "lower case") {
+		t.Errorf("respelled docker key: %v", err)
+	}
+}
+
 var errBoom = errors.New("boom")
 
 // faulty fails the operation named in fail.

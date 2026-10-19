@@ -57,15 +57,16 @@ Identity: `key` (also the path parameter; the path wins when both are given). Mu
 `key` and `rclass` are create-only; `packageType` is create-only in practice (changing it
 is rejected by Artifactory and must be rejected here); everything else is updatable.
 
-7.x differs: a key is at most 64 characters for local, federated and virtual repositories,
-58 for remote and 63 for Docker, OCI and Helm OCI local and federated ones; it cannot
-contain `/ \ : | ? * " < >`, be one of the reserved names (`.`, `..`, `&`,
-`artifactory-build-info`, `Auto-trashcan`, `release-bundles` and others) or start with
-`Jfrog-system-reserved` or `Jfrog-artifactory-system`; and Docker, OCI and Helm OCI keys
-cannot contain upper case or `_`
+A key is at most 64 characters for local, federated and virtual repositories, 58 for
+remote and 63 for Docker, OCI and Helm OCI local and federated ones. It cannot contain
+white space, `/ \ : | ? * " < >` or the other special characters the Terraform provider
+refuses, be one of the reserved names (`.`, `..`, `&`, `artifactory-build-info`,
+`auto-trashcan`, `release-bundles` and others) in any case, start with
+`jfrog-system-reserved` or `jfrog-artifactory-system` or end with `-cache`; and Docker, OCI
+and Helm OCI keys cannot contain upper case or `_`
 ([repository management overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview)).
-artifactweave refuses only an empty key, spaces, `/`, `\` and a `-cache` suffix
-(`pkg/repo/validate.go`); fixed by #395.
+A leading digit is allowed from 7.53.1. `pkg/repo/validate.go` applies these rules on every
+write path ([research 03](03-repository-configuration-model.md#key-rules)).
 
 Common fields (all classes):
 

@@ -150,10 +150,16 @@ components:
             one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
           type: string
         key:
-          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
-            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
-            created inside a project are prefixed with the project key followed by a hyphen.
+          description: 'Required within this object. The repository key, unique without regard to case. At most 64
+            characters, 58 on a remote repository and 63 on a local or federated repository of package type `docker`,
+            `oci` or `helmoci`. It contains no white space and none of `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ?
+            ~ | \ "` or a backtick. It is not one of `.`, `..`, `&`, `jfrog-usage-logs`, `jfrog-billing-logs`,
+            `jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`, `auto-trashcan`, `jfrog-support-bundle`,
+            `_intransit`, `artifactory-edge-uploads` or `release-bundles` in any case, does not start with
+            `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
+            suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
+            letters and no underscore. On create the key in the URL path wins over the body; after creation it is
+            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
           type: string
         maxUniqueSnapshots:
           description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
@@ -423,10 +429,16 @@ components:
             one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
           type: string
         key:
-          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
-            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
-            created inside a project are prefixed with the project key followed by a hyphen.
+          description: 'Required within this object. The repository key, unique without regard to case. At most 64
+            characters, 58 on a remote repository and 63 on a local or federated repository of package type `docker`,
+            `oci` or `helmoci`. It contains no white space and none of `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ?
+            ~ | \ "` or a backtick. It is not one of `.`, `..`, `&`, `jfrog-usage-logs`, `jfrog-billing-logs`,
+            `jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`, `auto-trashcan`, `jfrog-support-bundle`,
+            `_intransit`, `artifactory-edge-uploads` or `release-bundles` in any case, does not start with
+            `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
+            suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
+            letters and no underscore. On create the key in the URL path wins over the body; after creation it is
+            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
           type: string
         maxUniqueSnapshots:
           description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
@@ -902,10 +914,16 @@ components:
             one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
           type: string
         key:
-          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
-            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
-            created inside a project are prefixed with the project key followed by a hyphen.
+          description: 'Required within this object. The repository key, unique without regard to case. At most 64
+            characters, 58 on a remote repository and 63 on a local or federated repository of package type `docker`,
+            `oci` or `helmoci`. It contains no white space and none of `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ?
+            ~ | \ "` or a backtick. It is not one of `.`, `..`, `&`, `jfrog-usage-logs`, `jfrog-billing-logs`,
+            `jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`, `auto-trashcan`, `jfrog-support-bundle`,
+            `_intransit`, `artifactory-edge-uploads` or `release-bundles` in any case, does not start with
+            `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
+            suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
+            letters and no underscore. On create the key in the URL path wins over the body; after creation it is
+            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
           type: string
         listRemoteFolderItems:
           description: Optional within this object. When true folder listings include items that exist upstream
@@ -1296,10 +1314,16 @@ components:
             one are stored or served. Defaults to **/* which matches everything; an empty string also means everything.
           type: string
         key:
-          description: Required within this object. The repository key. Lower-case letters, digits, hyphens and
-            underscores; no spaces or slashes; it must not end in -cache, the suffix that names a remote repository's
-            cache. On create the key in the URL path wins over the body; after creation it is immutable. Repositories
-            created inside a project are prefixed with the project key followed by a hyphen.
+          description: 'Required within this object. The repository key, unique without regard to case. At most 64
+            characters, 58 on a remote repository and 63 on a local or federated repository of package type `docker`,
+            `oci` or `helmoci`. It contains no white space and none of `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ?
+            ~ | \ "` or a backtick. It is not one of `.`, `..`, `&`, `jfrog-usage-logs`, `jfrog-billing-logs`,
+            `jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`, `auto-trashcan`, `jfrog-support-bundle`,
+            `_intransit`, `artifactory-edge-uploads` or `release-bundles` in any case, does not start with
+            `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
+            suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
+            letters and no underscore. On create the key in the URL path wins over the body; after creation it is
+            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
           type: string
         keyPair:
           description: Optional within this object. Name of the key pair used to sign aggregated metadata where

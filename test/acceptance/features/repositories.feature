@@ -56,6 +56,60 @@ Feature: Repositories API
     And the response body does not contain "checksumPolicyType"
     And the response body does not contain "forceMetadataNameVersion"
 
+  Scenario: Repository keys follow the naming rules on every write path
+    When I PUT "/artifactory/api/repositories/release-bundles" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    Then the response status is 400
+    And the response body contains "is a reserved repository key"
+    When I PUT "/artifactory/api/repositories/a:b" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    Then the response status is 400
+    When I PUT "/artifactory/api/repositories/remote-key-of-fifty-nine-characters-xxxxxxxxxxxxxxxxxxxxxxx" as admin with body:
+      """
+      {"rclass": "remote", "packageType": "generic", "url": "https://example.com"}
+      """
+    Then the response status is 400
+    And the response body contains "at most 58 characters"
+    When I PUT "/artifactory/api/repositories/1st-generic" as admin with body:
+      """
+      {"rclass": "local", "packageType": "generic"}
+      """
+    Then the response status is 200
+    When I PUT "/artifactory/api/v2/repositories/batch" as admin with body:
+      """
+      [{"key": "batch-ok", "rclass": "local"}, {"key": "Jfrog-system-reserved-x", "rclass": "local"}]
+      """
+    Then the response status is 400
+    When I GET "/artifactory/api/repositories/batch-ok" as admin
+    Then the response status is 404
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        oci_local:
+          type: oci
+      """
+    Then the response status is 400
+    When I PUT "/artifactory/api/repositories/oci-local" as admin with body:
+      """
+      {"rclass": "local", "packageType": "oci"}
+      """
+    Then the response status is 200
+    When I POST "/artifactory/api/repositories/oci-local" as admin with body:
+      """
+      {"key": "OCI-Local", "description": "respelled"}
+      """
+    Then the response status is 400
+    And the response body contains "must be lower case without an underscore"
+    When I POST "/artifactory/api/repositories/oci-local" as admin with body:
+      """
+      {"key": "oci-local", "description": "kept"}
+      """
+    Then the response status is 200
+
   @jf
   Scenario: jf rt repo-create, repo-update and repo-delete from templates
     Given the JFrog CLI is available

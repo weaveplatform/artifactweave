@@ -175,7 +175,7 @@ func fixture(t *testing.T) store.Store {
 	db := inmem.New()
 	for _, c := range []repo.Config{
 		{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker},
-		{Key: "Mixed-Case", Class: repo.Local, PackageType: repo.Docker},
+		{Key: "mixed-case", Class: repo.Local, PackageType: repo.Docker},
 		{Key: "oci-local", Class: repo.Local, PackageType: repo.OCI},
 		{Key: "helm-oci", Class: repo.Local, PackageType: repo.HelmOCI},
 		{Key: "fed-docker", Class: repo.Federated, PackageType: repo.Docker},
@@ -270,10 +270,10 @@ func TestRoutingHandsEndpointsTheRequest(t *testing.T) {
 			},
 		},
 		{
-			"key in any case", "PATCH", "/v2/mixed-case/app/blobs/uploads/s1", "",
+			"key in any case", "PATCH", "/v2/Mixed-Case/app/blobs/uploads/s1", "",
 			map[string]any{
-				"kind": KindUpload, "repoKey": "mixed-case", "repo": "Mixed-Case", "name": "app",
-				"ref": "s1", "path": "/v2/mixed-case/app/blobs/uploads/id",
+				"kind": KindUpload, "repoKey": "Mixed-Case", "repo": "mixed-case", "name": "app",
+				"ref": "s1", "path": "/v2/Mixed-Case/app/blobs/uploads/id",
 			},
 		},
 		{

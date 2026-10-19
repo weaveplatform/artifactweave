@@ -297,7 +297,7 @@ What the bundled layouts do not describe, shown by real paths in
 
 | Field | Default | Notes |
 |---|---|---|
-| `key` | | Mandatory on create; the URL path segment wins over the body. |
+| `key` | | Mandatory on create; the URL path segment wins over the body. Follows the key rules below. |
 | `rclass` | | Mandatory. |
 | `packageType` | `generic` | |
 | `projectKey` | | JFrog marks `environments` "mandatory when assigning repo to project" ([D] configuration-json-files); artifactweave stores `["DEV"]` when it is missing ([decision 0013](decisions/0013-projects-and-environments.md)). The web UI prepends the project key to the key of a repository created inside a project ([D] [federated form reference](https://docs.jfrog.com/artifactory/docs/federated-repository-form-field-reference.md)); artifactweave does not check the prefix. |
@@ -314,6 +314,56 @@ What the bundled layouts do not describe, shown by real paths in
 | `cdnRedirect` | `false` | JFrog Cloud Enterprise+ only. |
 | `primaryKeyPairRef`, `secondaryKeyPairRef` | | Signing key pairs (Helm, Debian, Terraform providers, and npm's ECDSA package signing, [research 25](25-npm.md#5-storage-layout-and-properties)). |
 | `signedUrlTtl`, `xrayDataTtl` | | Read-only in responses. |
+
+### Key rules
+
+JFrog's "Repository Naming Rules and Limitations" ([D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md),
+updated 2026-09-10) and the Terraform provider's key validator ([S] terraform-provider-shared@adad42471470
+[`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go))
+set these rules. Keys are also unique without regard to case.
+
+- **Length.** At most 64 characters for local, federated and virtual repositories, 58 for
+  remote ones and 63 for Docker, OCI and Helm OCI local and federated ones ([D] the
+  overview's table). The provider checks "1 - 64", and the federated form reference says
+  "Must be 64 characters or fewer" ([D] [federated form reference](https://docs.jfrog.com/artifactory/docs/federated-repository-form-field-reference.md)).
+  A remote's 58 leaves room for the `-cache` suffix of its cache, as 6.20's validator
+  computed it, and 63 is the hard limit the Docker page gives for keys used as host names
+  under the subdomain method ([D] [docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
+  "Docker Limitations in Artifactory"). Before 6.7.0 a longer key broke the database
+  ([J] [RTFACT-18090](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-18090)).
+- **Characters.** The overview forbids `/ \ : | ? * " < >`, the class pages forbid
+  "spaces or special characters" ([D] [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md),
+  with the same text on the remote and virtual pages), and the provider refuses a space and
+  `! @ # $ % ^ & * ( ) + = { } [ ] : ; < > , / ? ~ | \` and the backtick. The lists do not
+  conflict: the provider spells out the special characters and leaves out only the double
+  quote, so a key may contain neither list's characters. artifactweave refuses the union,
+  and white space of every kind as spaces.
+- **Reserved names.** A key cannot be `.`, `..`, `&`, `Jfrog-usage-logs`,
+  `Jfrog-billing-logs`, `Jfrog-logs`, `artifactory-build-info`, `artifactory-pipe-info`,
+  `Auto-trashcan`, `jfrog-support-bundle`, `_intransit`, `Artifactory-edge-uploads` or
+  `release-bundles`, cannot start with `Jfrog-system-reserved` or
+  `Jfrog-artifactory-system`, and cannot end with `-cache`. The list capitalises some
+  entries as list items, where the repositories Artifactory creates are lower case
+  (`auto-trashcan`), and keys are unique without regard to case, so artifactweave compares
+  the names and prefixes without case, as 6.20's validator compared its reserved names.
+- **Docker, OCI and Helm OCI.** These keys "cannot contain uppercase letters or an
+  underscore" (the overview), on every class. [7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)
+  fixed the web UI, which had accepted an upper-case OCI key that the REST API then refused
+  (RTDEV-41390).
+- **Leading digit.** Allowed. The class pages still say a key "cannot begin with a number",
+  but 7.53.1 lifted that rule: "Artifactory repositories can now have a name that starts
+  with a numeric character" (Artifactory 7.53.1 Cloud release notes, RTFACT-27514, no
+  longer on docs.jfrog.com; [J] [RTFACT-27514](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-27514)
+  "Allow repo name to start with numeric character", Done, and
+  [RTFACT-25604](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-25604), "Implemented
+  in Artifactory 7.53.x"). The overview's rules, the newest list, have no such rule.
+
+`pkg/repo` applies the rules to every key a client chooses: on create, batch create, a
+repository the configuration descriptor adds, and an update that spells the key in another
+case. An update that keeps the stored key does not check it again, so a repository the
+server creates under a reserved name, such as `artifactory-build-info`, is not refused for
+its name. No 7.x error text is documented; artifactweave answers 400 with messages of its
+own, in the order of 6.20's `RepositoryNameValidator` **[I]**.
 
 ## Local fields
 
@@ -570,6 +620,8 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   keeps `checksumPolicyType` for the Maven family and `forceMetadataNameVersion` for Helm.
 
 **Changed or added in 7.x:**
+- **A key may start with a digit** from 7.53.1 (RTFACT-27514), though the class pages still
+  forbid it ("Key rules").
 - **Signing key pairs** also sign npm packages (ECDSA), as the row above now says.
 - **Bundled layouts.** The 7.x layout page lists Cargo and npm Test among the default
   layouts. `cargo-default` is bundled now ([#354](https://github.com/weaveplatform/artifactweave/issues/354));
@@ -583,8 +635,6 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   Configurations ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)) and batch updates ([7.104.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71045-self-managed)).
 
 **Where artifactweave differs from 7.x** (found by #378; the issue named changes the code):
-- 7.x differs: a key may not begin with a digit or contain spaces or special characters ([D] [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md); [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/main/validator/fw/string/repo_key.go)); fixed by [#395](https://github.com/weaveplatform/artifactweave/issues/395).
-- 7.x differs: a key has at most 64 characters ([D] [federated form reference](https://docs.jfrog.com/artifactory/docs/federated-repository-form-field-reference.md); [S] `repo_key.go`, "must be 1 - 64"); fixed by [#395](https://github.com/weaveplatform/artifactweave/issues/395).
 - 7.x differs: each class accepts the package types in the provider's map, and the newer `hex`, `nix` and `machinelearning` ([S] provider map and [D] release notes, "Package types"), where `pkg/repo/packagetypes.go` follows the JSON page; fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
 - 7.x differs: a federated repository accepts `terraformType` ([S] provider 12.11.14 [`resource_artifactory_federated_terraform_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/federated/resource_artifactory_federated_terraform_repository.go)); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
 - 7.x differs: remote `listRemoteFolderItems` is documented as the string `"false"` ([D] configuration-json-files), a spelling `pkg/repo` refuses with 400 ("Typing traps"); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
@@ -595,6 +645,7 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 Settled since the audit:
 - `repositories` is optional: a virtual repository may have no members, sent as an absent or an empty list, and it still takes updates after its last member is deleted. The evidence is [D] [configuration-json-files](https://docs.jfrog.com/integrations/docs/configuration-json-files.md), which marks `repositories` optional; [S] provider 12.11.14 [`virtual.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/virtual/virtual.go), which makes it optional with a default of `[]` and leaves it out of the request when it is empty (`omitempty`), and whose `TestAccVirtualRepository_basic` creates a virtual repository with `repositories = []` against live Artifactory and checks that `repositories.#` is 0; and [J] [RTFACT-12840](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-12840) and [RTFACT-14101](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-14101), virtual repositories without members in 4.13 and 5.2. The create page's OpenAPI lists `repositories` as required, which the provider's empty list contradicts. A read lists no members as `[]`: the provider reads an absent key as null against its `[]` default **[I]**. `defaultDeploymentRepo` must name a member, so a virtual repository without members has none. It answers as an empty repository: downloads find nothing, listings and searches are empty, and a deploy answers 405 for want of a deployment repository ([#394](https://github.com/weaveplatform/artifactweave/issues/394)).
 - From [7.133.3](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71333-self-managed) (SaaS 7.126.0, RTDEV-62756) the repositories API refuses a member, local, remote or virtual, whose package type does not match a non-generic virtual repository's. A generic virtual repository aggregates any type ([D] [virtual-repositories](https://docs.jfrog.com/artifactory/docs/virtual-repositories.md), "Generic Virtual Repositories"), and Helm and Helm OCI do not mix ([D] [kubernetes-helm-chart-repositories](https://docs.jfrog.com/artifactory/docs/kubernetes-helm-chart-repositories.md), "Repository Compatibility"). Maven, Gradle, Ivy, SBT and P2 count as one type, as 6.20's virtual repository editor offers them together (`GetAvailableRepositories`, `RepoType.isMavenGroup` in `knottnhupfer/artifactory-oss` at `b99e5649bcad`) and [J] [RTFACT-10202](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-10202) shows a Maven virtual repository with a Gradle member **[I]**. artifactweave refuses a mismatch with 400 on create, update, both batch operations and the configuration descriptor. JFrog documents no message, so artifactweave's is its own **[I]**, and the release note names only the create API, so the other write paths are **[I]** too. A repository's package type cannot change, and deleting a repository takes it out of every virtual repository, so the rule still holds after the write ([#394](https://github.com/weaveplatform/artifactweave/issues/394)).
+- A key follows the rules in "Key rules": a length for each class (64, 58 for remote, 63 for Docker, OCI and Helm OCI local and federated), none of the documented or provider-refused characters, no reserved name or prefix in any case, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm OCI. The evidence is [D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md) and [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go). artifactweave refuses a key that breaks them with 400 on create, batch create, the configuration descriptor and an update that spells the key in another case, and accepts a leading digit, as 7.x has since 7.53.1 ([#395](https://github.com/weaveplatform/artifactweave/issues/395)).
 
 **Unconfirmed for 7.x:**
 - The bundled layouts copied from the 6.20 descriptor ("Bundled definitions"): JFrog
@@ -616,3 +667,10 @@ Settled since the audit:
 - Where the YAML keys `remoteRepoLayout`, `primaryKeyPairDescriptor` and
   `cocoaPods.specRepoProvider` land, and whether `null` is accepted on a field with a fixed
   set of values ("JSON and YAML name differences"), on #216.
+- Parts of the key rules, on [#216](https://github.com/weaveplatform/artifactweave/issues/216):
+  the 400 messages and the order of the checks, which no 7.x page documents; whether 7.x
+  compares the reserved names and prefixes without case, and refuses tabs and other white
+  space as spaces; whether a Docker, OCI or Helm OCI virtual key may have 64 characters,
+  which the overview's table allows and the Docker page's 63-character "hard limit" does
+  not; whether the length counts characters or bytes; and whether a leading digit is
+  accepted, which 7.53.1's release note allows and the class pages forbid.
