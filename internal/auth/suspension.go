@@ -42,13 +42,15 @@ const (
 	maxDelayMillis = int64(1<<63-1) / int64(time.Millisecond)
 )
 
-// suspendedFor is the 403 of a login suspended for d more. The wording is
-// the one Artifactory 7.x logs for it (JFrog KB, "Artifactory intermittent
-// 403 errors").
+// suspendedFor is the 403 of a login suspended for d more, in the wording of
+// the REST body Artifactory 7.x answers (RTFACT-29934 on 7.61.1,
+// RTFACT-26575 on 7.27.6). The KB's "recurrent request failures ...
+// second(s)" is the log line, not the body. "seconds" stays plural for one
+// second too, as RTFACT-26575's "try again in 1 seconds" shows.
 func suspendedFor(d time.Duration) error {
 	secs := int64((d + time.Second - 1) / time.Second)
 	return fmt.Errorf("%w: %w", ErrLoginSuspended, apierror.New(http.StatusForbidden, fmt.Sprintf(
-		"This request is blocked due to recurrent request failures, please try again in %d second(s)",
+		"This request is blocked due to recurrent login failures, please try again in %d seconds",
 		secs,
 	)))
 }

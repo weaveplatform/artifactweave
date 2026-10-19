@@ -217,6 +217,9 @@ Dynamic mappings, from the examples of section 3 (implemented for
   `username_pattern` and `groups_pattern`.
 - **[I]** With a `project_key`, another project's mappings are not tried; the page says only
   that the project's own come first.
+- **[I]** A create or update whose scope names project roles in two projects answers 400, the
+  status the page gives for a changed project key; the page says only "Only one project key
+  is allowed per mapping". Several roles entries in one project are one project key.
 - **[I]** A project roles mapping without a `username` issues its token for the synthetic
   subject a groups-only mapping gets, `oidc-<provider>-<mapping>` here, as the page's "leave
   the Username field blank" describes. The form is not documented: jfrog-cli's
@@ -253,9 +256,10 @@ combine, and how mappings compete without a `project_key`.
 [#409](https://github.com/weaveplatform/artifactweave/issues/409), artifactweave follows
 section 3 on those five points and the Resource Scope mapping, and since
 [#476](https://github.com/weaveplatform/artifactweave/issues/476) on project roles mappings
-without a `username` and the project that cannot change. One choice differs: a resource
-scope from a claim narrows the permissions of the token's user and groups and never grants
-on its own, where 7.x grants it without permissions
+without a `username` and the project that cannot change, and since
+[#493](https://github.com/weaveplatform/artifactweave/issues/493) on one project key per
+mapping. One choice differs: a resource scope from a claim narrows the permissions of the
+token's user and groups and never grants on its own, where 7.x grants it without permissions
 ([DV-092](../implementation/deviations.md#security)). Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) records it.
 
@@ -266,6 +270,7 @@ on its own, where 7.x grants it without permissions
   operators, `$1_$2`, which parts are expressions, the table's "User", the
   `resource_pattern` field and another project's mappings;
 - whether a `token_spec.expires_in` over 24 hours is refused or capped;
+- the status for a scope that names project roles in two projects (section 4);
 - the synthetic subject's form, for a project roles mapping without a `username` as for a
   groups-only one (section 4);
 - what `self_revocable` changes;

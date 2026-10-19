@@ -144,7 +144,12 @@ These are choices made where no source documents Artifactory's behaviour:
     token acts through "Explicitly mapped groups only"
     ([access tokens](https://docs.jfrog.com/administration/docs/access-tokens), "Transient
     Users and Auto Join Groups").
-  - `applied-permissions/roles:…` grants nothing until projects arrive (P11).
+  - `applied-permissions/roles:…` grants nothing until projects arrive (P11). An OIDC
+    identity mapping's scope names roles in one project at most, so the roles in a token it
+    issues all belong to the mapping's project: "Only one project key is allowed per mapping",
+    and a mapping naming two is refused with 400
+    ([0005](0005-authentication-and-tokens.md#artifactory-7x-check),
+    [#493](https://github.com/weaveplatform/artifactweave/issues/493)).
   - `artifact:<repo|*>[/<ant path>]:<letters>` entries intersect artifact access with what
     they name. 7.x grants a resource scope "without requiring any permissions to be
     predefined"

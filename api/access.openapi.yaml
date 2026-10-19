@@ -1704,7 +1704,7 @@ paths:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappings.md
     post:
-      description: 'Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.'
+      description: 'Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.'
       operationId: createOidcIdentityMapping
       parameters:
         - description: Required path parameter. Name of the OIDC provider the mappings belong to.
@@ -1837,7 +1837,7 @@ paths:
         - oidc
       x-oracle-source: https://docs.jfrog.com/administration/reference/getoidcidentitymappingbyname.md
     put:
-      description: Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+      description: Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
       operationId: updateOidcIdentityMapping
       parameters:
         - description: Required path parameter. Name of the OIDC provider the mappings belong to.
@@ -7608,7 +7608,7 @@ components:
         - $ref: '#/components/schemas/OidcIdentityMapping'
         - properties:
             project_key:
-              description: Optional within this object. Project the mapping belongs to, derived from a project role in token_spec.scope. Set by the server.
+              description: Optional within this object. Project the mapping belongs to, derived from the project roles in token_spec.scope, which name one project at most. Set by the server.
               type: string
           type: object
       description: A stored identity mapping, with the project it belongs to.

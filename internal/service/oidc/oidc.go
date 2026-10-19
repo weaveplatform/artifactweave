@@ -240,6 +240,15 @@ func (m *Mapping) validate() error {
 	m.ProjectKey = nil
 	for _, e := range sc.Entries {
 		if e.Kind == types.ScopeRoles {
+			// "Only one project key is allowed per mapping" (Manage
+			// Project-Scoped Identity Mappings). Keeping the last project
+			// instead would file the mapping, and the tokens it issues,
+			// under one project while its scope still names roles in
+			// another.
+			if m.ProjectKey != nil && *m.ProjectKey != e.Project {
+				return invalid("token_spec.scope names project roles in '%s' and '%s'; "+
+					"only one project key is allowed per mapping", *m.ProjectKey, e.Project)
+			}
 			project := e.Project
 			m.ProjectKey = &project
 		}

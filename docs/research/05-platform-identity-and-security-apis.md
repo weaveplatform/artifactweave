@@ -423,8 +423,17 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    and from 7.90 the UI changes or disables it. The suspension starts at the second failure in
    a row, and the right password is refused while it lasts **[KB]**
    ([Artifactory intermittent 403 errors](https://jfrog.com/help/r/artifactory-intermittent-403-errors-while-working-with-artifactory/artifactory-intermittent-403-errors-while-working-with-artifactory),
-   which also gives the message "This request is blocked due to recurrent request failures,
-   please try again in 2 second(s)"). A cluster applies it on each node separately.
+   whose log line reads "This request is blocked due to recurrent request failures, please try
+   again in 2 second(s)"). The REST body says "login failures" and "seconds": 7.61.1 answers
+   `{"errors":[{"status":403,"message":"This request is blocked due to recurrent login
+   failures, please try again in 4 seconds"}]}` (**[J]**
+   [RTFACT-29934](https://jfrog.atlassian.net/browse/RTFACT-29934)), and 7.27.6 "please try
+   again in 1 seconds", plural for one second too (**[J]**
+   [RTFACT-26575](https://jfrog.atlassian.net/browse/RTFACT-26575)). artifactweave answers the
+   body's wording with the time left rounded up
+   ([#493](https://github.com/weaveplatform/artifactweave/issues/493)). The suspension moved
+   into Access in 7.98 ([7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed));
+   that Access kept the wording is **[I]**. A cluster applies it on each node separately.
    artifactweave enforces it (`internal/auth/suspension.go`): the delay is the base doubled for
    each failure past the threshold, capped at the maximum, as Artifactory 6.x's
    `loginBlockDelay << (attempts - allowed)` did **[I]**; the check comes after the lock and
@@ -543,6 +552,12 @@ with a file name, as getkeypairpublickeyperrepository's `curl -O -J` needs. A lo
 answers 403 whatever password it sends, its lock checked before the password (item 5 of
 [Authentication](#authentication-accepted-on-every-endpoint)).
 
+**Settled by [#493](https://github.com/weaveplatform/artifactweave/issues/493).** A suspended
+login answers 403 "This request is blocked due to recurrent login failures, please try again
+in N seconds", the REST body 7.61.1 and 7.27.6 answer (**[J]** RTFACT-29934 and RTFACT-26575,
+item 5 of [Authentication](#authentication-accepted-on-every-endpoint)), where it gave the KB's
+log line before.
+
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
 account policy, seeding and OIDC differences, and decision 0006's
@@ -626,7 +641,8 @@ records.
 - The temporary login suspension's growth and scope. **[I]** The delay doubles from the base
   at each failure past `maxLoginDelayIncorrectAttempts` (2), as in 6.x; failures are forgotten
   a day after the last one; a threshold of 0 or 1 suspends from the first failure; only Basic
-  logins with a password are suspended, not tokens; and the 403 body is the KB's log line.
+  logins with a password are suspended, not tokens; and the 403 body keeps the wording 7.61.1
+  answers since the suspension moved into Access in 7.98.
 - What `seconds-to-unlock` does in 7.x. **[I]** artifactweave stores and returns it, default 1,
   and a locked user stays locked until an administrator unlocks them, as the security
   configuration page says.

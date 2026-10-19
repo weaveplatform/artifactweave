@@ -545,6 +545,48 @@ func TestProjectRolesWithoutUser(t *testing.T) {
 	}
 }
 
+// TestMappingNamesOneProject: a mapping's scope may name roles in one project
+// only, "Only one project key is allowed per mapping", on create and on
+// update alike; several roles entries in that one project are fine (#493).
+func TestMappingNamesOneProject(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	const (
+		p1Dev    = `applied-permissions/roles:p1:"Developer"`
+		p1Viewer = `applied-permissions/roles:p1:"Viewer"`
+		p2Viewer = `applied-permissions/roles:p2:"Viewer"`
+	)
+	got, err := w.svc.CreateMapping(ctx, "ci",
+		mapping("one", oidc.TokenSpec{Scope: ptr(p1Dev + " " + p1Viewer)}, nil))
+	if err != nil || got.ProjectKey == nil || *got.ProjectKey != "p1" {
+		t.Fatalf("two entries in one project = %+v, %v", got, err)
+	}
+	two := oidc.TokenSpec{Username: ptr("dev"), Scope: ptr(p1Dev + " " + p2Viewer)}
+	for name, call := range map[string]func() error{
+		"create": func() error {
+			_, err := w.svc.CreateMapping(ctx, "ci", mapping("two", two, nil))
+			return err
+		},
+		"update": func() error {
+			_, err := w.svc.UpdateMapping(ctx, "ci", "one", oidc.Mapping{TokenSpec: &two})
+			return err
+		},
+	} {
+		err := call()
+		if !errors.Is(err, oidc.ErrInvalid) ||
+			!strings.Contains(err.Error(), "names project roles in 'p1' and 'p2'") {
+			t.Errorf("%s with roles in two projects: %v", name, err)
+		}
+	}
+	if _, err := w.svc.Mapping(ctx, "ci", "two"); !errors.Is(err, oidc.ErrNotFound) {
+		t.Errorf("the refused mapping was stored: %v", err)
+	}
+	if m, err := w.svc.Mapping(ctx, "ci", "one"); err != nil || *m.ProjectKey != "p1" ||
+		*m.TokenSpec.Scope != p1Dev+" "+p1Viewer {
+		t.Fatalf("after the refused update: %+v, %v", m, err)
+	}
+}
+
 // TestExchangeOrder: with a project, its mappings first, then global ones,
 // and never another project's; without one, every mapping competes. Lower
 // priorities first, none last, the first created among equals.
