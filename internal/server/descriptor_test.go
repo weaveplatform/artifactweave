@@ -29,22 +29,14 @@ virtualRepositories:
   yaml-virtual:
     type: generic
     repositories: [yaml-local]
-mailServer:
-  host: smtp.example
 `
+	// Artifactory's answer counts the document's six values.
+	const answer = "6 changes to config merged successfully"
 	rec := w.do(http.MethodPatch, configPath, "admin", patch, "Content-Type", "application/yaml")
 	if rec.Code != http.StatusOK ||
-		rec.Header().Get("Content-Type") != "text/plain; charset=utf-8" {
-		t.Fatalf("PATCH = %d %s: %s", rec.Code, rec.Header(), rec.Body)
-	}
-	for _, want := range []string{
-		"Created: localRepositories.yaml-local, virtualRepositories.yaml-virtual",
-		"Deleted: localRepositories.old-local",
-		"Ignored (accepted without effect): mailServer",
-	} {
-		if !strings.Contains(rec.Body.String(), want) {
-			t.Errorf("summary lacks %q:\n%s", want, rec.Body)
-		}
+		rec.Header().Get("Content-Type") != "text/plain; charset=utf-8" ||
+		rec.Body.String() != answer {
+		t.Fatalf("PATCH = %d %s: %q", rec.Code, rec.Header(), rec.Body)
 	}
 	if c := w.stored(
 		"yaml-local",
@@ -52,10 +44,18 @@ mailServer:
 		!*c.XrayIndex {
 		t.Fatalf("stored %+v", c)
 	}
-	// The same patch again changes nothing.
+	if _, err := w.db.Repos().Get(context.Background(), "old-local"); err == nil {
+		t.Fatal("old-local was not deleted")
+	}
+	// The same patch again changes nothing, and answers the same count.
+	before := w.stored("yaml-virtual")
 	rec = w.do(http.MethodPatch, configPath, "admin", patch, "Content-Type", "application/yaml")
-	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), "Created") {
-		t.Fatalf("second PATCH = %d: %s", rec.Code, rec.Body)
+	if rec.Code != http.StatusOK || rec.Body.String() != answer {
+		t.Fatalf("second PATCH = %d: %q", rec.Code, rec.Body)
+	}
+	if after := w.stored("yaml-virtual"); strings.Join(after.Repositories, ",") !=
+		strings.Join(before.Repositories, ",") {
+		t.Fatalf("second PATCH changed %+v", after)
 	}
 }
 
@@ -78,6 +78,14 @@ func TestPatchConfigurationErrors(t *testing.T) {
 		"layout names another": {
 			as: "admin", body: "repoLayouts:\n  mine:\n    name: theirs\n    artifactPathPattern: x\n",
 			want: 400, message: "repoLayouts.mine: name theirs does not match the entry key",
+		},
+		"unapplied sections": {
+			as: "admin", body: "security:\n  anonAccessEnabled: true\nmailServer:\n  host: smtp\n",
+			want: 400, message: "sections not supported: mailServer, security",
+		},
+		"null on a boolean": {
+			as: "admin", body: "localRepositories:\n  x-local:\n    blackedOut: null\n",
+			want: 400, message: "localRepositories.x-local.blackedOut cannot be null",
 		},
 		"store fails": {
 			as: "admin", body: "localRepositories:\n  x-local: {type: generic}\n",

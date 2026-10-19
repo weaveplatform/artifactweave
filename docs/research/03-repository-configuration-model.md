@@ -474,11 +474,40 @@ under `localRepositories`, `remoteRepositories`, `virtualRepositories` and
 The rows from `downloadRedirect` on, except `remoteRepoLayout`, are from the
 [YAML page](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml.md) [D].
 
+artifactweave reads each YAML key in the table into its JSON field, so the descriptor and
+the repositories API store the same value in the same place (`internal/descriptor/parse.go`):
+
+- `downloadRedirect` takes the `{enabled: <bool>}` block or the flat flag the JSON API
+  uses.
+- `remoteRepoLayout` is stored as `remoteRepoLayoutRef`, although RTFACT-29858 reports 7.49.8
+  leaving the field unchanged. **[I]** No source shows a current 7.x setting the field; the
+  report was closed without a fix or a reason.
+- `primaryKeyPairDescriptor` is stored as `primaryKeyPairRef`, which the local sample's
+  `secondaryKeyPairRef` beside it and the federated sample's `primaryKeyPairRef` suggest.
+  **[I]** The page gives the key with no description.
+- `type: terraformbe` is stored as `packageType: terraformbackend`.
+- `yumGroupFileNames`, `cocoaPods.cocoaPodsSpecsRepoUrl` (`podsSpecsRepoUrl`) and
+  `p2.urls` (`p2Urls`) reach their JSON fields, which `pkg/repo` does not keep yet ("Where
+  artifactweave differs" below): the descriptor drops them where the repositories API
+  drops them, and both keep them once `pkg/repo` does.
+- `cocoaPods.specRepoProvider{provider, downloadUrl}`, in the remote sample, has no JSON
+  field: the repositories API reads a CocoaPods remote's Git provider from
+  `vcsGitProvider` and `vcsGitDownloadUrl`, which the YAML writes under `vcs.git`
+  ([S] provider 12.11.14
+  [`resource_artifactory_remote_cocoapods_repository.go`](https://github.com/jfrog/terraform-provider-artifactory/blob/v12.11.14/pkg/artifactory/resource/repository/remote/resource_artifactory_remote_cocoapods_repository.go)).
+  It is accepted and not stored. **[I]** The 6.20 `HttpRepositoryConfigurationImpl` has
+  no JSON field for it either, and no 7.x source shows one.
+
 A `null` value in YAML deletes the element. Inside a repository element, only string fields
 other than `type` may be set to `null`
 ([D] [delete an element](https://docs.jfrog.com/installation/docs/delete-an-existing-element-in-artifactory-yaml.md)).
-An empty YAML document deletes every repository, which artifactweave refuses with 400
-(DV-023). Example:
+artifactweave clears a string field set to `null`, counting a field with a fixed set of
+values such as `checksumPolicyType` as a string, and answers 400 for `null` on `type`, on a
+block and on any field that does not hold a string ([research
+06](06-system-configuration-and-descriptor.md#what-artifactweave-serves)). The repositories
+API's update, by contrast, reads `null` on any field as a reset to its default
+(`internal/repos/repos.go`, `Merge`). An empty YAML document
+deletes every repository, which artifactweave refuses with 400 (DV-023). Example:
 
 ```yaml
 localRepositories:
@@ -584,3 +613,6 @@ Settled since the audit:
 - Whether a read by anyone but an administrator shows the stored `notes`. The samples whose
   shape looks like that partial read show `"notes": ""`, as artifactweave always does for
   such a reader [I] ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+- Where the YAML keys `remoteRepoLayout`, `primaryKeyPairDescriptor` and
+  `cocoaPods.specRepoProvider` land, and whether `null` is accepted on a field with a fixed
+  set of values ("JSON and YAML name differences"), on #216.

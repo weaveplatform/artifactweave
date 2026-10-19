@@ -68,8 +68,6 @@ repoLayouts:
   custom:
     artifactPathPattern: "[org]/[module]/[baseRev]/[module]-[baseRev].[ext]"
     distinctiveDescriptorPathPattern: false
-mailServer:
-  host: smtp.example
 `
 
 func TestApplyCreatesThenNothing(t *testing.T) {
@@ -95,8 +93,98 @@ func TestApplyCreatesThenNothing(t *testing.T) {
 	if len(res.Created)+len(res.Updated)+len(res.Deleted) != 0 || len(res.Unchanged) != 6 {
 		t.Fatalf("second apply %+v", res)
 	}
-	if !strings.Contains(res.String(), "Ignored (accepted without effect): mailServer") {
+	// The answer counts the document's 15 values, not what changed, so the
+	// second apply gives the same number.
+	if got := res.Merged(); got != "15 changes to config merged successfully" {
+		t.Fatalf("answer %q", got)
+	}
+	if !strings.Contains(res.String(), "Unchanged: localRepositories.libs-local") {
 		t.Fatalf("summary:\n%s", res)
+	}
+}
+
+// TestApplyDocumentedSpellings stores the descriptor's spellings where the
+// repositories API stores the same fields, and drops what pkg/repo does
+// not keep as that API drops it.
+func TestApplyDocumentedSpellings(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	res := mustApply(t, db, `
+localRepositories:
+  state-local:
+    type: terraformbe
+  rpm-local:
+    type: rpm
+    yumGroupFileNames: groups.xml
+    downloadRedirect:
+      enabled: true
+remoteRepositories:
+  pods-remote:
+    type: cocoapods
+    url: https://cdn.cocoapods.example
+    remoteRepoLayout: simple-default
+    cocoaPods:
+      cocoaPodsSpecsRepoUrl: https://specs.example
+      specRepoProvider:
+        provider: github
+virtualRepositories:
+  urls-virtual:
+    type: rpm
+    repositories: [rpm-local]
+    p2:
+      urls: [https://p2.example]
+`)
+	if len(res.Created) != 4 {
+		t.Fatalf("created %+v", res)
+	}
+	state, _ := db.Repos().Get(ctx, "state-local")
+	rpm, _ := db.Repos().Get(ctx, "rpm-local")
+	pods, _ := db.Repos().Get(ctx, "pods-remote")
+	if state.PackageType != repo.TerraformBackend ||
+		!rpm.DownloadRedirect.Bool() ||
+		pods.RemoteRepoLayoutRef != "simple-default" {
+		t.Fatalf("stored %+v %+v %+v", state, rpm, pods)
+	}
+	// A field pkg/repo does not keep is no change, on an update as on the
+	// JSON API.
+	res = mustApply(t, db, "localRepositories:\n  rpm-local:\n    yumGroupFileNames: other.xml\n")
+	if strings.Join(res.Unchanged, " ") != "localRepositories.rpm-local" {
+		t.Fatalf("update %+v", res)
+	}
+}
+
+// TestApplyNullClearsString clears a string field and leaves the rest.
+func TestApplyNullClearsString(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	mustApply(t, db, `
+remoteRepositories:
+  r:
+    type: generic
+    url: https://up.example
+    username: u
+    password: p
+    remoteRepoLayout: simple-default
+    blackedOut: true
+`)
+	res := mustApply(t, db, `
+remoteRepositories:
+  r:
+    username: null
+    password: ~
+    remoteRepoLayout: null
+`)
+	r, err := db.Repos().Get(ctx, "r")
+	if strings.Join(res.Updated, " ") != "remoteRepositories.r" || err != nil ||
+		r.Username != "" || r.Password != "" || r.RemoteRepoLayoutRef != "" ||
+		r.BlackedOut == nil || !*r.BlackedOut {
+		t.Fatalf("%+v: %+v %v", res, r, err)
+	}
+	if _, err := Parse(
+		[]byte("remoteRepositories:\n  r:\n    blackedOut: null\n"),
+		noEnv,
+	); err == nil {
+		t.Fatal("parsed a null on a boolean")
 	}
 }
 

@@ -129,7 +129,6 @@ func applyBootstrap(
 		return fmt.Errorf("bootstrap descriptor %s: %w", file, err)
 	}
 	log.Info("applied the bootstrap descriptor", "file", file,
-		"created", len(res.Created), "updated", len(res.Updated), "deleted", len(res.Deleted),
-		"ignored", res.Ignored)
+		"created", len(res.Created), "updated", len(res.Updated), "deleted", len(res.Deleted))
 	return nil
 }

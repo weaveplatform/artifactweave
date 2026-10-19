@@ -20,10 +20,12 @@ Feature: Configuration descriptor
             - desc-local
       """
     Then the response status is 200
-    And the response body contains "Created: localRepositories.desc-local, virtualRepositories.desc-virtual"
+    And the response body is "4 changes to config merged successfully"
     When I GET "/artifactory/api/repositories/desc-local" as admin
     Then the response status is 200
     And the JSON field "description" equals "from the descriptor"
+    When I GET "/artifactory/api/repositories/desc-virtual" as admin
+    Then the response status is 200
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       localRepositories:
@@ -32,15 +34,68 @@ Feature: Configuration descriptor
           description: from the descriptor
       """
     Then the response status is 200
-    And the response body contains "Unchanged: localRepositories.desc-local"
+    And the response body is "2 changes to config merged successfully"
     When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
       """
       localRepositories:
         desc-local: null
       """
     Then the response status is 200
-    And the response body contains "Deleted: localRepositories.desc-local"
+    And the response body is "1 changes to config merged successfully"
     When I GET "/artifactory/api/repositories/desc-local" as admin
+    Then the response status is 404
+
+  Scenario: Repository entries take the spellings of JFrog's YAML samples
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        spelt-local:
+          type: generic
+          description: spelt
+          downloadRedirect:
+            enabled: true
+      remoteRepositories:
+        spelt-remote:
+          type: generic
+          url: https://example.test/generic
+          remoteRepoLayout: simple-default
+      """
+    Then the response status is 200
+    And the response body is "6 changes to config merged successfully"
+    When I GET "/artifactory/api/repositories/spelt-local" as admin
+    Then the JSON field "downloadRedirect" equals "true"
+    When I GET "/artifactory/api/repositories/spelt-remote" as admin
+    Then the JSON field "remoteRepoLayoutRef" equals "simple-default"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        spelt-local:
+          description: null
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/spelt-local" as admin
+    Then the response body does not contain "description"
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        spelt-local:
+          blackedOut: null
+      """
+    Then the response status is 400
+    And the JSON field "errors.0.message" exists
+
+  Scenario: A section that is not applied is refused and changes nothing
+    When I PATCH "/artifactory/api/system/configuration" as admin with YAML:
+      """
+      localRepositories:
+        refused-local:
+          type: generic
+      mailServer:
+        host: smtp.example
+      """
+    Then the response status is 400
+    And the response body contains "sections not supported: mailServer"
+    When I GET "/artifactory/api/repositories/refused-local" as admin
     Then the response status is 404
 
   Scenario: An empty descriptor is refused rather than deleting every repository

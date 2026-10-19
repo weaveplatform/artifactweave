@@ -53,19 +53,17 @@ Where this design differs from 7.x (audit #378):
   `downloadRedirectConfig.fileMinimumSize` in MB
   ([general settings](https://docs.jfrog.com/administration/docs/general-settings)), where
   artifactweave reads only `download.redirect.min_size`; fixed by #402.
-- 7.x differs: the YAML descriptor gives local and remote repositories
-  `downloadRedirect: {enabled: <bool>}`, which artifactweave refuses with 400 because it
-  expects a flat boolean
-  ([repositories in YAML](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml));
-  fixed by #398.
 - 7.x differs: `downloadRedirect` on a remote repository with `storeArtifactsLocally=false`
   "generates an error"
   ([direct download, step 2](https://docs.jfrog.com/installation/docs/step-2-specify-repositories-for-direct-download)),
   where artifactweave accepts it; left to P9 (remote repositories), with no issue yet.
 
 artifactweave already redirects `downloadRedirect` GETs to a presigned URL on any store that
-can sign (research 19 section 5). Teams leaving Artifactory run on all three clouds and want
-CDN delivery there too, on their own instances.
+can sign (research 19 section 5). The YAML descriptor sets the flag as
+`downloadRedirect: {enabled: <bool>}` on local and remote repositories
+([repositories in YAML](https://docs.jfrog.com/installation/docs/repositories-configurations-in-artifactory-yaml)),
+and artifactweave also takes the JSON API's flat boolean there. Teams leaving Artifactory
+run on all three clouds and want CDN delivery there too, on their own instances.
 
 The clients set hard limits. The JFrog CLI sends a HEAD, following redirects and requiring
 200, before any download over 5,120,000 bytes, and a URL signed for GET answers HEAD with

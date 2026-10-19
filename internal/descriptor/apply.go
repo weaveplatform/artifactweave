@@ -21,14 +21,20 @@ import (
 // Result names what a patch changed, as "section.key".
 type Result struct {
 	Created, Updated, Deleted, Unchanged []string
-	// Ignored are the sections accepted without effect.
-	Ignored []string
+	// Changes is Patch.Changes.
+	Changes int
 	// DryRun is set when nothing was written.
 	DryRun bool
 }
 
-// String is the plain-text summary the PATCH endpoint and `config apply`
-// print.
+// Merged is the PATCH endpoint's answer, in Artifactory's words. It counts
+// the document's values rather than what changed, as Artifactory does, so
+// applying the same patch again gives the same number.
+func (r Result) Merged() string {
+	return fmt.Sprintf("%d changes to config merged successfully", r.Changes)
+}
+
+// String is the plain-text summary `config apply` prints.
 func (r Result) String() string {
 	var b strings.Builder
 	if r.DryRun {
@@ -44,7 +50,6 @@ func (r Result) String() string {
 		{"Updated", r.Updated},
 		{"Deleted", r.Deleted},
 		{"Unchanged", r.Unchanged},
-		{"Ignored (accepted without effect)", r.Ignored},
 	} {
 		if len(l.names) > 0 {
 			fmt.Fprintf(&b, "%s: %s\n", l.label, strings.Join(l.names, ", "))
@@ -76,7 +81,7 @@ func Apply(
 	now time.Time,
 	dryRun bool,
 ) (Result, error) {
-	res := Result{Ignored: p.Ignored, DryRun: dryRun}
+	res := Result{Changes: p.Changes, DryRun: dryRun}
 	deletes, writes, err := planRepos(ctx, st, p.Repos, &res)
 	if err != nil {
 		return res, err
