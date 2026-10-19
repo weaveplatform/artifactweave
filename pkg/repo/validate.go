@@ -52,13 +52,19 @@ func Validate(c *Config) error {
 	return validate(c, true)
 }
 
-// ValidateStored is Validate without the key rules, for an update that keeps
-// the stored key. That key met them when a client created it, or the server
-// created it under a name they reserve, such as artifactory-build-info, which
-// they would otherwise refuse on every update.
+// ValidateStored is Validate for an update, which keeps the stored key: it
+// skips the key rules, which that key met when a client created it or which
+// the server set aside when it created the repository under a name they
+// reserve. The server's build-info repository also keeps its package type,
+// buildinfo, which no class allows a client to choose.
 func ValidateStored(c *Config) error {
 	return validate(c, false)
 }
+
+// buildInfoKey is the key of the build-info repository the server seeds.
+// It must match types.BuildInfoRepository, which pkg/repo cannot import
+// because pkg/types imports pkg/repo; internal/repos tests the two agree.
+const buildInfoKey = "artifactory-build-info"
 
 func validate(c *Config, keyRules bool) error {
 	var errs Errors
@@ -87,7 +93,8 @@ func validate(c *Config, keyRules bool) error {
 	if (c.Proxy != "" || c.DisableProxy != nil) && (class == Local || class == Virtual) {
 		add("proxy", "is only valid on remote and federated repositories")
 	}
-	if c.PackageType != "" && class != "" {
+	storedBuildInfo := !keyRules && c.Key == buildInfoKey && c.PackageType == BuildInfo
+	if c.PackageType != "" && class != "" && !storedBuildInfo {
 		if allowed := AllowedPackageTypes(
 			class,
 		); allowed != nil &&
@@ -172,7 +179,7 @@ const keyForbidden = `!@#$%^&*()+={}[]:;<>,/?~` + "`" + `|\"`
 var reservedKeys = []string{
 	".", "..", "&",
 	"jfrog-usage-logs", "jfrog-billing-logs", "jfrog-logs",
-	"artifactory-build-info", "artifactory-pipe-info", "auto-trashcan",
+	buildInfoKey, "artifactory-pipe-info", "auto-trashcan",
 	"jfrog-support-bundle", "_intransit", "artifactory-edge-uploads", "release-bundles",
 }
 

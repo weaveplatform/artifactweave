@@ -646,6 +646,50 @@ func TestRepositoriesAs7x(t *testing.T) {
 	}
 }
 
+// An update never changes a key: a body key that differs from the path's in
+// case answers the key mismatch's 400 on every package type, not a 500, and
+// the seeded build-info repository takes updates (#472).
+func TestUpdateKeepsTheKey(t *testing.T) {
+	w := newRepoWorld(t)
+	w.create(
+		repo.Config{Key: "libs-local", Class: repo.Local, PackageType: repo.Maven},
+		repo.Config{Key: "npm-local", Class: repo.Local, PackageType: repo.NPM},
+	)
+	var e struct {
+		Errors []struct{ Message string }
+	}
+	for _, path := range []string{"libs-local", "npm-local"} {
+		rec := w.do("POST", "/artifactory/api/repositories/"+path, "admin",
+			`{"key":"`+strings.ToUpper(path)+`","description":"x"}`)
+		jsonBody(t, rec, &e)
+		if rec.Code != 400 || e.Errors[0].Message != "The repository key cannot be changed" {
+			t.Errorf("%s: %d %s", path, rec.Code, rec.Body)
+		}
+	}
+	rec := w.do("POST", "/artifactory/api/v2/repositories/batch", "admin",
+		`[{"key":"libs-local","description":"x"},{"key":"NPM-LOCAL","description":"x"}]`)
+	if rec.Code != 404 {
+		t.Errorf("batch with a respelled key: %d %s", rec.Code, rec.Body)
+	}
+	if c := w.stored("libs-local"); c.Description != "" {
+		t.Errorf("a refused batch changed libs-local: %q", c.Description)
+	}
+	rec = w.do("POST", "/artifactory/api/repositories/"+types.BuildInfoRepository, "admin",
+		`{"description":"builds","xrayIndex":true}`)
+	if rec.Code != 200 {
+		t.Fatalf("build-info update %d %s", rec.Code, rec.Body)
+	}
+	if c := w.stored(types.BuildInfoRepository); c.PackageType != repo.BuildInfo ||
+		c.Description != "builds" || !*c.XrayIndex {
+		t.Errorf("build-info %+v", c)
+	}
+	rec = w.do("POST", "/artifactory/api/v2/repositories/batch", "admin",
+		`[{"key":"artifactory-build-info","packageType":"buildinfo","notes":"n"}]`)
+	if rec.Code != 200 || w.stored(types.BuildInfoRepository).Notes != "n" {
+		t.Errorf("build-info batch update %d %s", rec.Code, rec.Body)
+	}
+}
+
 // The package type enumerations the OpenAPI document gives each class are
 // the types pkg/repo accepts for it, in its order.
 func TestPackageTypeEnumsMatchTheAcceptedTypes(t *testing.T) {
@@ -948,7 +992,7 @@ func TestDeleteRepository(t *testing.T) {
 		{types.BuildInfoRepository, 403, buildInfoBlocked},
 		{"Artifactory-Build-Info", 403, buildInfoBlocked},
 		{"auto-trashcan", 400, msgProtected},
-		{"JFrog-Support-Bundles", 400, msgProtected},
+		{"JFrog-Support-Bundle", 400, msgProtected},
 	} {
 		rec := w.do("DELETE", "/artifactory/api/repositories/"+c.key, "admin", "")
 		jsonBody(t, rec, &failure)
@@ -997,7 +1041,7 @@ func TestBatchDelete(t *testing.T) {
 		{`["b","artifactory-build-info"]`, 403, buildInfoBlocked},
 		{`["b","auto-trashcan"]`, 400, msgProtected},
 		{`["b",""]`, 400, msgProtected},
-		{`["jfrog-support-bundles","artifactory-build-info"]`, 400, msgProtected},
+		{`["jfrog-support-bundle","artifactory-build-info"]`, 400, msgProtected},
 		{`["artifactory-build-info","auto-trashcan"]`, 403, buildInfoBlocked},
 	} {
 		rec = w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin", c.body)

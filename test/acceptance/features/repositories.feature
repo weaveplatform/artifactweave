@@ -162,12 +162,26 @@ Feature: Repositories API
       {"key": "OCI-Local", "description": "respelled"}
       """
     Then the response status is 400
-    And the response body contains "must be lower case without an underscore"
+    And the response body contains "The repository key cannot be changed"
+    When I POST "/artifactory/api/repositories/1st-generic" as admin with body:
+      """
+      {"key": "1ST-GENERIC", "description": "respelled"}
+      """
+    Then the response status is 400
+    And the response body contains "The repository key cannot be changed"
     When I POST "/artifactory/api/repositories/oci-local" as admin with body:
       """
       {"key": "oci-local", "description": "kept"}
       """
     Then the response status is 200
+    When I POST "/artifactory/api/repositories/artifactory-build-info" as admin with body:
+      """
+      {"description": "builds"}
+      """
+    Then the response status is 200
+    When I GET "/artifactory/api/repositories/artifactory-build-info" as admin
+    Then the JSON field "packageType" equals "buildinfo"
+    And the JSON field "description" equals "builds"
 
   @jf
   Scenario: jf rt repo-create, repo-update and repo-delete from templates

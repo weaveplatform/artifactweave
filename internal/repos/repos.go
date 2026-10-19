@@ -31,8 +31,10 @@ func badRequest(format string, a ...any) error {
 // protected cannot be deleted: Artifactory's trash can and support
 // bundle repositories, and the built-in build-info repository, which the
 // repositories API cannot create again (its package type is in no allowed
-// list).
-var protected = []string{"auto-trashcan", "jfrog-support-bundles", types.BuildInfoRepository}
+// list). jfrog-support-bundle is singular, as JFrog's reserved names list
+// and 7.x's own logs in its Jira (RTFACT-22258, RTFACT-21053) spell it; the
+// delete page's example key JFrog-Support-Bundles is the odd one out.
+var protected = []string{"auto-trashcan", "jfrog-support-bundle", types.BuildInfoRepository}
 
 func Protected(key string) bool {
 	return strings.TrimSpace(key) == "" ||
@@ -163,7 +165,9 @@ func projectEnvironment(projectKey, name string) string {
 // Merge merges an update body into the stored configuration with
 // Artifactory's rules: a field present replaces the stored value, a field
 // left out keeps it, and null resets it to its default. The key, class and
-// package type cannot change.
+// package type cannot change. A key that differs from the stored one only in
+// case is a change too: the store finds a repository by its exact key, so
+// accepting the respelling would fail the write after validation (#472).
 func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, error) {
 	for field, current := range map[string]string{
 		"key": stored.Key, "rclass": string(stored.Class), "packageType": string(stored.PackageType),
@@ -183,7 +187,11 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 			delete(patch, field)
 			continue
 		}
-		if !strings.EqualFold(v, current) {
+		same := strings.EqualFold(v, current)
+		if field == "key" {
+			same = v == current
+		}
+		if !same {
 			return stored, badRequest("The repository %s cannot be changed", field)
 		}
 	}
@@ -212,14 +220,9 @@ func Merge(stored repo.Config, patch map[string]json.RawMessage) (repo.Config, e
 	}
 	repo.RestoreSecrets(stored, &out)
 	repo.Defaults(&out)
-	validate := repo.Validate
-	if out.Key == stored.Key {
-		// An update cannot choose a key, so the key rules would only refuse
-		// names the server took for itself, such as artifactory-build-info. A
-		// key the update spells in another case is checked as a new one.
-		validate = repo.ValidateStored
-	}
-	if err := validate(&out); err != nil {
+	// An update cannot choose a key, so the key rules would only refuse
+	// names the server took for itself, such as artifactory-build-info.
+	if err := repo.ValidateStored(&out); err != nil {
 		return stored, badRequest("%s", err.Error())
 	}
 	return out, nil

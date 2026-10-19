@@ -660,6 +660,9 @@ func repositoryStatusRows() []statusCase {
 		{update, r + "/libs-local", "admin", `{"description":"updated"}`, 200},
 		{update, r + "/libs-local", "admin", `{"projectKey":"proj","environments":["nope"]}`, 400},
 		{update, r + "/libs-local", "admin", `{"rclass":"remote"}`, 400},
+		// A key differs in case only, and the seeded build-info repository (#472).
+		{update, r + "/libs-local", "admin", `{"key":"LIBS-LOCAL"}`, 400},
+		{update, r + "/artifactory-build-info", "admin", `{"description":"builds"}`, 200},
 		{update, r + "/empty-virt", "admin", `{"description":"no members"}`, 200},
 		{update, r + "/npm-empty", "admin", `{"repositories":["libs-local"]}`, 400},
 		{update, r + "/missing", "admin", `{"description":"x"}`, 404},
@@ -669,6 +672,7 @@ func repositoryStatusRows() []statusCase {
 		{remove, r + "/del-one", "admin", "", 200},
 		{remove, r + "/missing", "admin", "", 404},
 		{remove, r + "/auto-trashcan", "admin", "", 400},
+		{remove, r + "/jfrog-support-bundle", "admin", "", 400},
 		{remove, r + "/artifactory-build-info", "admin", "", 403},
 		{remove, r + "/libs-local", "user", "", 403},
 		{remove, r + "/libs-local", "", "", 401},
@@ -735,6 +739,7 @@ func repositoryStatusRows() []statusCase {
 			400,
 		},
 		{bUpdate, v2 + "/batch", "admin", `[{"key":"missing"}]`, 404},
+		{bUpdate, v2 + "/batch", "admin", `[{"key":"UPD-BATCH"}]`, 404},
 		{bUpdate, v2 + "/batch", "user", `[{"key":"upd-batch"}]`, 403},
 		{bUpdate, v2 + "/batch", "", `[{"key":"upd-batch"}]`, 401},
 

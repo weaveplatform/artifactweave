@@ -289,6 +289,41 @@ func TestApplyRefusesAndWritesNothing(t *testing.T) {
 	}
 }
 
+// An entry never changes a repository's key, in case either: the entry's
+// own key field must match its name exactly, and a name that spells a
+// stored key in another case is a create the taken key refuses. The seeded
+// build-info repository takes updates and keeps its package type (#472).
+func TestApplyKeepsKeysAndUpdatesBuildInfo(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	seedRepo(t, db, repo.Config{Key: "libs-local", Class: repo.Local})
+	seedRepo(t, db, repo.Config{
+		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+	})
+	for _, doc := range []string{
+		"localRepositories:\n  libs-local:\n    key: LIBS-LOCAL\n",
+		"localRepositories:\n  LIBS-LOCAL:\n    description: x\n",
+	} {
+		p, err := Parse([]byte(doc), env(nil))
+		if err == nil {
+			_, err = Apply(ctx, db, p, now, false)
+		}
+		if !errors.Is(err, ErrInvalid) {
+			t.Errorf("%q: %v", doc, err)
+		}
+	}
+	res := mustApply(
+		t,
+		db,
+		"localRepositories:\n  artifactory-build-info:\n    type: buildinfo\n    description: builds\n",
+	)
+	got, err := db.Repos().Get(ctx, types.BuildInfoRepository)
+	if err != nil || len(res.Updated) != 1 || got.Description != "builds" ||
+		got.PackageType != repo.BuildInfo {
+		t.Fatalf("build-info %+v %+v %v", res, got, err)
+	}
+}
+
 // A virtual repository may have no members, and keeps taking changes once
 // its last member is deleted; a Maven virtual repository aggregates the rest
 // of its family.

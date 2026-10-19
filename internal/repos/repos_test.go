@@ -33,33 +33,78 @@ func TestMergeRefusesMalformedUpdates(t *testing.T) {
 	}
 }
 
-// An update keeps a key the server created under a reserved name, and checks
-// a key it spells in another case as a create would.
-func TestMergeAppliesTheKeyRulesToARespelledKey(t *testing.T) {
-	update := func(stored repo.Config, patch string) error {
-		t.Helper()
-		var p map[string]json.RawMessage
-		if err := json.Unmarshal([]byte(patch), &p); err != nil {
-			t.Fatal(err)
-		}
-		_, err := Merge(*repo.Defaults(&stored), p)
-		return err
+func update(t *testing.T, stored repo.Config, patch string) (repo.Config, error) {
+	t.Helper()
+	var p map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(patch), &p); err != nil {
+		t.Fatal(err)
 	}
+	return Merge(*repo.Defaults(&stored), p)
+}
+
+// An update keeps a key the server created under a reserved name, and
+// refuses a key that differs from the stored one in any way, case included,
+// as the key mismatch it is, whatever the package type (#472).
+func TestMergeNeverChangesTheKey(t *testing.T) {
+	const mismatch = "The repository key cannot be changed"
 	reserved := repo.Config{Key: "release-bundles", Class: repo.Local}
-	if err := update(reserved, `{"description": "x"}`); err != nil {
+	if _, err := update(t, reserved, `{"description": "x"}`); err != nil {
 		t.Errorf("stored reserved key: %v", err)
 	}
-	if err := update(reserved, `{"key": "release-bundles", "description": "x"}`); err != nil {
+	if _, err := update(t, reserved, `{"key": "release-bundles", "description": "x"}`); err != nil {
 		t.Errorf("stored reserved key in the body: %v", err)
 	}
-	if err := update(reserved, `{"key": "Release-Bundles"}`); err == nil ||
-		!strings.Contains(err.Error(), "reserved repository key") {
-		t.Errorf("respelled reserved key: %v", err)
+	for _, stored := range []repo.Config{
+		reserved,
+		{Key: "libs-local", Class: repo.Local, PackageType: repo.Maven},
+		{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker},
+		{Key: "up", Class: repo.Remote, URL: "https://up.example"},
+	} {
+		for _, key := range []string{strings.ToUpper(stored.Key), stored.Key + "x"} {
+			_, err := update(t, stored, `{"key": "`+key+`"}`)
+			if err == nil || !strings.Contains(err.Error(), mismatch) {
+				t.Errorf("%s as %s: %v", stored.Key, key, err)
+			}
+		}
 	}
-	docker := repo.Config{Key: "docker-local", Class: repo.Local, PackageType: repo.Docker}
-	if err := update(docker, `{"key": "Docker-Local"}`); err == nil ||
-		!strings.Contains(err.Error(), "lower case") {
-		t.Errorf("respelled docker key: %v", err)
+}
+
+// The seeded build-info repository takes updates and keeps its package
+// type; no other repository may have it (#472).
+func TestMergeUpdatesTheBuildInfoRepository(t *testing.T) {
+	buildInfo := repo.Config{
+		Key: types.BuildInfoRepository, Class: repo.Local, PackageType: repo.BuildInfo,
+	}
+	got, err := update(t, buildInfo, `{"description": "builds", "packageType": "buildinfo"}`)
+	if err != nil || got.Description != "builds" || got.PackageType != repo.BuildInfo {
+		t.Fatalf("update: %+v, %v", got, err)
+	}
+	if _, err := update(t, buildInfo, `{"packageType": "generic"}`); err == nil {
+		t.Error("the build-info repository changed its package type")
+	}
+	// A stored repository of another key with the type, which no write path
+	// can make, is still refused.
+	other := repo.Config{Key: "builds-copy", Class: repo.Local, PackageType: repo.BuildInfo}
+	if _, err := update(t, other, `{"description": "x"}`); err == nil ||
+		!strings.Contains(err.Error(), `"buildinfo" is not allowed`) {
+		t.Errorf("another key: %v", err)
+	}
+	if _, err := PrepareCreate(buildInfo, nil); err == nil {
+		t.Error("a create of the build-info repository was accepted")
+	}
+}
+
+// The support bundle repository is jfrog-support-bundle, as JFrog's reserved
+// names spell it; the plural is an ordinary key (#472).
+func TestProtectedKeys(t *testing.T) {
+	for key, want := range map[string]bool{
+		"auto-trashcan": true, "Auto-Trashcan": true, "jfrog-support-bundle": true,
+		"JFrog-Support-Bundle": true, types.BuildInfoRepository: true, " ": true,
+		"jfrog-support-bundles": false, "libs-local": false,
+	} {
+		if got := Protected(key); got != want {
+			t.Errorf("Protected(%q) = %v", key, got)
+		}
 	}
 }
 

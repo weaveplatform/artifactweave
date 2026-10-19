@@ -116,14 +116,21 @@ handler serves them.
   key rules: a length for each class, no white space or special characters, no reserved
   name or prefix, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm
   OCI ([research 03](../03-repository-configuration-model.md#key-rules)). The rules apply to
-  every key a client chooses, on create, batch create, the configuration descriptor and an
-  update that spells the key in another case. An update that keeps the stored key does not
-  check it again, so a repository the server creates under a reserved name, such as
-  `artifactory-build-info`, is not refused for its name. A key may start with a digit, as
-  7.x has allowed since 7.53.1.
+  every key a client chooses: on create, batch create and the configuration descriptor. A
+  key may start with a digit, as 7.x has allowed since 7.53.1.
 - **Updates:** an update merges into the stored configuration. A field present replaces
   the stored value, a field left out keeps it, `null` resets it to its default, and `key`,
-  `rclass` and `packageType` cannot change.
+  `rclass` and `packageType` cannot change. An update never changes a key: a body `key`
+  that differs from the stored key in any way, letter case included, answers 400 "The
+  repository key cannot be changed" on the repositories API, and the batch update finds a
+  repository only by its key as stored. The descriptor refuses an entry whose `key` differs
+  from the entry's name, and reads a name that spells a stored key in another case as a
+  create, which the taken key refuses ([#472](https://github.com/weaveplatform/artifactweave/issues/472)).
+  As an update keeps its key, it does not check the key rules again, so a repository the
+  server creates under a reserved name, such as `artifactory-build-info`, is not refused for
+  its name. That repository also keeps its package type `buildinfo`, which no class allows,
+  so it takes updates like any local repository; every other repository is still refused
+  `buildinfo` [I].
 - **Secrets:** reads mask the remote password and sensitive header values for everyone,
   and an update that leaves the password out or sends a masked header back keeps the
   stored secret.
@@ -140,8 +147,9 @@ handler serves them.
   too), the package index and the repository's place in virtual repositories, in one
   transaction. Blob references are released for garbage collection. Until the trash can
   lands (#48) the content does not pass through it.
-- **Protected keys:** the trash can, support bundle and `artifactory-build-info`
-  repositories cannot be deleted.
+- **Protected keys:** the trash can (`auto-trashcan`), support bundle
+  (`jfrog-support-bundle`) and `artifactory-build-info` repositories cannot be deleted, in
+  any letter case.
 
 ## Rationale
 
@@ -187,9 +195,17 @@ Deleting `artifactory-build-info` answers 403 with "Deletion of Build Info repos
 artifactory-build-info is not allowed." A batch that names it is refused before any delete,
 with that `statusMessage` and no `reports` ([D]
 [deleterepositories](https://docs.jfrog.com/artifactory/reference/deleterepositories.md),
-example `buildInfoBlocked`). A blank key, `auto-trashcan` and `jfrog-support-bundles`
+example `buildInfoBlocked`). A blank key, `auto-trashcan` and `jfrog-support-bundle`
 answer 400 ([D] [deleterepository](https://docs.jfrog.com/artifactory/reference/deleterepository.md),
-status list). A batch of `[]` answers 400 with the `statusMessage` "No repository keys were
+status list). The support bundle repository is `jfrog-support-bundle`, singular, as JFrog's
+reserved names list spells it ([D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md))
+and as 7.x's own log lines quoted in its Jira do, "Deployed bundle archive ... under
+'jfrog-support-bundle:..." ([J] [RTFACT-22258](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22258);
+also [RTFACT-21053](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21053) and
+[RTFACT-20834](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-20834)). Only the delete
+page's example names it `JFrog-Support-Bundles`; that example is on
+[#216](https://github.com/weaveplatform/artifactweave/issues/216)
+([#472](https://github.com/weaveplatform/artifactweave/issues/472)). A batch of `[]` answers 400 with the `statusMessage` "No repository keys were
 provided for deletion" (example `emptyRepoKeyList`), and a batch in which every repository
 failed has the `statusMessage` "Repositories batch removal failed" (the 403, 409, 424 and 500
 examples). Three points are inferred [I]: the single delete's 403 carries the batch's message

@@ -77,7 +77,8 @@ const (
 	JetBrainsPlugins   PackageType = "jetbrainsplugins"
 	// BuildInfo is the type of the built-in artifactory-build-info
 	// repository. It is in no AllowedPackageTypes list, so the repositories
-	// API cannot create another.
+	// API cannot create another; an update of that one repository keeps it
+	// (ValidateStored).
 	BuildInfo PackageType = "buildinfo"
 )
 

@@ -175,7 +175,8 @@ components:
             `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
             suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
             letters and no underscore. On create the key in the URL path wins over the body; after creation it is
-            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
+            immutable, letter case included. Repositories created inside a project are prefixed with the project key
+            followed by a hyphen.'
           type: string
         maxUniqueSnapshots:
           description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
@@ -483,7 +484,8 @@ components:
             `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
             suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
             letters and no underscore. On create the key in the URL path wins over the body; after creation it is
-            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
+            immutable, letter case included. Repositories created inside a project are prefixed with the project key
+            followed by a hyphen.'
           type: string
         maxUniqueSnapshots:
           description: Optional within this object. Maximum unique snapshot versions kept per Maven artifact; older
@@ -1016,7 +1018,8 @@ components:
             `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
             suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
             letters and no underscore. On create the key in the URL path wins over the body; after creation it is
-            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
+            immutable, letter case included. Repositories created inside a project are prefixed with the project key
+            followed by a hyphen.'
           type: string
         listRemoteFolderItems:
           description: Optional within this object. When true folder listings include items that exist upstream
@@ -1436,7 +1439,8 @@ components:
             `jfrog-system-reserved` or `jfrog-artifactory-system` in any case, and does not end in `-cache`, the
             suffix that names a remote repository''s cache. A `docker`, `oci` or `helmoci` key has no upper case
             letters and no underscore. On create the key in the URL path wins over the body; after creation it is
-            immutable. Repositories created inside a project are prefixed with the project key followed by a hyphen.'
+            immutable, letter case included. Repositories created inside a project are prefixed with the project key
+            followed by a hyphen.'
           type: string
         keyPair:
           description: Optional within this object. Name of the key pair used to sign aggregated metadata where
@@ -1961,7 +1965,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RemoveRepositoryFailureReport'
-          description: The key is blank, `auto-trashcan` or `jfrog-support-bundles`.
+          description: The key is blank, `auto-trashcan` or `jfrog-support-bundle`.
         '401':
           content:
             application/json:
@@ -2061,7 +2065,9 @@ paths:
     post:
       description: 'Merges the body into the stored configuration: fields present are replaced, fields absent keep their
         value, and an explicit null resets a field to its default. rclass, packageType and key are immutable and a
-        different value is rejected with 400. A remote password omitted from the body keeps the stored secret. Changing
+        different value is rejected with 400; a key that differs from the stored key only in letter case is a
+        different value. The seeded `artifactory-build-info` repository takes updates and keeps its package type
+        `buildinfo`, which no other repository may have. A remote password omitted from the body keeps the stored secret. Changing
         projectKey moves the repository; in a project, missing environments become DEV (decision 0013). Answers 200 with
         a plain-text confirmation.'
       operationId: updateRepositoryConfiguration
@@ -2200,7 +2206,7 @@ paths:
         the batch: 200 all removed (a missing key still counts as removed), 207 mixed, and 403, 409, 424 or 500
         when every repository failed for that reason, with the statusMessage `Repositories batch removal failed`.
         Before any delete the whole batch is refused with the fail-fast shape: 400 when the list is empty, and
-        otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundles` (400) or
+        otherwise at the first key that is blank, `auto-trashcan` or `jfrog-support-bundle` (400) or
         `artifactory-build-info` (403). Admin only.'
       operationId: deleteRepositories
       requestBody:
@@ -2235,7 +2241,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RepoBulkRemovalFailFastReport'
           description: The list is empty, or its first refused key is blank, `auto-trashcan` or
-            `jfrog-support-bundles`; nothing was deleted.
+            `jfrog-support-bundle`; nothing was deleted.
         '401':
           content:
             application/json:
@@ -2331,7 +2337,8 @@ paths:
     post:
       description: 'Applies one update per configuration in the body, with the same merge rules as the single update.
         Validation runs on the whole batch first: if any configuration is invalid nothing is changed and 400 is
-        returned. Each configuration must carry its key. Admin only.'
+        returned. Each configuration must carry its key, spelled as stored; a key that names no repository answers
+        404. Admin only.'
       operationId: updateMultipleRepositories
       requestBody:
         content:
