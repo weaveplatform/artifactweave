@@ -663,7 +663,6 @@ more points, and decision 0036 follows each:
 - Under `deployer`, a delete of other files recalculates `maven-metadata.xml` rather than
   leaving it (section 3.2).
 
-
 **Settled since the audit:** a repository created without `repoLayoutRef` gets `sbt-default` for
 sbt ([D] [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), section
 1.1), `ivy-default` for Ivy, as the provider's map has it **[I]**, and `maven-2-default` for Maven,
