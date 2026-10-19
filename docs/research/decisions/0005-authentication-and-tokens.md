@@ -350,6 +350,22 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
 - **A locked account** answers exactly as a wrong password does, after the same
   hashing work, so neither the message nor the timing tells that the account exists.
   Unlocking (one, several or all users) and disabling the policy clear locks.
+  `secondsToUnlock` (default 1) is stored and returned only: a lock lasts until an
+  administrator lifts it.
+- **The temporary login suspension** (`internal/auth/suspension.go`, #408) is the second
+  defence, independent of the lock. From the second failed Basic login in a row for a user
+  name (`maxLoginDelayIncorrectAttempts`), every Basic login with that name answers `403`
+  "This request is blocked due to recurrent request failures, please try again in N
+  second(s)" for `baseLoginDelayMillis` (1000), the right password included; each later
+  failure doubles the delay up to `maxLoginDelayMillis` (60000).
+  - The check runs before the user is read or any password hashed, and an unknown name is
+    suspended alike, so the `403` says nothing about which names exist.
+  - Attempts refused while suspended are not counted, toward the suspension or the lock, so
+    no stream of requests stretches one suspension past the maximum.
+  - A login whose password verifies clears the failures, and they are forgotten a day after
+    the last one. Tokens are never suspended.
+  - The state is per node and in memory, as JFrog documents it, bounded at 10,000 names.
+  - `clientLoginSuspensionEnabled` false, or a zero delay, turns it off.
 - **A password expires** when an administrator expires it (whatever the policy) or
   when the expiration policy is enabled and the password is older than
   `passwordMaxAge` days. Age counts from the recorded change, so passwords set before
@@ -550,12 +566,15 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
   [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
 **Account policies and seeded principals:**
-- 7.x differs: failed Basic logins also suspend the account for a moment, answering 403 for a
-  delay that grows to at most 60 seconds, and `seconds-to-unlock` defaults to 1
+- Failed Basic logins also suspend the account for a moment, answering 403 for a delay that
+  grows to at most 60 seconds, and `seconds-to-unlock` defaults to 1
   ([security configuration](https://docs.jfrog.com/administration/docs/security-configuration),
   "Temporary Login Suspension";
-  [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations));
-  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
+  [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)).
+  artifactweave matches both (**Account policies** above,
+  [#408](https://github.com/weaveplatform/artifactweave/issues/408)). The doubling, the day
+  after which failures are forgotten, the 403's message and leaving tokens alone are
+  inferred, and on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - Since 7.84.3 `anonymous` is in neither the `Anything` nor the `Any Remote` permission
   ([permissions](https://docs.jfrog.com/administration/docs/permissions)), and artifactweave
   seeds both that way. Decision

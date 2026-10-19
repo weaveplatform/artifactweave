@@ -112,6 +112,7 @@ func serve(
 			AllowDuplicateBuildEntries:     !cfg.Build.BlockDuplicateEntries,
 			EnforceIdenticalChecksumDeploy: cfg.Deploy.EnforceIdenticalChecksumDeploy,
 			NPMMaxPublishSize:              int64(cfg.NPM.MaxPublishSize),
+			GlobalEnvironmentLimit:         cfg.Environments.GlobalLimit,
 			Work:                           rt.work,
 		}),
 		ReadHeaderTimeout: readHeaderTimeout,

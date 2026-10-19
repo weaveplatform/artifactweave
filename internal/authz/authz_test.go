@@ -664,3 +664,86 @@ func TestSelf(t *testing.T) {
 		}
 	}
 }
+
+// failingUsers fails every read.
+type failingUsers struct{ store.UserStore }
+
+func (failingUsers) Get(context.Context, string) (types.User, error) {
+	return types.User{}, errBoom
+}
+
+// TestManagesResources checks the Manage Resources role follows the
+// identities the subject acts as: the user's flag while a scope keeps the
+// user, a group's while a scope keeps the group, and nothing under a scope
+// of resource entries alone.
+func TestManagesResources(t *testing.T) {
+	ctx := context.Background()
+	db := world(t)
+	for _, g := range []types.Group{
+		{Name: "resmgrs", Roles: types.RoleFlags{ResourcesManager: true}},
+	} {
+		if err := db.Groups().Create(ctx, g); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, u := range []types.User{
+		{Name: "rita", Roles: types.RoleFlags{ResourcesManager: true}},
+		{Name: "gil", Groups: []string{"resmgrs", "devs"}},
+		{Name: "bob", Groups: []string{"devs"}},
+	} {
+		if err := db.Users().Create(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+	}
+	src := Sources{Permissions: db.Permissions(), Groups: db.Groups()}
+	for _, c := range []struct {
+		name string
+		sub  Subject
+		want bool
+	}{
+		{"the user's flag", Subject{Name: "rita"}, true},
+		{"a group's flag", Subject{Name: "gil", Groups: []string{"resmgrs", "devs"}}, true},
+		{"neither", Subject{Name: "bob", Groups: []string{"devs"}}, false},
+		{"a user scope keeps the user's", Subject{
+			Name: "rita", Scope: scope(t, "applied-permissions/user"),
+		}, true},
+		{"a groups scope drops the user's", Subject{
+			Name: "rita", Groups: []string{"devs"}, Scope: scope(t, "applied-permissions/groups:devs"),
+		}, false},
+		{"a groups scope keeps a named group's", Subject{
+			Name:   "gil",
+			Groups: []string{"resmgrs", "devs"},
+			Scope:  scope(t, "applied-permissions/groups:resmgrs"),
+		}, true},
+		{"a groups scope drops an unnamed group's", Subject{
+			Name: "gil", Groups: []string{"resmgrs", "devs"}, Scope: scope(t, "applied-permissions/groups:devs"),
+		}, false},
+		{"resource entries keep no role", Subject{
+			Name: "rita", Scope: scope(t, "artifact:libs-local:r"),
+		}, false},
+		{"a system scope keeps no role", Subject{
+			Name: "rita", Scope: scope(t, "system:permissions:r"),
+		}, false},
+		{"a user that is not stored", Subject{Name: "transient"}, false},
+		{"a group that is gone", Subject{Name: "bob", Groups: []string{"gone"}}, false},
+	} {
+		d, err := New(ctx, src, c.sub)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := d.ManagesResources(ctx, db.Users(), db.Groups())
+		if err != nil || got != c.want {
+			t.Errorf("%s: %v, %v; want %v", c.name, got, err, c.want)
+		}
+	}
+	d, err := New(ctx, src, Subject{Name: "bob", Groups: []string{"devs"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := d.ManagesResources(ctx, failingUsers{}, db.Groups()); !errors.Is(err, errBoom) {
+		t.Errorf("users failure: %v", err)
+	}
+	if _, err := d.ManagesResources(ctx, db.Users(), failingGroups{}); !errors.Is(err, errBoom) {
+		t.Errorf("groups failure: %v", err)
+	}
+}

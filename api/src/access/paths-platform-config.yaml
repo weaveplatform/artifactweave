@@ -952,9 +952,14 @@ components:
       description: The Access user lock policy. One document over the same settings as
         /artifactory/api/security/userLockPolicy and
         /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads
-        back through both. attempts and passwordExpiryDays are enforced; the other fields are stored and returned
-        only. Users are not unlocked after secondsToUnlock, logins are not delayed, and administrators are not
-        exempt from password expiry.
+        back through both. attempts and passwordExpiryDays are enforced, and so is the temporary login
+        suspension that the four login delay fields set. From the maxLoginDelayIncorrectAttempts-th failed Basic
+        login in a row for one user name, every Basic login with that name answers 403 for baseLoginDelayMillis,
+        the right password included, and each further failure after the suspension doubles the delay up to
+        maxLoginDelayMillis. Logins refused while suspended are not counted; a login whose password verifies
+        clears the failures. Each node keeps the suspensions in memory, and tokens are not suspended.
+        secondsToUnlock and adminPasswordExpirable are stored and returned only. A locked user stays locked
+        until an administrator unlocks them, and administrators are not exempt from password expiry.
       properties:
         adminPasswordExpirable:
           description: Optional within this object. Whether password expiry also applies to administrators. Stored
@@ -968,21 +973,22 @@ components:
           minimum: 0
           type: integer
         baseLoginDelayMillis:
-          description: Optional within this object. Base delay, in milliseconds, for temporary login suspension
-            after failed logins. Stored and returned only. Default 1000.
+          description: Optional within this object. First temporary login suspension, in milliseconds, after
+            maxLoginDelayIncorrectAttempts failed logins; each further failure doubles it. 0 turns suspension off.
+            Default 1000.
           format: int64
           type: integer
         clientLoginSuspensionEnabled:
-          description: Optional within this object. Whether Basic logins check temporary login suspension. Stored
-            and returned only. Default true.
+          description: Optional within this object. Whether failed Basic logins suspend the user name; false
+            also lifts suspensions in progress. Default true.
           type: boolean
         maxLoginDelayIncorrectAttempts:
-          description: Optional within this object. Failed logins allowed before temporary login suspension starts.
-            Stored and returned only. Default 2.
+          description: Optional within this object. The number of failed Basic logins in a row that starts a
+            temporary login suspension; 0 and 1 both suspend from the first. Default 2.
           type: integer
         maxLoginDelayMillis:
-          description: Optional within this object. Upper bound, in milliseconds, on the temporary login suspension
-            delay. Stored and returned only. Default 60000.
+          description: Optional within this object. Longest temporary login suspension, in milliseconds. 0 turns
+            suspension off. Default 60000.
           format: int64
           type: integer
         passwordExpiryDays:
@@ -992,8 +998,8 @@ components:
           minimum: 0
           type: integer
         secondsToUnlock:
-          description: Optional within this object. Seconds after which a locked user may sign in again; 0 keeps
-            the user locked until an administrator unlocks them. Stored and returned only. Default 0.
+          description: Optional within this object. Seconds to wait before a locked user may sign in again.
+            Stored and returned only; a locked user stays locked until an administrator unlocks them. Default 1.
           minimum: 0
           type: integer
       type: object

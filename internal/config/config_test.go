@@ -155,6 +155,8 @@ token:
   allow_basic_auth: true
 deploy:
   enforce_permission_check_on_identical_checksum_deploy: true
+environments:
+  global_limit: 30
 `)
 	cfg, err := Load(LoadOptions{File: file})
 	if err != nil {
@@ -206,11 +208,12 @@ deploy:
 			AQL:            AQLConfig{MaxResults: 1000, NonAdminScanFactor: 3},
 			UserQueryLimit: 50,
 		},
-		Work:   WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
-		Build:  BuildConfig{BlockDuplicateEntries: false},
-		NPM:    NPMConfig{MaxPublishSize: 256 << 20},
-		Token:  TokenConfig{AllowBasicAuth: true},
-		Deploy: DeployConfig{EnforceIdenticalChecksumDeploy: true},
+		Work:         WorkConfig{Workers: 8, Lease: 5 * time.Minute, MaxAttempts: 4},
+		Build:        BuildConfig{BlockDuplicateEntries: false},
+		NPM:          NPMConfig{MaxPublishSize: 256 << 20},
+		Token:        TokenConfig{AllowBasicAuth: true},
+		Deploy:       DeployConfig{EnforceIdenticalChecksumDeploy: true},
+		Environments: EnvironmentsConfig{GlobalLimit: 30},
 	}
 	if diff := cmp.Diff(want, cfg); diff != "" {
 		t.Fatal(diff)
@@ -231,7 +234,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		case strings.HasSuffix(k, ".concurrency"), strings.HasSuffix(k, ".redundancy"),
 			strings.HasSuffix(k, ".write_quorum"), strings.HasPrefix(k, "search.aql."),
 			k == "search.user_query_limit", k == "work.workers", k == "work.max_attempts",
-			k == "download.folder.max_concurrent_requests":
+			k == "download.folder.max_concurrent_requests", k == "environments.global_limit":
 			env[envName(k)] = "3"
 		case strings.HasSuffix(k, ".member_timeout"), strings.HasPrefix(k, "gc."),
 			strings.HasSuffix(k, ".ttl"), k == "work.lease":
@@ -258,6 +261,7 @@ func TestEnvCoversEveryKey(t *testing.T) {
 		cfg.Work.Workers != 3 || cfg.Work.MaxAttempts != 3 || cfg.Work.Lease != 45*time.Second ||
 		cfg.NPM.MaxPublishSize != 8<<20 || !cfg.Token.AllowBasicAuth ||
 		!cfg.Deploy.EnforceIdenticalChecksumDeploy ||
+		cfg.Environments.GlobalLimit != 3 ||
 		cfg.Blob.S3.CDN.CloudFront.KeyPairID != "true" ||
 		cfg.ColdBlob.S3.CDN.CloudFront.PathPrefix != "true" ||
 		cfg.Blob.Azure.CDN.FrontDoor.Endpoint != "true" ||
@@ -956,6 +960,31 @@ func TestDeployConfig(t *testing.T) {
 		if err != nil || got.Deploy.EnforceIdenticalChecksumDeploy != tc.want {
 			t.Fatalf("env %v, flags %v: %+v, %v", tc.env, tc.flags, got.Deploy, err)
 		}
+	}
+}
+
+func TestEnvironmentsConfig(t *testing.T) {
+	if Default().Environments.GlobalLimit != 10 {
+		t.Fatalf("default global limit %d, want Access's 10", Default().Environments.GlobalLimit)
+	}
+	for _, v := range []string{"0", "-1"} {
+		_, err := Load(LoadOptions{Flags: map[string]string{"environments.global_limit": v}})
+		if !errors.Is(err, ErrInvalidValue) {
+			t.Fatalf("global limit %s: %v", v, err)
+		}
+	}
+	cfg := Default()
+	if err := set(&cfg, "environments.global_limit", "ten"); !errors.Is(err, ErrInvalidValue) {
+		t.Fatalf("not an integer: %v", err)
+	}
+	// The flag beats the environment, which beats the file.
+	got, err := Load(LoadOptions{
+		File:  writeFile(t, "environments:\n  global_limit: 20\n"),
+		Env:   envOf(map[string]string{"ARTIFACTWEAVE_ENVIRONMENTS_GLOBAL_LIMIT": "25"}),
+		Flags: map[string]string{"environments.global_limit": "30"},
+	})
+	if err != nil || got.Environments.GlobalLimit != 30 {
+		t.Fatalf("load: %+v, %v", got.Environments, err)
 	}
 }
 

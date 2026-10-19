@@ -39,6 +39,7 @@ func TestLockoutThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
 	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	noSuspension(t, db)
 	a, c := newAuth(t, db, Options{})
 
 	// With the policy off, failures are not counted.
@@ -89,6 +90,18 @@ func TestLockoutThroughBasic(t *testing.T) {
 	}
 }
 
+// noSuspension turns the temporary login suspension off, so a test of the
+// user lock, the other defence, sees its own answers alone.
+func noSuspension(t *testing.T, db *inmem.Store) {
+	t.Helper()
+	s := types.DefaultAccessLockSettings()
+	s.ClientLoginSuspensionEnabled = false
+	if err := db.Settings().
+		Put(context.Background(), types.SettingAccessLockSettings, s); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestExpiryThroughBasic(t *testing.T) {
 	ctx := context.Background()
 	db := inmem.New()
@@ -131,5 +144,8 @@ func TestPolicyReadErrors(t *testing.T) {
 	}
 	if _, err := ExpirationPolicy(ctx, failingSettings{db.Settings()}); err == nil {
 		t.Fatal("ExpirationPolicy hid the read error")
+	}
+	if _, err := AccessLockSettings(ctx, failingSettings{db.Settings()}); err == nil {
+		t.Fatal("AccessLockSettings hid the read error")
 	}
 }

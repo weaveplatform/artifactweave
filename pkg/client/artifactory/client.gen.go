@@ -5145,13 +5145,13 @@ type PermissionTargetListItem struct {
 
 // PermissionTargetV2 A version 2 permission target with separate sections for repositories, builds and release bundles. Keys mix kebab-case and camelCase.
 type PermissionTargetV2 struct {
-	// Build Optional within this object. Grants on build-info. Its repositories list is fixed to `artifactory-build-info`; any other value is a 400. A PUT that omits this section deletes it.
+	// Build Optional within this object. Grants on build-info. Its repositories list is fixed to `artifactory-build-info`; an omitted or empty list stands for it, and any other value is a 400. A PUT that omits this section deletes it.
 	Build *PermissionTargetV2Section `json:"build,omitempty"`
 
 	// Name Optional within this object. Target name, at most 64 characters. The path parameter wins; a mismatch is a 400.
 	Name *string `json:"name,omitempty"`
 
-	// ReleaseBundle Optional within this object. Grants on release bundles. Stored without effect; release bundles are not served. A PUT that omits it deletes it.
+	// ReleaseBundle Optional within this object. Grants on release bundles. An omitted or empty repositories list is stored as `release-bundles`. Stored without effect; release bundles are not served. A PUT that omits it deletes it.
 	ReleaseBundle *PermissionTargetV2Section `json:"releaseBundle,omitempty"`
 
 	// Repo Optional within this object. One section of a version 2 target: targets, patterns and grants.
@@ -10907,7 +10907,7 @@ type ClientInterface interface {
 
 	// GetPermissionTargets List permission targets (v1)
 	//
-	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
+	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.
 	//
 	// Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
 	//
@@ -10916,7 +10916,7 @@ type ClientInterface interface {
 
 	// DeletePermissionTarget Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
+	// Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 	//
 	// Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
 	//
@@ -10925,7 +10925,7 @@ type ClientInterface interface {
 
 	// GetPermissionTargetDetails Get a permission target (v1)
 	//
-	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
+	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 	//
 	// Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
 	//
@@ -10934,7 +10934,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetWithBody Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -10945,7 +10945,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTarget Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -10956,7 +10956,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type.
 	//
@@ -12030,35 +12030,35 @@ type ClientInterface interface {
 
 	// GetPermissionTargetsV2 List permission targets (v2)
 	//
-	// Lists every target by name and detail URL. Admins see all; other users see the targets they hold Manage on.
+	// Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.
 	//
 	// Corresponds with GET /api/v2/security/permissions (the `GetPermissionTargetsV2` operationId).
 	GetPermissionTargetsV2(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionTargetsByGroupV2 List targets granting a group
 	//
-	// Returns every target in which the group appears in any section's actions. Admin only.
+	// Returns every target in which the group appears in any section's actions. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 	//
 	// Corresponds with GET /api/v2/security/permissions/groups/{groupName} (the `GetPermissionTargetsByGroupV2` operationId).
 	GetPermissionTargetsByGroupV2(ctx context.Context, groupName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionTargetsByUserV2 List targets granting a user
 	//
-	// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admin only.
+	// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 	//
 	// Corresponds with GET /api/v2/security/permissions/users/{userName} (the `GetPermissionTargetsByUserV2` operationId).
 	GetPermissionTargetsByUserV2(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeletePermissionTargetV2 Delete a permission target (v2)
 	//
-	// Removes the target and every section. Answers 200 with no body. Admin only.
+	// Removes the target and every section. Answers 200 with no body. Admins and Manage Resources holders may call it.
 	//
 	// Corresponds with DELETE /api/v2/security/permissions/{permissionTargetName} (the `DeletePermissionTargetV2` operationId).
 	DeletePermissionTargetV2(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPermissionTargetDetailsV2 Get a permission target (v2)
 	//
-	// Returns the target with every section. Admins and holders of Manage on the target may read it.
+	// Returns the target with every section. Admins, Manage Resources holders and holders of Manage on the target may read it.
 	//
 	// Corresponds with GET /api/v2/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetailsV2` operationId).
 	GetPermissionTargetDetailsV2(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -12072,7 +12072,7 @@ type ClientInterface interface {
 
 	// CreatePermissionTargetV2WithBody Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12081,7 +12081,7 @@ type ClientInterface interface {
 
 	// CreatePermissionTargetV2 Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12090,7 +12090,7 @@ type ClientInterface interface {
 
 	// CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 	//
@@ -12099,7 +12099,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithBody Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -12108,7 +12108,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2 Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -12117,7 +12117,7 @@ type ClientInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 	//
@@ -17001,7 +17001,7 @@ func (c *Client) GetLockedOutUsers(ctx context.Context, reqEditors ...RequestEdi
 
 // GetPermissionTargets List permission targets (v1)
 //
-// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
+// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.
 //
 // Corresponds with GET /api/security/permissions (the `GetPermissionTargets` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17019,7 +17019,7 @@ func (c *Client) GetPermissionTargets(ctx context.Context, reqEditors ...Request
 
 // DeletePermissionTarget Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
+// Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 //
 // Corresponds with DELETE /api/security/permissions/{permissionTargetName} (the `DeletePermissionTarget` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17037,7 +17037,7 @@ func (c *Client) DeletePermissionTarget(ctx context.Context, permissionTargetNam
 
 // GetPermissionTargetDetails Get a permission target (v1)
 //
-// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
+// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 //
 // Corresponds with GET /api/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetails` operationId).
 // Deprecated: this operation has been marked as deprecated upstream, but no `x-deprecated-reason` was set
@@ -17055,7 +17055,7 @@ func (c *Client) GetPermissionTargetDetails(ctx context.Context, permissionTarge
 
 // CreateOrReplacePermissionTargetWithBody Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes any type of body and a specified content type.
 //
@@ -17075,7 +17075,7 @@ func (c *Client) CreateOrReplacePermissionTargetWithBody(ctx context.Context, pe
 
 // CreateOrReplacePermissionTarget Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -17095,7 +17095,7 @@ func (c *Client) CreateOrReplacePermissionTarget(ctx context.Context, permission
 
 // CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBody Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type.
 //
@@ -19471,7 +19471,7 @@ func (c *Client) DeleteRepositoryKey(ctx context.Context, repoName string, keyNa
 
 // GetPermissionTargetsV2 List permission targets (v2)
 //
-// Lists every target by name and detail URL. Admins see all; other users see the targets they hold Manage on.
+// Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.
 //
 // Corresponds with GET /api/v2/security/permissions (the `GetPermissionTargetsV2` operationId).
 func (c *Client) GetPermissionTargetsV2(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19488,7 +19488,7 @@ func (c *Client) GetPermissionTargetsV2(ctx context.Context, reqEditors ...Reque
 
 // GetPermissionTargetsByGroupV2 List targets granting a group
 //
-// Returns every target in which the group appears in any section's actions. Admin only.
+// Returns every target in which the group appears in any section's actions. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 //
 // Corresponds with GET /api/v2/security/permissions/groups/{groupName} (the `GetPermissionTargetsByGroupV2` operationId).
 func (c *Client) GetPermissionTargetsByGroupV2(ctx context.Context, groupName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19505,7 +19505,7 @@ func (c *Client) GetPermissionTargetsByGroupV2(ctx context.Context, groupName st
 
 // GetPermissionTargetsByUserV2 List targets granting a user
 //
-// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admin only.
+// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 //
 // Corresponds with GET /api/v2/security/permissions/users/{userName} (the `GetPermissionTargetsByUserV2` operationId).
 func (c *Client) GetPermissionTargetsByUserV2(ctx context.Context, userName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19522,7 +19522,7 @@ func (c *Client) GetPermissionTargetsByUserV2(ctx context.Context, userName stri
 
 // DeletePermissionTargetV2 Delete a permission target (v2)
 //
-// Removes the target and every section. Answers 200 with no body. Admin only.
+// Removes the target and every section. Answers 200 with no body. Admins and Manage Resources holders may call it.
 //
 // Corresponds with DELETE /api/v2/security/permissions/{permissionTargetName} (the `DeletePermissionTargetV2` operationId).
 func (c *Client) DeletePermissionTargetV2(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19539,7 +19539,7 @@ func (c *Client) DeletePermissionTargetV2(ctx context.Context, permissionTargetN
 
 // GetPermissionTargetDetailsV2 Get a permission target (v2)
 //
-// Returns the target with every section. Admins and holders of Manage on the target may read it.
+// Returns the target with every section. Admins, Manage Resources holders and holders of Manage on the target may read it.
 //
 // Corresponds with GET /api/v2/security/permissions/{permissionTargetName} (the `GetPermissionTargetDetailsV2` operationId).
 func (c *Client) GetPermissionTargetDetailsV2(ctx context.Context, permissionTargetName string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -19573,7 +19573,7 @@ func (c *Client) PermissionTargetExistenceCheckV2(ctx context.Context, permissio
 
 // CreatePermissionTargetV2WithBody Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19592,7 +19592,7 @@ func (c *Client) CreatePermissionTargetV2WithBody(ctx context.Context, permissio
 
 // CreatePermissionTargetV2 Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19611,7 +19611,7 @@ func (c *Client) CreatePermissionTargetV2(ctx context.Context, permissionTargetN
 
 // CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 //
@@ -19630,7 +19630,7 @@ func (c *Client) CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySe
 
 // CreateOrReplacePermissionTargetV2WithBody Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 //
 // Takes any type of body and a specified content type.
 //
@@ -19649,7 +19649,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2WithBody(ctx context.Context, 
 
 // CreateOrReplacePermissionTargetV2 Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -19668,7 +19668,7 @@ func (c *Client) CreateOrReplacePermissionTargetV2(ctx context.Context, permissi
 
 // CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBody Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type.
 //
@@ -37896,7 +37896,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetsWithResponse List permission targets (v1)
 	//
-	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
+	// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37907,7 +37907,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePermissionTargetWithResponse Delete a permission target (v1)
 	//
-	// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
+	// Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37918,7 +37918,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetDetailsWithResponse Get a permission target (v1)
 	//
-	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
+	// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -37929,7 +37929,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetWithBodyWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37940,7 +37940,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -37951,7 +37951,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse Create or replace a permission target (v1)
 	//
-	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+	// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39161,7 +39161,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetsV2WithResponse List permission targets (v2)
 	//
-	// Lists every target by name and detail URL. Admins see all; other users see the targets they hold Manage on.
+	// Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39170,7 +39170,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetsByGroupV2WithResponse List targets granting a group
 	//
-	// Returns every target in which the group appears in any section's actions. Admin only.
+	// Returns every target in which the group appears in any section's actions. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39179,7 +39179,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetsByUserV2WithResponse List targets granting a user
 	//
-	// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admin only.
+	// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39188,7 +39188,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeletePermissionTargetV2WithResponse Delete a permission target (v2)
 	//
-	// Removes the target and every section. Answers 200 with no body. Admin only.
+	// Removes the target and every section. Answers 200 with no body. Admins and Manage Resources holders may call it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39197,7 +39197,7 @@ type ClientWithResponsesInterface interface {
 
 	// GetPermissionTargetDetailsV2WithResponse Get a permission target (v2)
 	//
-	// Returns the target with every section. Admins and holders of Manage on the target may read it.
+	// Returns the target with every section. Admins, Manage Resources holders and holders of Manage on the target may read it.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -39215,7 +39215,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionTargetV2WithBodyWithResponse Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39224,7 +39224,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionTargetV2WithResponse Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39233,7 +39233,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create a permission target (v2)
 	//
-	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+	// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39242,7 +39242,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithBodyWithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39251,7 +39251,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -39260,7 +39260,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create or replace a permission target (v2)
 	//
-	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+	// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 	//
 	// Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -65375,7 +65375,7 @@ func (c *ClientWithResponses) GetLockedOutUsersWithResponse(ctx context.Context,
 
 // GetPermissionTargetsWithResponse List permission targets (v1)
 //
-// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
+// Lists every target by name and detail URL, including targets created through the v2 or Access APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65392,7 +65392,7 @@ func (c *ClientWithResponses) GetPermissionTargetsWithResponse(ctx context.Conte
 
 // DeletePermissionTargetWithResponse Delete a permission target (v1)
 //
-// Removes the whole target, every section included. Admin only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
+// Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65409,7 +65409,7 @@ func (c *ClientWithResponses) DeletePermissionTargetWithResponse(ctx context.Con
 
 // GetPermissionTargetDetailsWithResponse Get a permission target (v1)
 //
-// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
+// Returns the target projected to the v1 shape: only its repository section, with action names mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -65426,7 +65426,7 @@ func (c *ClientWithResponses) GetPermissionTargetDetailsWithResponse(ctx context
 
 // CreateOrReplacePermissionTargetWithBodyWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65443,7 +65443,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithBodyWithRespons
 
 // CreateOrReplacePermissionTargetWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -65459,7 +65459,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetWithResponse(ctx co
 
 // CreateOrReplacePermissionTargetWithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetPlusJSONBodyWithResponse Create or replace a permission target (v1)
 //
-// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
+// Creates the target or replaces its repository section; build and release bundle sections set through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTarget+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67455,7 +67455,7 @@ func (c *ClientWithResponses) DeleteRepositoryKeyWithResponse(ctx context.Contex
 
 // GetPermissionTargetsV2WithResponse List permission targets (v2)
 //
-// Lists every target by name and detail URL. Admins see all; other users see the targets they hold Manage on.
+// Lists every target by name and detail URL. Admins and holders of the Manage Resources role see all; other users see the targets they hold Manage on.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -67470,7 +67470,7 @@ func (c *ClientWithResponses) GetPermissionTargetsV2WithResponse(ctx context.Con
 
 // GetPermissionTargetsByGroupV2WithResponse List targets granting a group
 //
-// Returns every target in which the group appears in any section's actions. Admin only.
+// Returns every target in which the group appears in any section's actions. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -67485,7 +67485,7 @@ func (c *ClientWithResponses) GetPermissionTargetsByGroupV2WithResponse(ctx cont
 
 // GetPermissionTargetsByUserV2WithResponse List targets granting a user
 //
-// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admin only.
+// Returns every target in which the user appears directly in any section's actions; grants inherited through groups are not expanded. Admins and Manage Resources holders see every match; other users see the matches they hold Manage on.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -67500,7 +67500,7 @@ func (c *ClientWithResponses) GetPermissionTargetsByUserV2WithResponse(ctx conte
 
 // DeletePermissionTargetV2WithResponse Delete a permission target (v2)
 //
-// Removes the target and every section. Answers 200 with no body. Admin only.
+// Removes the target and every section. Answers 200 with no body. Admins and Manage Resources holders may call it.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -67515,7 +67515,7 @@ func (c *ClientWithResponses) DeletePermissionTargetV2WithResponse(ctx context.C
 
 // GetPermissionTargetDetailsV2WithResponse Get a permission target (v2)
 //
-// Returns the target with every section. Admins and holders of Manage on the target may read it.
+// Returns the target with every section. Admins, Manage Resources holders and holders of Manage on the target may read it.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -67545,7 +67545,7 @@ func (c *ClientWithResponses) PermissionTargetExistenceCheckV2WithResponse(ctx c
 
 // CreatePermissionTargetV2WithBodyWithResponse Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67560,7 +67560,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithBodyWithResponse(ctx c
 
 // CreatePermissionTargetV2WithResponse Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67575,7 +67575,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithResponse(ctx context.C
 
 // CreatePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create a permission target (v2)
 //
-// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
+// Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are a 400.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67590,7 +67590,7 @@ func (c *ClientWithResponses) CreatePermissionTargetV2WithApplicationVndOrgJfrog
 
 // CreateOrReplacePermissionTargetV2WithBodyWithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67605,7 +67605,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithBodyWithRespo
 
 // CreateOrReplacePermissionTargetV2WithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -67620,7 +67620,7 @@ func (c *ClientWithResponses) CreateOrReplacePermissionTargetV2WithResponse(ctx 
 
 // CreateOrReplacePermissionTargetV2WithApplicationVndOrgJfrogArtifactorySecurityPermissionTargetV2PlusJSONBodyWithResponse Create or replace a permission target (v2)
 //
-// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it. A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
+// Creates the target or replaces it whole: a section omitted from the body is deleted, not kept. Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything; holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for create.
 //
 // Takes a body of the `application/vnd.org.jfrog.artifactory.security.PermissionTargetV2+json` content type, and returns a wrapper object for the known response body format(s).
 //

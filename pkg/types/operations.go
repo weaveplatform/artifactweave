@@ -293,8 +293,10 @@ func DefaultPasswordPolicy() PasswordPolicy { return PasswordPolicy{Length: 4, N
 
 // AccessLockSettings are the Access user lock policy's fields beyond the
 // lock limit (UserLockPolicy) and the password expiry
-// (PasswordExpirationPolicy). They are stored and returned but not yet
-// enforced, as the Access OpenAPI source says field by field.
+// (PasswordExpirationPolicy). The four login delay fields drive the
+// temporary login suspension after failed Basic logins; SecondsToUnlock and
+// AdminPasswordExpirable are stored and returned only, as the Access
+// OpenAPI source says field by field.
 type AccessLockSettings struct {
 	SecondsToUnlock                int   `json:"seconds_to_unlock"`
 	AdminPasswordExpirable         bool  `json:"admin_password_expirable"`
@@ -306,12 +308,15 @@ type AccessLockSettings struct {
 
 // DefaultAccessLockSettings is in force while none is stored: Access's
 // server defaults. docs.jfrog.com, supported Access configurations
-// (security.user-lock-policy), documents the two delays. The
-// getAccessUserLockPolicy reference page, the source of the attempts before
-// suspension and the suspension switch, is gone; the endpoint is now
-// documented only in the migration notes of the deprecated JFrog APIs page.
+// (security.user-lock-policy), documents the two delays and
+// seconds-to-unlock. The JFrog KB article on intermittent 403 errors gives
+// the 2 failed attempts before a suspension. The getAccessUserLockPolicy
+// reference page, the source of the suspension switch, is gone; the
+// endpoint is now documented only in the migration notes of the deprecated
+// JFrog APIs page.
 func DefaultAccessLockSettings() AccessLockSettings {
 	return AccessLockSettings{
+		SecondsToUnlock:                1,
 		MaxLoginDelayIncorrectAttempts: 2,
 		MaxLoginDelayMillis:            60000,
 		BaseLoginDelayMillis:           1000,

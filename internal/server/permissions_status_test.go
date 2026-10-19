@@ -209,7 +209,10 @@ func permissionStatusRows() []statusCase {
 		{"GET " + permAcc, permAcc + "?limit=0", "admin", "", 400},
 		{"GET " + permAcc, permAcc + "?expand=true", "admin", "", 400},
 		{"GET " + permAcc, permAcc + "?user=nobody", "admin", "", 404},
+		// User names match without regard to case, group names exactly.
+		{"GET " + permAcc, permAcc + "?user=USER", "admin", "", 200},
 		{"GET " + permAcc, permAcc + "?group=nobody", "admin", "", 404},
+		{"GET " + permAcc, permAcc + "?group=READERS", "admin", "", 404},
 		{"GET " + permAcc, permAcc + "?cursor=Anything&limit=1", "admin", "", 200},
 		{"GET " + permAcc, permAcc, "user", "", 403},
 		{"GET " + permAcc, permAcc, "", "", 401},

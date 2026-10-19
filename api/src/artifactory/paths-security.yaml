@@ -365,7 +365,8 @@ components:
           allOf:
           - $ref: '#/components/schemas/PermissionTargetV2Section'
           description: Optional within this object. Grants on build-info. Its repositories list is fixed to `artifactory-build-info`;
-            any other value is a 400. A PUT that omits this section deletes it.
+            an omitted or empty list stands for it, and any other value is a 400. A PUT that omits this section
+            deletes it.
         name:
           description: Optional within this object. Target name, at most 64 characters. The path parameter wins;
             a mismatch is a 400.
@@ -373,8 +374,9 @@ components:
         releaseBundle:
           allOf:
           - $ref: '#/components/schemas/PermissionTargetV2Section'
-          description: Optional within this object. Grants on release bundles. Stored without effect; release bundles
-            are not served. A PUT that omits it deletes it.
+          description: Optional within this object. Grants on release bundles. An omitted or empty repositories list
+            is stored as `release-bundles`. Stored without effect; release bundles are not served. A PUT that omits
+            it deletes it.
         repo:
           allOf:
           - $ref: '#/components/schemas/PermissionTargetV2Section'
@@ -1487,7 +1489,7 @@ paths:
     get:
       deprecated: true
       description: Lists every target by name and detail URL, including targets created through the v2 or Access
-        APIs. Admin only. Deprecated in favour of GET /access/api/v2/permissions.
+        APIs. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions.
       operationId: getPermissionTargets
       responses:
         '200':
@@ -1518,7 +1520,7 @@ paths:
   /api/security/permissions/{permissionTargetName}:
     delete:
       deprecated: true
-      description: Removes the whole target, every section included. Admin only. The seeded `Anything` and
+      description: Removes the whole target, every section included. Admins and Manage Resources holders only. The seeded `Anything` and
         `Any Remote` targets can be deleted. Deprecated in favour of `DELETE /access/api/v2/permissions/{name}`.
       operationId: deletePermissionTarget
       parameters:
@@ -1553,7 +1555,7 @@ paths:
     get:
       deprecated: true
       description: 'Returns the target projected to the v1 shape: only its repository section, with action names
-        mapped back to the single-letter codes. Admin only. Deprecated in favour of GET /access/api/v2/permissions/{name}.'
+        mapped back to the single-letter codes. Admins and Manage Resources holders only. Deprecated in favour of GET /access/api/v2/permissions/{name}.'
       operationId: getPermissionTargetDetails
       parameters:
       - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is
@@ -1589,7 +1591,7 @@ paths:
     put:
       deprecated: true
       description: Creates the target or replaces its repository section; build and release bundle sections set
-        through v2 are left untouched. Admin only. Unknown users, groups or repositories and virtual repositories
+        through v2 are left untouched. Admins and Manage Resources holders only. Unknown users, groups or repositories and virtual repositories
         are a 400. Answers 200 with a confirmation message. Deprecated in favour of POST /access/api/v2/permissions.
       operationId: createOrReplacePermissionTarget
       parameters:
@@ -2768,8 +2770,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/deleterepositorykey.md
   /api/v2/security/permissions:
     get:
-      description: Lists every target by name and detail URL. Admins see all; other users see the targets they hold
-        Manage on.
+      description: Lists every target by name and detail URL. Admins and holders of the Manage Resources role see
+        all; other users see the targets they hold Manage on.
       operationId: getPermissionTargetsV2
       responses:
         '200':
@@ -2799,7 +2801,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsv2.md
   /api/v2/security/permissions/groups/{groupName}:
     get:
-      description: Returns every target in which the group appears in any section's actions. Admin only.
+      description: Returns every target in which the group appears in any section's actions. Admins and Manage
+        Resources holders see every match; other users see the matches they hold Manage on.
       operationId: getPermissionTargetsByGroupV2
       parameters:
       - description: Required path parameter. The group name. A `+` in the path stands for a space; `%2B` is a
@@ -2833,7 +2836,8 @@ paths:
   /api/v2/security/permissions/users/{userName}:
     get:
       description: Returns every target in which the user appears directly in any section's actions; grants inherited
-        through groups are not expanded. Admin only.
+        through groups are not expanded. Admins and Manage Resources holders see every match; other users see the
+        matches they hold Manage on.
       operationId: getPermissionTargetsByUserV2
       parameters:
       - description: Required path parameter. The user name. A `+` in the path stands for a space; `%2B` is a
@@ -2866,7 +2870,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/getpermissiontargetsbyuserv2.md
   /api/v2/security/permissions/{permissionTargetName}:
     delete:
-      description: Removes the target and every section. Answers 200 with no body. Admin only.
+      description: Removes the target and every section. Answers 200 with no body. Admins and Manage Resources
+        holders may call it.
       operationId: deletePermissionTargetV2
       parameters:
       - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is
@@ -2893,7 +2898,8 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/deletepermissiontargetv2.md
     get:
-      description: Returns the target with every section. Admins and holders of Manage on the target may read it.
+      description: Returns the target with every section. Admins, Manage Resources holders and holders of Manage on
+        the target may read it.
       operationId: getPermissionTargetDetailsV2
       parameters:
       - description: Required path parameter. The target name. A `+` in the path stands for a space; `%2B` is
@@ -2954,9 +2960,10 @@ paths:
       - security
       x-oracle-source: https://docs.jfrog.com/administration/reference/permissiontargetexistencecheckv2.md
     post:
-      description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admin
-        only. Unknown users, groups or repositories, a build section whose repositories is not `artifactory-build-info`,
-        a virtual repository target or a name over 64 characters are a 400.'
+      description: 'Creates the target and answers 201 with no body. Create only: an existing name is a 409. Admins
+        and Manage Resources holders may call it. Unknown users, groups or repositories, a build section whose
+        repositories is not `artifactory-build-info`, a virtual repository target or a name over 64 characters are
+        a 400.'
       operationId: createPermissionTargetV2
       parameters:
       - description: Required path parameter. The target name; wins over name in the body. A `+` in the path
@@ -3000,11 +3007,11 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/createpermissiontargetv2.md
     put:
       description: 'Creates the target or replaces it whole: a section omitted from the body is deleted, not kept.
-        Answers 200 with no body in both cases. Admins and holders of Manage on an existing target may call it.
-        A holder of Manage who is not an admin may change only actions: in each section where it holds Manage, it
-        may grant or revoke the actions it holds there, except Manage itself. It may not change its own user
-        entry or the entry of a group it belongs to. Any other change answers 403. Validation is the same as for
-        create.'
+        Answers 200 with no body in both cases. Admins and Manage Resources holders may create or change anything;
+        holders of Manage on an existing target may call it too. A holder of Manage who is neither may change only
+        actions: in each section where it holds Manage, it may grant or revoke the actions it holds there, except
+        Manage itself. It may not change its own user entry or the entry of a group it belongs to. Any other change
+        answers 403. Validation is the same as for create.'
       operationId: createOrReplacePermissionTargetV2
       parameters:
       - description: Required path parameter. The target name; wins over name in the body. A `+` in the path

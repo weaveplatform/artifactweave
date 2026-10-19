@@ -63,8 +63,11 @@ type matrixPrincipal struct {
 	// an administrator minted for a name that is no stored user.
 	identity types.TokenIdentity
 	// admin: acts as an administrator.
-	admin  bool
-	grants []matrixGrant
+	admin bool
+	// resources: holds the Manage Resources role, which manages every
+	// permission and reaches nothing else (decision 0006).
+	resources bool
+	grants    []matrixGrant
 	// system: the system areas a token scope lets it read
 	// (system:<area>:r), which grant no content.
 	system []string
@@ -84,6 +87,17 @@ var matrixPrincipals = []matrixPrincipal{
 	// An administrator through a group with admin privileges, not the flag.
 	{name: "gadmin", user: "gadmin", admin: true, grants: []matrixGrant{{"*", "", allContent}}},
 	{name: "nobody", user: "nobody"},
+	// Manage Resources holders, through the user's flag and through a
+	// group's: they manage every permission, and hold no content and no
+	// other admin route.
+	{name: "resmgr", user: "resmgr", resources: true},
+	{name: "gresmgr", user: "gresmgr", resources: true},
+	// resmgr's token scoped to A, where it holds nothing: a scope of
+	// resource entries alone keeps no role.
+	{
+		name: "tok-resmgr-repo", user: "resmgr", token: true, scope: "artifact:libs-local:*",
+		narrowed: true,
+	},
 	// Grants on artifactory-build-info are the build resource's (#165).
 	{name: "reader", user: "reader", grants: slices.Concat([]matrixGrant{
 		{"libs-local", "", types.ActionRead},
@@ -306,6 +320,16 @@ func systemReaders(area string) rule {
 		}
 		return refuse(p)
 	}
+}
+
+// permissionManagers: an administrator or a holder of the Manage Resources
+// role, who may "create, edit, and delete permissions on any resource type"
+// and sees every permission target (decision 0006).
+func permissionManagers(p matrixPrincipal) int {
+	if p.resources {
+		return 0
+	}
+	return administrators(p)
 }
 
 // holds: a caller holding every action in want at path in repoKey.
@@ -935,9 +959,10 @@ func roleMatrix() []matrixRow {
 	}
 }
 
-// permissionMatrix covers the three permission APIs. No principal but the
-// administrators holds MANAGE, so the v2 views that also answer a manager
-// list nothing for the others, and the details refuse them.
+// permissionMatrix covers the three permission APIs. Administrators and
+// the Manage Resources holders manage every permission through each of
+// them. No other principal holds MANAGE, so the v2 views that also answer a
+// manager list nothing for the others, and the details refuse them.
 func permissionMatrix() []matrixRow {
 	const (
 		v2Body = `{"repo":{"repositories":["perm-local"],"actions":{"users":{"v-{p}":["read"]}}}}`
@@ -948,61 +973,86 @@ func permissionMatrix() []matrixRow {
 		section = `{"actions":{"users":{"v-{p}":["READ"]}},"targets":{"perm-local":{}}}`
 	)
 	return []matrixRow{
-		at("GET "+permV1, "", administrators, 200),
-		row("GET "+permV1+"/{permissionTargetName}", permV1+"/Anything", "", administrators, 200),
+		at("GET "+permV1, "", permissionManagers, 200),
+		row(
+			"GET "+permV1+"/{permissionTargetName}",
+			permV1+"/Anything",
+			"",
+			permissionManagers,
+			200,
+		),
 		row(
 			"PUT "+permV1+"/{permissionTargetName}", permV1+"/np-{p}",
 			`{"repositories":["perm-local"],"principals":{"users":{"v-{p}":["r"]}}}`,
-			administrators, 200,
+			permissionManagers, 200,
 		),
 		row(
 			"DELETE "+permV1+"/{permissionTargetName}", permV1+"/perm-{p}",
-			"", administrators, 200,
+			"", permissionManagers, 200,
 		),
 
 		at("GET "+permV2, "", signedIn, 200),
 		row("GET "+permV2+"/groups/{groupName}", permV2+"/groups/team", "", signedIn, 200),
 		row("GET "+permV2+"/users/{userName}", permV2+"/users/v-{p}", "", signedIn, 200),
-		row("GET "+permV2+"/{permissionTargetName}", permV2+"/Anything", "", administrators, 200),
-		row("HEAD "+permV2+"/{permissionTargetName}", permV2+"/Anything", "", administrators, 200),
 		row(
-			"POST "+permV2+"/{permissionTargetName}", permV2+"/np-{p}",
-			v2Body, administrators, 201,
-		),
-		row(
-			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Body, administrators,
+			"GET "+permV2+"/{permissionTargetName}",
+			permV2+"/Anything",
+			"",
+			permissionManagers,
 			200,
 		),
-		// A caller granting itself: an administrator may change its own
-		// entry, which a holder of MANAGE may not (decision 0006).
+		row(
+			"HEAD "+permV2+"/{permissionTargetName}",
+			permV2+"/Anything",
+			"",
+			permissionManagers,
+			200,
+		),
+		row(
+			"POST "+permV2+"/{permissionTargetName}", permV2+"/np-{p}",
+			v2Body, permissionManagers, 201,
+		),
+		row(
+			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Body, permissionManagers,
+			200,
+		),
+		// A caller granting itself: an administrator or a holder of the
+		// Manage Resources role may change its own entry, which a holder of
+		// MANAGE may not (decision 0006).
 		row(
 			"PUT "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}", v2Self,
-			namesSelf(administrators), 200,
+			namesSelf(permissionManagers), 200,
 		),
 		row(
 			"DELETE "+permV2+"/{permissionTargetName}", permV2+"/perm-{p}",
-			"", administrators, 200,
+			"", permissionManagers, 200,
 		),
 
-		at("GET "+permAcc, "", administrators, 200),
-		at("POST "+permAcc, access, administrators, 201),
-		row("GET "+permAcc+"/{permissionName}", permAcc+"/Anything", "", administrators, 200),
-		row("DELETE "+permAcc+"/{permissionName}", permAcc+"/perm-{p}", "", administrators, 204),
+		at("GET "+permAcc, "", permissionManagers, 200),
+		at("POST "+permAcc, access, permissionManagers, 201),
+		row("GET "+permAcc+"/{permissionName}", permAcc+"/Anything", "", permissionManagers, 200),
+		row(
+			"DELETE "+permAcc+"/{permissionName}",
+			permAcc+"/perm-{p}",
+			"",
+			permissionManagers,
+			204,
+		),
 		row(
 			"GET "+permAcc+"/{permissionName}/{resourceType}", permAcc+"/Anything/artifact", "",
-			administrators, 200,
+			permissionManagers, 200,
 		),
 		row(
 			"PUT "+permAcc+"/{permissionName}/{resourceType}", permAcc+"/perm-{p}/artifact",
-			section, administrators, 200,
+			section, permissionManagers, 200,
 		),
 		row(
 			"PATCH "+permAcc+"/{permissionName}/{resourceType}", permAcc+"/perm-{p}/artifact",
-			section, administrators, 200,
+			section, permissionManagers, 200,
 		),
 		row(
 			"DELETE "+permAcc+"/{permissionName}/{resourceType}", permAcc+"/perm-{p}/artifact", "",
-			administrators, 204,
+			permissionManagers, 204,
 		),
 	}
 }
@@ -1260,6 +1310,10 @@ func (f *matrixFixture) deploy(t *testing.T, key, path string, body []byte) repo
 	return c
 }
 
+// matrixEnvironmentLimit is the fixture's global environment limit: room
+// for each principal's E-{p} and the N-{p} the administrators create.
+const matrixEnvironmentLimit = 1000
+
 func newMatrixFixture(t *testing.T) *matrixFixture {
 	t.Helper()
 	ctx := context.Background()
@@ -1276,9 +1330,16 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 			t.Fatal(err)
 		}
 	}
-	for _, u := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin"} {
+	for _, u := range []string{"nobody", "reader", "writer", "deployer", "member", "gadmin", "gresmgr"} {
 		must(db.Users().Create(ctx, types.User{Name: u, PasswordHash: cheapHash}))
 	}
+	must(db.Users().Create(ctx, types.User{
+		Name: "resmgr", PasswordHash: cheapHash, Roles: types.RoleFlags{ResourcesManager: true},
+	}))
+	must(db.Groups().Create(ctx, types.Group{
+		Name: "res-managers", Roles: types.RoleFlags{ResourcesManager: true},
+		Members: []string{"gresmgr"},
+	}))
 	for _, p := range names {
 		must(db.Users().Create(ctx, types.User{Name: "v-" + p, PasswordHash: cheapHash}))
 		must(db.Groups().Create(ctx, types.Group{Name: "g-" + p}))
@@ -1403,7 +1464,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 		}
 	}
 	k := testKeys()
-	rs := roles.Service{Store: db}
+	// Every principal has a global environment of its own, more than the
+	// default limit of ten allows; matrixEnvironmentLimit lifts it.
+	rs := roles.Service{Store: db, GlobalLimit: matrixEnvironmentLimit}
 	for _, p := range names {
 		must(db.Keys().CreateKeypair(ctx, types.Keypair{
 			Name: "kp-" + p, Type: types.KeypairRSA, Alias: "a-" + p,
@@ -1438,8 +1501,9 @@ func newMatrixFixture(t *testing.T) *matrixFixture {
 	must(err)
 	cfg := Config{
 		CompatVersion: "7.155.0", Store: db, Blobs: blobs, Auth: a, PasswordHash: testHash,
-		Tokens:    tokens,
-		Multipart: &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+		Tokens:                 tokens,
+		Multipart:              &multipart.Service{Store: db, Blobs: blobs, Dir: t.TempDir()},
+		GlobalEnvironmentLimit: matrixEnvironmentLimit,
 	}
 	for _, p := range matrixParts {
 		if p.tune != nil {

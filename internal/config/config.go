@@ -65,6 +65,9 @@ const (
 	// body. The body carries the tarball in base64, a third larger than the
 	// tarball itself.
 	DefaultNPMMaxPublishSize ByteSize = 1 << 30
+	// DefaultGlobalEnvironmentLimit is Access's environments.global-limit
+	// default; it must match roles.DefaultGlobalEnvironmentLimit.
+	DefaultGlobalEnvironmentLimit = 10
 )
 
 // Config is the application configuration. YAML tags are the file keys; the
@@ -83,18 +86,19 @@ type Config struct {
 	MasterKey string     `yaml:"master_key"`
 	// MasterKeyPrevious is the key being rotated away from; it is kept
 	// until `artifactweave keys rotate` has re-sealed every value.
-	MasterKeyPrevious string          `yaml:"master_key_previous"`
-	Bootstrap         BootstrapConfig `yaml:"bootstrap"`
-	Docker            DockerConfig    `yaml:"docker"`
-	Log               LogConfig       `yaml:"log"`
-	GC                GCConfig        `yaml:"gc"`
-	Download          DownloadConfig  `yaml:"download"`
-	Search            SearchConfig    `yaml:"search"`
-	Work              WorkConfig      `yaml:"work"`
-	Build             BuildConfig     `yaml:"build"`
-	NPM               NPMConfig       `yaml:"npm"`
-	Token             TokenConfig     `yaml:"token"`
-	Deploy            DeployConfig    `yaml:"deploy"`
+	MasterKeyPrevious string             `yaml:"master_key_previous"`
+	Bootstrap         BootstrapConfig    `yaml:"bootstrap"`
+	Docker            DockerConfig       `yaml:"docker"`
+	Log               LogConfig          `yaml:"log"`
+	GC                GCConfig           `yaml:"gc"`
+	Download          DownloadConfig     `yaml:"download"`
+	Search            SearchConfig       `yaml:"search"`
+	Work              WorkConfig         `yaml:"work"`
+	Build             BuildConfig        `yaml:"build"`
+	NPM               NPMConfig          `yaml:"npm"`
+	Token             TokenConfig        `yaml:"token"`
+	Deploy            DeployConfig       `yaml:"deploy"`
+	Environments      EnvironmentsConfig `yaml:"environments"`
 }
 
 // DeployConfig holds the deploy settings.
@@ -105,6 +109,14 @@ type DeployConfig struct {
 	// by default, as there, so that a CI re-run of jf rt u by a user who may
 	// deploy but not delete succeeds.
 	EnforceIdenticalChecksumDeploy bool `yaml:"enforce_permission_check_on_identical_checksum_deploy"`
+}
+
+// EnvironmentsConfig holds the environment settings.
+type EnvironmentsConfig struct {
+	// GlobalLimit caps the global environments, DEV and PROD included, as
+	// Access's environments.global-limit does; creating one more answers
+	// 400.
+	GlobalLimit int `yaml:"global_limit"`
 }
 
 // TokenConfig holds the access token settings (decision 0005).
@@ -285,8 +297,9 @@ func Default() Config {
 			Lease:       DefaultWorkLease,
 			MaxAttempts: DefaultWorkMaxAttempts,
 		},
-		Build: BuildConfig{BlockDuplicateEntries: true},
-		NPM:   NPMConfig{MaxPublishSize: DefaultNPMMaxPublishSize},
+		Build:        BuildConfig{BlockDuplicateEntries: true},
+		NPM:          NPMConfig{MaxPublishSize: DefaultNPMMaxPublishSize},
+		Environments: EnvironmentsConfig{GlobalLimit: DefaultGlobalEnvironmentLimit},
 	}
 }
 
@@ -360,6 +373,7 @@ var keys = append(append([]string{
 	"npm.max_publish_size",
 	"token.allow_basic_auth",
 	"deploy.enforce_permission_check_on_identical_checksum_deploy",
+	"environments.global_limit",
 }, blobKeys("blob")...), blobKeys("cold_blob")...)
 
 func envName(key string) string {
@@ -424,6 +438,8 @@ func set(cfg *Config, key, value string) error {
 		return setInt(&cfg.Work.MaxAttempts, key, value)
 	case "npm.max_publish_size":
 		return setByteSize(&cfg.NPM.MaxPublishSize, key, value)
+	case "environments.global_limit":
+		return setInt(&cfg.Environments.GlobalLimit, key, value)
 	default:
 		return fmt.Errorf("%w: %q", ErrUnknownKey, key)
 	}
@@ -555,6 +571,10 @@ func (c Config) Validate() error {
 	if c.Search.AQL.NonAdminScanFactor < 1 {
 		errs = append(errs, fmt.Errorf("%w: search.aql.non_admin_scan_factor %d must be at least 1",
 			ErrInvalidValue, c.Search.AQL.NonAdminScanFactor))
+	}
+	if c.Environments.GlobalLimit < 1 {
+		errs = append(errs, fmt.Errorf("%w: environments.global_limit %d must be at least 1",
+			ErrInvalidValue, c.Environments.GlobalLimit))
 	}
 	if c.Search.UserQueryLimit < 0 {
 		errs = append(errs, fmt.Errorf("%w: search.user_query_limit %d must not be negative",

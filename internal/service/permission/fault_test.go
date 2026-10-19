@@ -75,6 +75,13 @@ func (u faultyUsers) Get(ctx context.Context, name string) (types.User, error) {
 	return u.UserStore.Get(ctx, name) //nolint:wrapcheck // test double
 }
 
+func (u faultyUsers) List(ctx context.Context, pg store.Page) ([]types.User, string, error) {
+	if u.f.fail == "users.list" {
+		return nil, "", errBoom
+	}
+	return u.UserStore.List(ctx, pg) //nolint:wrapcheck // test double
+}
+
 type faultyGroups struct {
 	store.GroupStore
 	f *faulty
@@ -119,6 +126,7 @@ func TestStoreFailures(t *testing.T) {
 		"perms.forprincipal": func() error { _, _, err := svc.Granting(ctx, []string{"bob"}, nil, false); return err },
 		"users.get":          func() error { _, _, err := svc.Granting(ctx, []string{"bob"}, nil, false); return err },
 		"groups.get":         func() error { _, _, err := svc.Granting(ctx, nil, []string{"devs"}, false); return err },
+		"users.list":         func() error { _, err := svc.FoldUsers(ctx, []string{"bob"}); return err },
 	} {
 		f.fail = op
 		if err := call(); !errors.Is(err, errBoom) {

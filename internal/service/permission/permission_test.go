@@ -634,3 +634,40 @@ func TestNarrow(t *testing.T) {
 		t.Errorf("narrowing a permission without sections = %+v", got)
 	}
 }
+
+// TestFoldUsers checks the Access listing's user filter matches names
+// without regard to case (getpermissions), every stored spelling at once,
+// across pages of users.
+func TestFoldUsers(t *testing.T) {
+	ctx := context.Background()
+	db := seeded(t)
+	if err := db.Users().Create(ctx, types.User{Name: "Bob"}); err != nil {
+		t.Fatal(err)
+	}
+	svc := service(db)
+	defer permission.SetListPage(1)()
+	for _, c := range []struct {
+		names, want []string
+	}{
+		{nil, nil},
+		{[]string{"carol"}, []string{"carol"}},
+		{[]string{"CAROL"}, []string{"carol"}},
+		{[]string{"BOB"}, []string{"Bob", "bob"}},
+		{[]string{"bob", "Carol", "bOb"}, []string{"Bob", "bob", "carol"}},
+	} {
+		got, err := svc.FoldUsers(ctx, c.names)
+		if err != nil || !slices.Equal(got, c.want) {
+			t.Errorf("FoldUsers(%v) = %v, %v; want %v", c.names, got, err, c.want)
+		}
+	}
+	if _, err := svc.FoldUsers(
+		ctx,
+		[]string{"carol", "zed"},
+	); !errors.Is(
+		err,
+		permission.ErrNotFound,
+	) ||
+		!strings.Contains(err.Error(), "'zed'") {
+		t.Fatalf("an unknown user: %v", err)
+	}
+}

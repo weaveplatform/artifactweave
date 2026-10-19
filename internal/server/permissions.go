@@ -44,6 +44,10 @@ const (
 type permCaller struct {
 	svc permission.Service
 	dec *authz.Decider
+	// resources: the caller holds the Manage Resources role, which manages
+	// every permission as an administrator does and reaches nothing else
+	// (decision 0006).
+	resources bool
 }
 
 func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
@@ -68,25 +72,49 @@ func permissionCaller(ctx context.Context, cfg Config) (permCaller, error) {
 			err,
 		)
 	}
-	return permCaller{svc: permission.Service{Store: st}, dec: a.d}, nil
+	resources, err := a.d.ManagesResources(ctx, st.Users(), st.Groups())
+	if err != nil {
+		return permCaller{}, artifactoryService{
+			cfg: cfg,
+		}.internalError(
+			ctx,
+			"permission caller",
+			err,
+		)
+	}
+	return permCaller{svc: permission.Service{Store: st}, dec: a.d, resources: resources}, nil
 }
 
+// managesAll reports whether the caller manages every permission: an
+// administrator, or a holder of the Manage Resources role, who may "create,
+// edit, and delete permissions on any resource type" and sees every
+// permission target (docs.jfrog.com permissions page; JA-16022 in 7.146.7;
+// decision 0006).
+func (c permCaller) managesAll() bool { return c.dec.Admin() || c.resources }
+
+// admin refuses a caller that does not manage every permission. The
+// permission APIs' writes and their admin-only reads ask it; every other
+// admin-only route still asks for an administrator.
 func (c permCaller) admin() error {
-	if !c.dec.Admin() {
+	if !c.managesAll() {
 		return auth.ErrForbidden
 	}
 	return nil
 }
 
-// reader may list every permission and read any one whole: an
-// administrator, or a token carrying the system:permissions:r scope. Reading
-// one section is stricter, for administrators alone (GetPermissionResource).
-func (c permCaller) reader() bool { return c.dec.System("permissions", types.ScopeRead) }
+// reader may list every permission and read any one whole: a caller that
+// manages every permission, or a token carrying the system:permissions:r
+// scope. Reading one section is stricter, for those managers alone
+// (GetPermissionResource).
+func (c permCaller) reader() bool {
+	return c.managesAll() || c.dec.System("permissions", types.ScopeRead)
+}
 
-// manages reports whether the caller may manage p through the v2 API: an
-// administrator, or a holder of MANAGE in any of its sections.
+// manages reports whether the caller may manage p through the v2 API: a
+// caller that manages every permission, or a holder of MANAGE in any of
+// its sections.
 func (c permCaller) manages(p types.Permission) bool {
-	if c.dec.Admin() {
+	if c.managesAll() {
 		return true
 	}
 	for _, r := range p.Resources {
@@ -99,7 +127,8 @@ func (c permCaller) manages(p types.Permission) bool {
 
 // lookup returns the named permission for a caller allowed by may. A
 // permission the caller may not see answers 403 whether or not it exists,
-// so a non-administrator cannot probe for names; an administrator gets 404.
+// so a caller that does not see every permission cannot probe for names;
+// one that does gets 404.
 func (c permCaller) lookup(
 	ctx context.Context,
 	name string,
@@ -107,7 +136,7 @@ func (c permCaller) lookup(
 ) (types.Permission, error) {
 	p, err := c.svc.Get(ctx, name)
 	switch {
-	case errors.Is(err, permission.ErrNotFound) && !c.dec.Admin() && !c.reader():
+	case errors.Is(err, permission.ErrNotFound) && !c.reader():
 		return types.Permission{}, auth.ErrForbidden
 	case err != nil:
 		return types.Permission{}, fmt.Errorf("permissions: %w", err)
@@ -300,7 +329,8 @@ func (s artifactoryService) DeletePermissionTarget(
 // --- v2 permission targets ------------------------------------------------
 
 // GetPermissionTargetsV2 lists what the caller may manage: every permission
-// for an administrator, otherwise those it holds MANAGE on.
+// for an administrator or a Manage Resources holder, otherwise those it
+// holds MANAGE on.
 func (s artifactoryService) GetPermissionTargetsV2(
 	ctx context.Context,
 	_ artgen.GetPermissionTargetsV2RequestObject,
@@ -357,7 +387,8 @@ func (s artifactoryService) granting(
 		return nil, s.permissionError(ctx, "permissions by principal", err)
 	}
 	// getpermissiontargetsbyuserv2.json: an administrator, or a holder of
-	// MANAGE, who sees the permissions it manages.
+	// MANAGE, who sees the permissions it manages; a Manage Resources holder
+	// sees them all.
 	ps = slices.DeleteFunc(ps, func(p types.Permission) bool { return !c.manages(p) })
 	views, err := v2Views(ps)
 	if err != nil {
@@ -540,7 +571,7 @@ func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 				return p, c.admin()
 			case !c.manages(old):
 				return types.Permission{}, auth.ErrForbidden
-			case !c.dec.Admin():
+			case !c.managesAll():
 				if err := permission.CheckManagerEdit(old, p, v2Sections, c.dec); err != nil {
 					return types.Permission{}, fmt.Errorf("permissions: %w", err)
 				}
@@ -561,7 +592,8 @@ func (s artifactoryService) CreateOrReplacePermissionTargetV2(
 }
 
 // DeletePermissionTargetV2 removes the permission. Unlike a read or a
-// replace, it needs an administrator (deletepermissiontargetv2.json).
+// replace, it needs an administrator (deletepermissiontargetv2.json) or a
+// Manage Resources holder.
 func (s artifactoryService) DeletePermissionTargetV2(
 	ctx context.Context,
 	req artgen.DeletePermissionTargetV2RequestObject,
@@ -661,7 +693,12 @@ func (s accessService) GetPermissions(
 	)
 	if filtered {
 		inherited := q.IncludeInheritedGroups == nil || *q.IncludeInheritedGroups
-		ps, pr, err = c.svc.Granting(ctx, users, groups, inherited)
+		// User names match without regard to case, group names exactly
+		// (getpermissions).
+		users, err = c.svc.FoldUsers(ctx, users)
+		if err == nil {
+			ps, pr, err = c.svc.Granting(ctx, users, groups, inherited)
+		}
 	} else {
 		ps, err = c.svc.List(ctx)
 	}
@@ -763,8 +800,9 @@ func (s accessService) CreatePermission(
 	return accessJSON{http.StatusCreated, types.PermissionToAccess(stored)}, nil
 }
 
-// GetPermissionDetails returns one permission to an administrator or a
-// system:permissions:r token (getpermissiondetails.json).
+// GetPermissionDetails returns one permission to an administrator, a
+// Manage Resources holder or a system:permissions:r token
+// (getpermissiondetails.json).
 func (s accessService) GetPermissionDetails(
 	ctx context.Context,
 	req accessgen.GetPermissionDetailsRequestObject,
@@ -840,8 +878,9 @@ func sectionTo(rt types.ResourceType, r types.Resource) (accessgen.PermissionRes
 }
 
 // GetPermissionResource returns one section. It is admin only, as
-// getpermissionresource documents: a system:permissions:r token, which reads
-// the whole permission, is refused here (#382).
+// getpermissionresource documents, but for Manage Resources holders, who
+// see every permission whole: a system:permissions:r token, which reads the
+// whole permission, is refused here (#382).
 func (s accessService) GetPermissionResource(
 	ctx context.Context,
 	req accessgen.GetPermissionResourceRequestObject,

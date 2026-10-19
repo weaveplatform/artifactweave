@@ -1,5 +1,10 @@
 package server
 
+import (
+	"net/http"
+	"testing"
+)
+
 // roleStatusRows covers global environments and roles. Rows run in order
 // against one fixture: QA is created, renamed to STAGE and deleted; ci is
 // created, replaced and deleted.
@@ -103,5 +108,29 @@ func roleStatusRows() []statusCase {
 		{envDel, envPath + "/STAGE", "", "", 401},
 		{envDel, envPath + "/stage", "admin", "", 204},
 		{envDel, envPath + "/STAGE", "admin", "", 404},
+	}
+}
+
+// TestGlobalEnvironmentLimitStatus checks the global environment past the
+// limit answers 400 in the Access envelope; DEV and PROD count toward it.
+func TestGlobalEnvironmentLimitStatus(t *testing.T) {
+	h := statusFixture(t, false, func(c *Config) { c.GlobalEnvironmentLimit = 3 })
+	admin := jsonHeaders(basic("admin", "pw"))
+	const envs = "/access/api/v1/environments"
+	if rec := do(
+		t,
+		h,
+		http.MethodPost,
+		envs,
+		admin,
+		`{"name":"QA"}`,
+	); rec.Code != http.StatusCreated {
+		t.Fatalf("third: %d %s", rec.Code, rec.Body)
+	}
+	rec := do(t, h, http.MethodPost, envs, admin, `{"name":"STAGE"}`)
+	if want := `{"errors":[{"code":"BAD_REQUEST","message":` +
+		`"at most 3 global environments may exist: invalid"}]}` + "\n"; rec.Code !=
+		http.StatusBadRequest || rec.Body.String() != want {
+		t.Fatalf("fourth: %d %s", rec.Code, rec.Body)
 	}
 }

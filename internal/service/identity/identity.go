@@ -719,15 +719,11 @@ func (s *Service) AccessLockPolicy(ctx context.Context) (AccessLockPolicy, error
 	if err != nil {
 		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
-	p := AccessLockPolicy{AccessLockSettings: types.DefaultAccessLockSettings()}
-	if err := settings.Get(
-		ctx,
-		types.SettingAccessLockSettings,
-		&p.AccessLockSettings,
-	); err != nil &&
-		!errors.Is(err, store.ErrNotFound) {
-		return p, fmt.Errorf("identity: access lock settings: %w", err)
+	access, err := auth.AccessLockSettings(ctx, settings)
+	if err != nil {
+		return AccessLockPolicy{}, err //nolint:wrapcheck // already wrapped
 	}
+	p := AccessLockPolicy{AccessLockSettings: access}
 	if lock.Enabled {
 		p.Attempts = lock.LoginAttempts
 	}

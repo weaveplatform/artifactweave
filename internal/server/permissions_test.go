@@ -226,6 +226,14 @@ func TestExpandNarrows(t *testing.T) {
 	if !found {
 		t.Fatalf("shared missing from %+v", page)
 	}
+	// The user filter matches without regard to case (getpermissions), and
+	// narrows to the grants of the user's stored name.
+	upper := do(t, h, http.MethodGet,
+		permAcc+"?user=USER&expand=true&include_inherited_groups=false", basic("admin", "pw"), "")
+	mustStatus(t, upper, 200, "expand, other case")
+	if upper.Body.String() != rec.Body.String() {
+		t.Fatalf("USER and user differ:\n%s\n%s", upper.Body, rec.Body)
+	}
 }
 
 func TestAccessListing(t *testing.T) {
@@ -620,4 +628,92 @@ func TestPermissionTokenScopes(t *testing.T) {
 		403,
 		"group-scoped read",
 	)
+}
+
+// TestV2SectionDefaults checks a v2 build or releaseBundle section sent
+// without repositories reads back with its default repository, in the v2
+// and Access views (createorreplacepermissiontargetv2).
+func TestV2SectionDefaults(t *testing.T) {
+	h := statusFixture(t, false)
+	rec := do(t, h, http.MethodPut, permV2+"/v2-defaults", adminJSON(),
+		`{"name":"v2-defaults","build":{"actions":{"users":{"user":["read"]}}},`+
+			`"releaseBundle":{"repositories":[],"actions":{"users":{"user":["read"]}}}}`)
+	mustStatus(t, rec, 200, "put")
+	var v2 struct {
+		Build, ReleaseBundle struct{ Repositories []string }
+	}
+	rec = do(t, h, http.MethodGet, permV2+"/v2-defaults", basic("admin", "pw"), "")
+	mustStatus(t, rec, 200, "v2 get")
+	permDecode(t, rec, &v2)
+	if !slices.Equal(v2.Build.Repositories, []string{"artifactory-build-info"}) ||
+		!slices.Equal(v2.ReleaseBundle.Repositories, []string{"release-bundles"}) {
+		t.Fatalf("v2 view: %s", rec.Body)
+	}
+	rec = do(t, h, http.MethodGet, permAcc+"/v2-defaults", basic("admin", "pw"), "")
+	mustStatus(t, rec, 200, "access get")
+	if body := rec.Body.String(); !strings.Contains(body, `"artifactory-build-info":{`) ||
+		!strings.Contains(body, `"release-bundles":{`) {
+		t.Fatalf("access view: %s", body)
+	}
+}
+
+// TestManageResourcesRole checks a holder of the Manage Resources role, set
+// on the user or on a group, manages every permission as an administrator
+// does: it lists and reads them all, learns a missing name is missing, and
+// creates, replaces past the actions and deletes. It stays out of every
+// other admin route, so it cannot give itself more than the role.
+func TestManageResourcesRole(t *testing.T) {
+	h := statusFixture(t, false)
+	admin := adminJSON()
+	mustStatus(t, do(
+		t,
+		h,
+		http.MethodPost,
+		"/access/api/v2/users",
+		admin,
+		`{"username":"rita","email":"r@example.com","password":"Rita-pass-1","resources_manager":true}`,
+	),
+		201, "rita")
+	mustStatus(t, do(t, h, http.MethodPost, "/access/api/v2/users", admin,
+		`{"username":"gil","email":"g@example.com","password":"Gil-pass-1"}`), 201, "gil")
+	mustStatus(t, do(t, h, http.MethodPost, "/access/api/v2/groups", admin,
+		`{"name":"res-managers","manage_resources":true,"members":["gil"]}`), 201, "group")
+	for user, pw := range map[string]string{"rita": "Rita-pass-1", "gil": "Gil-pass-1"} {
+		as := jsonHeaders(basic(user, pw))
+		rec := do(t, h, http.MethodGet, permV2, as, "")
+		mustStatus(t, rec, 200, user+" v2 list")
+		if !strings.Contains(rec.Body.String(), `"Anything"`) ||
+			!strings.Contains(rec.Body.String(), `"st-managed"`) {
+			t.Fatalf("%s sees %s", user, rec.Body)
+		}
+		mustStatus(t, do(t, h, http.MethodGet, permAcc, as, ""), 200, user+" access list")
+		mustStatus(t, do(t, h, http.MethodGet, permV2+"/missing", as, ""), 404, user+" missing")
+		name := "rm-" + user
+		mustStatus(t, do(t, h, http.MethodPost, permV2+"/"+name, as,
+			`{"name":"`+name+`","repo":{"repositories":["perm-local"],`+
+				`"actions":{"users":{"user":["read","manage"]}}}}`), 201, user+" create")
+		// Unlike a MANAGE holder, it may change the targets too.
+		mustStatus(t, do(
+			t,
+			h,
+			http.MethodPut,
+			permV2+"/"+name,
+			as,
+			`{"name":"`+name+`","repo":{"repositories":["ANY LOCAL"],"include-patterns":["org/**"],`+
+				`"actions":{"users":{"user":["read"]}}}}`,
+		), 200, user+" replace")
+		mustStatus(t, do(t, h, http.MethodGet, permAcc+"/"+name+"/artifact", as, ""), 200,
+			user+" section")
+		mustStatus(t, do(t, h, http.MethodDelete, permAcc+"/"+name, as, ""), 204, user+" delete")
+		// Nothing outside the permissions: not users, groups or
+		// repositories, so not its own role or the admin flag either.
+		for _, c := range []struct{ method, path, body string }{
+			{http.MethodGet, "/access/api/v2/users", ""},
+			{http.MethodPatch, "/access/api/v2/users/" + user, `{"admin":true}`},
+			{http.MethodPatch, "/access/api/v2/groups/res-managers", `{"admin_privileges":true}`},
+			{http.MethodPut, "/artifactory/api/repositories/rm-repo", `{"rclass":"local"}`},
+		} {
+			mustStatus(t, do(t, h, c.method, c.path, as, c.body), 403, user+" "+c.method+" "+c.path)
+		}
+	}
 }

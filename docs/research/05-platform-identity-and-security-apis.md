@@ -59,11 +59,11 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | GET | `/api/security/permissions/{name}` | 200 | |
 | PUT | `/api/security/permissions/{name}` | 200 | create or replace, v1 shape |
 | DELETE | `/api/security/permissions/{name}` | 200 | |
-| GET | `/api/v2/security/permissions` | 200 | admin or Manage on the target |
+| GET | `/api/v2/security/permissions` | 200 | admin, Manage Resources role, or Manage on the target |
 | GET | `/api/v2/security/permissions/{name}` | 200 | |
 | HEAD | `/api/v2/security/permissions/{name}` | 200 / 404 | existence check |
 | POST | `/api/v2/security/permissions/{name}` | **201** | create only; 409 when it exists (jfrog-client-go treats 409 as "exists") |
-| PUT | `/api/v2/security/permissions/{name}` | **200** | create or replace; an omitted section (`build`, `releaseBundle`) is deleted. A Manage holder who is not an admin changes only actions, granting only those it holds and never `manage` (`exclude-manage`, the default), and only in the entries of "other users and groups": never its own entry, nor, **[I]**, the entry of a group it belongs to ([permissions](https://docs.jfrog.com/administration/docs/permissions)) |
+| PUT | `/api/v2/security/permissions/{name}` | **200** | create or replace; an omitted section (`build`, `releaseBundle`) is deleted. A `build` section without `repositories` targets `artifactory-build-info`, which "cannot be changed", and a `releaseBundle` section `release-bundles` ([createorreplacepermissiontargetv2](https://docs.jfrog.com/administration/reference/createorreplacepermissiontargetv2)). A Manage holder who is neither an admin nor a Manage Resources holder changes only actions, granting only those it holds and never `manage` (`exclude-manage`, the default), and only in the entries of "other users and groups": never its own entry, nor, **[I]**, the entry of a group it belongs to ([permissions](https://docs.jfrog.com/administration/docs/permissions)) |
 | DELETE | `/api/v2/security/permissions/{name}` | 200 | |
 | GET | `/api/v2/security/permissions/users/{u}`, `/groups/{g}` | 200 | targets per principal |
 | POST | `/api/security/apiKey` | **201** | jfrog-client-go hard-checks 201 although the docs say 200. artifactweave answers 400 "API key creation is disabled", matching Artifactory ≥7.98 defaults |
@@ -215,7 +215,7 @@ there is no other version gate on groups.
 
 | Method | Path | Status | Notes |
 |---|---|---|---|
-| GET | `/access/api/v2/permissions` | 200 | admin or `system:permissions:r`; query `cursor`, `limit` (1 to 99999), `user` (csv), `group` (csv), `include_inherited_groups` (default true), `expand` (needs `user` or `group`). The [reference page](https://docs.jfrog.com/administration/reference/getpermissions) gives `user`, `group`, `include_inherited_groups` and `expand` as available only from Artifactory 7.210.0, later than 7.161.32 and SaaS 7.174.0; artifactweave serves them already ([0006](decisions/0006-authorization-native-permission-model.md)) |
+| GET | `/access/api/v2/permissions` | 200 | admin, Manage Resources role or `system:permissions:r`; query `cursor`, `limit` (1 to 99999), `user` (csv, matched case-insensitively), `group` (csv, matched exactly), `include_inherited_groups` (default true), `expand` (needs `user` or `group`). The [reference page](https://docs.jfrog.com/administration/reference/getpermissions) gives `user`, `group`, `include_inherited_groups` and `expand` as available only from Artifactory 7.210.0, later than 7.161.32 and SaaS 7.174.0; artifactweave serves them already ([0006](decisions/0006-authorization-native-permission-model.md)) |
 | POST | `/access/api/v2/permissions` | **201** | 409 on conflict |
 | GET | `/access/api/v2/permissions/{name}` | 200 | |
 | DELETE | `/access/api/v2/permissions/{name}` | 204 | |
@@ -353,7 +353,7 @@ padding (`cliSafe`, `internal/auth/token/jwt.go`; decision 0005, "As implemented
 | POST | `/access/api/v1/roles` | **201** | body `{name,description,type:"CUSTOM_GLOBAL",environments[],actions[]}`; response `{code,message}`, not the role |
 | GET | `/access/api/v1/roles` | 200 | `type` enum `ADMIN | PREDEFINED | CUSTOM_GLOBAL` |
 | GET / PUT / DELETE | `/access/api/v1/roles/{role}` | 200 | |
-| POST | `/access/api/v1/environments` | **201** | `{"name":"..."}`, at most 32 characters, case-insensitive; built-ins `DEV`, `PROD` |
+| POST | `/access/api/v1/environments` | **201** | `{"name":"..."}`, at most 32 characters, case-insensitive; built-ins `DEV`, `PROD`; at most 10 global environments by default (`environments.global-limit` in [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)), and the next answers 400 **[I]** |
 | GET | `/access/api/v1/environments` | 200 | |
 | POST | `/access/api/v1/environments/{name}/rename` | 200 | `{"new_name":"..."}` |
 | DELETE | `/access/api/v1/environments/{name}` | 204 | 404 when absent |
@@ -405,6 +405,25 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    [research 01](01-jfrog-api-landscape.md#authentication-schemes)).
 5. Basic auth can be disabled platform-wide through
    `/access/api/v1/config/security/authentication/basic_authentication_enabled`.
+   Failed Basic logins also suspend the user name for a moment: "the system will temporarily
+   suspend (with a 403 HTTP status code) that user's account for a brief period of time during
+   which additional login attempts will be ignored", the suspension growing with each failure
+   "until it reaches a maximum of 60 seconds"
+   ([security configuration](https://docs.jfrog.com/administration/docs/security-configuration),
+   "Temporary Login Suspension"). The Access `security.user-lock-policy` sets it:
+   `base-login-delay-millis: 1000`, `max-login-delay-millis: 60000` and `seconds-to-unlock: 1`
+   ([supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)),
+   and from 7.90 the UI changes or disables it. The suspension starts at the second failure in
+   a row, and the right password is refused while it lasts **[KB]**
+   ([Artifactory intermittent 403 errors](https://jfrog.com/help/r/artifactory-intermittent-403-errors-while-working-with-artifactory/artifactory-intermittent-403-errors-while-working-with-artifactory),
+   which also gives the message "This request is blocked due to recurrent request failures,
+   please try again in 2 second(s)"). A cluster applies it on each node separately.
+   artifactweave enforces it (`internal/auth/suspension.go`): the delay is the base doubled for
+   each failure past the threshold, capped at the maximum, as Artifactory 6.x's
+   `loginBlockDelay << (attempts - allowed)` did **[I]**; the check comes before the user is
+   read or a password hashed; attempts refused while suspended are not counted; a name that
+   does not exist is suspended alike; a login whose password verifies clears the failures; and
+   tokens are not suspended **[I]**.
 6. The Docker token flow is described in [04-package-protocols.md](04-package-protocols.md);
    `/artifactory/api/docker/<repo>/v1|v2/auth` returns `{"auth":"<base64 user:pass>","email":"..."}`.
 7. Basic credentials create tokens through `POST /access/api/v1/tokens` only once an
@@ -490,6 +509,16 @@ the password policy. Every read path and status the two Terraform providers chec
 - the JWT payload quirk, which described padding the payload rather than escaping it;
 - three deprecated password endpoints missing from the legacy table.
 
+**Settled by [#408](https://github.com/weaveplatform/artifactweave/issues/408).** At most 10
+global environments exist by default
+([createglobalenvironment](https://docs.jfrog.com/administration/reference/createglobalenvironment):
+"By default, Artifactory supports up to 10 global environments"; `global-limit: 10` in
+[supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)),
+and artifactweave refuses the next with 400; `environments.global_limit` changes the limit. The
+temporary login suspension (item 5 of
+[Authentication](#authentication-accepted-on-every-endpoint)) is enforced, and
+`secondsToUnlock` defaults to 1.
+
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
 account policy, seeding and OIDC differences, and decision 0006's
@@ -501,9 +530,6 @@ permission ones. The others:
   ([gettokens](https://docs.jfrog.com/administration/reference/gettokens)); artifactweave
   always records it, at most once a minute per token (`internal/auth/token/token.go`), and
   returns it. Kept, as a deviation registered by #378.
-- 7.x differs: at most 10 global environments by default
-  ([createglobalenvironment](https://docs.jfrog.com/administration/reference/createglobalenvironment));
-  fixed by [#408](https://github.com/weaveplatform/artifactweave/issues/408).
 
 The three deprecated password endpoints are served as the legacy table records, and a `+` in a
 user, group or permission name in the legacy paths stands for a space, `%2B` excepted, as the
@@ -567,6 +593,19 @@ records.
   list.
 - How an exclude pattern meets an include pattern in a permission target.
 - The characters allowed in environment names; only the length and case are documented.
+- The global environment limit. **[I]** It counts `DEV` and `PROD`, and the one past it
+  answers 400 "at most 10 global environments may exist", the page's only status for invalid
+  input; the page gives no message. The
+  [custom global environment guide](https://docs.jfrog.com/administration/docs/create-a-custom-global-environment)
+  says 30 from 7.111.0, against 10 on the API page and in the Access configuration reference,
+  which artifactweave follows.
+- The temporary login suspension's growth and scope. **[I]** The delay doubles from the base
+  at each failure past `maxLoginDelayIncorrectAttempts` (2), as in 6.x; failures are forgotten
+  a day after the last one; a threshold of 0 or 1 suspends from the first failure; only Basic
+  logins with a password are suspended, not tokens; and the 403 body is the KB's log line.
+- What `seconds-to-unlock` does in 7.x. **[I]** artifactweave stores and returns it, default 1,
+  and a locked user stays locked until an administrator unlocks them, as the security
+  configuration page says.
 - What the seeded `Any Remote` grants on a fresh 7.x instance, which the pages describe only
   as without `anonymous`.
 - The status of `POST /api/security/keypair` when it replaces a pair. **[I]** 201, as for a

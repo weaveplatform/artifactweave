@@ -24,7 +24,7 @@ func (s accessService) roleService(ctx context.Context) (roles.Service, error) {
 	if err != nil {
 		return roles.Service{}, err
 	}
-	return roles.Service{Store: st}, nil
+	return roles.Service{Store: st, GlobalLimit: s.cfg.GlobalEnvironmentLimit}, nil
 }
 
 // roleError maps the service's errors to statuses. taken is the status of a
