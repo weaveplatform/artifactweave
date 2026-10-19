@@ -31,6 +31,30 @@ Feature: Trash can and garbage collection
     Then the response status is 200
     And the response body is "restore me"
 
+  Scenario: The trash can answers the storage API's views
+    When I PUT "/artifactory/trash-local/docs/a.txt" as admin with body:
+      """
+      list me
+      """
+    And I DELETE "/artifactory/trash-local/docs" as admin
+    Then the response status is 204
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local?list&deep=1&listFolders=1" as admin
+    Then the response status is 200
+    And the JSON field "files" has 2 entries
+    And the JSON field "files.0.uri" equals "/docs"
+    And the JSON field "files.1.uri" equals "/docs/a.txt"
+    And the JSON field "files.1.size" is the number 7
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local/docs/a.txt?properties" as admin
+    Then the response status is 200
+    And the response body contains "trash.originalRepositoryType"
+    And the response body contains "generic"
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local/docs/a.txt?stats" as admin
+    Then the response status is 200
+    And the JSON field "downloadCount" is the number 0
+    When I GET "/artifactory/api/storage/auto-trashcan/trash-local/docs?lastModified" as admin
+    Then the response status is 200
+    And the JSON field "lastModified" is not empty
+
   Scenario: Emptying the trash can and collecting garbage frees the content
     When I PUT "/artifactory/trash-local/collect/me.txt" as admin with body:
       """
@@ -86,7 +110,9 @@ Feature: Trash can and garbage collection
     Then the response status is 200
     And the JSON field "binariesSummary.artifactsCount" equals "1"
     And the JSON field "binariesSummary.artifactsSize" equals "8 bytes"
+    And the JSON field "binariesSummary.optimization" equals "100%"
     And the JSON field "fileStoreSummary.storageType" equals "file-system"
+    And the JSON field "fileStoreSummary.storageDirectory" is not empty
     And the JSON field "fileStoreSummary.totalSpace" is not empty
     And the JSON field "repositoriesSummaryList.1.repoKey" equals "auto-trashcan"
     And the JSON field "repositoriesSummaryList.1.repoType" equals "NA"

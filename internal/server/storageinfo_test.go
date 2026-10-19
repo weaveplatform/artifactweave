@@ -71,10 +71,12 @@ func TestStorageSummaryAccessFailure(t *testing.T) {
 // nothing stored and compares it with a 7.x SaaS capture of one
 // (watsonmartin/jartifactory README): N/A for every share, an auto-trashcan
 // row, a TOTAL row without packageType, projectKey or percentage, and an
-// object store with no space fields. Only the directory is ours.
+// object store with no space fields. Only the directory differs: SaaS
+// reports "Artifactory Cloud", and a store with no local copy reports what
+// a self-hosted chain without a filesystem provider does (#461).
 func TestStorageSummaryLikeAnEmpty7x(t *testing.T) {
 	sum := storageSummary(usage.Summary{
-		Location: usage.Location{Type: "s3-storage-v3-direct", Directory: "s3://bucket/prefix"},
+		Location: usage.Location{Type: "s3-storage-v3-direct", Directory: usage.NoFilesystem},
 		Rows: []usage.Row{
 			{
 				Key: "artifactory-build-info", Type: "LOCAL", PackageType: repo.BuildInfo,
@@ -108,7 +110,8 @@ func TestStorageSummaryLikeAnEmpty7x(t *testing.T) {
 			"optimization": "N/A", "itemsCount": "0", "artifactsCount": "0",
 		},
 		"fileStoreSummary": map[string]any{
-			"storageType": "s3-storage-v3-direct", "storageDirectory": "s3://bucket/prefix",
+			"storageType":      "s3-storage-v3-direct",
+			"storageDirectory": "Filesystem storage is not used",
 		},
 		"repositoriesSummaryList": []any{
 			row("artifactory-build-info", "LOCAL", "BuildInfo"),
@@ -122,6 +125,27 @@ func TestStorageSummaryLikeAnEmpty7x(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("summary\n got %s", body)
+	}
+}
+
+// TestStorageSummaryOptimization: optimization is binariesSize over
+// artifactsSize (#461), as JFrog's getstoragesummaryinfo example (3.48 GB
+// over 59.77 GB, 5.82%) and the bundle capture (67.84 GB over 83.64 GB,
+// 81.1%) show; N/A while there are no artifacts.
+func TestStorageSummaryOptimization(t *testing.T) {
+	for _, tc := range []struct {
+		binaries, artifacts int64
+		want                string
+	}{
+		{348, 5977, "5.82%"},
+		{6784, 8364, "81.11%"},
+		{100, 100, "100%"},
+		{0, 0, "N/A"},
+	} {
+		sum := storageSummary(usage.Summary{BinariesSize: tc.binaries, ArtifactsSize: tc.artifacts})
+		if got := *sum.BinariesSummary.Optimization; got != tc.want {
+			t.Errorf("%d over %d: %s, want %s", tc.binaries, tc.artifacts, got, tc.want)
+		}
 	}
 }
 

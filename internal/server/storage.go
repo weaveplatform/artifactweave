@@ -413,46 +413,80 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 	if !f.item.Folder {
 		return "", nil, badRequest("%s is a file; list needs a folder", f.item.StoragePath())
 	}
-	opts := map[string]bool{}
-	for _, name := range []string{"deep", "listFolders", "mdTimestamps", "includeRootPath"} {
-		on, err := flag(q, name, false)
-		if err != nil {
-			return "", nil, err
-		}
-		opts[name] = on
-	}
-	depth := -1
-	if d := q.Get("depth"); d != "" {
-		n, err := strconv.Atoi(d)
-		if err != nil || n < 0 {
-			return "", nil, badRequest("depth must be a non-negative integer")
-		}
-		depth = n
-	}
-	folder := f.item.FullPath()
-	items, err := v.below(ctx, folder, opts["deep"])
+	l, err := parseListing(q)
 	if err != nil {
 		return "", nil, err
 	}
+	folder := f.item.FullPath()
+	items, err := v.below(ctx, folder, l.deep)
+	if err != nil {
+		return "", nil, err
+	}
+	files := make([]listed, 0, len(items))
+	for _, it := range items {
+		files = append(files, listed{path: it.FullPath(), item: it})
+	}
+	return mediaFileList, l.render(v.uri(ctx, folder), folder, f.item, files), nil
+}
+
+// listing holds the FileList view's parameters.
+type listing struct {
+	deep, listFolders, mdTimestamps, includeRootPath bool
+	// depth bounds the levels a deep listing reaches below the listed
+	// folder; 0 is unlimited, as a deep listing without it.
+	depth int
+}
+
+func parseListing(q url.Values) (listing, error) {
+	var l listing
+	for _, f := range []struct {
+		name string
+		on   *bool
+	}{
+		{"deep", &l.deep},
+		{"listFolders", &l.listFolders},
+		{"mdTimestamps", &l.mdTimestamps},
+		{"includeRootPath", &l.includeRootPath},
+	} {
+		var err error
+		if *f.on, err = flag(q, f.name, false); err != nil {
+			return l, err
+		}
+	}
+	if d := q.Get("depth"); d != "" {
+		n, err := strconv.Atoi(d)
+		if err != nil || n < 0 {
+			return l, badRequest("depth must be a non-negative integer")
+		}
+		l.depth = n
+	}
+	return l, nil
+}
+
+// listed is an item below the listed folder and its full path in the tree
+// listed, which for the trash can is not the item's own.
+type listed struct {
+	path string
+	item types.Item
+}
+
+// render is the FileList body of folder, whose own item is self, over the
+// items below it.
+func (l listing) render(uri, folder string, self types.Item, items []listed) map[string]any {
 	base := segments(folder)
 	files := make([]map[string]any, 0, len(items)+1)
-	if opts["includeRootPath"] {
+	if l.includeRootPath {
 		// The listed folder itself, at "/" relative to itself. The
 		// Terraform provider's TestAccDataSourceFileList_include_root_path
 		// expects this entry first at a repository root, with size -1.
-		files = append(files, listEntry(f.item, "/", opts["mdTimestamps"]))
+		files = append(files, listEntry(self, "/", l.mdTimestamps))
 	}
 	for _, it := range items {
-		if it.Folder && !opts["listFolders"] {
+		if it.item.Folder && !l.listFolders || l.depth > 0 && segments(it.path)-base > l.depth {
 			continue
 		}
-		// depth counts levels below the listed folder; 0 is unlimited, as a
-		// deep listing without it.
-		if depth > 0 && segments(it.FullPath())-base > depth {
-			continue
-		}
-		uri := "/" + strings.TrimPrefix(strings.TrimPrefix(it.FullPath(), folder), "/")
-		files = append(files, listEntry(it, uri, opts["mdTimestamps"]))
+		rel := "/" + strings.TrimPrefix(strings.TrimPrefix(it.path, folder), "/")
+		files = append(files, listEntry(it.item, rel, l.mdTimestamps))
 	}
 	slices.SortFunc(files, func(a, b map[string]any) int {
 		return strings.Compare(
@@ -460,11 +494,7 @@ func (v storageView) list(ctx context.Context, f found, q url.Values) (string, a
 			b["uri"].(string),
 		) //nolint:forcetypeassert // set above
 	})
-	return mediaFileList, map[string]any{
-		"uri":     v.uri(ctx, folder),
-		"created": formatTime(time.Now()),
-		"files":   files,
-	}, nil
+	return map[string]any{"uri": uri, "created": formatTime(time.Now()), "files": files}
 }
 
 // listEntry is one entry of a FileList. size is a JSON number, -1 for a

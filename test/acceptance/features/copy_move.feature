@@ -68,6 +68,17 @@ Feature: Copy, move and archives
     When I GET "/artifactory/dst-local/mv/one.txt" as admin
     Then the response body is "one"
 
+  Scenario: An archive deploy answers 201 in plain text and names the folder in Location
+    Given a zip file "bundle.zip" holding "inner/readme.txt" with content "packed"
+    And the next request has header "X-Explode-Archive" "true"
+    When I deploy the file "bundle.zip" to "/artifactory/src-local/plain/bundle.zip" as admin
+    Then the response status is 201
+    And the response header "Content-Type" contains "text/plain"
+    And the response header "Location" contains "/artifactory/src-local/plain"
+    And the response body is ""
+    When I GET "/artifactory/src-local/plain/inner/readme.txt" as admin
+    Then the response body is "packed"
+
   @jf
   Scenario: jf rt u --explode, and an entry read from a stored archive
     Given the JFrog CLI is available

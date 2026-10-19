@@ -893,6 +893,47 @@ func trashMatrix() []matrixRow {
 			list, tc+"/libs-b/work", "",
 			holdsEither("libs-b", "work/", write, manage), 200,
 		).seeding(trashed("libs-b", "work/b-listed-{p}.txt")),
+		// Every storage view the trash can serves holds the same filter: A's
+		// trash to A's deploy and manage holders, B's to B's (#455).
+		at(list+"?list&deep=1&listFolders=1", "", trashViewer, 200),
+		row(
+			list, tc+"/libs-local/work?list&deep=1&listFolders=1&mdTimestamps=1", "",
+			holdsEither("libs-local", "work/", write, manage), 200,
+		).seeding(trashed("libs-local", "work/view-{p}.txt")),
+		row(
+			list, tc+"/libs-b/work?list&deep=1", "",
+			holdsEither("libs-b", "work/", write, manage), 200,
+		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
+		row(
+			list, tc+"/libs-local/work/view-{p}.txt?properties", "",
+			holdsEither("libs-local", "work/", write, manage), 200,
+		).seeding(trashed("libs-local", "work/view-{p}.txt")),
+		row(
+			list, tc+"/libs-b/work/b-view-{p}.txt?properties", "",
+			holdsEither("libs-b", "work/", write, manage), 200,
+		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
+		row(
+			list, tc+"/libs-local/work/view-{p}.txt?stats", "",
+			holdsEither("libs-local", "work/", write, manage), 200,
+		).seeding(trashed("libs-local", "work/view-{p}.txt")),
+		row(
+			list, tc+"/libs-b/work/b-view-{p}.txt?stats", "",
+			holdsEither("libs-b", "work/", write, manage), 200,
+		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
+		row(
+			list, tc+"/libs-local/work?lastModified", "",
+			holdsEither("libs-local", "work/", write, manage), 200,
+		).seeding(trashed("libs-local", "work/view-{p}.txt")),
+		row(
+			list, tc+"/libs-b/work?lastModified", "",
+			holdsEither("libs-b", "work/", write, manage), 200,
+		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
+		// The permissions view is for administrators, and does not apply to
+		// the trash can.
+		row(
+			list, tc+"/libs-b/work/b-view-{p}.txt?permissions", "",
+			allOf(holdsEither("libs-b", "work/", write, manage), administrators), 400,
+		).seeding(trashed("libs-b", "work/b-view-{p}.txt")),
 		row(
 			"DELETE /artifactory/api/trash/clean/{repoPath}",
 			"/artifactory/api/trash/clean/libs-local/work/trash-{p}.txt", "",

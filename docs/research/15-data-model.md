@@ -253,6 +253,11 @@ What they settle:
   `0%` for a share that rounds to nothing), as 6.20's `NumberFormatter.formatPercentage`
   (`###.##%`) does [I]. A share of nothing is `N/A`: the SaaS capture shows it for
   `optimization` and for every `percentage`.
+- **`optimization`** is `binariesSize` as a share of `artifactsSize`, the space the stored
+  binaries take, not the space deduplication saved
+  ([#461](https://github.com/weaveplatform/artifactweave/issues/461)). JFrog's example on the
+  page above gives 3.48 GB over 59.77 GB as `5.82%`, the bundle capture gives 67.84 GB over
+  83.64 GB as `81.1%`, and the 7.46 capture gives 13.52 TB over 21.67 TB as `62.42%`.
 - **The trash can** has a row of its own, `auto-trashcan`, with `repoType` and `packageType`
   `NA` and `projectKey` `default` (all three captures). The TOTAL row and the binaries
   summary count it: the 7.46 capture's trash row holds 150,423 files, which its TOTAL row
@@ -275,6 +280,15 @@ What they settle:
   blob mirror, which Artifactory can express only as a sharding chain of its own [I]. An
   object store reports no `totalSpace`, `usedSpace` or `freeSpace` (the SaaS capture), and
   neither does a mirror.
+- **`fileStoreSummary.storageDirectory`** is the directory of a local disk store (the 7.46
+  and bundle captures). For an object store artifactweave sends "Filesystem storage is not
+  used", not the bucket ([#461](https://github.com/weaveplatform/artifactweave/issues/461)).
+  JFrog's S3 SaaS sends `Artifactory Cloud` (the SaaS capture), which describes the hosted
+  service. No self-hosted 7.x capture of an object store was found. 6.20 sends the
+  directories of the chain's `file-system` and `cache-fs` providers, and that text when the
+  chain has neither (`StorageSummaryImpl`, `BinaryServiceUtils.collectFileBinaryProvidersDirsInternal`)
+  [I]. artifactweave's object stores keep no local cache, so they are that chain. A blob
+  mirror sends its members' names.
 - **Order.** artifactweave sorts the rows by key and puts TOTAL last. The captures follow no
   order but TOTAL last.
 
@@ -613,7 +627,7 @@ timestamps are UTC; identifiers are the wire identities above.
 | `packages` | `id PK, repo_key, package_type, name, created_at` | | package index ([0018](decisions/0018-package-index.md)); unique `(repo_key, package_type, name)` |
 | `package_versions` | `id PK, package_id, version, order_key, created_at, last_downloaded_at` | per-type metadata | `order_key` is the comparator-normalised sort key; retention and tag limits |
 | `package_version_files` | `version_id, item_id` | | |
-| `trash` | `id PK, original_repo_key, original_path, original_name, item_json, deleted_at, deleted_by` | the item record and its properties | restore and purge by `retentionPeriodDays` |
+| `trash` | `id PK, original_repo_key, original_path, original_name, item_json, deleted_at, deleted_by` | the item record, its properties and its repository's package type | restore and purge by `retentionPeriodDays` |
 | `users` | `name PK, email, password_hash, admin, profile_updatable, internal_password_disabled, disable_ui_access, realm, status, last_logged_in_at, created_at` | the role flags (`watch_manager` …) | legacy and Access views are projections |
 | `groups` | `name PK, description, auto_join, admin_privileges, realm, realm_attributes, external_id` | role flags | |
 | `group_members` | `group_name, user_name` | | |

@@ -808,7 +808,9 @@ func (s *Service) remove(
 				return fmt.Errorf("item: properties of %s: %w", it.FullPath(), err)
 			}
 			if _, err := s.Store.Trash().Add(ctx, types.TrashEntry{
-				Record:    types.TrashRecord{Item: it, Properties: props},
+				Record: types.TrashRecord{
+					Item: it, Properties: props, PackageType: string(t.Repo.PackageType),
+				},
 				DeletedAt: now, DeletedBy: by,
 			}); err != nil {
 				return fmt.Errorf("item: trash %s: %w", it.FullPath(), err)

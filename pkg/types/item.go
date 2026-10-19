@@ -272,6 +272,11 @@ type ItemStats struct {
 type TrashRecord struct {
 	Item       Item       `json:"item"`
 	Properties Properties `json:"properties,omitempty"`
+	// PackageType is the package type of the repository the item was
+	// deleted from, recorded then because the trash can still shows it once
+	// that repository is gone, when it tells an administrator what type of
+	// repository to recreate for a restore.
+	PackageType string `json:"packageType,omitempty"`
 }
 
 // TrashEntry is one deleted item awaiting restore or purge.

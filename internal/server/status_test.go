@@ -1,8 +1,10 @@
 package server
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
+	"io"
 	"maps"
 	"net/http"
 	"slices"
@@ -52,15 +54,26 @@ func (c statusCase) method() string { m, _, _ := strings.Cut(c.route, " "); retu
 // checksumDeploy turns a row body of "checksum:<sha1>" into the request of
 // a checksum deploy of that SHA-1: the headers that ask for one, which a row
 // has no field for, and no body. A body of "declared:<content>" is an upload
-// of content with its SHA-1 declared, as the JFrog CLI sends one.
+// of content with its SHA-1 declared, as the JFrog CLI sends one. A body of
+// "explode:<name>" is an archive deploy of a zip holding <name>.
 func checksumDeploy(headers map[string]string, body string) (map[string]string, string) {
 	sum, byChecksum := strings.CutPrefix(body, "checksum:")
 	content, declared := strings.CutPrefix(body, "declared:")
-	if !byChecksum && !declared {
+	entry, explode := strings.CutPrefix(body, "explode:")
+	if !byChecksum && !declared && !explode {
 		return headers, body
 	}
 	if headers == nil {
 		headers = map[string]string{}
+	}
+	if explode {
+		var buf bytes.Buffer
+		zw := zip.NewWriter(&buf)
+		f, _ := zw.Create(entry) // a buffer cannot fail to take a write
+		_, _ = io.WriteString(f, entry)
+		_ = zw.Close()
+		headers["X-Explode-Archive"] = "true"
+		return headers, buf.String()
 	}
 	if declared {
 		headers["X-Checksum-Sha1"] = sha1Hex(content)
@@ -997,6 +1010,7 @@ func transferStatusRows() []statusCase {
 		m   = "/artifactory/api/move/libs-local/fixture/"
 		dl  = "/artifactory/api/archive/download/libs-local/"
 		lib = "/artifactory/libs-local/fixture/"
+		put = "PUT /artifactory/{repoKey}/{filePath}"
 	)
 	return []statusCase{
 		{cp, c + "get.txt?to=/libs-local/copied/get.txt", "admin", "", 200},
@@ -1026,5 +1040,10 @@ func transferStatusRows() []statusCase {
 		{en, lib + "archive.zip!/absent", "admin", "", 404},
 		{en, lib + "archive.zip!/inner.txt", "user", "", 403},
 		{en, lib + "archive.zip!/inner.txt", "", "", 401},
+
+		// An archive deploy answers 201 text/plain (#474).
+		{put, lib + "exploded/bundle.zip", "admin", "explode:inner.txt", 201},
+		{put, lib + "exploded/bundle.zip", "user", "explode:inner.txt", 403},
+		{put, lib + "exploded/bundle.zip", "", "explode:inner.txt", 401},
 	}
 }

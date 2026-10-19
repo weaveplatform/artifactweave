@@ -3276,7 +3276,7 @@ type BinariesSummary struct {
 	// ItemsCount Optional within this object. Number of items, files and folders together and those in the trash can included, formatted with thousands separators.
 	ItemsCount *string `json:"itemsCount,omitempty"`
 
-	// Optimization Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), with up to two decimals, such as `5.82%`, or `N/A` while there are no artifacts.
+	// Optimization Optional within this object. `binariesSize` as a percentage of `artifactsSize`, with up to two decimals, such as `5.82%`, or `N/A` while there are no artifacts.
 	Optimization *string `json:"optimization,omitempty"`
 }
 
@@ -4377,7 +4377,7 @@ type FileStoreSummary struct {
 	// FreeSpace Optional within this object. Free space on the volume, with the percentage in parentheses.
 	FreeSpace *string `json:"freeSpace,omitempty"`
 
-	// StorageDirectory Optional within this object. Root directory for the local disk store, the bucket and prefix for object storage, or the member stores of a blob mirror.
+	// StorageDirectory Optional within this object. Root directory for the local disk store, `Filesystem storage is not used` for object storage, or the member stores of a blob mirror.
 	StorageDirectory *string `json:"storageDirectory,omitempty"`
 
 	// StorageType Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.

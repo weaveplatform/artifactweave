@@ -899,58 +899,68 @@ func TestChecksumDeployIdenticalContent(t *testing.T) {
 }
 
 // TestItemCreated (#400): every deploy answers uri with the download URL,
-// as downloadUri, and a folder's path and uri end in a slash.
+// as downloadUri, and a folder's path and uri end in a slash. Every deploy
+// names what it stored in Location (#474).
 func TestItemCreated(t *testing.T) {
 	w := newItemWorld(t, false)
 	const base = "https://reg.example/artifactory/"
-	body := func(rec *httptest.ResponseRecorder) map[string]any {
-		t.Helper()
-		wantStatus(t, rec, http.StatusCreated)
-		var out map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
-			t.Fatal(err)
-		}
-		return out
-	}
-	zip := string(zipBytes(t, map[string]string{"inner.txt": "inner"}))
 	for name, tc := range map[string]struct {
-		rec       *httptest.ResponseRecorder
-		path, uri string
-		file      bool
+		rec                 *httptest.ResponseRecorder
+		path, uri, location string
+		file                bool
 	}{
 		"file": {
 			w.do("PUT", "/artifactory/libs-local/d/a%20b.txt;k=v", "admin", "ab"),
-			"/d/a b.txt", base + "libs-local/d/a%20b.txt", true,
+			"/d/a b.txt", base + "libs-local/d/a%20b.txt", base + "libs-local/d/a%20b.txt", true,
 		},
 		"checksum deploy": {
 			w.do("PUT", "/artifactory/other-local/copy.txt", "admin", "",
 				"X-Checksum-Deploy", "true", "X-Checksum-Sha1", sha1Hex("ab")),
-			"/copy.txt", base + "other-local/copy.txt", true,
+			"/copy.txt", base + "other-local/copy.txt", base + "other-local/copy.txt", true,
 		},
 		"through a virtual repository": {
 			w.do("PUT", "/artifactory/virt/v.txt", "admin", "v"),
-			"/v.txt", base + "libs-local/v.txt", true,
+			"/v.txt", base + "libs-local/v.txt", base + "libs-local/v.txt", true,
 		},
+		// Location names a folder without the slash, as 6.20 sets it to
+		// the URL before adding one for the body.
 		"folder": {
 			w.do("PUT", "/artifactory/libs-local/f/g/", "admin", ""),
-			"/f/g/", base + "libs-local/f/g/", false,
-		},
-		"explode": {
-			w.do("PUT", "/artifactory/libs-local/ex/bundle.zip", "admin", zip,
-				"X-Explode-Archive", "true"),
-			"/ex/", base + "libs-local/ex/", false,
-		},
-		"explode at the root": {
-			w.do("PUT", "/artifactory/other-local/bundle.zip", "admin", zip,
-				"X-Explode-Archive", "true"),
-			"/", base + "other-local/", false,
+			"/f/g/", base + "libs-local/f/g/", base + "libs-local/f/g", false,
 		},
 	} {
-		got := body(tc.rec)
+		wantStatus(t, tc.rec, http.StatusCreated)
+		var got map[string]any
+		if err := json.Unmarshal(tc.rec.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
 		_, download := got["downloadUri"]
 		if got["path"] != tc.path || got["uri"] != tc.uri || download != tc.file ||
-			(tc.file && got["downloadUri"] != tc.uri) {
-			t.Errorf("%s: %v", name, got)
+			(tc.file && got["downloadUri"] != tc.uri) ||
+			tc.rec.Header().Get("Location") != tc.location {
+			t.Errorf("%s: %v %v", name, got, tc.rec.Header())
+		}
+	}
+}
+
+// TestExplodeAnswer (#474): an archive deploy answers 201 text/plain, as the
+// deployartifactsfromarchive page documents, with no text, and names the
+// folder the archive landed in as Location.
+func TestExplodeAnswer(t *testing.T) {
+	w := newItemWorld(t, false)
+	const base = "https://reg.example/artifactory/"
+	zip := string(zipBytes(t, map[string]string{"inner.txt": "inner"}))
+	for path, location := range map[string]string{
+		"libs-local/ex/bundle.zip": base + "libs-local/ex",
+		"other-local/bundle.zip":   base + "other-local/",
+	} {
+		for _, header := range []string{"X-Explode-Archive", "X-Explode-Archive-Atomic"} {
+			rec := w.do("PUT", "/artifactory/"+path, "admin", zip, header, "true")
+			wantStatus(t, rec, http.StatusCreated)
+			if rec.Body.Len() != 0 || rec.Header().Get("Content-Type") != "text/plain" ||
+				rec.Header().Get("Location") != location {
+				t.Errorf("%s with %s: %v %q", path, header, rec.Header(), rec.Body)
+			}
 		}
 	}
 }

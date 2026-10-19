@@ -349,8 +349,9 @@ func TestExplodeOverHTTP(t *testing.T) {
 	rec := w.do("PUT", "/artifactory/libs-local/ex/bundle.zip", "admin", string(body),
 		"X-Explode-Archive", "true")
 	wantStatus(t, rec, http.StatusCreated)
-	if !strings.Contains(rec.Body.String(), `"path":"/ex/"`) {
-		t.Fatalf("body %s", rec.Body)
+	if rec.Body.Len() != 0 ||
+		rec.Header().Get("Location") != "https://reg.example/artifactory/libs-local/ex" {
+		t.Fatalf("answer %v %q", rec.Header(), rec.Body)
 	}
 	wantStatus(
 		t,

@@ -40,8 +40,9 @@ item or trash entry and refreshes the storage summary.
   - Unset, the trash can is on, with Artifactory's 14-day retention.
   - A trashed file keeps its blob reference, so it stays restorable. Purging an entry, by `clean`, `empty` or expiry, releases that reference.
   - `restore` takes the newest trashed copy of each path. Without a path in `to`, items return to their original paths; with one, the restored path lands there. A file at the destination is replaced, as a deploy replaces one. Every restored item carries `trash.originalRepository` and `trash.restoredTime` beside its own properties ([Artifactory 7.x check](#artifactory-7x-check)).
-  - The trash can is listed through the storage API under the `auto-trashcan` key. An administrator sees all of it. Anyone else sees only what was trashed from repositories it holds deploy or manage on, judged at each item's original path, so exclude patterns hold.
-  - A caller holding deploy or manage on no repository is refused the listing with 403. A path where the caller sees nothing is refused with 403 before the trash is read, and a folder listing leaves out what the caller does not see. Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer exists.
+  - The trash can answers the storage API under the `auto-trashcan` key with the views any repository serves: the item info, `?list` with all its parameters, `?properties`, `?stats` and `?lastModified`. `?permissions` answers 400 to an administrator. An administrator sees all of it. Anyone else sees only what was trashed from repositories it holds deploy or manage on, judged at each item's original path, so exclude patterns hold, in every view.
+  - A caller holding deploy or manage on no repository is refused with 403. A path where the caller sees nothing is refused with 403 before the trash is read, and a listing leaves out what the caller does not see. Anonymous gets 401, and only an admin sees what was trashed from a repository that no longer exists.
+  - A trashed item carries its own properties and `trash.time`, `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`. `trash.time` is in Unix milliseconds. The repository's package type is recorded when the item is deleted, so it is still shown once the repository is gone.
   - `restore` needs Manage on the destination and delete or manage on the repository the items were deleted from, as `clean` does. The origin is checked at the requested path and at every restored item's original path, so an exclude pattern is honoured. One item not covered refuses the whole restore before anything moves.
   - The check at the requested path runs before the trash is read, so a refusal does not reveal whether anything is trashed there. Only an admin restores from a repository that no longer exists.
   - Permission failures on `clean`, `empty` and `restore` answer 400, as Artifactory reports them.
@@ -115,6 +116,25 @@ repositories that they have permission to". artifactweave applies this rule to t
 - **[I]** artifactweave judges each trashed item at its original path, so a folder-level grant shows only that folder's items and exclude patterns hold. 7.x may judge the repository as a whole, as RTFACT-29653 reports for restore.
 - **[I]** Anonymous gets 401 even when it holds deploy, and only an admin sees what was trashed from a repository that no longer exists, as only an admin cleans or restores it.
 
+The trash can serves the storage API's views as a repository does
+([#455](https://github.com/weaveplatform/artifactweave/issues/455)). JFrog documents the
+file list on `auto-trashcan` with `deep`, `depth`, `listFolders`, `mdTimestamps` and
+`includeRootPath` (**[KB]** [How to search artifacts under trash can using REST
+API](https://jfrog.com/help/r/artifactory-how-to-search-artifacts-under-trash-can-using-rest-api)).
+Three details are inferred:
+- **[I]** The other views answer as on any repository: `?properties` with the item's own properties and the `trash.*` ones, as 6.20 keeps both on the item in the trash can, `?stats` with a download count of 0, as 6.20 trashes a copy, and `?lastModified`. The filter above holds in each.
+- **[I]** `?permissions` answers 400 to an administrator: no permission target can name the trash can (**[J]** [RTFACT-30167](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30167), open), so the view has nothing to describe.
+- **[I]** A trashed item's properties change when it is trashed, which `mdTimestamps` reports, and a folder that holds only what was trashed below it has no times or properties.
+
+A trashed item carries `trash.time`, `trash.deletedBy`, `trash.originalRepository`,
+`trash.originalRepositoryType` and `trash.originalPath`
+([#477](https://github.com/weaveplatform/artifactweave/issues/477)). `trash.time` is in Unix
+milliseconds: **[J]** [RTFACT-29920](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29920)
+(Done, affects 7.61.1) compares it with an epoch in milliseconds. The other values are 6.20's
+(`TrashServiceImpl.buildDeletedItemProperties`):
+- **[I]** `trash.originalRepositoryType` is the repository's package type as `RepoType.getType()` spells it, the type's enumeration name in lower case, which is `yum` for rpm.
+- **[I]** `trash.deletedBy`, `trash.originalRepository` and `trash.originalPath` are who deleted the item, the key of its repository and its path there.
+
 A restore sets `trash.originalRepository` and `trash.restoredTime` on every item it brings back, beside the item's own properties (**[J]** [RTFACT-29810](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-29810), Done, affects 7.55.10: the expected and the observed properties of restored items both include them). Their values are inferred from 6.20 (`TrashService`, `TrashInterceptor.afterMove`):
 - **[I]** `trash.originalRepository` is the key of the repository the item was deleted from, also when it is restored into another repository.
 - **[I]** `trash.restoredTime` is the time of the restore in Unix milliseconds. A restore time recorded by an earlier restore gives way to the new one.
@@ -128,6 +148,10 @@ its rows carry `usedSpaceInBytes` and `projectKey` (**[S]** jfrog-client-go's li
 `storageInfoTest` at `3b4b900d8174`), and the trash can has its own `auto-trashcan` row,
 which the totals include, as three 7.x captures show
 ([research 15, section 2.2](../15-data-model.md#22-item-artifactory-artifacts-storage-api)).
+`optimization` is `binariesSize` over `artifactsSize`, as JFrog's example and the captures
+show, and an object store's `storageDirectory` is "Filesystem storage is not used", 6.20's
+text for a chain with no local directory **[I]**
+([#461](https://github.com/weaveplatform/artifactweave/issues/461)).
 
 ## Constraints
 

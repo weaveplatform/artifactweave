@@ -297,28 +297,70 @@ type Child struct {
 // Children lists what the trash can shows directly inside dir: the
 // repositories with trashed items at its root ("" for dir), and below a
 // repository the next path segment of every trashed path, as Artifactory's
-// auto-trashcan repository does.
-//
-// sees filters the entries before the children are derived from them, so a
-// repository or folder shows only when an entry the caller sees lies at or
-// below it. A nil sees shows every entry, for an administrator.
+// auto-trashcan repository does. sees filters as for Below.
 func (s *Service) Children(
 	ctx context.Context,
 	dir string,
 	sees func(types.Item) bool,
 ) ([]Child, error) {
+	nodes, err := s.Below(ctx, dir, false, sees)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Child, 0, len(nodes))
+	for _, n := range nodes {
+		out = append(out, Child{Name: path.Base(n.Path), Folder: n.Folder})
+	}
+	return out, nil
+}
+
+// Node is one item of the trash can's tree, as Artifactory's auto-trashcan
+// repository holds it: Path is the original repository key and the item's
+// original path, joined.
+type Node struct {
+	Path   string
+	Folder bool
+	// Entry is the newest entry trashed at Path. It is nil for a folder that
+	// only holds what was trashed below it, such as a repository's folder at
+	// the root, or the parent of a file deleted on its own.
+	Entry *types.TrashEntry
+}
+
+// Below lists the trash can's tree under dir ("" for its root): the direct
+// children, or with deep every descendant, sorted by path.
+//
+// sees filters the entries before the tree is derived from them, so a
+// repository or folder shows only when an entry the caller sees lies at or
+// below it. A nil sees shows every entry, for an administrator.
+func (s *Service) Below(
+	ctx context.Context,
+	dir string,
+	deep bool,
+	sees func(types.Item) bool,
+) ([]Node, error) {
 	dir = strings.Trim(dir, "/")
 	repoKey, prefix, _ := strings.Cut(dir, "/")
 	entries, err := s.Entries(ctx, repoKey, prefix)
 	if err != nil {
 		return nil, err
 	}
-	children := map[string]bool{}
+	visible := make([]types.TrashEntry, 0, len(entries))
 	for _, e := range entries {
-		if sees != nil && !sees(e.Record.Item) {
-			continue
+		if sees == nil || sees(e.Record.Item) {
+			visible = append(visible, e)
 		}
-		rel := e.Record.Item.RepoKey + "/" + e.Record.Item.FullPath()
+	}
+	nodes := map[string]*Node{}
+	node := func(p string) *Node {
+		n, ok := nodes[p]
+		if !ok {
+			n = &Node{Path: p}
+			nodes[p] = n
+		}
+		return n
+	}
+	for _, e := range Newest(visible) {
+		rel := strings.Trim(e.Record.Item.RepoKey+"/"+e.Record.Item.FullPath(), "/")
 		if dir != "" {
 			cut, ok := strings.CutPrefix(rel, dir+"/")
 			if !ok {
@@ -326,15 +368,29 @@ func (s *Service) Children(
 			}
 			rel = cut
 		}
-		name, rest, deeper := strings.Cut(rel, "/")
-		children[name] = children[name] || deeper || (rest == "" && e.Record.Item.Folder) ||
-			dir == ""
+		segs := strings.Split(rel, "/")
+		// Every segment above the entry is a folder of the tree, the
+		// repository's among them.
+		for i := 1; i < len(segs) && (deep || i == 1); i++ {
+			node(path.Join(dir, path.Join(segs[:i]...))).Folder = true
+		}
+		if !deep && len(segs) > 1 {
+			continue
+		}
+		n := node(path.Join(dir, rel))
+		n.Entry, n.Folder = &e, n.Folder || e.Record.Item.Folder
 	}
-	out := make([]Child, 0, len(children))
-	for name, folder := range children {
-		out = append(out, Child{Name: name, Folder: folder})
+	out := make([]Node, 0, len(nodes))
+	for _, n := range nodes {
+		// A file trashed where a folder later held trashed items is gone from
+		// Artifactory's trash can, which replaces it with the folder
+		// (TrashServiceImpl.undeployFileWithSameNameInTrash in 6.20).
+		if n.Folder && n.Entry != nil && !n.Entry.Record.Item.Folder {
+			n.Entry = nil
+		}
+		out = append(out, *n)
 	}
-	slices.SortFunc(out, func(a, b Child) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortFunc(out, func(a, b Node) int { return strings.Compare(a.Path, b.Path) })
 	return out, nil
 }
 

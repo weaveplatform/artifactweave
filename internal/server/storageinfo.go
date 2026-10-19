@@ -200,9 +200,10 @@ func storageSummary(sum usage.Summary) artgen.StorageSummaryInfo {
 			ArtifactsCount: str(thousands(sum.ArtifactsCount)),
 			ArtifactsSize:  str(humanBytes(sum.ArtifactsSize)),
 			ItemsCount:     str(thousands(sum.ItemsCount)),
-			Optimization: str(
-				percent(sum.ArtifactsSize-sum.BinariesSize, sum.ArtifactsSize),
-			),
+			// The share of the artifacts' size that the stored binaries take,
+			// not the share saved: JFrog's example gives 3.48 GB of binaries
+			// for 59.77 GB of artifacts as 5.82%, and every capture agrees.
+			Optimization: str(percent(sum.BinariesSize, sum.ArtifactsSize)),
 		},
 		FileStoreSummary:        &fileStore,
 		RepositoriesSummaryList: &rows,
