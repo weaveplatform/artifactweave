@@ -1220,7 +1220,7 @@ type OidcIdentityMappingResponse struct {
 	// Priority Optional within this object. Evaluation order among a provider's mappings: lower numbers are tried first, starting at 1, and a mapping without a priority is tried last. When the token exchange names a project_key, mappings scoped to that project are tried before global ones whatever their numbers, and other projects' mappings are not tried; without a project_key every mapping competes on its priority alone. Equal priorities go to the mapping created first. The first mapping whose claims match the presented token produces the access token, so the most restrictive mapping should carry priority 1.
 	Priority *int `json:"priority,omitempty"`
 
-	// ProjectKey Optional within this object. Project the mapping belongs to, derived from a project role in token_spec.scope. Set by the server.
+	// ProjectKey Optional within this object. Project the mapping belongs to, derived from the project roles in token_spec.scope, which name one project at most. Set by the server.
 	ProjectKey *string `json:"project_key,omitempty"`
 
 	// TokenSpec Optional within this object. Shape of the access token issued when this mapping matches.
@@ -3521,7 +3521,7 @@ type ClientInterface interface {
 
 	// CreateOidcIdentityMappingWithBody Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3530,7 +3530,7 @@ type ClientInterface interface {
 
 	// CreateOidcIdentityMapping Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -3553,7 +3553,7 @@ type ClientInterface interface {
 
 	// UpdateOidcIdentityMappingWithBody Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3562,7 +3562,7 @@ type ClientInterface interface {
 
 	// UpdateOidcIdentityMapping Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -5896,7 +5896,7 @@ func (c *Client) GetOidcIdentityMappings(ctx context.Context, providerName strin
 
 // CreateOidcIdentityMappingWithBody Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5915,7 +5915,7 @@ func (c *Client) CreateOidcIdentityMappingWithBody(ctx context.Context, provider
 
 // CreateOidcIdentityMapping Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -5968,7 +5968,7 @@ func (c *Client) GetOidcIdentityMappingByName(ctx context.Context, providerName 
 
 // UpdateOidcIdentityMappingWithBody Replace an identity mapping
 //
-// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5987,7 +5987,7 @@ func (c *Client) UpdateOidcIdentityMappingWithBody(ctx context.Context, provider
 
 // UpdateOidcIdentityMapping Replace an identity mapping
 //
-// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -15588,7 +15588,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOidcIdentityMappingWithBodyWithResponse Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15597,7 +15597,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateOidcIdentityMappingWithResponse Create an identity mapping
 	//
-	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+	// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15624,7 +15624,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateOidcIdentityMappingWithBodyWithResponse Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15633,7 +15633,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateOidcIdentityMappingWithResponse Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27245,7 +27245,7 @@ func (c *ClientWithResponses) GetOidcIdentityMappingsWithResponse(ctx context.Co
 
 // CreateOidcIdentityMappingWithBodyWithResponse Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27260,7 +27260,7 @@ func (c *ClientWithResponses) CreateOidcIdentityMappingWithBodyWithResponse(ctx 
 
 // CreateOidcIdentityMappingWithResponse Create an identity mapping
 //
-// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. Requires a platform admin.
+// Adds a rule to a provider: when a presented ID token carries every claim in claims, the exchange issues a token described by token_spec. Answers 200 with the stored mapping, including the project_key derived from its scope. A scope that names project roles in more than one project is refused with 400. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27305,7 +27305,7 @@ func (c *ClientWithResponses) GetOidcIdentityMappingByNameWithResponse(ctx conte
 
 // UpdateOidcIdentityMappingWithBodyWithResponse Replace an identity mapping
 //
-// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27320,7 +27320,7 @@ func (c *ClientWithResponses) UpdateOidcIdentityMappingWithBodyWithResponse(ctx 
 
 // UpdateOidcIdentityMappingWithResponse Replace an identity mapping
 //
-// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400, as is a scope that names project roles in more than one project. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //

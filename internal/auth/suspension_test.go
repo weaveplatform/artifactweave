@@ -45,6 +45,25 @@ func TestSuspensionDelay(t *testing.T) {
 	}
 }
 
+// TestSuspendedForMessage pins the 403's text to the REST body 7.x answers,
+// "seconds" plural even for one (RTFACT-29934, RTFACT-26575), with the wait
+// rounded up so a client never retries early.
+func TestSuspendedForMessage(t *testing.T) {
+	const prefix = "This request is blocked due to recurrent login failures, please try again in "
+	for d, want := range map[time.Duration]string{
+		time.Millisecond:        "1 seconds",
+		time.Second:             "1 seconds",
+		1500 * time.Millisecond: "2 seconds",
+		4 * time.Second:         "4 seconds",
+		time.Minute:             "60 seconds",
+	} {
+		var e *apierror.Error
+		if err := suspendedFor(d); !errors.As(err, &e) || e.Message != prefix+want {
+			t.Errorf("%v: %v, want %q", d, err, prefix+want)
+		}
+	}
+}
+
 func with(s types.AccessLockSettings, f func(*types.AccessLockSettings)) types.AccessLockSettings {
 	f(&s)
 	return s
@@ -62,7 +81,7 @@ func suspendedWait(t *testing.T, err error) int {
 	var secs int
 	if _, err := fmt.Sscanf(
 		e.Message,
-		"This request is blocked due to recurrent request failures, please try again in %d second(s)",
+		"This request is blocked due to recurrent login failures, please try again in %d seconds",
 		&secs,
 	); err != nil {
 		t.Fatalf("message %q: %v", e.Message, err)

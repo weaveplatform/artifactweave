@@ -68,6 +68,14 @@ the result of every other test in it
 holds for the rest of the test binary, so later tests do not wait again. On the Linux
 runners the engine answers at once and the tests run.
 
+The `@docker` and client scenarios drive the `docker` command itself, so their step "the
+Docker daemon can reach the registry" runs `docker info` instead, under the same 5-second
+deadline. A `docker info` that does not answer in time is killed, and those scenarios skip
+with "docker info did not answer within 5s" in the log rather than hanging until the job's
+timeout ([#497](https://github.com/weaveplatform/artifactweave/issues/497)). As with
+`CheckLinux`, the first answer holds for the whole acceptance run. `TestDockerInfo` checks the
+probe against stand-ins that hang, fail and answer.
+
 The cross-cloud blob mirror scenario (`TestCrossCloud` in `pkg/blob/mirror`) is one of
 those unit suites. It runs MinIO, fake-gcs-server and Azurite side by side in the Linux
 unit job and skips on macOS and Windows; the emulator images are pinned in

@@ -230,7 +230,10 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   platform UI asks a project mapping for its roles alone. "The project scope of an identity
   mapping can't be changed after creation", and "Attempting to change the project key
   returns `400 Bad Request`", so an update whose scope implies another project, none for a
-  project's mapping, or one for a global mapping answers 400 (#476).
+  project's mapping, or one for a global mapping answers 400 (#476). "Only one project key is
+  allowed per mapping", so a create or update whose scope names project roles in two
+  projects answers 400 rather than filing the mapping under one of them (#493). Several roles
+  entries in one project are one project key and are accepted.
 - **Patterns** ("Dynamic Mapping" and "Advanced Dynamic Mappings"). `username_pattern`,
   `groups_pattern` and `resource_pattern` name one claim as `{{claim}}`, followed by at
   most 15 more parts separated by `|`.
@@ -402,9 +405,20 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
 - **The temporary login suspension** (`internal/auth/suspension.go`, #408) is the second
   defence, independent of the lock. From the second failed Basic login in a row for a user
   name (`maxLoginDelayIncorrectAttempts`), every Basic login with that name answers `403`
-  "This request is blocked due to recurrent request failures, please try again in N
-  second(s)" for `baseLoginDelayMillis` (1000), the right password included; each later
-  failure doubles the delay up to `maxLoginDelayMillis` (60000).
+  "This request is blocked due to recurrent login failures, please try again in N seconds"
+  for `baseLoginDelayMillis` (1000), the right password included; each later failure
+  doubles the delay up to `maxLoginDelayMillis` (60000).
+  - The message is the REST body 7.x answers (#493). 7.61.1 answers
+    `{"errors":[{"status":403,"message":"This request is blocked due to recurrent login
+    failures, please try again in 4 seconds"}]}` (**[J]**
+    [RTFACT-29934](https://jfrog.atlassian.net/browse/RTFACT-29934)), and 7.27.6 the same
+    with "1 seconds", plural for one second too (**[J]**
+    [RTFACT-26575](https://jfrog.atlassian.net/browse/RTFACT-26575)). N is the time left,
+    rounded up to whole seconds. The KB's "recurrent request failures, please try again in N
+    second(s)" is the log line, not the body. From 7.98 the suspension runs in Access
+    ([7.98.7 self-managed release notes](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7987-self-managed)),
+    and that Access kept the body's wording is **[I]**
+    ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
   - The check runs after the lock and before any password is hashed, and an unknown name is
     suspended alike, so the `403` says nothing about which names exist.
   - Attempts refused while suspended are not counted, toward the suspension or the lock, so
@@ -637,9 +651,13 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
   "Temporary Login Suspension";
   [supported Access configurations](https://docs.jfrog.com/installation/docs/supported-access-configurations)).
   artifactweave matches both (**Account policies** above,
-  [#408](https://github.com/weaveplatform/artifactweave/issues/408)). The doubling, the day
-  after which failures are forgotten, the 403's message and leaving tokens alone are
-  inferred, and on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+  [#408](https://github.com/weaveplatform/artifactweave/issues/408)), and its 403 carries the
+  REST body's wording, "recurrent login failures, please try again in N seconds" (**[J]**
+  [RTFACT-29934](https://jfrog.atlassian.net/browse/RTFACT-29934) on 7.61.1;
+  [#493](https://github.com/weaveplatform/artifactweave/issues/493)). The doubling, the day
+  after which failures are forgotten, that the wording outlived the move into Access in 7.98,
+  and leaving tokens alone are inferred, and on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - A locked account is refused whatever password it sends, its lock checked before the
   password (**Account policies** above;
   **[J]** [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453);
@@ -677,13 +695,18 @@ These match 7.x since [#409](https://github.com/weaveplatform/artifactweave/issu
 - With no `project_key`, "all identity mappings compete equally based on priority and
   creation time", a project's mappings included ("Identity Mappings").
 
-These match 7.x since [#476](https://github.com/weaveplatform/artifactweave/issues/476)
+These match 7.x since [#476](https://github.com/weaveplatform/artifactweave/issues/476) and
+[#493](https://github.com/weaveplatform/artifactweave/issues/493)
 ([manage project-scoped identity mappings](https://docs.jfrog.com/administration/docs/manage-project-scoped-identity-mappings)):
 - A project roles mapping may leave out `username`, as the jfrog/platform provider's
   documented example does, and its token is the synthetic subject's ("If you need strict
   group-scoped permissions, leave the Username field blank").
 - An update may not change a mapping's project: "Attempting to change the project key
   returns `400 Bad Request`". The page gives no message; artifactweave's is its own.
+- A mapping's scope names project roles in one project at most: "Only one project key is
+  allowed per mapping" (#493). The page gives neither a status nor a message for a scope
+  naming two; the `400`, the one it gives for a changed project key, is **[I]**, and the
+  message is artifactweave's own.
 
 Two choices go further than the page. First, the resource scope's entries narrow the user's
 and groups' permissions, as every artifact entry does here
@@ -703,6 +726,7 @@ source states are inferred and listed on
   literal text, and `$1_$2` read as Java reads it;
 - the table's "User" being the `username` field or an `applied-permissions/user` scope;
 - another project's mappings not being tried when the request names a project;
+- the `400` for a scope that names project roles in two projects;
 - the bounds on claims and patterns, and the refusal of over-broad resource claims;
 - the synthetic subject's form, `oidc-<provider>-<mapping>`, for a project roles mapping as for
   a groups one. The JFrog CLI reads a token subject without `/users/` as the user name
@@ -733,7 +757,13 @@ source states are inferred and listed on
   `TestLockout`, and the status table's `locked` rows before and after the unlock.
 - OIDC projects (#476): `TestProjectRolesWithoutUser`, `TestMappings`, the status table's
   `project-roles` rows, and `oidc.feature`'s project roles mapping in the provider example's
-  shape.
+  shape. One project per mapping (#493): `TestMappingNamesOneProject` and the status table's
+  create and update rows whose scope names two projects.
+- The login suspension's body (#493): `TestSuspendedForMessage` pins the text, and
+  `TestLoginSuspension` reads it on both surfaces.
+  `TestAccessLockPolicyIsTheArtifactoryPolicies` and `TestLockout` run with the suspension
+  off and check each answer's message, so the suspension's `403` cannot pass for the lock's
+  however fast the logins come.
 - Token creation with a password: `TestAccessTokenWithPassword`, the status table and the
   route by principal matrix at the default, and `basic_auth_tokens.feature`, where the Access
   route refuses the password, the legacy route and `jf c add` with a password still work, and

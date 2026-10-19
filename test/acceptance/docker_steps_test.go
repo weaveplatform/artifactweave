@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,9 +15,13 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
+	"testing"
 	"time"
 
 	"github.com/cucumber/godog"
+
+	"github.com/weaveplatform/artifactweave/pkg/containertest"
 )
 
 // The registry's real clients (decision 0015): the runner's docker, whose
@@ -49,10 +54,60 @@ func (w *world) registerDocker(sc *godog.ScenarioContext) {
 // host: Docker Desktop's runs in a VM, where 127.0.0.1 is not the
 // binary's, so only Linux qualifies.
 func (w *world) dockerReachable() error {
-	if runtime.GOOS != "linux" || exec.Command("docker", "info").Run() != nil {
+	if runtime.GOOS != "linux" {
+		return godog.ErrSkip
+	}
+	if err := dockerAnswers(); err != nil {
+		w.t.Logf("skipping: %v", err)
 		return godog.ErrSkip
 	}
 	return nil
+}
+
+var (
+	dockerOnce sync.Once
+	dockerErr  error
+)
+
+// dockerAnswers asks the docker client for the engine's info once per
+// test binary, as containertest.CheckLinux asks the API: every @docker and
+// client scenario probes, and an engine that did not answer the first
+// would only make each of them wait out the deadline again.
+func dockerAnswers() error {
+	dockerOnce.Do(func() {
+		dockerErr = dockerInfo(context.Background(), "docker", containertest.AnswerTimeout)
+	})
+	return dockerErr
+}
+
+// dockerInfo runs docker info and returns why it failed, or that it did
+// not answer within timeout. Without the deadline an engine that accepts
+// connections and never answers, as Docker Desktop's can (#458), held
+// every Docker scenario until the job's timeout (#497).
+func dockerInfo(ctx context.Context, docker string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, docker, "info")
+	// docker info runs its CLI plugins for their metadata, and a plugin
+	// left running would keep the output pipe open after docker itself is
+	// killed, so Wait gives up on the pipe a second later.
+	cmd.WaitDelay = time.Second
+	out, err := cmd.CombinedOutput()
+	switch {
+	case err == nil:
+		return nil
+	case ctx.Err() != nil:
+		return fmt.Errorf("%s info did not answer within %s", docker, timeout)
+	default:
+		return fmt.Errorf("%s info: %w: %s", docker, err, firstLine(out))
+	}
+}
+
+// firstLine is the first line of a command's output, which for docker info
+// names the reason, such as the daemon socket it could not reach.
+func firstLine(out []byte) string {
+	line, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+	return line
 }
 
 // dockerLogin runs docker login against the binary, the password on stdin.
@@ -225,4 +280,53 @@ func (w *world) writeLayer(name, entry, content string) error {
 // jf rt build-docker-create reads.
 func (w *world) writeExpandedFile(name string, content *godog.DocString) error {
 	return w.writeFile(name, &godog.DocString{Content: w.expand(content.Content)})
+}
+
+// TestDockerInfo checks the probe against stand-ins for the docker client:
+// an engine that never answers costs the deadline and reads as unreachable,
+// even when a plugin it started holds the output open past it (#497); one
+// that fails says why; one that answers is reachable.
+func TestDockerInfo(t *testing.T) {
+	dir := t.TempDir()
+	fake := func(name, script string) string {
+		t.Helper()
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("#!/bin/sh\n"+script+"\n"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	// The stand-ins that hang get a short deadline and outlast the bound
+	// checked below, so only the deadline, and WaitDelay for the pipe, can
+	// end them in time. The others get the real one: starting a fresh
+	// script can itself take a few hundred milliseconds on macOS.
+	const short = 300 * time.Millisecond
+	for name, c := range map[string]struct {
+		script  string
+		timeout time.Duration
+		want    string
+	}{
+		"never-answers": {"exec sleep 10", short, "did not answer within 300ms"},
+		// The background sleep stands for a plugin that outlives docker:
+		// it holds the output open after docker is killed.
+		"plugin-holds-output": {"sleep 10 &\nexec sleep 10", short, "did not answer within 300ms"},
+		"daemon-down": {
+			"echo 'Cannot connect to the Docker daemon at unix:///x.sock.' >&2\nexit 1",
+			containertest.AnswerTimeout,
+			"exit status 1: Cannot connect to the Docker daemon at unix:///x.sock.",
+		},
+		"answers": {"echo 'Server Version: 28.0.0'", containertest.AnswerTimeout, ""},
+	} {
+		start := time.Now()
+		err := dockerInfo(context.Background(), fake(name, c.script), c.timeout)
+		took := time.Since(start)
+		switch {
+		case c.want == "" && err != nil:
+			t.Errorf("%s: %v", name, err)
+		case c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)):
+			t.Errorf("%s: %v, want %q", name, err, c.want)
+		case took > 5*time.Second:
+			t.Errorf("%s: took %s, past the deadline and the pipe's grace", name, took)
+		}
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"regexp"
 	"slices"
 	"strings"
@@ -514,16 +515,25 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 		t.Fatalf("Artifactory expiration policy: %q", got)
 	}
 
-	// The limit set through Access locks a user after two failures.
-	probe := func(password string) int {
-		return do(t, h, http.MethodGet, secAPIKey, basic("user", password), "").Code
+	// The limit set through Access locks a user after two failures. The
+	// login suspension, which answers 403 too for a second from the second
+	// failure, is off: the write above stored clientLoginSuspensionEnabled
+	// false, as its omission means. Each answer is still checked for what
+	// it says, so the suspension's 403 can never pass for the lock's, however
+	// fast the probes come (#493).
+	probe := func(password string) *httptest.ResponseRecorder {
+		return do(t, h, http.MethodGet, secAPIKey, basic("user", password), "")
 	}
 	for range 2 {
-		probe("wrong")
+		if rec := probe("wrong"); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("a wrong password: %d %s", rec.Code, rec.Body)
+		}
 	}
-	// A locked account answers 403, the right password included (#475).
-	if code := probe("pw"); code != http.StatusForbidden {
-		t.Fatalf("the Access limit did not lock: %d", code)
+	// A locked account answers 403 with its own message, the right password
+	// included (#475).
+	if rec := probe("pw"); rec.Code != http.StatusForbidden ||
+		!strings.Contains(rec.Body.String(), `User is Locked.\nContact System Administrator`) {
+		t.Fatalf("the Access limit did not lock: %d %s", rec.Code, rec.Body)
 	}
 
 	// Through Artifactory, read through Access; the other fields stay.
@@ -537,13 +547,15 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 		t.Fatalf("Access after Artifactory writes: %q", got)
 	}
 
-	// attempts 0 turns locking off, unlocks, and keeps the limit.
+	// attempts 0 turns locking off, unlocks, and keeps the limit. The
+	// suspension stays off, so the right password signs in at once after
+	// the failures above.
 	write(accessLock, `{}`)
 	if got := read(secLockPol); got != "{\"enabled\":false,\"loginAttempts\":7}\n" {
 		t.Fatalf("Artifactory after attempts 0: %q", got)
 	}
-	if code := probe("pw"); code != http.StatusNotFound {
-		t.Fatalf("turning locking off left the lock: %d", code)
+	if rec := probe("pw"); rec.Code != http.StatusNotFound {
+		t.Fatalf("turning locking off left the lock: %d %s", rec.Code, rec.Body)
 	}
 }
 
@@ -552,7 +564,9 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 // either surface, the right password included. A name that does not exist
 // is suspended alike, and an access token of the suspended user still
 // works. The base delay is raised from its default second so that a slow
-// run cannot outlast it; internal/auth checks the delays themselves.
+// run cannot outlast it, and the wait read back may have fallen by up to
+// nine seconds, so a loaded -race run does not fail on the clock;
+// internal/auth checks the delays themselves against a fake one.
 func TestLoginSuspension(t *testing.T) {
 	h := statusFixture(t, false)
 	if rec := do(t, h, http.MethodPut, "/access/api/v1/config/security/user_lock_policy",
@@ -570,8 +584,8 @@ func TestLoginSuspension(t *testing.T) {
 	if rec.Code != http.StatusOK || tok == "" {
 		t.Fatalf("token: %d %s", rec.Code, rec.Body)
 	}
-	const message = `"message":"This request is blocked due to recurrent request failures, ` +
-		`please try again in (30|29) second\(s\)"`
+	const message = `"message":"This request is blocked due to recurrent login failures, ` +
+		`please try again in (30|2[1-9]) seconds"`
 	suspended := map[string]*regexp.Regexp{
 		secAPIKey: regexp.MustCompile(
 			`^\{"errors":\[\{` + message + `,"status":403\}\]\}\n$`,

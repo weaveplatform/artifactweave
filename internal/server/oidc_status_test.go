@@ -163,6 +163,15 @@ func oidcStatusRows() []statusCase {
 			`{"name":"project-roles","token_spec":{"scope":"applied-permissions/roles:p1:Developer"}}`,
 			200,
 		},
+		// Only one project key is allowed per mapping (#493).
+		{
+			mapNew,
+			base + "/ci/identity_mappings",
+			"admin",
+			`{"name":"two-projects","token_spec":{"scope":` +
+				`"applied-permissions/roles:p1:Developer applied-permissions/roles:p2:Viewer"}}`,
+			400,
+		},
 		{mapNew, base + "/ci/identity_mappings", "admin", `{"name":"x"}`, 400},
 		{mapNew, base + "/ci/identity_mappings", "admin", "", 400},
 		{mapNew, base + "/ci/identity_mappings", "user", readers, 403},
@@ -208,6 +217,14 @@ func oidcStatusRows() []statusCase {
 			base + "/ci/identity_mappings/project-roles",
 			"admin",
 			`{"token_spec":{"scope":"applied-permissions/roles:p2:Viewer"}}`,
+			400,
+		},
+		{
+			mapPut,
+			base + "/ci/identity_mappings/project-roles",
+			"admin",
+			`{"token_spec":{"scope":` +
+				`"applied-permissions/roles:p1:Viewer applied-permissions/roles:p2:Viewer"}}`,
 			400,
 		},
 		{
