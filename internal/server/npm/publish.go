@@ -92,7 +92,7 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 			"You cannot publish over the previously published versions: %s.", t.Version))
 	}
 	if _, err := h.k.StoreNew(r, npmfmt.CanonicalPath(t.Name, t.Version), b.info,
-		v.props(t.Version), exists); err != nil {
+		v.props(t.Version), v.declared, exists); err != nil {
 		h.k.Error(w, r, err)
 		return
 	}
@@ -100,10 +100,11 @@ func (h handler) publish(w http.ResponseWriter, r *http.Request, name string) {
 }
 
 // published is the version a publish body names, with the dist-tags it
-// gives that version.
+// gives that version and the tarball checksums its dist declares.
 type published struct {
-	number string
-	tags   map[string]string
+	number   string
+	tags     map[string]string
+	declared types.Checksums
 }
 
 // version checks the body's shape and its tarball attachment against the
@@ -137,9 +138,11 @@ func (b publishBody) version(name string) (published, error) {
 	for number, m := range versions {
 		p.number, manifest = number, m
 	}
-	if err := checkDist(manifest, b.info.Digests); err != nil {
+	declared, err := checkDist(manifest, b.info.Digests)
+	if err != nil {
 		return published{}, err
 	}
+	p.declared = declared
 	var tags map[string]json.RawMessage
 	_ = json.Unmarshal(b.fields["dist-tags"], &tags)
 	p.tags = map[string]string{}
@@ -175,8 +178,11 @@ func (p published) props(version string) types.Properties {
 // checkDist checks the version manifest's dist.shasum, and each hash in
 // dist.integrity of an algorithm the blob store computes, against the
 // stored tarball's digests. npm sends both; a hash of another algorithm,
-// such as sha384, cannot be checked and is not.
-func checkDist(manifest json.RawMessage, d blob.Digests) error {
+// such as sha384, cannot be checked and is not. It returns the checksums
+// the client declared, which the tarball records as its originals, as 7.x
+// records dist.shasum since 7.31.10 (RTFACT-14280): under client-checksums
+// they are what the tarball's checksum files serve.
+func checkDist(manifest json.RawMessage, d blob.Digests) (types.Checksums, error) {
 	var doc struct {
 		Dist struct {
 			Shasum    string `json:"shasum"`
@@ -184,26 +190,40 @@ func checkDist(manifest json.RawMessage, d blob.Digests) error {
 		} `json:"dist"`
 	}
 	if json.Unmarshal(manifest, &doc) != nil {
-		return badRequest("the version's manifest is not an object whose dist is an object")
+		return types.Checksums{}, badRequest(
+			"the version's manifest is not an object whose dist is an object")
 	}
-	if s := doc.Dist.Shasum; s != "" && !strings.EqualFold(s, d.SHA1) {
-		return badRequest(fmt.Sprintf("dist.shasum %s is not the tarball's SHA-1 %s", s, d.SHA1))
+	var declared types.Checksums
+	if s := doc.Dist.Shasum; s != "" {
+		if !strings.EqualFold(s, d.SHA1) {
+			return types.Checksums{}, badRequest(
+				fmt.Sprintf("dist.shasum %s is not the tarball's SHA-1 %s", s, d.SHA1))
+		}
+		declared.SHA1 = d.SHA1
 	}
-	computed := map[string]string{"sha512": d.SHA512, "sha256": d.SHA256, "sha1": d.SHA1}
+	computed := map[string]struct {
+		digest   string
+		declared *string
+	}{
+		"sha512": {d.SHA512, &declared.SHA512},
+		"sha256": {d.SHA256, &declared.SHA256},
+		"sha1":   {d.SHA1, &declared.SHA1},
+	}
 	for _, sri := range strings.Fields(doc.Dist.Integrity) {
 		alg, value, _ := strings.Cut(sri, "-")
-		digest, ok := computed[alg]
+		c, ok := computed[alg]
 		if !ok {
 			continue
 		}
 		value, _, _ = strings.Cut(value, "?")
 		got, err := base64.StdEncoding.DecodeString(value)
-		want, _ := hex.DecodeString(digest)
+		want, _ := hex.DecodeString(c.digest)
 		if err != nil || !bytes.Equal(got, want) {
-			return badRequest(
+			return types.Checksums{}, badRequest(
 				fmt.Sprintf("dist.integrity's %s hash does not match the tarball", alg),
 			)
 		}
+		*c.declared = c.digest
 	}
-	return nil
+	return declared, nil
 }

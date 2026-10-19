@@ -45,6 +45,15 @@ func TestMavenMetadataRebuiltOnRead(t *testing.T) {
 	if got := meta.Header().Get("X-Checksum-Sha1"); got == "" || got != rec.Body.String() {
 		t.Errorf("checksum %q, header %q", rec.Body, got)
 	}
+	// The metadata's checksums are the server's under client-checksums too:
+	// Maven's upload of one is dropped, and the computed one is served.
+	wantStatus(t, w.do("PUT", base+"maven-metadata.xml.md5", "admin", strings.Repeat("0", 32)),
+		http.StatusOK)
+	rec = w.do("GET", base+"maven-metadata.xml.md5", "admin", "")
+	wantStatus(t, rec, http.StatusOK)
+	if got := meta.Header().Get("X-Checksum-Md5"); got == "" || got != rec.Body.String() {
+		t.Errorf("md5 %q, header %q", rec.Body, got)
+	}
 	if body := w.do("GET", base+"maven-metadata.xml", "admin", "").Body.String(); !strings.Contains(
 		body, "<version>1.1</version>",
 	) {

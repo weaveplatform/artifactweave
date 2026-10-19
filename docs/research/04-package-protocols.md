@@ -222,7 +222,9 @@ extension, not Artifactory behaviour (a deviation registered by #378; **[J]**
 to add SHA-512 for generic files). `checksumPolicyType` decides whether a
 mismatch between the client's sidecar and the computed value is rejected
 (`client-checksums`) or replaced (`server-generated-checksums`). Sidecars are served from
-metadata and are not items.
+metadata and are not items. Under `client-checksums` a sidecar serves the client's value, and
+answers 404 while the client has sent none
+([research 27 section 4](27-maven.md#4-checksums)).
 
 ### Generated metadata
 

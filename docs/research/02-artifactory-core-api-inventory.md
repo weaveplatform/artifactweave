@@ -137,7 +137,12 @@ access rule and their evidence are in
 [research 15, section 2.2](15-data-model.md#22-item-artifactory-artifacts-storage-api).
 
 Checksum sidecars `.sha1`, `.md5` and `.sha256` are served next to every artifact and are
-not items themselves. artifactweave also serves `.sha512`, which is its own extension (a
+not items themselves. Under `client-checksums` a sidecar serves the client's checksum, and
+answers 404 while the client has sent none; every deploy records the SHA-256 as the client's,
+so the `.sha256` file is always served. Under `server-generated-checksums`, and for
+`maven-metadata.xml`, a sidecar serves the computed checksum
+([#399](https://github.com/weaveplatform/artifactweave/issues/399), the 7.x check below).
+artifactweave also serves `.sha512`, which is its own extension (a
 deviation registered by #378). No 7.x page or release note documents SHA-512 for generic or
 Maven files, and an open request asks JFrog to add it for generic files
 (**[J]** [RTFACT-30948](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30948)). With
@@ -153,10 +158,17 @@ provider's acceptance tests. The rows hold for 7.x with the corrections made in 
 checksum deploy matches 7.x: it reuses stored content only for a caller that can read an
 existing artifact with that checksum, and answers 404 otherwise
 ([#379](https://github.com/weaveplatform/artifactweave/issues/379)).
-artifactweave differs from 7.x in these places:
-
-- 7.x differs: under `client-checksums`, `GET <file>.sha1` or `.md5` serves the client's checksum, and answers 404 while the client has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories), modified 2026-10-11); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
-- 7.x differs: every deploy records the SHA-256 as an original checksum, including when the client sent none (**[KB]** the same article). Since [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) (RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not publish a checksum value"; fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+Checksum sidecars match 7.x
+([#399](https://github.com/weaveplatform/artifactweave/issues/399)). Under `client-checksums`,
+`GET <file>.sha1` or `.md5` serves the client's checksum, and answers 404 while the client
+has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories),
+modified 2026-10-11). Every deploy records the SHA-256 as an original checksum, including when
+the client sent none (**[KB]** the same article), and a checksum deploy records all the
+checksums of the content it reuses: since
+[7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)
+(RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not
+publish a checksum value". The 404's message, "Checksum not found for <path>", is 6.20's
+(`DownloadServiceImpl.respondForChecksumRequest`) **[I]**.
 
 Settled since the audit:
 - The storage summary reads as 7.x's ([#390](https://github.com/weaveplatform/artifactweave/issues/390)). An administrator or a token scoped `system:info/storage:r` reads it ([getstoragesummaryinfo](https://docs.jfrog.com/artifactory/reference/getstoragesummaryinfo.md); [7.117.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71175-self-managed)). Each row carries `usedSpaceInBytes` and `projectKey` (**[S]** jfrog-client-go's live `storageInfoTest`; jfrog-cli-core `artifactory/utils/storageinfo.go` reads `usedSpaceInBytes` first), and `packageType` is the display name. Sizes keep two decimals and group thousands, a share of nothing is `N/A`, an `auto-trashcan` row counts the trash can, the TOTAL row has no `packageType`, `percentage` or `projectKey`, and `storageType` names the binary provider template. [Research 15, section 2.2](15-data-model.md#22-item-artifactory-artifacts-storage-api) has the captures behind each, and what stays **[I]**.

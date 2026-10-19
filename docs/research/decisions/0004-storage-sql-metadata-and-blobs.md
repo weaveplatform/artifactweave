@@ -100,10 +100,25 @@ contract:
 **Checksum sidecars.** `.sha1`, `.md5`, `.sha256` and `.sha512` files are never stored.
 Artifactory's file info names only `sha1`, `md5` and `sha256`, so SHA-512 reaches clients
 as a `.sha512` file and nowhere else in the REST API.
-GET and HEAD serve them from item metadata. PUT validates the client value against the
+GET and HEAD serve them from item metadata, choosing the value as Artifactory's
+`LocalRepoChecksumPolicy.getChecksum` does (**[S]** 6.20). Under `client-checksums` a sidecar
+serves the client's checksum (`original_*`), and answers 404 "Checksum not found for
+<path>" while the client has sent none. Under `server-generated-checksums`, for a file named
+`maven-metadata.xml` in any repository, and in a remote cache, it serves the computed one.
+PUT validates the client value against the
 artifact per the repository's `checksumPolicyType`: `client-checksums` rejects a mismatch
 and records the client value as `original_*`; `server-generated-checksums` records and
-ignores. Mismatches feed the bad-checksum search.
+ignores. Mismatches feed the bad-checksum search. A PUT of the right value is how a client
+fixes a missing checksum, after which the sidecar answers 200.
+Every deploy records the SHA-256 as the client's when the client declared none, so a
+`.sha256` file is always served. A checksum deploy records every checksum of the content it
+reuses as the client's, as 6.20 trusts them (`UploadServiceUtils.setFileInfoChecksums`).
+So does a file the server writes itself, with no other client to send its checksums: a
+build-info document, a registry's finished upload, manifest and linked layers, and Maven
+metadata. 6.20 trusts the server's checksums on its own writes
+(`InternalArtifactoryRequest.isTrustServerChecksums`). An npm publish records the
+tarball's `dist.shasum` and the `dist.integrity` hashes it checks as the client's, as 7.x
+does since 7.31.10 (**[J]** RTFACT-14280).
 Serving and checking `.sha512` files is an artifactweave extension, a deviation registered
 by #378. No 7.x page or release note documents SHA-512 for generic or Maven files, and an
 open request asks JFrog to add it for generic files
@@ -172,13 +187,30 @@ checksum deploys ([known issues](https://docs.jfrog.com/releases/docs/artifactor
 `deploy.enforce_permission_check_on_identical_checksum_deploy`
 ([#400](https://github.com/weaveplatform/artifactweave/issues/400)). Content addressing
 makes the check cheap and exact: the item service compares the SHA-256 of the content it
-stores with the file's, so a declaration that the bytes do not bear out replaces nothing. The audit of P1 to P7
-([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found these differences
-in the deploy and checksum paths, which
-[research 02](../02-artifactory-core-api-inventory.md#artifactory-7x-check) lists with the
-rest of the storage API:
-- 7.x differs: under `client-checksums`, a `.sha1` or `.md5` file serves the client's checksum, and answers 404 while the client has sent none (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories)); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
-- 7.x differs: every deploy records the SHA-256 as an original checksum, including when the client sent none (**[KB]** the same article). Since [7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed) (RTDEV-80481), a checksum deploy that sends only a SHA-256 no longer reports "Client did not publish a checksum value"; fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
+stores with the file's, so a declaration that the bytes do not bear out replaces nothing.
+Checksum files follow the repository's policy as 7.x serves them
+([#399](https://github.com/weaveplatform/artifactweave/issues/399)). Under `client-checksums`
+a `.sha1` or `.md5` file serves the client's checksum, and "if a checksum is not provided,
+and you do not address the problem by using 'Fix Checksum,' ... Artifactory will return a
+404" (**[KB]** [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories),
+modified 2026-10-11; **[D]** [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md)).
+Every deploy records the SHA-256 as an original checksum, "even if you did not explicitly
+send checksum on file deployment" (**[KB]** the same article), so the `.sha256` file is
+always there. Since
+[7.161.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-716115-self-managed)
+(RTDEV-80481) a checksum deploy that sends only a SHA-256 no longer reports "Client did not
+publish a checksum value"; here a checksum deploy records all the content's checksums. Fix
+Checksum is an action of the web UI (**[KB]** the same article), and no REST operation for
+it is documented; a PUT of the checksum file fixes a missing checksum here. Six points are
+**[I]**:
+- the 404 message, which is 6.20's;
+- that a `.sha512` file follows the same rule as `.sha1` (DV-073);
+- that the original SHA-256 is the declared one when a client declared a different one
+  under `server-generated-checksums`;
+- that 7.x still records the computed checksums as the originals of the files it writes
+  itself, as 6.20 does;
+- that 7.x records an npm tarball's `dist.integrity` SHA-512 as well as its SHA-1;
+- that an exploded archive's entries have only the SHA-256 as an original.
 
 ## Constraints
 

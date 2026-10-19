@@ -26,6 +26,18 @@ Feature: Deploy and download generic artifacts
     And I GET "/artifactory/generic-local/dir/hello.txt" as admin
     Then the response status is 206
     And the response body is "artifactweave"
+    # Under client-checksums a checksum file serves the client's checksum.
+    # The deploy sent none, so there is no SHA-1 file until the client sends
+    # one; every deploy records its SHA-256 as the client's.
+    When I GET "/artifactory/generic-local/dir/hello.txt.sha1" as admin
+    Then the response status is 404
+    When I GET "/artifactory/generic-local/dir/hello.txt.sha256" as admin
+    Then the response body is "9bd2c7af5be7e200a79e1363c398c575bce0ba8f441554007716beff1b80bb96"
+    When I PUT "/artifactory/generic-local/dir/hello.txt.sha1" as admin with body:
+      """
+      afe5052f1ac78ab0db1811ea8aa0107e0e186371
+      """
+    Then the response status is 201
     When I GET "/artifactory/generic-local/dir/hello.txt.sha1" as admin
     Then the response body is "afe5052f1ac78ab0db1811ea8aa0107e0e186371"
     When the next request has header "X-Checksum-Deploy" "true"
@@ -34,6 +46,9 @@ Feature: Deploy and download generic artifacts
     Then the response status is 201
     When I GET "/artifactory/generic-local/copy/hello.txt" as admin
     Then the response body is "hello artifactweave"
+    # A checksum deploy records every checksum of the content it found.
+    When I GET "/artifactory/generic-local/copy/hello.txt.md5" as admin
+    Then the response body is "229a080252f8a6a86e46a92528d6ac9d"
     When I DELETE "/artifactory/generic-local/dir/hello.txt" as admin
     Then the response status is 204
     When I GET "/artifactory/generic-local/dir/hello.txt" as admin

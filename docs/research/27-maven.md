@@ -352,6 +352,16 @@ highest in version order, whatever the upload order.
 - **[S]** Checksum headers sent with the file (`X-Checksum-Sha1`, `-Sha256`, `-Md5`) are
   recorded as client checksums; a mismatch fails the upload only under `client-checksums`
   (`UploadServiceUtils.setFileInfoChecksums`, `LocalRepoChecksumPolicy.verify`).
+- **[D] Checksum downloads.** Under `client-checksums` a GET of `<file>.sha1` or `.md5`
+  serves the client's checksum, and answers 404 while the client has sent none
+  (`local-repositories`; [KB] [Understanding Artifactory Checksum Policies](https://jfrog.com/help/r/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories/what-are-client-checksum-server-checksum-and-checksum-policy-in-local-repositories),
+  modified 2026-10-11). `mvn deploy` sends a `.sha1` and a `.md5` after each file, so its
+  files have both. The SHA-256 is recorded as the client's on every deploy, "even if you did
+  not explicitly send checksum on file deployment" ([KB] the same article), so `.sha256` is
+  always served. **[S]** Under `server-generated-checksums`, and for `maven-metadata.xml`
+  under either policy, the computed checksum is served (`LocalRepoChecksumPolicy.getChecksum`).
+  artifactweave serves sidecars this way, `.sha512` included
+  ([#399](https://github.com/weaveplatform/artifactweave/issues/399)).
 - **[S]** 6.20 knows SHA-1, MD5 and SHA-256 only (`ChecksumType`); a `.sha512` upload is an
   ordinary file there. No 7.x page or release note documents SHA-512 for Maven files, and
   **[J]** [RTFACT-30948](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30948) is an open
@@ -558,6 +568,9 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
     of its file. The 7.x documentation says only that unique names are "time-based".
 18. Whether 7.x renames the snapshot files of an exploded archive, as artifactweave does
     for every entry it stores; 6.20's archive deploy was not read.
+19. Whether 7.x still serves the computed checksum of `maven-metadata.xml` under
+    `client-checksums`, as 6.20 does, and the message of the 404 for a checksum the client
+    never sent (section 4).
 
 ## 12. Versions at the research baseline
 
@@ -581,7 +594,12 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 
 **Confirmed for 7.x:**
 - The three snapshot behaviours, and no metadata generated on a deploy under `deployer` (2.1).
-- The two checksum policies and their 404 and 409 (section 4).
+- The two checksum policies and their 404 and 409 (section 4). Under `client-checksums` a
+  GET of a sidecar the client never sent answers 404 ([D]
+  [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md):
+  "Artifactory will return a 404 (not found) error to a client trying to access that
+  checksum"), and artifactweave now does the same
+  ([#399](https://github.com/weaveplatform/artifactweave/issues/399)).
 - `handleReleases`, `handleSnapshots` and the POM consistency refusal (sections 5 and 6), now
   with its status, 409 (7.125.4).
 - `<latest>` rewritten on each deployment (3.4, 7.125.4).
@@ -617,10 +635,6 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   after a delete; JFrog staff on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651):
   "If the file is not deleted, but only the other files (jars,etc.), the re-calculation should
   be done properly on our end"); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
-- 7.x differs: under `client-checksums`, a GET of a sidecar the client never sent answers 404
-  ([D] [local-repositories](https://docs.jfrog.com/artifactory/docs/local-repositories.md):
-  "Artifactory will return a 404 (not found) error to a client trying to access that
-  checksum", section 4); fixed by [#399](https://github.com/weaveplatform/artifactweave/issues/399).
 - 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
   [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), section
   1.1); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
@@ -650,10 +664,11 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - the snapshot adapters and build numbering (2.2, 2.3);
 - when and how metadata is calculated (3.2 to 3.7);
 - the checksum upload statuses (section 4);
+- the computed checksum served for `maven-metadata.xml` under `client-checksums` (section 4);
 - the snapshot policy message (section 5);
 - the POM check's rules and the defaults table (section 6);
 - the cleanup schedule (section 7);
 - token tie-breaks (section 8);
 - the 6.20 behaviour of `calculateMetadata` (section 9).
 
-They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added, and items 17 and 18 from #280.
+They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added, items 17 and 18 from #280, and item 19 from #399.

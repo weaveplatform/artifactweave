@@ -3643,7 +3643,7 @@ type ChecksumReplicationStatus struct {
 	TrustUntil *string `json:"trustUntil,omitempty"`
 }
 
-// Checksums Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+// Checksums Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
 type Checksums struct {
 	// Md5 Optional within this object. Lowercase hex MD5 digest, 32 characters.
 	Md5 *string `json:"md5,omitempty"`
@@ -4275,7 +4275,7 @@ type FederatedRepositoryConfiguration = repo.Config
 
 // FileInfo Metadata of one file item as returned by the storage API without a mode query parameter. Timestamps are RFC 3339 with millisecond precision and a zone offset.
 type FileInfo struct {
-	// Checksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+	// Checksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
 	Checksums *Checksums `json:"checksums,omitempty"`
 
 	// Created Optional within this object. RFC 3339 time the item was first stored. For large uploads this can be later than `lastModified`.
@@ -4299,7 +4299,7 @@ type FileInfo struct {
 	// ModifiedBy Optional within this object. Username that last replaced the content.
 	ModifiedBy *string `json:"modifiedBy,omitempty"`
 
-	// OriginalChecksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+	// OriginalChecksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
 	OriginalChecksums *Checksums `json:"originalChecksums,omitempty"`
 
 	// Path Optional within this object. Item path relative to the repository root, always with a leading `/`. AQL reports the same item without the slash and with `.` for the root.
@@ -4536,7 +4536,7 @@ type Issues struct {
 
 // ItemCreated Body returned with 201 after a deploy. It is `FileInfo` without the modification fields because the item was just created.
 type ItemCreated struct {
-	// Checksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+	// Checksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
 	Checksums *Checksums `json:"checksums,omitempty"`
 
 	// Created Optional within this object. RFC 3339 creation time.
@@ -4551,7 +4551,7 @@ type ItemCreated struct {
 	// MimeType Optional within this object. Media type detected from the file name.
 	MimeType *string `json:"mimeType,omitempty"`
 
-	// OriginalChecksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time, so a mismatch between the two is visible to the bad-checksum search.
+	// OriginalChecksums Optional within this object. Hex digests of a file's content. `checksums` holds what the server computed; `originalChecksums` holds what the client declared at deploy time or sent as checksum files, so a mismatch between the two is visible to the bad-checksum search. The SHA-256 is always recorded, as the computed one when the client declared none. A checksum deploy records every checksum of the content it reuses. A file the server writes itself, such as a build-info document or an image manifest, records all of its computed checksums.
 	OriginalChecksums *Checksums `json:"originalChecksums,omitempty"`
 
 	// Path Optional within this object. Item path relative to the repository root with a leading `/`. A folder's ends in `/`.

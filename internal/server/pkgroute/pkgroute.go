@@ -489,7 +489,9 @@ func (k *Kit) Upload(r *http.Request, body io.Reader) (blob.Info, error) {
 func (k *Kit) Blobs() blob.Store { return k.o.Items().Blobs }
 
 // StoreNew stores content Upload committed as a new file at path in the
-// request's repository, with props, and answers exists() when path already
+// request's repository, with props and the checksums the client declared
+// as its originals, which the caller has checked against info, and answers
+// exists() when path already
 // holds an item: a file published once and never replaced, such as an npm
 // version's tarball (decision 0034). The caller needs Write on path, and
 // never Delete. The item service checks the path inside the write's
@@ -501,6 +503,7 @@ func (k *Kit) StoreNew(
 	path string,
 	info blob.Info,
 	props types.Properties,
+	declared types.Checksums,
 	exists func() error,
 ) (types.Item, error) {
 	ctx := r.Context()
@@ -511,7 +514,7 @@ func (k *Kit) StoreNew(
 	p, _ := auth.FromContext(ctx)
 	it, err := k.o.Items().DeployCommitted(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Properties: props, By: p.Name,
-		IfAbsent: true,
+		Declared: declared, IfAbsent: true,
 	}, info)
 	switch {
 	case errors.Is(err, item.ErrExists):

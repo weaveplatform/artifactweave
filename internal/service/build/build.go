@@ -688,8 +688,11 @@ func (s *Service) writeDocument(
 	by string,
 ) (types.Item, error) {
 	_, path := b.DocumentItem()
+	// The server writes the document from the run it stored, so its
+	// computed checksums are the originals.
 	it, err := s.items().Deploy(ctx, item.Deploy{
 		Target: item.Target{Repo: c, Path: path}, Body: bytes.NewReader(b.Document), By: by,
+		Trusted: true,
 	})
 	if err != nil {
 		return types.Item{}, fmt.Errorf("build: write document %s: %w", path, err)

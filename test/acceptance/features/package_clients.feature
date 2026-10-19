@@ -78,6 +78,15 @@ Feature: The npm, Go and Maven clients reach artifactweave
     When I GET "/artifactory/mvn-local/org/acme/smoke/lib/maven-metadata.xml" as admin
     Then the response status is 200
     And the response body contains "<release>1.0.0</release>"
+    # Under client-checksums a checksum file serves what the client sent:
+    # mvn sends a SHA-1 and an MD5 after each file. The metadata's are the
+    # server's own.
+    When I GET "/artifactory/mvn-local/org/acme/smoke/lib/1.0.0/lib-1.0.0.jar.sha1" as admin
+    Then the response status is 200
+    When I GET "/artifactory/mvn-local/org/acme/smoke/lib/1.0.0/lib-1.0.0.pom.md5" as admin
+    Then the response status is 200
+    When I GET "/artifactory/mvn-local/org/acme/smoke/lib/maven-metadata.xml.sha1" as admin
+    Then the response status is 200
     # A fresh local repository, chained to the cache for plugins only, so the
     # artifact can come from nowhere but artifactweave.
     When I run mvn "-s settings.xml -Dmaven.repo.local=/work/fresh -Dmaven.repo.local.tail={m2} org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -Dartifact=org.acme.smoke:lib:1.0.0 -DremoteRepositories=aw::default::{url}/mvn-local"

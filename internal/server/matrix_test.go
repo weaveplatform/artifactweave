@@ -715,6 +715,11 @@ func contentMatrix() []matrixRow {
 			holds("libs-local", "work/", write|del), 201,
 		).seeding(deployed("work/diff-cs-{p}.bin")),
 		row(get, lib+"work/get.txt", "", holds("libs-local", "work/", read), 200),
+		// Sidecars: work/get.txt was deployed with no checksum, so under
+		// client-checksums a reader finds only the SHA-256 the deploy
+		// recorded as the client's (#399).
+		row(get, lib+"work/get.txt.sha256", "", holds("libs-local", "work/", read), 200),
+		row(get, lib+"work/get.txt.sha1", "", holds("libs-local", "work/", read), 404),
 		row(get, lib+"fixture/get.txt", "", holds("libs-local", "fixture/", read), 200),
 		row(get, "/artifactory/libs-b/b/get.txt", "", holds("libs-b", "b/", read), 200),
 		// A trace answers 200 to every caller that authenticates; a caller
