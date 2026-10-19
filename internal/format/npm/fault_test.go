@@ -161,14 +161,6 @@ func (i faultyItems) Get(
 }
 
 //nolint:wrapcheck // test double
-func (i faultyItems) GetByID(ctx context.Context, id int64) (types.Item, error) {
-	if i.f.fail("GetByID") {
-		return types.Item{}, errFault
-	}
-	return i.ItemStore.GetByID(ctx, id)
-}
-
-//nolint:wrapcheck // test double
 func (i faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
 	if i.f.fail("Properties") {
 		return nil, errFault
@@ -222,7 +214,6 @@ func TestStoreFaults(t *testing.T) {
 		{"deploy creates the package", "Ensure", 0, nil, deployOne},
 		{"deploy finds the old version", "VersionOf", 0, one, overwriteGarbage},
 		{"overwrite drops the version", "DeleteVersion", 0, one, overwriteGarbage},
-		{"overwrite drops the version's tags", "PatchProperties", 0, one, overwriteGarbage},
 		{"overwrite reads what is left", "Versions", 0, one, overwriteGarbage},
 		{"overwrite drops the package", "Delete", 0, one, overwriteGarbage},
 		{"annotate finds the version", "VersionOf", 0, one, tag},

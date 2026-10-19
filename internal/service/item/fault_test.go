@@ -64,6 +64,18 @@ func (f faultyItems) PatchProperties(
 	return f.ItemStore.PatchProperties(ctx, id, set, rm, at)
 }
 
+func (f faultyItems) SetProperties(
+	ctx context.Context,
+	id int64,
+	props types.Properties,
+	at time.Time,
+) error {
+	if f.fail == "set" {
+		return errBoom
+	}
+	return f.ItemStore.SetProperties(ctx, id, props, at)
+}
+
 func (f faultyItems) Properties(ctx context.Context, id int64) (types.Properties, error) {
 	if f.fail == "properties" {
 		return nil, errBoom
@@ -220,11 +232,23 @@ func TestStoreFailures(t *testing.T) {
 		{"put", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
 		{"ref", func(w *world) error { _, err := w.deploy("n", "x", types.Checksums{}); return err }},
 		{"unref", func(w *world) error { _, err := w.deploy("seed", "x", types.Checksums{}); return err }},
-		{"patch", func(w *world) error {
+		{"set", func(w *world) error {
 			_, err := w.svc.Deploy(ctx, Deploy{
 				Target: Target{Repo: w.loc, Path: "n"}, Body: strings.NewReader("x"),
 				Properties: types.Properties{"k": {"v"}},
 			})
+			return err
+		}},
+		{"stats", func(w *world) error { _, err := w.deploy("seed", "x", types.Checksums{}); return err }},
+		{"putStats", func(w *world) error {
+			seed, ok := w.get(w.loc, "seed")
+			if !ok {
+				return errors.New("no seed")
+			}
+			if err := w.db.Items().RecordDownload(ctx, seed.ID, store.Download{At: at}); err != nil {
+				return err //nolint:wrapcheck // test setup
+			}
+			_, err := w.deploy("seed", "x", types.Checksums{})
 			return err
 		}},
 		{"patch", func(w *world) error {

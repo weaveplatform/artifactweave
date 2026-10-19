@@ -140,21 +140,15 @@ func versionOf(ctx context.Context, st store.Store, id int64) (types.PackageVers
 // the write's time. A version has one file, its tarball, so a file that no
 // longer backs it leaves nothing to keep.
 //
-// With staleTags, the write set no dist-tags of its own, so those the file
-// has are the dropped version's, and they go with it. Otherwise a later
-// move of the file to its own canonical path, by a conversion say, would
-// give them to a version that never had them, latest included (rule 1).
-// A file the index does not hold names no version, so it keeps its tags.
-func (h Handler) unindex(ctx context.Context, st store.Store, it types.Item, staleTags bool) error {
+// The dropped version's dist-tags and deprecation are off the file by
+// now: the item service gives a file that took other content only the
+// properties the write brings (decision 0034), so none is left for a later
+// move to its own canonical path, by a conversion say, to hand to a
+// version that never had it, latest included (rule 1).
+func (h Handler) unindex(ctx context.Context, st store.Store, it types.Item) error {
 	pv, ok, err := versionOf(ctx, st, it.ID)
 	if err != nil || !ok {
 		return err
-	}
-	if staleTags {
-		if err := st.Items().PatchProperties(ctx, it.ID, nil,
-			[]string{PropDistTag}, it.Updated); err != nil {
-			return fmt.Errorf("npm: dist-tags of %s: %w", it.FullPath(), err)
-		}
 	}
 	if err := st.Packages().DeleteVersion(ctx, pv.ID); err != nil {
 		return fmt.Errorf("npm: drop version %s: %w", pv.Version, err)

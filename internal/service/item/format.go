@@ -112,7 +112,9 @@ func (s *Service) derive(ctx context.Context, d format.Derived) (types.Item, err
 	var out types.Item
 	err = s.Store.Tx(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.writeFile(ctx, dep, digestsOf(info), info.Size, types.Checksums{}, s.now())
+		out, err = s.writeFile(ctx, dep, fileWrite{
+			actual: digestsOf(info), size: info.Size, replace: len(d.Properties) > 0,
+		}, s.now())
 		return err
 	})
 	if err != nil {

@@ -144,13 +144,14 @@ Artifactory wires it.
   ([#292](https://github.com/weaveplatform/artifactweave/issues/292)).
   `api/npm/<repo>/reindex` answers in the Artifactory envelope too: `surfaceFor` picks it
   for that path ahead of npm's ([#293](https://github.com/weaveplatform/artifactweave/issues/293)).
-  7.x lets `maxUniqueSnapshots` be set on npm repositories and deletes artifacts there
-  (known issue RTDEV-45622, from 7.35.4), so `IntegrationCleanerInterceptor`'s cleanup (fact
-  1.3) is not confined to the Maven group in 7.x either. The npm format runs its own on
-  Maven's timer ([#515](https://github.com/weaveplatform/artifactweave/issues/515), research
-  25 section 2.1). `artifactory.npm.tag.tagLatestByPublish`, a server-wide setting,
-  changes what the npm format does with every write, so the formats take their settings
-  with their handlers (`formats.Settings`, decision 0034).
+  7.x lets `maxUniqueSnapshots` be set on npm repositories and can delete artifacts there
+  (open known issue RTDEV-45622, from 7.35.4), but JFrog states that the setting should be
+  ignored where snapshot policing does not apply (RTFACT-27078, RTFACT-30672), so the npm
+  format runs no cleanup ([#518](https://github.com/weaveplatform/artifactweave/issues/518),
+  research 25 section 2.1). `artifactory.npm.tag.tagLatestByPublish` and
+  `artifactory.npm.enforce.path`, server-wide settings, change what the npm format does with
+  every write, so the formats take their settings with their handlers (`formats.Settings`,
+  decision 0034).
 - **Maven.** 7.x accepts more POMs, with a leading blank line, non-breaking spaces or
   ISO-8859-1 (research 27 section 6).
 

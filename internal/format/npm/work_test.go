@@ -173,6 +173,13 @@ func TestWorkFailures(t *testing.T) {
 	if h.Owed(w.c, false, canonical("1.0.0")) != nil {
 		t.Error("a read owes work")
 	}
+	// An item of a kind the format no longer runs, left by an earlier
+	// build, is finished without reading anything.
+	if err := h.Work(w.ctx, format.Env{}, types.WorkItem{
+		Kind: "npm.snapshots", Key: w.c.Key + "/left-pad",
+	}); err != nil {
+		t.Errorf("a stale kind: %v", err)
+	}
 	w.deploy("stray.tgz", pkg("left-pad", "1.0.0", ""), nil)
 	moveFails := env
 	moveFails.Move = func(context.Context, repo.Config, string, string, string) (string, error) {

@@ -8,3 +8,12 @@ type NPMTagConfig struct {
 	// there.
 	TagLatestByPublish bool `yaml:"tag_latest_by_publish"`
 }
+
+// NPMPathConfig holds the npm format's upload path option (decision 0034).
+type NPMPathConfig struct {
+	// EnforcePath refuses the upload of a package tarball whose file name
+	// is not the one its package.json gives, in every npm local
+	// repository, as 7.x's global artifactory.npm.enforce.path does. Off
+	// by default, as there.
+	EnforcePath bool `yaml:"enforce_path"`
+}

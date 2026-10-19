@@ -33,11 +33,11 @@ func (w *world) converted() {
 	}
 }
 
-// An overwrite that changes a tarball's version takes the dropped
-// version's dist-tags off the file and settles latest anew (rule 4), so a
-// conversion that later moves the file to its own canonical path gives
-// them to no version (#515). Before the fix, 0.5.0 came out of the
-// conversion as latest and beta.
+// An overwrite with other content leaves the file none of its properties
+// (the item service, decision 0034), so the dropped version's dist-tags go
+// and latest settles anew (rule 4), and a conversion that later moves the
+// file to its own canonical path gives them to no version (#515). Without
+// that, 0.5.0 came out of the conversion as latest and beta.
 func TestOverwriteDropsDistTags(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
@@ -86,22 +86,46 @@ func TestOverwriteKeepsTheWritesOwnTags(t *testing.T) {
 	}
 }
 
-// A redeploy of the same version keeps its tags: the version did not
-// change, so nothing moves.
-func TestRedeployKeepsDistTags(t *testing.T) {
+// The dropped version's deprecation goes with its tags, so the version a
+// conversion later finds in the file is not shown as deprecated although
+// nobody deprecated it (#518).
+func TestOverwriteDropsTheDeprecation(t *testing.T) {
 	w := newWorld(t)
 	w.tagged()
-	w.deploy(canonical("2.0.0"), pkg("left-pad", "2.0.0", `"description":"rebuilt"`), nil)
-	if diff := cmp.Diff(map[string][]string{"1.0.0": nil, "2.0.0": {"beta", "latest"}},
-		w.tags("left-pad")); diff != "" {
-		t.Fatalf("tags (-want +got):\n%s", diff)
+	w.annotate(canonical("2.0.0"), types.Properties{npm.PropDeprecated: {"use 3"}})
+	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""), nil)
+	if got := w.props(canonical("2.0.0")); len(got) != 0 {
+		t.Fatalf("the overwritten file kept %v", got)
+	}
+	w.converted()
+	if m := w.index()["left-pad"]["0.5.0"]; m.Deprecated != "" {
+		t.Fatalf("0.5.0 is deprecated: %q", m.Deprecated)
 	}
 }
 
-// A copy or a move onto a canonical path is an overwrite too. A source
-// that carries no dist-tags leaves the target's stale ones behind unless
-// the format drops them; a source that carries its own brings them, and
-// they replace the target's.
+// A redeploy of a version with the same content keeps its tags, so it
+// undoes no npm dist-tag add. One with other content, a rebuild, is new
+// content at the path: its tags go, and latest settles by rule 4, which
+// gives it back to 2.0.0, the highest.
+func TestRedeployOfAVersion(t *testing.T) {
+	w := newWorld(t)
+	w.tagged()
+	w.annotate(canonical("1.0.0"), types.Properties{npm.PropDistTag: {"latest"}})
+	w.deploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", ""), nil)
+	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "2.0.0": {"beta"}},
+		w.tags("left-pad")); diff != "" {
+		t.Fatalf("the same content (-want +got):\n%s", diff)
+	}
+	w.deploy(canonical("1.0.0"), pkg("left-pad", "1.0.0", `"description":"rebuilt"`), nil)
+	if diff := cmp.Diff(map[string][]string{"1.0.0": nil, "2.0.0": {"beta", "latest"}},
+		w.tags("left-pad")); diff != "" {
+		t.Fatalf("a rebuild (-want +got):\n%s", diff)
+	}
+}
+
+// A copy or a move onto a canonical path replaces the file whole: the
+// target has the source's properties and none of its own, so a source
+// without dist-tags leaves none behind, and one with its own brings them.
 func TestTransferOntoACanonicalPath(t *testing.T) {
 	for _, c := range []struct {
 		name string

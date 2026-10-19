@@ -246,7 +246,8 @@ func TestLongPropertyValues(t *testing.T) {
 
 // artifactory.licenses follows package.json's license when it has one,
 // and is otherwise left as it is: other tools write it too, so a value the
-// format did not write is not removed.
+// format did not write is not removed. An overwrite with other content
+// takes it off with every other property (decision 0034).
 func TestLicenses(t *testing.T) {
 	w := newWorld(t)
 	p := "left-pad/-/left-pad-1.0.0.tgz"
@@ -255,7 +256,16 @@ func TestLicenses(t *testing.T) {
 	if got := w.props(p)[npm.PropLicenses]; !slices.Equal(got, []string{"ISC"}) {
 		t.Fatalf("after a new license: %v", got)
 	}
-	w.deploy(p, pkg("left-pad", "1.0.0", ""), nil)
+	bare := pkg("left-pad", "1.0.0", "")
+	w.deploy(p, bare, nil)
+	if got := w.props(p)[npm.PropLicenses]; got != nil {
+		t.Fatalf("other content kept %v", got)
+	}
+	w.annotate(p, types.Properties{npm.PropLicenses: {"ISC"}})
+	w.deploy(p, bare, nil)
+	if err := w.run(npm.KindReindex, ""); err != nil {
+		t.Fatal(err)
+	}
 	if got := w.props(p)[npm.PropLicenses]; !slices.Equal(got, []string{"ISC"}) {
 		t.Fatalf("after no license: %v", got)
 	}
@@ -471,54 +481,60 @@ func TestMissingContent(t *testing.T) {
 }
 
 // Inspect reads only what could be a canonical tarball, before the write's
-// transaction, and notes whether the write sets its own dist-tags, which
-// content that is no tarball needs as much as a tarball.
+// transaction, and, with npm.enforce_path, any .tgz uploaded to a local
+// repository, whose file name Admit then checks.
 func TestInspect(t *testing.T) {
 	w := newWorld(t)
-	h := npm.Handler{}
 	tarball := w.deploy("x/-/x-1.0.0.tgz", pkg("x", "1.0.0", ""), nil)
 	garbage := w.deploy("y/-/y-1.0.0.tgz", []byte("garbage"), nil)
 	env := format.Env{Blobs: w.items.Blobs}
-	tagged := types.Properties{npm.PropDistTag: {"beta"}}
+	stray := format.Write{Op: format.OpDeploy, Path: "x/x-1.0.0.tgz", Checksums: tarball.Actual}
 	for _, c := range []struct {
+		enforce         bool
 		w               format.Write
 		inspected, read bool
-		ownTags         bool
 	}{
 		{
+			false,
 			format.Write{Op: format.OpDeploy, Path: "x/-/x-1.0.0.tgz", Checksums: tarball.Actual},
-			true, true, false,
+			true, true,
 		},
 		{
-			format.Write{
-				Op: format.OpCopy, Path: "z/-/z-1.0.0.tgz", Checksums: tarball.Actual,
-				Properties: tagged,
-			},
-			true, true, true,
+			false,
+			format.Write{Op: format.OpCopy, Path: "z/-/z-1.0.0.tgz", Checksums: tarball.Actual},
+			true, true,
+		},
+		{false, stray, false, false},
+		{true, stray, true, true},
+		{
+			true,
+			format.Write{Op: format.OpCopy, Path: "x/x-1.0.0.tgz", Checksums: tarball.Actual},
+			false, false,
 		},
 		{
-			format.Write{Op: format.OpDeploy, Path: "x/x-1.0.0.tgz", Checksums: tarball.Actual},
-			false, false, false,
+			true,
+			format.Write{Op: format.OpDeploy, Path: "x/x-1.0.0.tar", Checksums: tarball.Actual},
+			false, false,
 		},
-		{format.Write{Op: format.OpChecksum, Path: "x/-/x-1.0.0.tgz"}, false, false, false},
+		{false, format.Write{Op: format.OpChecksum, Path: "x/-/x-1.0.0.tgz"}, false, false},
 		{
-			format.Write{
-				Op: format.OpDeploy, Path: "y/-/y-1.0.0.tgz", Checksums: garbage.Actual,
-				Properties: tagged,
-			},
-			true, false, true,
+			false,
+			format.Write{Op: format.OpDeploy, Path: "y/-/y-1.0.0.tgz", Checksums: garbage.Actual},
+			true, false,
 		},
 	} {
+		h := npm.Handler{Settings: npm.Settings{EnforcePath: c.enforce}}
 		got, err := h.Inspect(w.ctx, env, w.c, c.w)
 		if err != nil {
 			t.Fatal(err)
 		}
-		tb, own, ok := npm.Inspected(got)
-		if ok != c.inspected || (tb != nil) != c.read || own != c.ownTags ||
+		tb, ok := npm.Inspected(got)
+		if ok != c.inspected || (tb != nil) != c.read ||
 			tb != nil && tb.SHA256 != tarball.Actual.SHA256 {
-			t.Errorf("%+v: %#v", c.w, got)
+			t.Errorf("enforce %v, %+v: %#v", c.enforce, c.w, got)
 		}
 	}
+	h := npm.Handler{}
 	_, err := h.Inspect(w.ctx, env, w.c, format.Write{
 		Op: format.OpDeploy, Path: "x/-/x-1.0.0.tgz",
 		Checksums: types.Checksums{SHA256: hex.EncodeToString(make([]byte, 32))},

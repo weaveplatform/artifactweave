@@ -496,21 +496,8 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 		if err != nil {
 			return err
 		}
-		if len(props) > 0 {
-			if err := items.PatchProperties(ctx, landed.ID, props, nil, now); err != nil {
-				return fmt.Errorf("item: properties of %s: %w", st.dst, err)
-			}
-		}
-		if t.Move && st.src.ID != 0 {
-			stats, err := items.Stats(ctx, st.src.ID)
-			if err != nil {
-				return fmt.Errorf("item: statistics of %s: %w", st.src.FullPath(), err)
-			}
-			if stats != (types.ItemStats{}) {
-				if err := items.PutStats(ctx, landed.ID, stats); err != nil {
-					return fmt.Errorf("item: statistics of %s: %w", st.dst, err)
-				}
-			}
+		if err := s.carry(ctx, t, st, landed, props, now); err != nil {
+			return err
 		}
 		if err := s.landed(ctx, hooks, env, t.To.Repo, st, landed, props, now); err != nil {
 			return err
@@ -518,6 +505,48 @@ func (s *Service) apply(ctx context.Context, t Transfer, steps []step) error {
 	}
 	if t.Move {
 		return s.removeSources(ctx, t, steps)
+	}
+	return nil
+}
+
+// carry gives landed, the item st wrote, the source's properties, and a
+// move the source's statistics too. A file landing on another replaces it
+// whole, as 6.20's mover deletes the target before it writes the source's
+// info and properties (BaseRepoPathMover.overrideTargetFileIfExist), so
+// none of the replaced file's properties or statistics are left. A folder
+// landing on another keeps the properties the source does not set.
+func (s *Service) carry(
+	ctx context.Context,
+	t Transfer,
+	st step,
+	landed types.Item,
+	props types.Properties,
+	now time.Time,
+) error {
+	items := s.Store.Items()
+	replaced := st.replace.ID != 0
+	switch {
+	case replaced:
+		if err := items.SetProperties(ctx, landed.ID, props, now); err != nil {
+			return fmt.Errorf("item: properties of %s: %w", st.dst, err)
+		}
+	case len(props) > 0:
+		if err := items.PatchProperties(ctx, landed.ID, props, nil, now); err != nil {
+			return fmt.Errorf("item: properties of %s: %w", st.dst, err)
+		}
+	}
+	var stats types.ItemStats
+	if t.Move && st.src.ID != 0 {
+		var err error
+		if stats, err = items.Stats(ctx, st.src.ID); err != nil {
+			return fmt.Errorf("item: statistics of %s: %w", st.src.FullPath(), err)
+		}
+	}
+	if stats == (types.ItemStats{}) && !replaced {
+		return nil
+	}
+	if err := items.PutStats(ctx, landed.ID, stats); err != nil {
+		return fmt.Errorf("item: statistics of %s: %w", st.dst, err)
 	}
 	return nil
 }
