@@ -11,7 +11,7 @@ This page describes the workflows in `.github/workflows/` and the jobs the
 | `pr-title-validation.yml` | Conventional PR title |
 | `dependency-review.yml` | GitHub Dependency Review |
 | `deps-refresh.yml`, `auto-merge.yml`, `release-please.yml` | Dependency currency, auto-merge once the gate passes, releases |
-| `release.yml` (on a `v*` tag, and on pull requests that change it or `.goreleaser.yaml`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release; see [Releases](#releases) |
+| `release.yml` (on a `v*` tag, and on pull requests that change it, `.goreleaser.yaml` or `Dockerfile.release`) | Builds, checksums, SBOMs and signs the release binaries and appends them to the release, and publishes the signed multi-arch image to GHCR; see [Releases](#releases) |
 | `cloud-conformance.yml` (manual) | The blob contract and probes against real GCS, Azure and S3; see [Real-cloud conformance](#real-cloud-conformance-manual) |
 | `platform-auth-check.yml` (manual, and on pull requests that change a bootstrap) | Proves GitHub's trust in the deployer identities; see [Cloud trust and environments](#cloud-trust-and-environments) |
 | `platform-scenarios.yml` (manual, and on pull requests that change it, its driver, `test/platform`, a scenario or a module; the `prove-all` label proves everything) | Applies, tests, destroys and reaps reference deployments on real clouds as the deployer; see [Platform scenarios](#platform-scenarios-manual) |
@@ -568,13 +568,24 @@ mode on the existing release (#507):
   --certificate-identity` checks which workflow built the release, and the checksums then
   check every archive and SBOM. The README shows the two commands.
 
+The same run publishes the container image (#510). GoReleaser's `dockers_v2` builds one
+multi-arch image for linux/amd64 and linux/arm64 from the binaries it has just built, with
+[`Dockerfile.release`](../../Dockerfile.release), which only copies the binary into the
+pinned distroless base, so the image holds exactly what the archives hold. It pushes the
+image to `ghcr.io/weaveplatform/artifactweave` as `<version>`, plus `<major>.<minor>` and
+`latest` for releases that are not pre-releases. buildx attaches an SBOM and a provenance
+attestation, and cosign signs the image by digest with the same keyless workflow identity as
+the checksum file. The job has `packages: write` for the push. The root `Dockerfile` still
+builds from source for `make docker` and acceptance.
+
 Release-please owns the version, the changelog and the release; GoReleaser only appends
 artifacts, so a failed build leaves the release intact and can be re-run from the Actions
 tab without re-tagging.
 
-On a pull request that changes `release.yml` or `.goreleaser.yaml`, the `check` job builds a
-snapshot of every archive and the checksums (`goreleaser release --snapshot --skip=sign,sbom`),
-so a broken config fails before a tag rather than after it. Locally:
+On a pull request that changes `release.yml`, `.goreleaser.yaml` or `Dockerfile.release`, the
+`check` job builds a snapshot of every archive, the checksums and one image per platform
+(`goreleaser release --snapshot --skip=sign,sbom`), without pushing, so a broken config fails
+before a tag rather than after it. Locally:
 `goreleaser check` and `goreleaser release --snapshot --clean --skip=sign,sbom`, which writes
 to the gitignored `dist/`.
 

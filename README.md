@@ -79,6 +79,22 @@ shasum -a 256 -c artifactweave_0.1.0_checksums.txt --ignore-missing
 The first command proves the checksum file came from this repository's release workflow
 for that tag; the second proves each archive you downloaded matches it.
 
+The same release publishes the container image `ghcr.io/weaveplatform/artifactweave` for
+linux/amd64 and linux/arm64, tagged with the version (and, for releases that are not
+pre-releases, `<major>.<minor>` and `latest`). It is built from the same binaries on a
+distroless base, runs as a non-root user with `/data` as its working directory and port
+8081, and carries an SBOM and a provenance attestation. Verify it:
+
+```console
+cosign verify ghcr.io/weaveplatform/artifactweave:0.1.0 \
+  --certificate-identity 'https://github.com/weaveplatform/artifactweave/.github/workflows/release.yml@refs/tags/v0.1.0' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+docker run --rm -p 8081:8081 -v artifactweave-data:/data \
+  -v "$PWD/artifactweave.yaml:/etc/artifactweave/artifactweave.yaml:ro" \
+  ghcr.io/weaveplatform/artifactweave:0.1.0
+```
+
 ## Licence
 
 MIT. JFrog's API definitions are proprietary and are cited, not vendored; this project
