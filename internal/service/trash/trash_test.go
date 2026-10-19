@@ -3,6 +3,7 @@ package trash_test
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -391,6 +392,70 @@ func TestChildrenAndFind(t *testing.T) {
 	}
 	if _, err := w.trash.Find(ctx, "libs", "absent"); !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("find absent: %v", err)
+	}
+}
+
+// Below lists the tree under a folder, direct children or every descendant,
+// with the newest entry at each path; a folder only implied by what lies
+// below it has none.
+func TestBelow(t *testing.T) {
+	ctx := context.Background()
+	w := newWorld(t)
+	w.deploy(t, w.libs, "a/b/f.txt", "f", nil)
+	w.deploy(t, w.libs, "top.txt", "first", nil)
+	w.remove(t, w.libs, "a/b/f.txt")
+	w.remove(t, w.libs, "top.txt")
+	w.clock = w.clock.Add(time.Hour)
+	w.deploy(t, w.libs, "top.txt", "second", nil)
+	w.remove(t, w.libs, "top.txt")
+	// A file trashed at x, then a folder x holding a trashed file: the
+	// folder takes the file's place, as in Artifactory's trash can.
+	w.deploy(t, w.other, "x", "file", nil)
+	w.remove(t, w.other, "x")
+	w.deploy(t, w.other, "x/y.txt", "y", nil)
+	w.remove(t, w.other, "x/y.txt")
+	type got struct {
+		path          string
+		folder, entry bool
+	}
+	for _, tc := range []struct {
+		dir  string
+		deep bool
+		want []got
+	}{
+		{"", false, []got{{"libs", true, false}, {"other", true, false}}},
+		{"", true, []got{
+			{"libs", true, false},
+			{"libs/a", true, false},
+			{"libs/a/b", true, false},
+			{"libs/a/b/f.txt", false, true},
+			{"libs/top.txt", false, true},
+			{"other", true, false},
+			{"other/x", true, false},
+			{"other/x/y.txt", false, true},
+		}},
+		{"libs/a", true, []got{{"libs/a/b", true, false}, {"libs/a/b/f.txt", false, true}}},
+		{"other", false, []got{{"other/x", true, false}}},
+	} {
+		nodes, err := w.trash.Below(ctx, tc.dir, tc.deep, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var have []got
+		for _, n := range nodes {
+			have = append(have, got{n.Path, n.Folder, n.Entry != nil})
+		}
+		if !slices.Equal(have, tc.want) {
+			t.Errorf("Below(%q, %v) = %v, want %v", tc.dir, tc.deep, have, tc.want)
+		}
+	}
+	nodes, err := w.trash.Below(ctx, "libs", false, nil)
+	if err != nil || len(nodes) != 2 || nodes[1].Entry == nil ||
+		!nodes[1].Entry.DeletedAt.Equal(w.clock) {
+		t.Fatalf("newest top.txt: %+v, %v", nodes, err)
+	}
+	if nodes[1].Entry.Record.PackageType != string(repo.Generic) {
+		t.Fatalf("package type %q", nodes[1].Entry.Record.PackageType)
 	}
 }
 

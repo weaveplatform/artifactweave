@@ -332,6 +332,19 @@ func (s artifactoryService) deployItem(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, r, s.itemError(ctx, "deploy", err))
 		return
 	}
+	// Every deploy names what it stored, where a format may have put it, as
+	// 6.20's SuccessfulDeploymentResponseHelper does; an archive names the
+	// folder it was extracted into.
+	w.Header().Set("Location", downloadURI(ctx, it.ReportedRepoKey(), it.FullPath()))
+	if explode {
+		// The deployartifactsfromarchive page documents a text/plain 201
+		// and gives no text. jfrog-client-go decodes any body an upload
+		// answers as JSON (ExtractSha256FromResponseBody), so jf rt u
+		// --explode could only work against Artifactory with no body.
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusCreated)
+		return
+	}
 	writeJSON(w, http.StatusCreated, itemCreated(ctx, it))
 }
 

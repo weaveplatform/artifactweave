@@ -11427,7 +11427,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/deleteitemproperties.md
     get:
-      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories.
+      description: Reads metadata about a file or folder. Without a mode parameter the response is `FileInfo` for a file or `FolderInfo` for a folder. Exactly one of `properties`, `lastModified`, `stats`, `permissions` or `list` selects another view and changes the response shape and media type accordingly. Needs read permission; `list` additionally refuses anonymous callers, `lastModified` needs deploy permission and `permissions` needs admin. Works on local repositories, remote caches and virtual repositories, and on the trash can under the key `auto-trashcan`, whose root holds a folder per repository with deleted items and below it their original paths. There a file's information adds its `trash.*` properties, `properties` shows the item's own properties and `trash.time` (Unix milliseconds), `trash.deletedBy`, `trash.originalRepository`, `trash.originalRepositoryType` and `trash.originalPath`, `stats` shows no downloads, and `permissions` answers 400. A caller other than an admin sees only what was deleted from repositories where it holds deploy or manage permission, in every view, and is refused with 403 at a path where it sees nothing.
       operationId: getStorageItem
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -17103,7 +17103,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrieveartifact.md
     put:
-      description: 'Stores the request body at the path. Needs deploy permission; the target must be a local repository or a virtual repository with a default deployment repository, otherwise 405. A path ending in `/` with an empty body creates a folder. Matrix parameters `;key=value` on the last path segment become properties. Checksums declared in `X-Checksum-*` headers are recorded as original checksums and verified against the stored bytes; a mismatch is rejected with 409. Responds 201 with the created item, at the path it was stored at: in a local Maven, Gradle, Ivy or SBT repository with the `maven-2-default` layout, a snapshot file is renamed as the repository''s `snapshotVersionBehavior` says, so `unique` stores `app-1.0-SNAPSHOT.jar` as `app-1.0-<yyyyMMdd.HHmmss>-<buildNumber>.jar`. Deploying over an existing path replaces the content unless the repository forbids overwrites; replacing needs delete permission at the stored path, except with the file''s own content: a deploy that declares the stored file''s SHA-1 or SHA-256 and stores those same bytes needs deploy permission only, and so does such a checksum deploy unless the server is set to require delete permission for it. A `.md5`, `.sha1`, `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true` makes the extraction all-or-nothing). With `X-Checksum-Deploy: true` and a checksum header the server deploys an existing binary with that checksum without a body, answering 201. The caller must be able to read a file with that checksum, or send in `X-Checksum-Deploy-Token` the `checksumToken` of its own finished multipart upload of that content; otherwise, as when no binary matches, it answers 404 so the client uploads normally.'
+      description: 'Stores the request body at the path. Needs deploy permission; the target must be a local repository or a virtual repository with a default deployment repository, otherwise 405. A path ending in `/` with an empty body creates a folder. Matrix parameters `;key=value` on the last path segment become properties. Checksums declared in `X-Checksum-*` headers are recorded as original checksums and verified against the stored bytes; a mismatch is rejected with 409. Responds 201 with the created item and its URL in `Location`, at the path it was stored at: in a local Maven, Gradle, Ivy or SBT repository with the `maven-2-default` layout, a snapshot file is renamed as the repository''s `snapshotVersionBehavior` says, so `unique` stores `app-1.0-SNAPSHOT.jar` as `app-1.0-<yyyyMMdd.HHmmss>-<buildNumber>.jar`. Deploying over an existing path replaces the content unless the repository forbids overwrites; replacing needs delete permission at the stored path, except with the file''s own content: a deploy that declares the stored file''s SHA-1 or SHA-256 and stores those same bytes needs deploy permission only, and so does such a checksum deploy unless the server is set to require delete permission for it. A `.md5`, `.sha1`, `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true` makes the extraction all-or-nothing), answering 201 `text/plain` with no body. With `X-Checksum-Deploy: true` and a checksum header the server deploys an existing binary with that checksum without a body, answering 201. The caller must be able to read a file with that checksum, or send in `X-Checksum-Deploy-Token` the `checksumToken` of its own finished multipart upload of that content; otherwise, as when no binary matches, it answers 404 so the client uploads normally.'
       operationId: deployArtifact
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -17208,10 +17208,14 @@ paths:
             application/vnd.org.jfrog.artifactory.storage.ItemCreated+json:
               schema:
                 $ref: '#/components/schemas/ItemCreated'
-          description: The item was stored, or a checksum file's value was recorded on its file.
+            text/plain:
+              schema:
+                description: Empty; the answer to an archive deploy.
+                type: string
+          description: The item was stored, an archive was extracted, or a checksum file's value was recorded on its file.
           headers:
             Location:
-              description: Set for a checksum file only. The URL of the file the checksum was recorded on, which in a Maven repository may be a unique snapshot build the request did not name.
+              description: The URL of what was stored, which in a Maven repository may be a unique snapshot build the request did not name. A folder's URL has no trailing `/`. For an archive it is the folder the entries were extracted into; for a checksum file, the file the checksum was recorded on.
               schema:
                 type: string
         '400':
@@ -18663,7 +18667,7 @@ components:
           description: Optional within this object. Number of items, files and folders together and those in the trash can included, formatted with thousands separators.
           type: string
         optimization:
-          description: Optional within this object. Percentage saved by deduplication (`binariesSize` relative to `artifactsSize`), with up to two decimals, such as `5.82%`, or `N/A` while there are no artifacts.
+          description: Optional within this object. `binariesSize` as a percentage of `artifactsSize`, with up to two decimals, such as `5.82%`, or `N/A` while there are no artifacts.
           type: string
       type: object
     BuildAgent:
@@ -20253,7 +20257,7 @@ components:
           description: Optional within this object. Free space on the volume, with the percentage in parentheses.
           type: string
         storageDirectory:
-          description: Optional within this object. Root directory for the local disk store, the bucket and prefix for object storage, or the member stores of a blob mirror.
+          description: Optional within this object. Root directory for the local disk store, `Filesystem storage is not used` for object storage, or the member stores of a blob mirror.
           type: string
         storageType:
           description: 'Optional within this object. The binary provider template that names the blob store: `file-system` for the local disk store, `s3-storage-v3-direct`, `google-storage-v2-direct` or `azure-blob-storage-v2-direct` for object storage, and `user-chain` for a blob mirror.'

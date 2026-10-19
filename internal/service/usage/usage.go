@@ -20,14 +20,19 @@ import (
 // DefaultProject is the project key of a repository in no project.
 const DefaultProject = "default"
 
+// NoFilesystem is the directory Artifactory reports for a binary provider
+// chain with no file-system or cache-fs provider in it, as an object store
+// is here: it keeps no local copy (6.20's StorageSummaryImpl).
+const NoFilesystem = "Filesystem storage is not used"
+
 // Location describes the hot blob store for the summary.
 type Location struct {
 	// Type names the store as Artifactory names a binary provider chain:
 	// its template, such as file-system or s3-storage-v3-direct, or
 	// user-chain for a chain no template describes.
 	Type string
-	// Directory is the root directory, or the bucket or container with its
-	// prefix, or the mirror's members.
+	// Directory is the root directory, NoFilesystem for an object store, or
+	// the mirror's members.
 	Directory string
 	// Root is the local directory whose volume reports capacity; empty for
 	// object storage, whose capacity is unknown.

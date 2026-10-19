@@ -245,6 +245,10 @@ func (w *world) deployFile(name, target string) error {
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.SetBasicAuth("admin", testAdminPassword)
+	for k, v := range w.next {
+		req.Header.Set(k, v)
+	}
+	w.next = nil
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

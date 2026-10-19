@@ -11,6 +11,7 @@ import (
 
 	"github.com/weaveplatform/artifactweave/internal/config"
 	"github.com/weaveplatform/artifactweave/internal/service/gc"
+	"github.com/weaveplatform/artifactweave/internal/service/usage"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 )
 
@@ -51,17 +52,17 @@ func TestLocation(t *testing.T) {
 		"s3": {cfg: be(config.BlobBackendConfig{
 			Backend: "s3",
 			S3:      config.BlobS3Config{Bucket: "b", Prefix: "p"},
-		}), kind: "s3-storage-v3-direct", dir: "s3://b/p"},
+		}), kind: "s3-storage-v3-direct", dir: usage.NoFilesystem},
 		"gcs": {cfg: be(config.BlobBackendConfig{
 			Backend: "gcs",
 			GCS:     config.BlobGCSConfig{Bucket: "b"},
-		}), kind: "google-storage-v2-direct", dir: "gs://b"},
+		}), kind: "google-storage-v2-direct", dir: usage.NoFilesystem},
 		"azure": {
 			cfg: be(config.BlobBackendConfig{
 				Backend: "azure",
 				Azure:   config.BlobAzureConfig{Account: "a", Container: "c", Prefix: "p"},
 			}),
-			kind: "azure-blob-storage-v2-direct", dir: "a/c/p",
+			kind: "azure-blob-storage-v2-direct", dir: usage.NoFilesystem,
 		},
 		"mirror": {
 			cfg:  func() config.Config { c := cfg; c.Blob = mirrorConfig(); return c }(),
