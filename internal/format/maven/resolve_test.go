@@ -333,6 +333,36 @@ func TestResolvePrefersTheRequestedPath(t *testing.T) {
 	})
 }
 
+// Version tokens need both integration revisions in the layout (JFrog's
+// Retrieve Artifact): maven-1-default has no folder revision and
+// sbt-default neither, so a token there is part of the name looked up,
+// even where a release would match it.
+func TestResolveNeedsBothIntegrationRevisions(t *testing.T) {
+	w := newWorld(t, func(c *repo.Config) {
+		c.RepoLayoutRef = repo.LayoutMaven1
+		c.SuppressPomConsistencyChecks = on()
+	})
+	w.deploy("acme/jars/app-1.0.jar", "acme/jars/app-2.0.jar", "acme/jars/app-2.0-SNAPSHOT.jar")
+	w.check([]resolveCase{
+		{name: "release", path: "acme/jars/app-[RELEASE].jar", want: "acme/jars/app-[RELEASE].jar"},
+		{
+			name: "integration", path: "acme/jars/app-2.0-[INTEGRATION].jar",
+			want: "acme/jars/app-2.0-[INTEGRATION].jar",
+		},
+	})
+
+	w = newWorld(t, func(c *repo.Config) {
+		c.PackageType, c.RepoLayoutRef = repo.SBT, repo.LayoutSBT
+		c.SuppressPomConsistencyChecks = on()
+	})
+	dir := "org.acme/plug/scala_2.12/sbt_1.0/"
+	w.deploy(dir+"1.0/jars/plug.jar", dir+"2.0/jars/plug.jar")
+	w.check([]resolveCase{{
+		name: "sbt release", path: dir + "[RELEASE]/jars/plug.jar",
+		want: dir + "[RELEASE]/jars/plug.jar",
+	}})
+}
+
 // JFrog resolves in local repositories and remote repositories' caches,
 // and in a virtual repository through its members; a federated repository
 // is local.

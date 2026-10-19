@@ -48,8 +48,9 @@ Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)). For all of them:
   (`pkgindex.Stored`, #361). The hooks and a reindex both read only there, and the
   contract suite's cache scenario holds every format to it. Docker's cache follows with
   its remote repositories in P9.
-- **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment)
-  is a cache of what the version's items, content and properties say. A reindex rebuilds
+- **Per-version metadata** (`PackageVersion.Metadata`, such as an npm packument fragment,
+  or the time a Go version's `.info` gives, which `@v/list` answers, #417) is a cache of
+  what the version's items, content and properties say. A reindex rebuilds
   it, and nothing is kept there that the items do not carry.
 - **Download statistics:** a download served through the item path records the version's
   last download (`RecordVersionDownload`), as it records the item's.

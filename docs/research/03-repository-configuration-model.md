@@ -213,41 +213,95 @@ Source: <https://docs.jfrog.com/artifactory/docs/repository-layouts.md> and
 
 ### Bundled definitions
 
-`pkg/layout/bundled.go` holds each bundled definition with its source (#277):
+`pkg/layout/bundled.go` holds each bundled definition with its source (#277, #376). They are
+7.x's, in the order a 7.x descriptor lists them:
 
-- **Fifteen are copied from Artifactory 6.20's default descriptor** [S]:
-  `base/config/src/main/resources/META-INF/default/artifactory.config.xml:112-221` in the
-  `knottnhupfer/artifactory-oss` mirror at `b99e5649bcad`, kept in its order. They are
-  `maven-2-default`, `ivy-default`, `gradle-default`, `maven-1-default`, `nuget-default`,
-  `npm-default`, `bower-default`, `vcs-default`, `sbt-default`, `simple-default`,
-  `composer-default`, `conan-default`, `puppet-default`, `go-default` and `build-default`.
+- **JFrog's own 7.38.8 export** [S] is the first source. It is a test fixture of the JFrog
+  CLI: [`artifactory/commands/testdata/artifactory_export/etc/artifactory.config.latest.xml`](https://github.com/jfrog/jfrog-cli-artifactory/blob/4a0f3827cfa0/artifactory/commands/testdata/artifactory_export/etc/artifactory.config.latest.xml)
+  in jfrog-cli-artifactory at `4a0f3827cfa0`, schema 3.1.29, with
+  `artifactory.version=7.38.8` beside it. It defines every bundled layout but
+  `gradle-default`, `ansible-default`, `sbt-ivy-default` and `nix-default`, and the four
+  exported descriptors below agree with it wherever they hold the same layout.
+- **`npm-default`** has been `[orgPath]/-/[module]-[baseRev](-[fileItegRev]).tgz` since 7.5.0
+  ([J] [RTFACT-21456](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21456), "Change
+  the default layout for NPM repositories", fixed in 7.5.0). It reads `<name>/-/<name>-<version>.tgz`
+  as organisation and module `<name>`, but `[module]` stops at a slash, so it matches no
+  scoped tarball, `@scope/name/-/@scope/name-<version>.tgz`. `pkg/layout` adds an optional
+  `([scope<@[^/]+>]/)` group before `[module]`, which reads one as module `name` of
+  organisation `@scope/name` and changes nothing else the layout reads or builds (DV-100).
+  `[module]` is greedy, so `lodash-5.0.0-rc.1.tgz` reads as module `lodash-5.0.0` and base
+  revision `rc.1`, in 7.x and here.
+- **`go-default`** is `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]` on a fresh
+  7.x instance; one upgraded from 6.x keeps 6.20's `[orgPath]/[module]/@v/v[refs].zip`
+  ([J] [RTFACT-31118](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31118), a
+  customer's report, no JFrog reply). It reads every file the Go format stores: release,
+  pre-release, `+incompatible` and pseudo-versions ([research 26 section 4.2](26-go-modules.md#42-storage-and-the-go-default-layout)).
+- **`conan-default`** has no `?` after its optional package group in any 7.x source, so it
+  matches recipe and package files. 6.20's descriptor wrote the `?`, which its parser reads
+  as a literal, so that layout matched no Conan file; a customer's 6.10.1 configuration on
+  [RTFACT-19290](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-19290) has it too.
+- **The Terraform, Swift and Ansible layouts** are 7.x's, and use tokens outside the
+  documented set: `[namespace]`, `[module-name]`, `[provider]`, `[provider-name]`,
+  `[version]`, `[os]`, `[arch]`, `[scope]` and `[name]`. A bundled layout drops each, as
+  Artifactory's parser does when it matches a path (`RepoLayoutUtils.generateRegExpFromPattern`
+  in 6.20 [S]), so these four match no path, and layout-based searches and layout
+  translation find nothing in their repositories [I]. `ansible-default` comes from the 3.4.x
+  exports only; JFrog's 7.38.8 export predates it.
+- **`sbt-ivy-default`** is the Maven pattern with the Ivy descriptor
+  `ivy-[baseRev](-[fileItegRev])(-[classifier]).xml` in the revision folder and `\d{14}`
+  integration revisions, from the 3.4.5 and 3.4.8 exports only [I].
+- **`gradle-default`** keeps 6.20's definition and place, third. JFrog's repository-layouts
+  page still lists it as bundled (updated 2026-09-09: "Gradle (Wharf cache default layout)"),
+  and the scala export, from an instance upgraded from 6.x, keeps it. JFrog's 7.38.8 export
+  has none: [RTFACT-21231](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21231),
+  "Deprecate the current gradle-default layout, and switch to using maven-2-default by
+  default", is done but carries no fix version [I].
+- **`nix-default`** is named only by the Terraform provider's default map and is in no 7.x
+  source's list, so it is reconstructed as `simple-default`'s pattern [I] (DV-055) and comes
+  last.
+- **The other layouts** match 6.20's descriptor
+  (`base/config/src/main/resources/META-INF/default/artifactory.config.xml:112-221` in the
+  `knottnhupfer/artifactory-oss` mirror at `b99e5649bcad`) as well as the 7.x sources.
   Maven 1 uses `.+` for both integration revisions and every later non-JVM layout `.*`.
-- **Two depart from the descriptor on purpose:** `go-default` (DV-040) and
-  `conan-default` (DV-056) match nothing as Artifactory ships them.
-- **Six were added in 7.x without a published definition:** `sbt-ivy-default` (named on
-  JFrog's sbt page), and `terraform-module-default`, `terraform-provider-default`,
-  `ansible-default`, `swift-default` and `nix-default` (named in the Terraform provider's
-  default map). They are reconstructed from the storage paths JFrog documents [I] (DV-055)
-  and are on the P19 list ([#216](https://github.com/weaveplatform/artifactweave/issues/216)).
-- **One was added in 7.x with a known definition:** `cargo-default`,
-  `crates/[module]/[module]-[baseRev].[ext]` with `.*` integration revisions (#354). JFrog
-  does not publish it, but every exported 7.x descriptor below defines it this way, and it
-  describes the one path JFrog's [Cargo page](https://docs.jfrog.com/artifactory/docs/cargo-repositories.md)
-  accepts, `crates/<name>/<name>-<version>.crate`; a crate stored anywhere else is not
-  indexed. The provider's default for a `cargo` repository is still `simple-default`. On the
-  P19 list [I].
+- **Order.** The 7.x sources list `cargo-default` right after `simple-default`, then
+  `composer-default` to `build-default` in 6.20's order, then the Terraform, Swift and
+  Ansible layouts, and `sbt-ivy-default` last. `pkg/layout` keeps that order, with
+  `gradle-default` third and `nix-default` after them all. It matters once
+  `GET /api/system/configuration` serves the descriptor (P12).
+- **`cargo-default`** is `crates/[module]/[module]-[baseRev].[ext]` with `.*` integration
+  revisions (#354), in every 7.x source. It describes the one path JFrog's
+  [Cargo page](https://docs.jfrog.com/artifactory/docs/cargo-repositories.md) accepts,
+  `crates/<name>/<name>-<version>.crate`; a crate stored anywhere else is not indexed. The
+  provider's default for a `cargo` repository is still `simple-default`.
 - **"npm Test" is not bundled** [I]. The layouts page lists it among the default layouts,
   but its only trace in JFrog's documentation is the same page's screenshot of the layout
   list, which shows a layout named `npm-test-layout` beside `npm-default`. Every bundled
-  layout is named `<type>-default`, no exported 7.x descriptor has it, and the provider's map
-  does not name it, so it reads as a custom layout on the instance the screenshot came from.
-  On the P19 list.
+  layout is named `<type>-default`, no 7.x source has it, and the provider's map does not
+  name it, so it reads as a custom layout on the instance the screenshot came from. On the
+  P19 list.
+
+**Module identification.** JFrog's repository-layouts page (updated 2026-09-09): "At a
+minimum, there are three mandatory fields required for module identification:
+Organization, Module, Base Revision" [D], as 6.20's `ModuleInfo.isValid` requires [S]. So
+`pkg/layout` reads coordinates only from a path that gives all three, and a layout without
+`[org]` or `[orgPath]`, such as `cargo-default`, reads none: layout-based searches find no
+module in it.
+
+**Unknown tokens.** A layout the descriptor stores may use only the documented tokens and
+custom `[name<regex>]` ones; any other token is refused with 400. JFrog's layout editor
+reports such a token as an error ([J] [RTFACT-4395](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-4395),
+fixed in 2.4.0; [RTFACT-8199](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-8199),
+fixed in 4.6.0, a 400 from the layout test), and a 2024 report says 7.x will not let a user
+create a layout with the Terraform and Swift layouts' tokens
+([RTFACT-30300](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-30300)). Whether 7.x
+also refuses one through `PATCH /api/system/configuration` is [I], so a YAML `repoLayouts`
+entry copied from an export with such tokens is refused here [I].
 
 #### Exported 7.x descriptors
 
 Four configuration descriptors exported from running 7.x instances are published in public
 repositories. They are an instance's `artifactory.config.latest.xml`, or an import made from
-one, not JFrog documentation, so what they show is [I]:
+one, not JFrog documentation, so what they show alone is [I]:
 
 | Descriptor | Schema |
 |---|---|
@@ -256,42 +310,43 @@ one, not JFrog documentation, so what they show is [I]:
 | [scala/community-build](https://github.com/scala/community-build/blob/0a9bdc4e9f61/artifactory.xml) | 3.4.2 |
 | [Panda-Academy-Workshops/Infrastructure](https://github.com/Panda-Academy-Workshops/Infrastructure/blob/bf56ad425899/artifactory/artifactory.config.import.xml) | 3.1.26 |
 
-All four define `cargo-default` as `pkg/layout` now does. They also define other layouts
-differently from `pkg/layout`. This document records the differences; nothing here acts on
-them yet:
+What each holds, beside JFrog's 7.38.8 export (3.1.29) and `pkg/layout`:
 
-| Layout | Exported 7.x descriptors | `pkg/layout` |
-|---|---|---|
-| `npm-default` | `[orgPath]/-/[module]-[baseRev](-[fileItegRev]).tgz`, in all four | 6.20's `[orgPath]/[module]/[module]-[baseRev](-[fileItegRev]).tgz` |
-| `go-default` | `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]` in three; the scala one keeps 6.20's `[orgPath]/[module]/@v/v[refs].zip` | `[orgPath]/[module]/@v/[baseRev].[ext]` (DV-040) |
-| `terraform-module-default` | `[namespace]/[module-name]/[provider]/[version].[ext]` | `[orgPath]/[module]/[provider<[^/]+>]/[baseRev].[ext]` (DV-055) |
-| `terraform-provider-default` | `[namespace]/[provider-name]/[version]/terraform-provider-[provider-name]_[version]_[os]_[arch].[ext]` | `[orgPath]/[module]/[baseRev]/terraform-provider-[module]_[baseRev]_[os<[^_/]+>]_[arch<[^./]+>].[ext]` (DV-055) |
-| `swift-default` | `[scope]/[name]/[name]-[version].zip` | `[orgPath]/[module]/[module]-[baseRev].[ext]` (DV-055) |
-| `ansible-default` | `collections/[namespace]/[name]/[version]/[namespace]-[name]-[version].tar.gz` | `[orgPath]/[module]/[orgPath]-[module]-[baseRev].tar.gz` (DV-055) |
-| `sbt-ivy-default` | `[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]`, descriptor `ivy-[baseRev](-[fileItegRev])(-[classifier]).xml` in the revision folder; in the two newest only | sbt's Ivy-style pattern (DV-055) |
-| `gradle-default` | in the scala one only | bundled, from 6.20 |
-| `nix-default` | in none | bundled (DV-055) |
-
-The Terraform, Swift and Ansible patterns use tokens outside the documented set
-(`[namespace]`, `[module-name]`, `[provider-name]`, `[scope]`, `[name]`, `[version]`).
-6.20's parser drops an unknown token, as it does `[refs]` in its `go-default` (DV-040);
-whether 7.x's parser reads them is not known.
+| Layout | JFrog's 7.38.8 export | The four exports | `pkg/layout` |
+|---|---|---|---|
+| `npm-default` | `[orgPath]/-/[module]-[baseRev](-[fileItegRev]).tgz` | the same, in all four | the same with `([scope<@[^/]+>]/)` before `[module]` (DV-100) |
+| `go-default` | `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]` | the same in three; the scala one keeps 6.20's `v[refs].zip` | the same |
+| `conan-default` | without 6.20's `?` | the same, in all four | the same |
+| `terraform-module-default` | `[namespace]/[module-name]/[provider]/[version].[ext]` | the same, in all four | the same |
+| `terraform-provider-default` | `[namespace]/[provider-name]/[version]/terraform-provider-[provider-name]_[version]_[os]_[arch].[ext]` | the same, in all four | the same |
+| `swift-default` | `[scope]/[name]/[name]-[version].zip` | the same in three; the oldest has `[scope]/[name]/[version].zip` | the same |
+| `ansible-default` | none | `collections/[namespace]/[name]/[version]/[namespace]-[name]-[version].tar.gz`, in the three 3.4.x ones | the same |
+| `sbt-ivy-default` | none | in the two newest | the same |
+| `gradle-default` | none | in the scala one only | 6.20's |
+| `nix-default` | none | in none | `simple-default`'s pattern (DV-055) |
 
 Artifactory turns a pattern into an expression in `RepoLayoutUtils.generateRegExpFromPattern`
 [S]: `[module]` is greedy (`[^/]+`), so where it appears only in a file name, as in
 `maven-1-default` and `build-default`, `commons-lang-2.1.jar` is module `commons-lang`; a `?`
-outside a token is escaped as a literal; and a repeated token is a back-reference to its first
-value. `pkg/layout` matches all three.
+outside a token is escaped as a literal; a repeated token is a back-reference to its first
+value; and a token that is neither documented nor custom adds nothing. `pkg/layout` matches
+all four, the last for bundled layouts only.
 
 What the bundled layouts do not describe, shown by real paths in
 `pkg/layout/bundled_test.go` [S]:
 
 | Layout | Path it does not match | Why |
 |---|---|---|
-| `npm-default` | `lodash/-/lodash-4.17.21.tgz` | npm's tarball path is not the layout's |
 | `ivy-default` | `org.gradle.sample/project1/1.0/jars/project1.jar` | Ivy's own default pattern has no revision in the file name |
 | `gradle-default` | `org.gradle.sample/project1/1.0/ivy-1.0.xml` | Gradle's ivy-publish writes the descriptor in the revision folder; the layout expects it beside the module folders, as in Gradle's old Wharf cache |
 | `sbt-default` | `org.example/lib_2.13/1.0/jars/lib_2.13.jar` | the slashes after the optional `scala_` and `sbt_` groups are mandatory, so only plugin paths match; JFrog's sbt page says the layout does not support cleanup |
+| `sbt-ivy-default` | `org.example/lib_2.13/1.0/jars/lib_2.13.jar` | sbt's Ivy-style pattern is not 7.x's |
+| `terraform-module-default`, `terraform-provider-default`, `swift-default`, `ansible-default` | any | their unknown tokens are dropped |
+
+**Existing repositories.** A repository names its layout, so a changed definition applies to
+it at once. Neither the npm nor the Go format reads a layout to find its files, so nothing
+they store depends on the old definitions; a file a layout-translating copy wrote with one
+stays where it was written.
 
 ## Common fields
 
@@ -648,10 +703,10 @@ Settled since the audit:
 - A key follows the rules in "Key rules": a length for each class (64, 58 for remote, 63 for Docker, OCI and Helm OCI local and federated), none of the documented or provider-refused characters, no reserved name or prefix in any case, no `-cache` suffix, and lower case without `_` for Docker, OCI and Helm OCI. The evidence is [D] [repository-management-overview](https://docs.jfrog.com/artifactory/docs/repository-management-overview.md) and [S] terraform-provider-shared [`repo_key.go`](https://github.com/jfrog/terraform-provider-shared/blob/adad42471470/validator/fw/string/repo_key.go). artifactweave refuses a key that breaks them with 400 on create, batch create, the configuration descriptor and an update that spells the key in another case, and accepts a leading digit, as 7.x has since 7.53.1 ([#395](https://github.com/weaveplatform/artifactweave/issues/395)).
 
 **Unconfirmed for 7.x:**
-- The bundled layouts copied from the 6.20 descriptor ("Bundled definitions"): JFrog
-  publishes only their names, so their patterns stay as 6.20 had them, on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
-  Exported 7.x descriptors define `npm-default` and `go-default` differently
-  ("Exported 7.x descriptors").
+- The bundled layouts ("Bundled definitions"): JFrog's documentation publishes only their
+  names. Their patterns come from JFrog's 7.38.8 export and the exported 7.x descriptors,
+  and whether 7.161 ships the same, and how its parser reads the Terraform, Swift and
+  Ansible layouts' tokens, is on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 - 6.20's default for `snapshotVersionBehavior` and `suppressPomConsistencyChecks`, which the
   table notes.
 - The listing names marked [I] in "Package type names in listings", and that the list uses

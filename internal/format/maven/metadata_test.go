@@ -392,33 +392,75 @@ func TestPluginMetadata(t *testing.T) {
 	}
 }
 
-// Under deployer the client keeps every level of metadata: nothing is
-// queued or derived.
-func TestDeployerDerivesNothing(t *testing.T) {
+// Under deployer a deploy leaves every level of metadata to the client:
+// nothing is queued or derived. A delete of other files recalculates it, as
+// JFrog says of 7.x (RTFACT-26651), so the metadata no longer lists what
+// was deleted and still lists every other snapshot (RTFACT-26126). A
+// delete of the metadata itself writes nothing back.
+func TestDeployerMetadata(t *testing.T) {
 	w := newMetaWorld(t, func(c *repo.Config) { c.SnapshotVersionBehavior = repo.Deployer })
 	dir := "com/acme/app/"
-	w.deploy(dir+"1.0/app-1.0.pom", types.Properties{maven.PluginProperty: {"true"}})
+	plugin := types.Properties{maven.PluginProperty: {"true"}}
+	w.deploy(dir+"1.0/app-1.0.pom", plugin)
+	w.deploy(dir+"1.0/app-1.0.jar", nil)
+	w.deploy(dir+"2.0/app-2.0.pom", nil)
 	w.deploy(dir+"1.0-SNAPSHOT/app-1.0-SNAPSHOT.pom", nil)
+	w.deploy(dir+"1.0-SNAPSHOT/app-1.0-SNAPSHOT.jar", nil)
+	w.deploy(dir+"2.0-SNAPSHOT/app-2.0-20261017.090000-1.pom", nil)
+	w.deploy(dir+"2.0-SNAPSHOT/app-2.0-20261017.090000-1.jar", nil)
+	w.deploy(dir+"2.0-SNAPSHOT/maven-metadata.xml", nil, "client snapshot")
 	w.deploy(dir+"maven-metadata.xml", nil, "client")
-	w.delete(dir + "1.0/app-1.0.pom")
+	w.deploy("com/acme/maven-metadata.xml", nil, "client plugins")
 	if got := w.queued(); len(got) != 0 {
-		t.Errorf("queued %v", got)
+		t.Fatalf("a deploy queued %v", got)
 	}
 	if body, _, _ := w.get(dir + "maven-metadata.xml"); body != "client" {
-		t.Errorf("%q", body)
+		t.Fatalf("%q", body)
 	}
 	if _, _, ok := w.get(dir + "1.0-SNAPSHOT/maven-metadata.xml"); ok {
-		t.Error("snapshot metadata derived under deployer")
+		t.Fatal("snapshot metadata derived on a deploy")
+	}
+
+	w.delete(dir + "maven-metadata.xml")
+	if got := w.queued(); len(got) != 0 {
+		t.Fatalf("deleting the metadata queued %v", got)
+	}
+	w.deploy(dir+"maven-metadata.xml", nil, "client")
+
+	w.delete(dir + "1.0/app-1.0.jar")
+	w.delete(dir + "2.0")
+	w.delete(dir + "1.0/app-1.0.pom")
+	if got := w.queued(); got[maven.KindMetadata] != 1 || got[maven.KindPlugins] != 1 {
+		t.Fatalf("a delete queued %v", got)
+	}
+	body, it, _ := w.get(dir + "maven-metadata.xml")
+	if it.ModifiedBy != maven.Deriver || strings.Contains(body, "<version>1.0</version>") ||
+		strings.Contains(body, "<version>2.0</version>") ||
+		!strings.Contains(body, "<version>1.0-SNAPSHOT</version>") ||
+		!strings.Contains(body, "<version>2.0-SNAPSHOT</version>") {
+		t.Errorf("artifact level after the deletes:\n%s", body)
+	}
+	body, _, _ = w.get(dir + "1.0-SNAPSHOT/maven-metadata.xml")
+	if !strings.Contains(body, "<buildNumber>1</buildNumber>") {
+		t.Errorf("a deployer's -SNAPSHOT folder:\n%s", body)
+	}
+	body, _, _ = w.get(dir + "2.0-SNAPSHOT/maven-metadata.xml")
+	if !strings.Contains(body, "<value>2.0-20261017.090000-1</value>") {
+		t.Errorf("a deployer's unique folder:\n%s", body)
+	}
+	// The run found no plugin, and keeps a group file it did not write.
+	if body, _, _ := w.get("com/acme/maven-metadata.xml"); body != "client plugins" {
+		t.Errorf("plugin level after the deletes: %q", body)
 	}
 }
 
 // Work asked for a repository that is gone, or no longer of the Maven
-// group, or under deployer, owes nothing.
+// group, owes nothing.
 func TestWorkForChangedRepository(t *testing.T) {
 	w := newMetaWorld(t, nil)
 	w.deploy("com/acme/app/1.0/app-1.0.pom", nil)
 	c := w.c
-	c.SnapshotVersionBehavior = repo.Deployer
+	c.PackageType = repo.Generic
 	if err := w.db.Repos().Update(w.ctx, c); err != nil {
 		t.Fatal(err)
 	}
@@ -426,7 +468,7 @@ func TestWorkForChangedRepository(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, _, ok := w.get("com/acme/app/maven-metadata.xml"); ok {
-		t.Error("metadata derived after the repository turned to deployer")
+		t.Error("metadata derived after the repository turned generic")
 	}
 	for _, key := range []string{"gone/com.acme:app", "no-slash"} {
 		if err := w.db.WorkQueue().Enqueue(w.ctx, maven.KindMetadata, key, nil, w.now); err != nil {
@@ -501,9 +543,14 @@ func TestOwed(t *testing.T) {
 		{local, false, "com/acme/app/1.0/app-1.0.jar", nil},
 		{local, true, "com/acme/app/maven-metadata.xml", nil},
 		{repo.Config{Key: "r", Class: repo.Remote}, false, "com/acme/app/maven-metadata.xml", nil},
+		// Under deployer only a delete asks for work, which a read waits for.
 		{
 			repo.Config{Key: "m", Class: repo.Local, SnapshotVersionBehavior: repo.Deployer},
-			false, "com/acme/app/maven-metadata.xml", nil,
+			false, "com/acme/app/maven-metadata.xml",
+			[]format.WorkRef{
+				{Kind: maven.KindMetadata, Key: "m/com.acme:app"},
+				{Kind: maven.KindPlugins, Key: "m/com.acme.app"},
+			},
 		},
 	} {
 		if got := h.Owed(tc.c, tc.cached, tc.path); !slices.Equal(got, tc.want) {

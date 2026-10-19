@@ -102,6 +102,11 @@ for 7.x and stays on that list.
   `sbt-default` is not defined in that class but in the default descriptor
   (`artifactory.config.xml:172-179`), which #277 checked artifactweave's copy against
   ([research 03](03-repository-configuration-model.md#bundled-definitions)).
+- **[I]** 7.x adds `sbt-ivy-default`, which the two newest exported 7.x descriptors define
+  as `[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]`
+  with the Ivy descriptor `ivy-[baseRev](-[fileItegRev])(-[classifier]).xml` in the revision
+  folder ([research 03](03-repository-configuration-model.md#exported-7x-descriptors));
+  `pkg/layout` bundles it so.
 - **[S]** The Terraform provider gives each type a default `repoLayoutRef`: `maven-2-default`
   for Maven and Gradle, `ivy-default` for Ivy and `sbt-default` for SBT
   (`default_repo_layout_map.go`).
@@ -244,7 +249,18 @@ Artifactory uses two different tests:
     it is used to calculate future snapshots";
   - any POM queues the grandparent (`groupId/artifactId`) **asynchronously**.
 - **[S] After a delete,** the parent is queued, and for a POM the grandparent too, unless
-  `mvn.metadata.calculation.skip.delete.event` is set (`afterDelete`).
+  `mvn.metadata.calculation.skip.delete.event` is set (`afterDelete`). Unlike `afterCreate`,
+  it does not skip `deployer` repositories.
+- **[J] 7.x under `deployer`** recalculates after a delete of other files: JFrog's Evgeny
+  Karasik on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651)
+  (open, affects 7.27.10): "in case of Deployer strategy, we do expect this file not to be
+  deleted). If the file is not deleted, but only the other files (jars,etc.), the
+  re-calculation should be done properly on our end." [7.27.3](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26126)
+  fixed that recalculation: "the maven-metadata.xml of this repository was emptied, when
+  deleting a snapshot from the Maven local repository if the Maven snapshot version was set
+  to deployer" (RTFACT-26126, expecting "metadata related to other snapshots in that
+  repository" to remain). 6.20's snapshot level under `deployer` has `buildNumber` 1 with
+  no unique POM and an empty `snapshot` with one (3.3), which may be what emptied it.
 - **[S] The queue.** `calculateMavenMetadataAsync` and `calculateMavenPluginsMetadataAsync`
   are `@Async(delayUntilAfterCommit = true, workQueue = true)`: they run after the commit, on
   work queues of 8 and 2 workers (`mvn.metadata.calculation.workers`,
@@ -483,6 +499,12 @@ highest in version order, whatever the upload order.
 - **[I]** The alphabetical order for other layouts is older than 6.20, whose code used the
   Mercury order and creation dates instead; artifactweave follows the 7.x documentation
   (decision 0036), and #216 asks which a live 7.x does.
+- **[J]** Older Jira contradicts the rule that both integration revisions must be in the
+  layout: on [RTFACT-17515](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-17515)
+  (fixed in 6.12.0) JFrog's assignee resolved `{generic_repo}/org/pkg/[RELEASE]/pkg-[RELEASE].tgz`
+  to 2.0.0 under `[orgPath]/[module]/[baseRev]/[module]-[baseRev].[ext]`, which has neither.
+  The 7.x page is the newer and first source, so artifactweave follows it; #216 asks which a
+  live 7.x does.
 - **[D]** The same page says latest version resolution needs Artifactory Pro.
 
 ## 9. calculateMetadata and generatePom
@@ -571,6 +593,15 @@ These go to the live-comparison list ([#216](https://github.com/weaveplatform/ar
 19. Whether 7.x still serves the computed checksum of `maven-metadata.xml` under
     `client-checksums`, as 6.20 does, and the message of the 404 for a checksum the client
     never sent (section 4).
+20. Whether 7.x resolves `[RELEASE]` and `[INTEGRATION]` under a layout without both
+    integration revisions, as RTFACT-17515 did in 6.12, or looks the path up as it is, as
+    its documentation says (section 8).
+21. What 7.x recalculates under `deployer` after a delete (3.2): only the deleted file's
+    folder and, for a POM, its artifact folder, as 6.20's `afterDelete` asks, or every level
+    of the package, as artifactweave does; and what a recalculated snapshot folder says when
+    it holds unique builds.
+22. How 7.x reads a POM whose declaration names an encoding other than ISO-8859-1 or UTF-8,
+    one it does not know, and one with non-UTF-8 bytes and no declaration (section 6).
 
 ## 12. Versions at the research baseline
 
@@ -619,27 +650,25 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - Plugin metadata is calculated only when the file deployed or deleted is a Maven plugin,
   since 7.10.1 ([J] RTFACT-20623, section 3.2). Decision 0036 now says so.
 
-**7.x differs** from artifactweave on these points, found by the audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
-- 7.x differs: an ISO-8859-1 POM is accepted on upload and on copy, where artifactweave reads
-  every POM as UTF-8 and refuses one with a non-ASCII byte ([D]
+The audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) settled three
+more points, and decision 0036 follows each:
+- An ISO-8859-1 POM is accepted on upload and on copy ([D]
   [SaaS 7.110.5](https://docs.jfrog.com/releases/docs/artifactory-saas-releases#artifactory-71105-saas),
-  RTDEV-56287, section 6); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
-- 7.x differs: `[RELEASE]` and `[INTEGRATION]` resolve only under a layout that defines both
+  RTDEV-56287, section 6), so a POM is read in the encoding its XML declaration names.
+- `[RELEASE]` and `[INTEGRATION]` resolve only under a layout that defines both
   `[folderItegRev]` and `[fileItegRev]`, so under `maven-1-default` or `sbt-default` the path
   is looked up as it is ([D] [retrieveartifact](https://docs.jfrog.com/artifactory/reference/retrieveartifact.md):
   "Both [folderItegRev] and [fileItegRev] have to be defined in the repository layout",
-  section 8); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
-- 7.x differs: under `deployer`, a delete of other files recalculates `maven-metadata.xml`
-  rather than leaving it ([J] [RTFACT-26126](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26126),
-  fixed in 7.27.3, expects "metadata related to other snapshots in that repository" to remain
-  after a delete; JFrog staff on [RTFACT-26651](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-26651):
-  "If the file is not deleted, but only the other files (jars,etc.), the re-calculation should
-  be done properly on our end"); fixed by [#418](https://github.com/weaveplatform/artifactweave/issues/418).
+  section 8).
+- Under `deployer`, a delete of other files recalculates `maven-metadata.xml` rather than
+  leaving it (section 3.2).
+
+**7.x differs** from artifactweave on this point, found by the audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
 - 7.x differs: an sbt repository created without `repoLayoutRef` gets `sbt-default` ([D]
   [sbt-repositories](https://docs.jfrog.com/artifactory/docs/sbt-repositories.md), section
   1.1); fixed by [#396](https://github.com/weaveplatform/artifactweave/issues/396).
 
-**Evidence for open tickets.** The audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found 7.x evidence for three points that open tickets change:
+**Evidence for open tickets.** The audit ([#378](https://github.com/weaveplatform/artifactweave/issues/378)) found 7.x evidence for two points that open tickets change:
 - `maxUniqueSnapshots`: "Artifactory requires that you store a minimum of 2 unique
   snapshots", builds over the limit are marked on deploy, and "every 5 minutes, Artifactory
   runs a background process" that deletes them ([KB] [how the max unique snapshots parameter
@@ -654,11 +683,6 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   artifactweave's specification as "Plain-text acknowledgement naming the folder", where it
   now says "Empty." (`api/src/artifactory/paths-packagetypes.yaml`). Both are
   [#282](https://github.com/weaveplatform/artifactweave/issues/282)'s.
-- `sbt-ivy-default`: the two newest exported 7.x descriptors define it as
-  `[orgPath]/[module]/[baseRev](-[folderItegRev])/[module]-[baseRev](-[fileItegRev])(-[classifier]).[ext]`
-  ([I], [research 03](03-repository-configuration-model.md#exported-7x-descriptors)), which
-  weakens DV-055's reasoning that no definition is published;
-  [#376](https://github.com/weaveplatform/artifactweave/issues/376) aligns it.
 
 **Unconfirmed for 7.x:** every other **[S]** claim, which the 6.20 source alone supports:
 - the snapshot adapters and build numbering (2.2, 2.3);
@@ -671,4 +695,4 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
 - token tie-breaks (section 8);
 - the 6.20 behaviour of `calculateMetadata` (section 9).
 
-They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added, items 17 and 18 from #280, and item 19 from #399.
+They stay on [#216](https://github.com/weaveplatform/artifactweave/issues/216) for P19, with items 15 and 16 of section 11 added, items 17 and 18 from #280, item 19 from #399, and items 20 to 22 from #418.

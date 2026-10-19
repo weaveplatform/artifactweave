@@ -2908,7 +2908,8 @@ paths:
       description: 'Streams the content of a file. Resolution follows the repository class: local serves stored
         content, remote serves the cache or fetches from upstream, virtual walks its members in order. Matrix parameters
         `;key=value` on the path restrict resolution to items carrying those properties. The version tokens `[RELEASE]`,
-        `[INTEGRATION]` and `SNAPSHOT` in layout-aware repositories resolve to the latest matching version. Supports
+        `[INTEGRATION]` and `SNAPSHOT` resolve to the latest matching version in a repository whose layout defines
+        both `[folderItegRev]` and `[fileItegRev]`; elsewhere the path is looked up as written. Supports
         `Range` requests with 206 and exposes `X-Checksum-Md5`, `X-Checksum-Sha1` and `X-Checksum-Sha256` headers.
         Each completed download updates the statistics unless `skipUpdateStats=true`. In a repository with
         `downloadRedirect` or `cdnRedirect`, a GET of a file at least `download.redirect.min_size` long answers 302

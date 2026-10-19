@@ -69,3 +69,40 @@ func TestMavenDownloadsResolveVersions(t *testing.T) {
 		http.StatusNotFound,
 	)
 }
+
+// Under a layout without both integration revisions a version token is part
+// of the name looked up, so the download is 404 though a release exists.
+func TestMavenLayoutWithoutIntegrationRevisions(t *testing.T) {
+	w := newItemWorld(t, false)
+	c := repo.Config{
+		Key:           "m1-local",
+		Class:         repo.Local,
+		PackageType:   repo.Maven,
+		RepoLayoutRef: repo.LayoutMaven1,
+	}
+	if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+		t.Fatal(err)
+	}
+	base := "/artifactory/m1-local/acme/jars/"
+	wantStatus(t, w.do("PUT", base+"app-2.0.jar", "admin", "jar 2.0"), http.StatusCreated)
+	wantStatus(t, w.do("GET", base+"app-[RELEASE].jar", "reader", ""), http.StatusNotFound)
+	wantStatus(t, w.do("GET", base+"app-2.0.jar", "reader", ""), http.StatusOK)
+}
+
+// An ISO-8859-1 POM is deployed and copied with the POM checks on.
+func TestMavenLatin1POM(t *testing.T) {
+	w := newItemWorld(t, false)
+	for _, key := range []string{"latin-local", "latin-copy"} {
+		c := repo.Config{Key: key, Class: repo.Local, PackageType: repo.Maven}
+		if err := w.db.Repos().Create(context.Background(), *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	pom := `<?xml version="1.0" encoding="ISO-8859-1"?>` +
+		"<project><groupId>com.acme</groupId><artifactId>app</artifactId><version>2.0</version>" +
+		"<name>Caf\xe9</name></project>"
+	path := "com/acme/app/2.0/app-2.0.pom"
+	wantStatus(t, w.do("PUT", "/artifactory/latin-local/"+path, "admin", pom), http.StatusCreated)
+	wantStatus(t, w.do("POST", "/artifactory/api/copy/latin-local/"+path+"?to=/latin-copy/"+path,
+		"admin", ""), http.StatusOK)
+}

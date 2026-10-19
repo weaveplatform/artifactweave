@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +16,7 @@ import (
 	"github.com/weaveplatform/artifactweave/internal/format/golang"
 	"github.com/weaveplatform/artifactweave/internal/service/item"
 	"github.com/weaveplatform/artifactweave/pkg/aql"
+	"github.com/weaveplatform/artifactweave/pkg/blob"
 	"github.com/weaveplatform/artifactweave/pkg/blob/fs"
 	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
@@ -229,6 +232,163 @@ func TestIndex(t *testing.T) {
 		t.Fatalf("reindexed: %+v %v", again, files)
 	}
 }
+
+// A version keeps the Time its stored .info gives, which @v/list answers:
+// a replaced .info changes it, and one that gives no RFC 3339 Time, or is
+// gone, leaves the version dated as a synthesised .info is. A reindex
+// reads the same.
+func TestInfoTime(t *testing.T) {
+	w := newWorld(t)
+	c := w.repo("go-local")
+	w.must(w.deploy(c, dir+".zip", "zip"))
+	zipped := w.now
+	w.must(w.deploy(c, dir+".mod", "module example.com/m\n"))
+	listed := func(step string, want time.Time) {
+		t.Helper()
+		pv, _, ok := w.version(c, "example.com/m", "v1.0.0")
+		if got := golang.ListTime(pv); !ok || !got.Equal(want) {
+			t.Fatalf("%s: %v (%s); want %v", step, got, pv.Metadata, want)
+		}
+		env := format.Env{Store: w.st, Blobs: w.items.Blobs}
+		w.must(golang.Handler{}.Reindex(w.ctx, env, c))
+		again, _, _ := w.version(c, "example.com/m", "v1.0.0")
+		if got := golang.ListTime(again); !got.Equal(want) {
+			t.Fatalf("%s, reindexed: %v; want %v", step, got, want)
+		}
+	}
+	listed("no .info", zipped)
+	w.must(w.deploy(c, dir+".info", `{"Version":"v1.0.0","Time":"2026-10-01T10:00:00+02:00"}`))
+	listed("stored .info", time.Date(2026, 10, 1, 8, 0, 0, 0, time.UTC))
+	w.must(w.deploy(c, dir+".info", `{"Version":"v1.0.0","Time":"2026-10-02T08:00:00Z"}`))
+	listed("replaced .info", time.Date(2026, 10, 2, 8, 0, 0, 0, time.UTC))
+	for name, body := range map[string]string{
+		"no Time":       `{"Version":"v1.0.0"}`,
+		"null Time":     `{"Version":"v1.0.0","Time":null}`,
+		"not RFC 3339":  `{"Version":"v1.0.0","Time":"yesterday"}`,
+		"not a string":  `{"Version":"v1.0.0","Time":7}`,
+		"not JSON":      `v1.0.0`,
+		"over 64 KiB":   `{"Version":"v1.0.0","Pad":"` + strings.Repeat("x", golang.MaxInfo) + `"}`,
+		"blank content": ``,
+	} {
+		w.must(w.deploy(c, dir+".info", body))
+		listed(name, zipped)
+	}
+	w.must(w.deploy(c, dir+".info", `{"Version":"v1.0.0","Time":"2026-10-02T08:00:00Z"}`))
+	_, err := w.items.Delete(w.ctx, item.Target{Repo: c, Path: dir + ".info"}, "test")
+	w.must(err)
+	listed("deleted .info", zipped)
+
+	// Hooks run on a store alone read no .info, so the version is dated
+	// by its files.
+	w.must(w.deploy(c, dir+".info", `{"Version":"v1.0.0","Time":"2026-10-02T08:00:00Z"}`))
+	w.must(golang.Handler{}.Reindex(w.ctx, format.Env{Store: w.st}, c))
+	pv, _, _ := w.version(c, "example.com/m", "v1.0.0")
+	if got := golang.ListTime(pv); !got.Equal(zipped) {
+		t.Fatalf("without blobs: %v", got)
+	}
+}
+
+// A layout-translating copy from a simple-default repository into one with
+// go-default lands each file where the Go format reads it, so the copy
+// indexes the version; one back translates the path to simple-default's.
+func TestTranslatingCopy(t *testing.T) {
+	w := newWorld(t)
+	simple := repo.Config{
+		Key: "flat", Class: repo.Local, PackageType: repo.Generic,
+		RepoLayoutRef: repo.LayoutSimple,
+	}
+	repo.Defaults(&simple)
+	w.must(w.st.Repos().Create(w.ctx, simple))
+	gorepo := repo.Config{
+		Key: "go-local", Class: repo.Local, PackageType: repo.Go, RepoLayoutRef: repo.LayoutGo,
+	}
+	repo.Defaults(&gorepo)
+	w.must(w.st.Repos().Create(w.ctx, gorepo))
+	for _, ext := range []string{"zip", "mod", "info"} {
+		w.must(w.deploy(simple, "example.com/acme/lib/lib-1.2.3."+ext, ext))
+	}
+	res, err := w.items.Transfer(w.ctx, item.Transfer{
+		From: item.Target{Repo: simple}, To: item.Target{Repo: gorepo},
+		TranslateLayouts: true, By: "test",
+	})
+	if err != nil || res.Failed != 0 || res.Files != 3 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	_, files, ok := w.version(gorepo, "example.com/acme/lib", "v1.2.3")
+	if !ok || len(files) != 3 || !slices.Contains(files, "example.com/acme/lib/@v/v1.2.3.zip") {
+		t.Fatalf("indexed %v %v", files, ok)
+	}
+
+	back := repo.Config{
+		Key: "flat-back", Class: repo.Local, PackageType: repo.Generic,
+		RepoLayoutRef: repo.LayoutSimple,
+	}
+	repo.Defaults(&back)
+	w.must(w.st.Repos().Create(w.ctx, back))
+	if _, err := w.items.Transfer(w.ctx, item.Transfer{
+		From: item.Target{Repo: gorepo}, To: item.Target{Repo: back},
+		TranslateLayouts: true, By: "test",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.st.Items().Get(
+		w.ctx, back.Key, false, "example.com/acme/lib/lib-1.2.3.mod",
+	); err != nil {
+		t.Fatalf("translated back: %v", err)
+	}
+}
+
+// A stored .info whose content cannot be read fails the write or the
+// reindex that indexes it, with the cause.
+func TestInfoTimeUnreadable(t *testing.T) {
+	ctx := context.Background()
+	c := repo.Config{Key: "go-local", Class: repo.Local, PackageType: repo.Go}
+	st := inmem.New()
+	if err := st.Repos().Create(ctx, c); err != nil {
+		t.Fatal(err)
+	}
+	info := types.Item{
+		RepoKey: c.Key, Path: "example.com/m/@v", Name: "v1.0.0.info", Depth: 4,
+		Actual: types.Checksums{SHA256: strings.Repeat("0", 64)},
+	}
+	if _, err := st.Items().Put(ctx, info); err != nil {
+		t.Fatal(err)
+	}
+	for name, blobs := range map[string]format.Blobs{
+		"open": brokenBlobs{}, "read": brokenBlobs{read: true},
+	} {
+		env := format.Env{Store: st, Blobs: blobs}
+		if err := (golang.Handler{}).Deployed(ctx, env, c, info); !errors.Is(err, errBlob) {
+			t.Errorf("%s, deployed: %v", name, err)
+		}
+		if err := (golang.Handler{}).Reindex(ctx, env, c); !errors.Is(err, errBlob) {
+			t.Errorf("%s, reindex: %v", name, err)
+		}
+	}
+}
+
+var errBlob = errors.New("blob boom")
+
+// brokenBlobs fails to open any blob, or with read, opens one that fails
+// to read.
+type brokenBlobs struct{ read bool }
+
+func (b brokenBlobs) Open(context.Context, string) (io.ReadSeekCloser, blob.Info, error) {
+	if b.read {
+		return brokenReader{}, blob.Info{}, nil
+	}
+	return nil, blob.Info{}, errBlob
+}
+
+func (brokenBlobs) Stat(context.Context, string) (blob.Info, error) {
+	return blob.Info{}, errBlob
+}
+
+type brokenReader struct{}
+
+func (brokenReader) Read([]byte) (int, error)       { return 0, errBlob }
+func (brokenReader) Seek(int64, int) (int64, error) { return 0, nil }
+func (brokenReader) Close() error                   { return nil }
 
 // A version's .info is metadata, replaced under the same path; its .zip,
 // .mod and every other file are unique content.

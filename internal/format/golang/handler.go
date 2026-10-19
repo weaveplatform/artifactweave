@@ -26,8 +26,9 @@ func Serves(t repo.PackageType) bool { return t == repo.Go }
 // on every write and delete in them, whichever API carried it. It keeps the
 // package index of decision 0035. A module is a package, and a version is a
 // version while any of its .zip, .mod and .info is stored. The version
-// links exactly those files and is dated by the first of them stored. A
-// file whose path fails the path checks belongs to no version.
+// links exactly those files, is dated by the first of them stored, and
+// keeps the Time its stored .info gives as its metadata. A file whose path
+// fails the path checks belongs to no version.
 type Handler struct {
 	// The generic format admits writes under every package type's deploy
 	// policy.
@@ -41,7 +42,7 @@ func (Handler) Deployed(ctx context.Context, env format.Env, c repo.Config, it t
 	if !ok {
 		return nil
 	}
-	return syncVersion(ctx, env.Store, c, it.Cached, f.Module, f.Version)
+	return syncVersion(ctx, env, c, it.Cached, f.Module, f.Version)
 }
 
 // Deleting runs before a file is removed. The item service drops the
@@ -72,7 +73,7 @@ func (Handler) Deleted(
 	for _, v := range slices.SortedFunc(maps.Keys(touched), func(a, b version) int {
 		return cmp.Or(cmp.Compare(a.module, b.module), cmp.Compare(a.version, b.version))
 	}) {
-		if err := syncVersion(ctx, env.Store, c, v.cached, v.module, v.version); err != nil {
+		if err := syncVersion(ctx, env, c, v.cached, v.module, v.version); err != nil {
 			return err
 		}
 	}
@@ -152,6 +153,13 @@ func (Handler) Reindex(ctx context.Context, env format.Env, c repo.Config) error
 			}
 			v.Files = append(v.Files, h.Item.ID)
 			v.Created = earliest(v.Created, h.Item.Created)
+			if f.Ext == ExtInfo {
+				t, ok, err := storedTime(ctx, env.Blobs, h.Item)
+				if err != nil {
+					return err
+				}
+				v.Metadata = metadataOf(t, ok)
+			}
 		}
 		want := make([]pkgindex.Indexed, 0, len(modules))
 		for name, versions := range modules {
@@ -190,13 +198,13 @@ func fileOf(it types.Item) (File, bool) {
 }
 
 // syncVersion makes version v of module m in c what the tree says: linked
-// to exactly the version files stored, and dated by the first of them. The
-// same reading of the tree is what Reindex does, so the hooks and a
-// reindex agree; files stored anywhere but where the index reads
-// (pkgindex.Stored) are not indexed.
+// to exactly the version files stored, dated by the first of them, and
+// with the Time its stored .info gives. The same reading of the tree is
+// what Reindex does, so the hooks and a reindex agree; files stored
+// anywhere but where the index reads (pkgindex.Stored) are not indexed.
 func syncVersion(
 	ctx context.Context,
-	st store.Store,
+	env format.Env,
 	c repo.Config,
 	cached bool,
 	m, v string,
@@ -204,8 +212,10 @@ func syncVersion(
 	if cached != pkgindex.Stored(c).Cached {
 		return nil
 	}
+	st := env.Store
 	var files []int64
 	var created time.Time
+	var meta []byte
 	for _, ext := range []string{ExtZip, ExtMod, ExtInfo} {
 		p := File{Module: m, Version: v, Ext: ext}.Path()
 		it, err := st.Items().Get(ctx, c.Key, cached, p)
@@ -219,6 +229,13 @@ func syncVersion(
 		}
 		files = append(files, it.ID)
 		created = earliest(created, it.Created)
+		if ext == ExtInfo {
+			t, ok, err := storedTime(ctx, env.Blobs, it)
+			if err != nil {
+				return err
+			}
+			meta = metadataOf(t, ok)
+		}
 	}
 	if len(files) == 0 {
 		return nil
@@ -230,7 +247,7 @@ func syncVersion(
 		return fmt.Errorf("golang: module %s: %w", m, err)
 	}
 	_, err = pkgindex.Sync(ctx, st, p, pkgindex.IndexedVersion{
-		Version: v, Created: created, Files: files,
+		Version: v, Created: created, Metadata: meta, Files: files,
 	})
 	return err //nolint:wrapcheck // pkgindex wraps its own
 }

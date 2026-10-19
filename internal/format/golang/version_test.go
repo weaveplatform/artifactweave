@@ -3,6 +3,7 @@ package golang_test
 import (
 	"slices"
 	"testing"
+	"time"
 
 	"golang.org/x/mod/semver"
 
@@ -60,18 +61,35 @@ func sign(n int) int {
 	return min(max(n, -1), 1)
 }
 
-// @v/list leaves pseudo-versions out and sorts the rest.
+// @v/list lists every version, pseudo-versions included, in ascending
+// order, each with the Time its stored .info gives, or else when its first
+// file was stored, in UTC.
 func TestListed(t *testing.T) {
-	got := golang.Listed([]string{
-		"v2.0.0+incompatible", "v1.10.0", "v0.0.0-20191109021931-daa7c04131f5", "v1.2.0",
-		"v1.2.4-0.20191109021931-daa7c04131f5", "v1.2.0-rc.1",
-	})
-	want := []string{"v1.2.0-rc.1", "v1.2.0", "v1.10.0", "v2.0.0+incompatible"}
-	if !slices.Equal(got, want) {
-		t.Fatalf("%v; want %v", got, want)
+	created := time.Date(2026, 10, 17, 9, 30, 0, 0, time.FixedZone("CEST", 2*3600))
+	v := func(version, meta string) types.PackageVersion {
+		return types.PackageVersion{Version: version, Created: created, Metadata: []byte(meta)}
 	}
-	if got := golang.Listed([]string{"v0.0.0-20191109021931-daa7c04131f5"}); len(got) != 0 {
-		t.Fatalf("pseudo-versions only: %v", got)
+	got := golang.Listed([]types.PackageVersion{
+		v("v2.0.0+incompatible", ""),
+		v("v1.10.0", `{"time":"2026-10-01T08:00:00Z"}`),
+		v("v0.0.0-20191109021931-daa7c04131f5", `{"time":"2019-11-09T02:19:31Z"}`),
+		v("v1.2.0", `{"time":"not a time"}`),
+		v("v1.2.4-0.20191109021931-daa7c04131f5", `not JSON`),
+		v("v1.2.0-rc.1", ""),
+	})
+	want := []string{
+		"v0.0.0-20191109021931-daa7c04131f5 2019-11-09T02:19:31Z",
+		"v1.2.0-rc.1 2026-10-17T07:30:00Z",
+		"v1.2.0 2026-10-17T07:30:00Z",
+		"v1.2.4-0.20191109021931-daa7c04131f5 2026-10-17T07:30:00Z",
+		"v1.10.0 2026-10-01T08:00:00Z",
+		"v2.0.0+incompatible 2026-10-17T07:30:00Z",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("%q; want %q", got, want)
+	}
+	if got := golang.Listed(nil); len(got) != 0 {
+		t.Fatalf("no versions: %v", got)
 	}
 }
 

@@ -103,6 +103,12 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
     field parsed as RFC 3339 if the line has one, else the time a pseudo-version encodes.
     Lines with neither are skipped. A proxy whose list leaves out pseudo-versions and that
     has no `@latest` therefore cannot resolve a module that has only pseudo-versions.
+- **[S]** So a list that holds pseudo-versions changes nothing the go command resolves while
+  `@latest` answers. Tested with go1.27.1 against a file proxy on 2026-10-19, with lines
+  `<version> <RFC 3339 time>` that include pseudo-versions newer than every tag:
+  `go list -m -versions` printed only the tagged versions; `go list -m <module>@latest` and
+  `go get <module>@latest` chose the highest release, or the highest pre-release when
+  there was none, and for a module with only pseudo-versions the version `@latest` named.
   - `Stat` (369-389) requests `@v/$version.info` and fails when the answer's `Version`
     differs from a requested version that is canonical and valid for the module path.
   - `GoMod` (406-420) and `Zip` (from 422) request only canonical versions, and `Zip` reads at most
@@ -225,7 +231,7 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
 
 ### 4.2 Storage and the `go-default` layout
 
-- **[S]** `GoDefaultLayoutConverter` and `artifactory.config.xml:209-213` define
+- **[S]** In 6.20, `GoDefaultLayoutConverter` and `artifactory.config.xml:209-213` define
   `go-default` as `[orgPath]/[module]/@v/v[refs].zip`, with
   `distinctiveDescriptorPathPattern` false and both integration-revision expressions `.*`.
 - **[S]** `RepoLayoutUtils.generateRegExpFromPattern` (`RepoLayoutUtils.java:278-345`)
@@ -233,17 +239,33 @@ where neither shows it, the claim is **[I]** and the point is on the live-captur
   custom `[name<regex>]` token, and with `failOnUnknownToken` false the parser drops it
   with a debug log. The expression then matches only a file named `v.zip` under `@v/`,
   that is no stored module file, and has no `baseRev` to read a version from.
+- **[S]** 7.x replaced it. JFrog's own 7.38.8 export, a test fixture of the JFrog CLI
+  (jfrog-cli-artifactory `4a0f3827cfa0`,
+  `artifactory/commands/testdata/artifactory_export/etc/artifactory.config.latest.xml`,
+  schema 3.1.29), defines `go-default` as
+  `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]`, both integration revisions
+  `.*`, as three of the four exported descriptors in
+  [research 03](03-repository-configuration-model.md#exported-7x-descriptors) do.
+- **[J]** A fresh instance has the new form and one upgraded from 6.x keeps
+  `v[refs].zip`: a customer reports both on 7.99.1
+  ([RTFACT-31118](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-31118), open, no
+  JFrog reply), and a 7.4.3 upgrade log reads "Module Info cannot be extracted from
+  go-default layout - version files will not be resolved"
+  ([RTFACT-22104](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-22104)). No release
+  note names the change.
 - **[I]** Artifactory stores a version at the path `jf gp` deploys it to,
   `<module>/@v/<version>.{zip,mod,info}`, with the module path and version as written, not
   case-encoded: the build-info `jf gp` records names that path (section 3.1).
-- **[S]** artifactweave's `go-default` (`pkg/layout/bundled.go:146-154`) is
-  `[orgPath]/[module]/@v/[baseRev].[ext]`. Checked against `pkg/layout` on 2026-10-16:
+- **[S]** artifactweave's `go-default` (`pkg/layout/bundled.go`) is 7.x's. Checked against
+  `pkg/layout` on 2026-10-19 (`bundled_test.go`):
   - `github.com/go-chi/chi/v5/@v/v5.3.2.zip` gives `orgPath` `github.com/go-chi/chi`,
-    `module` `v5`, `baseRev` `v5.3.2` and `ext` `zip`;
-  - pseudo-versions, `+incompatible` and pre-releases such as `v1.0.0-rc.1` split correctly;
-  - `v1.0.0-alpha.beta.zip` splits into `baseRev` `v1.0.0-alpha` and `ext` `beta.zip`,
-    because the `[ext]` expression accepts any later dotted part that does not start with a
-    digit;
+    `module` `v5`, `baseRev` `5.3.2` and `ext` `zip`;
+  - `v1.2.0-rc.1.mod` gives `baseRev` `1.2.0` and `fileItegRev` `rc.1`, and
+    `v1.0.0-alpha.beta.info` `fileItegRev` `alpha.beta`: the greedy file revision leaves
+    only the last dotted part to `[ext]`;
+  - a pseudo-version's timestamp and commit are its `fileItegRev`, and
+    `v2.0.0+incompatible.zip` gives `baseRev` `2.0.0+incompatible`;
+  - each path rebuilds from what it gives;
   - a single-element module path such as `example.com` does not match, because
     `[orgPath]/` needs a slash.
 
@@ -285,9 +307,10 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
    case-encoded (section 4.2).
 2. Which properties Artifactory sets on the stored files beyond those `jf gp` sends, such
    as `go.version`.
-3. How Artifactory composes `@v/list` and `@latest`: whether pre-releases and
-   pseudo-versions are listed, the order, and whether a version without `.mod`, `.zip` or
-   `.info` is listed.
+3. How Artifactory composes `@v/list` and `@latest`: the order of the lines, the form of
+   each line's time, the time of a version without a `.info`, and whether a version without
+   `.mod`, `.zip` or `.info` is listed. Section 8 settles that pseudo-versions are listed
+   with their `.info` time.
 4. What Artifactory answers for `.info` and `.mod` of a version deployed without them.
 5. The status and body when a version is republished, with identical and with different
    content, for each of `.zip`, `.mod` and `.info`, and whether the generic deploy, copy
@@ -297,8 +320,8 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
    directly.
 7. Whether `X-Checksum-Sha256` and the other `X-Checksum-*` headers are sent on a deploy
    through `/api/go/`, and on a generic deploy.
-8. The `go-default` layout on Artifactory 7.x, and whether its layout-based searches
-   resolve Go versions (section 4.2).
+8. Whether a fresh 7.161 instance's `go-default` is still the 7.38.8 export's, and whether
+   its layout-based searches resolve Go versions (section 4.2).
 9. Whether `@v/list` and `@latest` leave out versions the caller cannot read.
 10. The `Content-Type` of `.mod`, `.info` and `@v/list` downloads (section 4.3).
 
@@ -340,19 +363,17 @@ their VCS providers (P9). They are:
   ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed));
 - include and exclude patterns honoured for a remote's `.info` files ([7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed)).
 
-None changes what a local repository stores or answers. Jira and the exported descriptors
-show two earlier changes that do ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
-- 7.x differs: a local repository's `@v/list` gives each version a second field, its time
-  from the version's `.info`, and lists the pseudo-versions `jf gp` pushed ([J]
+None changes what a local repository stores or answers. Jira and JFrog's 7.x export show
+two earlier changes that do ([#378](https://github.com/weaveplatform/artifactweave/issues/378)):
+- A local repository's `@v/list` gives each version a second field, its time from the
+  version's `.info`, and lists the pseudo-versions `jf gp` pushed ([J]
   [RTFACT-21670](https://jfrog.atlassian.net/rest/api/2/issue/RTFACT-21670), fixed in 7.8.1:
   Artifactory "is using the last update timestamp for local Go repositories when populating
-  the version list ... we should use that information"); fixed by
-  [#417](https://github.com/weaveplatform/artifactweave/issues/417).
-- `go-default`: three of the four exported 7.x descriptors define it as
-  `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]`, and only the scala one keeps
-  6.20's `v[refs].zip` ([I], [research 03](03-repository-configuration-model.md#exported-7x-descriptors)),
-  so section 4.2's "matches no module file" no longer describes current 7.x;
-  [#376](https://github.com/weaveplatform/artifactweave/issues/376) aligns the layout and DV-040.
+  the version list ... we should use that information"; JFrog's QA marked it resolved after
+  testing on 7.x). The go command picks the same versions with such a list (section 1.3),
+  and decision 0035 lists them so.
+- `go-default` is `[orgPath]/[module]/@v/v[baseRev](-[fileItegRev]).[ext]` on a fresh 7.x
+  instance (section 4.2), and `pkg/layout` bundles it.
 
 **Unconfirmed for 7.x:** Artifactory's Go handler was closed source before 7, so the 6.20 mirror
 holds nothing for this report beyond the shared repository code. Every **[I]** above stays on

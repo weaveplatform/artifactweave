@@ -23,14 +23,23 @@ func TestBundledCompile(t *testing.T) {
 	if len(defs) != 22 {
 		t.Fatalf("expected 22 bundled layouts, got %d", len(defs))
 	}
+	// 7.x ships these with tokens outside the documented set, which a
+	// layout the descriptor stores may not use.
+	unknownTokens := map[string]bool{
+		"terraform-module-default": true, "terraform-provider-default": true,
+		"swift-default": true, "ansible-default": true,
+	}
 	for _, d := range defs {
-		l, err := layout.Compile(d)
-		if err != nil {
-			t.Errorf("%s: %v", d.Name, err)
-			continue
-		}
-		if l.Definition().Name != d.Name {
+		l := mustLookup(t, d.Name)
+		if l.Definition() != d {
 			t.Errorf("definition lost: %+v", l.Definition())
+		}
+		if _, err := l.VersionTokens(); err != nil {
+			t.Errorf("%s with version tokens: %v", d.Name, err)
+		}
+		_, err := layout.Compile(d)
+		if unknownTokens[d.Name] != errors.Is(err, layout.ErrPattern) {
+			t.Errorf("Compile(%s): %v", d.Name, err)
 		}
 	}
 	defs[0].Name = "mutated"
@@ -325,7 +334,13 @@ func TestPrefixes(t *testing.T) {
 			layout.Values{"org": "org.acme", "module": "lib", "baseRev": "2"},
 			[]string{"org.acme/lib/2", "org.acme/lib/ivy-2"},
 		},
-		{"npm-default", layout.Values{"org": "@acme", "module": "ui"}, []string{"@acme/ui/ui-"}},
+		{
+			"npm-default",
+			layout.Values{"orgPath": "lodash", "module": "lodash"},
+			[]string{"lodash/-/"},
+		},
+		// A dropped token adds nothing.
+		{"swift-default", layout.Values{}, []string{"//-.zip"}},
 	}
 	for _, tt := range tests {
 		if got := mustLookup(t, tt.layout).Prefixes(tt.v); !cmp.Equal(got, tt.want) {

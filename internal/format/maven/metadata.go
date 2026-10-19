@@ -353,9 +353,9 @@ func writeSnapshotLevel(
 			continue
 		}
 		// A snapshot folder's metadata is always the server's under unique
-		// and non-unique, which drop the client's (#278), so it goes
-		// whoever wrote it, as Artifactory's removeMetadataIfExist removes
-		// it.
+		// and non-unique, which drop the client's (#278), and a run under
+		// deployer follows a delete, so it goes whoever wrote it, as
+		// Artifactory's removeMetadataIfExist removes it.
 		if err := env.Underive(ctx, c, false, p); err != nil {
 			return fmt.Errorf("maven: remove %s: %w", p, err)
 		}
@@ -422,7 +422,9 @@ func newer(a, b UniqueBuild) bool {
 // snapshotMetadata is the metadata of a snapshot folder with a POM, from
 // its files, as Artifactory's createSnapshotsMetadata writes it under
 // unique and non-unique, except for <version>, which is the folder's base
-// version where Artifactory cuts it at the first hyphen (DV-050).
+// version where Artifactory cuts it at the first hyphen (DV-050). Under
+// deployer, which has it written only after a delete, unique names are
+// read as under unique.
 func snapshotMetadata(
 	c repo.Config,
 	g, a, folder string,
@@ -454,8 +456,13 @@ func snapshotMetadata(
 			latest[k] = build{b, co}
 		}
 	}
-	if latestPom != nil {
+	switch {
+	case latestPom != nil:
 		v.Snapshot.Timestamp, v.Snapshot.BuildNumber = latestPom.Timestamp, latestPom.Number
+	case c.SnapshotVersionBehavior == repo.Deployer:
+		// What a deployer sent as -SNAPSHOT names gets non-unique's build
+		// number, as in 6.20's createSnapshotsMetadata.
+		v.Snapshot.BuildNumber = 1
 	}
 	for _, k := range slices.SortedFunc(maps.Keys(latest), func(x, y [2]string) int {
 		return cmp.Or(cmp.Compare(x[0], y[0]), cmp.Compare(x[1], y[1]))

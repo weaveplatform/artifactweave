@@ -57,7 +57,7 @@ func Read(l *layout.Layout, fullPath string) (Coordinates, bool) {
 		return Coordinates{}, false
 	}
 	lc, ok := l.Read(fullPath)
-	if !ok || lc.Org == "" {
+	if !ok {
 		return Coordinates{}, false
 	}
 	return Coordinates{
