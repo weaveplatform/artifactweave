@@ -83,6 +83,9 @@ type world struct {
 	// goProxy is the GOPROXY the go command uses in this scenario, and
 	// tlsCA the certificate of the scenario's TLS front, if it has one.
 	goProxy, tlsCA string
+	// npmImage and mavenImage are the client images the scenario chose
+	// with "the <client> client can reach the registry", empty until then.
+	npmImage, mavenImage string
 }
 
 // syncBuffer is the server's stderr: the process writes it from exec's

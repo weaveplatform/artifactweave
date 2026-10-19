@@ -1,8 +1,15 @@
 package acceptance
 
 import (
+	"crypto/sha512"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -46,11 +53,55 @@ func (p *pacedLines) Read(b []byte) (int, error) {
 	return n, nil
 }
 
-// npmOnPath skips the scenario unless the runner has an npm of its own, which
-// the JFrog CLI's npm commands run.
-func (w *world) npmOnPath() error {
-	if _, err := exec.LookPath("npm"); err != nil {
+// onRunnerPath skips the scenario unless the runner has the tool on its own
+// PATH, as the JFrog CLI's npm, mvn and gradle commands run it there rather
+// than in a client container.
+func (w *world) onRunnerPath(tool string) error {
+	if _, err := exec.LookPath(tool); err != nil {
 		return godog.ErrSkip
+	}
+	return nil
+}
+
+// lockfilePins checks the entry npm install wrote to package-lock.json for
+// a package: resolved is the binary's URL for the tarball and integrity the
+// SHA-512 of the bytes served there, so an install from the lockfile alone
+// fetches and verifies the same file.
+func (w *world) lockfilePins(name, tarball string) error {
+	dir, err := w.filesDir()
+	if err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "package-lock.json"))
+	if err != nil {
+		return err
+	}
+	var lock struct {
+		Packages map[string]struct {
+			Resolved  string `json:"resolved"`
+			Integrity string `json:"integrity"`
+		} `json:"packages"`
+	}
+	if err := json.Unmarshal(raw, &lock); err != nil {
+		return fmt.Errorf("package-lock.json: %w", err)
+	}
+	entry, ok := lock.Packages["node_modules/"+name]
+	if !ok {
+		return fmt.Errorf("package-lock.json has no entry for %s:\n%s", name, raw)
+	}
+	if want := w.url + w.expand(tarball); entry.Resolved != want {
+		return fmt.Errorf("%s resolved to %q, want %q", name, entry.Resolved, want)
+	}
+	if err := w.getAsAdmin(tarball); err != nil {
+		return err
+	}
+	if err := w.statusIs(http.StatusOK); err != nil {
+		return err
+	}
+	sum := sha512.Sum512(w.body)
+	if want := "sha512-" + base64.StdEncoding.EncodeToString(sum[:]); entry.Integrity != want {
+		return fmt.Errorf("%s has integrity %q, but the tarball served is %q",
+			name, entry.Integrity, want)
 	}
 	return nil
 }
