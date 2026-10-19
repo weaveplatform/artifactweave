@@ -35,6 +35,9 @@ type artifactoryService struct {
 	// signWarn throttles the log line for a failing download-redirect
 	// signer; nil, in services built only to reach the store, logs each.
 	signWarn *throttle
+	// folderSlots holds a token for each folder archive download running;
+	// nil, in services built only to reach the store, limits nothing.
+	folderSlots chan struct{}
 }
 
 type accessService struct {

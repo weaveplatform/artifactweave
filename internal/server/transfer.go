@@ -234,10 +234,16 @@ func writeTransfer(w http.ResponseWriter, status int, msgs []item.Message) {
 	_ = json.NewEncoder(w).Encode(out)
 }
 
+// defaultFolderSlots is Artifactory's "Max Parallel Folder Downloads"
+// default (folderDownloadConfig.maxConcurrentRequests).
+const defaultFolderSlots = 10
+
 // downloadFolderArchive answers GET /api/archive/download/{repo}/{path}: a
 // folder, or a whole repository with an empty path, streamed as one archive.
 // Like Artifactory it is off until the folder download setting enables it,
-// and bounded by that setting's file count and size.
+// bounded by that setting's file count and size, and refused with 400 while
+// the most folder downloads that may run at once are running, after every
+// other check as 6.20's FolderDownloadServiceImpl orders them.
 func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	st, err := s.content()
@@ -314,6 +320,12 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 			fd.MaxFiles, fd.MaxDownloadSizeMB))
 		return
 	}
+	if !s.takeFolderSlot() {
+		writeErr(w, r, badRequest(
+			"There are too many folder download requests currently running. Try again later."))
+		return
+	}
+	defer s.releaseFolderSlot()
 	name := c.Key
 	if p != "" {
 		name = path.Base(p)
@@ -324,6 +336,27 @@ func (s artifactoryService) downloadFolderArchive(w http.ResponseWriter, r *http
 	if err := s.items(st).ArchiveFiles(ctx, files, p, kind, sums, w); err != nil {
 		// The status is sent; the client sees a truncated archive.
 		_ = s.internalError(ctx, "stream folder archive", err)
+	}
+}
+
+// takeFolderSlot reserves a place among the folder downloads that may run
+// at once, false when every place is taken. It never waits: a client told to
+// try again later is better off than one held until another download ends.
+func (s artifactoryService) takeFolderSlot() bool {
+	if s.folderSlots == nil {
+		return true
+	}
+	select {
+	case s.folderSlots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s artifactoryService) releaseFolderSlot() {
+	if s.folderSlots != nil {
+		<-s.folderSlots
 	}
 }
 

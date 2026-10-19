@@ -693,6 +693,9 @@ func contentMatrix() []matrixRow {
 		row(get, lib+"work/get.txt", "", holds("libs-local", "work/", read), 200),
 		row(get, lib+"fixture/get.txt", "", holds("libs-local", "fixture/", read), 200),
 		row(get, "/artifactory/libs-b/b/get.txt", "", holds("libs-b", "b/", read), 200),
+		// A trace answers 200 to every caller that authenticates; a caller
+		// that may not read the file finds the refusal inside it.
+		row(get, lib+"work/get.txt?trace", "", anyone, 200),
 		row(
 			"HEAD /artifactory/{repoKey}/{filePath}", lib+"work/get.txt", "",
 			holds("libs-local", "work/", read), 200,
@@ -774,6 +777,11 @@ func storageMatrix() []matrixRow {
 		row(
 			"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}", meta, `{"props":{"k":"{p}"}}`,
 			holds("libs-local", "work/", annotate), 204,
+		),
+		// Download statistics need annotate too (updateitemproperties).
+		row(
+			"PATCH /artifactory/api/metadata/{repoKey}/{itemPath}", meta,
+			`{"stats":{"downloadCount":3}}`, holds("libs-local", "work/", annotate), 204,
 		),
 		// The repository root's own properties need annotate on all of it.
 		row(

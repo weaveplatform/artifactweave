@@ -98,6 +98,7 @@ func serve(
 			Redirect: server.Redirect{
 				MinSize: int64(cfg.Download.Redirect.MinSize), TTL: cfg.Download.Redirect.TTL,
 			},
+			FolderDownloadMaxConcurrent: cfg.Download.Folder.MaxConcurrentRequests,
 			AQL: server.AQLLimits{
 				MaxResults: cfg.Search.AQL.MaxResults,
 				ScanFactor: cfg.Search.AQL.NonAdminScanFactor,

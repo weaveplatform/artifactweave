@@ -573,6 +573,9 @@ type download struct {
 	folder  bool
 	matrix  types.Matrix
 	resolve resolver
+	// trace records the steps of a ?trace request (traceItem); nil for a
+	// download.
+	trace *resolutionTrace
 }
 
 // newDownload checks p as Artifactory does: its request parsing splits an
@@ -613,6 +616,7 @@ func lookup(
 	seen[c.Key] = true
 	if dl != nil {
 		if err := generic.CheckDownload(c, dl.path, dl.folder); err != nil {
+			dl.step("Request is forbidden by %s", c.Key)
 			return found{}, err //nolint:wrapcheck // a Rejection is the answer
 		}
 	}
@@ -620,6 +624,7 @@ func lookup(
 		cached = cached || c.Class == repo.Remote
 		if dl != nil && dl.resolve != nil {
 			var err error
+			asked := p
 			if p, err = dl.resolve(ctx, c, format.Download{
 				Path:   p,
 				Cached: cached,
@@ -630,9 +635,15 @@ func lookup(
 			}); err != nil {
 				return found{}, err
 			}
+			if p != asked {
+				dl.step("Request path was translated to %s", p)
+			}
 		}
 		it, err := st.Items().Get(ctx, c.Key, cached, p)
 		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				dl.step("Unable to find resource in %s", traceRepoPath(c, cached, p))
+			}
 			return found{}, err //nolint:wrapcheck // ErrNotFound is the answer
 		}
 		return found{repo: c, item: it}, nil
@@ -648,6 +659,7 @@ func lookup(
 		if !acc.folder(m, p, types.ActionRead) {
 			continue
 		}
+		dl.step("Searching for the resource within %s", m.Key)
 		f, err := lookup(ctx, st, m, false, p, acc, dl, seen)
 		// A member that refuses the download is passed over like one that
 		// lacks the item, as Artifactory's search goes on past every member
@@ -661,8 +673,12 @@ func lookup(
 }
 
 // getItem answers GET and HEAD on an item path: file content, a checksum
-// sidecar, or a folder listing.
+// sidecar, or a folder listing; with ?trace, the resolution instead.
 func (s artifactoryService) getItem(w http.ResponseWriter, r *http.Request) {
+	if _, ok := r.URL.Query()["trace"]; ok {
+		s.traceItem(w, r)
+		return
+	}
 	ctx := r.Context()
 	st, err := s.content()
 	if err != nil {
