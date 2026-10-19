@@ -425,3 +425,82 @@ func TestStorageFormatting(t *testing.T) {
 		t.Fatalf("file store %+v", fs)
 	}
 }
+
+// TestRepositoryDeleteKeepsItsContent: deleting a repository moves its
+// content to the trash can under its key, as deleted by the administrator,
+// and only an administrator sees it there or restores it, into a repository
+// that exists, as 7.x restores a deleted repository (#504). While the trash
+// can is off, a repository delete keeps nothing.
+func TestRepositoryDeleteKeepsItsContent(t *testing.T) {
+	w := newItemWorld(t, false)
+	ctx := context.Background()
+	const (
+		tc   = "/artifactory/api/storage/auto-trashcan"
+		repo = "/artifactory/api/repositories/"
+		rs   = "/artifactory/api/trash/restore/"
+	)
+	for _, p := range []string{"a/one.txt", "b/two.txt"} {
+		wantStatus(t, w.do("PUT", "/artifactory/libs-local/"+p, "admin", p), http.StatusCreated)
+	}
+	// user manages, deletes and deploys in both repositories, so only the
+	// deleted repository being gone keeps it out.
+	if err := w.db.Permissions().Create(ctx, types.Permission{
+		Name: "user-all",
+		Resources: map[types.ResourceType]types.Resource{types.ResourceArtifact: {
+			Actions: types.Grants{Users: map[string]types.Actions{
+				"user": types.ActionWrite | types.ActionDelete | types.ActionManage,
+			}},
+			Targets: map[string]types.Target{
+				"libs-local": {Include: []string{"**"}}, "other-local": {Include: []string{"**"}},
+			},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	wantStatus(t, w.do("DELETE", repo+"libs-local", "admin", ""), http.StatusOK)
+
+	file := decodeObject(t, w.do("GET", tc+"/libs-local/a/one.txt", "admin", "").Body.String())
+	props, _ := file["properties"].(map[string]any)
+	if by, _ := props["trash.deletedBy"].([]any); len(by) != 1 || by[0] != "admin" {
+		t.Fatalf("trashed file %v", file)
+	}
+	wantStatus(t, w.do("GET", tc+"/libs-local", "user", ""), http.StatusForbidden)
+	root := w.do("GET", tc, "user", "")
+	wantStatus(t, root, http.StatusOK)
+	if strings.Contains(root.Body.String(), "libs-local") {
+		t.Fatalf("user sees the deleted repository's trash: %s", root.Body)
+	}
+	wantStatus(t, w.do("POST", rs+"libs-local?to=other-local", "user", ""), http.StatusBadRequest)
+	// The restore needs a destination that exists: the deleted repository is
+	// not created again.
+	rec := w.do("POST", rs+"libs-local?to=libs-local", "admin", "")
+	wantStatus(t, rec, http.StatusBadRequest)
+	if !strings.Contains(rec.Body.String(), "Destination repository 'libs-local' does not exist") {
+		t.Fatalf("restore into the deleted repository: %s", rec.Body)
+	}
+	wantStatus(t, w.do("PUT", repo+"libs-local", "admin", `{"rclass":"local"}`,
+		"Content-Type", "application/json"), http.StatusOK)
+	wantStatus(t, w.do("POST", rs+"libs-local?to=libs-local", "admin", ""), http.StatusAccepted)
+	for _, p := range []string{"a/one.txt", "b/two.txt"} {
+		if rec := w.do(
+			"GET",
+			"/artifactory/libs-local/"+p,
+			"admin",
+			"",
+		); rec.Code != http.StatusOK ||
+			rec.Body.String() != p {
+			t.Fatalf("restored %s: %d %q", p, rec.Code, rec.Body)
+		}
+	}
+	wantStatus(t, w.do("GET", tc+"/libs-local", "admin", ""), http.StatusNotFound)
+
+	// The batch delete trashes too.
+	wantStatus(t, w.do("DELETE", "/artifactory/api/v2/repositories/batch", "admin",
+		`["libs-local"]`, "Content-Type", "application/json"), http.StatusOK)
+	wantStatus(t, w.do("GET", tc+"/libs-local/a/one.txt", "admin", ""), http.StatusOK)
+
+	setTrashcan(t, w.db, false)
+	wantStatus(t, w.do("PUT", "/artifactory/other-local/o.txt", "admin", "o"), http.StatusCreated)
+	wantStatus(t, w.do("DELETE", repo+"other-local", "admin", ""), http.StatusOK)
+	wantStatus(t, w.do("POST", rs+"other-local?to=server-local", "admin", ""), http.StatusNotFound)
+}

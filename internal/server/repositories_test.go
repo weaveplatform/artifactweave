@@ -958,16 +958,31 @@ func TestDeleteRepository(t *testing.T) {
 	if pkgs, _, _ := w.db.Packages().List(ctx, "up", store.Page{}); len(pkgs) != 0 {
 		t.Fatalf("packages survived: %v", pkgs)
 	}
-	// lib still references the blob; deleting lib drops the last reference.
+	// The cache's reference is released; lib still references the blob.
 	if v := w.stored("v"); !slices.Equal(v.Repositories, []string{"lib"}) {
 		t.Fatalf("virtual members %v", v.Repositories)
 	}
+	sha := strings.Repeat("ab", 32)
+	if b, err := w.db.Blobs().Get(ctx, sha); err != nil || b.Refs != 1 {
+		t.Fatalf("blob after the remote %+v %v", b, err)
+	}
+	// Deleting lib moves its file to the trash can, whose entry keeps the
+	// last reference until it is purged (#504).
 	if rec := w.do("DELETE", "/artifactory/api/repositories/lib", "admin", ""); rec.Code != 200 {
 		t.Fatalf("delete lib %d", rec.Code)
 	}
-	b, err := w.db.Blobs().Get(ctx, strings.Repeat("ab", 32))
-	if err != nil || b.Refs != 0 {
-		t.Fatalf("blob %+v %v", b, err)
+	if b, err := w.db.Blobs().Get(ctx, sha); err != nil || b.Refs != 1 {
+		t.Fatalf("blob after lib %+v %v", b, err)
+	}
+	if kept, err := w.db.Trash().
+		Find(ctx, "lib", "f.txt"); err != nil || len(kept) != 1 || kept[0].DeletedBy != "admin" {
+		t.Fatalf("trashed %+v %v", kept, err)
+	}
+	if rec := w.do("POST", "/artifactory/api/trash/empty", "admin", ""); rec.Code != 202 {
+		t.Fatalf("empty %d", rec.Code)
+	}
+	if b, err := w.db.Blobs().Get(ctx, sha); err != nil || b.Refs != 0 {
+		t.Fatalf("blob after emptying %+v %v", b, err)
 	}
 	if v := w.stored("v"); len(v.Repositories) != 0 || v.DefaultDeploymentRepo != "" {
 		t.Fatalf("virtual %+v", v)

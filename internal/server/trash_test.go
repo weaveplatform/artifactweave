@@ -1,9 +1,13 @@
 package server
 
 import (
+	"context"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/weaveplatform/artifactweave/internal/repos"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
 	"github.com/weaveplatform/artifactweave/pkg/store"
 )
 
@@ -24,6 +28,10 @@ func trashStatusRows() []statusCase {
 		del     = "libs-local/fixture/del.txt"
 		rs      = "/artifactory/api/trash/restore/"
 		cl      = "/artifactory/api/trash/clean/"
+		create  = "PUT /artifactory/api/repositories/{repoKey}"
+		drop    = "DELETE /artifactory/api/repositories/{repoKey}"
+		deploy  = "PUT /artifactory/{repoKey}/{filePath}"
+		gone    = "/artifactory/api/repositories/trashed-repo"
 	)
 	return []statusCase{
 		{list, tc, "admin", "", 200},
@@ -78,6 +86,18 @@ func trashStatusRows() []statusCase {
 		{restore, rs + "libs-local?to=libs-local", "admin", "", 404},
 		// An admin may restore from a repository that is gone (#380).
 		{restore, rs + "gone-repo/x?to=libs-local", "admin", "", 404},
+		// A repository delete keeps the content in the trash can under the
+		// repository's key, which only an admin sees or restores, into a
+		// repository that exists (#504).
+		{create, gone, "admin", `{"rclass":"local"}`, 200},
+		{deploy, "/artifactory/trashed-repo/kept/file.txt", "admin", "kept", 201},
+		{drop, gone, "admin", "", 200},
+		{list, tc + "/trashed-repo/kept/file.txt", "admin", "", 200},
+		{list, tc + "/trashed-repo", "user", "", 403},
+		{restore, rs + "trashed-repo?to=libs-local/from-trashed-repo", "user", "", 400},
+		{restore, rs + "trashed-repo?to=trashed-repo", "admin", "", 400},
+		{restore, rs + "trashed-repo?to=libs-local/from-trashed-repo", "admin", "", 202},
+		{list, tc + "/trashed-repo", "admin", "", 404},
 
 		{remove, "/artifactory/" + del, "admin", "", 204},
 		{clean, cl + del, "user", "", 400},
@@ -126,6 +146,8 @@ func trashOffStatusRows() []statusCase {
 		clean   = "DELETE /artifactory/api/trash/clean/{repoPath}"
 		remove  = "DELETE /artifactory/{repoKey}/{filePath}"
 		empty   = "POST /artifactory/api/trash/empty"
+		deploy  = "PUT /artifactory/{repoKey}/{filePath}"
+		drop    = "DELETE /artifactory/api/repositories/{repoKey}"
 		tc      = "/artifactory/api/storage/auto-trashcan"
 		del     = "libs-local/fixture/del.txt"
 		moved   = "libs-local/fixture/move.txt"
@@ -153,6 +175,10 @@ func trashOffStatusRows() []statusCase {
 		// A delete while the trash can is off removes the file for good.
 		{remove, "/artifactory/" + del, "admin", "", 204},
 		{restore, rs + del + "?to=libs-local", "admin", "", 404},
+		// So does a repository delete, its content with it (#504).
+		{deploy, "/artifactory/del-one/kept.txt", "admin", "kept", 201},
+		{drop, "/artifactory/api/repositories/del-one", "admin", "", 200},
+		{restore, rs + "del-one?to=libs-local", "admin", "", 404},
 		{empty, "/artifactory/api/trash/empty", "admin", "", 202},
 	}
 }
@@ -196,5 +222,24 @@ func trashedThenOff(repoKey, path string) seeder {
 		setTrashcan(t, f.db, true)
 		seed(t, f, p)
 		setTrashcan(t, f.db, false)
+	}
+}
+
+// repositoryTrashed seeds a local repository named key, {p} the principal's
+// name, with a file at kept/{p}.txt, and then deletes the repository, which
+// moves the file to the trash can under key (#504).
+func repositoryTrashed(key string) seeder {
+	return func(t *testing.T, f *matrixFixture, p string) {
+		t.Helper()
+		ctx := context.Background()
+		key := strings.ReplaceAll(key, "{p}", p)
+		c := repo.Config{Key: key, Class: repo.Local}
+		if err := f.db.Repos().Create(ctx, *repo.Defaults(&c)); err != nil {
+			t.Fatal(err)
+		}
+		f.deploy(t, key, "kept/"+p+".txt", []byte(p))
+		if _, _, err := repos.Remove(ctx, f.db, key, "admin"); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

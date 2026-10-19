@@ -1,7 +1,7 @@
 // Package trash restores, cleans and purges the trash can (decision 0010).
-// Deleting an item moves its record here (internal/service/item), and a
-// trashed file keeps its blob reference, so it can be restored until its
-// retention period passes. Purging an entry releases that reference, and the
+// Deleting an item moves its record here (internal/service/item), as does
+// deleting a repository (Keep, internal/repos), and a trashed file keeps its
+// blob reference, so it can be restored until its retention period passes. Purging an entry releases that reference, and the
 // next garbage collection removes the content once nothing else holds it.
 package trash
 
@@ -88,6 +88,51 @@ func (s *Service) Entries(ctx context.Context, repoKey, prefix string) ([]types.
 		out = append(out, batch...)
 		if next == "" {
 			return out, nil
+		}
+		page.After = next
+	}
+}
+
+// Keep records every item of c's own content as trashed by by, as a delete
+// of the repository's root through the item service records them, so a
+// deleted repository can be restored. It changes nothing else: call it
+// inside the transaction that then deletes the items, which hands each
+// file's blob reference to its entry instead of releasing it. It returns
+// how many references the entries hold per sha256, for that delete to
+// release only the ones no entry took over.
+//
+// It pages through the items rather than listing them at once, so a large
+// repository costs one page of memory, not all of it.
+func (s *Service) Keep(ctx context.Context, c repo.Config, by string) (map[string]int64, error) {
+	held := map[string]int64{}
+	now := s.now()
+	page := store.Page{Limit: store.MaxLimit}
+	for {
+		batch, next, err := s.Store.Items().Descendants(ctx, c.Key, false, "", page)
+		if err != nil {
+			return nil, fmt.Errorf("trash: list %s: %w", c.Key, err)
+		}
+		for _, it := range batch {
+			props, err := s.Store.Items().Properties(ctx, it.ID)
+			if err != nil {
+				return nil, fmt.Errorf("trash: properties of %s/%s: %w", c.Key, it.FullPath(), err)
+			}
+			if _, err := s.Store.Trash().Add(ctx, types.TrashEntry{
+				Record: types.TrashRecord{
+					Item: it, Properties: props, PackageType: string(c.PackageType),
+				},
+				DeletedAt: now, DeletedBy: by,
+			}); err != nil {
+				return nil, fmt.Errorf("trash: keep %s/%s: %w", c.Key, it.FullPath(), err)
+			}
+			// purge releases one reference per file entry with content, so
+			// this counts exactly what it will release.
+			if !it.Folder && it.Actual.SHA256 != "" {
+				held[it.Actual.SHA256]++
+			}
+		}
+		if next == "" {
+			return held, nil
 		}
 		page.After = next
 	}

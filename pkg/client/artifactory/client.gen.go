@@ -10308,7 +10308,7 @@ type ClientInterface interface {
 
 	// DeleteRepository Delete a repository
 	//
-	// Removes the configuration and every item in the repository, moving items through the trash can when it is enabled. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache; deleting a virtual repository removes only the aggregation.
+	// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 	//
 	// Corresponds with DELETE /api/repositories/{repoKey} (the `DeleteRepository` operationId).
 	DeleteRepository(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -11703,7 +11703,7 @@ type ClientInterface interface {
 
 	// RestoreItemFromTrashCan Restore an item from the trash can
 	//
-	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
+	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. The destination must be an existing local or federated repository, otherwise the answer is 400; a restore never creates one, so the content of a deleted repository is restored into a repository created for it first. Answers 202 with the plain-text message Successfully restored trash items.
 	//
 	// Corresponds with POST /api/trash/restore/{fromPath} (the `RestoreItemFromTrashCan` operationId).
 	RestoreItemFromTrashCan(ctx context.Context, fromPath string, params *RestoreItemFromTrashCanParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -15570,7 +15570,7 @@ func (c *Client) GetRemoteRepositoryConfiguration(ctx context.Context, remoteRep
 
 // DeleteRepository Delete a repository
 //
-// Removes the configuration and every item in the repository, moving items through the trash can when it is enabled. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache; deleting a virtual repository removes only the aggregation.
+// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 //
 // Corresponds with DELETE /api/repositories/{repoKey} (the `DeleteRepository` operationId).
 func (c *Client) DeleteRepository(ctx context.Context, repoKey RepoKey, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -18645,7 +18645,7 @@ func (c *Client) EmptyTrashCan(ctx context.Context, reqEditors ...RequestEditorF
 
 // RestoreItemFromTrashCan Restore an item from the trash can
 //
-// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
+// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. The destination must be an existing local or federated repository, otherwise the answer is 400; a restore never creates one, so the content of a deleted repository is restored into a repository created for it first. Answers 202 with the plain-text message Successfully restored trash items.
 //
 // Corresponds with POST /api/trash/restore/{fromPath} (the `RestoreItemFromTrashCan` operationId).
 func (c *Client) RestoreItemFromTrashCan(ctx context.Context, fromPath string, params *RestoreItemFromTrashCanParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -37223,7 +37223,7 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteRepositoryWithResponse Delete a repository
 	//
-	// Removes the configuration and every item in the repository, moving items through the trash can when it is enabled. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache; deleting a virtual repository removes only the aggregation.
+	// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -38806,7 +38806,7 @@ type ClientWithResponsesInterface interface {
 
 	// RestoreItemFromTrashCanWithResponse Restore an item from the trash can
 	//
-	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
+	// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. The destination must be an existing local or federated repository, otherwise the answer is 400; a restore never creates one, so the content of a deleted repository is restored into a repository created for it first. Answers 202 with the plain-text message Successfully restored trash items.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -64225,7 +64225,7 @@ func (c *ClientWithResponses) GetRemoteRepositoryConfigurationWithResponse(ctx c
 
 // DeleteRepositoryWithResponse Delete a repository
 //
-// Removes the configuration and every item in the repository, moving items through the trash can when it is enabled. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache; deleting a virtual repository removes only the aggregation.
+// Removes the configuration and every item in the repository. While the trash can is enabled the items move to it under the repository key, where an administrator can restore them into an existing local or federated repository until the retention period ends. Admin only. The status code reports the outcome: 200 removed, 202 a delete is already running for this key (retry later), 207 some items could not be removed and the configuration was kept, 404 no such repository (success report shape with the message in statusMsg). Deleting a remote repository also removes its cache, which does not pass through the trash can; deleting a virtual repository removes only the aggregation.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -66828,7 +66828,7 @@ func (c *ClientWithResponses) EmptyTrashCanWithResponse(ctx context.Context, req
 
 // RestoreItemFromTrashCanWithResponse Restore an item from the trash can
 //
-// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. Answers 202 with the plain-text message Successfully restored trash items.
+// Moves a trashed item or folder back into a repository. The destination may differ from the original so content can be restored into another repository. Allowed for admins, project admins and callers that hold Manage permission on the destination and also Delete or Manage permission on the original repository, both at fromPath and at the original path of every item restored. If any item below fromPath is not covered, nothing is restored and the answer is 400. Only an admin can restore items whose original repository no longer exists. The destination must be an existing local or federated repository, otherwise the answer is 400; a restore never creates one, so the content of a deleted repository is restored into a repository created for it first. Answers 202 with the plain-text message Successfully restored trash items.
 //
 // Returns a wrapper object for the known response body format(s).
 //
