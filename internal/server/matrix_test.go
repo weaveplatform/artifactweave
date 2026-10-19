@@ -1070,8 +1070,9 @@ func securityMatrix() []matrixRow {
 		// Expiring every password locks out every later principal.
 		at("POST "+secExpire+"ForAllUsers", "", administrators, 200).alone(),
 		// One's own password, proven by the old one, with the whole identity
-		// as the Access change asks; anyone's for an administrator.
-		at("POST "+secChangePw, changeBody("{u}", "pw", "Matrix-{p}-1"), wholeIdentity, 200),
+		// as the Access change asks; anyone's for an administrator. A
+		// transient user has no stored password to change.
+		at("POST "+secChangePw, changeBody("{u}", "pw", "Matrix-{p}-1"), ownRecord(wholeIdentity), 200),
 		at("POST "+secChangePw, changeBody("v-{p}", "pw", "Matrix-{p}-2"), administrators, 200),
 		// API keys are retired: creating one is refused, and there is none
 		// to read; revoking one's own succeeds.
