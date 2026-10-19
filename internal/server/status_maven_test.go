@@ -96,6 +96,9 @@ var mavenStatusPart = statusPart{
 			{mavenGenerate, gen + "libs-local/fixture/get.txt", "admin", "", 400},
 			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-1.0.jar", "user", "", 403},
 			{mavenGenerate, gen + "maven-local/com/acme/lib/1.0/lib-1.0.jar", "", "", 401},
+			// A release jar is replaced only by a caller who may delete it
+			// (#565): overwriter may not.
+			{mavenPut, local + "1.0/app-1.0.jar", overwriter, "other jar", 403},
 		}
 	},
 	seed: func(t *testing.T, db store.Store, blobs blob.Store) {
@@ -115,5 +118,6 @@ var mavenStatusPart = statusPart{
 				t.Fatal(err)
 			}
 		}
+		grantOverwriter(t, db, "maven-local", "com/acme/app/")
 	},
 }

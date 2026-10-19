@@ -42,8 +42,35 @@ var (
 var ErrBadArchive = archive.ErrUnusable
 
 // ErrOverwriteDenied is a deploy or an explode that would replace existing
-// files the caller may not delete (403).
+// files the caller may not delete (403). The service returns it as an
+// *OverwriteDeniedError, which names the file and the caller.
 var ErrOverwriteDenied = errors.New("item: no permission to overwrite")
+
+// OverwriteDeniedError is a write refused because it would replace a file
+// the caller may not delete. Its text is Artifactory 7.x's, which clients
+// match rather than read: Poetry's publish --skip-existing takes a 403
+// whose text holds "overwrite artifact" for a file that is already there,
+// and fails on any other wording.
+type OverwriteDeniedError struct {
+	// Repo is the key of the repository that holds the file.
+	Repo string
+	// Path is the file's path in it, where the format stored the write,
+	// which for a Maven unique snapshot is not the path sent.
+	Path string
+	// User is the caller's name: auth.AnonymousUser for an anonymous one.
+	User string
+}
+
+func (e *OverwriteDeniedError) Error() string {
+	return fmt.Sprintf(
+		"Not enough permissions to delete/overwrite artifact '%s:%s' (user: '%s' needs DELETE permission).",
+		e.Repo,
+		e.Path,
+		e.User,
+	)
+}
+
+func (e *OverwriteDeniedError) Unwrap() error { return ErrOverwriteDenied }
 
 // errFound ends an archive walk once the wanted entry is served.
 var errFound = errors.New("item: archive entry found")
@@ -220,7 +247,7 @@ func (s *Service) validateEntries(
 		case err == nil && existing.Folder:
 			return fmt.Errorf("%w: %s is a folder", ErrConflict, target)
 		case err == nil && !d.CanOverwrite:
-			return fmt.Errorf("%w: %s", ErrOverwriteDenied, target)
+			return &OverwriteDeniedError{Repo: d.Repo.Key, Path: target, User: d.By}
 		case err != nil && !errors.Is(err, store.ErrNotFound):
 			return fmt.Errorf("item: get %s: %w", target, err)
 		}

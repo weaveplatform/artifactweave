@@ -307,6 +307,7 @@ func newStatusFixture(
 	items := &item.Service{Store: db, Blobs: blobs}
 	seedStatusBuilds(t, db, blobs)
 	seedStatusSearches(t, db, blobs)
+	seedOverwriteStatus(t, db, items)
 	libs, err := db.Repos().Get(ctx, "libs-local")
 	if err != nil {
 		t.Fatal(err)
@@ -495,6 +496,20 @@ func itemStatusRows() []statusCase {
 
 		{upl, "/artifactory/api/v1/uploads/config", "admin", "", 200},
 		{upl, "/artifactory/api/v1/uploads/config", "", "", 401},
+
+		// A caller that may deploy but not delete replaces a file only with
+		// its own content; any other is refused with Artifactory's text
+		// (#565, TestOverwriteRefusalText).
+		{put, lib + "/overwrite/taken.txt", overwriter, "changed", 403},
+		{put, lib + "/overwrite/taken.txt", overwriter, "declared:taken", 201},
+		{
+			put,
+			lib + "/overwrite/taken.txt",
+			overwriter,
+			"checksum:" + sha1Hex("other content"),
+			403,
+		},
+		{put, lib + "/overwrite/fresh.txt", overwriter, "fresh", 201},
 	}
 }
 
@@ -1113,5 +1128,19 @@ func transferStatusRows() []statusCase {
 		{put, lib + "exploded/bundle.zip", "admin", "explode:inner.txt", 201},
 		{put, lib + "exploded/bundle.zip", "user", "explode:inner.txt", 403},
 		{put, lib + "exploded/bundle.zip", "", "explode:inner.txt", 401},
+
+		// Onto a file the caller may not delete, an archive is refused and
+		// a copy fails in its report (#565).
+		{
+			put, "/artifactory/libs-local/overwrite/bundle.zip", overwriter,
+			"explode:taken.txt", 403,
+		},
+		{
+			cp,
+			"/artifactory/api/copy/libs-local/overwrite/other.txt?to=/libs-local/overwrite/taken.txt",
+			overwriter,
+			"",
+			200,
+		},
 	}
 }

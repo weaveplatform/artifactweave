@@ -3234,7 +3234,7 @@ paths:
       x-tier: stub
   /api/copy/{srcRepoKey}/{srcFilePath}:
     post:
-      description: Copies a file or a folder subtree to another path, in the same or another repository. Works on local repositories, federated repositories and remote caches as the source; the target must be local. Properties are copied with the items. Returns 200 with per-item messages even when some items failed; `failFast=1` stops at the first failure.
+      description: Copies a file or a folder subtree to another path, in the same or another repository. Works on local repositories, federated repositories and remote caches as the source; the target must be local. Properties are copied with the items. Returns 200 with per-item messages even when some items failed; `failFast=1` stops at the first failure. A file at the target is replaced only for a caller with delete permission there; for any other the item fails with the message `User doesn't have permissions to override '<repoKey>:<path>'. Needs delete permissions.`
       operationId: copyItem
       parameters:
         - description: Required path parameter. Key of the repository holding the source item.
@@ -6302,7 +6302,7 @@ paths:
       x-tier: stub
   /api/move/{srcRepoKey}/{srcFilePath}:
     post:
-      description: Moves a file or a folder subtree to another path in the same or another local repository; remote caches and virtual repositories cannot be the source. Properties move with the items. Returns 200 with per-item messages even when some items failed; `failFast=1` stops at the first failure.
+      description: Moves a file or a folder subtree to another path in the same or another local repository; remote caches and virtual repositories cannot be the source. Properties move with the items. Returns 200 with per-item messages even when some items failed; `failFast=1` stops at the first failure. A file at the target is replaced only for a caller with delete permission there; for any other the item fails with the message `User doesn't have permissions to override '<repoKey>:<path>'. Needs delete permissions.`
       operationId: moveItem
       parameters:
         - description: Required path parameter. Key of the repository holding the source item.
@@ -17125,7 +17125,7 @@ paths:
       x-handwritten: true
       x-oracle-source: https://docs.jfrog.com/artifactory/reference/retrieveartifact.md
     put:
-      description: 'Stores the request body at the path. Needs deploy permission; the target must be a local repository or a virtual repository with a default deployment repository, otherwise 405. A path ending in `/` with an empty body creates a folder. Matrix parameters `;key=value` on the last path segment become properties. Checksums declared in `X-Checksum-*` headers are recorded as original checksums and verified against the stored bytes; a mismatch is rejected with 409. Responds 201 with the created item and its URL in `Location`, at the path it was stored at: in a local Maven, Gradle, Ivy or SBT repository with the `maven-2-default` layout, a snapshot file is renamed as the repository''s `snapshotVersionBehavior` says, so `unique` stores `app-1.0-SNAPSHOT.jar` as `app-1.0-<yyyyMMdd.HHmmss>-<buildNumber>.jar`. Deploying over an existing path replaces the content unless the repository forbids overwrites; replacing needs delete permission at the stored path, except with the file''s own content: a deploy that declares the stored file''s SHA-1 or SHA-256 and stores those same bytes needs deploy permission only, and so does such a checksum deploy unless the server is set to require delete permission for it. A `.md5`, `.sha1`, `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true` makes the extraction all-or-nothing), answering 201 `text/plain` with no body. With `X-Checksum-Deploy: true` and a checksum header the server deploys an existing binary with that checksum without a body, answering 201. The caller must be able to read a file with that checksum, or send in `X-Checksum-Deploy-Token` the `checksumToken` of its own finished multipart upload of that content; otherwise, as when no binary matches, it answers 404 so the client uploads normally.'
+      description: 'Stores the request body at the path. Needs deploy permission; the target must be a local repository or a virtual repository with a default deployment repository, otherwise 405. A path ending in `/` with an empty body creates a folder. Matrix parameters `;key=value` on the last path segment become properties. Checksums declared in `X-Checksum-*` headers are recorded as original checksums and verified against the stored bytes; a mismatch is rejected with 409. Responds 201 with the created item and its URL in `Location`, at the path it was stored at: in a local Maven, Gradle, Ivy or SBT repository with the `maven-2-default` layout, a snapshot file is renamed as the repository''s `snapshotVersionBehavior` says, so `unique` stores `app-1.0-SNAPSHOT.jar` as `app-1.0-<yyyyMMdd.HHmmss>-<buildNumber>.jar`. Deploying over an existing path replaces the content unless the repository forbids overwrites; replacing needs delete permission at the stored path, except with the file''s own content: a deploy that declares the stored file''s SHA-1 or SHA-256 and stores those same bytes needs deploy permission only, and so does such a checksum deploy unless the server is set to require delete permission for it. A replacement refused for want of delete permission answers 403, or 401 to an anonymous caller, with the message `Not enough permissions to delete/overwrite artifact ''<repoKey>:<path>'' (user: ''<user>'' needs DELETE permission).`, naming the repository the file is in, its stored path (for an archive, the entry in the way) and the caller, `anonymous` for an anonymous one. A `.md5`, `.sha1`, `.sha256` or `.sha512` body for an existing file, or for any file in a Maven-family repository, records that checksum on the file and answers 201 with no body and the file''s URL in `Location`. The same route carries two variants selected by headers. With `X-Explode-Archive: true` the body is a zip, tar, tar.gz or tgz archive whose entries are deployed under the target folder instead of the archive itself (`X-Explode-Archive-Atomic: true` makes the extraction all-or-nothing), answering 201 `text/plain` with no body. With `X-Checksum-Deploy: true` and a checksum header the server deploys an existing binary with that checksum without a body, answering 201. The caller must be able to read a file with that checksum, or send in `X-Checksum-Deploy-Token` the `checksumToken` of its own finished multipart upload of that content; otherwise, as when no binary matches, it answers 404 so the client uploads normally.'
       operationId: deployArtifact
       parameters:
         - description: Required path parameter. Key of the repository. A remote repository's cache is addressed as `<key>-cache` and a virtual repository resolves through its members.
@@ -17251,13 +17251,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: No credentials or invalid credentials.
+          description: No credentials or invalid credentials, or an anonymous caller that may not replace the file at the path.
         '403':
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-          description: The caller lacks the permission the operation needs.
+          description: The caller lacks the permission the operation needs, deploy permission or, to replace a file, delete permission.
         '404':
           content:
             application/json:

@@ -322,7 +322,9 @@ func TestPromoteFailFast(t *testing.T) {
 	if !res.Aborted || !w.has("libs-local", "app/a.bin") || w.has("release-local", "app/a.bin") {
 		t.Errorf("aborted %v, report:\n%s", res.Aborted, texts(res.Messages))
 	}
-	if got := texts(res.Messages); !strings.Contains(got, "no permission to overwrite") ||
+	const refused = "User doesn't have permissions to override 'release-local:app/c.bin'. " +
+		"Needs delete permissions."
+	if got := texts(res.Messages); !strings.Contains(got, refused) ||
 		strings.Contains(got, "completed successfully") {
 		t.Errorf("report:\n%s", got)
 	}

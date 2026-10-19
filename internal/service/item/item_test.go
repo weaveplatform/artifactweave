@@ -8,6 +8,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -322,7 +323,9 @@ func TestDeployOverwriteIdentical(t *testing.T) {
 		"one declaration differs": {"content", types.Checksums{SHA1: c.SHA1, SHA256: sums("x").SHA256}, true, false},
 	} {
 		err := deploy(tc.body, tc.declared, tc.identical)
-		if tc.ok != (err == nil) || !tc.ok && !errors.Is(err, ErrOverwriteDenied) {
+		var denied *OverwriteDeniedError
+		if tc.ok != (err == nil) || !tc.ok && (!errors.As(err, &denied) ||
+			*denied != (OverwriteDeniedError{Repo: "libs", Path: "f", User: "bob"})) {
 			t.Errorf("%s: %v", name, err)
 		}
 	}
@@ -344,6 +347,35 @@ func TestDeployOverwriteIdentical(t *testing.T) {
 	err = byChecksum(types.Checksums{SHA1: sums("other").SHA1})
 	if !errors.Is(err, ErrOverwriteDenied) {
 		t.Fatalf("other content by checksum: %v", err)
+	}
+}
+
+// The refusal reads as Artifactory 7.x's (RTFACT-26398, a 7.26.0 REST
+// deploy), which clients match on "overwrite artifact", and is still
+// ErrOverwriteDenied to a caller that tests for that.
+func TestOverwriteDeniedText(t *testing.T) {
+	for _, c := range []struct {
+		err  *OverwriteDeniedError
+		want string
+	}{
+		{
+			&OverwriteDeniedError{Repo: "test-libs-release-local", Path: "abc-test-art-plugin-0.3.jar", User: "abc@jfrog.com"},
+			"Not enough permissions to delete/overwrite artifact " +
+				"'test-libs-release-local:abc-test-art-plugin-0.3.jar' " +
+				"(user: 'abc@jfrog.com' needs DELETE permission).",
+		},
+		{
+			&OverwriteDeniedError{Repo: "pypi-local", Path: "pkg/1.0/pkg-1.0.tar.gz", User: "anonymous"},
+			"Not enough permissions to delete/overwrite artifact 'pypi-local:pkg/1.0/pkg-1.0.tar.gz' " +
+				"(user: 'anonymous' needs DELETE permission).",
+		},
+	} {
+		if got := c.err.Error(); got != c.want {
+			t.Errorf("text %q, want %q", got, c.want)
+		}
+		if !errors.Is(fmt.Errorf("deploy: %w", c.err), ErrOverwriteDenied) {
+			t.Errorf("%v is not ErrOverwriteDenied", c.err)
+		}
 	}
 }
 

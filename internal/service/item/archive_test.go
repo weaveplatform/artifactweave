@@ -256,10 +256,14 @@ func TestExplodeChecksumsAndConflicts(t *testing.T) {
 	}}); err != nil {
 		t.Fatalf("matching checksums: %v", err)
 	}
-	// Overwriting needs the right; a folder in the way is a conflict.
-	if _, err := w.svc.Explode(ctx, Explode{Deploy: Deploy{
-		Target: Target{Repo: w.loc, Path: "x.zip"}, Body: bytes.NewReader(body),
-	}}); !errors.Is(err, ErrOverwriteDenied) {
+	// Overwriting needs the right, and the refusal names the entry in the
+	// way; a folder in the way is a conflict.
+	_, err = w.svc.Explode(ctx, Explode{Deploy: Deploy{
+		Target: Target{Repo: w.loc, Path: "x.zip"}, Body: bytes.NewReader(body), By: "bob",
+	}})
+	var denied *OverwriteDeniedError
+	if !errors.As(err, &denied) ||
+		*denied != (OverwriteDeniedError{Repo: "libs", Path: "a.txt", User: "bob"}) {
 		t.Fatalf("overwrite: %v", err)
 	}
 	w.must("f/a.txt/inside", "x")

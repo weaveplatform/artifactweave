@@ -98,11 +98,14 @@ func newPubFixture(t *testing.T) *pubFixture {
 		// The server's mapping of the errors these deploys meet.
 		ItemError: func(_ context.Context, _ string, err error) error {
 			var refused *format.Rejection
+			var overwrite *item.OverwriteDeniedError
 			switch {
 			case errors.As(err, &refused):
 				return apierror.New(refused.Status, refused.Message)
 			case errors.Is(err, item.ErrChecksumMismatch):
 				return apierror.New(http.StatusConflict, err.Error())
+			case errors.As(err, &overwrite):
+				return apierror.New(http.StatusForbidden, overwrite.Error())
 			}
 			return err
 		},
@@ -213,7 +216,11 @@ func TestRepublish(t *testing.T) {
 			"mod", "deployer", "module other\n", http.StatusConflict,
 			"Version v1.0.0 of module example.com/m already has a different .mod; delete the version to replace it.\n",
 		},
-		{"info", "deployer", `{"Version":"v1.0.0","Time":"2026-10-17T21:04:05Z"}`, http.StatusForbidden, ""},
+		{
+			"info", "deployer", `{"Version":"v1.0.0","Time":"2026-10-17T21:04:05Z"}`, http.StatusForbidden,
+			"Not enough permissions to delete/overwrite artifact 'go-local:example.com/m/@v/v1.0.0.info' " +
+				"(user: 'deployer' needs DELETE permission).\n",
+		},
 		{"info", "maintainer", `{"Version":"v1.0.0","Time":"2026-10-17T21:04:05Z"}`, http.StatusCreated, ""},
 	} {
 		rec := f.put(put+v+"."+c.ext, c.user, c.body)
