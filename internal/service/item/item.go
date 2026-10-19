@@ -415,15 +415,20 @@ func (s *Service) writeFile(
 	// Otherwise Artifactory records the SHA-256 it computes as the client's
 	// when the client sent none ("Identical"), so a .sha256 file is served
 	// under client-checksums for every deploy (ServedChecksum).
+	// The overwrite check below reads declared, what the client sent: the
+	// SHA-256 filled in here is the server's own, and counting it as a
+	// declaration would let any re-upload of the same bytes replace a file
+	// without the delete permission.
+	original := declared
 	switch {
 	case d.Trusted:
-		declared = actual
-	case declared.SHA256 == "":
-		declared.SHA256 = actual.SHA256
+		original = actual
+	case original.SHA256 == "":
+		original.SHA256 = actual.SHA256
 	}
 	it := types.Item{
 		RepoKey: d.Repo.Key, Cached: d.Cached, Name: full,
-		Size: size, Actual: actual, Original: declared, MimeType: MimeType(full),
+		Size: size, Actual: actual, Original: original, MimeType: MimeType(full),
 		Created: now, CreatedBy: d.By, Modified: now, ModifiedBy: d.By, Updated: now,
 	}
 	old, err := items.Get(ctx, d.Repo.Key, d.Cached, full)
