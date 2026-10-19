@@ -214,6 +214,7 @@ func TestStoreFaults(t *testing.T) {
 		{"deploy creates the package", "Ensure", 0, nil, deployOne},
 		{"deploy finds the old version", "VersionOf", 0, one, overwriteGarbage},
 		{"overwrite drops the version", "DeleteVersion", 0, one, overwriteGarbage},
+		{"overwrite drops the version's tags", "PatchProperties", 0, one, overwriteGarbage},
 		{"overwrite reads what is left", "Versions", 0, one, overwriteGarbage},
 		{"overwrite drops the package", "Delete", 0, one, overwriteGarbage},
 		{"annotate finds the version", "VersionOf", 0, one, tag},

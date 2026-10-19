@@ -1,0 +1,157 @@
+package npm_test
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/weaveplatform/artifactweave/internal/format/npm"
+	"github.com/weaveplatform/artifactweave/internal/service/item"
+	"github.com/weaveplatform/artifactweave/pkg/repo"
+	"github.com/weaveplatform/artifactweave/pkg/types"
+)
+
+// tagged is left-pad 1.0.0, then 2.0.0, which takes latest, and the beta
+// tag on 2.0.0 too.
+func (w *world) tagged() {
+	w.t.Helper()
+	w.deployVersion("1.0.0")
+	w.deployVersion("2.0.0")
+	w.annotate(canonical("2.0.0"), types.Properties{npm.PropDistTag: {"latest", "beta"}})
+	if got := w.latestOf("left-pad"); got != "2.0.0" {
+		w.t.Fatalf("latest %s", got)
+	}
+}
+
+// converted runs the strict-layout conversion, which moves the tarball
+// overwritten onto 2.0.0's path to its own canonical path.
+func (w *world) converted() {
+	w.t.Helper()
+	if err := w.run(npm.KindConvert, ""); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+// An overwrite that changes a tarball's version takes the dropped
+// version's dist-tags off the file and settles latest anew (rule 4), so a
+// conversion that later moves the file to its own canonical path gives
+// them to no version (#515). Before the fix, 0.5.0 came out of the
+// conversion as latest and beta.
+func TestOverwriteDropsDistTags(t *testing.T) {
+	w := newWorld(t)
+	w.tagged()
+	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""), nil)
+	if got := w.props(canonical("2.0.0"))[npm.PropDistTag]; got != nil {
+		t.Fatalf("the overwritten file kept %v", got)
+	}
+	if got := w.latestOf("left-pad"); got != "1.0.0" {
+		t.Fatalf("latest after the overwrite %s", got)
+	}
+	w.converted()
+	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "0.5.0": nil},
+		w.tags("left-pad")); diff != "" {
+		t.Fatalf("tags after the conversion (-want +got):\n%s", diff)
+	}
+}
+
+// Content that is no tarball at all drops the version's tags too.
+func TestOverwriteWithGarbageDropsDistTags(t *testing.T) {
+	w := newWorld(t)
+	w.tagged()
+	w.deploy(canonical("2.0.0"), []byte("garbage"), nil)
+	if got := w.props(canonical("2.0.0"))[npm.PropDistTag]; got != nil {
+		t.Fatalf("the overwritten file kept %v", got)
+	}
+	if got := w.latestOf("left-pad"); got != "1.0.0" {
+		t.Fatalf("latest %s", got)
+	}
+}
+
+// A write that sets dist-tags of its own, as a deploy's matrix parameters
+// do (jf rt u --target-props), replaces the file's: those are the new
+// content's, so they stay, and the conversion gives them to its version.
+func TestOverwriteKeepsTheWritesOwnTags(t *testing.T) {
+	w := newWorld(t)
+	w.tagged()
+	w.deploy(canonical("2.0.0"), pkg("left-pad", "0.5.0", ""),
+		types.Properties{npm.PropDistTag: {"legacy"}})
+	if got := w.props(canonical("2.0.0"))[npm.PropDistTag]; !cmp.Equal(got, []string{"legacy"}) {
+		t.Fatalf("the overwritten file has %v", got)
+	}
+	w.converted()
+	if diff := cmp.Diff(map[string][]string{"1.0.0": {"latest"}, "0.5.0": {"legacy"}},
+		w.tags("left-pad")); diff != "" {
+		t.Fatalf("tags (-want +got):\n%s", diff)
+	}
+}
+
+// A redeploy of the same version keeps its tags: the version did not
+// change, so nothing moves.
+func TestRedeployKeepsDistTags(t *testing.T) {
+	w := newWorld(t)
+	w.tagged()
+	w.deploy(canonical("2.0.0"), pkg("left-pad", "2.0.0", `"description":"rebuilt"`), nil)
+	if diff := cmp.Diff(map[string][]string{"1.0.0": nil, "2.0.0": {"beta", "latest"}},
+		w.tags("left-pad")); diff != "" {
+		t.Fatalf("tags (-want +got):\n%s", diff)
+	}
+}
+
+// A copy or a move onto a canonical path is an overwrite too. A source
+// that carries no dist-tags leaves the target's stale ones behind unless
+// the format drops them; a source that carries its own brings them, and
+// they replace the target's.
+func TestTransferOntoACanonicalPath(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		move bool
+		tags []string
+	}{
+		{"copy", false, nil},
+		{"move", true, nil},
+		{"copy of a tagged tarball", false, []string{"edge"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			w := newWorld(t)
+			other := repo.Config{Key: "npm-uploads", Class: repo.Local, PackageType: repo.NPM}
+			repo.Defaults(&other)
+			if err := w.st.Repos().Create(w.ctx, other); err != nil {
+				t.Fatal(err)
+			}
+			var props types.Properties
+			if c.tags != nil {
+				props = types.Properties{npm.PropDistTag: c.tags}
+			}
+			// Off its canonical path the source is no version, so it
+			// carries only the tags its deploy gave it.
+			if _, err := w.items.Deploy(w.ctx, item.Deploy{
+				Target:     item.Target{Repo: other, Path: "uploads/left-pad.tgz"},
+				Body:       bytes.NewReader(pkg("left-pad", "0.5.0", "")),
+				Properties: props,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			w.tagged()
+			res, err := w.items.Transfer(w.ctx, item.Transfer{
+				From: item.Target{Repo: other, Path: "uploads/left-pad.tgz"},
+				To:   item.Target{Repo: w.c, Path: canonical("2.0.0")}, Move: c.move,
+				CanOverwrite: true,
+			})
+			if err != nil || res.Failed > 0 {
+				t.Fatalf("%+v %v", res, err)
+			}
+			if got := w.props(canonical("2.0.0"))[npm.PropDistTag]; !cmp.Equal(got, c.tags) {
+				t.Fatalf("the target has %v, want %v", got, c.tags)
+			}
+			if got := w.latestOf("left-pad"); got != "1.0.0" {
+				t.Fatalf("latest %s", got)
+			}
+			w.converted()
+			want := map[string][]string{"1.0.0": {"latest"}, "0.5.0": c.tags}
+			if diff := cmp.Diff(want, w.tags("left-pad")); diff != "" {
+				t.Fatalf("tags after the conversion (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
