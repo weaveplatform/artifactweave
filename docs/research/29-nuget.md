@@ -167,7 +167,7 @@ Sources:
 | `packageContent` is `<base>/api/nuget/v3/<repo>/registration-semver2/Download/<id>/<version>` there, and `.../registration/Download/<id>/<version>` in the other hive; older captures point at the v2 `<base>/api/nuget/<repo>/Download/<id>/<version>` | [J] RTFACT-30380, RTFACT-26500 (7.27.6); RTFACT-18567 (6.8.2), RTFACT-29190 (7.46.11, remote), RTFACT-31126 (SaaS 2025, remote); [C] |
 | The leaf `@id` and the `registration` links there read `.../registration-semver2/registration-semver2/<id>/...`, the hive named twice | [J] RTFACT-30380 |
 | A remote repository's leaf document is `{listed, packageContent, registration, @id}`, without `published`; nuget.org's adds `published` and the catalog link | [J] RTFACT-27465 (open) |
-| The publish date is missing from the API though the UI shows it; both requests are open | [J] RTFACT-27465, RTFACT-30380 |
+| The publish date is missing from the API though the UI shows it; both requests are open. artifactweave writes `published`, filling the gap JFrog tracks, which is not a deviation (decision [0038](decisions/0038-nuget.md#registration)) | [J] RTFACT-27465, RTFACT-30380 |
 | JFrog's support offers `.../registration-semver2/<id>/page/<first>/<last>.json` for any range of versions, so 7.x answers a page for bounds it did not list | [J] RTFACT-30380, the workaround |
 | Page URLs once lower-cased mixed-case pre-release bounds and then found no page; fixed in 2022 | [J] RTFACT-27116 (Done) |
 | A `packageContent` with the id lower-cased failed on 6.x; fixed in 6.17.0. Lower-cased download URLs were fixed in 7.31.10 | [J] RTFACT-18567 (6.17.0), RTFACT-26500, RTFACT-15356 (7.31.10) |
@@ -299,7 +299,7 @@ Sources:
 | The package view reads the name from `nuget.id`, the version from `nuget.version`, and the tags from `nuget.tags` split on spaces | [S] 6.20 `NugetMetadataProvider.java` |
 | 7.x stores each dependency in `nuget.dependency` as `<id>:<version>:<target framework>`, the framework taken from the `<group>` only | [J] RTFACT-31474 (a customer's report, Done 2026) |
 | `nuget.releaseNotes` was cut to 4000 characters | [J] RTFACT-21236 (a 6.17 log) |
-| NuGet metadata "is automatically calculated when adding, moving, copying, or removing NuGet packages", asynchronously, after the action completes; properties set straight after a push can be lost | [D] nuget-repositories, "Metadata Updates"; [J] RTFACT-29222 (open, 7.46.11) |
+| NuGet metadata "is automatically calculated when adding, moving, copying, or removing NuGet packages", asynchronously, after the action completes; properties set straight after a push can be lost. artifactweave makes a version visible once its deploy commits, following JFrog's intent that a pushed package resolves, which is not a deviation (decision [0038](decisions/0038-nuget.md#storage-and-the-package-index)) | [D] nuget-repositories, "Metadata Updates"; [J] RTFACT-29222 (open, 7.46.11) |
 | A deploy by a user without Read was "Removed from indexing" for want of a NuGet id | [J] RTFACT-26971 (deferred) |
 | JFrog documents no list of package properties; the request is open | [J] RTFACT-31054 |
 | `POST /api/nuget/{repoKey}/reindex` "Recalculates all the NuGet packages for this repository (local/cache/virtual), and re-annotate the NuGet properties for each NuGet package according to its internal nuspec file", for local, local-cache, remote and virtual repositories; 200 `text/plain`, 401, 403, 500 | [D] [calculatenugetrepositorymetadata](https://docs.jfrog.com/artifactory/reference/calculatenugetrepositorymetadata.md) |

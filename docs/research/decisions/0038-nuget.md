@@ -81,8 +81,9 @@ The read of the package is bounded as npm's is (decision [0034](0034-npm.md)): a
   properties.
 - **Visibility.** A version appears in every feed once its deploy commits: the hooks keep
   the index current in the write's transaction. 7.x calculates NuGet metadata
-  asynchronously, so a client may not see a push at once (R29 12). The difference is DV-112,
-  which #542 registers, as DV-071 is for npm search.
+  asynchronously today, so a client may not see a push at once (R29 12). JFrog intends a
+  pushed package to be resolvable, and the delay is an artefact of its implementation, so
+  this is not a deviation.
 
 ### Properties
 
@@ -175,8 +176,9 @@ the request's base URL (decision [0002](0002-spec-first-flat-crud-handwritten-it
   `id`, `range` (as the nuspec writes it) and `registration`. It adds `@id` (the leaf URL),
   which Microsoft requires, and, when the nuspec has them, `title`, `summary`, `tags`,
   `iconUrl`, `licenseUrl`, `licenseExpression`, `projectUrl`, `language` and
-  `minClientVersion`. It also has `published`, the version's deploy time in ISO 8601 UTC,
-  which 7.x leaves out (DV-114, which #543 registers).
+  `minClientVersion`. It also has `published`, the version's deploy time in ISO 8601 UTC.
+  7.x leaves it out today, a gap JFrog tracks as an open request (RTFACT-27465,
+  RTFACT-30380), and the field is in Microsoft's schema, so filling it is not a deviation.
 - **The leaf document**, `GET {hive}{lower id}/{lower version}.json`, answers
   `{"@id","listed","packageContent","registration","published"}`, the fields 7.x's leaf has
   (RTFACT-27465) and `published`.
@@ -440,11 +442,12 @@ because 7.x does both (R29 5).
 **`published`.** nuget.org supplies the publish date, "which is visible in the Visual Studio
 GUI, and useful for downstream tooling"; 7.x shows it in its own UI, and two open requests ask
 for it in the API (RTFACT-27465, RTFACT-30380). The field is optional in Microsoft's schema,
-so no client can fail on it. DV-114.
+so no client can fail on it. Filling a gap JFrog tracks as missing is not a deviation.
 
 **Visible on commit.** The index is kept current in the write's transaction, as for npm, so a
 second, delayed calculation would only add the delay that the JFrog CLI retries around (R29 1,
-12). DV-112.
+12). A pushed package is meant to be resolvable, so serving it at once follows JFrog's intent
+and is not a deviation.
 
 **`maxUniqueSnapshots` by version.** JFrog documents the setting for NuGet (KB 000005403, the
 UI), and describes it as removing older versions. Applying it through `nuget-default` would
@@ -465,11 +468,8 @@ the client's command working.
 **Symbol-server reads later.** The P8 exit criteria are push and restore; serving PDBs needs a
 second protocol (the SSQP key conventions) and PDB reading, which a ticket of its own can take.
 
-**Three choices depart from Artifactory** and go into the
-[deviations register](../../implementation/deviations.md) from the tickets that implement them:
-- the normalised layout has no switch (DV-111, #542);
-- a version is visible once its deploy commits (DV-112, #542);
-- the registration carries `published` (DV-114, #543).
+**One choice departs from Artifactory:** the normalised layout has no switch. #542 registers
+it in the [deviations register](../../implementation/deviations.md) as DV-111.
 
 **Alternatives considered:**
 - *A repository field for Enforce Layout:* no source shows its name, and a repository created
@@ -497,9 +497,10 @@ The decision follows 7.161.32 and SaaS 7.174.0 ([research 29 section 18](../29-n
   credentials (7.84.10), and NuGet among the `maxUniqueSnapshots` types (KB 000005403).
 - **From the clients:** the requests and statuses `NuGet.Protocol` 8.1.0.12 sends and needs, and
   the paths the JFrog CLI expects.
-- **7.x bugs not reproduced, which are not deviations:** the doubled hive in registration links
-  (RTFACT-30380), the bearer token refused on NuGet routes (RTFACT-29362), and
-  `maxUniqueSnapshots` deleting nothing at the root (RTFACT-31210).
+- **7.x bugs and gaps not reproduced, which are not deviations:** the doubled hive in
+  registration links (RTFACT-30380), the bearer token refused on NuGet routes (RTFACT-29362),
+  `maxUniqueSnapshots` deleting nothing at the root (RTFACT-31210), the delay before a pushed
+  version appears (R29 12), and the registration's missing `published` (RTFACT-27465).
 - **7.x features left out:** symbol-server reads, the search rate limit, `repository-signatures`
   (remote only), the global "Normalize package version" setting (every repository is
   normalised), the migration tool (nothing to migrate), and the newer handler's system
