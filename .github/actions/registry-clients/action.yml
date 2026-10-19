@@ -1,18 +1,23 @@
 name: Registry clients (pinned)
 description: >-
-  Install the pinned crane, oras and cosign binaries, each checked against
-  the SHA-256 its release publishes, and export their paths as
-  ARTIFACTWEAVE_CRANE_BIN, ARTIFACTWEAVE_ORAS_BIN and ARTIFACTWEAVE_COSIGN_BIN.
+  Install the pinned crane, oras, cosign, helm and terraform binaries, each
+  checked against the SHA-256 its release publishes, and export their paths
+  as ARTIFACTWEAVE_CRANE_BIN, ARTIFACTWEAVE_ORAS_BIN, ARTIFACTWEAVE_COSIGN_BIN,
+  ARTIFACTWEAVE_HELM_BIN and ARTIFACTWEAVE_TERRAFORM_BIN.
 
 # The registry's real clients for the acceptance features (decision 0015,
-# #229). Binaries rather than setup actions: crane and oras publish a
-# checksums file and cosign a signed one, and one action keeps the three
-# pins together. Dependabot does not see these; move them by hand with the
-# hashes from each release's checksums file.
+# #229), and P8's helm and terraform (#534). Binaries rather than setup
+# actions: crane, oras and helm publish a checksum for each archive,
+# HashiCorp a SHA256SUMS file and cosign a signed one, and one action keeps
+# the pins together. Dependabot does not see these; move them by hand with
+# the hashes from each release's checksums. Terraform is the release
+# deploy/check.sh pins, read from there rather than copied again (the
+# terraform job and platform-scenarios.yml pin it inline), so the acceptance
+# features always run deploy-check's terraform; move it in check.sh.
 runs:
   using: composite
   steps:
-    - name: Download crane, oras and cosign
+    - name: Download crane, oras, cosign, helm and terraform
       shell: bash
       env:
         CRANE_VERSION: 'v0.22.1'
@@ -21,6 +26,8 @@ runs:
         ORAS_SHA256: 'f27adb935022d94df8dc77719c322dda592c78a0d57a6f7dcdd8d900b248c454'
         COSIGN_VERSION: 'v3.1.3'
         COSIGN_SHA256: '4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71'
+        HELM_VERSION: 'v4.3.1'
+        HELM_SHA256: '0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b'
       run: |
         dir="$RUNNER_TEMP/registry-clients"
         mkdir -p "$dir"
@@ -35,9 +42,28 @@ runs:
         curl -fsSL -o "$dir/cosign" \
           "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
         echo "${COSIGN_SHA256}  $dir/cosign" | sha256sum -c -
-        chmod +x "$dir/crane" "$dir/oras" "$dir/cosign"
+        curl -fsSL -o "$dir/helm.tar.gz" \
+          "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz"
+        echo "${HELM_SHA256}  $dir/helm.tar.gz" | sha256sum -c -
+        tar -xzf "$dir/helm.tar.gz" -C "$dir" --strip-components=1 linux-amd64/helm
+        # A reworded pin line in check.sh leaves these empty: say so, rather
+        # than fail later on a download of no version.
+        check="$GITHUB_WORKSPACE/deploy/check.sh"
+        tf_version=$(sed -n 's/^TERRAFORM_VERSION=//p' "$check")
+        tf_sha256=$(sed -n 's/^[[:space:]]*terraform_linux_amd64) echo \([0-9a-f]\{64\}\) ;;$/\1/p' "$check")
+        if [ -z "$tf_version" ] || [ -z "$tf_sha256" ]; then
+          echo "deploy/check.sh pins no terraform version or linux_amd64 SHA-256" >&2
+          exit 1
+        fi
+        curl -fsSL -o "$dir/terraform.zip" \
+          "https://releases.hashicorp.com/terraform/${tf_version}/terraform_${tf_version}_linux_amd64.zip"
+        echo "${tf_sha256}  $dir/terraform.zip" | sha256sum -c -
+        unzip -q -o "$dir/terraform.zip" terraform -d "$dir"
+        chmod +x "$dir/crane" "$dir/oras" "$dir/cosign" "$dir/helm" "$dir/terraform"
         {
           echo "ARTIFACTWEAVE_CRANE_BIN=$dir/crane"
           echo "ARTIFACTWEAVE_ORAS_BIN=$dir/oras"
           echo "ARTIFACTWEAVE_COSIGN_BIN=$dir/cosign"
+          echo "ARTIFACTWEAVE_HELM_BIN=$dir/helm"
+          echo "ARTIFACTWEAVE_TERRAFORM_BIN=$dir/terraform"
         } >> "$GITHUB_ENV"

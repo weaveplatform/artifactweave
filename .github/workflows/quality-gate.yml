@@ -188,10 +188,11 @@ jobs:
         with:
           persist-credentials: false
 
-      # The npm and Maven client images (test/acceptance/clients), built in
-      # the background while the job sets up and make accept compiles the
-      # -cover binary: npm 11 and 12, Maven 3.10 and 3.9. Their scenarios
-      # wait for the images, and the log is printed if the job fails.
+      # The package client images (test/acceptance/clients), built in the
+      # background while the job sets up and make accept compiles the -cover
+      # binary: npm 11 and 12, Maven 3.10 and 3.9, the Python tools, and
+      # .NET 10 and 11. Their scenarios wait for the images, and the log is
+      # printed if the job fails.
       - name: Client images (background)
         run: |
           {
@@ -202,6 +203,12 @@ jobs:
             docker build -t artifactweave-accept-npm12 \
               -f test/acceptance/clients/node-npm12.Dockerfile test/acceptance/clients
             docker build -t artifactweave-accept-maven39 test/acceptance/clients/maven-3.9
+            docker build -t artifactweave-accept-python \
+              -f test/acceptance/clients/python.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-dotnet \
+              -f test/acceptance/clients/dotnet.Dockerfile test/acceptance/clients
+            docker build -t artifactweave-accept-dotnet11 \
+              -f test/acceptance/clients/dotnet-11.Dockerfile test/acceptance/clients
           } > "$RUNNER_TEMP/client-images.log" 2>&1 &
 
       - name: Set up Go
@@ -224,9 +231,10 @@ jobs:
       - name: JFrog CLI (pinned)
         uses: ./.github/actions/jfrog-cli
 
-      # crane, oras and cosign for the registry features, each a pinned
-      # release checked against its published sha256. The runner's own
-      # docker covers docker login, push and pull.
+      # crane, oras and cosign for the registry features, and helm and
+      # terraform for P8's, each a pinned release checked against its
+      # published sha256. The runner's own docker covers docker login, push
+      # and pull.
       - name: Registry clients (pinned)
         uses: ./.github/actions/registry-clients
 
@@ -236,6 +244,9 @@ jobs:
           ARTIFACTWEAVE_NPM12_IMAGE: artifactweave-accept-npm12
           ARTIFACTWEAVE_MAVEN_IMAGE: artifactweave-accept-maven
           ARTIFACTWEAVE_MAVEN39_IMAGE: artifactweave-accept-maven39
+          ARTIFACTWEAVE_PYTHON_IMAGE: artifactweave-accept-python
+          ARTIFACTWEAVE_DOTNET_IMAGE: artifactweave-accept-dotnet
+          ARTIFACTWEAVE_DOTNET11_IMAGE: artifactweave-accept-dotnet11
           # Gradle runs in the next step, which does not gate.
           ARTIFACTWEAVE_ACCEPT_TAGS: '~@gradle'
         run: make accept
