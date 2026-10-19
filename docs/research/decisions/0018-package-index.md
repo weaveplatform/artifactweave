@@ -54,6 +54,13 @@ Maven with Gradle, Ivy and SBT ([0036](0036-maven.md)). For all of them:
   it, and nothing is kept there that the items do not carry.
 - **Download statistics:** a download served through the item path records the version's
   last download (`RecordVersionDownload`), as it records the item's.
+- **Layout-translating copies and moves** (`suppressLayouts=0`) never land two source paths
+  on one target path, so they never merge two versions into one in the target's index
+  (#496). A file whose translated path would drop a value the target layout has no place
+  for, such as `go-default`'s `v1.2.3-rc.1.zip` in `simple-default`, which has no file
+  revision and would give it `v1.2.3.zip`'s path, is refused and reported, and a move
+  leaves it in place. [Research 03](../03-repository-configuration-model.md#layout-translation)
+  gives the rule and what each pair of bundled layouts loses; what 7.x does there is **[I]**.
 - **Derived metadata and retention** that would contend in the write transaction run from
   the persistent work queue ([0033](0033-persistent-work-queue.md)): Maven metadata and
   `maxUniqueSnapshots`.

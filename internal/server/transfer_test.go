@@ -224,9 +224,11 @@ func TestCopyAndMoveKeepTimes(t *testing.T) {
 }
 
 // A Cargo repository can name the cargo-default layout Artifactory 7.x
-// bundles (#354), and a copy that translates layouts reads it: a crate copied
-// from a simple-default repository lands at the path JFrog's Cargo page
-// requires. Before cargo-default was bundled, the copy failed to resolve it.
+// bundles (#354), and a copy that translates layouts reads it. Before
+// cargo-default was bundled, the copy failed to resolve it. cargo-default
+// names no organisation, so rust/serde/serde-1.0.197.crate in a
+// simple-default repository would take the path other/serde/... takes too:
+// the copy answers 200 and reports the crate it refused (#496).
 func TestCopyTranslatesToTheCargoLayout(t *testing.T) {
 	w := newItemWorld(t, false)
 	for key, body := range map[string]string{
@@ -247,12 +249,23 @@ func TestCopyTranslatesToTheCargoLayout(t *testing.T) {
 	}
 
 	w.put("/artifactory/simple-local/rust/serde/serde-1.0.197.crate", "crate")
-	wantStatus(t, w.do("POST",
-		"/artifactory/api/copy/simple-local/rust?to=/crates-local/&suppressLayouts=0", "admin", ""),
-		http.StatusOK)
+	rec = w.do("POST",
+		"/artifactory/api/copy/simple-local/rust?to=/crates-local/&suppressLayouts=0", "admin", "")
+	wantStatus(t, rec, http.StatusOK)
+	var report struct {
+		Messages []struct{ Level, Message string }
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &report); err != nil || len(report.Messages) != 2 ||
+		report.Messages[0].Level != "ERROR" || report.Messages[0].Message !=
+		"Cannot transfer simple-local:rust/serde/serde-1.0.197.crate to "+
+			"crates-local:crates/serde/serde-1.0.197.crate: layout cargo-default has no place "+
+			"for [orgPath] rust from layout simple-default, so another path could translate to "+
+			"crates/serde/serde-1.0.197.crate" {
+		t.Fatalf("report %s", rec.Body)
+	}
 	wantStatus(t,
 		w.do("GET", "/artifactory/crates-local/crates/serde/serde-1.0.197.crate", "admin", ""),
-		http.StatusOK)
+		http.StatusNotFound)
 }
 
 func TestCopyAndMoveRefused(t *testing.T) {

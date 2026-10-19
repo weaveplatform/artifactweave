@@ -321,6 +321,41 @@ func TestFullPackument(t *testing.T) {
 	}
 }
 
+// The latest version's description, author and license reach the top of
+// the full packument as its package.json has them, empty ones included:
+// 7.x sends "description" : "" for an empty description (RTFACT-30472's
+// second packument). Only a field package.json lacks is left out, and a
+// description that is not a string.
+func TestPackumentKeepsEmptyFields(t *testing.T) {
+	f := newFixture(t)
+	f.deploy(t, "blank", "1.0.0",
+		`{"name":"blank","version":"1.0.0","description":"","author":"","license":""}`, nil)
+	f.deploy(t, "bare", "1.0.0", `{"name":"bare","version":"1.0.0"}`, nil)
+	f.deploy(t, "odd", "1.0.0", `{"name":"odd","version":"1.0.0","description":["a list"]}`, nil)
+	for name, want := range map[string]map[string]any{
+		"blank": {"description": "", "author": "", "license": ""},
+		"bare":  {},
+		"odd":   {},
+	} {
+		rec := f.do("GET", registry+name, "reader")
+		wantStatus(t, rec, http.StatusOK)
+		got := map[string]any{}
+		for k, v := range decode(t, rec) {
+			if k == "description" || k == "author" || k == "license" {
+				got[k] = v
+			}
+		}
+		if diff := cmp.Diff(want, got); diff != "" {
+			t.Errorf("%s (-want +got):\n%s", name, diff)
+		}
+	}
+	// The version keeps the empty description its package.json has.
+	versions, _ := decode(t, f.do("GET", registry+"blank", "reader"))["versions"].(map[string]any)
+	if v, _ := versions["1.0.0"].(map[string]any); v["description"] != "" {
+		t.Fatalf("%v", versions)
+	}
+}
+
 // The abbreviated packument keeps per version only what installing needs,
 // with hasInstallScript, and is what pacote's Accept asks for.
 func TestAbbreviatedPackument(t *testing.T) {

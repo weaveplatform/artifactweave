@@ -183,10 +183,23 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 	if err != nil {
 		return nil, err
 	}
-	translate, translating, err := s.translator(ctx, t, toFull, res)
+	tr, err := s.translator(ctx, t, toFull, res)
 	if err != nil {
 		return nil, err
 	}
+	return s.planItems(ctx, t, res, sources, srcFull, dstRoot, tr)
+}
+
+// planItems plans each of sources, the source at srcFull and everything
+// below it, under dstRoot or, with tr, where tr translates each file.
+func (s *Service) planItems(
+	ctx context.Context,
+	t Transfer,
+	res *TransferResult,
+	sources []types.Item,
+	srcFull, dstRoot string,
+	tr *translation,
+) ([]step, error) {
 	hooks, env := s.format(t.To.Repo.PackageType), s.env()
 	var steps []step
 	var skipped []string
@@ -199,18 +212,22 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 			continue
 		}
 		dst := join(dstRoot, strings.TrimPrefix(strings.TrimPrefix(full, srcFull), "/"))
-		if translating {
+		var problem string
+		if tr != nil {
 			if src.Folder {
 				continue
 			}
-			dst = translate(full)
+			dst, problem = tr.path(full)
 		}
-		st, problem, err := s.admitStep(ctx, hooks, env, t, src, dst)
-		if err == nil && problem == "" {
-			st, problem, err = s.check(ctx, t, st)
+		var st step
+		if problem == "" {
+			var err error
+			if st, problem, err = s.planStep(ctx, hooks, env, t, src, dst); err != nil {
+				return nil, err
+			}
 		}
-		if err != nil {
-			return nil, err
+		if problem == "" && tr != nil {
+			problem = tr.claim(st.dst, full)
 		}
 		if problem != "" {
 			res.Failed++
@@ -226,6 +243,23 @@ func (s *Service) plan(ctx context.Context, t Transfer, res *TransferResult) ([]
 		steps = append(steps, st)
 	}
 	return steps, nil
+}
+
+// planStep plans one item at dst: what the target's format admits there,
+// then what is in its way.
+func (s *Service) planStep(
+	ctx context.Context,
+	hooks format.Handler,
+	env format.Env,
+	t Transfer,
+	src types.Item,
+	dst string,
+) (step, string, error) {
+	st, problem, err := s.admitStep(ctx, hooks, env, t, src, dst)
+	if err != nil || problem != "" {
+		return st, problem, err
+	}
+	return s.check(ctx, t, st)
 }
 
 // admitStep plans where a file lands as the target's format inspects and
@@ -309,49 +343,74 @@ func (s *Service) checkAncestors(ctx context.Context, t Target, dst string) erro
 	return nil
 }
 
-// translator returns the path conversion between the repositories' layouts;
-// ok is false when there is none to make. Layout patterns describe a path
-// from the repository root, so a translation needs the target to be that
-// root; otherwise the paths are kept, with a warning.
+// translator returns the path conversion between the repositories' layouts,
+// or nil when there is none to make. Layout patterns describe a path from
+// the repository root, so a translation needs the target to be that root;
+// otherwise the paths are kept, with a warning.
 func (s *Service) translator(
 	ctx context.Context,
 	t Transfer,
 	toFull string,
 	res *TransferResult,
-) (translate func(string) string, ok bool, err error) {
+) (*translation, error) {
 	from, to := t.From.Repo.RepoLayoutRef, t.To.Repo.RepoLayoutRef
 	if !t.TranslateLayouts || from == "" || to == "" || from == to {
-		return nil, false, nil
+		return nil, nil //nolint:nilnil // no translation to make
 	}
 	if toFull != "" {
 		res.Messages = append(res.Messages, Message{
 			LevelWarning,
 			"Layout translation needs the target repository's root as the target; paths are kept",
 		})
-		return nil, false, nil
+		return nil, nil //nolint:nilnil // no translation to make
 	}
 	src, err := s.Layout(ctx, from)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 	dst, err := s.Layout(ctx, to)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
-	return func(p string) string {
-		v, err := src.Match(p)
-		if err != nil {
-			return p
-		}
-		build := dst.Build
-		if src.IsDescriptor(p) {
-			build = dst.BuildDescriptor
-		}
-		if out, err := build(v); err == nil {
-			return out
-		}
-		return p
-	}, true, nil
+	return &translation{t: t, from: src, to: dst, landed: map[string]string{}}, nil
+}
+
+// translation converts one transfer's file paths between two layouts. It
+// never lands two source paths on one target path, which would write one
+// version over another (#496).
+type translation struct {
+	t        Transfer
+	from, to *layout.Layout
+	// landed maps each planned target path to its source.
+	landed map[string]string
+}
+
+// path is where the file at p lands, or why it may not: a path the target
+// layout would give another source path too (layout.Translate). A path the
+// source layout does not read, or the target cannot build, is kept.
+func (tr *translation) path(p string) (string, string) {
+	out, err := layout.Translate(tr.from, tr.to, p)
+	var lossy *layout.LossError
+	switch {
+	case errors.As(err, &lossy):
+		return p, fmt.Sprintf("Cannot transfer %s:%s to %s:%s: %v",
+			tr.t.From.Repo.Key, p, tr.t.To.Repo.Key, lossy.Target, lossy)
+	case err != nil:
+		return p, ""
+	}
+	return out, ""
+}
+
+// claim plans the file at src to land at dst, or says why it may not. A
+// kept path and a translated one can meet, which layout.Translate cannot
+// see: the second of them is refused.
+func (tr *translation) claim(dst, src string) string {
+	if other, taken := tr.landed[dst]; taken {
+		return fmt.Sprintf("Cannot transfer %s:%s to %s:%s: %s:%s lands there too",
+			tr.t.From.Repo.Key, src, tr.t.To.Repo.Key, dst, tr.t.From.Repo.Key, other)
+	}
+	tr.landed[dst] = src
+	return ""
 }
 
 // Layout compiles a repository layout: one the descriptor stored, else a

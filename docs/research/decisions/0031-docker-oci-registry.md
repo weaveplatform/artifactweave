@@ -59,7 +59,7 @@ each code with the reference registry's status (R23 1.3):
 Only these fourteen codes are sent, with one exception, `TAG_INVALID` for the reserved
 tag below; the other legacy schema-1 codes and the reference registry's `RANGE_INVALID` are
 not. `message` is a short English sentence, and `detail`, when present,
-names what failed (the digest, the tag, the expected and actual sizes). Two codes carry
+names what failed (the digest, the tag, the expected and actual sizes). Four codes carry
 7.x's own text:
 - `MANIFEST_UNKNOWN` answers `"message":"The named manifest is not known to the registry."`
   with `"detail":{"manifest":"<image>"}`, the image as the client named it, without the tag
@@ -74,6 +74,15 @@ names what failed (the digest, the tag, the expected and actual sizes). Two code
   ([RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656),
   [RTFACT-22236](https://jfrog.atlassian.net/browse/RTFACT-22236)). 7.x puts its server's
   exception text there; the description here is a sentence of its own.
+- `BLOB_UNKNOWN` answers `"message":"blob unknown to registry"` with
+  `"detail":{"blobSum":"<digest>"}`, the digest as the client wrote it
+  ([RTFACT-27328](https://jfrog.atlassian.net/browse/RTFACT-27328), 7.33.8).
+- `NAME_UNKNOWN` answers `"message":"Repository name not known to registry."` with
+  `"detail":{"name":"<image>"}`, the image as the client named it
+  ([RTFACT-29193](https://jfrog.atlassian.net/browse/RTFACT-29193), 7.46.11), for an unknown
+  image and an unknown repository alike. **[I]** On the repository-path method that name
+  begins with the repository key, as for `MANIFEST_UNKNOWN`, and a catalog of an unknown
+  repository names the key.
 
 The JFrog REST
 operations under `/artifactory/api/docker/<repo>/v2/` that are not registry operations
@@ -314,12 +323,14 @@ the anonymous user.
   every tag of the image when `tag` is absent, to `targetRepo` under
   `targetDockerRepository` and `targetTag`, which default to the source's names. Each tag
   folder is copied with its blobs linked, never copied as bytes; a multi-architecture tag
-  takes its platform manifests' digest folders with it. Answers 200 with a plain-text
+  takes along each platform manifest's digest folder the target image does not hold yet,
+  as after an earlier promotion (RTDEV-42905). Answers 200 with a plain-text
   message, 400 for a malformed body, 404 for an unknown repository, image or tag. Local and
   federated sources and targets of the same package type.
   - The promotion goes through the item service's copy and move, so the trash can, the
     package index and events follow; a move keeps the items' history, and the platform
-    manifests nothing left in the source image names go with it.
+    manifests nothing left in the source image names go with it, those the target held
+    already included.
   - A target tag holding a different manifest is replaced as a push replaces it, kept under
     Tag Retention; one holding the same manifest is left as it is. The target image's Max
     Unique Tags then applies.
@@ -433,9 +444,11 @@ The audit of 2026-10-18 against KB, Jira and client sources ([#378](https://gith
 - `_catalog` lists every image of a repository to a user with Read on any path in it
   ([docker-repositories](https://docs.jfrog.com/artifactory/docs/docker-repositories.md),
   "Repository Metadata and Permissions"); see "Catalogs" above.
-- `MANIFEST_UNKNOWN` and `MANIFEST_INVALID` carry JFrog's own `message` and a `detail`
-  object ([a KB article on 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl),
-  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)); see "Operations and
+- `MANIFEST_UNKNOWN`, `MANIFEST_INVALID`, `BLOB_UNKNOWN` and `NAME_UNKNOWN` carry JFrog's
+  own `message` and a `detail` object ([a KB article on 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl),
+  [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656),
+  [RTFACT-27328](https://jfrog.atlassian.net/browse/RTFACT-27328),
+  [RTFACT-29193](https://jfrog.atlassian.net/browse/RTFACT-29193)); see "Operations and
   errors" above.
 - A manifest at or above the minimum size redirects like a layer
   ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705)); see "Reads" above.

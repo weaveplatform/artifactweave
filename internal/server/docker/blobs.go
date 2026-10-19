@@ -61,8 +61,7 @@ func (g *Registry) getBlob(w http.ResponseWriter, r *http.Request, q Request) {
 	}
 	it, err := layout.FindBlob(r.Context(), g.store.Items(), q.Repo.Key, q.Name, hex)
 	if errors.Is(err, store.ErrNotFound) {
-		Write(w, Errorf(http.StatusNotFound, CodeBlobUnknown,
-			"blob unknown to registry: %s", q.Reference))
+		Write(w, blobUnknown(q.Reference))
 		return
 	}
 	if err != nil {
@@ -433,7 +432,7 @@ func parseDigest(d string) (hex string, err error) {
 func blobDigest(d string) (string, error) {
 	hex, err := parseDigest(d)
 	if err == nil && hex == "" {
-		err = Errorf(http.StatusNotFound, CodeBlobUnknown, "blob unknown to registry: %s", d)
+		err = blobUnknown(d)
 	}
 	return hex, err
 }

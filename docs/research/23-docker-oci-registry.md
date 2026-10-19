@@ -466,6 +466,14 @@ behaviour below is documented or seen in its clients; where neither shows it, th
   fails on that 206 as it does on a 403. artifactweave refuses such a move with 403 before
   anything is copied (maintainer decision, 2026-10-18), a deviation registered by
   [#378](https://github.com/weaveplatform/artifactweave/issues/378).
+- **[D] A repeated multi-architecture promotion** succeeds: [7.84.15](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-78415-self-managed)
+  and [7.90.5](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-7905-self-managed)
+  fixed a 400 for promoting a multi-architecture image "more than once in the same repository
+  with the same source tag and destination tag" (RTDEV-42905). So a target image may already
+  hold the list's platform manifests. artifactweave copies each platform manifest the target
+  image lacks and skips each one it holds, and a move removes every source platform manifest
+  that nothing left in the source image names, held by the target or not. **[I]** No source
+  shows a promotion into an image that holds only some of the platforms (section 10).
 - **[D] Parent manifests** (`findParentManifestLists`, [7.125.4](https://docs.jfrog.com/releases/docs/artifactory-self-managed-releases#artifactory-71254-self-managed),
   SaaS 7.119.0): `POST
   .../v2/parentManifests` with `{dockerRepository, tag}` answers
@@ -543,8 +551,12 @@ These go to the live-capture list ([#216](https://github.com/weaveplatform/artif
 15. The default of `artifactory.docker.filter.catalog.by.user.permission` (section 2.1).
 16. Which host the `auth` endpoints key their entry by when the base URL, the request's host
     and a repository subdomain differ, and whether a port is kept (section 2.1).
-17. On the repository-path method, whether `MANIFEST_UNKNOWN`'s `detail.manifest` begins with
-    the repository key (section 12).
+17. On the repository-path method, whether `MANIFEST_UNKNOWN`'s `detail.manifest` and
+    `NAME_UNKNOWN`'s `detail.name` begin with the repository key, and what `detail.name` an
+    unknown repository gets (section 12).
+18. Whether a multi-architecture promotion into an image that holds some of the list's
+    platforms copies the rest, and whether a move then removes the source's copy of a
+    platform the target already held (section 7).
 
 ## 11. Versions at the research baseline
 
@@ -617,6 +629,15 @@ Checked against Artifactory 7.161.32 on 2026-10-17 ([#341](https://github.com/we
   artifactweave ([KB, 7.146.10](https://jfrog.com/help/r/artifactory-404-manifest-unknown-when-retrieving-docker-manifests-from-an-artifactory-remote-repository-using-curl);
   [RTFACT-25069](https://jfrog.atlassian.net/browse/RTFACT-25069), [RTFACT-30468](https://jfrog.atlassian.net/browse/RTFACT-30468),
   [RTFACT-29656](https://jfrog.atlassian.net/browse/RTFACT-29656)).
+  `BLOB_UNKNOWN` carries "blob unknown to registry" with `{"blobSum":"sha256:<hex>"}`, the
+  digest the client asked for, captured on 7.33.8
+  ([RTFACT-27328](https://jfrog.atlassian.net/browse/RTFACT-27328)), and `NAME_UNKNOWN`
+  carries "Repository name not known to registry." with `{"name":"<image>"}`, the image of
+  an unknown tags list, captured on 7.46.11
+  ([RTFACT-29193](https://jfrog.atlassian.net/browse/RTFACT-29193)), as in artifactweave. On
+  the repository-path method `detail.name` is the name as the client wrote it, with the
+  repository key, as for `MANIFEST_UNKNOWN`, and a catalog of an unknown repository names
+  the key **[I]** (section 10).
 - **Manifest redirects.** A manifest at or above the minimum direct download size redirects
   like a layer ([RTFACT-29705](https://jfrog.atlassian.net/browse/RTFACT-29705)), as in artifactweave (decision 0031, "Redirects";
   [research 19](19-cdn-and-download-redirect.md)).

@@ -108,8 +108,10 @@ Sources:
 |---|---|
 | pacote asks for the abbreviated packument with `Accept: application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*`, and falls back to the full document on a 404 | [S] `registry.js:15,74,107-111` |
 | The abbreviated form carries `name`, `modified`, `dist-tags` and, per version, `dist` (`tarball`, `shasum`, `integrity`, `fileCount`, `unpackedSize`), `deprecated`, `hasInstallScript` and the dependency fields; the full form adds `_id`, `_rev`, `time`, `readme`, `maintainers` and the rest of each manifest | [D] npm's `package-metadata.md` (research 04) |
-| A 7.x full packument from a local repository carries `"_rev" : "1-0"`, `"users" : { }`, `time` with `"unpublished" : null` beside `created`, `modified` and one entry per version, and the latest version's `author` and `license` at the top level. Each version's `dist` has only `tarball`, `shasum` and `integrity`, and there is no `readme` or `maintainers` | [J] RTFACT-30472 (JFrog's reproduction, 2024, two packuments quoted in full), RTFACT-29708 (7.55.14) |
+| A 7.x full packument from a local repository carries `"_rev" : "1-0"`, `"users" : { }`, `time` with `"unpublished" : null` beside `created`, `modified` and one entry per version, and the latest version's `description`, `author` and `license` at the top level. Each version's `dist` has only `tarball`, `shasum` and `integrity`, and there is no `readme` or `maintainers` | [J] RTFACT-30472 (JFrog's reproduction, 2024, two packuments quoted in full), RTFACT-29708 (7.55.14) |
+| An empty description stays: the second packument's `package.json` has `"description": ""`, and both its version and the top level carry `"description" : ""` | [J] RTFACT-30472 |
 | Both captures are of packages with one version; the `_rev` of a package with more, the fields of the abbreviated form, and what a `?write=true` read adds | [I] |
+| Both captures' `package.json` have a `description`, an `author` and a `license`. What the top level carries when the latest version's `package.json` has none of one: artifactweave leaves the field out | [I] |
 | Packuments carry `X-Checksum-Sha1` and an `ETag` equal to it, unquoted, and a matching `If-None-Match` answers 304: `X-Checksum-Sha1: cdc2b1de…` and `ETag: cdc2b1de…` on 7.87.3, and a 304 for `If-None-Match: 35e83b02…` | [J] RTFACT-30566 (JFrog, 7.87.3), RTFACT-19423 (fixed 2019) |
 | Both captures are of remote or virtual repositories. Whether a local repository's packuments carry the headers, and what 7.x's checksum is taken over; artifactweave takes it over the body it sends | [I] |
 | `npm ping` is `GET /-/ping`; any 2xx passes and a body that is not JSON is ignored | [S] `lib/utils/ping.js:3-6` |
@@ -222,8 +224,10 @@ Each item below is on #216 for the live comparison in P19:
    the 403 on overwriting a version applies to every caller, administrators included ([KB]
    000005823, section 2.1).
 2. The fields of the abbreviated packument, its `dist` among them, the `_rev` of a package
-   with more than one version, and what a `?write=true` read adds. The audit settled the full
-   packument's fields and `_rev` `1-0` ([J] RTFACT-30472, RTFACT-29708, section 3).
+   with more than one version, what a `?write=true` read adds, and what the full packument's
+   top level carries for a `description`, `author` or `license` the latest `package.json`
+   lacks. The audit settled the full packument's fields, an empty `description` kept as `""`,
+   and `_rev` `1-0` ([J] RTFACT-30472, RTFACT-29708, section 3).
 3. The statuses and bodies of publish, dist-tag, deprecate and unpublish answers, the status
    of a publish the `client-checksums` policy refuses among them, apart from a successful
    publish's 201, which the audit settled (section 2.1).

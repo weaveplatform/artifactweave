@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -330,7 +331,7 @@ func TestTransferLayouts(t *testing.T) {
 	)
 	custom := w.addRepo(repo.Config{Key: "custom", Class: repo.Local, RepoLayoutRef: "flat"})
 	doc, _ := json.Marshal(map[string]string{
-		"artifactPathPattern": "[module]-[baseRev].[ext]",
+		"artifactPathPattern": "[orgPath]/[module]-[baseRev].[ext]",
 	})
 	if err := w.db.Configs().Put(ctx, types.ConfigDocument{
 		Kind: types.ConfigLayout, Key: "flat", Document: doc,
@@ -359,7 +360,7 @@ func TestTransferLayouts(t *testing.T) {
 	w.transfer(
 		Transfer{From: Target{Repo: maven}, To: Target{Repo: custom}, TranslateLayouts: true},
 	)
-	if _, ok := w.get(custom, "app-1.0.jar"); !ok {
+	if _, ok := w.get(custom, "org/acme/app-1.0.jar"); !ok {
 		t.Fatal("translation to a stored layout")
 	}
 	// Below the target root the paths are kept, with a warning.
@@ -377,6 +378,84 @@ func TestTransferLayouts(t *testing.T) {
 		From: Target{Repo: maven}, To: Target{Repo: bad}, TranslateLayouts: true,
 	}); err == nil {
 		t.Fatal("an unknown layout must fail")
+	}
+}
+
+// A translation never lands two source paths on one target path (#496):
+// a file whose values the target layout has no place for is refused and
+// reported, not written over the version that does fit, and so is a kept
+// path another file translates to. Under failFast the first refusal ends
+// the transfer.
+func TestTransferLayoutsNeverMerge(t *testing.T) {
+	w := newWorld(t)
+	ctx := context.Background()
+	gomod := w.addRepo(repo.Config{Key: "go-local", Class: repo.Local, RepoLayoutRef: "go-default"})
+	flat := w.addRepo(
+		repo.Config{Key: "flat", Class: repo.Local, RepoLayoutRef: "simple-default"},
+	)
+	for _, p := range []string{
+		"example.com/lib/@v/v1.2.3.zip",
+		"example.com/lib/@v/v1.2.3-rc.1.zip",
+	} {
+		if _, err := w.svc.Deploy(ctx, Deploy{
+			Target: Target{Repo: gomod, Path: p}, Body: strings.NewReader(p),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res := w.transfer(Transfer{
+		From: Target{Repo: gomod}, To: Target{Repo: flat}, TranslateLayouts: true,
+	})
+	if res.Files != 1 || res.Failed != 1 {
+		t.Fatalf("%+v", res)
+	}
+	got, ok := w.get(flat, "example.com/lib/lib-1.2.3.zip")
+	if !ok || got.Actual.SHA256 != sums("example.com/lib/@v/v1.2.3.zip").SHA256 {
+		t.Fatalf("the release: %+v %v", got, ok)
+	}
+	want := Message{LevelError, "Cannot transfer go-local:example.com/lib/@v/v1.2.3-rc.1.zip " +
+		"to flat:example.com/lib/lib-1.2.3.zip: layout simple-default has no place for " +
+		"[fileItegRev] rc.1 from layout go-default, so another path could translate to " +
+		"example.com/lib/lib-1.2.3.zip"}
+	if !slices.Contains(res.Messages, want) {
+		t.Fatalf("%+v", res.Messages)
+	}
+
+	// A path the source layout does not read keeps its place, so it may
+	// meet a translated one; whichever comes second is refused.
+	maven := w.addRepo(
+		repo.Config{Key: "mvn", Class: repo.Local, RepoLayoutRef: "maven-2-default"},
+	)
+	for _, p := range []string{"a/b/b-1.0.pom", "a/b/1.0/b-1.0.pom"} {
+		if _, err := w.svc.Deploy(ctx, Deploy{
+			Target: Target{Repo: flat, Path: p}, Body: strings.NewReader(p),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	res = w.transfer(Transfer{
+		From: Target{Repo: flat, Path: "a"}, To: Target{Repo: maven}, TranslateLayouts: true,
+	})
+	want = Message{LevelError, "Cannot transfer flat:a/b/1.0/b-1.0.pom to mvn:a/b/1.0/b-1.0.pom: " +
+		"flat:a/b/b-1.0.pom lands there too"}
+	if res.Files != 1 || res.Failed != 1 || res.Messages[0] != want {
+		t.Fatalf("%+v", res)
+	}
+	got, ok = w.get(maven, "a/b/1.0/b-1.0.pom")
+	if !ok || got.Actual.SHA256 != sums("a/b/b-1.0.pom").SHA256 {
+		t.Fatalf("the translated file: %+v %v", got, ok)
+	}
+
+	// failFast stops at the refusal, which comes before the release in
+	// the source's order, and writes nothing.
+	again := w.addRepo(
+		repo.Config{Key: "flat2", Class: repo.Local, RepoLayoutRef: "simple-default"},
+	)
+	res = w.transfer(Transfer{
+		From: Target{Repo: gomod}, To: Target{Repo: again}, TranslateLayouts: true, FailFast: true,
+	})
+	if res.Files != 0 || res.Failed != 1 {
+		t.Fatalf("failFast: %+v", res)
 	}
 }
 

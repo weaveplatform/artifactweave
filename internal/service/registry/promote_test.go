@@ -242,6 +242,80 @@ func TestPromoteMultiArch(t *testing.T) {
 	})
 }
 
+// A target image that already holds some or all of a list's platforms
+// still gets every platform it lacks, and a move leaves none of the
+// source's behind: neither a platform the target held nor one copied after
+// it. A repeated promotion is the target holding them all, which 7.x
+// accepts (RTDEV-42905, 7.84.15).
+func TestPromoteMultiArchHeldPlatforms(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		held   []int // platforms the target holds by digest beforehand
+		again  bool  // the list was promoted by copy beforehand
+		copyIt bool
+	}{
+		{name: "partial target by copy", held: []int{0}, copyIt: true},
+		{name: "partial target by move", held: []int{0}},
+		{name: "middle platform held by move", held: []int{1}},
+		{name: "every platform held by copy", held: []int{0, 1, 2}, copyIt: true},
+		{name: "every platform held by move", held: []int{0, 1, 2}},
+		{name: "repeated by copy", again: true, copyIt: true},
+		{name: "repeated by move", again: true},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			each(t, func(t *testing.T, w *world, _ func() store.Store) {
+				ctx := context.Background()
+				prod := w.prod()
+				ps := w.platforms()
+				folder := func(body string) string { return "app/" + layout.DigestFolder(sum(body)) }
+				for _, i := range c.held {
+					if _, err := w.items().Transfer(ctx, item.Transfer{
+						From: item.Target{Repo: w.docker, Path: folder(ps[i])},
+						To:   item.Target{Repo: prod, Path: folder(ps[i])},
+					}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				list, digest := indexOf(layout.MediaTypeOCIIndex, ps...)
+				if err := w.pushAs(layout.MediaTypeOCIIndex, list, digest, "v1"); err != nil {
+					t.Fatal(err)
+				}
+				promote := func(copyIt bool) {
+					t.Helper()
+					if err := w.svc.Promote(ctx, registry.Promotion{
+						From: w.owner(
+							"app",
+						),
+						To:   registry.Owner{Repo: prod, Name: "app", By: "bob"},
+						Tags: []registry.Rename{{From: "v1", To: "v1"}},
+						Copy: copyIt,
+					}); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if c.again {
+					promote(true)
+				}
+				promote(c.copyIt)
+				if !w.existsIn(prod, "app/v1/list.manifest.json") {
+					t.Fatal("the list did not land")
+				}
+				for i, p := range ps {
+					if !w.existsIn(prod, folder(p)+"/manifest.json") {
+						t.Errorf("platform %d is not in the target", i)
+					}
+					if got := w.existsIn(w.docker, folder(p)); got != c.copyIt {
+						t.Errorf("platform %d in the source: %v, want %v", i, got, c.copyIt)
+					}
+				}
+				if got := w.existsIn(w.docker, "app/v1"); got != c.copyIt {
+					t.Errorf("the source tag: %v, want %v", got, c.copyIt)
+				}
+			})
+		})
+	}
+}
+
 // A target tag holding another manifest is replaced as a push replaces it:
 // nothing of the old image stays in the folder, and under Tag Retention
 // the old manifest keeps its digest folder.

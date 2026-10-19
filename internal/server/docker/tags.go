@@ -37,8 +37,7 @@ func (g *Registry) listTags(w http.ResponseWriter, r *http.Request, q Request) {
 		return
 	}
 	if !found {
-		Write(w, Errorf(http.StatusNotFound, CodeNameUnknown,
-			"repository name not known to registry: %s", q.Name))
+		Write(w, nameUnknown(q))
 		return
 	}
 	tags = paginate(w, r, tags)

@@ -53,6 +53,8 @@ Feature: Docker and OCI registry
     When I GET "/v2/missing/app/manifests/latest" as admin
     Then the response status is 404
     And the JSON field "errors.0.code" equals "NAME_UNKNOWN"
+    And the JSON field "errors.0.message" equals "Repository name not known to registry."
+    And the JSON field "errors.0.detail.name" equals "missing/app"
 
   Scenario: A remote Docker repository is not served yet
     When I PUT "/artifactory/api/repositories/docker-remote" as admin with body:
