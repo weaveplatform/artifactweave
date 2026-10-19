@@ -233,6 +233,64 @@ func TestOIDCExchange(t *testing.T) {
 
 func basicToken(user, tok string) map[string]string { return basic(user, tok) }
 
+// TestOIDCSelfMint: a transient user from an exchange mints a token for
+// itself, as jf atc does with the exchanged token configured. The token
+// carries the exchanged token's scope and transient identity, so it reads
+// what the exchanged token reads and no more, and it expires with the
+// exchanged token. A synthetic subject's groups-only token mints nothing
+// (#456).
+func TestOIDCSelfMint(t *testing.T) {
+	w := newOIDCWorld(t)
+	admin := jsonAs(basic("admin", "pw"))
+	// ci-team may also deploy to team-local, which the auto-join groups
+	// may not: only a token that keeps the groups scope deploys there.
+	w.call(
+		t,
+		http.MethodPut,
+		"/artifactory/api/v2/security/permissions/deploy-team",
+		admin,
+		`{"repo":{"repositories":["team-local"],"actions":{"groups":{"ci-team":["read","write"]}}}}`,
+		http.StatusOK,
+	)
+	w.call(t, http.MethodPost, "/access/api/v1/oidc/ci/identity_mappings", admin,
+		`{"name":"both","priority":3,"claims":{"ref":"refs/tags/*"},`+
+			`"token_spec":{"username":"ci-both","scope":"applied-permissions/groups:ci-team",`+
+			`"expires_in":300}}`, http.StatusOK)
+	for name, c := range map[string]struct {
+		claims  map[string]any
+		mapping string
+		deploy  int
+	}{
+		"user scope":      {map[string]any{"ref": "refs/heads/main"}, "deployer", http.StatusForbidden},
+		"user and groups": {map[string]any{"ref": "refs/tags/v1"}, "both", http.StatusCreated},
+	} {
+		got := w.exchange(t, exchangeBody(w.mint(t, "jfrog", time.Hour, c.claims),
+			`,"identity_mapping_name":"`+c.mapping+`"`), http.StatusOK)
+		body := w.call(t, http.MethodPost, "/access/api/v1/tokens",
+			jsonAs(bearerAuth(got.AccessToken)), `{"expires_in":86400}`, http.StatusOK)
+		var mine exchangeResult
+		if err := json.Unmarshal([]byte(body), &mine); err != nil {
+			t.Fatal(err)
+		}
+		if mine.Scope != got.Scope || mine.ExpiresIn < 1 || mine.ExpiresIn > got.ExpiresIn {
+			t.Fatalf("%s: self-minted %+v from %+v", name, mine, got)
+		}
+		for who, tok := range map[string]string{"exchanged": got.AccessToken, "own": mine.AccessToken} {
+			w.call(t, http.MethodGet, "/artifactory/open-local/f.txt", bearerAuth(tok), "",
+				http.StatusOK)
+			// A new path each: replacing a file would also need delete.
+			w.call(t, http.MethodPut, "/artifactory/team-local/"+c.mapping+"-"+who+".txt",
+				bearerAuth(tok), "x", c.deploy)
+		}
+		w.call(t, http.MethodPost, "/access/api/v1/tokens", jsonAs(bearerAuth(got.AccessToken)),
+			`{"refreshable":true}`, http.StatusForbidden)
+	}
+	synthetic := w.exchange(t, exchangeBody(w.mint(t, "jfrog", time.Hour,
+		map[string]any{"repository": "octo-org/app"}), ""), http.StatusOK)
+	w.call(t, http.MethodPost, "/access/api/v1/tokens", jsonAs(bearerAuth(synthetic.AccessToken)),
+		`{}`, http.StatusForbidden)
+}
+
 // TestOIDCDynamicMappings follows exchanged tokens to what they may read: a
 // resolved user adds the auto-join groups to a groups scope (IDZ-59), and a
 // resource pattern narrows what the user and groups may read but never

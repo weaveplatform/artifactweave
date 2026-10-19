@@ -94,6 +94,21 @@ issue tokens from the same service, under these rules:
   read and revoked through the token API like any other. Creating a user of that name makes
   the tokens act as that user, and deleting that user then revokes them with the user's own.
   Only an administrator's token is marked: a non-administrator mints for themselves alone.
+- *A transient user mints for itself (#456).* The subject of a `transient` token, from an
+  administrator or an OIDC exchange, may mint tokens for itself as any user may, with `jf atc`
+  or `jf rt atc`. Each new token carries the caller's `transient` marker and the caller's
+  scope, so it resolves to the same user with the same groups and acts exactly as the caller
+  does; `applied-permissions/user`, the one scope a non-administrator may ask for, means "as I
+  am" here. Issued for a stored user, as everyone else's is, the token would answer 401 on
+  every use. It never gains more than the caller holds:
+  - it expires no later than the caller's token, whatever `expires_in` asks;
+  - it may be refreshable only when the caller's token is, or the request answers 403 "The
+    requested token details are forbidden", since each refresh would extend an identity that
+    ends with the caller's token. The 24-hour limit of an OIDC mapping would otherwise mean
+    nothing ([DV-093](../../implementation/deviations.md#security)).
+
+  A caller whose scope narrows its identity, a groups-only transient token or a synthetic
+  subject among them, mints nothing, as the next item says.
 - A token whose scope is narrower than its user's identity (groups or resources only) may not
   mint tokens at all, so a narrowed token cannot obtain a broader one. For the same reason it
   may not set its user's password (`PUT /access/api/v2/users/{username}/password`), which would
@@ -205,8 +220,17 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   scope. Every other pair is accepted, so a user or a user pattern may come with a groups
   pattern. `resource_pattern` also refuses artifact entries in the mapping's own scope,
   because a token's artifact entries allow their union and a claim's entry would widen
-  them. A mapping without `username` or `username_pattern` needs a groups scope or
-  `groups_pattern`.
+  them. A mapping without `username` or `username_pattern` needs a groups scope, a project
+  roles scope or `groups_pattern`, and its scope may hold nothing but groups and project
+  roles (#476).
+- **Projects** ("Manage Project-Scoped Identity Mappings"). A mapping belongs to the project
+  its scope's project roles name, and `project_key` in the response is derived from the
+  scope. A project roles mapping needs no `username`: the jfrog/platform provider's
+  documented example `my-github-oidc-project-roles-identity-mapping` sends none, and the
+  platform UI asks a project mapping for its roles alone. "The project scope of an identity
+  mapping can't be changed after creation", and "Attempting to change the project key
+  returns `400 Bad Request`", so an update whose scope implies another project, none for a
+  project's mapping, or one for a global mapping answers 400 (#476).
 - **Patterns** ("Dynamic Mapping" and "Advanced Dynamic Mappings"). `username_pattern`,
   `groups_pattern` and `resource_pattern` name one claim as `{{claim}}`, followed by at
   most 15 more parts separated by `|`.
@@ -240,8 +264,10 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   entry or another resource type fails the request with 400. The entries only narrow:
   like every artifact entry they intersect the permissions of the token's user and
   groups ([0006](0006-authorization-native-permission-model.md)), so a claim never
-  reaches a repository the mapping's user or groups cannot. That is why a mapping with
-  `resource_pattern` needs a user or groups as well.
+  reaches a repository the mapping's user or groups cannot. 7.x grants a resource scope
+  without permissions, a deviation that
+  [DV-092](../../implementation/deviations.md#security) records with its reason. That is why
+  a mapping with `resource_pattern` needs a user, groups or project roles as well.
 - **The token.** Its lifetime is `token_spec.expires_in`, one hour when unset, at most
   24 hours. Its scope is the mapping's `scope`, then the groups and artifact entries its
   patterns yield, then `applied-permissions/user` whenever the mapping names a user. So a
@@ -251,8 +277,14 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   `transient`, and authenticates as the stored user of that name when there is one,
   otherwise as a transient user in the auto-join groups. A mapping without a user
   issues for the synthetic subject `oidc-<provider>-<mapping>`, marked `synthetic`,
-  which is never a stored user and acts through its scope's groups alone; such a
-  mapping must therefore name groups only. A token an administrator mints for a name that
+  which is never a stored user and acts through its scope's groups or project roles alone;
+  such a mapping must therefore name nothing else. The page says a blank username gives "a
+  synthetic subject instead, preventing Auto Join group expansion", without its form, and
+  a project roles mapping without one gets the same. The ID token's `sub` claim is not used
+  as the user: it is chosen by the provider, not the administrator, and as a `transient`
+  name it would act as any stored user it happened to equal, whose tokens the exchanged
+  token could then list and revoke; GitHub's also holds `/`, which no token's user name may.
+  A token an administrator mints for a name that
   is no stored user is marked `transient` too (**Token API** above). Every other token
   still needs a stored, enabled user. The description records the provider, the mapping
   and the request's
@@ -263,7 +295,7 @@ stored in their wire form so the jfrog/platform provider reads back what it wrot
   token that does not verify, including when the provider's keys cannot be fetched,
   which is logged at WARN. Management answers 404 for an unknown provider or mapping,
   400 for an invalid body, a combination the table refuses, a pattern that cannot be
-  read, or a name in use.
+  read, a name in use, or an update that would change the mapping's project.
 
 **Docker token endpoint** (values from [research 17](../17-undocumented-shapes.md),
 behaviour from [research 23](../23-docker-oci-registry.md) section 3; routes in
@@ -347,8 +379,18 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   wrong passwords only while it is enabled. Each failure is counted and, at the limit,
   the account locked, in one database statement, so concurrent attempts cannot all
   stay below it. A correct password resets the count.
-- **A locked account** answers exactly as a wrong password does, after the same
-  hashing work, so neither the message nor the timing tells that the account exists.
+- **A locked account** answers every Basic login 403, "User is Locked.\nContact System
+  Administrator to Unlock The Account.", whatever password it sends (#475). The lock is
+  checked first, before the suspension and before the password, so the answer cannot tell a
+  right password from a wrong one, and no password is hashed for it. A locked login is not
+  counted as a failure, toward the lock or the suspension. 7.x checks it in the same place:
+  its debug log shows "Checking if user is not locked" and then "User is locked, denying
+  login." with no failed attempt registered (**[J]**
+  [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453), 7.31.10 to 7.55.6). The
+  status and message are **[I]**, from OSS 6.20: `ArtifactoryAuthenticationFilterChain` checks
+  the lock before the password, and `ArtifactoryBasicAuthenticationEntryPoint` answers a
+  `LockedException` 403 with the `UserLockedException` message above. The message differs
+  from the suspension's and the expired password's, so each says what the user must do.
   Unlocking (one, several or all users) and disabling the policy clear locks.
   `secondsToUnlock` (default 1) is stored and returned only: a lock lasts until an
   administrator lifts it.
@@ -358,7 +400,7 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   "This request is blocked due to recurrent request failures, please try again in N
   second(s)" for `baseLoginDelayMillis` (1000), the right password included; each later
   failure doubles the delay up to `maxLoginDelayMillis` (60000).
-  - The check runs before the user is read or any password hashed, and an unknown name is
+  - The check runs after the lock and before any password is hashed, and an unknown name is
     suspended alike, so the `403` says nothing about which names exist.
   - Attempts refused while suspended are not counted, toward the suspension or the lock, so
     no stream of requests stretches one suspension past the maximum.
@@ -372,8 +414,9 @@ decodes them; string spellings such as `"true"` and `"60"` are accepted on write
   it was recorded never expire on their own. Expiry is reported only after the
   password verifies, as 403 with "Password has expired" on every route but the user's own
   password change. That is the answer of Artifactory's entry point to an expired password,
-  which it gives a locked account too (**[I]**, from OSS 6.20; research 05 lists the
-  evidence for [#216](https://github.com/weaveplatform/artifactweave/issues/216)).
+  the status it gives a locked account too, with another message (**[I]**, from OSS 6.20;
+  research 05 lists the evidence for
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216)).
 - **The policies are cached** for 10 seconds per instance. A change made through an
   instance applies there at once, and elsewhere within the 10 seconds.
 
@@ -470,6 +513,11 @@ Reporting a recent Artifactory version is necessary: the providers silently disa
 newer code paths when the version is older, and the CLI expects the multipart probe to
 exist. Reporting the real artifactweave version elsewhere keeps the lie bounded.
 
+A token never outlives the identity it stands for. A transient user exists only through its
+token, so the tokens it mints for itself end with that token and refresh only if it does
+([DV-093](../../implementation/deviations.md#security)); without that bound, one exchanged
+OIDC token, limited to 24 hours, would become a credential with no end.
+
 **Alternatives considered:**
 - *Opaque tokens only*: simpler, but the CLI and providers read the JWT payload.
 - *Symmetric JWT signing*: fine for one process, but RS256 lets a future UI or edge
@@ -564,6 +612,18 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
   The 404 from the user API, nothing revoked by deleting the name, and revocation through the
   token API as for any other token are inferred **[I]**, and on
   [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- A transient user's token mints further tokens for that user: on 7.5.7 "access token with
+  time limit is eligible to be used for new access tokens" (**[J]**
+  [RTFACT-23934](https://jfrog.atlassian.net/browse/RTFACT-23934), closed without a fix), and
+  the access-tokens page lets every user assign tokens to themselves. artifactweave's
+  self-minted token acts as its caller (**Token API** above,
+  [#456](https://github.com/weaveplatform/artifactweave/issues/456)). Two points go further,
+  as [DV-093](../../implementation/deviations.md#security) records: the token expires no later
+  than the caller's, and is refreshable only when the caller's is. RTFACT-23934's reporter
+  asked for exactly that, since a chain of such tokens "can be refreshed indefinitely". That
+  the new token keeps the caller's scope and transient identity, rather than the
+  `token:<transient username>` user the report saw, is inferred **[I]**, and on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216).
 
 **Account policies and seeded principals:**
 - Failed Basic logins also suspend the account for a moment, answering 403 for a delay that
@@ -575,6 +635,13 @@ legacy route, the OIDC exchange and the registry token keep their own one-hour d
   [#408](https://github.com/weaveplatform/artifactweave/issues/408)). The doubling, the day
   after which failures are forgotten, the 403's message and leaving tokens alone are
   inferred, and on [#216](https://github.com/weaveplatform/artifactweave/issues/216).
+- A locked account is refused whatever password it sends, its lock checked before the
+  password (**Account policies** above;
+  **[J]** [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453);
+  [#475](https://github.com/weaveplatform/artifactweave/issues/475)). The 403 and its message,
+  from OSS 6.20's entry point and `UserLockedException`, are inferred **[I]**, and on
+  [#216](https://github.com/weaveplatform/artifactweave/issues/216): no 7.x capture of the
+  response is published.
 - Since 7.84.3 `anonymous` is in neither the `Anything` nor the `Any Remote` permission
   ([permissions](https://docs.jfrog.com/administration/docs/permissions)), and artifactweave
   seeds both that way. Decision
@@ -605,12 +672,22 @@ These match 7.x since [#409](https://github.com/weaveplatform/artifactweave/issu
 - With no `project_key`, "all identity mappings compete equally based on priority and
   creation time", a project's mappings included ("Identity Mappings").
 
+These match 7.x since [#476](https://github.com/weaveplatform/artifactweave/issues/476)
+([manage project-scoped identity mappings](https://docs.jfrog.com/administration/docs/manage-project-scoped-identity-mappings)):
+- A project roles mapping may leave out `username`, as the jfrog/platform provider's
+  documented example does, and its token is the synthetic subject's ("If you need strict
+  group-scoped permissions, leave the Username field blank").
+- An update may not change a mapping's project: "Attempting to change the project key
+  returns `400 Bad Request`". The page gives no message; artifactweave's is its own.
+
 Two choices go further than the page. First, the resource scope's entries narrow the user's
 and groups' permissions, as every artifact entry does here
 ([0006](0006-authorization-native-permission-model.md)). The
 [create-scoped-token](https://docs.jfrog.com/administration/reference/create-scoped-token)
-page says a resource scope needs no permissions defined beforehand, but a claim from an
-external token never grants anything on its own here. Second, a claim naming a wildcard
+page says resource scopes give access "without requiring any permissions to be predefined in
+the platform or in any project", but a scope, and above all a claim from an external token,
+never grants anything on its own here
+([DV-092](../../implementation/deviations.md#security)). Second, a claim naming a wildcard
 repository, another resource type or several entries fails the request. The details no
 source states are inferred and listed on
 [#216](https://github.com/weaveplatform/artifactweave/issues/216):
@@ -621,7 +698,11 @@ source states are inferred and listed on
   literal text, and `$1_$2` read as Java reads it;
 - the table's "User" being the `username` field or an `applied-permissions/user` scope;
 - another project's mappings not being tried when the request names a project;
-- the bounds on claims and patterns, and the refusal of over-broad resource claims.
+- the bounds on claims and patterns, and the refusal of over-broad resource claims;
+- the synthetic subject's form, `oidc-<provider>-<mapping>`, for a project roles mapping as for
+  a groups one. The JFrog CLI reads a token subject without `/users/` as the user name
+  itself, commented as the form of an OIDC groups-scope token (jfrog-cli
+  `ExtractUsernameFromAccessToken`), so 7.x's synthetic subject may not be a user path at all.
 
 ## Constraints
 
@@ -638,6 +719,16 @@ source states are inferred and listed on
 - Transient users, the admin scope, the default lifetime and the revocation statuses (#406):
   `TestTransientUserToken`, `TestRevokeNonRevocable`, `TestDefaultExpiryApplies`, the status
   table, the matrix's `tok-transient` and `tok-admin-scope` principals, and `tokens.feature`.
+- A transient user's own tokens (#456): `TestTransientSelfMint` for an administrator's
+  transient token and `TestOIDCSelfMint` for an exchanged one, each following the new token
+  to what it may read and deploy; `TestNotAfterCapsTheLifetime`; the status table's
+  `transient` rows; the matrix's `tok-transient-user` principal and its refreshable row; and
+  `oidc.feature`, where `jf atc` mints with an exchanged token and the new token downloads.
+- A locked account (#475): `TestLockoutThroughBasic`, `TestLockBeforeSuspensionAndPassword`,
+  `TestLockout`, and the status table's `locked` rows before and after the unlock.
+- OIDC projects (#476): `TestProjectRolesWithoutUser`, `TestMappings`, the status table's
+  `project-roles` rows, and `oidc.feature`'s project roles mapping in the provider example's
+  shape.
 - Token creation with a password: `TestAccessTokenWithPassword`, the status table and the
   route by principal matrix at the default, and `basic_auth_tokens.feature`, where the Access
   route refuses the password, the legacy route and `jf c add` with a password still work, and

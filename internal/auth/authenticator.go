@@ -99,10 +99,11 @@ func NewAuthenticator(
 // Basic verifies a user name and password. Wrong credentials, an unknown or
 // disabled user, and a user without an internal password all answer
 // ErrBadCredentials alike; while basic authentication is switched off,
-// every password answers ErrBasicAuthDisabled. A correct but expired
-// password answers ErrPasswordExpired with the principal, marked
-// PasswordExpired. While the name is temporarily suspended after failed
-// logins, every password answers ErrLoginSuspended (suspension.go).
+// every password answers ErrBasicAuthDisabled. A locked account answers
+// ErrAccountLocked whatever the password. A correct but expired password
+// answers ErrPasswordExpired with the principal, marked PasswordExpired.
+// While the name is temporarily suspended after failed logins, every
+// password answers ErrLoginSuspended (suspension.go).
 func (a *Authenticator) Basic(ctx context.Context, name, password string) (Principal, error) {
 	// A switch that cannot be read does not stop the check here: a correct
 	// password then fails in accept, which needs the same settings, and a
@@ -111,25 +112,26 @@ func (a *Authenticator) Basic(ctx context.Context, name, password string) (Princ
 		return Principal{}, ErrBasicAuthDisabled
 	}
 	now := a.now()
-	// Before the user is read or any password hashed: a suspended name
-	// answers at once and alike whether it exists, and the right password
-	// cannot be told from a wrong one by the time it takes.
+	u, err := a.users.Get(ctx, name)
+	switch {
+	case err == nil && u.Status == types.UserLocked:
+		// Before the suspension and the password, the order Artifactory
+		// checks them in (decision 0005): the answer is the same whatever
+		// password came, so it tells nothing about the password, and it
+		// costs no hash. It is no failed login, so nothing is counted.
+		return Principal{}, ErrAccountLocked
+	case err != nil && !errors.Is(err, store.ErrNotFound):
+		return Principal{}, fmt.Errorf("auth: user %s: %w", name, err)
+	}
+	// Before any password is hashed, and whether or not the name exists: a
+	// suspended name answers at once and alike, so neither the answer nor
+	// the time it takes tells the right password from a wrong one.
 	if set, ok := a.suspension(ctx); ok && suspensionOn(set) {
 		if wait := a.suspended.remaining(name, now); wait > 0 {
 			return Principal{}, suspendedFor(wait)
 		}
 	}
-	u, err := a.users.Get(ctx, name)
-	if errors.Is(err, store.ErrNotFound) {
-		_, _ = a.check(ctx, a.dummy, password)
-		return a.refuse(ctx, name, now)
-	}
 	if err != nil {
-		return Principal{}, fmt.Errorf("auth: user %s: %w", name, err)
-	}
-	if u.Status == types.UserLocked {
-		// Answered like a wrong password, after the same work, so neither
-		// the message nor the timing tells that the account exists.
 		_, _ = a.check(ctx, a.dummy, password)
 		return a.refuse(ctx, name, now)
 	}

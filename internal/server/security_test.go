@@ -115,7 +115,14 @@ func securityStatusRows() []statusCase {
 
 		{locked, "/artifactory/api/security/lockedUsers", "admin", "", 200},
 		{locked, "/artifactory/api/security/lockedUsers", "user", "", 403},
+		// A locked account answers 403 whatever password it sends, until it
+		// is unlocked; a signed-in user reads its absent API key as 404
+		// (#475).
+		{getKey, secAPIKey, "locked:pw", "", 403},
+		{getKey, secAPIKey, "locked:wrong", "", 403},
 		{unlockAll, "/artifactory/api/security/unlockAllUsers", "admin", "", 200},
+		{getKey, secAPIKey, "locked:pw", "", 404},
+		{getKey, secAPIKey, "locked:wrong", "", 401},
 		{unlockAll, "/artifactory/api/security/unlockAllUsers", "user", "", 403},
 		{unlock, "/artifactory/api/security/unlockUsers", "admin", `["sec-user","ghost"]`, 200},
 		{unlock, "/artifactory/api/security/unlockUsers", "admin", `[]`, 400},
@@ -402,8 +409,14 @@ func TestLockout(t *testing.T) {
 			t.Fatalf("wrong password: %d", code)
 		}
 	}
-	if code := probe("pw"); code != http.StatusUnauthorized {
-		t.Fatalf("a locked user signed in: %d", code)
+	// A locked account answers 403 with Artifactory's message, whatever
+	// password it sends (#475).
+	for _, pw := range []string{"pw", "wrong"} {
+		rec := do(t, h, http.MethodGet, secAPIKey, basic("user", pw), "")
+		if rec.Code != http.StatusForbidden ||
+			!strings.Contains(rec.Body.String(), `User is Locked.\nContact System Administrator`) {
+			t.Fatalf("a locked user with %q: %d %s", pw, rec.Code, rec.Body)
+		}
 	}
 	rec := do(
 		t,
@@ -508,7 +521,8 @@ func TestAccessLockPolicyIsTheArtifactoryPolicies(t *testing.T) {
 	for range 2 {
 		probe("wrong")
 	}
-	if code := probe("pw"); code != http.StatusUnauthorized {
+	// A locked account answers 403, the right password included (#475).
+	if code := probe("pw"); code != http.StatusForbidden {
 		t.Fatalf("the Access limit did not lock: %d", code)
 	}
 

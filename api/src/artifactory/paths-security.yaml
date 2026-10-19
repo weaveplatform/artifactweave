@@ -1258,7 +1258,13 @@ paths:
               schema:
                 description: PEM or ASCII-armored public key.
                 type: string
-          description: The public key.
+          description: The public key, as an attachment.
+          headers:
+            Content-Disposition:
+              description: '`attachment`, with the file name `<alias>.rsa.pub` for an RSA pair or `<alias>.gpg.pub`
+                for a GPG pair, where `<alias>` is the pair''s alias. `curl -O -J` saves the key under that name.'
+              schema:
+                type: string
         '401':
           $ref: '#/components/responses/SecurityUnauthorized'
         '403':
@@ -1310,8 +1316,8 @@ paths:
       x-oracle-source: https://docs.jfrog.com/administration/reference/verifykeypair.md
   /api/security/keypair/{keyPairName}:
     delete:
-      description: Removes the pair. Admin only. A pair still referenced by a repository's primaryKeyPairRef or
-        secondaryKeyPairRef is refused with 400 so signed repositories never lose their key silently.
+      description: Removes the pair. Admin only. A pair that repositories still use is removed all the same, and
+        each of those repositories loses its primaryKeyPairRef or secondaryKeyPairRef to it in the same change.
       operationId: deleteKeyPair
       parameters:
       - description: Required path parameter. The pair name.

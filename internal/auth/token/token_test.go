@@ -338,6 +338,38 @@ func TestRefresh(t *testing.T) {
 
 // TestRefreshKeepsIdentity: the token a refresh issues resolves to a user
 // as the one it replaces did, so a transient user's token stays usable.
+// TestNotAfterCapsTheLifetime: a token with NotAfter lives no longer than
+// it, whatever it asks for, never expiring included, and one that would
+// expire at once is refused (#456).
+func TestNotAfterCapsTheLifetime(t *testing.T) {
+	s, _, c := world(t)
+	end := c.now().Add(10 * time.Minute)
+	for name, r := range map[string]Request{
+		"longer":  {ExpiresIn: dur(time.Hour), NotAfter: end},
+		"never":   {ExpiresIn: dur(0), ByAdmin: true, NotAfter: end},
+		"default": {NotAfter: end},
+	} {
+		out := issue(t, s, r)
+		if out.ExpiresIn != 600 || !out.Record.ExpiresAt.Equal(end) {
+			t.Errorf("%s: expires in %d at %v, want 600 at %v",
+				name, out.ExpiresIn, out.Record.ExpiresAt, end)
+		}
+	}
+	if out := issue(
+		t,
+		s,
+		Request{ExpiresIn: dur(time.Minute), NotAfter: end},
+	); out.ExpiresIn != 60 {
+		t.Errorf("a shorter lifetime was changed: %d", out.ExpiresIn)
+	}
+	_, err := s.Issue(context.Background(), Request{
+		Username: "alice", ExpiresIn: dur(time.Hour), NotAfter: c.now().Add(time.Millisecond),
+	})
+	if !errors.Is(err, ErrInvalidRequest) {
+		t.Fatalf("a token that would expire at once: %v", err)
+	}
+}
+
 func TestRefreshKeepsIdentity(t *testing.T) {
 	s, _, _ := world(t)
 	ctx := context.Background()

@@ -1295,7 +1295,7 @@ type OidcTokenExchangeResult struct {
 	// TokenType Optional within this object. Always Bearer.
 	TokenType *string `json:"token_type,omitempty"`
 
-	// Username Optional within this object. Username the mapping produced for the token's subject. A mapping without a username issues its token for a synthetic subject, oidc-<provider>-<mapping>, which acts through the groups of its scope alone.
+	// Username Optional within this object. Username the mapping produced for the token's subject. A mapping without a username issues its token for a synthetic subject, oidc-<provider>-<mapping>, which is never a stored user and acts through the groups or project roles of its scope alone.
 	Username *string `json:"username,omitempty"`
 }
 
@@ -1974,7 +1974,7 @@ type TokenResponse struct {
 	TokenType string `json:"token_type"`
 }
 
-// TokenSpec The shape of the access token an identity mapping issues. When the mapping names a user, through username or username_pattern, the issued scope also holds applied-permissions/user, unless it holds project roles or applied-permissions/admin. An admin scope combines with no other scope or pattern; username_pattern combines with neither username nor an applied-permissions/user scope; groups_pattern does not combine with a groups scope; resource_pattern does not combine with artifact entries in scope; every other combination is accepted. A mapping without username or username_pattern needs a groups scope or groups_pattern.
+// TokenSpec The shape of the access token an identity mapping issues. When the mapping names a user, through username or username_pattern, the issued scope also holds applied-permissions/user, unless it holds project roles or applied-permissions/admin. An admin scope combines with no other scope or pattern; username_pattern combines with neither username nor an applied-permissions/user scope; groups_pattern does not combine with a groups scope; resource_pattern does not combine with artifact entries in scope; every other combination is accepted. A mapping without username or username_pattern needs a groups scope, a project roles scope or groups_pattern, and its scope holds nothing but groups and project roles.
 //
 // The three patterns share one syntax: parts separated by |, at most 16. The first part names one claim as {{claim}} and is a regular expression, whitespace ignored, in which {{claim}} stands for a capture group; each value of the claim must match it whole. Each later part is one of: op:replaceAll("from","to"), op:replaceFirst("from","to") or op:replaceLast("from","to"), which replace literal text in the value; a regular expression the value must match; or a replacement that rebuilds the value from the groups of the latest expression, matched again against the current value, where $0 is the whole match, $1 the first group and ${name} a named group. Among the later parts that are not operators, a part is an expression when another such part follows it and the one before it, if any, is not an expression; every other such part is a replacement, and without an expression before it a replacement uses the first part. A claim that is missing, that does not match, or whose values are not strings, numbers or booleans fails the exchange with 400. A list claim yields one value per element, at most 100, and each value is limited to 1024 bytes.
 type TokenSpec struct {
@@ -2132,7 +2132,7 @@ type UserListResponse struct {
 	} `json:"users"`
 }
 
-// UserLockPolicyConfig The Access user lock policy. One document over the same settings as /artifactory/api/security/userLockPolicy and /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced, and so is the temporary login suspension that the four login delay fields set. From the maxLoginDelayIncorrectAttempts-th failed Basic login in a row for one user name, every Basic login with that name answers 403 for baseLoginDelayMillis, the right password included, and each further failure after the suspension doubles the delay up to maxLoginDelayMillis. Logins refused while suspended are not counted; a login whose password verifies clears the failures. Each node keeps the suspensions in memory, and tokens are not suspended. secondsToUnlock and adminPasswordExpirable are stored and returned only. A locked user stays locked until an administrator unlocks them, and administrators are not exempt from password expiry.
+// UserLockPolicyConfig The Access user lock policy. One document over the same settings as /artifactory/api/security/userLockPolicy and /artifactory/api/security/configuration/passwordExpirationPolicy, so a change through either API reads back through both. attempts and passwordExpiryDays are enforced, and so is the temporary login suspension that the four login delay fields set. From the maxLoginDelayIncorrectAttempts-th failed Basic login in a row for one user name, every Basic login with that name answers 403 for baseLoginDelayMillis, the right password included, and each further failure after the suspension doubles the delay up to maxLoginDelayMillis. Logins refused while suspended are not counted; a login whose password verifies clears the failures. Each node keeps the suspensions in memory, and tokens are not suspended. secondsToUnlock and adminPasswordExpirable are stored and returned only. A locked user stays locked until an administrator unlocks them, and administrators are not exempt from password expiry. Every Basic login of a locked user answers 403, whatever its password, before the suspension or the password is checked, and is not counted.
 type UserLockPolicyConfig struct {
 	// AdminPasswordExpirable Optional within this object. Whether password expiry also applies to administrators. Stored and returned only. Default false.
 	AdminPasswordExpirable *bool `json:"adminPasswordExpirable,omitempty"`
@@ -3553,7 +3553,7 @@ type ClientInterface interface {
 
 	// UpdateOidcIdentityMappingWithBody Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -3562,7 +3562,7 @@ type ClientInterface interface {
 
 	// UpdateOidcIdentityMapping Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4305,7 +4305,7 @@ type ClientInterface interface {
 
 	// CreateTokenWithBody Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -4314,7 +4314,7 @@ type ClientInterface interface {
 
 	// CreateToken Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -4323,7 +4323,7 @@ type ClientInterface interface {
 
 	// CreateTokenWithFormdataBody Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type.
 	//
@@ -5968,7 +5968,7 @@ func (c *Client) GetOidcIdentityMappingByName(ctx context.Context, providerName 
 
 // UpdateOidcIdentityMappingWithBody Replace an identity mapping
 //
-// Replaces the named mapping with the body. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 //
 // Takes any type of body and a specified content type.
 //
@@ -5987,7 +5987,7 @@ func (c *Client) UpdateOidcIdentityMappingWithBody(ctx context.Context, provider
 
 // UpdateOidcIdentityMapping Replace an identity mapping
 //
-// Replaces the named mapping with the body. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7660,7 +7660,7 @@ func (c *Client) GetTokens(ctx context.Context, params *GetTokensParams, reqEdit
 
 // CreateTokenWithBody Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes any type of body and a specified content type.
 //
@@ -7679,7 +7679,7 @@ func (c *Client) CreateTokenWithBody(ctx context.Context, contentType string, bo
 
 // CreateToken Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -7698,7 +7698,7 @@ func (c *Client) CreateToken(ctx context.Context, body CreateTokenJSONRequestBod
 
 // CreateTokenWithFormdataBody Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type.
 //
@@ -15624,7 +15624,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateOidcIdentityMappingWithBodyWithResponse Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -15633,7 +15633,7 @@ type ClientWithResponsesInterface interface {
 
 	// UpdateOidcIdentityMappingWithResponse Replace an identity mapping
 	//
-	// Replaces the named mapping with the body. Requires a platform admin.
+	// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16470,7 +16470,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithBodyWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16479,7 +16479,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -16488,7 +16488,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateTokenWithFormdataBodyWithResponse Create or refresh an access token
 	//
-	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+	// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 	//
 	// Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -27305,7 +27305,7 @@ func (c *ClientWithResponses) GetOidcIdentityMappingByNameWithResponse(ctx conte
 
 // UpdateOidcIdentityMappingWithBodyWithResponse Replace an identity mapping
 //
-// Replaces the named mapping with the body. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -27320,7 +27320,7 @@ func (c *ClientWithResponses) UpdateOidcIdentityMappingWithBodyWithResponse(ctx 
 
 // UpdateOidcIdentityMappingWithResponse Replace an identity mapping
 //
-// Replaces the named mapping with the body. Requires a platform admin.
+// Replaces the named mapping with the body. The mapping's project, which the project roles in token_spec.scope imply, cannot change, so a scope that implies another project, none for a project's mapping or one for a global mapping is refused with 400. Requires a platform admin.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28715,7 +28715,7 @@ func (c *ClientWithResponses) GetTokensWithResponse(ctx context.Context, params 
 
 // CreateTokenWithBodyWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28730,7 +28730,7 @@ func (c *ClientWithResponses) CreateTokenWithBodyWithResponse(ctx context.Contex
 
 // CreateTokenWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -28745,7 +28745,7 @@ func (c *ClientWithResponses) CreateTokenWithResponse(ctx context.Context, body 
 
 // CreateTokenWithFormdataBodyWithResponse Create or refresh an access token
 //
-// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
+// With grant_type client_credentials (the default) mints a new access token for username, or for the caller when username is omitted. With grant_type refresh_token exchanges refresh_token for a new access token with the same scope and audience. The body may be JSON or form-encoded. A non-admin may only mint identity tokens for themselves (scope applied-permissions/user). Admins may mint any scope that a user already holds; scopes only narrow. A transient user, the subject of a token minted for a name that is no stored user or of an OIDC exchange, mints for itself a token with its own token's scope that resolves to the same transient user. That token expires no later than the caller's own token, and may be refreshable only when the caller's own token is, or the request is refused with 403. A user name and password sent with Basic mint a token only while the token.allow_basic_auth setting is on, which it is not by default; an access or reference token, as Bearer or as the Basic password, always may. The response status is 200 and the body always carries token_id.
 //
 // Takes a body of the `application/x-www-form-urlencoded` content type, and returns a wrapper object for the known response body format(s).
 //

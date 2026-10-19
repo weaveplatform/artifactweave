@@ -154,6 +154,15 @@ func oidcStatusRows() []statusCase {
 			`{"name":"x","token_spec":{"username_pattern":"{{a}} | $2"}}`,
 			400,
 		},
+		// A project roles mapping needs no username, as the jfrog/platform
+		// provider's example sends none (#476).
+		{
+			mapNew,
+			base + "/ci/identity_mappings",
+			"admin",
+			`{"name":"project-roles","token_spec":{"scope":"applied-permissions/roles:p1:Developer"}}`,
+			200,
+		},
 		{mapNew, base + "/ci/identity_mappings", "admin", `{"name":"x"}`, 400},
 		{mapNew, base + "/ci/identity_mappings", "admin", "", 400},
 		{mapNew, base + "/ci/identity_mappings", "user", readers, 403},
@@ -185,6 +194,36 @@ func oidcStatusRows() []statusCase {
 			404,
 		},
 		{mapPut, base + "/ci/identity_mappings/readers", "admin", "", 400},
+		// A mapping's project cannot change, to another or to none, nor a
+		// global mapping gain one (#476).
+		{
+			mapPut,
+			base + "/ci/identity_mappings/project-roles",
+			"admin",
+			`{"token_spec":{"scope":"applied-permissions/roles:p1:Viewer"}}`,
+			200,
+		},
+		{
+			mapPut,
+			base + "/ci/identity_mappings/project-roles",
+			"admin",
+			`{"token_spec":{"scope":"applied-permissions/roles:p2:Viewer"}}`,
+			400,
+		},
+		{
+			mapPut,
+			base + "/ci/identity_mappings/project-roles",
+			"admin",
+			`{"token_spec":{"scope":"applied-permissions/groups:readers"}}`,
+			400,
+		},
+		{
+			mapPut,
+			base + "/ci/identity_mappings/readers",
+			"admin",
+			`{"token_spec":{"scope":"applied-permissions/roles:p1:Viewer"}}`,
+			400,
+		},
 		{mapPut, base + "/ci/identity_mappings/readers", "user", readers, 403},
 
 		// The exchange needs no credentials; a credential that fails still

@@ -187,6 +187,17 @@ var matrixPrincipals = []matrixPrincipal{
 		name: "tok-registry-oidc", user: "ci-oidc", token: true, registry: true, narrowed: true,
 		identity: types.IdentityTransient,
 	},
+	// A transient user from an OIDC exchange whose mapping names it and
+	// member's group: it acts through team, as tok-transient does, but its
+	// scope keeps its identity, so it mints tokens that act as it does
+	// (#456).
+	{
+		name: "tok-transient-user", user: "ci-user", token: true,
+		scope:    "applied-permissions/groups:team applied-permissions/user",
+		identity: types.IdentityTransient, grants: slices.Concat([]matrixGrant{
+			{"libs-local", "", rawd}, {types.BuildInfoRepository, "", rwd}, {dockerA, "", rawd},
+		}, formatGrants("", rawd)),
+	},
 }
 
 // holds reports whether p holds every action in want at path in repo.
@@ -1068,6 +1079,16 @@ func permissionMatrix() []matrixRow {
 	}
 }
 
+// refreshableMinter: accessMinter, for a refreshable token. A transient
+// user's token mints one only when it is refreshable itself, which no
+// principal's is, since each refresh would outlast the identity (#456).
+func refreshableMinter(p matrixPrincipal) int {
+	if s := accessMinter(p); s != 0 || p.identity != types.IdentityTransient || p.admin {
+		return s
+	}
+	return http.StatusForbidden
+}
+
 // tokenMatrix covers access tokens. The fixture seeded t-{p}, a token record
 // of the principal's own user, and o-{p}, one of its victim v-{p}.
 func tokenMatrix() []matrixRow {
@@ -1078,6 +1099,7 @@ func tokenMatrix() []matrixRow {
 	)
 	return []matrixRow{
 		at("POST "+tokens, `{}`, accessMinter, 200),
+		at("POST "+tokens, `{"refreshable":true}`, refreshableMinter, 200),
 		at("GET "+tokens, "", signedIn, 200),
 		at("DELETE "+tokens+"/revoke", `{"token":"{token}"}`, administrators, 200),
 		row("GET "+tokens+"/{tokenId}", tokens+"/t-{p}", "", signedIn, 200),

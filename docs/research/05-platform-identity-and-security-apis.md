@@ -91,8 +91,8 @@ and https://docs.jfrog.com/integrations/docs/deprecated-jfrog-apis.
 | PUT | `/api/security/keypair` | 200 | admin only; replaces the pair named in the body |
 | POST | `/api/security/keypair/verify` | 200 | admin only; `text/plain` `Key was verified.` ([verifykeypair](https://docs.jfrog.com/administration/reference/verifykeypair)) |
 | GET | `/api/security/keypair/{name}` | 200 | only `{pairName,pairType,alias,publicKey}`, never the private key or passphrase; any authenticated user, or anonymous when anonymous access is on ([getkeypair](https://docs.jfrog.com/administration/reference/getkeypair)) |
-| DELETE | `/api/security/keypair/{name}` | 200 | admin only; `text/plain` `OK` ([deletekeypair](https://docs.jfrog.com/administration/reference/deletekeypair)) |
-| GET | `/api/security/keypair/public/repositories/{repo}` | 200 | `text/plain` public key assigned to a repository; any authenticated user, or anonymous when anonymous access is on, with no permission on the repository ([getkeypairpublickeyperrepository](https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository)) |
+| DELETE | `/api/security/keypair/{name}` | 200 | admin only; `text/plain` `OK`; the page documents 200, 401, 403, 404 and 500 and no refusal of a pair a repository uses ([deletekeypair](https://docs.jfrog.com/administration/reference/deletekeypair)). artifactweave deletes such a pair and clears it from the repositories that name it, in one transaction **[I]** ([#473](https://github.com/weaveplatform/artifactweave/issues/473)) |
+| GET | `/api/security/keypair/public/repositories/{repo}` | 200 | `text/plain` public key assigned to a repository, "a text/plain attachment" fetched with `curl -O -J`; any authenticated user, or anonymous when anonymous access is on, with no permission on the repository ([getkeypairpublickeyperrepository](https://docs.jfrog.com/administration/reference/getkeypairpublickeyperrepository)). `Content-Disposition: attachment; filename=<alias>.rsa.pub`, or `.gpg.pub` for a GPG pair **[I]**: the jfrog/artifactory provider documents the pair's `alias` as one that "Will be used as a filename when retrieving the public key via REST API" (`docs/resources/keypair.md` at `master`, read 2026-10-19), and the rest of the name is inferred ([#473](https://github.com/weaveplatform/artifactweave/issues/473)) |
 | POST | `/api/v2/repositories/{repo}/keyPairs`, `.../primary`, `.../secondary` | 200 | body is the key-pair name, `text/plain` |
 | POST | `/api/security/keys/trusted` | **201** | distribution public keys; GET returns `{"keys":[{kid,alias,fingerprint,key,issued_on,issued_by,valid_until}]}`; DELETE `.../{key_id}` 204 or 200 |
 | POST | `/api/system/encrypt`, `/api/system/decrypt` | 200 | `DONE` |
@@ -306,7 +306,14 @@ Authentication for Non-existing Users" and "Transient Users and Auto Join Groups
 scope acts through "Explicitly mapped groups only", and `applied-permissions/user` through those
 "plus any local Auto Join groups". Non-administrators "can only create tokens with themselves as
 the Subject". [RTFACT-30181](https://jfrog.atlassian.net/browse/RTFACT-30181) shows a transient
-user's reference token working on 7.68.14.
+user's reference token working on 7.68.14, and
+[RTFACT-23934](https://jfrog.atlassian.net/browse/RTFACT-23934) a transient user's token minting
+further time-limited tokens on 7.5.7, under the user `token:<transient username>`; its reporter
+warned that such a chain "can be refreshed indefinitely". artifactweave lets a transient user
+mint for itself, with its own scope and transient identity, a token that expires no later than
+its own and refreshes only if its own does
+([decision 0005](decisions/0005-authentication-and-tokens.md#decision), DV-093,
+[#456](https://github.com/weaveplatform/artifactweave/issues/456)).
 
 ### Scope grammar
 
@@ -420,10 +427,19 @@ https://docs.jfrog.com/user-management/docs/identity-tokens.
    please try again in 2 second(s)"). A cluster applies it on each node separately.
    artifactweave enforces it (`internal/auth/suspension.go`): the delay is the base doubled for
    each failure past the threshold, capped at the maximum, as Artifactory 6.x's
-   `loginBlockDelay << (attempts - allowed)` did **[I]**; the check comes before the user is
-   read or a password hashed; attempts refused while suspended are not counted; a name that
+   `loginBlockDelay << (attempts - allowed)` did **[I]**; the check comes after the lock and
+   before a password is hashed; attempts refused while suspended are not counted; a name that
    does not exist is suspended alike; a login whose password verifies clears the failures; and
    tokens are not suspended **[I]**.
+   A locked account, which the user lock policy locks after too many wrong passwords, is
+   refused whatever password it sends: 7.x checks the lock before the password, logging
+   "Checking if user is not locked" and then "User is locked, denying login." with no failed
+   attempt registered (**[J]** [RTFACT-29453](https://jfrog.atlassian.net/browse/RTFACT-29453),
+   7.31.10 to 7.55.6). artifactweave answers it 403 "User is Locked.\nContact System
+   Administrator to Unlock The Account." before the suspension and the password, and counts
+   nothing ([#475](https://github.com/weaveplatform/artifactweave/issues/475)). The status and
+   message are OSS 6.20's: `ArtifactoryBasicAuthenticationEntryPoint` answers a
+   `LockedException` 403 with the `UserLockedException` message **[I]**.
 6. The Docker token flow is described in [04-package-protocols.md](04-package-protocols.md);
    `/artifactory/api/docker/<repo>/v1|v2/auth` returns `{"auth":"<base64 user:pass>","email":"..."}`.
 7. Basic credentials create tokens through `POST /access/api/v1/tokens` only once an
@@ -519,6 +535,14 @@ temporary login suspension (item 5 of
 [Authentication](#authentication-accepted-on-every-endpoint)) is enforced, and
 `secondsToUnlock` defaults to 1.
 
+**Settled by [#473](https://github.com/weaveplatform/artifactweave/issues/473) and
+[#475](https://github.com/weaveplatform/artifactweave/issues/475).** Deleting a key pair a
+repository uses answers 200 "OK", as deletekeypair documents no refusal, and the
+repositories lose their reference to it. A repository's public key comes as an attachment
+with a file name, as getkeypairpublickeyperrepository's `curl -O -J` needs. A locked account
+answers 403 whatever password it sends, its lock checked before the password (item 5 of
+[Authentication](#authentication-accepted-on-every-endpoint)).
+
 **Where artifactweave differs.** Decision 0005's
 [7.x check](decisions/0005-authentication-and-tokens.md#artifactory-7x-check) lists the token,
 account policy, seeding and OIDC differences, and decision 0006's
@@ -613,3 +637,13 @@ records.
   documents no other success status.
 - What a replaced pair does to the repositories that use it. **[I]** They keep referring to
   it by name and sign with the new material, as after `PUT /api/security/keypair`.
+- What deleting a pair a repository uses does. **[I]** It succeeds, as deletekeypair lists no
+  refusal, and the repositories lose their `primaryKeyPairRef` or `secondaryKeyPairRef` to it
+  in the same transaction, so none names a pair that does not exist. That old Artifactory
+  removed a pair from a repository only by deleting the pair (**[J]**
+  [RTFACT-2807](https://jfrog.atlassian.net/browse/RTFACT-2807)) points the same way.
+- The file name of a repository's public key. **[I]** `<alias>.rsa.pub`, or `<alias>.gpg.pub`
+  for a GPG pair, sent as `Content-Disposition: attachment; filename=...`.
+- The status and message for a locked account. **[I]** 403 "User is Locked.\nContact System
+  Administrator to Unlock The Account.", from OSS 6.20's entry point and
+  `UserLockedException`; no 7.x capture of the response is published.

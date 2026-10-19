@@ -36,7 +36,8 @@ type statusCase struct {
 	// "admin-token" and "user-token" (an identity token of admin's or
 	// user's, as a Bearer token), "expired" (an expired, refreshable access
 	// token of admin's, as a Bearer token) or "forged" (that token with its
-	// signature altered).
+	// signature altered). Any other value is "<user>:<password>" as Basic,
+	// or the name of a statusSecrets token "<name>-access" as Bearer.
 	// A body names the fixture's other token values as {name}
 	// (statusSecrets). A body of checksum:<sha1> is a checksum deploy, and
 	// one of declared:<content> an upload declaring its SHA-1
@@ -234,7 +235,8 @@ func sinkStatusRows() []statusCase {
 }
 
 // statusFixture is a seeded store with the admin (password "pw"), a user
-// "user" (password "pw") in no group, and the repositories the rows use.
+// "user" (password "pw") in no group, a locked user "locked" (password
+// "pw"), and the repositories the rows use.
 // Each row that changes state uses keys no other row touches, so the rows
 // run in any order against one store.
 func statusFixture(t *testing.T, anonymous bool, tune ...func(*Config)) http.Handler {
@@ -256,6 +258,12 @@ func newStatusFixture(
 	cheapSeed(t, db)
 	if err := db.Users().
 		Create(ctx, types.User{Name: "user", PasswordHash: cheapHash}); err != nil {
+		t.Fatal(err)
+	}
+	// A locked account, until securityStatusRows unlocks every user.
+	if err := db.Users().Create(ctx, types.User{
+		Name: "locked", PasswordHash: cheapHash, Status: types.UserLocked,
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if anonymous {
@@ -733,6 +741,12 @@ func TestStatusTable(t *testing.T) {
 			headers = bearerAuth(secrets["expired-access"])
 		case "forged":
 			headers = bearerAuth(secrets["forged-access"])
+		default:
+			if user, password, ok := strings.Cut(c.as, ":"); ok {
+				headers = basic(user, password)
+			} else if tok, ok := secrets[c.as+"-access"]; ok {
+				headers = bearerAuth(tok)
+			}
 		}
 		var body string
 		headers, body = checksumDeploy(headers, fill.Replace(c.body))

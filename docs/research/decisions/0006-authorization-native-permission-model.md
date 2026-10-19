@@ -40,6 +40,12 @@ has to be Artifactory's. A policy language on top would add a translation layer 
 adding expressiveness the clients can use. One internal shape with converters keeps the
 evaluator small and makes the legacy shims thin.
 
+Token scopes only remove, resource entries included, although 7.x lets a resource scope
+grant access with no permission defined
+([DV-092](../../implementation/deviations.md#security)). Permission targets stay the one
+place access is granted, where an administrator can see and revoke it, and a scope written
+by a token's minter, or taken from an OIDC claim, can never reach past them.
+
 **Alternatives considered:**
 - *Cedar as in hostweave*: good for a policy model we own; here every policy would be a
   generated translation of a permission target.
@@ -92,6 +98,14 @@ who is no administrator or one that does not exist
 `+` that stands for a space in permission names. The seeded permissions match 7.x, as
 [Seeded permissions](#seeded-permissions-383) records.
 
+7.x differs in one point, kept as
+[DV-092](../../implementation/deviations.md#security)
+([#476](https://github.com/weaveplatform/artifactweave/issues/476)): a resource scope there
+gives access "without requiring any permissions to be predefined in the platform or in any
+project"
+([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token)),
+where here a token's artifact entries only narrow what its user and groups already hold.
+
 ## Constraints
 
 - Pattern matching follows Ant semantics (`*`, `**`, `?`), case-sensitive, and is tested
@@ -132,7 +146,12 @@ These are choices made where no source documents Artifactory's behaviour:
     Users and Auto Join Groups").
   - `applied-permissions/roles:…` grants nothing until projects arrive (P11).
   - `artifact:<repo|*>[/<ant path>]:<letters>` entries intersect artifact access with what
-    they name.
+    they name. 7.x grants a resource scope "without requiring any permissions to be
+    predefined"
+    ([create scoped token](https://docs.jfrog.com/administration/reference/create-scoped-token));
+    here an entry never grants on its own, whether an administrator minted it or an OIDC
+    mapping's `resource_pattern` took it from a claim
+    ([DV-092](../../implementation/deviations.md#security), #476).
   - A scope of resource entries only reaches artifacts through its artifact entries, and
     no other resource.
   - An administrator's resource-only token keeps every action within those entries, but

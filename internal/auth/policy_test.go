@@ -3,9 +3,11 @@ package auth
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/weaveplatform/artifactweave/internal/server/apierror"
 	"github.com/weaveplatform/artifactweave/pkg/store/inmem"
 	"github.com/weaveplatform/artifactweave/pkg/types"
 )
@@ -79,14 +81,60 @@ func TestLockoutThroughBasic(t *testing.T) {
 	for range 2 {
 		_, _ = a.Basic(ctx, "dev", "wrong")
 	}
-	if _, err := a.Basic(ctx, "dev", "pw"); !errors.Is(err, ErrBadCredentials) {
-		t.Fatalf("a locked user signed in: %v", err)
+	// The lock answers 403 whatever the password, before it is checked, and
+	// counts nothing.
+	for _, pw := range []string{"pw", "wrong"} {
+		if _, err := a.Basic(ctx, "dev", pw); !errors.Is(err, ErrAccountLocked) {
+			t.Fatalf("a locked user with %q: %v", pw, err)
+		}
+	}
+	if u, _ := db.Users().Get(ctx, "dev"); u.FailedLogins != 2 {
+		t.Fatalf("the locked logins were counted: %d", u.FailedLogins)
 	}
 	if err := db.Users().Unlock(ctx, "dev"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := a.Basic(ctx, "dev", "pw"); err != nil {
 		t.Fatalf("after unlocking: %v", err)
+	}
+}
+
+// TestLockBeforeSuspensionAndPassword: a locked account answers its 403 before
+// the suspension and before any password is hashed, so a suspended locked
+// account still reads as locked, and with every hashing slot taken the
+// answer still comes at once (#475).
+func TestLockBeforeSuspensionAndPassword(t *testing.T) {
+	ctx := context.Background()
+	db := inmem.New()
+	addUser(t, db, types.User{Name: "dev", Status: types.UserEnabled}, "pw")
+	a, _ := newAuth(t, db, Options{Concurrency: 1})
+	for range 2 {
+		_, _ = a.Basic(ctx, "dev", "wrong")
+	}
+	if err := ezBasic(a, "dev", "pw"); !errors.Is(err, ErrLoginSuspended) {
+		t.Fatalf("not suspended: %v", err)
+	}
+	u, err := db.Users().Get(ctx, "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.Status = types.UserLocked
+	if err := db.Users().Update(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	a.slots <- struct{}{}
+	defer func() { <-a.slots }()
+	// The store still answers, but a hash would wait for a slot until the
+	// deadline and fail with it.
+	bounded, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	for _, pw := range []string{"pw", "wrong"} {
+		_, err := a.Basic(bounded, "dev", pw)
+		var e *apierror.Error
+		if !errors.Is(err, ErrAccountLocked) || !errors.As(err, &e) ||
+			e.Status != http.StatusForbidden {
+			t.Fatalf("%s while locked and suspended: %v", pw, err)
+		}
 	}
 }
 
